@@ -1,0 +1,42 @@
+{
+  "name": "connectcircle",
+  "version": "1.0.0",
+  "description": "Never lose touch with the people who matter",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "jest"
+  },
+  "jest": {
+    "preset": "jest-expo"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^14.0.2",
+    "@react-native-async-storage/async-storage": "1.23.1",
+    "@react-navigation/native": "^6.1.17",
+    "date-fns": "^3.6.0",
+    "expo": "~51.0.20",
+    "expo-notifications": "~0.27.4",
+    "expo-router": "3.5.18",
+    "expo-sqlite": "~13.2.0",
+    "expo-status-bar": "~1.12.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.1",
+    "react-native-paper": "^5.12.3",
+    "react-native-svg": "14.1.0",
+    "zustand": "^4.5.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.20.0",
+    "@testing-library/react-native": "^12.4.0",
+    "@types/jest": "^29.5.12",
+    "@types/react": "~18.2.45",
+    "jest": "^29.7.0",
+    "typescript": "^5.3.3"
+  },
+  "private": true
+}
