@@ -1,0 +1,14 @@
+[project]
+name = "idea-scout"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+idea-scout = "idea_scout.main:main"
+prototype-builder = "builder.orchestrator:main"
