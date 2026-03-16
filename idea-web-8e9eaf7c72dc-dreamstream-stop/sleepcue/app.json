@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "SleepCue",
+    "slug": "sleepcue",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.sleepcue",
+      "infoPlist": {
+        "UIBackgroundModes": ["audio", "processing"],
+        "NSMotionUsageDescription": "SleepCue uses motion detection to know when you've fallen asleep.",
+        "NSMicrophoneUsageDescription": "SleepCue uses the microphone to detect ambient sounds that indicate you're asleep."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.yourcompany.sleepcue",
+      "permissions": [
+        "RECORD_AUDIO",
+        "FOREGROUND_SERVICE",
+        "WAKE_LOCK"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow SleepCue to detect when you fall asleep using ambient audio."
+        }
+      ]
+    ]
+  }
+}
