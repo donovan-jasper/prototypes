@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "SimpliPhone",
+    "slug": "simpliphone",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.simpliphone"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.example.simpliphone"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "permissions": [
+      "CALL_PHONE",
+      "SEND_SMS",
+      "READ_CONTACTS",
+      "ACCESS_FINE_LOCATION",
+      "VIBRATE"
+    ],
+    "notification": {
+      "icon": "./assets/notification-icon.png",
+      "color": "#ffffff",
+      "androidMode": "default",
+      "androidCollapsedTitle": "SimpliPhone"
+    }
+  }
+}
