@@ -1,0 +1,77 @@
+# .gitagent/agent.yaml
+# GitAgent Configuration File
+
+# --- Agent Metadata ---
+name: "My First GitAgent"
+version: "0.1.0"
+description: "A simple assistant agent demonstrating GitAgent capabilities."
+metadata:
+  author: "Your Name"
+  date_created: "2023-10-27"
+  tags: ["assistant", "demo"]
+
+# --- Model Configuration ---
+# The AI model to use for the agent.
+# Examples: "gpt-4o-mini", "gpt-3.5-turbo", "gpt-4"
+model: "gpt-4o-mini"
+
+# --- System Prompt ---
+# The initial system message that defines the agent's persona and instructions.
+system_prompt: |
+  You are a helpful AI assistant named GitAgent.
+  You can answer questions and use tools to assist the user.
+  Be concise and polite.
+
+# --- Model Parameters ---
+# Optional parameters to control the model's behavior.
+# Common parameters include:
+# - temperature: Controls randomness (0.0-2.0). Lower values make output more deterministic.
+# - max_tokens: The maximum number of tokens to generate in the completion.
+parameters:
+  temperature: 0.7
+  max_tokens: 1024
+
+# --- Tools ---
+# A list of tools the agent can use. Each tool requires:
+# - name: A unique identifier for the tool.
+# - type: The type of tool (e.g., "function").
+# - description: A clear explanation of what the tool does.
+# - parameters: A JSON schema defining the tool's input arguments.
+#   This helps the LLM understand how to call the tool.
+tools:
+  - name: "echo"
+    type: "function"
+    description: "Echoes the input text back. Useful for testing tool calls."
+    parameters:
+      type: "object"
+      properties:
+        text:
+          type: "string"
+          description: "The text to echo back."
+      required: ["text"]
+
+  # Uncomment the following tools to enable file operations
+  # - name: "read_file"
+  #   type: "function"
+  #   description: "Reads the content of a file from the specified path."
+  #   parameters:
+  #     type: "object"
+  #     properties:
+  #       path:
+  #         type: "string"
+  #         description: "The path to the file to read."
+  #     required: ["path"]
+
+  # - name: "write_file"
+  #   type: "function"
+  #   description: "Writes content to a file at the specified path. Overwrites if file exists."
+  #   parameters:
+  #     type: "object"
+  #     properties:
+  #       path:
+  #         type: "string"
+  #         description: "The path to the file to write to."
+  #       content:
+  #         type: "string"
+  #         description: "The content to write into the file."
+  #     required: ["path", "content"]

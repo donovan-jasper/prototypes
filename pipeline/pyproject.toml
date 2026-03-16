@@ -12,3 +12,8 @@ dev = ["pytest>=8.0"]
 [project.scripts]
 idea-scout = "idea_scout.main:main"
 prototype-builder = "builder.orchestrator:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
