@@ -4,138 +4,138 @@
 
 | App | Description | V | F |
 |-----|-------------|---|---|
-| [BehaviorMatch](idea-hn-47229757-show-hn--truematch---ai-agents-match-you/) | Uses AI agents to match people based on observed behavior | 8 | - |
-| [FileVault](idea-hn-47231795-show-hn--fileshot---zero-knowledge-file/) | A privacy-focused, account-free file sharing and management | 8 | - |
-| [VocaVault](idea-hn-47237537-show-hn--spanish-words--spaced-repetitio/) | A mobile-first, AI-powered language learning app that uses | 8 | - |
-| [SafeCircle](idea-hn-47241821-tectonic-good-project-plan--please-read/) | Platform empowering vulnerable populations with AI-driven | 8 | - |
-| [FinFlow](idea-hn-47250252-show-hn--i-spent-1000-hours-building-my/) | Combines budgeting, investment tracking, and financial | 8 | - |
-| [CloudGuard](idea-hn-47259962-fly-io-deleted-my-apps-and-dbs-in-an-unr/) | Provides real-time alerts and recovery tools for cloud | 8 | - |
-| [GuardianGate](idea-hn-47274329-age-based-content-gating-----age-verific/) | Mobile app that empowers parents to control content access | 8 | - |
-| [LaunchLift](idea-hn-47280008-show-hn--i-made-a-free-list-of-100-place/) | Aggregates and ranks curated directories for app promotion | 8 | - |
-| [CodeCapsule](idea-hn-47298242-show-hn--claude-code-container---zero-co/) | Provides secure, zero-configuration sandbox environments | 8 | - |
-| [AudioChain](idea-hn-47311435-buildhifi/) | A mobile app for hobbyists to design, visualize, and | 8 | - |
-| [DesignBlend](idea-hn-47312489-show-hn--marque---mcp-cli-server-for-per/) | Helps designers and developers quickly generate, blend, and | 8 | - |
-| [DataDeck](idea-hn-47323284-show-hn--columnlens---query-millions-of/) | Lets users analyze large datasets locally on their phones | 8 | - |
-| [VoxCrew](idea-hn-47325824-show-hn--conkoa-ai---voice-first-slack-f/) | Communication and workflow hub for field workers across | 8 | - |
-| [DataMirror](idea-hn-47351412-show-hn--mori---test-against-production/) | Lets developers and AI-assisted coders test their code | 8 | - |
-| [PosturePal](idea-hn-47376169-ask-hn--have-you-successfully-treated-fo/) | Gamifies posture correction exercises with AI feedback and | 8 | - |
-| [TraceGuard](idea-hn-47381471-show-hn--replacing--50k-manual-forensic/) | Automated financial tracking and audit trail app that uses | 8 | - |
-| [ProtoPulse](idea-hn-47386240-ask-hn--why-do-the-majority-of-vibecoded/) | Platform that helps non-technical users create functional | 8 | - |
-| [ThreadFlow](idea-hn-47395989-show-hn--i-built-an-mcp-server-that-lets/) | Lets users manage social media (Threads, Bluesky) via | 8 | - |
-| [ParallelMind](idea-hn-47396171-show-hn--shard---stop-watching-one-ai-ag/) | Parallelizes complex tasks (coding, design, research) | 8 | - |
-| [App Name: **CogniQuest**](idea-web-242cee7afd41-codequest/) | A mobile app offering gamified, interactive problem-solving | 8 | - |
-| [GoalGrid Spec](idea-web-2445867c2f26-goalgrid/) | And productivity app that gamifies goal-setting with social | 8 | - |
-| [MediaMesh](idea-web-24c58c980c54-droproll-sync/) | Cloud-to-local media sync app that automatically downloads | 8 | - |
-| [Kindness Kitchen Spec](idea-web-2d0048d44d78-kindness-kitchen/) | A mobile platform for sending personalized, on-demand gifts | 8 | - |
-| [GrowLog Pro Spec](idea-web-2fa7bdf325c3-growlog-pro/) | App for tracking and optimizing any plant growth process | 8 | - |
-| [SkillForge](idea-web-31b12cc9277f-pokepitch-perfect/) | Gamifies skill training for any mobile game's core | 8 | - |
-| [NotifyTasks](idea-web-3f05fdfad385-notifytasks/) | Provides a hyper-accessible, glanceable interface for | 8 | - |
-| [RoutineRhythm Spec](idea-web-3f982b57817b-routinerhythm/) | A dynamic personal assistant app that intelligently adapts | 8 | - |
-| [CareConnect Companion Spec](idea-web-423ce7b46bbc-careconnect-companion/) | Simplified mobile interface for anyone needing easier | 8 | - |
-| [PageFlow](idea-web-43df17ce84bf-pagesync-pal/) | Progress-tracking app for any book, movie, or media that | 8 | - |
+| [BehaviorMatch](idea-hn-47229757-show-hn--truematch---ai-agents-match-you/) | Uses AI to match people based on real behavior and | 8 | 7 |
+| [FileVault](idea-hn-47231795-show-hn--fileshot---zero-knowledge-file/) | A mobile-first, privacy-focused file-sharing and | 8 | 7 |
+| [SafeCircle](idea-hn-47241821-tectonic-good-project-plan--please-read/) | Platform empowering vulnerable populations with AI-driven | 8 | 7 |
+| [FinFlow](idea-hn-47250252-show-hn--i-spent-1000-hours-building-my/) | Combines budgeting, investment tracking, and financial | 8 | 7 |
+| [CloudGuard](idea-hn-47259962-fly-io-deleted-my-apps-and-dbs-in-an-unr/) | Provides real-time alerts and recovery tools for cloud | 8 | 7 |
+| [MotiMorph](idea-hn-47260470-show-hn--i-built-a-daily-affirmation-ios/) | App that delivers personalized, context-aware | 8 | 9 |
+| [ContribFlow](idea-hn-47261253-first-pr-concierge---ai-that-matches-you/) | Mobile app that helps beginners contribute to open source | 8 | 7 |
+| [SensorSync](idea-hn-47322441-show-hn--dspx---native-c---dsp-library-f/) | Provides real-time, low-latency signal processing for | 8 | 6 |
+| [DataDeck](idea-hn-47323284-show-hn--columnlens---query-millions-of/) | Lets users query and analyze large datasets locally on | 8 | 6 |
+| [NightOwl AI](idea-hn-47323608-show-hn--familiar---open-source-local-ai/) | A local AI assistant app that runs entirely on-device | 8 | 6 |
+| [VoxCrew](idea-hn-47325824-show-hn--conkoa-ai---voice-first-slack-f/) | Mobile hub for teams to communicate, update workflows, and | 8 | 7 |
+| [DataMirror](idea-hn-47351412-show-hn--mori---test-against-production/) | Lets developers and QA testers safely run production-like | 8 | 7 |
+| [PosturePal](idea-hn-47376169-ask-hn--have-you-successfully-treated-fo/) | Gamifies posture correction exercises with AI feedback and | 8 | 7 |
+| [AI Cost Optimizer App Spec](idea-hn-47377220-what-the-2026-ai-price-hikes-taught-me-a/) | Helps users optimize AI model usage by suggesting cheaper | 8 | 8 |
+| [AuthentiChat](idea-hn-47384485-ask-hn--balancing-the-use-of-ai-in-out-i/) | Helps users detect and manage AI-generated content in their | 8 | 7 |
+| [EquityEdge](idea-hn-47395894-show-hn--i-was-laid-off--so-i-built-a-ne/) | A mobile app providing personalized financial guidance and | 8 | 8 |
+| [MorseMate](idea-hn-47395931-show-hn--zmorse--morse-code-learning--gu/) | Teaches and gamifies learning of various coding systems | 8 | 8 |
+| [ThreadFlow](idea-hn-47395989-show-hn--i-built-an-mcp-server-that-lets/) | Allows users to manage and optimize their social media | 8 | 8 |
+| [SketchSync](idea-hn-47396067-show-hn--excalihub---chrome-extension-to/) | A mobile app for intuitive and collaborative visual | 8 | 8 |
+| [ParallelMind](idea-hn-47396171-show-hn--shard---stop-watching-one-ai-ag/) | Accelerates task completion by breaking down complex tasks | 8 | 6 |
+| [ListLink Spec](idea-web-07550482147f-listlink/) | A mobile app for anyone to easily manage and sell their | 8 | 8 |
+| [CritWave](idea-web-097e90d5f219-aoty-mobile/) | Provides personalized music discovery, tracking, and | 8 | 8 |
+| [SignalShift](idea-web-11cdc62a331a-signalscope-scan/) | Helps users optimize their mobile experience by providing | 8 | 8 |
+| [App Spec: GearGuru](idea-web-11cedfb6c097-gearguru/) | A mobile app for managing and optimizing in-game inventory | 8 | 8 |
+| [QuerySnap](idea-web-16fe686efcbc-schemasense/) | Uses AI to help users generate and manage data-driven | 8 | 8 |
+| [IdeaSpark](idea-web-18364f5bf2d9-sparkshare/) | Networking app for creatives and entrepreneurs to share | 8 | 8 |
+| [MemoryMate](idea-web-18fae97910ca-mommit/) | Life management app that simplifies task organization | 8 | 8 |
+| [LifeFlow Planner App Spec](idea-web-19bab3fd00f7-lifeflow-planner/) | A holistic mobile life management platform that integrates | 8 | 8 |
+| [ConnectCircle](idea-web-1d2cf8cec42a-friendflow/) | Helps users nurture and maintain their personal | 8 | 8 |
+| [CareCircle](idea-web-1d37a54a5e69-healthhub-family/) | Mobile app for managing family health and wellness | 8 | 8 |
+| [HobbyHub](idea-web-1db34c1d2f0e-boardgamebuddy/) | Discovery and community-building app for hobbyists to | 8 | 8 |
+| [App Name: **CogniQuest**](idea-web-242cee7afd41-codequest/) | A mobile app for learning and practicing problem-solving | 8 | 8 |
+| [GoalGrid Spec](idea-web-2445867c2f26-goalgrid/) | Empowers users to set, track, and achieve personal and | 8 | 8 |
+| [MediaMesh](idea-web-24c58c980c54-droproll-sync/) | Seamlessly syncs and consolidates photos and videos from | 8 | 8 |
+| [Kindness Kitchen Spec](idea-web-2d0048d44d78-kindness-kitchen/) | Enables users to send gifts, including food, groceries, and | 8 | 8 |
+| [GrowLog Pro Spec](idea-web-2fa7bdf325c3-growlog-pro/) | A mobile-first, AI-powered productivity hub for small | 8 | 7 |
+| [GrandPal Connect Spec](idea-web-31aff2adac9a-grandpal-connect/) | A mobile app connecting people across different age groups | 8 | 8 |
+| [SkillForge](idea-web-31b12cc9277f-pokepitch-perfect/) | Helps users improve their throwing mechanics and accuracy | 8 | 8 |
+| [LocalLink Play Spec](idea-web-3ab1a824a164-locallink-play/) | Connects people with shared interests and facilitates | 8 | 8 |
+| [BookNest](idea-web-3e7afaef242a-readerrite/) | Simplifies access to and management of personal digital | 8 | 8 |
+| [NotifyTasks](idea-web-3f05fdfad385-notifytasks/) | Streamlines task management by integrating with the phone's | 8 | 8 |
+| [BuddyBond Keeper](idea-web-3f1ca9375f4c-buddybond-keeper/) | Helps users nurture and strengthen their personal | 8 | 8 |
+| [RoutineRhythm Spec](idea-web-3f982b57817b-routinerhythm/) | Daily routine and task management app that adapts to users' | 8 | 8 |
+| [CareConnect Companion Spec](idea-web-423ce7b46bbc-careconnect-companion/) | Mobile assistant app that simplifies smartphone usage for | 8 | 8 |
+| [LocalLoop](idea-web-427bdac88667-cityconnect/) | Discovery app that connects people with shared interests | 8 | 8 |
+| [GiftSwift](idea-web-4394ec7fe687-giftgrub/) | Enables users to send gifts, including food, care packages | 8 | 8 |
+| [PageFlow](idea-web-43df17ce84bf-pagesync-pal/) | Enables seamless switching between physical and digital | 8 | 8 |
+| [FinchApp](idea-web-457d9bfcb971-stocksnap/) | A mobile app providing personalized financial insights and | 8 | 8 |
+| [RestPulse](idea-web-49eb9b9e665b-dreamdose/) | Helps users relax and recharge during downtime, using | 8 | 8 |
+| [DataPal](idea-web-4b7fee602828-sql-sync/) | Simplifies data management and analysis for non-technical | 8 | 8 |
+| [DebateDialect Evolution](idea-web-4eb124460af3-debatedialect/) | A mobile app for structured discussions and debates on | 8 | 8 |
+| [MindMeld Mobile App Specification](idea-web-51d32cc3bed3-mindmeld/) | Productivity and wellness assistant that uses AI to | 8 | 8 |
+| [Unsubscribe Pro Spec](idea-web-571ad6c1a866-unsubscribe-pro/) | Helps users manage all their subscriptions (emails | 8 | 7 |
+| [PageBridge](idea-web-5cd573246e4e-pagesync/) | Synchronizes reading progress across multiple formats | 8 | 8 |
+| [MultiMarket Maestro Spec](idea-web-61eb53a69419-multimarket-maestro/) | Streamlines selling and managing products across multiple | 8 | 8 |
 | [LifeThread](idea-web-6519e8eb5b9f-preventivecare/) | A hyper-personalized health and wellness app that tracks | 8 | - |
-| [MechaLab](idea-web-721cb0e90f63-contraption-creator/) | A mobile app for anyone to quickly prototype and test | 8 | - |
-| [PhotoRestore App Spec](idea-web-73af3b8ad4fb-photorestore/) | AI-powered mobile app that effortlessly transforms any | 8 | - |
-| [StrikeZone](idea-web-7a59050717c7-pokepractice/) | A mobile app for training precision and timing in | 8 | - |
-| [ZenSprint](idea-web-91a6b932a887-focusflow-voice/) | Gamifies productivity with voice coaching, rewards, and | 8 | - |
-| [MarketPulse](idea-web-96ff3cbd218d-stocksight/) | A hyper-personalized financial news and insights app that | 8 | - |
-| [PeaceFlow](idea-web-9871a935b1d4-cramcure/) | Mobile platform empowering individuals who menstruate to | 8 | - |
+| [FlowDeck](idea-web-69943611b56e-appshelf/) | Mobile dashboard that streamlines access to frequently used | 8 | 8 |
+| [Mindful Moment App Specification](idea-web-6f485e38a556-mindful-moment/) | Gamifies mindfulness and productivity breaks with social | 8 | 7 |
+| [MechaLab](idea-web-721cb0e90f63-contraption-creator/) | Provides a interactive, physics-based sandbox environment | 8 | 6 |
+| [PhotoRestore App Spec](idea-web-73af3b8ad4fb-photorestore/) | Uses AI to restore, colorize, and edit old photos and | 8 | 8 |
+| [MealMingle Spec](idea-web-73f7869f274a-mealmingle/) | Gifting and care app where users can send personalized | 8 | 8 |
+| [**SQLGPT Evolution: App Spec**](idea-web-74786e983b97-sqlgpt/) | Uses AI to help users optimize and troubleshoot their | 8 | 8 |
+| [StrikeZone](idea-web-7a59050717c7-pokepractice/) | Offers immersive, interactive training simulations for | 8 | 8 |
+| [**OTP Sync** → **SyncVault**](idea-web-85c09864819f-otp-sync/) | A unified messaging and authentication hub that seamlessly | 8 | 8 |
+| [TuneLocal](idea-web-8762a1800089-airwave-stream/) | Streams live TV, including local channels, to smartphones | 8 | 6 |
+| [AppArcade Organizer Spec](idea-web-8c56c35ed64e-apparcade-organizer/) | Mobile dashboard that streamlines access to frequently used | 8 | 8 |
+| [VoiceVault](idea-web-8e65f38563c9-snapshift/) | Motivation and task management mobile app that utilizes | 8 | 8 |
+| [DreamStream Stop Spec](idea-web-8e9eaf7c72dc-dreamstream-stop/) | Uses AI-powered detection to pause and resume audio | 8 | 6 |
+| [ZenSprint](idea-web-91a6b932a887-focusflow-voice/) | A mobile app providing personalized, audio-guided | 8 | 8 |
+| [MarketPulse](idea-web-96ff3cbd218d-stocksight/) | Financial assistant app providing real-time market | 8 | 8 |
+| [PeaceFlow](idea-web-9871a935b1d4-cramcure/) | A holistic wellness app for women to manage menstrual | 8 | 8 |
+| [LootVault](idea-web-9f701a2f34e7-lootlogic-link/) | Streamlines preparation and management for gamers, allowing | 8 | 8 |
 | [App Spec: SkillSprint](idea-web-a2684aff731f-shorthandpro/) | Gamifies learning any skill (not just shorthand) with | 8 | - |
+| [TrackFlow](idea-web-a6ffaec0db28-cultivar-chronicle/) | A mobile app for tracking and managing plant care | 8 | 8 |
 | [InstaGran Evolution: "Bondly"](idea-web-ac66b6351353-instagran/) | Connects people seeking companionship with others who can | 8 | - |
-| [Support Sentinel](idea-web-b4e42f564a1a-shopify-support-sentinel/) | Instantly alerts users when their customer service requests | 8 | - |
+| [SchemaSync AI Mobile Spec](idea-web-af8bf3f86d5d-schemasync-ai/) | Provides AI-powered insights and management for various | 8 | 8 |
+| [BridgeGen](idea-web-b457832b897e-kinship-connect/) | A mobile app connecting people across different age groups | 8 | 8 |
+| [ParentCircle](idea-web-b96e83af42f2-momlink/) | Connects caregivers and families to share resources | 8 | 8 |
+| [PlantPulse](idea-web-bccd9395e4c6-bonsai-buddy/) | A mobile app for tracking and caring for various types of | 8 | 8 |
 | [TachiManga App Spec](idea-web-c2d86a047b27-tachimanga/) | Reading app for digital content (books, comics, magazines) | 8 | - |
-| [PageTurn](idea-web-e63b785e2d65-mangaflow/) | Cross-platform manga reader app that delivers a seamless | 8 | - |
+| [SkillShot](idea-web-ca2a4ec524e1-throwtrainer/) | Helps users improve their throwing, aiming, and timing | 8 | 8 |
+| [FoodGuard](idea-web-d35c0b0df6bf-foodsafety/) | Provides users with instant access to food establishment | 8 | 8 |
+| [SaveStack](idea-web-de5b4806bf3c-vidditsave/) | Allows users to easily discover, download, and manage video | 8 | 8 |
+| [PageTurn](idea-web-e63b785e2d65-mangaflow/) | A mobile app for discovering, organizing, and enjoying | 8 | 8 |
+| [BrainWave Mobile App Spec](idea-web-e66985c1093a-brainwave/) | Uses AI-powered audio analysis and user behavior tracking | 8 | 6 |
+| [**App Name: VibeHive**](idea-web-e8c0d1d200ff-vibeventures/) | A location-based social discovery app that connects users | 8 | 8 |
+| [DiscoverDeck Mobile → **Curio**](idea-web-eb3621ccd0d2-discoverdeck-mobile/) | Mobile app discovery and recommendation platform that helps | 8 | 8 |
 | [FoodSafe Mobile App Specification](idea-web-f60695dd3dac-foodsafe/) | A hyper-local, real-time food safety and hygiene ratings | 8 | - |
-| [MotiMate](idea-web-fcc63d4d5cce-prodcoach/) | Gamifies productivity by blending AI-driven motivational | 8 | - |
-| [SoloVault → **BrainVault**](idea-web-ff9a9115a1a9-solovault/) | A personal digital assistant and "second brain" app that | 8 | - |
-| [PairPurse](idea-hn-47232676-show-hn--i-built-an-expense-tracker-wher/) | A privacy-focused, peer-to-peer expense tracking app that | 7 | - |
-| [TypeBridge](idea-hn-47239604-show-hn--typeshim----net-webassembly-mee/) | Bridges TypeScript and .NET WebAssembly for developers | 7 | - |
-| [ChapterCast](idea-hn-47246757-show-hn--m4bindr---convert-mp3-m4a-files/) | Helps users organize and package any type of audio content | 7 | - |
-| [MotiMorph](idea-hn-47260470-show-hn--i-built-a-daily-affirmation-ios/) | App that delivers personalized, context-aware | 7 | - |
-| [ContribFlow](idea-hn-47261253-first-pr-concierge---ai-that-matches-you/) | Mobile app that helps beginners and experienced developers | 7 | - |
-| [SlideFlow](idea-hn-47284873-show-hn--slidehtml---render-html-files-a/) | Lets users generate and present slides directly from HTML | 7 | - |
-| [CourseKit](idea-hn-47296680-show-hn--lesso---a-place-for-writers-to/) | Platform for creators to build, sell, and distribute | 7 | - |
-| [SubmitGuard](idea-hn-47315006-show-hn--submitgate---catch-mobile-submi/) | Proactively scans and fixes compliance issues in app builds | 7 | - |
-| [SensorSync](idea-hn-47322441-show-hn--dspx---native-c---dsp-library-f/) | Real-time sensor data processing and analysis platform that | 7 | - |
-| [NightOwl AI](idea-hn-47323608-show-hn--familiar---open-source-local-ai/) | A local AI assistant app that leverages mobile device | 7 | - |
-| [PromptVault Mobile App Specificatio](idea-hn-47332546-promptvault-free-tool-for-multi-agentic/) | A mobile app for non-technical users to collaboratively | 7 | - |
-| [HumanGuard](idea-hn-47377046-ask-hn--would-this-eliminate-bots-for-go/) | Uses biometric and behavioral data to verify human | 7 | - |
-| [AI Cost Optimizer App Spec](idea-hn-47377220-what-the-2026-ai-price-hikes-taught-me-a/) | Helps users optimize AI model selection for their tasks | 7 | - |
-| [GitFlow](idea-hn-47377625-show-hn--bettergit---free--simple--no-fr/) | A simplified mobile-first code collaboration and version | 7 | - |
-| [CrediGen](idea-hn-47380019-my-thoughts-on-gdc-2026---the-good--the/) | AI-powered content creation assistant that helps | 7 | - |
-| [Pano Mobile App Specification](idea-hn-47383103-show-hn--pano--a-bookmarking-tool-built/) | A visual, shelf-based content curation and sharing platform | 7 | - |
-| [AuthentiChat](idea-hn-47384485-ask-hn--balancing-the-use-of-ai-in-out-i/) | Helps users detect, manage, and respond appropriately to | 7 | - |
-| [CodeForge](idea-hn-47390920-show-hn--llvm-z80---i-wrote-a-complete-l/) | Mobile IDE and compiler platform that lets users write | 7 | - |
-| [CareerShield](idea-hn-47394979-ask-hn--are-there-any-cs-niches-safe-fro/) | A mobile career guidance platform that helps tech | 7 | - |
-| [CodeLens](idea-hn-47395783-show-hn--javadecompiler-org---a-unified/) | Mobile reverse engineering and code analysis platform that | 7 | - |
-| [EquityEdge](idea-hn-47395894-show-hn--i-was-laid-off--so-i-built-a-ne/) | Aggregates and simplifies startup equity liquidity options | 7 | - |
-| [MorseMate](idea-hn-47395931-show-hn--zmorse--morse-code-learning--gu/) | Social Morse code learning app for beginners and | 7 | - |
-| [SketchSync](idea-hn-47396067-show-hn--excalihub---chrome-extension-to/) | Combines Excalidraw's whiteboard-style drawing with | 7 | - |
-| [ListLink Spec](idea-web-07550482147f-listlink/) | Inventory management tool for resellers, enabling seamless | 7 | - |
-| [CritWave](idea-web-097e90d5f219-aoty-mobile/) | A personalized, notification-driven music discovery app | 7 | - |
-| [SignalShift](idea-web-11cdc62a331a-signalscope-scan/) | Helps users optimize their cellular connectivity by | 7 | - |
-| [App Spec: GearGuru](idea-web-11cedfb6c097-gearguru/) | Companion app for dedicated gamers to manage in-game | 7 | - |
+| [StyleSync](idea-web-f656444c37bc-stylesense-wardrobe/) | Uses AI-powered virtual try-on and personalized styling to | 8 | 8 |
+| [MotiMate](idea-web-fcc63d4d5cce-prodcoach/) | Provides personalized motivation and productivity coaching | 8 | 6 |
+| [SoloVault → **BrainVault**](idea-web-ff9a9115a1a9-solovault/) | Allows users to capture, organize, and retrieve personal | 8 | 8 |
+| [PairPurse](idea-hn-47232676-show-hn--i-built-an-expense-tracker-wher/) | A privacy-focused, peer-to-peer expense tracker that syncs | 7 | 7 |
+| [VocaVault](idea-hn-47237537-show-hn--spanish-words--spaced-repetitio/) | A mobile-first, language learning app using spaced | 7 | 9 |
+| [TypeBridge](idea-hn-47239604-show-hn--typeshim----net-webassembly-mee/) | Lets developers quickly prototype and test .NET WebAssembly | 7 | 6 |
+| [ChapterCast](idea-hn-47246757-show-hn--m4bindr---convert-mp3-m4a-files/) | A mobile app for organizing and packaging audio files into | 7 | 8 |
+| [GuardianGate](idea-hn-47274329-age-based-content-gating-----age-verific/) | Mobile OS layer that enforces age-based content | 7 | 6 |
+| [LaunchLift](idea-hn-47280008-show-hn--i-made-a-free-list-of-100-place/) | Aggregates and curates directories for promoting apps | 7 | 8 |
+| [SlideFlow](idea-hn-47284873-show-hn--slidehtml---render-html-files-a/) | Lets users generate and present slides directly from HTML | 7 | 8 |
+| [CourseKit](idea-hn-47296680-show-hn--lesso---a-place-for-writers-to/) | Platform for creators to build and monetize written | 7 | 8 |
+| [CodeCapsule](idea-hn-47298242-show-hn--claude-code-container---zero-co/) | Provides secure, zero-configuration sandboxing for AI | 7 | 8 |
+| [AudioChain](idea-hn-47311435-buildhifi/) | A mobile app for enthusiasts and casual users to design | 7 | 8 |
+| [DesignBlend](idea-hn-47312489-show-hn--marque---mcp-cli-server-for-per/) | Helps designers and developers maintain consistent design | 7 | 7 |
+| [SubmitGuard](idea-hn-47315006-show-hn--submitgate---catch-mobile-submi/) | Proactively scans and fixes compliance issues in app builds | 7 | 6 |
+| [PromptVault Mobile App Specificatio](idea-hn-47332546-promptvault-free-tool-for-multi-agentic/) | A mobile app for non-technical users to visually map and | 7 | 8 |
+| [HumanGuard](idea-hn-47377046-ask-hn--would-this-eliminate-bots-for-go/) | Uses biometric data (fingerprint, pulse, movement patterns) | 7 | 6 |
+| [GitFlow](idea-hn-47377625-show-hn--bettergit---free--simple--no-fr/) | Simplifies Git operations for non-technical users, making | 7 | 8 |
+| [CrediGen](idea-hn-47380019-my-thoughts-on-gdc-2026---the-good--the/) | Aggregates and curates AI-driven insights from gaming | 7 | 7 |
+| [TraceGuard](idea-hn-47381471-show-hn--replacing--50k-manual-forensic/) | Automates forensic accounting for divorce settlements | 7 | 6 |
+| [Pano Mobile App Specification](idea-hn-47383103-show-hn--pano--a-bookmarking-tool-built/) | A mobile app for effortless, visually engaging link saving | 7 | 8 |
+| [ProtoPulse](idea-hn-47386240-ask-hn--why-do-the-majority-of-vibecoded/) | Helps non-technical users build and iterate on their own | 7 | 7 |
+| [CodeForge](idea-hn-47390920-show-hn--llvm-z80---i-wrote-a-complete-l/) | Allows users to compile and run Rust code directly on their | 7 | 6 |
+| [CareerShield](idea-hn-47394979-ask-hn--are-there-any-cs-niches-safe-fro/) | Helps developers identify and pivot to AI-resistant CS | 7 | 8 |
+| [CodeLens](idea-hn-47395783-show-hn--javadecompiler-org---a-unified/) | Lets developers and non-developers inspect, analyze, and | 7 | 6 |
 | [**App Name: FinSight**](idea-web-12fe5b72ead1-stocksense/) | Simplifies financial literacy by providing personalized | 7 | - |
-| [QuerySnap](idea-web-16fe686efcbc-schemasense/) | Database assistant app that helps non-technical users | 7 | - |
-| [IdeaSpark](idea-web-18364f5bf2d9-sparkshare/) | Platform for crowdsourced idea generation, feedback, and | 7 | - |
-| [MemoryMate](idea-web-18fae97910ca-mommit/) | Memory aid app that helps people remember daily tasks | 7 | - |
-| [LifeFlow Planner App Spec](idea-web-19bab3fd00f7-lifeflow-planner/) | Helps people manage work and personal tasks in one place | 7 | - |
-| [ConnectCircle](idea-web-1d2cf8cec42a-friendflow/) | Gamifies and simplifies relationship maintenance for all | 7 | - |
-| [CareCircle](idea-web-1d37a54a5e69-healthhub-family/) | A family-focused health management app that simplifies | 7 | - |
-| [HobbyHub](idea-web-1db34c1d2f0e-boardgamebuddy/) | Social app that connects people for shared interests | 7 | - |
 | [ZenBlock](idea-web-24727e977efb-focusflow/) | Helps people stay focused by blocking distractions, with | 7 | - |
-| [SleepyBook → DriftGuard](idea-web-294443805afe-sleepybook/) | Productivity app that uses phone sensors (motion, sound | 7 | - |
-| [GrandPal Connect Spec](idea-web-31aff2adac9a-grandpal-connect/) | Connects people across generations for meaningful | 7 | - |
+| [SleepyBook → DriftGuard](idea-web-294443805afe-sleepybook/) | Uses biometric sensors to detect user states (sleep | 7 | 6 |
 | [DataPal](idea-web-31d1a323b52d-sqlite/) | Database assistant that helps non-technical users create | 7 | - |
-| [CareQuest](idea-web-3233b35993a1-preventive-care-tracker/) | App that gamifies preventive healthcare tracking for | 7 | - |
-| [LocalLink Play Spec](idea-web-3ab1a824a164-locallink-play/) | Social network that connects people for spontaneous | 7 | - |
-| [BookNest](idea-web-3e7afaef242a-readerrite/) | One-time-purchase ebook reader app that simplifies digital | 7 | - |
-| [BuddyBond Keeper](idea-web-3f1ca9375f4c-buddybond-keeper/) | A relationship management app that helps users nurture | 7 | - |
-| [LocalLoop](idea-web-427bdac88667-cityconnect/) | Community app that helps people discover and organize | 7 | - |
-| [GiftSwift](idea-web-4394ec7fe687-giftgrub/) | Simplifies gifting experiences beyond food, offering | 7 | - |
-| [FinchApp](idea-web-457d9bfcb971-stocksnap/) | Simplifies financial literacy by providing real-time stock | 7 | - |
-| [RestPulse](idea-web-49eb9b9e665b-dreamdose/) | Guides users into optimal short rest or power nap states | 7 | - |
-| [DataPal](idea-web-4b7fee602828-sql-sync/) | Helps non-technical users create and manage simple | 7 | - |
-| [DebateDialect Evolution](idea-web-4eb124460af3-debatedialect/) | A mobile app for structured, real-time debates with voting | 7 | - |
-| [MindMeld Mobile App Specification](idea-web-51d32cc3bed3-mindmeld/) | Automates daily life management by intelligently scheduling | 7 | - |
-| [Unsubscribe Pro Spec](idea-web-571ad6c1a866-unsubscribe-pro/) | Email management assistant that automatically organizes | 7 | - |
+| [CareQuest](idea-web-3233b35993a1-preventive-care-tracker/) | A hyper-personalized health and wellness reminder app that | 7 | 7 |
 | [JustSwipe → SwipeClear](idea-web-57cc14a3182a-justswipe/) | Helps users declutter and organize digital life beyond just | 7 | - |
-| [PageBridge](idea-web-5cd573246e4e-pagesync/) | Syncs reading progress across digital and physical books | 7 | - |
-| [MultiMarket Maestro Spec](idea-web-61eb53a69419-multimarket-maestro/) | Productivity tool for small businesses and freelancers that | 7 | - |
-| [FlowDeck](idea-web-69943611b56e-appshelf/) | A highly customizable and workflow-optimized mobile | 7 | - |
-| [Mindful Moment App Specification](idea-web-6f485e38a556-mindful-moment/) | Wellness companion that delivers contextual mindfulness | 7 | - |
-| [MealMingle Spec](idea-web-73f7869f274a-mealmingle/) | Meal-sharing app that lets users coordinate group orders | 7 | - |
-| [Friendship Keeper App Spec](idea-web-743d4abc791e-friendship-keeper/) | A relationship maintenance platform that helps people | 7 | - |
-| [**SQLGPT Evolution: App Spec**](idea-web-74786e983b97-sqlgpt/) | SQL assistant that helps non-technical users write | 7 | - |
+| [Friendship Keeper App Spec](idea-web-743d4abc791e-friendship-keeper/) | Gamifies and rewards social engagement through challenges | 7 | 8 |
 | [FocusBlank](idea-web-765050c1f06d-whitescreen/) | A distraction-free productivity hub that replaces the | 7 | - |
-| [JawZen](idea-web-7e4f4b65deb0-zenjaw/) | A mindfulness and wellness app that uses gentle audio | 7 | - |
-| [**OTP Sync** → **SyncVault**](idea-web-85c09864819f-otp-sync/) | Cross-device notification and message hub that securely | 7 | - |
-| [TuneLocal](idea-web-8762a1800089-airwave-stream/) | Aggregates and streams local broadcast TV channels to | 7 | - |
-| [AppArcade Organizer Spec](idea-web-8c56c35ed64e-apparcade-organizer/) | AI-powered app launcher that intelligently organizes and | 7 | - |
-| [VoiceVault](idea-web-8e65f38563c9-snapshift/) | Delivers personalized, on-demand motivational coaching for | 7 | - |
-| [DreamStream Stop Spec](idea-web-8e9eaf7c72dc-dreamstream-stop/) | A sleep-friendly audio companion app that intelligently | 7 | - |
-| [LootVault](idea-web-9f701a2f34e7-lootlogic-link/) | Mobile app for managing digital assets across games, with | 7 | - |
-| [Sleepy Reader Spec](idea-web-a54001a8abdd-sleepy-reader/) | Audio app that adapts content to user's sleep cycles | 7 | - |
-| [TrackFlow](idea-web-a6ffaec0db28-cultivar-chronicle/) | A mobile app for anyone who wants to track and optimize | 7 | - |
+| [JawZen](idea-web-7e4f4b65deb0-zenjaw/) | Uses voice-guided mindfulness and relaxation techniques to | 7 | 7 |
 | [PlayPals Mobile App Specification](idea-web-af38f3ad934c-playpals/) | Social app that connects people to spontaneous | 7 | - |
-| [SchemaSync AI Mobile Spec](idea-web-af8bf3f86d5d-schemasync-ai/) | Database assistant that provides real-time insights and | 7 | - |
-| [BridgeGen](idea-web-b457832b897e-kinship-connect/) | Connects people across generations for mentorship | 7 | - |
-| [ParentCircle](idea-web-b96e83af42f2-momlink/) | Community app for parents (single or not) to share | 7 | - |
+| [Support Sentinel](idea-web-b4e42f564a1a-shopify-support-sentinel/) | Provides real-time, AI-powered customer service | 7 | 7 |
 | [OTA Stream Spec](idea-web-b9a527507fba-ota-stream/) | Aggregates and streams local TV channels, sports, and live | 7 | - |
-| [FriendSpark](idea-web-bb43cd8a39b2-friendfuse/) | Gamifies social connection by rewarding consistent | 7 | - |
-| [PlantPulse](idea-web-bccd9395e4c6-bonsai-buddy/) | Plant care app that gamifies and socializes plant | 7 | - |
-| [Crosslisting Manager Spec](idea-web-ca0c1dbb357d-crosslisting-manager/) | Helps small businesses and sellers manage their online | 7 | - |
-| [SkillShot](idea-web-ca2a4ec524e1-throwtrainer/) | Gamifies skill training for real-world physical activities | 7 | - |
-| [FoodGuard](idea-web-d35c0b0df6bf-foodsafety/) | A hyper-local, real-time safety and quality ratings app for | 7 | - |
-| [SaveStack](idea-web-de5b4806bf3c-vidditsave/) | Content curation and offline access tool that allows users | 7 | - |
-| [MotiveMate](idea-web-e01161f2aa22-workout-motivator/) | Provides real-time motivational coaching for any task or | 7 | - |
-| [BrainWave Mobile App Spec](idea-web-e66985c1093a-brainwave/) | Productivity app that uses biometric data to optimize focus | 7 | - |
-| [Friendship Tracker App Spec](idea-web-e78e86178aa0-friendship-tracker/) | Gamifies friendship maintenance by rewarding users for | 7 | - |
-| [**App Name: VibeHive**](idea-web-e8c0d1d200ff-vibeventures/) | A mobile platform that empowers individuals to effortlessly | 7 | - |
-| [ListSync](idea-web-e9899472c93b-crosslist-pro/) | Helps small businesses and e-commerce sellers automate | 7 | - |
-| [DiscoverDeck Mobile → **Curio**](idea-web-eb3621ccd0d2-discoverdeck-mobile/) | Digital concierge that helps users discover the best apps | 7 | - |
-| [Verdant — Universal Plant Care Comp](idea-web-f19e70e4655e-bonsai-care-log/) | Plant care log app for tracking growth, watering, and | 7 | - |
-| [StyleSync](idea-web-f656444c37bc-stylesense-wardrobe/) | Personal stylist and wardrobe management app that | 7 | - |
+| [FriendSpark](idea-web-bb43cd8a39b2-friendfuse/) | Gamifies social connection through challenges, shared | 7 | 8 |
+| [Crosslisting Manager Spec](idea-web-ca0c1dbb357d-crosslisting-manager/) | Helps small businesses and sellers manage their inventory | 7 | 8 |
+| [MotiveMate](idea-web-e01161f2aa22-workout-motivator/) | Provides real-time, context-aware motivational coaching for | 7 | 8 |
+| [Friendship Tracker App Spec](idea-web-e78e86178aa0-friendship-tracker/) | Gamifies friendship maintenance by tracking interactions | 7 | 8 |
+| [ListSync](idea-web-e9899472c93b-crosslist-pro/) | Helps small business owners and e-commerce sellers automate | 7 | 8 |
+| [Verdant — Universal Plant Care Comp](idea-web-f19e70e4655e-bonsai-care-log/) | Care log app for any plant, pet, or household item that | 7 | 8 |
+| [Sleepy Reader Spec](idea-web-a54001a8abdd-sleepy-reader/) | Intelligently manages audio playback for sleep | 6 | 4 |
 | [CloudCLI Implementation Spec](idea-hn-47352564-palmcode/) | -- | - | - |
 | [App Name](idea-hn-47355049-tapteam/) | -- | - | - |
 | [Aurora AI](idea-hn-47355207-flowforge/) | -- | - | - |
