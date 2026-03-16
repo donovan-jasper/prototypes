@@ -1,7 +1,7 @@
 import json
 import asyncio
 import httpx
-from .config import OMNIROUTE_BASE, PLANNER_MODEL
+from .config import OMNIROUTE_BASE, CODER_MODEL
 
 ANALYSIS_PROMPT = """Analyze this as a MOBILE APP opportunity. Think BROADLY — don't just evaluate the literal idea.
 Ask yourself: "What's the widest audience version of this concept on mobile?"
@@ -67,7 +67,7 @@ async def analyze_post(client: httpx.AsyncClient, post: dict) -> dict:
     resp = await client.post(
         f"{OMNIROUTE_BASE}/chat/completions",
         json={
-            "model": PLANNER_MODEL,
+            "model": CODER_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
         },

@@ -91,7 +91,7 @@ class IdeaDB:
 
     def get_unanalyzed_posts(self, limit: int = 20) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT * FROM posts WHERE analysis IS NULL ORDER BY score DESC LIMIT ?",
+            "SELECT * FROM posts WHERE analysis IS NULL ORDER BY rowid DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]

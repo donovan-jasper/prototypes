@@ -28,7 +28,13 @@ Mix these strategies:
    - "wish X had a mobile app"
    - "X only works on desktop"
    - "need mobile version of"
-4. Niche communities: specific subreddits (r/apps, r/androidapps, r/iphone), forums, Twitter/X, Quora
+4. Overpriced apps to undercut:
+   - Search for App Store apps that charge $5-20+ for simple functionality
+   - "overpriced" + app category on Reddit
+   - "not worth the price" app review
+   - "free alternative to [expensive app]"
+   - Simple utility apps (contacts sync, file manager, QR scanner) charging premium prices
+5. Niche communities: specific subreddits (r/apps, r/androidapps, r/iphone), forums, Twitter/X, Quora
 
 Return ONLY a JSON array of query strings. No commentary."""
 
@@ -67,10 +73,12 @@ Focus specifically on the App Store / Google Play landscape. A web-only tool wit
 Return JSON:
 {{
   "competitors": ["list of existing MOBILE apps that do this"],
+  "competitor_prices": ["price of each competitor: free, $X, $X/mo"],
   "web_only_alternatives": ["web tools with no mobile app — these are opportunities"],
   "gaps": "what's missing or bad about existing mobile solutions",
-  "monetization": "how top competitors monetize (subscription, paid, freemium, ads)",
-  "competition_score": <1-10 integer, 10 = wide open mobile market, 1 = saturated with good mobile apps>
+  "overpriced_opportunity": "if competitors charge $5+ for simple functionality, note the undercut opportunity",
+  "monetization": "recommended price point to undercut competitors while still making money",
+  "competition_score": <1-10 integer, 10 = wide open OR overpriced incumbents easy to undercut, 1 = saturated with good free/cheap apps>
 }}
 
 Be honest. If strong mobile competitors exist with no clear gap, score low. Only a JSON object."""
@@ -90,6 +98,12 @@ SEED_QUERIES = [
     '"app idea" site:reddit.com/r/AppIdeas OR site:reddit.com/r/SomebodyMakeThis',
     '"looking for an app" site:reddit.com -"found it"',
     '"every app for" "sucks" OR "terrible" OR "awful" site:reddit.com',
+    # Overpriced app store apps — undercut opportunity
+    '"too expensive" app store site:reddit.com',
+    '"not worth" "$" app store site:reddit.com',
+    '"overpriced" app iOS OR Android site:reddit.com',
+    '"why does this app cost" site:reddit.com',
+    '"free alternative to" app iOS OR Android site:reddit.com',
 ]
 
 
@@ -131,14 +145,22 @@ def parse_competition_from_llm(text: str) -> dict:
         data = json.loads(cleaned)
         score = max(1, min(10, int(data.get("competition_score", 5))))
         competitors = data.get("competitors", [])
+        prices = data.get("competitor_prices", [])
         web_only = data.get("web_only_alternatives", [])
         gaps = data.get("gaps", "Unknown")
         monetization = data.get("monetization", "Unknown")
-        parts = [f"Mobile competitors: {', '.join(competitors) if competitors else 'None found'}"]
+        overpriced = data.get("overpriced_opportunity", "")
+        comp_with_prices = []
+        for i, c in enumerate(competitors):
+            price = prices[i] if i < len(prices) else ""
+            comp_with_prices.append(f"{c} ({price})" if price else c)
+        parts = [f"Mobile competitors: {', '.join(comp_with_prices) if comp_with_prices else 'None found'}"]
         if web_only:
             parts.append(f"Web-only (mobile gap): {', '.join(web_only)}")
         parts.append(f"Gaps: {gaps}")
-        parts.append(f"Monetization: {monetization}")
+        if overpriced:
+            parts.append(f"Undercut opportunity: {overpriced}")
+        parts.append(f"Recommended pricing: {monetization}")
         analysis = "\n".join(parts)
         return {"competition_analysis": analysis, "competition_score": score}
     except (json.JSONDecodeError, ValueError, IndexError):
@@ -243,44 +265,7 @@ async def run_agentic_scout(db: IdeaDB) -> int:
             db.upsert_post(post)
             new_count += 1
 
-        # Step 5: Competition analysis for unanalyzed ideas
-        unanalyzed = db.get_unanalyzed_posts(limit=10)
-        print(f"  [scout] Analyzing {len(unanalyzed)} ideas + competition...")
-        for post in unanalyzed:
-            try:
-                # Viability analysis
-                from .analyzer import analyze_post
-                result = await analyze_post(client, post)
-                db.save_analysis(post["id"], result["analysis"], result["viability_score"])
-                print(f"    [{result['viability_score']}/10] {post['title'][:50]}")
-
-                # Competition check for promising ideas
-                if result["viability_score"] >= 5:
-                    comp_queries = [
-                        f"{post['title'][:30]} mobile app iOS Android",
-                        f"alternatives to {post['title'][:30]} app store",
-                    ]
-                    comp_results = []
-                    for cq in comp_queries:
-                        comp_results.extend(search_web(cq, max_results=5))
-                    comp_context = "\n".join(
-                        f"- {r['title']}: {r['body']}" for r in comp_results
-                    )
-                    comp_response = await _llm_call(
-                        client,
-                        COMPETITION_PROMPT.format(
-                            title=post["title"],
-                            description=post.get("selftext", ""),
-                            search_results=comp_context,
-                        ),
-                        model=PLANNER_MODEL,
-                    )
-                    comp = parse_competition_from_llm(comp_response)
-                    db.save_competition(
-                        post["id"], comp["competition_analysis"], comp["competition_score"]
-                    )
-                    print(f"    Competition: {comp['competition_score']}/10")
-            except Exception as e:
-                print(f"    ERROR: {e}")
+        # Analysis + competition handled by daemon's analyze_batch loop
+        print(f"  [scout] Done — {new_count} new ideas stored, awaiting analysis")
 
     return new_count

@@ -1,4 +1,5 @@
 import asyncio
+import os
 import time
 import traceback
 import httpx
@@ -8,8 +9,11 @@ from idea_scout.config import (
 )
 from idea_scout.db import IdeaDB
 from idea_scout.main import run as run_scout
+from idea_scout.analyzer import analyze_post
 from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
+
+SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
 
 
 async def notify(msg: str, title: str = "Pipeline", tags: str = "robot"):
@@ -27,32 +31,70 @@ async def notify(msg: str, title: str = "Pipeline", tags: str = "robot"):
         pass
 
 
+async def analyze_batch(db: IdeaDB, limit: int = 10):
+    """Analyze a small batch of unanalyzed ideas. Skips errors gracefully."""
+    unanalyzed = db.get_unanalyzed_posts(limit=limit)
+    if not unanalyzed:
+        return 0
+    scored = 0
+    print(f"  Analyzing {len(unanalyzed)} ideas...")
+    async with httpx.AsyncClient(timeout=60) as client:
+        for post in unanalyzed:
+            try:
+                result = await analyze_post(client, post)
+                db.save_analysis(post["id"], result["analysis"], result["viability_score"])
+                print(f"    [{result['viability_score']}/10] {post['title'][:50]}")
+                scored += 1
+            except Exception as e:
+                print(f"    SKIP {post['id']}: {type(e).__name__}")
+    return scored
+
+
+def _read_last_scout() -> float:
+    try:
+        with open(SCOUT_TIMESTAMP_FILE) as f:
+            return float(f.read().strip())
+    except (FileNotFoundError, ValueError):
+        return 0
+
+def _write_last_scout(ts: float):
+    with open(SCOUT_TIMESTAMP_FILE, "w") as f:
+        f.write(str(ts))
+
+
 async def run_loop():
-    last_scout = 0
     print("Pipeline daemon started")
     await notify("Pipeline daemon started", tags="rocket")
 
     while True:
         try:
             db = IdeaDB(DB_PATH)
+            last_scout = _read_last_scout()
             hours_since_scout = (time.time() - last_scout) / 3600
             backlog = db.count_unbuilt_ideas(min_score=7)
+            unanalyzed = len(db.get_unanalyzed_posts(limit=1))
 
-            # Priority 1: Scout for ideas
-            if hours_since_scout >= SCOUT_INTERVAL_HOURS or backlog < MIN_BACKLOG:
+            # Priority 1: Scout for NEW ideas — but only if backlog is low or it's been a while
+            if hours_since_scout >= SCOUT_INTERVAL_HOURS and backlog < MIN_BACKLOG:
                 print(f"\n=== SCOUTING (backlog={backlog}, hours={hours_since_scout:.1f}) ===")
                 await run_scout()
-                last_scout = time.time()
+                _write_last_scout(time.time())
                 continue
 
-            # Priority 2: Build new prototype
+            # Priority 2: Build a prototype if we have buildable ideas
             buildable = db.get_buildable_ideas(limit=1)
             if buildable:
                 print(f"\n=== BUILDING: {buildable[0]['title'][:50]} ===")
                 await build_next_prototype()
                 continue
 
-            # Priority 3: Improve existing prototype
+            # Priority 3: Analyze unscored ideas (small batches to avoid timeouts)
+            if unanalyzed:
+                print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
+                await analyze_batch(db, limit=10)
+                continue
+
+            # Priority 4: Improve existing prototype
             improvable = db.get_improvable_prototypes(
                 max_improvements=MAX_IMPROVEMENTS, limit=1
             )
@@ -67,10 +109,9 @@ async def run_loop():
             await asyncio.sleep(IDLE_SLEEP_MINUTES * 60)
 
         except Exception as e:
-            print(f"Daemon error: {e}\n{traceback.format_exc()[-500:]}")
-            # Don't spam ntfy with rate limit errors
+            print(f"Daemon error: {type(e).__name__}: {e}\n{traceback.format_exc()[-500:]}")
             err_str = str(e)
-            if "429" not in err_str and "406" not in err_str and "circuit" not in err_str.lower():
+            if "429" not in err_str and "406" not in err_str and "circuit" not in err_str.lower() and "ReadTimeout" not in type(e).__name__:
                 await notify(f"Error: {err_str[:200]}", title="Pipeline Error", tags="warning")
             await asyncio.sleep(60)
 

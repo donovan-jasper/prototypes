@@ -39,9 +39,11 @@ Write a spec with these sections:
 
 8. File structure
 
-9. Implementation steps (detailed enough for an AI coding agent to follow)
+9. Tests — include Jest test files for core logic. Every feature must have at least one test.
 
-10. How to test it works (Expo Go on device or simulator)
+10. Implementation steps (detailed enough for an AI coding agent to follow)
+
+11. How to verify it works (Expo Go on device or simulator, plus `npm test` must pass)
 
 Output as clean markdown. No preamble."""
 
