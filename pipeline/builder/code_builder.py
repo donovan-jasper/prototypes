@@ -57,5 +57,10 @@ def parse_code_blocks(response: str) -> dict[str, str]:
         if "/" in header or "." in header:
             # Strip language hint if present (e.g., "python src/app.py" -> "src/app.py")
             path = header.split()[-1] if " " in header else header
+            # Strip "lang:" prefix (e.g., "json:package.json" -> "package.json")
+            if ":" in path and not path.startswith("/"):
+                after_colon = path.split(":", 1)[1]
+                if "." in after_colon:
+                    path = after_colon
             files[path] = content.rstrip("\n") + "\n"
     return files
