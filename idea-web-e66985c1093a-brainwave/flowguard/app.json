@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "FlowGuard",
+    "slug": "flowguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.flowguard",
+      "backgroundColor": "#ffffff",
+      "infoPlist": {
+        "NSMotionUsageDescription": "We use motion data to detect when you're drifting off.",
+        "NSMicrophoneUsageDescription": "We analyze your breathing patterns to better detect drowsiness (optional).",
+        "UIBackgroundModes": ["audio", "fetch"]
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.VIBRATE"
+      ],
+      "package": "com.yourcompany.flowguard"
+    },
+    "web": {
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff",
+          "sounds": [
+            "./assets/sounds/gentle-chime.mp3",
+            "./assets/sounds/alert-pulse.mp3"
+          ]
+        }
+      ]
+    ]
+  }
+}
