@@ -132,18 +132,19 @@ async def build_next_prototype():
     subprocess.run(["git", "push"], cwd=PROTOTYPES_DIR)
 
     # Notify
+    analysis = idea.get("analysis", "") or ""
+    summary = analysis.split("\n")[0] if analysis else idea["title"]
     async with httpx.AsyncClient() as client:
         await client.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
             content=(
-                f"Prototype built: {idea['title']}\n"
+                f"{summary}\n\n"
                 f"Score: {idea['viability_score']}/10\n"
                 f"Status: {status}\n"
-                f"Files: {len(files)}\n"
-                f"Dir: {project_dir}"
+                f"Files: {len(files)}"
             ).encode(),
             headers={
-                "Title": f"Prototype {'Ready' if success else 'Needs Fix'}",
+                "Title": f"Built: {idea['title'][:60]}",
                 "Priority": "high" if success else "default",
                 "Tags": "white_check_mark" if success else "warning",
             },

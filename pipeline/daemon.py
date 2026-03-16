@@ -64,9 +64,11 @@ async def run_loop():
             await asyncio.sleep(IDLE_SLEEP_MINUTES * 60)
 
         except Exception as e:
-            msg = f"Daemon error: {e}\n{traceback.format_exc()[-500:]}"
-            print(msg)
-            await notify(msg, title="Pipeline Error", tags="warning")
+            print(f"Daemon error: {e}\n{traceback.format_exc()[-500:]}")
+            # Don't spam ntfy with rate limit errors
+            err_str = str(e)
+            if "429" not in err_str and "406" not in err_str and "circuit" not in err_str.lower():
+                await notify(f"Error: {err_str[:200]}", title="Pipeline Error", tags="warning")
             await asyncio.sleep(60)
 
 

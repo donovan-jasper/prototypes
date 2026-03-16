@@ -8,10 +8,17 @@ def format_digest(ideas: list[dict]) -> str:
         return "No new high-scoring ideas today."
     lines = []
     for i, idea in enumerate(ideas, 1):
+        analysis = idea.get("analysis", "") or ""
+        # First line of analysis is the summary
+        summary = analysis.split("\n")[0] if analysis else idea["title"]
+        source = idea.get("source_type") or idea.get("subreddit", "")
+        competition = idea.get("competition_score")
+        comp_str = f" | Competition: {competition}/10" if competition else ""
+
         lines.append(
             f"{i}. [{idea['viability_score']}/10] {idea['title']}\n"
-            f"   r/{idea['subreddit']} | {idea['score']}pts\n"
-            f"   {(idea.get('analysis', '') or '')[:150]}"
+            f"   {summary}\n"
+            f"   {source}{comp_str}"
         )
     return "\n\n".join(lines)
 
@@ -24,7 +31,7 @@ async def send_digest(ideas: list[dict]):
             f"https://ntfy.sh/{NTFY_TOPIC}",
             content=body.encode(),
             headers={
-                "Title": f"App Ideas: {len(ideas)} top finds",
+                "Title": f"Top {len(ideas)} App Ideas",
                 "Priority": "default",
                 "Tags": "bulb",
             },

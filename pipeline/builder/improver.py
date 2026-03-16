@@ -174,10 +174,12 @@ async def improve_prototype(idea: dict) -> bool:
         db.record_improvement(idea["id"])
 
         # Notify
+        analysis = idea.get("analysis", "") or ""
+        summary = analysis.split("\n")[0] if analysis else idea["title"]
         await client.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
-            content=f"Improved: {idea['title']}\n{improvement}\nStatus: {status}".encode(),
-            headers={"Title": "Prototype Improved", "Tags": "sparkles"},
+            content=f"{summary}\n\nImprovement: {improvement}\nStatus: {status}".encode(),
+            headers={"Title": f"Improved: {idea['title'][:60]}", "Tags": "sparkles"},
         )
 
     return success

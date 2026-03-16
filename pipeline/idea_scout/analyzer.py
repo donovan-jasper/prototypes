@@ -1,4 +1,5 @@
 import json
+import asyncio
 import httpx
 from .config import OMNIROUTE_BASE, PLANNER_MODEL
 
@@ -60,4 +61,5 @@ async def analyze_post(client: httpx.AsyncClient, post: dict) -> dict:
     )
     resp.raise_for_status()
     content = resp.json()["choices"][0]["message"]["content"]
+    await asyncio.sleep(2)  # spread load across providers
     return parse_analysis_response(content)

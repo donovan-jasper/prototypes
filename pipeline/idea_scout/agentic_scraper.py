@@ -1,4 +1,5 @@
 import json
+import asyncio
 import hashlib
 import httpx
 from .config import OMNIROUTE_BASE, PLANNER_MODEL
@@ -118,6 +119,7 @@ async def _llm_call(client: httpx.AsyncClient, prompt: str) -> str:
         timeout=120,
     )
     resp.raise_for_status()
+    await asyncio.sleep(3)  # spread load across providers
     return resp.json()["choices"][0]["message"]["content"]
 
 
