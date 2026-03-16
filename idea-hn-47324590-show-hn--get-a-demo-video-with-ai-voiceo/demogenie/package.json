@@ -1,0 +1,21 @@
+{
+  "name": "demogenie",
+  "version": "1.0.0",
+  "description": "DemoGenie CLI tool for generating demo videos with AI voiceover",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@google-cloud/text-to-speech": "^4.0.0",
+    "commander": "^8.0.0",
+    "express": "^4.17.1",
+    "fluent-ffmpeg": "^2.1.2",
+    "node-nltk": "^0.0.1",
+    "playwright": "^1.15.2"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.12"
+  }
+}

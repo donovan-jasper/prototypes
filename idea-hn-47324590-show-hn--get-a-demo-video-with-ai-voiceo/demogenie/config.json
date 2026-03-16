@@ -1,0 +1,9 @@
+{
+  "playwright": {
+    "headless": true,
+    "slowMo": 50
+  },
+  "googleTextToSpeech": {
+    "apiKey": "YOUR_GOOGLE_TEXT_TO_SPEECH_API_KEY"
+  }
+}
