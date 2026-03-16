@@ -12,7 +12,7 @@ from idea_scout.main import run as run_scout
 from idea_scout.analyzer import analyze_post
 from idea_scout.agentic_scraper import COMPETITION_PROMPT, parse_competition_from_llm
 from idea_scout.web_search import search_web
-from idea_scout.notify import notify_daemon, notify_high_score_idea
+from idea_scout.notify import notify_daemon, notify_high_score_idea, notify_batch_analysis
 from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
 
@@ -20,11 +20,16 @@ SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
 
 
 async def analyze_batch(db: IdeaDB, limit: int = 10):
-    """Analyze a small batch of unanalyzed ideas. Sends notification for each 7+ idea."""
+    """Analyze a small batch of unanalyzed ideas.
+
+    Sends one batched notification for all 7+ ideas, plus individual
+    notifications only for truly exciting 8+ scores.
+    """
     unanalyzed = db.get_unanalyzed_posts(limit=limit)
     if not unanalyzed:
         return 0
     scored = 0
+    high_scorers: list[dict] = []
     print(f"  Analyzing {len(unanalyzed)} ideas...")
     async with httpx.AsyncClient(timeout=60) as client:
         for post in unanalyzed:
@@ -34,14 +39,24 @@ async def analyze_batch(db: IdeaDB, limit: int = 10):
                 print(f"    [{result['viability_score']}/10] {post['title'][:50]}")
                 scored += 1
 
-                # Send individual notification for high-scoring ideas
+                # Collect 7+ ideas for batch notification
                 if result["viability_score"] >= 7:
                     idea = db.get_post(post["id"])
                     if idea:
-                        await notify_high_score_idea(idea)
+                        high_scorers.append(idea)
 
             except Exception as e:
                 print(f"    SKIP {post['id']}: {type(e).__name__}")
+
+    # Send one batch summary for all 7+ ideas
+    if high_scorers:
+        await notify_batch_analysis(high_scorers)
+
+    # Send individual notifications only for 8+ (truly exciting)
+    for idea in high_scorers:
+        if idea.get("viability_score", 0) >= 8:
+            await notify_high_score_idea(idea)
+
     return scored
 
 
