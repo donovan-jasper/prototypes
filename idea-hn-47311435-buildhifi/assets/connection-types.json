@@ -1,0 +1,18 @@
+[
+  {
+    "type": "rca",
+    "description": "Standard audio cable with 1/4 inch connectors"
+  },
+  {
+    "type": "xlr",
+    "description": "Professional audio cable with 3-pin connectors"
+  },
+  {
+    "type": "optical",
+    "description": "Digital audio connection using light pulses"
+  },
+  {
+    "type": "speaker",
+    "description": "Speaker wire connection"
+  }
+]

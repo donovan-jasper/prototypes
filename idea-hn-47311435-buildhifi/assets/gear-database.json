@@ -1,0 +1,48 @@
+[
+  {
+    "name": "Turntable A",
+    "type": "turntable",
+    "brand": "Brand X",
+    "price": 299.99,
+    "specs": {
+      "outputs": ["rca"]
+    },
+    "upc": "123456789012"
+  },
+  {
+    "name": "Phono Preamp B",
+    "type": "preamp",
+    "brand": "Brand Y",
+    "price": 149.99,
+    "specs": {
+      "inputs": ["rca"],
+      "outputs": ["rca"]
+    },
+    "upc": "234567890123"
+  },
+  {
+    "name": "Amplifier C",
+    "type": "amplifier",
+    "brand": "Brand Z",
+    "price": 399.99,
+    "specs": {
+      "inputs": ["rca"],
+      "outputs": ["speaker"],
+      "powerWatts": 100,
+      "outputOhms": 8
+    },
+    "upc": "345678901234"
+  },
+  {
+    "name": "Speaker D",
+    "type": "speaker",
+    "brand": "Brand W",
+    "price": 199.99,
+    "specs": {
+      "inputs": ["speaker"],
+      "impedance": 8,
+      "maxPowerWatts": 100
+    },
+    "upc": "456789012345"
+  }
+]
