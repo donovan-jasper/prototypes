@@ -1,20 +1,18 @@
-# FlowForge
+# Aurora AI
 
-> FlowForge
+Aurora AI: Revolutionize your workflow with AI-native SaaS architecture, stabilizing long-lived applications and streamlining schema changes.
 
-## Features
+### What it does
+*   **AI-powered Application Builder**: Visually design applications with AI-driven schema and workflow optimization.
+*   **Schema Evolution Management**: Seamlessly manage and evolve application schemas and state over time.
 
-- FlowForge
+### Monetization
+Subscription-based model for SaaS features and usage.
 
-## Details
+### Tech Stack
+Built with React Native (Expo), SQLite, `expo-sqlite`, and `react-native-svg`.
 
-| | |
-|---|---|
-| **Score** | None/10 |
-| **Stack** | React Native (Expo) |
-
-## Run
-
+### How to Run
 ```bash
 npx expo start
 ```

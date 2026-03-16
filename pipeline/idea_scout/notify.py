@@ -42,9 +42,9 @@ async def notify_daemon(msg: str, tags: str = "robot"):
 
 
 async def notify_high_score_idea(idea: dict):
-    """Individual notification for an idea scoring 8+. Truly exciting ideas only.
+    """Individual notification when an idea scores >= 7 during analysis.
 
-    Title: "New 9/10: CramCure"
+    Title: "New 8/10: CramCure"
     Body:
     Smart flashcard app that uses spaced repetition
     Money: Freemium $4.99/mo
@@ -52,8 +52,6 @@ async def notify_high_score_idea(idea: dict):
     Gap: No good mobile-first solution exists
     """
     score = idea.get("viability_score", 0)
-    if score < 8:
-        return
     title = idea.get("title", "Unknown")
     summary, parts = _parse_analysis(idea.get("analysis", "") or "")
 
@@ -70,36 +68,6 @@ async def notify_high_score_idea(idea: dict):
     tags = "star2,iphone" if score >= 9 else "bulb,iphone"
 
     await _send(ntfy_title, "\n".join(body_lines), tags=tags, priority=priority)
-
-
-async def notify_batch_analysis(ideas: list[dict]):
-    """Single summary notification for all 7+ ideas from one analyze_batch run.
-
-    Skips if no ideas scored 7+. Ideas scoring 8+ also get their own
-    individual notification via notify_high_score_idea.
-
-    Title: "3 new buildable ideas"
-    Body:
-    CramCure (8/10) - Smart flashcard app
-    DayDrop (7/10) - Daily habit tracker
-    FlipFile (7/10) - Resume builder
-    """
-    if not ideas:
-        return
-    # Sort descending by score
-    ideas = sorted(ideas, key=lambda i: i.get("viability_score", 0), reverse=True)
-    count = len(ideas)
-    ntfy_title = f"{count} new buildable idea{'s' if count != 1 else ''}"
-
-    body_lines = []
-    for idea in ideas:
-        score = idea.get("viability_score", 0)
-        title = idea.get("title", "Unknown")
-        summary, _ = _parse_analysis(idea.get("analysis", "") or "")
-        short = (summary or title)[:60]
-        body_lines.append(f"{title[:30]} ({score}/10) - {short}")
-
-    await _send(ntfy_title, "\n".join(body_lines), tags="bulb,iphone")
 
 
 async def notify_build_complete(idea: dict, status: str, file_count: int):
@@ -138,6 +106,31 @@ async def notify_improvement(idea: dict, improvement: str, status: str, round_nu
     title = idea.get("title", "Unknown")
     ntfy_title = f"Improved: {title[:35]} (r{round_num}) [{status}]"
     await _send(ntfy_title, improvement[:200], tags="sparkles")
+
+
+async def notify_analysis_batch(ideas: list[dict]):
+    """Single notification summarizing a batch of 7+ ideas found during analysis.
+
+    Title: "Analyzed: 3 promising ideas"
+    Body:
+    [8] CramCure — Smart flashcard app
+    [7] DayDrop — One-note-per-day journal
+    [7] FlipFile — Client-side file converter
+    """
+    if not ideas:
+        return
+
+    lines = []
+    for idea in sorted(ideas, key=lambda x: x.get("viability_score", 0), reverse=True):
+        score = idea.get("viability_score", 0)
+        title = idea.get("title", "?")[:30]
+        summary, _ = _parse_analysis(idea.get("analysis", "") or "")
+        # Truncate summary to first sentence or 60 chars
+        short = summary[:60].split(".")[0] if summary else ""
+        lines.append(f"[{score}] {title} — {short}")
+
+    ntfy_title = f"Analyzed: {len(ideas)} promising idea{'s' if len(ideas) != 1 else ''}"
+    await _send(ntfy_title, "\n".join(lines), tags="bulb,iphone")
 
 
 async def notify_scout_complete(new_count: int, total_queries: int):
