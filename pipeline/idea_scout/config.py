@@ -25,3 +25,9 @@ HN_SEARCH_QUERIES = [
 
 # How many stories to fetch per source
 HN_STORY_LIMIT = 30
+
+# Daemon config
+SCOUT_INTERVAL_HOURS = int(os.getenv("SCOUT_INTERVAL_HOURS", "5"))
+IDLE_SLEEP_MINUTES = int(os.getenv("IDLE_SLEEP_MINUTES", "30"))
+MIN_BACKLOG = int(os.getenv("MIN_BACKLOG", "3"))
+MAX_IMPROVEMENTS = int(os.getenv("MAX_IMPROVEMENTS", "3"))
