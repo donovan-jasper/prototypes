@@ -84,7 +84,7 @@ async def build_next_prototype():
     spec = await generate_spec(idea)
 
     # Step 2: Generate code (coder model)
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=300) as client:
         print("  [coder] Generating code...")
         code_response = await generate_code(client, spec)
         files = parse_code_blocks(code_response)

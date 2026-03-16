@@ -6,7 +6,7 @@ async def llm_call(client: httpx.AsyncClient, model: str, messages: list[dict], 
     resp = await client.post(
         f"{OMNIROUTE_BASE}/chat/completions",
         json={"model": model, "messages": messages, "temperature": temperature},
-        timeout=120,
+        timeout=300,
     )
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"]
