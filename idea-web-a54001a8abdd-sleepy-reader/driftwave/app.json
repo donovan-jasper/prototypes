@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "DriftWave",
+    "slug": "driftwave",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "UIBackgroundModes": ["audio"],
+        "NSMotionUsageDescription": "We use motion data to detect your sleep stages",
+        "NSHealthShareUsageDescription": "We share sleep data with Apple Health",
+        "NSHealthUpdateUsageDescription": "We update your sleep data in Apple Health"
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "permissions": ["BODY_SENSORS", "FOREGROUND_SERVICE", "RECEIVE_BOOT_COMPLETED"]
+    },
+    "plugins": [
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow DriftWave to detect when you fall asleep"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ]
+    ]
+  }
+}
