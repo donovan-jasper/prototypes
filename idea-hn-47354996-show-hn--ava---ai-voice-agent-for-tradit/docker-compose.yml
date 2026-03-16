@@ -1,0 +1,34 @@
+version: '3.8'
+services:
+  asterisk:
+    image: andrius/asterisk:18
+    ports:
+      - "5060:5060/udp"
+      - "8088:8088"
+    volumes:
+      - ./config/asterisk:/etc/asterisk
+    networks:
+      - ava-network
+  
+  ava:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # These override values in ava_config.yaml if set
+      - ASTERISK_ARI_URL=http://asterisk:8088
+      - ASTERISK_ARI_USER=ava
+      - ASTERISK_ARI_PASSWORD=ava_secret
+      # Set your OpenAI API key here or directly in config/ava_config.yaml
+      # - OPENAI_API_KEY=sk-YOUR_OPENAI_API_KEY
+    volumes:
+      - ./config/ava_config.yaml:/app/config/ava_config.yaml
+      - ./data:/app/data
+    depends_on:
+      - asterisk
+    networks:
+      - ava-network
+
+networks:
+  ava-network:
+    driver: bridge

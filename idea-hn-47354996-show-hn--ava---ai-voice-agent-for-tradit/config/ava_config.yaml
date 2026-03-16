@@ -1,0 +1,23 @@
+asterisk:
+  ari_url: "http://asterisk:8088"
+  ari_user: "ava"
+  ari_password: "ava_secret"
+  app_name: "ava-app"
+
+ai_providers:
+  stt:
+    provider: "openai"
+    api_key: "" # Replace with your OpenAI API key or set OPENAI_API_KEY env var
+  llm:
+    provider: "openai"
+    api_key: "" # Replace with your OpenAI API key or set OPENAI_API_KEY env var
+    model: "gpt-4"
+    system_prompt: "You are a helpful phone assistant. Keep responses brief and conversational."
+  tts:
+    provider: "openai"
+    api_key: "" # Replace with your OpenAI API key or set OPENAI_API_KEY env var
+    voice: "alloy"
+
+audio:
+  vad_threshold: 0.02
+  silence_duration: 1.5
