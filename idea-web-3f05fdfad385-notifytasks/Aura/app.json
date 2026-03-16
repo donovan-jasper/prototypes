@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "Aura",
+    "slug": "aura",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.aura",
+      "infoPlist": {
+        "UIBackgroundModes": ["remote-notification"],
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to provide location-based reminders."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.yourcompany.aura",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      "expo-sqlite",
+      "expo-in-app-purchases"
+    ]
+  }
+}
