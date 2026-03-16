@@ -1,0 +1,591 @@
+:root {
+    --primary-color: #4CAF50; /* Green */
+    --primary-dark-color: #388E3C;
+    --secondary-color: #2196F3; /* Blue */
+    --background-color: #f4f7f6;
+    --surface-color: #ffffff;
+    --border-color: #e0e0e0;
+    --text-color: #333333;
+    --light-text-color: #666666;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --node-start-color: #8BC34A; /* Light Green */
+    --node-stt-color: #2196F3;  /* Blue */
+    --node-llm-color: #4CAF50;  /* Green */
+    --node-tts-color: #9C27B0;  /* Purple */
+    --node-branch-color: #FF9800; /* Orange */
+    --node-end-color: #F44336;  /* Red */
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: var(--text-color);
+    background-color: var(--background-color);
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+#app {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+}
+
+header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 1rem 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px var(--shadow-color);
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.8rem;
+}
+
+header nav button {
+    background-color: var(--primary-dark-color);
+    color: white;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    margin-left: 0.8rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+}
+
+header nav button:hover {
+    background-color: #2e7d32;
+}
+
+.main-container {
+    display: flex;
+    flex-grow: 1;
+}
+
+.sidebar {
+    width: 300px;
+    background-color: var(--surface-color);
+    border-right: 1px solid var(--border-color);
+    padding: 1.5rem;
+    box-shadow: 2px 0 5px var(--shadow-color);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.sidebar h2 {
+    font-size: 1.4rem;
+    color: var(--primary-color);
+    margin-bottom: 1rem;
+    border-bottom: 2px solid var(--primary-color);
+    padding-bottom: 0.5rem;
+}
+
+#workflow-list {
+    list-style: none;
+    padding: 0;
+}
+
+#workflow-list li {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    padding: 0.8rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+#workflow-list li:hover {
+    background-color: #e9ecef;
+    border-color: var(--primary-color);
+}
+
+#workflow-list li.selected {
+    background-color: var(--primary-color);
+    color: white;
+    border-color: var(--primary-dark-color);
+}
+
+#workflow-list li.selected .delete-workflow-btn {
+    color: white;
+}
+
+.delete-workflow-btn {
+    background: none;
+    border: none;
+    color: var(--light-text-color);
+    font-size: 1.2rem;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: color 0.2s ease;
+}
+
+.delete-workflow-btn:hover {
+    color: var(--node-end-color);
+}
+
+.content-area {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--background-color);
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+    padding: 0 1.5rem;
+}
+
+.tab-button {
+    background-color: transparent;
+    border: none;
+    padding: 1rem 1.5rem;
+    cursor: pointer;
+    font-size: 1rem;
+    color: var(--light-text-color);
+    border-bottom: 3px solid transparent;
+    transition: color 0.2s ease, border-bottom-color 0.2s ease;
+}
+
+.tab-button:hover {
+    color: var(--text-color);
+}
+
+.tab-button.active {
+    color: var(--primary-color);
+    border-bottom-color: var(--primary-color);
+    font-weight: bold;
+}
+
+.tab-content {
+    flex-grow: 1;
+    display: none;
+    position: relative; /* For canvas toolbar positioning */
+}
+
+.tab-content.active {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Canvas Editor */
+#canvas-editor {
+    position: relative;
+    overflow: hidden;
+}
+
+#workflow-canvas {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+#workflow-canvas.dragging {
+    cursor: grabbing;
+}
+
+.canvas-toolbar {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    z-index: 10;
+    pointer-events: none; /* Allow canvas interaction underneath */
+}
+
+.node-palette {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 5px var(--shadow-color);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    pointer-events: all; /* Re-enable pointer events for palette items */
+}
+
+.node-item {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: 5px;
+    cursor: grab;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    transition: background-color 0.2s ease;
+}
+
+.node-item:hover {
+    background-color: #e9ecef;
+}
+
+.canvas-controls {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    box-shadow: 0 2px 5px var(--shadow-color);
+    display: flex;
+    gap: 5px;
+    pointer-events: all;
+}
+
+.canvas-controls button {
+    background-color: var(--secondary-color);
+    color: white;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1.1rem;
+    transition: background-color 0.2s ease;
+}
+
+.canvas-controls button:hover {
+    background-color: #1976D2;
+}
+
+/* Node styles for canvas rendering (handled by JS, but for visual reference) */
+/* .node {
+    border-radius: 8px;
+    padding: 10px 15px;
+    font-size: 0.9rem;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    cursor: grab;
+    position: absolute;
+    color: white;
+    font-weight: bold;
+}
+.node.start { background-color: var(--node-start-color); }
+.node.stt { background-color: var(--node-stt-color); }
+.node.llm { background-color: var(--node-llm-color); }
+.node.tts { background-color: var(--node-tts-color); }
+.node.branch { background-color: var(--node-branch-color); }
+.node.end { background-color: var(--node-end-color); }
+*/
+
+/* Voice Test */
+#voice-test {
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+#voice-test h2 {
+    color: var(--primary-color);
+    margin-bottom: 0.5rem;
+}
+
+.voice-controls {
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    box-shadow: 0 2px 5px var(--shadow-color);
+}
+
+.voice-controls label {
+    font-weight: bold;
+    color: var(--light-text-color);
+}
+
+.voice-controls select {
+    padding: 0.6rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1rem;
+    min-width: 200px;
+}
+
+#record-btn {
+    background-color: var(--node-end-color); /* Red for record */
+    color: white;
+    border: none;
+    padding: 0.8rem 1.5rem;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+}
+
+#record-btn.recording {
+    background-color: var(--primary-dark-color); /* Green when recording */
+}
+
+#record-btn:hover {
+    opacity: 0.9;
+}
+
+#audio-waveform {
+    flex-grow: 1;
+    height: 40px;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+    position: relative;
+}
+
+#audio-waveform::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 0%; /* Controlled by JS */
+    height: 100%;
+    background-color: var(--secondary-color);
+    transition: width 0.1s linear;
+}
+
+#voice-status {
+    font-style: italic;
+    color: var(--light-text-color);
+}
+
+.voice-output {
+    flex-grow: 1;
+    background-color: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 5px var(--shadow-color);
+    overflow-y: auto;
+}
+
+.voice-output h3 {
+    color: var(--secondary-color);
+    margin-bottom: 0.8rem;
+    border-bottom: 1px dashed var(--border-color);
+    padding-bottom: 0.5rem;
+}
+
+.chat-bubble {
+    padding: 10px 15px;
+    border-radius: 15px;
+    margin-bottom: 10px;
+    max-width: 80%;
+    word-wrap: break-word;
+}
+
+.chat-bubble.user {
+    background-color: #e0f7fa; /* Light blue */
+    align-self: flex-end;
+    margin-left: auto;
+    text-align: right;
+}
+
+.chat-bubble.assistant {
+    background-color: #e8f5e9; /* Light green */
+    align-self: flex-start;
+    margin-right: auto;
+    text-align: left;
+}
+
+
+/* Modals */
+.modal {
+    display: none; /* Hidden by default */
+    position: fixed; /* Stay in place */
+    z-index: 100; /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%; /* Full width */
+    height: 100%; /* Full height */
+    overflow: auto; /* Enable scroll if needed */
+    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+    justify-content: center;
+    align-items: center;
+}
+
+.modal-content {
+    background-color: var(--surface-color);
+    margin: auto;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px var(--shadow-color);
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+}
+
+.modal-content h2 {
+    color: var(--primary-color);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+.modal-content label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+    color: var(--light-text-color);
+}
+
+.modal-content input[type="text"],
+.modal-content input[type="password"],
+.modal-content select,
+.modal-content textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    font-size: 1rem;
+}
+
+.modal-content button {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.2s ease;
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+}
+
+.modal-content button:hover {
+    background-color: var(--primary-dark-color);
+}
+
+.close-button {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    right: 20px;
+    cursor: pointer;
+}
+
+.close-button:hover,
+.close-button:focus {
+    color: var(--text-color);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Provider Config Modal Specifics */
+.provider-config-item {
+    background-color: var(--background-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.provider-config-item h3 {
+    color: var(--secondary-color);
+    margin-bottom: 1rem;
+}
+
+.provider-config-item button {
+    margin-top: 0.8rem;
+    background-color: var(--secondary-color);
+}
+
+.provider-config-item button:hover {
+    background-color: #1976D2;
+}
+
+#provider-status {
+    margin-top: 1rem;
+    text-align: center;
+    color: var(--primary-color);
+    font-weight: bold;
+}
+
+/* Node Config Form Specifics */
+#node-config-form .form-group {
+    margin-bottom: 15px;
+}
+
+#node-config-form .form-group label {
+    margin-bottom: 5px;
+}
+
+#node-config-form .form-group input[type="number"] {
+    width: auto;
+}
+
+#node-config-form .form-group textarea {
+    min-height: 80px;
+    resize: vertical;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    header nav {
+        margin-top: 1rem;
+    }
+    header nav button {
+        margin-left: 0;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+    .main-container {
+        flex-direction: column;
+    }
+    .sidebar {
+        width: 100%;
+        max-height: 250px;
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .canvas-toolbar {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+        position: static; /* Make toolbar part of normal flow */
+        padding: 10px;
+    }
+    .node-palette {
+        width: 100%;
+        justify-content: center;
+    }
+    .canvas-controls {
+        width: 100%;
+        justify-content: center;
+    }
+    #workflow-canvas {
+        height: 500px; /* Fixed height for smaller screens */
+    }
+}

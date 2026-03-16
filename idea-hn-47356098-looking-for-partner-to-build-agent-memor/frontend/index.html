@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VectorMind Prototype</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>VectorMind Prototype</h1>
+        <p class="pitch">VectorMind is a high-performance, bare-metal memory platform for autonomous AI agents, utilizing Vector Symbolic Architecture to enable O(1) constant-time SIMD operations for complex graph traversals.</p>
+
+        <section class="card">
+            <h2>VSA Operations</h2>
+            <div class="input-group">
+                <button id="createVectorBtn">Create VSA Vector</button>
+                <textarea id="vectorOutput" rows="3" placeholder="Generated VSA Vector (JSON string)" readonly></textarea>
+            </div>
+            <div class="input-group">
+                <label for="vec1Input">Vector 1 (JSON string):</label>
+                <textarea id="vec1Input" rows="2" placeholder="Paste VSA Vector 1 here"></textarea>
+                <label for="vec2Input">Vector 2 (JSON string):</label>
+                <textarea id="vec2Input" rows="2" placeholder="Paste VSA Vector 2 here"></textarea>
+                <button id="bindVectorsBtn">Bind Vectors</button>
+                <button id="similarityVectorsBtn">Calculate Similarity</button>
+                <textarea id="vsaResultOutput" rows="3" placeholder="VSA Operation Result" readonly></textarea>
+            </div>
+            <div class="input-group">
+                <label for="bundleVectorsInput">Vectors to Bundle (JSON array of strings):</label>
+                <textarea id="bundleVectorsInput" rows="3" placeholder='e.g., ["vector1_str", "vector2_str"]'></textarea>
+                <button id="bundleVectorsBtn">Bundle Vectors</button>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Graph Traversal Engine</h2>
+            <div class="input-group">
+                <label for="nodeNameInput">Node Name:</label>
+                <input type="text" id="nodeNameInput" placeholder="e.g., conceptA">
+                <label for="nodeVsaInput">VSA Vector (optional, JSON string):</label>
+                <textarea id="nodeVsaInput" rows="2" placeholder="Leave empty to auto-generate"></textarea>
+                <button id="addNodeBtn">Add Graph Node</button>
+            </div>
+            <div class="input-group">
+                <label for="sourceNodeInput">Source Node Name:</label>
+                <input type="text" id="sourceNodeInput" placeholder="e.g., conceptA">
+                <label for="targetNodeInput">Target Node Name:</label>
+                <input type="text" id="targetNodeInput" placeholder="e.g., conceptB">
+                <button id="addEdgeBtn">Add Graph Edge</button>
+            </div>
+            <div class="input-group">
+                <label for="startNodeInput">Start Node for Traversal:</label>
+                <input type="text" id="startNodeInput" placeholder="e.g., conceptA">
+                <button id="traverseGraphBtn">Traverse Graph (BFS)</button>
+                <textarea id="graphTraversalOutput" rows="3" placeholder="Traversal Path" readonly></textarea>
+            </div>
+            <div id="graphStatus" class="status-message"></div>
+        </section>
+
+        <section class="card">
+            <h2>Agent Memory Management</h2>
+            <div class="input-group">
+                <label for="memoryDescriptionInput">Memory Description:</label>
+                <textarea id="memoryDescriptionInput" rows="2" placeholder="e.g., Agent learned to open the door"></textarea>
+                <button id="storeMemoryBtn">Store Memory</button>
+            </div>
+            <div class="input-group">
+                <label for="memoryQueryInput">Query for Memories:</label>
+                <input type="text" id="memoryQueryInput" placeholder="e.g., door opening">
+                <label for="memoryThresholdInput">Similarity Threshold (0-1):</label>
+                <input type="number" id="memoryThresholdInput" value="0.7" step="0.1" min="0" max="1">
+                <button id="retrieveMemoryBtn">Retrieve Memories</button>
+            </div>
+            <div class="input-group">
+                <button id="getAllMemoriesBtn">Get All Memories</button>
+                <textarea id="memoryOutput" rows="5" placeholder="Stored/Retrieved Memories" readonly></textarea>
+            </div>
+            <div id="memoryStatus" class="status-message"></div>
+        </section>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+{
+  "name": "vector-mind",
+  "version": "1.0.0",
+  "description": "VectorMind is a high-performance, bare-metal memory platform for autonomous AI agents, utilizing Vector Symbolic Architecture to enable O(1) constant-time SIMD operations for complex graph traversals.",
+  "main": "backend/app.js",
+  "scripts": {
+    "start": "node backend/app.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "VSA",
+    "Vector Symbolic Architecture",
+    "AI",
+    "Agent Memory",
+    "Graph Traversal",
+    "Hyperdimensional Computing"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "sqlite3": "^5.1.7"
+  }
+}
