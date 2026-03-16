@@ -27,12 +27,14 @@ async def send_digest(ideas: list[dict]):
     """Send daily digest via ntfy."""
     body = format_digest(ideas)
     async with httpx.AsyncClient() as client:
+        # ASCII-safe title to avoid httpx encoding errors
+        title = f"Top {len(ideas)} Mobile App Ideas"
         await client.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
-            content=body.encode(),
+            content=body.encode("utf-8"),
             headers={
-                "Title": f"Top {len(ideas)} App Ideas",
+                "Title": title.encode("ascii", errors="replace").decode(),
                 "Priority": "default",
-                "Tags": "bulb",
+                "Tags": "bulb,iphone",
             },
         )

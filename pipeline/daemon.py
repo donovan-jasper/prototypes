@@ -17,8 +17,11 @@ async def notify(msg: str, title: str = "Pipeline", tags: str = "robot"):
         async with httpx.AsyncClient() as client:
             await client.post(
                 f"https://ntfy.sh/{NTFY_TOPIC}",
-                content=msg.encode(),
-                headers={"Title": title, "Tags": tags},
+                content=msg.encode("utf-8"),
+                headers={
+                    "Title": title.encode("ascii", errors="replace").decode(),
+                    "Tags": tags,
+                },
             )
     except Exception:
         pass

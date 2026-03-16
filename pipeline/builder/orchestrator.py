@@ -134,6 +134,7 @@ async def build_next_prototype():
     # Notify
     analysis = idea.get("analysis", "") or ""
     summary = analysis.split("\n")[0] if analysis else idea["title"]
+    ntfy_title = f"Built: {idea['title'][:60]}".encode("ascii", errors="replace").decode()
     async with httpx.AsyncClient() as client:
         await client.post(
             f"https://ntfy.sh/{NTFY_TOPIC}",
@@ -142,11 +143,11 @@ async def build_next_prototype():
                 f"Score: {idea['viability_score']}/10\n"
                 f"Status: {status}\n"
                 f"Files: {len(files)}"
-            ).encode(),
+            ).encode("utf-8"),
             headers={
-                "Title": f"Built: {idea['title'][:60]}",
+                "Title": ntfy_title,
                 "Priority": "high" if success else "default",
-                "Tags": "white_check_mark" if success else "warning",
+                "Tags": "white_check_mark,iphone" if success else "warning",
             },
         )
 
