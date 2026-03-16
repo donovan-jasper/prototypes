@@ -37,7 +37,7 @@ EXTRACT_IDEAS_PROMPT = """Extract MOBILE APP ideas from these web search results
 Focus on ideas that would work as a paid/freemium mobile app (iOS or Android).
 
 For each idea found, return:
-- title: concise name for the mobile app
+- title: a CREATIVE, ORIGINAL app name (NOT the name from the source post). Good names alliterate (SnapShift), are punchy acronyms, or catchy words. NEVER copy the project name from the source.
 - description: what the person wants/needs as a mobile app (2-3 sentences)
 - source_url: the URL where you found it
 - source_type: "reddit", "hn", "twitter", "forum", "blog", "producthunt", or "other"
@@ -75,8 +75,22 @@ Return JSON:
 
 Be honest. If strong mobile competitors exist with no clear gap, score low. Only a JSON object."""
 
-MAX_SEARCH_QUERIES = 20
+MAX_SEARCH_QUERIES = 25
 MAX_PAGE_FETCHES = 30
+
+# Always-run queries that reliably find mobile app demand on Reddit/social
+SEED_QUERIES = [
+    '"I wish there was an app" site:reddit.com',
+    '"someone should make an app" site:reddit.com',
+    '"is there an app that" site:reddit.com',
+    '"I would pay for" app site:reddit.com',
+    '"no good app for" site:reddit.com',
+    '"why is there no app" site:reddit.com',
+    '"need an app" site:reddit.com/r/androidapps OR site:reddit.com/r/iphone',
+    '"app idea" site:reddit.com/r/AppIdeas OR site:reddit.com/r/SomebodyMakeThis',
+    '"looking for an app" site:reddit.com -"found it"',
+    '"every app for" "sucks" OR "terrible" OR "awful" site:reddit.com',
+]
 
 
 def parse_ideas_from_llm(text: str) -> list[dict]:
@@ -156,21 +170,24 @@ async def run_agentic_scout(db: IdeaDB) -> int:
     new_count = 0
 
     async with httpx.AsyncClient(timeout=30) as client:
-        # Step 1: Generate search queries
+        # Step 1: Seed queries (guaranteed Reddit/social hits) + LLM-generated queries
         print("  [scout] Generating search queries...")
-        query_response = await _llm_call(client, QUERY_GEN_PROMPT)
+        queries = list(SEED_QUERIES)  # always search these first
         try:
+            query_response = await _llm_call(client, QUERY_GEN_PROMPT)
             cleaned = query_response.strip()
             if "```" in cleaned:
                 cleaned = cleaned.split("```")[1]
                 if cleaned.startswith("json"):
                     cleaned = cleaned[4:]
                 cleaned = cleaned.strip()
-            queries = json.loads(cleaned)
-        except json.JSONDecodeError:
-            queries = []
+            llm_queries = json.loads(cleaned)
+            if isinstance(llm_queries, list):
+                queries.extend(llm_queries)
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"  [scout] LLM query gen failed: {e}, using seed queries only")
         queries = queries[:MAX_SEARCH_QUERIES]
-        print(f"  [scout] Got {len(queries)} queries")
+        print(f"  [scout] Got {len(queries)} queries ({len(SEED_QUERIES)} seed + {len(queries) - len(SEED_QUERIES)} LLM)")
 
         # Step 2: Search and collect results
         all_context = []
