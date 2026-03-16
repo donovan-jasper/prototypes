@@ -9,6 +9,7 @@ from .code_builder import generate_code, fix_with_unstuck, parse_code_blocks
 
 
 PROTOTYPES_DIR = os.path.expanduser("~/prototypes")
+UV_BIN = os.path.expanduser("~/.local/bin/uv")
 MAX_UNSTUCK_RETRIES = 2
 
 
@@ -28,7 +29,7 @@ def try_install_and_test(project_dir: str) -> tuple[bool, str]:
 
     if os.path.exists(req_txt):
         r = subprocess.run(
-            ["uv", "pip", "install", "-r", "requirements.txt", "--python", "python3"],
+            [UV_BIN, "pip", "install", "-r", "requirements.txt", "--python", "python3"],
             cwd=project_dir, capture_output=True, text=True, timeout=120,
         )
         if r.returncode != 0:
