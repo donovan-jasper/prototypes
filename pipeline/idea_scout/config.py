@@ -2,7 +2,7 @@ import os
 
 # LLM config — OmniRoute gateway (OpenAI-compatible endpoint)
 OMNIROUTE_BASE = os.getenv("OMNIROUTE_BASE", "http://localhost:20128/v1")
-OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "qw/qwen3-coder-plus")
+OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "free-pipeline")
 DB_PATH = os.path.expanduser("~/prototypes/pipeline/ideas.db")
 NTFY_TOPIC = "donovan-oci-app-pipeline"
 
