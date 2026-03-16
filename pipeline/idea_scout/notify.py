@@ -22,6 +22,20 @@ async def _send(title: str, body: str, tags: str = "robot", priority: str = "def
         pass
 
 
+def _parse_analysis(analysis: str) -> tuple[str, dict]:
+    """Parse analysis text into (summary, key-value dict)."""
+    lines = analysis.split("\n")
+    summary = lines[0] if lines else ""
+    parts = {}
+    for line in lines[1:]:
+        if ":" in line:
+            key = line.split(":")[0].strip()
+            val = ":".join(line.split(":")[1:]).strip()
+            if val:
+                parts[key] = val
+    return summary, parts
+
+
 async def notify_daemon(msg: str, tags: str = "robot"):
     """Daemon lifecycle events (start, error, idle)."""
     await _send("Pipeline", msg, tags=tags)
@@ -30,39 +44,24 @@ async def notify_daemon(msg: str, tags: str = "robot"):
 async def notify_high_score_idea(idea: dict):
     """Individual notification when an idea scores >= 7 during analysis.
 
-    Format:
     Title: "New 8/10: CramCure"
     Body:
     Smart flashcard app that uses spaced repetition
     Money: Freemium $4.99/mo
     Who: Students, language learners
+    Gap: No good mobile-first solution exists
     """
     score = idea.get("viability_score", 0)
     title = idea.get("title", "Unknown")
-    analysis = idea.get("analysis", "") or ""
+    summary, parts = _parse_analysis(idea.get("analysis", "") or "")
 
-    # Parse analysis: first line is summary, rest are "Key: value" pairs
-    lines = analysis.split("\n")
-    summary = lines[0] if lines else title
-    parts = {}
-    for line in lines[1:]:
-        if ":" in line:
-            key = line.split(":")[0].strip()
-            val = ":".join(line.split(":")[1:]).strip()
-            if val:
-                parts[key] = val
-
-    monetization = parts.get("Monetization", "")
-    audience = parts.get("Audience", "")
-    gap = parts.get("Gap", "")
-
-    body_lines = [summary[:120]]
-    if monetization:
-        body_lines.append(f"Money: {monetization[:80]}")
-    if audience:
-        body_lines.append(f"Who: {audience[:80]}")
-    if gap:
-        body_lines.append(f"Gap: {gap[:80]}")
+    body_lines = [(summary or title)[:120]]
+    if parts.get("Monetization"):
+        body_lines.append(f"Money: {parts['Monetization'][:80]}")
+    if parts.get("Audience"):
+        body_lines.append(f"Who: {parts['Audience'][:80]}")
+    if parts.get("Gap"):
+        body_lines.append(f"Gap: {parts['Gap'][:80]}")
 
     ntfy_title = f"New {score}/10: {title[:50]}"
     priority = "high" if score >= 9 else "default"
@@ -74,7 +73,6 @@ async def notify_high_score_idea(idea: dict):
 async def notify_build_complete(idea: dict, status: str, file_count: int):
     """Notification when a prototype build finishes.
 
-    Format:
     Title: "Built: CramCure [working]"
     Body:
     Smart flashcard app with spaced repetition
@@ -82,27 +80,16 @@ async def notify_build_complete(idea: dict, status: str, file_count: int):
     Money: Freemium $4.99/mo
     """
     title = idea.get("title", "Unknown")
-    analysis = idea.get("analysis", "") or ""
-    lines = analysis.split("\n")
-    summary = lines[0] if lines else title
-    parts = {}
-    for line in lines[1:]:
-        if ":" in line:
-            key = line.split(":")[0].strip()
-            val = ":".join(line.split(":")[1:]).strip()
-            if val:
-                parts[key] = val
-
-    monetization = parts.get("Monetization", "")
+    summary, parts = _parse_analysis(idea.get("analysis", "") or "")
 
     is_working = "working" in status or status == "improved"
     status_tag = "working" if is_working else "needs-fix"
     ntfy_title = f"Built: {title[:40]} [{status_tag}]"
 
-    body_lines = [summary[:120]]
+    body_lines = [(summary or title)[:120]]
     body_lines.append(f"Score: {idea.get('viability_score', '?')}/10 | Files: {file_count}")
-    if monetization:
-        body_lines.append(f"Money: {monetization[:80]}")
+    if parts.get("Monetization"):
+        body_lines.append(f"Money: {parts['Monetization'][:80]}")
 
     tags = "white_check_mark,iphone" if is_working else "warning"
     priority = "high" if is_working else "default"
@@ -113,8 +100,7 @@ async def notify_build_complete(idea: dict, status: str, file_count: int):
 async def notify_improvement(idea: dict, improvement: str, status: str, round_num: int):
     """Notification when a prototype improvement finishes.
 
-    Format:
-    Title: "Improved: CramCure (round 2) [improved]"
+    Title: "Improved: CramCure (r2) [improved]"
     Body: Added paywall skeleton with free trial
     """
     title = idea.get("title", "Unknown")
@@ -125,7 +111,7 @@ async def notify_improvement(idea: dict, improvement: str, status: str, round_nu
 async def notify_scout_complete(new_count: int, total_queries: int):
     """Notification when a scout cycle finishes finding new ideas."""
     if new_count == 0:
-        return  # Don't notify on empty runs
+        return
     await _send(
         f"Scout: {new_count} new ideas",
         f"Searched {total_queries} queries",
