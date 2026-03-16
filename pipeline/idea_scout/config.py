@@ -15,5 +15,8 @@ SUBREDDITS = [
     "startups",
 ]
 
-REDDIT_BASE = "https://old.reddit.com/r/{subreddit}/hot.json?limit=25"
-REDDIT_HEADERS = {"User-Agent": "idea-scout/0.1 (autonomous app pipeline)"}
+REDDIT_BASE = "https://www.reddit.com/r/{subreddit}/hot.json?limit=25&raw_json=1"
+REDDIT_HEADERS = {
+    "User-Agent": "idea-scout:v0.1 by /u/idea_scout_bot (autonomous app pipeline)",
+    "Accept": "application/json",
+}
