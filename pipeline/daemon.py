@@ -5,11 +5,13 @@ import traceback
 import httpx
 from idea_scout.config import (
     DB_PATH, NTFY_TOPIC, SCOUT_INTERVAL_HOURS, IDLE_SLEEP_MINUTES,
-    MIN_BACKLOG, MAX_IMPROVEMENTS,
+    MIN_BACKLOG, MAX_IMPROVEMENTS, OMNIROUTE_BASE, CODER_MODEL,
 )
 from idea_scout.db import IdeaDB
 from idea_scout.main import run as run_scout
 from idea_scout.analyzer import analyze_post
+from idea_scout.agentic_scraper import COMPETITION_PROMPT, parse_competition_from_llm
+from idea_scout.web_search import search_web
 from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
 
@@ -50,6 +52,52 @@ async def analyze_batch(db: IdeaDB, limit: int = 10):
     return scored
 
 
+async def competition_batch(db: IdeaDB, limit: int = 5):
+    """Run competition analysis on high-scoring ideas that lack it. Uses coder model."""
+    ideas = db.get_ideas_needing_competition(min_score=5, limit=limit)
+    if not ideas:
+        return 0
+    checked = 0
+    print(f"  Checking competition for {len(ideas)} ideas...")
+    async with httpx.AsyncClient(timeout=90) as client:
+        for idea in ideas:
+            try:
+                # Search for existing competitors
+                query = f"{idea['title']} mobile app"
+                results = search_web(query, max_results=5)
+                search_text = "\n".join(
+                    f"- {r['title']}: {r['body']}" for r in results
+                )
+                prompt = COMPETITION_PROMPT.format(
+                    title=idea["title"],
+                    description=idea.get("selftext", ""),
+                    search_results=search_text or "No results found",
+                )
+                resp = await client.post(
+                    f"{OMNIROUTE_BASE}/chat/completions",
+                    json={
+                        "model": CODER_MODEL,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.3,
+                    },
+                    timeout=90,
+                )
+                resp.raise_for_status()
+                content = resp.json()["choices"][0]["message"]["content"]
+                result = parse_competition_from_llm(content)
+                db.save_competition(
+                    idea["id"],
+                    result["competition_analysis"],
+                    result["competition_score"],
+                )
+                print(f"    [comp {result['competition_score']}/10] {idea['title'][:50]}")
+                checked += 1
+                await asyncio.sleep(3)  # rate limit buffer
+            except Exception as e:
+                print(f"    SKIP competition {idea['id']}: {type(e).__name__}")
+    return checked
+
+
 def _read_last_scout() -> float:
     try:
         with open(SCOUT_TIMESTAMP_FILE) as f:
@@ -74,27 +122,34 @@ async def run_loop():
             backlog = db.count_unbuilt_ideas(min_score=7)
             unanalyzed = len(db.get_unanalyzed_posts(limit=1))
 
-            # Priority 1: Scout for NEW ideas — but only if backlog is low or it's been a while
-            if hours_since_scout >= SCOUT_INTERVAL_HOURS and backlog < MIN_BACKLOG:
-                print(f"\n=== SCOUTING (backlog={backlog}, hours={hours_since_scout:.1f}) ===")
-                await run_scout()
-                _write_last_scout(time.time())
-                continue
-
-            # Priority 2: Build a prototype if we have buildable ideas
+            # Priority 1: Build if we have buildable ideas (highest value action)
             buildable = db.get_buildable_ideas(limit=1)
             if buildable:
                 print(f"\n=== BUILDING: {buildable[0]['title'][:50]} ===")
                 await build_next_prototype()
                 continue
 
-            # Priority 3: Analyze unscored ideas (small batches to avoid timeouts)
+            # Priority 2: Scout for NEW ideas — only if backlog is low
+            if hours_since_scout >= SCOUT_INTERVAL_HOURS and backlog < MIN_BACKLOG:
+                print(f"\n=== SCOUTING (backlog={backlog}, hours={hours_since_scout:.1f}) ===")
+                await run_scout()
+                _write_last_scout(time.time())
+                continue
+
+            # Priority 3: Analyze unscored ideas (small batches between builds)
             if unanalyzed:
                 print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
                 await analyze_batch(db, limit=10)
                 continue
 
-            # Priority 4: Improve existing prototype
+            # Priority 4: Competition check for promising ideas
+            needs_comp = db.get_ideas_needing_competition(min_score=5, limit=1)
+            if needs_comp:
+                print(f"\n=== COMPETITION CHECK ===")
+                await competition_batch(db, limit=5)
+                continue
+
+            # Priority 5: Improve existing prototype
             improvable = db.get_improvable_prototypes(
                 max_improvements=MAX_IMPROVEMENTS, limit=1
             )

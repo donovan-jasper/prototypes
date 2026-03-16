@@ -27,11 +27,12 @@ async def run():
     web_ideas = await run_agentic_scout(db)
     print(f"Agentic scout found {web_ideas} new mobile app ideas")
 
-    # 3. Send digest with top ideas
-    top = db.get_top_ideas(limit=5)
+    # 3. Send digest with NEW top ideas only (avoid duplicate notifications)
+    top = db.get_unsent_top_ideas(limit=5)
     if top:
         await send_digest(top)
-        print(f"Digest sent with {len(top)} top ideas")
+        db.mark_digest_sent([idea["id"] for idea in top])
+        print(f"Digest sent with {len(top)} new ideas")
 
 
 def main():

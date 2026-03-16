@@ -46,6 +46,7 @@ class IdeaDB:
             "demand_signal": "TEXT",
             "improvement_count": "INTEGER DEFAULT 0",
             "last_improved_at": "TIMESTAMP",
+            "digest_sent_at": "TIMESTAMP",
         }
         for col, col_type in new_cols.items():
             if col not in existing:
@@ -161,6 +162,41 @@ class IdeaDB:
             "UPDATE posts SET prototype_started = 1 WHERE id = ?", (post_id,),
         )
         self.conn.commit()
+
+    def get_unsent_top_ideas(self, limit: int = 5) -> list[dict]:
+        """Get top ideas that have NOT been included in a digest yet."""
+        rows = self.conn.execute(
+            """SELECT * FROM posts
+               WHERE viability_score IS NOT NULL
+                 AND digest_sent_at IS NULL
+               ORDER BY viability_score DESC, score DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_digest_sent(self, post_ids: list[str]):
+        """Mark ideas as included in a digest."""
+        if not post_ids:
+            return
+        self.conn.executemany(
+            "UPDATE posts SET digest_sent_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [(pid,) for pid in post_ids],
+        )
+        self.conn.commit()
+
+    def get_ideas_needing_competition(self, min_score: int = 5, limit: int = 5) -> list[dict]:
+        """Get analyzed ideas scoring >= min_score that lack competition analysis."""
+        rows = self.conn.execute(
+            """SELECT * FROM posts
+               WHERE viability_score >= ?
+                 AND viability_score IS NOT NULL
+                 AND competition_score IS NULL
+               ORDER BY viability_score DESC
+               LIMIT ?""",
+            (min_score, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def count_unbuilt_ideas(self, min_score: int = 7) -> int:
         row = self.conn.execute(

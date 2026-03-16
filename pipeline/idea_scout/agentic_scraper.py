@@ -236,9 +236,10 @@ async def run_agentic_scout(db: IdeaDB) -> int:
         if len(context_str) > 30000:
             context_str = context_str[:30000]
 
-        print("  [scout] Extracting ideas...")
+        print("  [scout] Extracting ideas (planner)...")
         extract_response = await _llm_call(
-            client, EXTRACT_IDEAS_PROMPT.format(context=context_str)
+            client, EXTRACT_IDEAS_PROMPT.format(context=context_str),
+            model=PLANNER_MODEL,
         )
         ideas = parse_ideas_from_llm(extract_response)
         print(f"  [scout] Extracted {len(ideas)} ideas")
