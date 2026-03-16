@@ -1,8 +1,11 @@
 import os
 
 # LLM config — OmniRoute gateway (OpenAI-compatible endpoint)
+# Role-based combos: planner (analysis/specs), coder (implementation), unstuck (error recovery)
 OMNIROUTE_BASE = os.getenv("OMNIROUTE_BASE", "http://localhost:20128/v1")
-OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "free-pipeline")
+PLANNER_MODEL = os.getenv("PLANNER_MODEL", "planner")
+CODER_MODEL = os.getenv("CODER_MODEL", "coder")
+UNSTUCK_MODEL = os.getenv("UNSTUCK_MODEL", "unstuck")
 DB_PATH = os.path.expanduser("~/prototypes/pipeline/ideas.db")
 NTFY_TOPIC = "donovan-oci-app-pipeline"
 

@@ -1,5 +1,5 @@
 import httpx
-from idea_scout.config import OMNIROUTE_BASE, OMNIROUTE_MODEL
+from idea_scout.config import OMNIROUTE_BASE, PLANNER_MODEL
 
 SPEC_PROMPT = """You are a senior software architect. Given this app idea, write a complete
 implementation spec that a coding agent can follow to build a working prototype.
@@ -29,7 +29,7 @@ async def generate_spec(post: dict) -> str:
         resp = await client.post(
             f"{OMNIROUTE_BASE}/chat/completions",
             json={
-                "model": OMNIROUTE_MODEL,
+                "model": PLANNER_MODEL,
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0.5,
             },

@@ -1,6 +1,6 @@
 import json
 import httpx
-from .config import OMNIROUTE_BASE, OMNIROUTE_MODEL
+from .config import OMNIROUTE_BASE, PLANNER_MODEL
 
 ANALYSIS_PROMPT = """Analyze this app idea from Reddit. Respond ONLY with valid JSON, no markdown.
 
@@ -52,7 +52,7 @@ async def analyze_post(client: httpx.AsyncClient, post: dict) -> dict:
     resp = await client.post(
         f"{OMNIROUTE_BASE}/chat/completions",
         json={
-            "model": OMNIROUTE_MODEL,
+            "model": PLANNER_MODEL,
             "messages": [{"role": "user", "content": prompt}],
             "temperature": 0.3,
         },
