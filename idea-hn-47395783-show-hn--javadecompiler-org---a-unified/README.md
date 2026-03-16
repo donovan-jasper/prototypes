@@ -1,29 +1,21 @@
-# Show HN: Javadecompiler.org – a unified Java decompiler and transformer API
+# CodeLens
 
-> Mobile reverse engineering and code analysis platform that allows developers to examine, decompile, and understand compiled applications across multiple programming languages with visual comparison to
+Mobile reverse engineering and code analysis platform that allows developers to examine, decompile, and understand compiled applications across multiple programming languages with visual comparison tools.
 
-**Gap:** No mobile-first reverse engineering tools exist. All current solutions require desktop/laptop computers. Security professionals and developers lack po
+**Who it's for:** Mobile app security researchers, penetration testers, software engineers doing code reviews, students learning reverse engineering, and freelance developers who need portable analysis tools for client work.
 
-## Features
+**Gap:** No mobile-first reverse engineering tools exist. All current solutions require desktop/laptop computers. Security professionals and developers lack portable options for examining compiled code while traveling or during field work.
 
-- Mobile developers debugging production issues** — When your app crashes in production and you need t
-- Freelance consultants doing code audits** — Clients send you an APK or IPA and want a security asses
-- Tech-curious non-developers** — People who want to understand "what's inside" their favorite apps. T
-- Open source contributors** — Examining closed-source apps to understand APIs, data structures, and i
+**Monetization:** Freemium model - free basic decompilation with ads, premium subscription at $9.99/month for advanced features like multi-format support, export capabilities, and comparison tools. Enterprise licenses for security firms at $49.99/month.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 9/10 |
-| **Monetization** | Freemium model - free basic decompilation with ads, premium subscription at $9.99/month for advanced features like multi |
-| **Audience** | Mobile app security researchers, penetration testers, software engineers doing code reviews, students learning reverse e |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Hard - Requires significant technical expertise to port complex decompilation en |
+**Viability: 7/10 | Competition: 9/10 | Difficulty: Hard - Requires significant technical expertise to port complex decompilation engines to mobile, optimize performance on limited hardware, and ensure compatibility across different architectures.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://news.ycombinator.com/item?id=47395783

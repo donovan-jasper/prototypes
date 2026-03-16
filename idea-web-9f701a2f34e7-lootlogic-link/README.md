@@ -1,29 +1,21 @@
-# LootLogic Link
+# LootVault
 
-> A universal mobile app for managing digital assets across games, with cross-platform inventory tracking and automation tools for non-gamers
+A universal mobile app for managing digital assets across games, with cross-platform inventory tracking and automation tools for non-gamers
+
+**Who it's for:** Players of free-to-play and subscription-based games (e.g., Fortnite, Genshin Impact, Diablo IV) who spend 10+ hours weekly in-game
 
 **Gap:** Most competitors are game-specific or lack automation features; no cross-platform inventory sync
 
-## Features
+**Monetization:** Freemium with $4.99/month premium tier for advanced features like auto-sell, vendor price alerts, and cloud backup
 
-- Broader appeal:**
-- Casual collectors** who play Pokémon GO, Marvel Snap, or mobile gacha games and want to track what t
-- Parents managing kids' accounts** across Roblox, Minecraft, Fortnite—one dashboard to see what's bee
-- Trading card game players** (MTG Arena, Hearthstone) who need deck-building tools and collection tra
-
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 7/10 |
-| **Monetization** | Freemium with $4.99/month premium tier for advanced features like auto-sell, vendor price alerts, and cloud backup |
-| **Audience** | Players of free-to-play and subscription-based games (e.g., Fortnite, Genshin Impact, Diablo IV) who spend 10+ hours wee |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — requires API partnerships with game publishers and robust backend infra |
+**Viability: 7/10 | Competition: 7/10 | Difficulty: Medium — requires API partnerships with game publishers and robust backend infrastructure**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/thedivision/comments/dcdbg4/i_would_pay_for_app/

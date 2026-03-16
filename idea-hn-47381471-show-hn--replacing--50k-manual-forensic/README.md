@@ -1,29 +1,21 @@
-# Show HN: Replacing $50k manual forensic audits with a deterministic .py engine
+# TraceGuard
 
-> Automated financial tracking and audit trail app that uses deterministic algorithms to trace money flow for personal asset protection, inheritance claims, business partnerships, and relationship finan
+Automated financial tracking and audit trail app that uses deterministic algorithms to trace money flow for personal asset protection, inheritance claims, business partnerships, and relationship finances.
 
-**Gap:** Existing finance apps focus on budgeting and investment tracking, but none provide court-admissible financial forensics or deterministic money-tracing
+**Who it's for:** High-net-worth individuals going through divorce, business partners needing financial transparency, entrepreneurs protecting pre-marital assets, small business owners tracking mixed personal/business funds, and anyone in financial disputes requiring audit trails.
 
-## Features
+**Gap:** Existing finance apps focus on budgeting and investment tracking, but none provide court-admissible financial forensics or deterministic money-tracing capabilities for legal disputes. Current apps rely on aggregation APIs that can fail or change, creating unreliable records.
 
-- Freelancers and gig workers** who need to prove income/expenses for tax audits, loan applications, o
-- Renters** documenting security deposit deductions, rent payment history, and landlord disputes
-- Small claims plaintiffs** building evidence for unpaid invoices, contractor disputes, or refund clai
-- Parents** tracking child support payments, shared custody expenses, or college fund contributions
+**Monetization:** Freemium model - free basic tracking, premium $99/month for advanced forensic features, unlimited document processing, and exportable audit trails. One-time $499 for major financial event analysis (divorce, inheritance, business dissolution).
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 8/10 |
-| **Monetization** | Freemium model - free basic tracking, premium $99/month for advanced forensic features, unlimited document processing, a |
-| **Audience** | High-net-worth individuals going through divorce, business partners needing financial transparency, entrepreneurs protec |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Hard - requires sophisticated OCR, complex financial algorithms, legal complianc |
+**Viability: 8/10 | Competition: 8/10 | Difficulty: Hard - requires sophisticated OCR, complex financial algorithms, legal compliance standards, and building trust for sensitive financial data processing**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://news.ycombinator.com/item?id=47381471

@@ -1,29 +1,21 @@
-# MomLink
+# ParentCircle
 
-> A hyper-local community app for parents (single or not) to share childcare, errands, and social support, with real-time coordination and verified profiles.
+A hyper-local community app for parents (single or not) to share childcare, errands, and social support, with real-time coordination and verified profiles.
 
-**Gap:** Existing apps lack real-time coordination, verified profiles, or a seamless blend of childcare and social support. Many are too transactional or lack 
+**Who it's for:** Parents (especially single parents, working parents, and dual-income households) in urban/suburban areas with limited free time or resources.
 
-## Features
+**Gap:** Existing apps lack real-time coordination, verified profiles, or a seamless blend of childcare and social support. Many are too transactional or lack mobile-native features.
 
-- Broadest reach:**
-- Working parents** (dual-income households) who need last-minute backup when daycare closes early or 
-- Single parents** seeking emotional support and practical help without judgment
-- Stay-at-home parents** combating isolation and seeking adult interaction
+**Monetization:** Freemium with premium features like verified profiles, priority listings, and ad-free browsing. Sponsorships from local businesses (e.g., daycares, babysitters).
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 7/10 |
-| **Monetization** | Freemium with premium features like verified profiles, priority listings, and ad-free browsing. Sponsorships from local  |
-| **Audience** | Parents (especially single parents, working parents, and dual-income households) in urban/suburban areas with limited fr |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — requires strong community moderation, local partnerships, and user enga |
+**Viability: 7/10 | Competition: 7/10 | Difficulty: Medium — requires strong community moderation, local partnerships, and user engagement strategies.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/singlemoms/comments/1hw7sfz/why_is_there_no_app_to_link_single_moms_together/

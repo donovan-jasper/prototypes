@@ -1,27 +1,21 @@
-# Unsubscribe Pro
+# Unsubscribe Pro Spec
 
-> A mobile-first email management assistant that automatically organizes, categorizes, and handles email cleanup tasks including unsubscribing, deleting, and organizing while providing smart recommendat
+A mobile-first email management assistant that automatically organizes, categorizes, and handles email cleanup tasks including unsubscribing, deleting, and organizing while providing smart recommendations for email hygiene.
 
-**Gap:** Existing apps are either too complex, require full email access (privacy concerns), lack iOS/Android optimization, or don't provide the seamless one-t
+**Who it's for:** Busy professionals aged 25-45 who receive 50+ emails daily and feel overwhelmed by inbox clutter, plus privacy-conscious users who want control over their digital footprint and marketing communications.
 
-## Features
+**Gap:** Existing apps are either too complex, require full email access (privacy concerns), lack iOS/Android optimization, or don't provide the seamless one-tap management experience that matches mobile user expectations for quick actions.
 
-- A mobile-first email management assistant that automatically organizes, categorizes, and handles ema
-- Email overload is primarily experienced on mobile where people check messages constantly. Phone nati
+**Monetization:** Freemium model - free tier handles 10 unsubscriptions/month, premium $2.99/mo for unlimited + smart email organization, duplicate removal, and privacy monitoring. People pay because it saves hours of manual email management monthly.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 6/10 |
-| **Monetization** | Freemium model - free tier handles 10 unsubscriptions/month, premium $2.99/mo for unlimited + smart email organization,  |
-| **Audience** | Busy professionals aged 25-45 who receive 50+ emails daily and feel overwhelmed by inbox clutter, plus privacy-conscious |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium - requires email API integrations, anti-spam detection algorithms, and bu |
+**Viability: 7/10 | Competition: 6/10 | Difficulty: Medium - requires email API integrations, anti-spam detection algorithms, and building trust with sensitive email access, but core functionality is achievable**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://twitter.com/VeronicaBuron/status/1907537186653651182

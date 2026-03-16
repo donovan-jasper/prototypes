@@ -1,27 +1,21 @@
-# Kindness Kitchen
+# Kindness Kitchen Spec
 
-> A mobile platform for sending personalized, on-demand gifts (food, flowers, experiences) with seamless delivery logistics, targeting emotional connections and community support.
+A mobile platform for sending personalized, on-demand gifts (food, flowers, experiences) with seamless delivery logistics, targeting emotional connections and community support.
 
-**Gap:** Existing gifting apps are either too generic (flowers, cards) or lack seamless delivery. No single platform combines food delivery with emotional gift
+**Who it's for:** Young professionals (25-40), parents, and community organizers who value thoughtful gestures. Also, nonprofits, hospitals, and shelters that need scalable gift distribution.
 
-## Features
+**Gap:** Existing gifting apps are either too generic (flowers, cards) or lack seamless delivery. No single platform combines food delivery with emotional gifting at scale.
 
-- A mobile platform for sending personalized, on-demand gifts (food, flowers, experiences) with seamle
-- Hyper-local delivery, real-time tracking, and social sharing features are phone-native advantages. U
+**Monetization:** Freemium model: Free basic gifting, premium features like custom messages, scheduled deliveries, and bulk discounts for nonprofits ($5-$20 per gift). Delivery fees could be a small markup on restaurant partnerships.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 8/10 |
-| **Monetization** | Freemium model: Free basic gifting, premium features like custom messages, scheduled deliveries, and bulk discounts for  |
-| **Audience** | Young professionals (25-40), parents, and community organizers who value thoughtful gestures. Also, nonprofits, hospital |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — Requires partnerships with restaurants, logistics coordination, and emo |
+**Viability: 8/10 | Competition: 8/10 | Difficulty: Medium — Requires partnerships with restaurants, logistics coordination, and emotional UX design.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/AppDevelopers/comments/1mcvd8v/i_had_an_idea_for_an_app_but_i_dont_know_how_to/

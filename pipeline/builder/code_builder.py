@@ -16,9 +16,9 @@ async def generate_code(client: httpx.AsyncClient, spec: str) -> str:
     """Generate code from a spec using the coder combo."""
     messages = [
         {"role": "system", "content": (
-            "You are a coding agent. Given a spec, output ALL files needed as a single response. "
+            "You are a coding agent. Given a spec, output ALL source code files needed as a single response. "
             "Format each file as:\n```path/to/file.ext\n<contents>\n```\n"
-            "Include a README.md with setup and run instructions. No commentary outside code blocks."
+            "Do NOT include a README.md — one will be generated separately. No commentary outside code blocks."
         )},
         {"role": "user", "content": f"Build this prototype:\n\n{spec}"},
     ]

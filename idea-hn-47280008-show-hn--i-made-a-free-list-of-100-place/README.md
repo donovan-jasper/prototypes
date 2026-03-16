@@ -1,27 +1,21 @@
-# Show HN: I made a free list of 100 places where you can promote your app
+# LaunchLift
 
-> A mobile app that aggregates and ranks curated directories for app promotion, startup discovery, and tool marketing, with real-time DR metrics and submission tracking
+A mobile app that aggregates and ranks curated directories for app promotion, startup discovery, and tool marketing, with real-time DR metrics and submission tracking
 
-**Gap:** Existing mobile solutions are either too broad (e.g., Product Hunt) or lack DR rankings/submission tracking. No single app consolidates all directorie
+**Who it's for:** Founders, indie developers, marketers, and small business owners launching apps, products, or startups who need quick, organized access to promotion channels
 
-## Features
+**Gap:** Existing mobile solutions are either too broad (e.g., Product Hunt) or lack DR rankings/submission tracking. No single app consolidates all directories with actionable insights
 
-- A mobile app that aggregates and ranks curated directories for app promotion, startup discovery, and
-- Phone-native advantage: instant access to directories, push notifications for new listings, offline 
+**Monetization:** Freemium model: Free tier with basic directory access; premium ($9.99/mo) for DR rankings, submission analytics, and priority support
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 6/10 |
-| **Monetization** | Freemium model: Free tier with basic directory access; premium ($9.99/mo) for DR rankings, submission analytics, and pri |
-| **Audience** | Founders, indie developers, marketers, and small business owners launching apps, products, or startups who need quick, o |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — requires directory aggregation, real-time data integration, and UX for  |
+**Viability: 8/10 | Competition: 6/10 | Difficulty: Medium — requires directory aggregation, real-time data integration, and UX for non-technical users**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://news.ycombinator.com/item?id=47280008

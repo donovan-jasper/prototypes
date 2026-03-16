@@ -1,28 +1,21 @@
-# Bonsai Care Log
+# Verdant — Universal Plant Care Companion
 
-> A universal plant care log app for tracking growth, watering, and health across all houseplants, not just bonsai
+A universal plant care log app for tracking growth, watering, and health across all houseplants, not just bonsai
+
+**Who it's for:** Plant parents (25-45), urban gardeners, and remote workers who maintain houseplants but lack dedicated tracking tools
 
 **Gap:** Most competitors focus on identification or basic reminders; none offer a seamless blend of photo logging, care schedules, and community features
 
-## Features
+**Monetization:** Freemium with $4.99/month for advanced features like AI watering recommendations and offline access
 
-- Broader reach:**
-- Apartment dwellers** who need to maximize limited space with healthy plants
-- Remote workers** building biophilic home offices and tracking which plants thrive in their environme
-
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 8/10 |
-| **Monetization** | Freemium with $4.99/month for advanced features like AI watering recommendations and offline access |
-| **Audience** | Plant parents (25-45), urban gardeners, and remote workers who maintain houseplants but lack dedicated tracking tools |
-| **Stack** | Node.js |
-| **Difficulty** | Medium — requires plant care expertise to build accurate recommendations |
+**Viability: 7/10 | Competition: 8/10 | Difficulty: Medium — requires plant care expertise to build accurate recommendations**
 
 ## Run
 
 ```bash
-npm install && npm start
+npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/Bonsai/comments/zp4ijo/is_there_still_no_good_app_for_organizing_and/

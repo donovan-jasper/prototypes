@@ -126,41 +126,14 @@ async def run_loop():
             backlog = db.count_unbuilt_ideas(min_score=7)
             unanalyzed = len(db.get_unanalyzed_posts(limit=1))
 
-            # Priority 1: Build if we have buildable ideas (highest value action)
+            # Priority 1: Build new prototypes (highest value)
             buildable = db.get_buildable_ideas(limit=1)
             if buildable:
                 print(f"\n=== BUILDING ===")
                 await build_next_prototype()
                 continue
 
-            # Priority 2: Scout for NEW ideas — only if backlog is low
-            if hours_since_scout >= SCOUT_INTERVAL_HOURS and backlog < MIN_BACKLOG:
-                print(f"\n=== SCOUTING (backlog={backlog}, hours={hours_since_scout:.1f}) ===")
-                await run_scout()
-                _write_last_scout(time.time())
-                continue
-
-            # Priority 3: Competition check for high-scoring ideas (unlocks builds)
-            needs_comp = db.get_ideas_needing_competition(min_score=7, limit=1)
-            if needs_comp:
-                print(f"\n=== COMPETITION CHECK (high priority) ===")
-                await competition_batch(db, limit=5)
-                continue
-
-            # Priority 4: Analyze unscored ideas (small batches between builds)
-            if unanalyzed:
-                print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
-                await analyze_batch(db, limit=10)
-                continue
-
-            # Priority 4b: Competition check for lower-scoring ideas
-            needs_comp_low = db.get_ideas_needing_competition(min_score=5, limit=1)
-            if needs_comp_low:
-                print(f"\n=== COMPETITION CHECK ===")
-                await competition_batch(db, limit=5)
-                continue
-
-            # Priority 5: Improve existing prototype
+            # Priority 2: Improve existing prototypes (make them shippable)
             improvable = db.get_improvable_prototypes(
                 max_improvements=MAX_IMPROVEMENTS, limit=1
             )
@@ -168,6 +141,33 @@ async def run_loop():
                 idea = improvable[0]
                 print(f"\n=== IMPROVING: {idea['title'][:50]} (round {idea.get('improvement_count', 0) + 1}) ===")
                 await improve_prototype(idea)
+                continue
+
+            # Priority 3: Competition check for 7+ ideas (unlocks builds)
+            needs_comp = db.get_ideas_needing_competition(min_score=7, limit=1)
+            if needs_comp:
+                print(f"\n=== COMPETITION CHECK (high priority) ===")
+                await competition_batch(db, limit=5)
+                continue
+
+            # Priority 4: Analyze unscored ideas (small batches)
+            if unanalyzed:
+                print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
+                await analyze_batch(db, limit=10)
+                continue
+
+            # Priority 5: Competition check for lower-scoring ideas
+            needs_comp_low = db.get_ideas_needing_competition(min_score=5, limit=1)
+            if needs_comp_low:
+                print(f"\n=== COMPETITION CHECK ===")
+                await competition_batch(db, limit=5)
+                continue
+
+            # Priority 6: Scout for NEW ideas — only if backlog is low
+            if hours_since_scout >= SCOUT_INTERVAL_HOURS and backlog < MIN_BACKLOG:
+                print(f"\n=== SCOUTING (backlog={backlog}, hours={hours_since_scout:.1f}) ===")
+                await run_scout()
+                _write_last_scout(time.time())
                 continue
 
             # Nothing to do — sleep

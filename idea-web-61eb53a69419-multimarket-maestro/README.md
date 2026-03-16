@@ -1,27 +1,21 @@
-# MultiMarket Maestro
+# MultiMarket Maestro Spec
 
-> A mobile-first productivity tool for small businesses and freelancers that automates cross-platform selling, inventory management, and localized marketing across multiple e-commerce platforms.
+A mobile-first productivity tool for small businesses and freelancers that automates cross-platform selling, inventory management, and localized marketing across multiple e-commerce platforms.
 
-**Gap:** Existing tools are either platform-specific or require desktop use. Mobile users need unified dashboards with offline capabilities and localized autom
+**Who it's for:** Micro-sellers (1-5 products), handmade artists, and resellers who juggle multiple platforms but lack time for manual syncing. Also, small e-commerce stores in emerging markets with limited tech access.
 
-## Features
+**Gap:** Existing tools are either platform-specific or require desktop use. Mobile users need unified dashboards with offline capabilities and localized automation (e.g., currency/tax rules).
 
-- A mobile-first productivity tool for small businesses and freelancers that automates cross-platform 
-- Mobile enables real-time inventory updates, on-the-go listing management, and location-based feature
+**Monetization:** Freemium: Free for basic syncing; $9.99/month for automation + premium support. One-time $99 for 'Power Pack' (advanced analytics).
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 6/10 |
-| **Monetization** | Freemium: Free for basic syncing; $9.99/month for automation + premium support. One-time $99 for 'Power Pack' (advanced  |
-| **Audience** | Micro-sellers (1-5 products), handmade artists, and resellers who juggle multiple platforms but lack time for manual syn |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — requires API integrations and UX for non-technical users, but mobile-fi |
+**Viability: 7/10 | Competition: 6/10 | Difficulty: Medium — requires API integrations and UX for non-technical users, but mobile-first design reduces complexity vs. desktop.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/Depop/comments/1d8prey/why_there_is_no_good_app_for_crosslisting/

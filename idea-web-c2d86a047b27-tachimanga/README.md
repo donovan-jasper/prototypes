@@ -1,29 +1,21 @@
-# TachiManga
+# TachiManga App Spec
 
-> A universal reading app for digital content (books, comics, magazines) with offline access, customization, and social features for any audience that consumes long-form digital media
+A universal reading app for digital content (books, comics, magazines) with offline access, customization, and social features for any audience that consumes long-form digital media
 
-**Gap:** Most competitors lack seamless offline + social features in one app. Many are either too niche (e.g., Tachiyomi for advanced users) or lack modern UX 
+**Who it's for:** Adults 18-45 who read manga, webtoons, or digital comics, including casual readers and hardcore fans who want a dedicated, optimized experience
 
-## Features
+**Gap:** Most competitors lack seamless offline + social features in one app. Many are either too niche (e.g., Tachiyomi for advanced users) or lack modern UX polish.
 
-- Book clubs** (sync reading progress, annotate together).
-- Accessibility users** (text-to-speech, dyslexia-friendly fonts).
-- Content creators** (publish manga/webtoons directly via the app).
-- Adjacent use cases:**
+**Monetization:** Freemium with premium features like ad-free reading, exclusive content, and advanced customization. One-time $4.99 for offline library expansion.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 5/10 |
-| **Monetization** | Freemium with premium features like ad-free reading, exclusive content, and advanced customization. One-time $4.99 for o |
-| **Audience** | Adults 18-45 who read manga, webtoons, or digital comics, including casual readers and hardcore fans who want a dedicate |
-| **Stack** | Node.js |
-| **Difficulty** | Medium — requires strong UX for reading, backend for syncing, and community enga |
+**Viability: 8/10 | Competition: 5/10 | Difficulty: Medium — requires strong UX for reading, backend for syncing, and community engagement features**
 
 ## Run
 
 ```bash
-npm install && npm start
+npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/mangapiracy/comments/1nkwibv/is_the_manga_app_experience_good_on_ios_im/

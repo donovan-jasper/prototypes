@@ -1,29 +1,21 @@
-# Show HN: FileShot – zero-knowledge file sharing, nothing locked behind accounts
+# FileVault
 
-> A privacy-focused, account-free file sharing and management app that enables secure, encrypted transfers and previews without requiring personal data or signups
+A privacy-focused, account-free file sharing and management app that enables secure, encrypted transfers and previews without requiring personal data or signups
 
-**Gap:** Existing apps either lack strong encryption, require accounts, or gate features behind paywalls. Mobile solutions often lack P2P transfer options or h
+**Who it's for:** Journalists, activists, remote workers, and privacy-conscious professionals who need to share sensitive files without exposing metadata or requiring accounts
 
-## Features
+**Gap:** Existing apps either lack strong encryption, require accounts, or gate features behind paywalls. Mobile solutions often lack P2P transfer options or have poor offline support
 
-- Parents** sharing medical records with doctors without creating yet another account
-- Freelancers** sending client deliverables without exposing their email to data brokers
-- Students** collaborating on projects without institutional surveillance
-- Small business owners** sharing contracts and invoices without subscription fees
+**Monetization:** Freemium model with premium features like unlimited storage, advanced encryption, and team collaboration tools at $4.99/month
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 7/10 |
-| **Monetization** | Freemium model with premium features like unlimited storage, advanced encryption, and team collaboration tools at $4.99/ |
-| **Audience** | Journalists, activists, remote workers, and privacy-conscious professionals who need to share sensitive files without ex |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Medium — requires strong encryption expertise and UX for non-technical users |
+**Viability: 8/10 | Competition: 7/10 | Difficulty: Medium — requires strong encryption expertise and UX for non-technical users**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://news.ycombinator.com/item?id=47231795

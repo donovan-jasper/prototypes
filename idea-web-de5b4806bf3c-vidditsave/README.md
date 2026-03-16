@@ -1,29 +1,21 @@
-# VidditSave
+# SaveStack
 
-> A universal content curation and offline access tool that allows users to effortlessly save, organize, and manage various forms of media (videos, articles, images) from any online source for personal 
+A universal content curation and offline access tool that allows users to effortlessly save, organize, and manage various forms of media (videos, articles, images) from any online source for personal consumption, sharing, or creative projects.
 
-**Gap:** There isn't a single, reliable, and user-friendly mobile app that universally handles the *downloading*, *conversion*, and *robust organization* of di
+**Who it's for:** Heavy social media users, content creators/curators, students/researchers, and anyone who frequently encounters interesting online media (videos, articles, images) they wish to save, organize, access offline, or easily share across platforms. This includes users who travel frequently, have inconsistent internet access, or simply want a personal archive of valuable online content.
 
-## Features
+**Gap:** There isn't a single, reliable, and user-friendly mobile app that universally handles the *downloading*, *conversion*, and *robust organization* of diverse media types (especially video) from *any* online source. Existing 'save for later' apps are often text-focused, while downloaders are niche, ad-heavy, unreliable, or lack advanced curation features. The ability to truly own, manage, and repurpose saved content across platforms is largely unaddressed.
 
-- Commuters & travelers** — Download content at home, consume during dead zones (subway, flights, rura
-- Students & lifelong learners** — Build research libraries, save educational videos/articles for exam
-- Parents** — Download kids' content for car trips, doctor's offices, anywhere without reliable WiFi
-- Content creators** — Collect inspiration, reference material, competitor analysis in one searchable 
+**Monetization:** Freemium model: Basic saving, limited downloads, and standard organization features are free. A premium subscription ($4.99/month or $49.99/year) unlocks unlimited high-quality downloads, advanced organization (AI-powered tagging, smart folders), ad-free experience, cloud backup integration, cross-device sync, batch processing, and priority support. Users would pay for reliability, convenience, advanced features, and the peace of mind that their curated content is always accessible and well-organized.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 7/10 |
-| **Competition** | 6/10 |
-| **Monetization** | Freemium model: Basic saving, limited downloads, and standard organization features are free. A premium subscription ($4 |
-| **Audience** | Heavy social media users, content creators/curators, students/researchers, and anyone who frequently encounters interest |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Hard — This involves constantly adapting to changes in website structures and AP |
+**Viability: 7/10 | Competition: 6/10 | Difficulty: Hard — This involves constantly adapting to changes in website structures and APIs, navigating legal complexities of content downloading, robust video/audio processing and conversion, managing large media files, and ensuring cross-platform compatibility. Maintaining reliability and performance across diverse sources is a significant ongoing challenge.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://www.reddit.com/r/androidapps/comments/foboul/heres_a_list_of_just_about_every_app_i_currently/

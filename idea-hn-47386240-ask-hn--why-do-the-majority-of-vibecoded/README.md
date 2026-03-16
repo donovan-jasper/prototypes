@@ -1,29 +1,21 @@
-# Ask HN: Why do the majority of vibecoded projects fail?
+# ProtoPulse
 
-> A mobile-first platform that helps non-technical users create functional prototypes and MVPs of their app ideas using AI-powered guided workflows, bridging the gap between vision and execution without
+A mobile-first platform that helps non-technical users create functional prototypes and MVPs of their app ideas using AI-powered guided workflows, bridging the gap between vision and execution without requiring deep technical knowledge.
 
-**Gap:** Existing tools are either desktop-focused with poor mobile experiences, require design expertise, or don't guide non-technical users through the compl
+**Who it's for:** Entrepreneurs, product managers, designers, and business professionals who have app/service ideas but lack technical skills - specifically solopreneurs aged 25-45 with business acumen but limited development experience who want to validate concepts before hiring developers.
 
-## Features
+**Gap:** Existing tools are either desktop-focused with poor mobile experiences, require design expertise, or don't guide non-technical users through the complete journey from idea to functional prototype with built-in validation features - current tools assume users know what decisions to make at each step.
 
-- Students and educators** teaching entrepreneurship, product design, or innovation who need a tool to
-- Corporate intrapreneurs** pitching internal tools or process improvements who need visual proof-of-c
-- Consultants and agencies** who want to show clients interactive mockups during discovery phases
-- Non-profit organizers** building community tools on tight budgets
+**Monetization:** Freemium model: $0 for basic wireframes, $19/mo for AI-powered prototyping with interactive elements, $49/mo for advanced features including user testing integration and code export - people pay because it eliminates the $5000+ cost of hiring a designer/developer to build initial prototypes.
 
-## Details
-
-| | |
-|---|---|
-| **Score** | 8/10 |
-| **Competition** | 7/10 |
-| **Monetization** | Freemium model: $0 for basic wireframes, $19/mo for AI-powered prototyping with interactive elements, $49/mo for advance |
-| **Audience** | Entrepreneurs, product managers, designers, and business professionals who have app/service ideas but lack technical ski |
-| **Stack** | React Native (Expo) |
-| **Difficulty** | Hard - requires sophisticated AI to understand user intent, generate appropriate |
+**Viability: 8/10 | Competition: 7/10 | Difficulty: Hard - requires sophisticated AI to understand user intent, generate appropriate UI components, handle complex logic flows, and ensure generated code is actually functional while maintaining an intuitive mobile interface.**
 
 ## Run
 
 ```bash
 npx expo start
 ```
+
+## Origin
+
+Inspired by: https://news.ycombinator.com/item?id=47386240
