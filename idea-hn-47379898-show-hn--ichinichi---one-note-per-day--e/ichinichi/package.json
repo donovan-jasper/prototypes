@@ -1,0 +1,14 @@
+{
+  "name": "ichinichi",
+  "version": "1.0.0",
+  "description": "A minimalist, local-first journaling app with end-to-end encryption and immutable past entries.",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "crypto-js": "^4.1.1",
+    "express": "^4.17.1",
+    "sqlite3": "^5.0.2"
+  }
+}
