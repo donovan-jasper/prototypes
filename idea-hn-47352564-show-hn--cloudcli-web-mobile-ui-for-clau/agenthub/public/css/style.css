@@ -1,0 +1,277 @@
+:root {
+  --bg-color: #1e1e1e;
+  --text-color: #d4d4d4;
+  --primary-color: #007acc;
+  --secondary-color: #3a3d41;
+  --border-color: #3a3d41;
+  --highlight-color: #2a2d2e;
+  --error-color: #f44747;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+}
+
+header {
+  background-color: var(--secondary-color);
+  padding: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border-color);
+}
+
+header h1 {
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.session-selector {
+  display: flex;
+  gap: 1rem;
+}
+
+.session-selector select, .session-selector button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.session-selector button {
+  background-color: var(--primary-color);
+  color: white;
+  cursor: pointer;
+}
+
+.session-selector button:hover {
+  background-color: #0062a3;
+}
+
+.container {
+  display: flex;
+  height: calc(100vh - 60px);
+}
+
+.sidebar {
+  width: 25%;
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+}
+
+.file-browser {
+  padding: 1rem;
+}
+
+.file-browser h2 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.file-tree {
+  margin-top: 1rem;
+}
+
+.file-tree-item {
+  margin-left: 1rem;
+  cursor: pointer;
+}
+
+.file-tree-item:hover {
+  background-color: var(--highlight-color);
+}
+
+.file-tree-item.directory::before {
+  content: "📁 ";
+}
+
+.file-tree-item.file::before {
+  content: "📄 ";
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.terminal {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.terminal-output {
+  flex: 1;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  white-space: pre-wrap;
+  margin-bottom: 1rem;
+}
+
+.terminal-input {
+  display: flex;
+}
+
+.terminal-input input {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.file-editor {
+  width: 25%;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.editor-header h2 {
+  color: var(--primary-color);
+}
+
+.editor-header button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: none;
+  background-color: var(--primary-color);
+  color: white;
+  cursor: pointer;
+}
+
+.editor-header button:hover {
+  background-color: #0062a3;
+}
+
+.editor-content {
+  flex: 1;
+  padding: 1rem;
+}
+
+.editor-content textarea {
+  width: 100%;
+  height: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: 'Courier New', Courier, monospace;
+  resize: none;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--bg-color);
+  margin: 10% auto;
+  padding: 2rem;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 500px;
+}
+
+.modal-content h2 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.form-group input, .form-group select {
+  width: 100%;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.modal-actions button {
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.modal-actions button:first-child {
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.modal-actions button:first-child:hover {
+  background-color: #0062a3;
+}
+
+.modal-actions button:last-child {
+  background-color: var(--secondary-color);
+  color: var(--text-color);
+}
+
+.modal-actions button:last-child:hover {
+  background-color: #333;
+}
+
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+  }
+
+  .sidebar, .file-editor {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .file-editor {
+    display: none;
+  }
+
+  .file-editor.active {
+    display: flex;
+  }
+}
