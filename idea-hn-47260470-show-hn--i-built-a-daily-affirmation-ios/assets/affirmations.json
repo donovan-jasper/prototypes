@@ -1,0 +1,32 @@
+[
+  {
+    "text": "You are capable of amazing things.",
+    "category": "general",
+    "time_of_day": "morning",
+    "energy_level": 3
+  },
+  {
+    "text": "Today is a fresh start.",
+    "category": "general",
+    "time_of_day": "morning",
+    "energy_level": 2
+  },
+  {
+    "text": "You've got this.",
+    "category": "general",
+    "time_of_day": "afternoon",
+    "energy_level": 3
+  },
+  {
+    "text": "Rest is productive too.",
+    "category": "general",
+    "time_of_day": "evening",
+    "energy_level": 1
+  },
+  {
+    "text": "Small steps lead to big changes.",
+    "category": "general",
+    "time_of_day": "morning",
+    "energy_level": 2
+  }
+]
