@@ -5,18 +5,19 @@ OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "gc/gemini-2.5-flash")
 DB_PATH = os.path.expanduser("~/prototypes/pipeline/ideas.db")
 NTFY_TOPIC = "donovan-oci-app-pipeline"
 
-SUBREDDITS = [
-    "AppIdeas",
-    "SomebodyMakeThis",
-    "androidapps",
-    "iphone",
-    "selfhosted",
-    "webapps",
-    "startups",
+# Hacker News API (fully open, no auth)
+HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
+HN_SEARCH_BASE = "https://hn.algolia.com/api/v1"
+
+# Search queries for finding app ideas on HN
+HN_SEARCH_QUERIES = [
+    "Show HN",
+    "app idea",
+    "I built",
+    "side project",
+    "looking for app",
+    "wish there was an app",
 ]
 
-REDDIT_BASE = "https://www.reddit.com/r/{subreddit}/hot.json?limit=25&raw_json=1"
-REDDIT_HEADERS = {
-    "User-Agent": "idea-scout:v0.1 by /u/idea_scout_bot (autonomous app pipeline)",
-    "Accept": "application/json",
-}
+# How many stories to fetch per source
+HN_STORY_LIMIT = 30
