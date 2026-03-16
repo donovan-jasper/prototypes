@@ -128,15 +128,22 @@ async def run_loop():
                 _write_last_scout(time.time())
                 continue
 
-            # Priority 3: Analyze unscored ideas (small batches between builds)
+            # Priority 3: Competition check for high-scoring ideas (unlocks builds)
+            needs_comp = db.get_ideas_needing_competition(min_score=7, limit=1)
+            if needs_comp:
+                print(f"\n=== COMPETITION CHECK (high priority) ===")
+                await competition_batch(db, limit=5)
+                continue
+
+            # Priority 4: Analyze unscored ideas (small batches between builds)
             if unanalyzed:
                 print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
                 await analyze_batch(db, limit=10)
                 continue
 
-            # Priority 4: Competition check for promising ideas
-            needs_comp = db.get_ideas_needing_competition(min_score=5, limit=1)
-            if needs_comp:
+            # Priority 4b: Competition check for lower-scoring ideas
+            needs_comp_low = db.get_ideas_needing_competition(min_score=5, limit=1)
+            if needs_comp_low:
                 print(f"\n=== COMPETITION CHECK ===")
                 await competition_batch(db, limit=5)
                 continue

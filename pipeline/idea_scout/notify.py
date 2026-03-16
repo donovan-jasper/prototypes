@@ -41,24 +41,28 @@ async def notify_high_score_idea(idea: dict):
     title = idea.get("title", "Unknown")
     analysis = idea.get("analysis", "") or ""
 
-    # Parse analysis fields
+    # Parse analysis: first line is summary, rest are "Key: value" pairs
+    lines = analysis.split("\n")
+    summary = lines[0] if lines else title
     parts = {}
-    for line in analysis.split("\n"):
+    for line in lines[1:]:
         if ":" in line:
             key = line.split(":")[0].strip()
             val = ":".join(line.split(":")[1:]).strip()
             if val:
                 parts[key] = val
 
-    summary = parts.get("Summary", parts.get("Idea", analysis.split("\n")[0] if analysis else title))
-    monetization = parts.get("Monetization", parts.get("$", ""))
-    audience = parts.get("Audience", parts.get("Who", ""))
+    monetization = parts.get("Monetization", "")
+    audience = parts.get("Audience", "")
+    gap = parts.get("Gap", "")
 
     body_lines = [summary[:120]]
     if monetization:
         body_lines.append(f"Money: {monetization[:80]}")
     if audience:
         body_lines.append(f"Who: {audience[:80]}")
+    if gap:
+        body_lines.append(f"Gap: {gap[:80]}")
 
     ntfy_title = f"New {score}/10: {title[:50]}"
     priority = "high" if score >= 9 else "default"
@@ -79,16 +83,17 @@ async def notify_build_complete(idea: dict, status: str, file_count: int):
     """
     title = idea.get("title", "Unknown")
     analysis = idea.get("analysis", "") or ""
+    lines = analysis.split("\n")
+    summary = lines[0] if lines else title
     parts = {}
-    for line in analysis.split("\n"):
+    for line in lines[1:]:
         if ":" in line:
             key = line.split(":")[0].strip()
             val = ":".join(line.split(":")[1:]).strip()
             if val:
                 parts[key] = val
 
-    summary = parts.get("Summary", parts.get("Idea", analysis.split("\n")[0] if analysis else title))
-    monetization = parts.get("Monetization", parts.get("$", ""))
+    monetization = parts.get("Monetization", "")
 
     is_working = "working" in status or status == "improved"
     status_tag = "working" if is_working else "needs-fix"

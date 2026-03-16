@@ -118,14 +118,15 @@ class IdeaDB:
         return [dict(r) for r in rows]
 
     def get_buildable_ideas(self, limit: int = 1) -> list[dict]:
-        """Get unbuilt ideas ranked by combined viability + competition score."""
+        """Get unbuilt ideas ranked by combined viability + competition score.
+        Requires both viability AND competition analysis to be complete."""
         rows = self.conn.execute(
             """SELECT *,
-                      (COALESCE(viability_score, 0) * 0.6 +
-                       COALESCE(competition_score, 0) * 0.4) AS combined_score
+                      (viability_score * 0.6 + competition_score * 0.4) AS combined_score
                FROM posts
                WHERE viability_score >= 7
-                 AND COALESCE(competition_score, 5) >= 4
+                 AND competition_score IS NOT NULL
+                 AND competition_score >= 4
                  AND prototype_started = 0
                ORDER BY combined_score DESC
                LIMIT ?""",
