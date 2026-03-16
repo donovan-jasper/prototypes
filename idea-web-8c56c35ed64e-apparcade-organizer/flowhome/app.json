@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "FlowHome",
+    "slug": "flowhome",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.flowhome"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.yourcompany.flowhome",
+      "intentFilters": [
+        {
+          "action": "android.intent.action.MAIN",
+          "category": ["android.intent.category.HOME", "android.intent.category.DEFAULT"]
+        }
+      ],
+      "permissions": [
+        "android.permission.QUERY_ALL_PACKAGES",
+        "android.permission.ACCESS_COARSE_LOCATION"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-sqlite",
+        {
+          "iosDatabaseLocation": "Library/Application Support/FlowHome"
+        }
+      ],
+      "expo-application",
+      "expo-device",
+      "expo-task-manager",
+      "@tensorflow/tfjs-react-native"
+    ]
+  }
+}
