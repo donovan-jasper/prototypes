@@ -2,7 +2,7 @@ import asyncio
 import os
 import subprocess
 import httpx
-from idea_scout.config import DB_PATH
+from idea_scout.config import DB_PATH, OMNIROUTE_BASE, CODER_MODEL
 from idea_scout.db import IdeaDB
 from idea_scout.notify import notify_build_complete
 from .spec_writer import generate_spec
@@ -12,6 +12,55 @@ from .code_builder import generate_code, fix_with_unstuck, parse_code_blocks
 PROTOTYPES_DIR = os.path.expanduser("~/prototypes")
 UV_BIN = os.path.expanduser("~/.local/bin/uv")
 MAX_UNSTUCK_RETRIES = 2
+
+README_PROMPT = """Write a README.md for this mobile app prototype.
+
+App: {title}
+Status: {status}
+Analysis: {analysis}
+
+Spec summary (first 500 chars): {spec_snippet}
+
+Files: {file_list}
+
+Write a clear, concise README with:
+1. App name as H1
+2. One-line description
+3. What it does (2-3 bullet points)
+4. Monetization model (one line)
+5. Tech stack (one line)
+6. How to run: `npx expo start` (or equivalent based on the stack)
+7. Status badge: {status}
+
+Keep it SHORT — under 40 lines. No filler. Markdown only, no code fences around the whole thing."""
+
+
+async def _generate_readme(
+    client: httpx.AsyncClient, idea: dict, spec: str,
+    file_names: list[str], status: str,
+) -> str:
+    """Generate a README from the idea + spec."""
+    try:
+        resp = await client.post(
+            f"{OMNIROUTE_BASE}/chat/completions",
+            json={
+                "model": CODER_MODEL,
+                "messages": [{"role": "user", "content": README_PROMPT.format(
+                    title=idea["title"],
+                    status=status,
+                    analysis=idea.get("analysis", "")[:500],
+                    spec_snippet=spec[:500],
+                    file_list=", ".join(file_names[:20]),
+                )}],
+                "temperature": 0.3,
+            },
+            timeout=60,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"  README generation failed: {type(e).__name__}, using fallback")
+        return f"# {idea['title']}\n\n{idea.get('analysis', idea.get('selftext', ''))[:200]}\n\n**Status:** {status}\n"
 
 
 def write_files(project_dir: str, files: dict[str, str]):
@@ -124,6 +173,11 @@ async def build_next_prototype():
 
         status = "working" if success else f"needs-fix (after {retries} unstuck attempts)"
         print(f"  Status: {status}")
+
+        # Step 4: Generate README
+        readme = await _generate_readme(client, idea, spec, list(files.keys()), status)
+        with open(os.path.join(project_dir, "README.md"), "w") as f:
+            f.write(readme)
 
     # Commit and push
     subprocess.run(["git", "add", "."], cwd=PROTOTYPES_DIR)
