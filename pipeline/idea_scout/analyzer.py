@@ -3,22 +3,28 @@ import asyncio
 import httpx
 from .config import OMNIROUTE_BASE, PLANNER_MODEL
 
-ANALYSIS_PROMPT = """Analyze this as a MOBILE APP idea. Focus on monetization potential. Respond ONLY with valid JSON, no markdown.
+ANALYSIS_PROMPT = """Analyze this as a MOBILE APP opportunity. Think BROADLY — don't just evaluate the literal idea.
+Ask yourself: "What's the widest audience version of this concept on mobile?"
+
+A developer tool might inspire a productivity app. A web service might reveal an unserved mobile need.
+Think about what non-technical people would pay for.
 
 Title: {title}
 Description: {selftext}
 Source: {subreddit}
 Upvotes: {score} | Comments: {num_comments}
 
-Respond with this exact JSON structure:
+Respond ONLY with valid JSON, no markdown:
 {{
-  "idea_summary": "one sentence summary as a mobile app concept",
-  "mobile_fit": "why this works (or doesn't) as a mobile app",
-  "competitors": "existing MOBILE apps that do something similar",
-  "gap": "what's missing in the mobile app market for this",
-  "monetization": "how to make money (subscription/paid/freemium/ads) and estimated willingness to pay",
+  "idea_summary": "one sentence — the BROADENED mobile app concept, not just the original idea",
+  "mobile_fit": "why this works as a mobile app — what's the phone-native advantage?",
+  "target_audience": "who downloads this? be specific beyond just 'everyone'",
+  "competitors": "existing MOBILE apps (App Store/Play Store) that compete directly",
+  "gap": "what's missing or bad about existing mobile solutions",
+  "monetization": "specific strategy (subscription $X/mo, freemium, one-time $X) and why people would pay",
+  "saturated": true/false — true if dominant well-funded apps already nail this (e.g. password managers, basic notes),
   "difficulty": "Easy/Medium/Hard — brief explanation",
-  "viability_score": <1-10 integer, 10 = most viable as a monetizable mobile app>
+  "viability_score": <1-10 integer, 10 = most viable. Score 0 if saturated by incumbents.>
 }}"""
 
 
@@ -38,8 +44,12 @@ def parse_analysis_response(text: str) -> dict:
         data = json.loads(cleaned)
         score = int(data.get("viability_score", 0))
         score = max(0, min(10, score))
+        # Score 0 for saturated markets
+        if data.get("saturated", False):
+            score = 0
         analysis = (
             f"{data.get('idea_summary', '')}\n"
+            f"Audience: {data.get('target_audience', 'Unknown')}\n"
             f"Mobile fit: {data.get('mobile_fit', 'Unknown')}\n"
             f"Competitors: {data.get('competitors', 'Unknown')}\n"
             f"Gap: {data.get('gap', 'Unknown')}\n"

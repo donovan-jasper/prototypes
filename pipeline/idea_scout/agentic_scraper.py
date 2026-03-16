@@ -44,7 +44,10 @@ For each idea found, return:
 - demand_signal: evidence of demand (upvotes, replies, "me too" comments, etc.)
 - monetization_hint: how this could make money (subscription, one-time purchase, freemium, ads, etc.)
 
-Only extract ideas that make sense as MOBILE apps — skip desktop-only tools, CLI utilities, developer tools with no mobile use case, and vague wishes. Prioritize ideas where people express willingness to pay.
+Think BROADLY — a developer tool complaint might inspire a consumer mobile app. "I wish my CI was faster" → build status dashboard app. "No good way to track API costs" → subscription tracker app.
+
+Skip ideas where well-funded incumbents already dominate (password managers, basic note apps, etc.).
+Prioritize ideas where people express willingness to pay.
 
 Search results and page contents:
 {context}

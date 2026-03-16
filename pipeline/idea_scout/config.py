@@ -13,12 +13,12 @@ NTFY_TOPIC = "donovan-oci-app-pipeline"
 HN_API_BASE = "https://hacker-news.firebaseio.com/v0"
 HN_SEARCH_BASE = "https://hn.algolia.com/api/v1"
 
-# HN queries — find web tools that could be mobile apps
+# HN queries — find web tools that could become mobile apps
 HN_SEARCH_QUERIES = [
     "Show HN",
-    "I built",
-    "side project",
     "mobile app",
+    "I wish there was",
+    "no good app for",
 ]
 
 # How many stories to fetch per source

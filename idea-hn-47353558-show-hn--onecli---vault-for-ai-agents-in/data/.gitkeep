@@ -1,2 +1,0 @@
-# This file ensures the 'data' directory is kept in git, even if empty.
-# The secretswap.db file will be created here at runtime.
