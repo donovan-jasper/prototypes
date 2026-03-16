@@ -1,23 +1,27 @@
-# InboxZen
+# Unsubscribe Pro
 
-Reclaim your inbox in seconds — swipe away spam, unsubscribe instantly, and breathe easier with AI-powered email cleanup.
+> A mobile-first email management assistant that automatically organizes, categorizes, and handles email cleanup tasks including unsubscribing, deleting, and organizing while providing smart recommendat
 
-**Status:** ✅ Working
+**Gap:** Existing apps are either too complex, require full email access (privacy concerns), lack iOS/Android optimization, or don't provide the seamless one-t
 
-## What it does
-• Automatically categorizes and organizes incoming emails by type (promotional, newsletters, receipts, etc.)
-• Provides one-tap unsubscribe and bulk cleanup tools to eliminate email clutter
-• Offers smart recommendations for managing subscriptions and maintaining email hygiene
+## Features
 
-## Monetization
-Freemium model with premium features for advanced automation and analytics
+- A mobile-first email management assistant that automatically organizes, categorizes, and handles ema
+- Email overload is primarily experienced on mobile where people check messages constantly. Phone nati
 
-## Tech Stack
-React Native + Expo with Node.js backend and machine learning classification API
+## Details
 
-## How to run
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 6/10 |
+| **Monetization** | Freemium model - free tier handles 10 unsubscriptions/month, premium $2.99/mo for unlimited + smart email organization,  |
+| **Audience** | Busy professionals aged 25-45 who receive 50+ emails daily and feel overwhelmed by inbox clutter, plus privacy-conscious |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium - requires email API integrations, anti-spam detection algorithms, and bu |
+
+## Run
+
 ```bash
 npx expo start
 ```
-
-Built for busy professionals aged 25-45 who receive 50+ emails daily and feel overwhelmed by inbox clutter, plus privacy-conscious users seeking control over their digital footprint.

@@ -1,10 +1,27 @@
-# KinKeeper - BuddyBond Keeper Prototype
+# BuddyBond Keeper
 
-Never let distance dim your closest friendships — smart reminders and thoughtful prompts keep you connected to the people who matter most.
+> A relationship management app that helps users nurture existing friendships through personalized reminders, interaction tracking, and thoughtful gesture suggestions.
 
-## Setup Instructions
+**Gap:** Existing apps either focus on dating, networking, or generic reminders. No dedicated tool for deepening existing friendships with personalized insight
 
-1. Install Node.js (v18 or higher)
-2. Clone this repository
-3. Navigate to the project directory
-4. Install dependencies:
+## Features
+
+- A relationship management app that helps users nurture existing friendships through personalized rem
+- Mobile's always-on nature makes it ideal for relationship maintenance. Push notifications for remind
+
+## Details
+
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 8/10 |
+| **Monetization** | Freemium model with premium features like AI-generated gesture suggestions ($4.99/month) and ad-free experience. One-tim |
+| **Audience** | Adults aged 25-55 who value meaningful friendships, including busy professionals, parents, and empty nesters who struggl |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires user engagement and data privacy compliance, but the niche is  |
+
+## Run
+
+```bash
+npx expo start
+```

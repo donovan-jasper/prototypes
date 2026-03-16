@@ -1,19 +1,27 @@
 # Mindful Moment
 
-Your pocket wellness coach that knows when you need a moment—delivering personalized mindfulness breaks that fit your life, not interrupt it.
+> A personalized wellness companion that delivers contextual mindfulness moments throughout the day based on user activity, stress levels, and real-time needs.
 
-## What it does
-• Delivers contextual mindfulness moments based on user activity, stress levels, and real-time needs
-• Uses phone's sensors and app usage data to detect optimal timing for wellness interventions
-• Provides micro-meditations and breathing exercises designed for busy professionals
+**Gap:** Existing apps require active engagement and scheduled sessions. This concept meets users in their flow of daily life with micro-interventions that don
 
-## Monetization model
-Freemium with premium subscriptions for advanced personalization and content library
+## Features
 
-## Tech stack
-React Native/Expo with device sensors API and push notifications
+- A personalized wellness companion that delivers contextual mindfulness moments throughout the day ba
+- Phones are always with users and can detect context (location, movement, app usage) to deliver perfe
 
-## How to run
-```npx expo start```
+## Details
 
-![Status: Working](https://img.shields.io/badge/status-working-brightgreen)
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 4/10 |
+| **Monetization** | Freemium model - free basic reminders, premium ($9.99/month) for personalized timing algorithms, advanced analytics, cus |
+| **Audience** | Remote workers, office professionals, students, and busy parents aged 25-45 who experience daily stress but lack time fo |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium - requires good UX design for non-intrusive notifications, personalizatio |
+
+## Run
+
+```bash
+npx expo start
+```

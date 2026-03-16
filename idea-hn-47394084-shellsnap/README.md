@@ -1,23 +1,20 @@
-# Clsh
+# ShellSnap
 
-A Mac-based terminal server with a mobile-optimized web interface featuring a custom virtual keyboard.
+> ShellSnap
 
 ## Features
-- Mobile-friendly terminal interface with virtual keyboard
-- Multi-session support with tab switching
-- Session persistence for reconnecting to active sessions
 
-## Monetization
-TBD
+- ShellSnap
 
-## Tech Stack
-- Node.js + Express
-- Socket.IO for real-time communication
-- xterm.js for terminal emulation
-- Vanilla HTML/CSS/JS
+## Details
 
-## Running
-Start with `node server.js` and access via `http://[mac-ip]:3000?token=[token]` from mobile devices.
+| | |
+|---|---|
+| **Score** | None/10 |
+| **Stack** | Node.js |
 
-## Status
-Prototype
+## Run
+
+```bash
+npm install && npm start
+```

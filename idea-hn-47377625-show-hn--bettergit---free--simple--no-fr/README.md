@@ -1,20 +1,29 @@
-# BetterGit
+# Show HN: BetterGit – Free, simple, no frills, Git GUI
 
-Free, simple, no-frills Git GUI that makes version control accessible to non-technical team members.
+> A simplified mobile-first code collaboration and version control app that makes Git accessible to non-technical team members like designers, product managers, and content creators who need to work wit
 
-## What it does
-• Provides visual interface for viewing code changes, commits, and file differences without command line knowledge
-• Enables designers, PMs, and content creators to review, approve, and collaborate on code changes
-• Offers simplified workflows for common Git operations like pulling, pushing, and switching branches
+**Gap:** Existing mobile git apps are either watered-down versions of desktop tools requiring git knowledge, or have clunky interfaces. No mobile-first git app
 
-## Monetization
-Freemium model with basic features free and advanced collaboration tools for teams
+## Features
 
-## Tech stack
-React Native/Expo with TypeScript
+- Content creators** updating copy, managing translations, editing markdown documentation
+- Marketing teams** updating landing pages, managing content repositories, reviewing analytics code
+- Secondary audience:**
+- Junior developers** who find Git intimidating and want a gentler learning curve
 
-## How to run
-```npx expo start```
+## Details
 
-## Status
-![Working](https://img.shields.io/badge/status-working-brightgreen)
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 6/10 |
+| **Monetization** | Freemium model - free for basic operations (viewing, simple commits), premium $4.99/month for advanced features (branch  |
+| **Audience** | Non-technical professionals working in tech companies (designers, product managers, content creators, QA testers) who oc |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Hard - Git operations are inherently complex, mobile UI constraints make complex |
+
+## Run
+
+```bash
+npx expo start
+```

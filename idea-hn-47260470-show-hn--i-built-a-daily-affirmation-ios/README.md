@@ -1,38 +1,27 @@
-# MotiMorph
+# Show HN: I built a daily affirmation iOS app solo — what AI actually helped with
 
-## Overview
+> A habit-building app that delivers personalized, context-aware micro-motivations at optimal times, leveraging mobile's always-on nature and push notifications to reinforce daily routines.
 
-MotiMorph is a mobile application designed to provide daily motivational affirmations tailored to the user's needs and patterns. It adapts to the user's engagement, offering the right words at the right moment to boost motivation and support personal growth.
+**Gap:** Most apps lack personalization, timing optimization, or emotional context. They also rely on manual input, whereas this could use AI to adapt to user 
 
 ## Features
 
-- **Smart Timing Engine**: Learns optimal notification times based on user engagement.
-- **Contextual Affirmation Library**: Provides affirmations categorized by energy level, time of day, streak status, and emotional tone.
-- **Streak Visualization**: Tracks daily check-ins with a visual calendar and milestone celebrations.
-- **Mood Check-in**: Allows users to rate their mood after reading affirmations, influencing future messages.
-- **Goal Anchoring**: Users can set personal goals, with affirmations subtly referencing these goals.
+- A habit-building app that delivers personalized, context-aware micro-motivations at optimal times, l
+- Mobile's ability to deliver timely, interruptive reminders (push notifications) and context-aware co
 
-## Tech Stack
+## Details
 
-- **Framework**: React Native (Expo SDK 52+)
-- **Local storage**: SQLite (expo-sqlite)
-- **Notifications**: expo-notifications
-- **State management**: Zustand
-- **Date handling**: date-fns
-- **Testing**: Jest + React Native Testing Library
-- **AI integration (premium)**: OpenAI API (GPT-4o-mini)
-- **Analytics**: Expo Analytics
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 5/10 |
+| **Monetization** | Freemium model with a $5/month premium tier for advanced personalization (e.g., AI-generated affirmations, deeper analyt |
+| **Audience** | People struggling with motivation (e.g., students, remote workers, parents, or anyone with ADHD/low motivation), profess |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires strong UX for habit formation, but the core concept is underse |
 
-## Setup Instructions
+## Run
 
-### Prerequisites
-
-- Node.js (v14 or higher)
-- npm or yarn
-- Expo CLI (`npm install -g expo-cli`)
-- Android Studio or Xcode (for running on physical devices)
-
-### Installation
-
-1. Clone the repository:
-   
+```bash
+npx expo start
+```

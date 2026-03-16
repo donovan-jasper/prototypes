@@ -1,23 +1,29 @@
-# TraceGuard
+# Show HN: Replacing $50k manual forensic audits with a deterministic .py engine
 
-Your financial paper trail, camera-ready — turn receipts and statements into court-admissible proof in seconds.
+> Automated financial tracking and audit trail app that uses deterministic algorithms to trace money flow for personal asset protection, inheritance claims, business partnerships, and relationship finan
+
+**Gap:** Existing finance apps focus on budgeting and investment tracking, but none provide court-admissible financial forensics or deterministic money-tracing
 
 ## Features
-- Snap & extract: OCR scans bank statements and receipts
-- Money timeline: Visual flow of transactions with source documents
-- Deterministic trace: Identifies gaps in financial records
 
-## Monetization
-Free tier with premium unlocks for unlimited documents and advanced features
+- Freelancers and gig workers** who need to prove income/expenses for tax audits, loan applications, o
+- Renters** documenting security deposit deductions, rent payment history, and landlord disputes
+- Small claims plaintiffs** building evidence for unpaid invoices, contractor disputes, or refund clai
+- Parents** tracking child support payments, shared custody expenses, or college fund contributions
 
-## Tech Stack
-- React Native (Expo)
-- SQLite (local-first storage)
-- Vision Camera (on-device OCR)
-- PDF-Lib (court-ready exports)
+## Details
 
-## Running
-`npx expo start` then scan QR code with Expo Go
+| | |
+|---|---|
+| **Score** | 8/10 |
+| **Competition** | 8/10 |
+| **Monetization** | Freemium model - free basic tracking, premium $99/month for advanced forensic features, unlimited document processing, a |
+| **Audience** | High-net-worth individuals going through divorce, business partners needing financial transparency, entrepreneurs protec |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Hard - requires sophisticated OCR, complex financial algorithms, legal complianc |
 
-## Status
-Prototype
+## Run
+
+```bash
+npx expo start
+```

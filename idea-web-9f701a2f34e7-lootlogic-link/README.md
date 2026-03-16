@@ -1,19 +1,29 @@
-# LootVault
+# LootLogic Link
 
-Track, trade, and optimize your gaming inventory across every platform—never miss a limited drop or overpay for gear again.
+> A universal mobile app for managing digital assets across games, with cross-platform inventory tracking and automation tools for non-gamers
 
-## Setup
+**Gap:** Most competitors are game-specific or lack automation features; no cross-platform inventory sync
 
-1. Install Node.js and npm
-2. Install Expo CLI: `npm install -g expo-cli`
-3. Clone the repository: `git clone https://github.com/yourusername/loot-vault.git`
-4. Navigate to the project directory: `cd loot-vault`
-5. Install dependencies: `npm install`
+## Features
 
-## Run the app
+- Broader appeal:**
+- Casual collectors** who play Pokémon GO, Marvel Snap, or mobile gacha games and want to track what t
+- Parents managing kids' accounts** across Roblox, Minecraft, Fortnite—one dashboard to see what's bee
+- Trading card game players** (MTG Arena, Hearthstone) who need deck-building tools and collection tra
 
-1. Start the development server: `npx expo start`
-2. Scan the QR code with the Expo Go app on your mobile device
-3. Alternatively, press `i` to run on iOS simulator or `a` to run on Android emulator
+## Details
 
-## File Structure
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 7/10 |
+| **Monetization** | Freemium with $4.99/month premium tier for advanced features like auto-sell, vendor price alerts, and cloud backup |
+| **Audience** | Players of free-to-play and subscription-based games (e.g., Fortnite, Genshin Impact, Diablo IV) who spend 10+ hours wee |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires API partnerships with game publishers and robust backend infra |
+
+## Run
+
+```bash
+npx expo start
+```

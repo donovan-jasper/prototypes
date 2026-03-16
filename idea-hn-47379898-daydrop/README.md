@@ -1,23 +1,20 @@
-# Ichinichi
+# DayDrop
 
-A minimalist, local-first journaling app with end-to-end encryption and immutable daily notes.
+> DayDrop
 
 ## Features
-- Create one encrypted note per day with a simple text editor
-- Immutable past entries that cannot be edited or deleted
-- Local-first storage with optional cross-device sync
 
-## Monetization
-TBD
+- DayDrop
 
-## Tech Stack
-- Backend: Node/Express
-- Database: SQLite
-- Frontend: Vanilla HTML/CSS/JS
-- Encryption: Crypto-JS library
+## Details
 
-## Running
-Install dependencies with `npm install` and start the server with `node app.js`.
+| | |
+|---|---|
+| **Score** | None/10 |
+| **Stack** | Node.js |
 
-## Status
-Prototype
+## Run
+
+```bash
+npm install && npm start
+```

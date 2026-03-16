@@ -1,23 +1,29 @@
-# CogniQuest
+# CodeQuest
 
-Train your mind with daily challenges—sharpen logic, math, and reasoning for smarter decisions, better tests, and career success.
+> A mobile app offering gamified, interactive problem-solving challenges across various cognitive domains (logic, quantitative, verbal, strategic thinking) to enhance critical thinking and cognitive ski
+
+**Gap:** While there are apps for general brain training, specific academic subjects, or test prep, there isn't a dominant mobile platform that offers a *unifi
 
 ## Features
-- Daily adaptive problems in logic, math, and strategy
-- Progress dashboard with streaks and skill heatmaps
-- Micro-learning sessions (5-10 minutes)
 
-## Monetization
-Free tier with ads; premium unlocks unlimited challenges, analytics, and ad-free access.
+- Daily Challenges**: 3-5 adaptive problems per domain (logic, math, verbal, strategy).
+- Progress Dashboard**: Streaks, skill heatmaps, and performance trends.
+- Adaptive Learning**: Problems adjust difficulty based on user performance.
+- Micro-Learning**: 5-10 minute sessions for mobile-friendly practice.
 
-## Tech Stack
-- React Native (Expo)
-- Firebase (Auth, Firestore, Cloud Functions)
-- SQLite (local storage)
-- Jest (testing)
+## Details
 
-## Running
-Install dependencies with `npm install` and run `expo start`.
+| | |
+|---|---|
+| **Score** | 8/10 |
+| **Competition** | 4/10 |
+| **Monetization** | Freemium model with a strong subscription offering ($9.99/month or $79.99/year). Free users get access to a limited set  |
+| **Audience** | Students preparing for standardized tests (e.g., SAT, GMAT, GRE, LSAT) or academic competitions; professionals seeking t |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Hard — Requires extensive content creation across multiple domains, a sophistica |
 
-## Status
-Prototype
+## Run
+
+```bash
+npx expo start
+```

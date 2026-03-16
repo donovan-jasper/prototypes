@@ -1,26 +1,29 @@
-# TaskHive
+# LifeFlow Planner
 
-Your AI-powered task manager that learns your rhythm and keeps you ahead, not overwhelmed.
+> A mobile app that helps people manage work and personal tasks in one place, with AI-powered organization and seamless calendar sync
+
+**Gap:** Most apps either focus too much on work or personal life separately, lack AI-driven organization, or have clunky mobile interfaces
 
 ## Features
-- AI-driven auto-organization of tasks based on patterns
-- Seamless calendar sync with push notifications
-- Visual Kanban board with drag-and-drop and color-coded priorities
 
-## Monetization
-Freemium model with a $4.99/month premium tier unlocking AI features, integrations, and ad-free experience.
+- Learns user’s task patterns and auto-categorizes
+- Suggests deadlines based on past behavior
+- Auto-imports events from Google/Apple Calendar
+- Push notifications for upcoming tasks/events
 
-## Tech Stack
-- React Native (Expo)
-- SQLite (offline-first)
-- TensorFlow.js (on-device AI)
-- Firebase (optional cloud sync)
+## Details
 
-## Running
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 4/10 |
+| **Monetization** | Freemium with a $4.99/month premium tier for AI features, advanced integrations, and ad-free experience |
+| **Audience** | Busy professionals (25-45), remote workers, and parents juggling multiple responsibilities |
+| **Stack** | Node.js |
+| **Difficulty** | Medium — requires strong UX design and AI integration, but market demand exists |
+
+## Run
+
 ```bash
-expo start --ios
-# or --android
+npm install && npm start
 ```
-
-## Status
-Prototype

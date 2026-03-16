@@ -1,29 +1,29 @@
-# FileVault
+# Show HN: FileShot – zero-knowledge file sharing, nothing locked behind accounts
 
-Share files instantly with military-grade encryption — no signup, no tracking, no limits on who you send to.
+> A privacy-focused, account-free file sharing and management app that enables secure, encrypted transfers and previews without requiring personal data or signups
+
+**Gap:** Existing apps either lack strong encryption, require accounts, or gate features behind paywalls. Mobile solutions often lack P2P transfer options or h
 
 ## Features
 
-• **Instant encrypted sharing** — Tap a file, generate a secure link, share via any app with auto-expiring links
-• **Camera-to-encrypted-file** — Snap photos/documents that are instantly encrypted and ready to share
-• **Offline P2P transfer** — Direct WiFi transfers between devices without internet or cloud dependency
+- Parents** sharing medical records with doctors without creating yet another account
+- Freelancers** sending client deliverables without exposing their email to data brokers
+- Students** collaborating on projects without institutional surveillance
+- Small business owners** sharing contracts and invoices without subscription fees
 
-## Monetization
+## Details
 
-Freemium model with $4.99/month premium tier for unlimited shares, larger file sizes, and custom expiration options.
+| | |
+|---|---|
+| **Score** | 8/10 |
+| **Competition** | 7/10 |
+| **Monetization** | Freemium model with premium features like unlimited storage, advanced encryption, and team collaboration tools at $4.99/ |
+| **Audience** | Journalists, activists, remote workers, and privacy-conscious professionals who need to share sensitive files without ex |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires strong encryption expertise and UX for non-technical users |
 
-## Tech Stack
+## Run
 
-• React Native (Expo SDK 52+)
-• AES-256-GCM encryption via `react-native-quick-crypto`
-• SQLite for local storage via `expo-sqlite`
-• WebRTC for P2P transfers
-• Expo File System for secure local storage
-
-## Running
-
-Run `npx create-expo-app@latest filevault --template tabs` then install dependencies with `npx expo install`.
-
-## Status
-
-Prototype
+```bash
+npx expo start
+```

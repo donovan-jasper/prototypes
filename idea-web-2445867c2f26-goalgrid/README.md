@@ -1,24 +1,27 @@
-# StreakStack
+# GoalGrid
 
-Build unstoppable habits with friends — track streaks, compete on leaderboards, and get AI coaching that actually keeps you motivated.
+> A habit-building and productivity app that gamifies goal-setting with social accountability and AI-driven motivation for personal and professional growth
+
+**Gap:** Most apps lack AI-driven personalized motivation or social accountability features. Many are too rigid or lack visual progress tracking.
 
 ## Features
-- Track habits with visual heat maps and streak counters
-- Join or create accountability groups with friends
-- AI-powered daily motivation tailored to your progress
 
-## Monetization
-Freemium model with basic features free and advanced social/AI features in a paid Pro tier (TBD pricing).
+- A habit-building and productivity app that gamifies goal-setting with social accountability and AI-d
+- Mobile's native advantage is constant accessibility, push notifications, and real-time progress trac
 
-## Tech Stack
-- React Native (Expo)
-- Zustand for state management
-- SQLite for local storage
-- OpenAI API for AI coaching
-- Expo Notifications for reminders
+## Details
 
-## Running
-`npx expo start` then scan QR code with Expo Go app.
+| | |
+|---|---|
+| **Score** | 8/10 |
+| **Competition** | 7/10 |
+| **Monetization** | Freemium model with premium features like AI coaching ($9.99/month) and social accountability groups ($4.99/month). One- |
+| **Audience** | Busy professionals (25-45), students, and parents who struggle with time management and motivation, as well as anyone se |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires strong UX for habit formation and AI integration, but clear de |
 
-## Status
-Prototype
+## Run
+
+```bash
+npx expo start
+```

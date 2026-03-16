@@ -1,23 +1,27 @@
-# PairPurse
+# Show HN: I built an expense tracker where no data ever touches a server
 
-Privacy-first expense sharing that never leaves your phone
+> A privacy-focused, peer-to-peer expense tracking app that enables secure, offline-first financial collaboration between two devices without cloud storage
+
+**Gap:** Existing apps require cloud storage, exposing sensitive financial data to third parties. Mobile-first solutions often lack robust offline sync or peer
 
 ## Features
-- QR code pairing for instant device connections
-- Offline-first expense tracking with real-time sync
-- Voice-to-expense input (premium feature)
 
-## Monetization
-Freemium model with premium features like multi-device sync and receipt scanning
+- A privacy-focused, peer-to-peer expense tracking app that enables secure, offline-first financial co
+- Leverages mobile's native capabilities (IndexedDB, WebRTC, speech-to-text) to create a truly decentr
 
-## Tech Stack
-- React Native (Expo)
-- SQLite (local storage)
-- WebRTC (peer-to-peer sync)
-- Expo Crypto (end-to-end encryption)
+## Details
 
-## Running
-`npx expo start` then scan QR code with Expo Go
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 7/10 |
+| **Monetization** | Freemium model with a $4.99/month premium tier for advanced features like multi-device sync (beyond two), voice-to-expen |
+| **Audience** | Couples, roommates, or small families who want to share finances without relying on cloud services, privacy-conscious pr |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires strong implementation of WebRTC, IndexedDB, and speech recogni |
 
-## Status
-Prototype
+## Run
+
+```bash
+npx expo start
+```

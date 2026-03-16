@@ -1,26 +1,29 @@
-# MemoryMate
+# Mommit
 
-Never forget what matters — AI-powered reminders that adapt to your life.
+> A cross-platform memory aid app that helps people remember daily tasks, appointments, and personal details with AI-powered reminders and contextual cues
+
+**Gap:** Existing apps lack AI-driven contextual reminders (e.g., 'It's 5 PM—time to call your mom') and social sharing features for shared responsibilities (e
 
 ## Features
-- Smart voice/text input that understands natural language ("Remind me to call mom every Sunday")
-- Context-aware triggers (time, location, routines) for personalized reminders
-- Shared memory spaces for families, couples, and teams
 
-## Monetization
-Freemium model with premium features like unlimited AI suggestions and location-based reminders.
+- Broadest reach:** This isn't just a reminder app — it's a personal memory assistant that understands
+- Families:** Shared grocery lists, pickup schedules, medication reminders for elderly parents
+- Couples:** Relationship maintenance (anniversaries, date nights, "call your mom" nudges)
+- Roommates/housemates:** Chore rotation, bill splitting reminders, shared responsibilities
 
-## Tech Stack
-- React Native (Expo)
-- SQLite for local storage
-- OpenAI API for AI processing
-- Zustand for state management
+## Details
 
-## Running
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 6/10 |
+| **Monetization** | Freemium with premium features like AI-powered reminders ($3.99/month) and family/group plans ($9.99/month) |
+| **Audience** | Busy professionals, students, caregivers, and anyone struggling with forgetfulness (e.g., 30-60-year-olds with ADHD, mem |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires UX polish, AI integration, and retention strategies |
+
+## Run
+
 ```bash
-npm install
 npx expo start
 ```
-
-## Status
-Prototype

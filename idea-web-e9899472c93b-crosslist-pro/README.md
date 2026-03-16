@@ -1,31 +1,29 @@
-# ListSync - Multi-Channel E-commerce Listing Manager
+# CrossList Pro
 
-Sell everywhere, manage from anywhere — one tap to list products across Amazon, eBay, Shopify, and more.
+> A mobile app that helps small businesses and e-commerce sellers automate product listings across platforms like Amazon, eBay, and Shopify with real-time inventory sync and pricing optimization.
 
-## Overview
-
-ListSync is a React Native application that allows small-scale sellers to manage their inventory across multiple e-commerce platforms from a single interface. The app takes care of platform-specific listing requirements, inventory synchronization, and price optimization.
+**Gap:** Existing tools are either platform-specific, lack automation, or require technical setup. A unified mobile app with AI-driven pricing suggestions and 
 
 ## Features
 
-- **Smart Product Creator**: Take/upload photos, add title/description/price once, then publish to multiple platforms
-- **Unified Inventory Dashboard**: View and manage all listings in one place
-- **Real-time Stock Sync**: Automatically update quantities across platforms when items sell
-- **Platform Connectors**: Secure OAuth integration with Amazon, eBay, Shopify
-- **Price Optimizer**: AI-powered pricing suggestions based on competitor analysis
-- **Bulk Actions**: Import/export products via CSV, mass updates
+- Resellers (thrift flippers, garage sale arbitrage, liquidation buyers)
+- Handmade/craft sellers (Etsy → Amazon handmade expansion)
+- Local retailers testing online channels
+- Dropshippers managing 10-500 SKUs
 
-## Tech Stack
+## Details
 
-- **Framework**: React Native (Expo SDK 52+)
-- **Language**: TypeScript
-- **Local Storage**: SQLite (expo-sqlite)
-- **State Management**: Zustand
-- **API Client**: Axios
-- **Image Handling**: expo-image-picker + expo-image-manipulator
-- **Background Sync**: expo-task-manager + expo-background-fetch
-- **Push Notifications**: expo-notifications
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 4/10 |
+| **Monetization** | Freemium model with a $9.99/month premium tier for advanced features like AI pricing optimization and bulk listing tools |
+| **Audience** | Small business owners, e-commerce sellers, and dropshippers who sell on multiple platforms but lack time or expertise to |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Medium — requires API integrations with e-commerce platforms and AI/ML for prici |
 
-## Setup Instructions
+## Run
 
-1. Clone the repository:
+```bash
+npx expo start
+```

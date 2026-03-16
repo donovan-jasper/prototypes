@@ -1,20 +1,27 @@
-# QueryMentor
+# SQLGPT
 
-Turn your data questions into SQL queries instantly—no coding required.
+> An AI-powered SQL assistant that helps non-technical users write, optimize, and debug SQL queries on mobile devices
 
-## Setup
+**Gap:** Most SQL tools are desktop-only or require technical knowledge; no mobile-first solution for non-developers
 
-1. Install Node.js and npm.
-2. Install Expo CLI: `npm install -g @expo/cli`
-3. Clone the repository.
-4. Navigate to the project directory: `cd querymentor`
-5. Install dependencies: `npm install`
+## Features
+
+- An AI-powered SQL assistant that helps non-technical users write, optimize, and debug SQL queries on
+- Phone-native advantage: voice-to-SQL input, real-time query testing on local databases, and offline 
+
+## Details
+
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 8/10 |
+| **Monetization** | Freemium model with $5/month premium for advanced features like query optimization and error detection |
+| **Audience** | Business analysts, marketers, and non-technical database users who need SQL but lack expertise |
+| **Stack** | Node.js |
+| **Difficulty** | Medium — requires integrating AI with SQL syntax understanding and mobile databa |
 
 ## Run
 
-1. Start the development server: `npx expo start`
-2. Open the app on your device using the Expo Go app or run it on an emulator.
-
-## Test
-
-1. Run unit tests: `npm test`
+```bash
+npm install && npm start
+```

@@ -1,20 +1,29 @@
-# SensorSync
+# Show HN: Dspx – Native C++ DSP Library for Node.js Built for AWS Lambda (1.3MB)
 
-Turn any sensor into real-time insights — track health, monitor equipment, and analyze data streams with professional-grade accuracy on your phone.
+> Real-time sensor data processing and analysis platform that handles irregular timing, packet loss, and drift compensation for IoT devices streaming to mobile apps
 
-## What it does
-• Processes real-time sensor data from IoT devices with automatic compensation for timing irregularities, packet loss, and signal drift
-• Provides professional-grade DSP analysis for health monitors, fitness trackers, industrial sensors, and custom IoT devices
-• Delivers actionable insights through intuitive mobile interface for immediate decision-making
+**Gap:** Existing mobile apps struggle with real-time processing of high-frequency sensor data with irregular timing, packet loss, and drift - most consumer ap
 
-## Monetization
-Freemium model with basic sensor support free and advanced analytics/professional features paid
+## Features
 
-## Tech stack
-React Native + Node.js + C++ DSP library optimized for mobile performance
+- Broadest reach:**
+- Health enthusiasts** tracking glucose monitors, ECG patches, sleep sensors, or custom biometric devi
+- Parents** monitoring baby vitals, room temperature, air quality in nurseries
+- Pet owners** tracking activity collars, health monitors, smart feeders
 
-## How to run
-```npx expo start```
+## Details
 
-## Status
-![Working](https://img.shields.io/badge/status-working-brightgreen)
+| | |
+|---|---|
+| **Score** | 7/10 |
+| **Competition** | 7/10 |
+| **Monetization** | Freemium model - free tier for basic sensor monitoring, premium $9.99/month for advanced real-time processing, custom se |
+| **Audience** | Health and fitness enthusiasts using wearable sensors, DIY IoT hobbyists, physical therapists monitoring patient recover |
+| **Stack** | React Native (Expo) |
+| **Difficulty** | Hard - requires sophisticated signal processing algorithms optimized for mobile  |
+
+## Run
+
+```bash
+npx expo start
+```

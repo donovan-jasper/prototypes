@@ -1,20 +1,29 @@
-# PageTurner Pro
+# TachiManga
 
-"Read comics, manga, and books offline with smart sync, social sharing, and endless customization—all in one polished app."
+> A universal reading app for digital content (books, comics, magazines) with offline access, customization, and social features for any audience that consumes long-form digital media
 
-## Setup
+**Gap:** Most competitors lack seamless offline + social features in one app. Many are either too niche (e.g., Tachiyomi for advanced users) or lack modern UX 
 
-1. Install Node.js and npm.
-2. Install Expo CLI: `npm install -g expo-cli`.
-3. Clone the repository.
-4. Install dependencies: `npm install`.
-5. Set up Firebase:
-   - Create a Firebase project at [Firebase Console](https://console.firebase.com/).
-   - Enable Firestore and Authentication.
-   - Add your Firebase config to `firebase.js`.
+## Features
+
+- Book clubs** (sync reading progress, annotate together).
+- Accessibility users** (text-to-speech, dyslexia-friendly fonts).
+- Content creators** (publish manga/webtoons directly via the app).
+- Adjacent use cases:**
+
+## Details
+
+| | |
+|---|---|
+| **Score** | 8/10 |
+| **Competition** | 5/10 |
+| **Monetization** | Freemium with premium features like ad-free reading, exclusive content, and advanced customization. One-time $4.99 for o |
+| **Audience** | Adults 18-45 who read manga, webtoons, or digital comics, including casual readers and hardcore fans who want a dedicate |
+| **Stack** | Node.js |
+| **Difficulty** | Medium — requires strong UX for reading, backend for syncing, and community enga |
 
 ## Run
 
-1. Start the development server: `expo start`.
-2. Run on iOS/Android simulator or device.
-3. Run tests: `npm test`.
+```bash
+npm install && npm start
+```

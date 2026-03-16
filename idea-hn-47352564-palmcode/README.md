@@ -1,26 +1,23 @@
-# AgentHub
+# PalmCode
 
-A lightweight web interface for managing and interacting with AI coding agents (Claude, Codex, Gemini) with real-time terminal streaming and session persistence.
+> PalmCode
 
 ## Features
-- Multi-agent session management with persistent state
-- Real-time terminal interface with command execution
-- File browser and editor with syntax highlighting
 
-## Monetization
-TBD
+- Create and switch between coding sessions for different AI agents
+- Each session maintains its own working directory, conversation history, and terminal state
+- Sessions persist across browser refreshes and device switches
+- Interactive terminal that streams AI agent responses and command execution
 
-## Tech Stack
-- Backend: Node.js + Express
-- Database: SQLite
-- Frontend: Vanilla HTML/CSS/JS with WebSocket
-- Real-time: Socket.IO
-- Terminal: node-pty
+## Details
 
-## Running
-1. Install dependencies with `npm install`
-2. Configure API keys in `.env`
-3. Start with `npm run dev`
+| | |
+|---|---|
+| **Score** | None/10 |
+| **Stack** | Node.js |
 
-## Status
-Prototype
+## Run
+
+```bash
+npm install && npm start
+```
