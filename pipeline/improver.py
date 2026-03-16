@@ -4,9 +4,10 @@ import subprocess
 import httpx
 from idea_scout.config import (
     OMNIROUTE_BASE, PLANNER_MODEL, CODER_MODEL, UNSTUCK_MODEL,
-    DB_PATH, NTFY_TOPIC,
+    DB_PATH,
 )
 from idea_scout.db import IdeaDB
+from idea_scout.notify import notify_improvement
 from builder.code_builder import llm_call, parse_code_blocks
 from builder.orchestrator import write_files, try_install_and_test, PROTOTYPES_DIR
 
@@ -174,12 +175,7 @@ async def improve_prototype(idea: dict) -> bool:
         db.record_improvement(idea["id"])
 
         # Notify
-        analysis = idea.get("analysis", "") or ""
-        summary = analysis.split("\n")[0] if analysis else idea["title"]
-        await client.post(
-            f"https://ntfy.sh/{NTFY_TOPIC}",
-            content=f"{summary}\n\nImprovement: {improvement}\nStatus: {status}".encode(),
-            headers={"Title": f"Improved: {idea['title'][:60]}", "Tags": "sparkles"},
-        )
+        round_num = idea.get("improvement_count", 0) + 1
+        await notify_improvement(idea, improvement, status, round_num)
 
     return success

@@ -54,7 +54,7 @@ async def generate_spec(post: dict) -> str:
         title=post["title"],
         analysis=post.get("analysis", post.get("selftext", "")),
     )
-    async with httpx.AsyncClient(timeout=120) as client:
+    async with httpx.AsyncClient(timeout=180) as client:
         resp = await client.post(
             f"{OMNIROUTE_BASE}/chat/completions",
             json={

@@ -71,11 +71,10 @@ def try_install_and_test(project_dir: str) -> tuple[bool, str]:
 
 async def build_next_prototype():
     db = IdeaDB(DB_PATH)
-    # Use get_buildable_ideas (requires viability >= 7 AND competition >= 4)
-    ideas = db.get_buildable_ideas(limit=1)
+    ideas = db.get_unbuilt_top_ideas(min_score=7, limit=1)
 
     if not ideas:
-        print("No buildable ideas")
+        print("No unbuilt ideas with score >= 7")
         return
 
     idea = ideas[0]

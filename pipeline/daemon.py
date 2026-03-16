@@ -4,7 +4,7 @@ import time
 import traceback
 import httpx
 from idea_scout.config import (
-    DB_PATH, NTFY_TOPIC, SCOUT_INTERVAL_HOURS, IDLE_SLEEP_MINUTES,
+    DB_PATH, SCOUT_INTERVAL_HOURS, IDLE_SLEEP_MINUTES,
     MIN_BACKLOG, MAX_IMPROVEMENTS, OMNIROUTE_BASE, CODER_MODEL,
 )
 from idea_scout.db import IdeaDB
@@ -12,29 +12,15 @@ from idea_scout.main import run as run_scout
 from idea_scout.analyzer import analyze_post
 from idea_scout.agentic_scraper import COMPETITION_PROMPT, parse_competition_from_llm
 from idea_scout.web_search import search_web
+from idea_scout.notify import notify_daemon, notify_high_score_idea
 from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
 
 SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
 
 
-async def notify(msg: str, title: str = "Pipeline", tags: str = "robot"):
-    try:
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"https://ntfy.sh/{NTFY_TOPIC}",
-                content=msg.encode("utf-8"),
-                headers={
-                    "Title": title.encode("ascii", errors="replace").decode(),
-                    "Tags": tags,
-                },
-            )
-    except Exception:
-        pass
-
-
 async def analyze_batch(db: IdeaDB, limit: int = 10):
-    """Analyze a small batch of unanalyzed ideas. Skips errors gracefully."""
+    """Analyze a small batch of unanalyzed ideas. Sends notification for each 7+ idea."""
     unanalyzed = db.get_unanalyzed_posts(limit=limit)
     if not unanalyzed:
         return 0
@@ -47,6 +33,13 @@ async def analyze_batch(db: IdeaDB, limit: int = 10):
                 db.save_analysis(post["id"], result["analysis"], result["viability_score"])
                 print(f"    [{result['viability_score']}/10] {post['title'][:50]}")
                 scored += 1
+
+                # Send individual notification for high-scoring ideas
+                if result["viability_score"] >= 7:
+                    idea = db.get_post(post["id"])
+                    if idea:
+                        await notify_high_score_idea(idea)
+
             except Exception as e:
                 print(f"    SKIP {post['id']}: {type(e).__name__}")
     return scored
@@ -62,7 +55,6 @@ async def competition_batch(db: IdeaDB, limit: int = 5):
     async with httpx.AsyncClient(timeout=90) as client:
         for idea in ideas:
             try:
-                # Search for existing competitors
                 query = f"{idea['title']} mobile app"
                 results = search_web(query, max_results=5)
                 search_text = "\n".join(
@@ -92,7 +84,7 @@ async def competition_batch(db: IdeaDB, limit: int = 5):
                 )
                 print(f"    [comp {result['competition_score']}/10] {idea['title'][:50]}")
                 checked += 1
-                await asyncio.sleep(3)  # rate limit buffer
+                await asyncio.sleep(3)
             except Exception as e:
                 print(f"    SKIP competition {idea['id']}: {type(e).__name__}")
     return checked
@@ -112,7 +104,7 @@ def _write_last_scout(ts: float):
 
 async def run_loop():
     print("Pipeline daemon started")
-    await notify("Pipeline daemon started", tags="rocket")
+    await notify_daemon("Pipeline daemon started", tags="rocket")
 
     while True:
         try:
@@ -125,7 +117,7 @@ async def run_loop():
             # Priority 1: Build if we have buildable ideas (highest value action)
             buildable = db.get_buildable_ideas(limit=1)
             if buildable:
-                print(f"\n=== BUILDING: {buildable[0]['title'][:50]} ===")
+                print(f"\n=== BUILDING ===")
                 await build_next_prototype()
                 continue
 
@@ -167,7 +159,7 @@ async def run_loop():
             print(f"Daemon error: {type(e).__name__}: {e}\n{traceback.format_exc()[-500:]}")
             err_str = str(e)
             if "429" not in err_str and "406" not in err_str and "circuit" not in err_str.lower() and "ReadTimeout" not in type(e).__name__:
-                await notify(f"Error: {err_str[:200]}", title="Pipeline Error", tags="warning")
+                await notify_daemon(f"Error: {err_str[:200]}", tags="warning")
             await asyncio.sleep(60)
 
 
