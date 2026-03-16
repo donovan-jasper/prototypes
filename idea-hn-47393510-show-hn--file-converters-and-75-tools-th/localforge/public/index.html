@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalForge - Privacy-First File Converter</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="manifest" href="manifest.json">
+</head>
+<body>
+  <header>
+    <h1>LocalForge</h1>
+    <p>Privacy-first file converter suite</p>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <nav>
+        <ul>
+          <li><a href="#" data-tool="image">Images</a></li>
+          <li><a href="#" data-tool="pdf">PDFs</a></li>
+          <li><a href="#" data-tool="media">Media</a></li>
+          <li><a href="#" data-tool="document">Documents</a></li>
+          <li><a href="#" data-tool="archive">Archives</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <main class="main-content">
+      <div class="drop-zone" id="dropZone">
+        <p>Drag & drop files here or click to select</p>
+        <input type="file" id="fileInput" multiple>
+      </div>
+
+      <div class="conversion-options" id="conversionOptions">
+        <!-- Options will be dynamically added based on selected tool -->
+      </div>
+
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar" id="progressBar"></div>
+        <div class="progress-text" id="progressText">0%</div>
+      </div>
+
+      <div class="download-container" id="downloadContainer">
+        <button id="downloadButton" disabled>Download</button>
+      </div>
+
+      <div class="privacy-notice">
+        <p>All processing happens locally in your browser. No files are uploaded to servers.</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/utils/file-handler.js"></script>
+  <script src="js/utils/ui-manager.js"></script>
+  <script src="js/converters/image-converter.js"></script>
+  <script src="js/converters/pdf-converter.js"></script>
+  <script src="js/converters/media-converter.js"></script>
+  <script src="js/converters/document-converter.js"></script>
+  <script src="js/converters/archive-converter.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
