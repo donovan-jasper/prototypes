@@ -1,5 +1,5 @@
 import httpx
-from idea_scout.config import OMNIROUTE_BASE, PLANNER_MODEL
+from idea_scout.config import OMNIROUTE_BASE, PLANNER_MODEL, CODER_MODEL
 
 SPEC_PROMPT = """You are a senior mobile app architect and product strategist.
 
@@ -54,14 +54,23 @@ async def generate_spec(post: dict) -> str:
         title=post["title"],
         analysis=post.get("analysis", post.get("selftext", "")),
     )
-    async with httpx.AsyncClient(timeout=180) as client:
-        resp = await client.post(
-            f"{OMNIROUTE_BASE}/chat/completions",
-            json={
-                "model": PLANNER_MODEL,
-                "messages": [{"role": "user", "content": prompt}],
-                "temperature": 0.5,
-            },
-        )
-        resp.raise_for_status()
-        return resp.json()["choices"][0]["message"]["content"]
+    async with httpx.AsyncClient(timeout=300) as client:
+        # Try planner model first, fall back to coder if it times out
+        for model in [PLANNER_MODEL, CODER_MODEL]:
+            try:
+                resp = await client.post(
+                    f"{OMNIROUTE_BASE}/chat/completions",
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.5,
+                    },
+                    timeout=120,
+                )
+                resp.raise_for_status()
+                return resp.json()["choices"][0]["message"]["content"]
+            except httpx.ReadTimeout:
+                if model == PLANNER_MODEL:
+                    print(f"  [spec] Planner timed out, falling back to coder model")
+                    continue
+                raise

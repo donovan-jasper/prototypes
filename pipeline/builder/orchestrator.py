@@ -80,11 +80,11 @@ async def build_next_prototype():
 
     idea = ideas[0]
     print(f"Building prototype for: {idea['title']}")
-    db.mark_prototype_started(idea["id"])
 
-    # Step 1: Generate spec (planner model)
+    # Step 1: Generate spec (planner model) — mark started only after spec succeeds
     print("  [planner] Generating spec...")
     spec = await generate_spec(idea)
+    db.mark_prototype_started(idea["id"])
 
     # Step 2: Generate code (coder model)
     async with httpx.AsyncClient(timeout=300) as client:

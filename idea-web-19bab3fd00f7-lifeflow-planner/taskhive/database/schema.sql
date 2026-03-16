@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  notes TEXT,
+  category TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_preferences (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  auto_categorize BOOLEAN DEFAULT 1,
+  notifications_enabled BOOLEAN DEFAULT 1
+);
