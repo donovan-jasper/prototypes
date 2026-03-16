@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clsh - Cloud Shell for Mobile</title>
+    <link rel="stylesheet" href="/css/main.css">
+    <link rel="stylesheet" href="/css/keyboard.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.1.0/css/xterm.min.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>Clsh</h1>
+            <div id="session-tabs">
+                <button id="new-session-btn">+</button>
+            </div>
+        </header>
+        
+        <div id="terminal-container"></div>
+        
+        <div id="keyboard">
+            <div class="keyboard-row">
+                <button class="key" data-key="Escape">ESC</button>
+                <button class="key" data-key="Tab">TAB</button>
+                <button class="key" data-key="Control">CTRL</button>
+                <button class="key" data-key="Alt">ALT</button>
+                <button class="key arrow" data-key="ArrowLeft">←</button>
+                <button class="key arrow" data-key="ArrowUp">↑</button>
+                <button class="key arrow" data-key="ArrowDown">↓</button>
+                <button class="key arrow" data-key="ArrowRight">→</button>
+            </div>
+            
+            <div class="keyboard-row">
+                <button class="key shortcut" data-shortcut="ctrl+c">^C</button>
+                <button class="key shortcut" data-shortcut="ctrl+d">^D</button>
+                <button class="key shortcut" data-shortcut="ctrl+z">^Z</button>
+                <button class="key shortcut" data-shortcut="ctrl+l">^L</button>
+            </div>
+            
+            <div class="keyboard-row">
+                <button class="key special" data-key="|">|</button>
+                <button class="key special" data-key="&">&</button>
+                <button class="key special" data-key=">">&gt;</button>
+                <button class="key special" data-key="<">&lt;</button>
+                <button class="key special" data-key="~">~</button>
+                <button class="key special" data-key="`">`</button>
+                <button class="key special" data-key="$">$</button>
+            </div>
+            
+            <div class="keyboard-row">
+                <button id="toggle-native-keyboard">Toggle Native Keyboard</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.1.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="/js/terminal.js"></script>
+    <script src="/js/keyboard.js"></script>
+    <script src="/js/session.js"></script>
+</body>
+</html>

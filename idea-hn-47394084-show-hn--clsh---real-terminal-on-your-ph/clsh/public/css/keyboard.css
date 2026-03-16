@@ -1,0 +1,81 @@
+#keyboard {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: #2d2d2d;
+    border-top: 1px solid #3c3c3c;
+    padding: 10px;
+    z-index: 100;
+    transform: translateY(0);
+    transition: transform 0.3s ease;
+}
+
+.keyboard-hidden {
+    transform: translateY(100%);
+}
+
+.keyboard-row {
+    display: flex;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.keyboard-row:last-child {
+    margin-bottom: 0;
+}
+
+.key {
+    flex: 1;
+    min-width: 44px;
+    min-height: 44px;
+    background-color: #3c3c3c;
+    color: #d4d4d4;
+    border: 1px solid #555;
+    border-radius: 4px;
+    padding: 8px;
+    font-size: 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.key:hover {
+    background-color: #454545;
+}
+
+.key:active {
+    background-color: #555;
+    transform: scale(0.95);
+}
+
+.arrow {
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.shortcut {
+    background-color: #007acc;
+}
+
+.special {
+    background-color: #7a5c94;
+}
+
+#toggle-native-keyboard {
+    width: 100%;
+    background-color: #007acc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* Hide keyboard on desktop */
+@media (min-width: 769px) {
+    #keyboard {
+        display: none;
+    }
+}
