@@ -1,0 +1,19 @@
+{
+  "name": "formrelay",
+  "version": "1.0.0",
+  "description": "A Cloudflare Worker API that generates pre-filled web forms from AI agents",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler publish",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["cloudflare", "workers", "api", "forms", "ai"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20230419.0",
+    "typescript": "^5.0.4",
+    "wrangler": "^3.0.0"
+  }
+}
