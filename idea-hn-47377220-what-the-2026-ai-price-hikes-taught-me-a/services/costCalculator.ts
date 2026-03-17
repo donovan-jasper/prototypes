@@ -88,3 +88,61 @@ export async function getCostRecommendation(
     return `Based on your task and available models, ${currentModel.name} is currently the most cost-effective option.`;
   }
 }
+
+export async function getCostProjection(
+  usageHistory: Array<{ date: string; cost: number }>,
+  currentMonth: boolean = true
+): Promise<{ projectedCost: number; savingsOpportunities: string[] }> {
+  try {
+    const response = await axios.post(
+      OPENAI_API_URL,
+      {
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI cost optimization assistant. Analyze the given spending history and provide:
+            1. A projected cost for the current month
+            2. 2-3 specific savings opportunities based on patterns in the data`
+          },
+          {
+            role: 'user',
+            content: `Spending History:\n${usageHistory.map(entry =>
+              `${entry.date}: $${entry.cost.toFixed(2)}`
+            ).join('\n')}\n\nCurrent month: ${currentMonth ? 'Yes' : 'No'}`
+          }
+        ],
+        max_tokens: 200,
+        temperature: 0.7
+      },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${OPENAI_API_KEY}`
+        }
+      }
+    );
+
+    const content = response.data.choices[0].message.content;
+    const lines = content.split('\n');
+
+    // Parse the response (simplified - in production you'd want more robust parsing)
+    const projectedCost = parseFloat(lines[0].match(/\$([\d.]+)/)?.[1] || '0');
+    const savingsOpportunities = lines.slice(1).filter(line => line.trim() !== '');
+
+    return {
+      projectedCost,
+      savingsOpportunities
+    };
+  } catch (error) {
+    console.error('Error getting cost projection:', error);
+    return {
+      projectedCost: usageHistory.reduce((sum, entry) => sum + entry.cost, 0) * (currentMonth ? 1 : 1.1),
+      savingsOpportunities: [
+        'Consider switching to cheaper models for repetitive tasks',
+        'Review your usage patterns for unusually high costs',
+        'Set up budget alerts to stay within your spending limits'
+      ]
+    };
+  }
+}

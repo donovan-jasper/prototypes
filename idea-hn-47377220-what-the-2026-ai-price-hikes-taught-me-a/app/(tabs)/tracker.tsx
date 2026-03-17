@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { Text, Button, Divider, Card, Chip, ProgressBar } from 'react-native-paper';
+import { Text, Button, Divider, Card, Chip, ProgressBar, Dialog, Portal, RadioButton, TextInput } from 'react-native-paper';
 import CostChart from '../../components/CostChart';
 import { getUsageHistory, getMonthlyTotal } from '../../services/database';
-import { UsageEntry } from '../../types/models';
-import { projectMonthlyCost } from '../../services/costCalculator';
+import { UsageEntry, AIModel } from '../../types/models';
+import { projectMonthlyCost, calculateSavings } from '../../services/costCalculator';
+import { getAllModels } from '../../services/modelService';
 
 export default function TrackerScreen() {
   const [usageHistory, setUsageHistory] = useState<UsageEntry[]>([]);
@@ -13,6 +14,10 @@ export default function TrackerScreen() {
   const [savingsOpportunities, setSavingsOpportunities] = useState<string[]>([]);
   const [budgetLimit, setBudgetLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [whatIfVisible, setWhatIfVisible] = useState(false);
+  const [whatIfModel, setWhatIfModel] = useState<string>('');
+  const [whatIfSavings, setWhatIfSavings] = useState<number>(0);
+  const [models, setModels] = useState<AIModel[]>([]);
 
   useEffect(() => {
     loadData();
@@ -23,9 +28,11 @@ export default function TrackerScreen() {
     try {
       const history = await getUsageHistory();
       const total = await getMonthlyTotal();
+      const allModels = getAllModels();
 
       setUsageHistory(history);
       setMonthlyTotal(total);
+      setModels(allModels);
 
       // Prepare data for chart
       const chartData = history.reduce((acc, entry) => {
@@ -64,6 +71,36 @@ export default function TrackerScreen() {
     if (progress > 0.9) return '#f44336'; // Red
     if (progress > 0.7) return '#ff9800'; // Orange
     return '#4CAF50'; // Green
+  };
+
+  const calculateWhatIfSavings = () => {
+    if (!whatIfModel) return 0;
+
+    const selectedModel = models.find(m => m.id === whatIfModel);
+    if (!selectedModel) return 0;
+
+    // Calculate total savings if all future tasks used this model
+    // This is a simplified calculation - in a real app you'd need more context
+    const totalSavings = usageHistory.reduce((sum, entry) => {
+      const currentModel = models.find(m => m.id === entry.modelId);
+      if (currentModel) {
+        const savings = calculateSavings(
+          currentModel,
+          selectedModel,
+          entry.inputTokens,
+          entry.outputTokens
+        );
+        return sum + savings;
+      }
+      return sum;
+    }, 0);
+
+    return totalSavings;
+  };
+
+  const handleWhatIfSubmit = () => {
+    const savings = calculateWhatIfSavings();
+    setWhatIfSavings(savings);
   };
 
   if (loading) {
@@ -126,6 +163,15 @@ export default function TrackerScreen() {
         </Card.Content>
       </Card>
 
+      <Button
+        mode="outlined"
+        onPress={() => setWhatIfVisible(true)}
+        style={styles.whatIfButton}
+        icon="lightbulb-on"
+      >
+        What-If Scenario
+      </Button>
+
       <CostChart data={usageHistory.map(entry => ({
         date: new Date(entry.timestamp).toISOString(),
         cost: entry.cost
@@ -179,6 +225,50 @@ export default function TrackerScreen() {
       >
         Refresh Data
       </Button>
+
+      <Portal>
+        <Dialog visible={whatIfVisible} onDismiss={() => setWhatIfVisible(false)}>
+          <Dialog.Title>What-If Scenario</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium" style={styles.dialogText}>
+              Simulate cost savings if you switched all future tasks to a different model.
+            </Text>
+
+            <Text variant="titleSmall" style={styles.dialogSectionTitle}>
+              Select a model to compare:
+            </Text>
+            <RadioButton.Group
+              onValueChange={value => setWhatIfModel(value)}
+              value={whatIfModel}
+            >
+              {models.map(model => (
+                <View key={model.id} style={styles.radioItem}>
+                  <RadioButton value={model.id} />
+                  <Text variant="bodyMedium">{model.name}</Text>
+                </View>
+              ))}
+            </RadioButton.Group>
+
+            {whatIfSavings > 0 && (
+              <View style={styles.savingsResult}>
+                <Text variant="titleMedium" style={styles.savingsTitle}>
+                  Potential Savings:
+                </Text>
+                <Text variant="headlineSmall" style={styles.savingsAmount}>
+                  ${whatIfSavings.toFixed(2)}
+                </Text>
+                <Text variant="bodyMedium" style={styles.savingsNote}>
+                  Based on your recent usage history
+                </Text>
+              </View>
+            )}
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setWhatIfVisible(false)}>Cancel</Button>
+            <Button onPress={handleWhatIfSubmit}>Calculate</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </ScrollView>
   );
 }
@@ -249,6 +339,10 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     fontWeight: 'bold',
   },
+  whatIfButton: {
+    marginBottom: 24,
+    marginHorizontal: 16,
+  },
   savingsSection: {
     marginVertical: 24,
     marginHorizontal: 16,
@@ -290,5 +384,36 @@ const styles = StyleSheet.create({
   refreshButton: {
     marginVertical: 16,
     marginHorizontal: 16,
+  },
+  dialogText: {
+    marginBottom: 16,
+  },
+  dialogSectionTitle: {
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  radioItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  savingsResult: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+  },
+  savingsTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  savingsAmount: {
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    marginBottom: 4,
+  },
+  savingsNote: {
+    color: '#666',
   },
 });
