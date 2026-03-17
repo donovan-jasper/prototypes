@@ -1,81 +1,76 @@
 import * as SQLite from 'expo-sqlite';
 
-const db = SQLite.openDatabase('mediamesh.db');
+const db = SQLite.openDatabaseSync('mediamesh.db');
+
+export const initDatabase = () => {
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS media (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cloudId TEXT NOT NULL,
+      source TEXT NOT NULL,
+      localPath TEXT NOT NULL,
+      hash TEXT NOT NULL,
+      metadata TEXT,
+      syncedAt INTEGER NOT NULL
+    );
+  `);
+  
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS clouds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      service TEXT NOT NULL,
+      token TEXT NOT NULL,
+      lastSync INTEGER
+    );
+  `);
+  
+  db.execSync(`
+    CREATE TABLE IF NOT EXISTS sync_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cloudId INTEGER NOT NULL,
+      filters TEXT,
+      FOREIGN KEY (cloudId) REFERENCES clouds (id)
+    );
+  `);
+};
 
 export const insertMedia = (media) => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'INSERT INTO media (cloudId, source, localPath, hash, metadata, syncedAt) VALUES (?, ?, ?, ?, ?, ?)',
-        [media.cloudId, media.source, media.localPath, media.hash, JSON.stringify(media.metadata), media.syncedAt],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.runSync(
+    'INSERT INTO media (cloudId, source, localPath, hash, metadata, syncedAt) VALUES (?, ?, ?, ?, ?, ?)',
+    [media.cloudId, media.source, media.localPath, media.hash, JSON.stringify(media.metadata), media.syncedAt]
+  );
+  return result;
 };
 
 export const getMediaBySource = (source) => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'SELECT * FROM media WHERE source = ?',
-        [source],
-        (_, result) => resolve(result.rows._array),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.getAllSync(
+    'SELECT id, cloudId, source, localPath, hash, metadata, syncedAt FROM media WHERE source = ?',
+    [source]
+  );
+  return result;
 };
 
 export const getAllMedia = () => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'SELECT * FROM media ORDER BY syncedAt DESC',
-        [],
-        (_, result) => resolve(result.rows._array),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.getAllSync(
+    'SELECT id, cloudId, source, localPath, hash, metadata, syncedAt FROM media ORDER BY syncedAt DESC'
+  );
+  return result;
 };
 
 export const insertCloud = (cloud) => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'INSERT INTO clouds (service, token, lastSync) VALUES (?, ?, ?)',
-        [cloud.service, cloud.token, Date.now()],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.runSync(
+    'INSERT INTO clouds (service, token, lastSync) VALUES (?, ?, ?)',
+    [cloud.service, cloud.token, Date.now()]
+  );
+  return result;
 };
 
 export const getClouds = () => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'SELECT * FROM clouds',
-        [],
-        (_, result) => resolve(result.rows._array),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.getAllSync('SELECT id, service, token, lastSync FROM clouds');
+  return result;
 };
 
 export const deleteCloud = (id) => {
-  return new Promise((resolve, reject) => {
-    db.transaction((tx) => {
-      tx.executeSql(
-        'DELETE FROM clouds WHERE id = ?',
-        [id],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
-    });
-  });
+  const result = db.runSync('DELETE FROM clouds WHERE id = ?', [id]);
+  return result;
 };
