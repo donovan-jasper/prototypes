@@ -1,6 +1,8 @@
 import { OpenAI } from 'openai';
 import * as SQLite from 'expo-sqlite';
 import { getUserPreferences } from './database';
+import { calculateStreak, getLongestStreak, calculateCompletionRate, getStreakStatus } from './streaks';
+import { getHabitCompletions } from './habits';
 
 const openai = new OpenAI({
   apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
@@ -17,6 +19,42 @@ interface CoachMessageContext {
   completionRate: number;
   status: 'active' | 'at-risk' | 'broken';
   userTone: 'supportive' | 'encouraging' | 'challenging';
+}
+
+export async function fetchCoachContext(userId: string, habitId: string): Promise<CoachMessageContext> {
+  // Get habit completions
+  const completions = await getHabitCompletions(habitId);
+
+  // Calculate streak metrics
+  const streakLength = calculateStreak(completions);
+  const longestStreak = getLongestStreak(completions);
+  const completionRate = calculateCompletionRate(completions);
+  const status = getStreakStatus(completions);
+
+  // Calculate missed days (days since last completion)
+  let missedDays = 0;
+  if (completions.length > 0) {
+    const lastCompletionDate = new Date(completions[0].date);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - lastCompletionDate.getTime());
+    missedDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) - 1;
+  }
+
+  // Get user preferences
+  const userTone = await getCoachTone(userId);
+
+  // Get habit name
+  const habitName = completions.length > 0 ? completions[0].habitName : 'your habit';
+
+  return {
+    streakLength,
+    longestStreak,
+    missedDays,
+    habitName,
+    completionRate,
+    status,
+    userTone
+  };
 }
 
 export async function generateCoachMessage(context: CoachMessageContext): Promise<string> {
