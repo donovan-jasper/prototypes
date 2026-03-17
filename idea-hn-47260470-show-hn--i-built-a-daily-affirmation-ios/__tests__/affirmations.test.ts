@@ -13,4 +13,23 @@ describe('Affirmations', () => {
     const streak = await calculateStreak([]);
     expect(streak).toBe(0);
   });
+
+  test('getAffirmationForContext returns an affirmation', async () => {
+    const affirmation = await getAffirmationForContext('morning', 2, 5);
+    expect(affirmation).toHaveProperty('text');
+    expect(affirmation).toHaveProperty('time_of_day');
+  });
+
+  test('getAffirmationForContext filters by time of day', async () => {
+    const morningAffirmation = await getAffirmationForContext('morning', 2, 5);
+    expect(morningAffirmation.time_of_day).toBe('morning');
+
+    const eveningAffirmation = await getAffirmationForContext('evening', 2, 5);
+    expect(eveningAffirmation.time_of_day).toBe('evening');
+  });
+
+  test('getAffirmationForContext adjusts for low mood', async () => {
+    const lowMoodAffirmation = await getAffirmationForContext('morning', 1, 5);
+    expect(lowMoodAffirmation.energy_level).toBeLessThanOrEqual(2);
+  });
 });

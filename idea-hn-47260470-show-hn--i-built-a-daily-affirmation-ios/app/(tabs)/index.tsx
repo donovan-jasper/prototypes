@@ -11,6 +11,7 @@ const HomeScreen = () => {
   const streakCount = useStore((state) => state.streakCount);
   const lastMoodRating = useStore((state) => state.lastMoodRating);
   const setAffirmation = useStore((state) => state.setAffirmation);
+  const updateStreak = useStore((state) => state.updateStreak);
 
   useEffect(() => {
     const fetchAffirmation = async () => {
@@ -20,11 +21,12 @@ const HomeScreen = () => {
       setAffirmation(affirmation);
       if (affirmation?.id) {
         await logSession(affirmation.id, lastMoodRating);
+        await updateStreak();
       }
     };
 
     fetchAffirmation();
-  }, [lastMoodRating, streakCount, setAffirmation]);
+  }, [lastMoodRating, streakCount, setAffirmation, updateStreak]);
 
   return (
     <View style={styles.container}>

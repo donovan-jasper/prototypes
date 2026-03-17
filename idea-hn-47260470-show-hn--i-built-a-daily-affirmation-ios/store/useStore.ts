@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getCurrentStreak } from '../lib/database';
 
 interface StoreState {
   currentAffirmation: any;
@@ -7,7 +8,7 @@ interface StoreState {
   isPremium: boolean;
   lastMoodRating: number;
   setAffirmation: (affirmation: any) => void;
-  updateStreak: (count: number) => void;
+  updateStreak: () => Promise<void>;
   addGoal: (goal: any) => void;
   setMoodRating: (rating: number) => void;
 }
@@ -19,7 +20,10 @@ export const useStore = create<StoreState>((set) => ({
   isPremium: false,
   lastMoodRating: 2,
   setAffirmation: (affirmation) => set({ currentAffirmation: affirmation }),
-  updateStreak: (count) => set({ streakCount: count }),
+  updateStreak: async () => {
+    const streak = await getCurrentStreak();
+    set({ streakCount: streak });
+  },
   addGoal: (goal) => set((state) => ({ goals: [...state.goals, goal] })),
   setMoodRating: (rating) => set({ lastMoodRating: rating }),
 }));
