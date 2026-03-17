@@ -1,4 +1,3 @@
-import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 
@@ -22,9 +21,14 @@ export const initAREngine = (gl) => {
 };
 
 export const addTarget = (scene, position) => {
-  const geometry = new THREE.SphereGeometry(0.5, 32, 32);
+  const geometry = new THREE.SphereGeometry(0.1, 32, 32);
   const material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
   const target = new THREE.Mesh(geometry, material);
   target.position.set(position.x, position.y, position.z);
   scene.add(target);
+  return target;
+};
+
+export const removeTarget = (scene, target) => {
+  scene.remove(target);
 };
