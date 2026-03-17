@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Button, StyleSheet, Text } from 'react-native';
 import useVoiceRecognition from '../hooks/useVoiceRecognition';
 
 interface VoiceInputProps {
@@ -18,11 +18,13 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
   return (
     <View style={styles.container}>
       <Button
-        title={isListening ? 'Listening...' : 'Start Listening'}
-        onPress={startListening}
-        disabled={isListening}
-        color="#007AFF"
+        title={isListening ? 'Stop Listening' : 'Start Listening'}
+        onPress={isListening ? stopListening : startListening}
+        color={isListening ? '#FF3B30' : '#007AFF'}
       />
+      {transcript ? (
+        <Text style={styles.transcript}>Recognized: {transcript}</Text>
+      ) : null}
     </View>
   );
 };
@@ -31,6 +33,11 @@ const styles = StyleSheet.create({
   container: {
     marginVertical: 16,
     alignItems: 'center',
+  },
+  transcript: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#333',
   },
 });
 

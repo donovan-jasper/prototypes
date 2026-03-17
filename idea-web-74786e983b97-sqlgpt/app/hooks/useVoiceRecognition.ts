@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import * as Speech from 'expo-speech';
 import * as SpeechRecognition from 'expo-speech-recognition';
 
 const useVoiceRecognition = () => {
@@ -17,19 +16,20 @@ const useVoiceRecognition = () => {
 
   const startListening = async () => {
     setIsListening(true);
+    setTranscript(''); // Clear previous transcript
     try {
       await SpeechRecognition.startAsync({
         language: 'en-US',
         onRecognized: (result) => {
-          setTranscript(result.text);
+          setTranscript(prev => prev + ' ' + result.text);
         },
         onError: (error) => {
           console.error('Speech recognition error:', error);
+          setIsListening(false);
         },
       });
     } catch (error) {
       console.error('Speech recognition error:', error);
-    } finally {
       setIsListening(false);
     }
   };
