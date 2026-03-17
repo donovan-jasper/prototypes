@@ -1,12 +1,14 @@
-import React from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { View, Button, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { incrementUsage } from '../store/userSlice';
+import { restorePhoto } from '../services/RestorationService';
 
 const HomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const { isPremium, usageCount } = useSelector((state) => state.user);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const pickImage = async () => {
     if (!isPremium && usageCount >= 3) {
@@ -22,15 +24,34 @@ const HomeScreen = ({ navigation }) => {
     });
 
     if (!result.canceled) {
-      dispatch(incrementUsage());
-      // Process the image with AI here
-      navigation.navigate('Gallery', { image: result.assets[0].uri });
+      setIsProcessing(true);
+      
+      try {
+        const restoredImage = await restorePhoto(result.assets[0].uri);
+        dispatch(incrementUsage());
+        setIsProcessing(false);
+        navigation.navigate('Gallery', { 
+          originalImage: result.assets[0].uri,
+          restoredImage: restoredImage.uri,
+          quality: restoredImage.quality 
+        });
+      } catch (error) {
+        setIsProcessing(false);
+        console.error('Failed to restore photo:', error);
+      }
     }
   };
 
   return (
     <View style={styles.container}>
-      <Button title="Restore Photo" onPress={pickImage} />
+      {isProcessing ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Restoring your photo...</Text>
+        </View>
+      ) : (
+        <Button title="Restore Photo" onPress={pickImage} />
+      )}
     </View>
   );
 };
@@ -40,6 +61,14 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
 });
 
