@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Contact, Interaction } from '../types';
 import { initDatabase, getContacts, insertContact, updateContact, deleteContact, logInteraction, getInteractionsByContact } from '../lib/database';
-import { scheduleReminder, cancelReminder } from '../lib/notifications';
 import { getOverdueContacts } from '../lib/analytics';
 
 interface ContactState {
@@ -39,7 +39,7 @@ export const useContactStore = create<ContactState>()(
           await insertContact(contact);
           await get().fetchContacts();
           set({ loading: false });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
@@ -50,7 +50,7 @@ export const useContactStore = create<ContactState>()(
           await updateContact(contact);
           await get().fetchContacts();
           set({ loading: false });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
@@ -61,7 +61,7 @@ export const useContactStore = create<ContactState>()(
           await deleteContact(id);
           await get().fetchContacts();
           set({ loading: false });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
@@ -73,7 +73,7 @@ export const useContactStore = create<ContactState>()(
           await get().fetchContacts();
           await get().fetchInteractions(interaction.contactId);
           set({ loading: false });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
@@ -100,7 +100,7 @@ export const useContactStore = create<ContactState>()(
             }),
             loading: false,
           });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
@@ -110,7 +110,7 @@ export const useContactStore = create<ContactState>()(
         try {
           const interactions = await getInteractionsByContact(contactId);
           set({ interactions, loading: false });
-        } catch (error) {
+        } catch (error: any) {
           set({ loading: false, error: error.message });
         }
       },
