@@ -12,52 +12,76 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { format, startOfDay, endOfDay, isToday, isBefore } from 'date-fns';
 import { useTaskStore } from '../../store/taskStore';
 import { useScheduleStore } from '../../store/scheduleStore';
 import { suggestTaskTime } from '../../lib/scheduler';
 import { Task } from '../../types';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+
+type FilterType = 'all' | 'today' | 'overdue';
+type PriorityType = 'high' | 'medium' | 'low';
 
 export default function TasksScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<'high' | 'medium' | 'low'>('medium');
-  const [estimatedMinutes, setEstimatedMinutes] = useState('');
+  const [priority, setPriority] = useState<PriorityType>('medium');
+  const [duration, setDuration] = useState('');
   const [businessHours, setBusinessHours] = useState(false);
   const [preferredStart, setPreferredStart] = useState('');
   const [preferredEnd, setPreferredEnd] = useState('');
+  const [filter, setFilter] = useState<FilterType>('all');
 
-  const { tasks, addTask, completeTask, rescheduleTask } = useTaskStore();
+  const { tasks, addTask, completeTask, deleteTask } = useTaskStore();
   const { schedules } = useScheduleStore();
 
-  const activeTasks = useMemo(() => {
-    return tasks
-      .filter((t) => !t.completed)
-      .sort((a, b) => {
-        const priorityOrder = { high: 0, medium: 1, low: 2 };
-        return priorityOrder[a.priority] - priorityOrder[b.priority];
-      });
-  }, [tasks]);
+  const today = new Date();
+  const todayStart = startOfDay(today);
+  const todayEnd = endOfDay(today);
 
-  const getTaskSuggestion = (task: Task) => {
-    const today = new Date();
-    return suggestTaskTime(task, today, schedules);
-  };
+  const todaySchedules = schedules.filter(
+    (s) => s.startTime >= todayStart && s.startTime <= todayEnd
+  );
+
+  const filteredTasks = useMemo(() => {
+    let filtered = tasks.filter((t) => !t.completed);
+
+    if (filter === 'today') {
+      filtered = filtered.filter(
+        (t) => t.scheduledFor && isToday(t.scheduledFor)
+      );
+    } else if (filter === 'overdue') {
+      filtered = filtered.filter(
+        (t) =>
+          t.scheduledFor &&
+          isBefore(t.scheduledFor, todayStart) &&
+          !isToday(t.scheduledFor)
+      );
+    }
+
+    return filtered;
+  }, [tasks, filter, todayStart]);
+
+  const groupedTasks = useMemo(() => {
+    const high = filteredTasks.filter((t) => t.priority === 'high');
+    const medium = filteredTasks.filter((t) => t.priority === 'medium');
+    const low = filteredTasks.filter((t) => t.priority === 'low');
+
+    return { high, medium, low };
+  }, [filteredTasks]);
 
   const handleAddTask = () => {
-    if (!title.trim() || !estimatedMinutes.trim()) {
+    if (!title.trim() || !duration.trim()) {
       return;
     }
 
-    const minutes = parseInt(estimatedMinutes, 10);
-    if (isNaN(minutes) || minutes <= 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid number of minutes');
+    const estimatedMinutes = parseInt(duration, 10);
+    if (isNaN(estimatedMinutes) || estimatedMinutes <= 0) {
+      Alert.alert('Invalid Duration', 'Please enter a valid duration in minutes');
       return;
     }
 
     const timeConstraints: Task['timeConstraints'] = {};
-    
+
     if (businessHours) {
       timeConstraints.businessHours = true;
     }
@@ -65,7 +89,7 @@ export default function TasksScreen() {
     if (preferredStart.trim() && preferredEnd.trim()) {
       const start = parseInt(preferredStart, 10);
       const end = parseInt(preferredEnd, 10);
-      
+
       if (!isNaN(start) && !isNaN(end) && start >= 0 && start < 24 && end > start && end <= 24) {
         timeConstraints.preferredTimeWindow = { start, end };
       }
@@ -74,242 +98,311 @@ export default function TasksScreen() {
     addTask({
       title,
       priority,
-      estimatedMinutes: minutes,
+      estimatedMinutes,
       timeConstraints: Object.keys(timeConstraints).length > 0 ? timeConstraints : undefined,
     });
 
     setTitle('');
     setPriority('medium');
-    setEstimatedMinutes('');
+    setDuration('');
     setBusinessHours(false);
     setPreferredStart('');
     setPreferredEnd('');
     setModalVisible(false);
   };
 
-  const handleAcceptSuggestion = (task: Task) => {
-    const suggestion = getTaskSuggestion(task);
-    if (suggestion) {
-      rescheduleTask(task.id, suggestion);
-      Alert.alert('Scheduled', `Task scheduled for ${format(suggestion, 'h:mm a')}`);
-    } else {
-      Alert.alert('No Available Time', 'Could not find a suitable time slot for this task');
-    }
+  const getSuggestedTime = (task: Task): string | null => {
+    const suggestion = suggestTaskTime(task, today, todaySchedules);
+    if (!suggestion) return null;
+    return format(suggestion, 'h:mm a');
   };
 
-  const renderRightActions = (task: Task) => {
+  const handleComplete = (taskId: string) => {
+    completeTask(taskId);
+  };
+
+  const handleDelete = (taskId: string) => {
+    Alert.alert('Delete Task', 'Are you sure you want to delete this task?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => deleteTask(taskId) },
+    ]);
+  };
+
+  const renderTaskCard = ({ item }: { item: Task }) => {
+    const suggestedTime = getSuggestedTime(item);
+
     return (
-      <TouchableOpacity
-        style={styles.completeAction}
-        onPress={() => completeTask(task.id)}
-      >
-        <Ionicons name="checkmark-circle" size={32} color="#fff" />
-        <Text style={styles.completeActionText}>Complete</Text>
-      </TouchableOpacity>
+      <View style={styles.taskCard}>
+        <View style={styles.taskHeader}>
+          <View style={styles.taskTitleRow}>
+            <View
+              style={[
+                styles.priorityDot,
+                item.priority === 'high' && styles.priorityHigh,
+                item.priority === 'medium' && styles.priorityMedium,
+                item.priority === 'low' && styles.priorityLow,
+              ]}
+            />
+            <Text style={styles.taskTitle}>{item.title}</Text>
+          </View>
+          <View style={styles.taskActions}>
+            <TouchableOpacity
+              onPress={() => handleComplete(item.id)}
+              style={styles.actionButton}
+            >
+              <Ionicons name="checkmark-circle-outline" size={24} color="#4CAF50" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleDelete(item.id)}
+              style={styles.actionButton}
+            >
+              <Ionicons name="trash-outline" size={24} color="#F44336" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.taskDetails}>
+          <View style={styles.taskDetailItem}>
+            <Ionicons name="time-outline" size={16} color="#666" />
+            <Text style={styles.taskDetailText}>{item.estimatedMinutes} min</Text>
+          </View>
+
+          {suggestedTime && (
+            <View style={styles.suggestedChip}>
+              <Ionicons name="bulb-outline" size={14} color="#007AFF" />
+              <Text style={styles.suggestedText}>Suggested: {suggestedTime}</Text>
+            </View>
+          )}
+        </View>
+      </View>
     );
   };
 
-  const renderTaskItem = ({ item }: { item: Task }) => {
-    const suggestion = getTaskSuggestion(item);
-    const priorityColors = {
-      high: '#FF3B30',
-      medium: '#FF9500',
-      low: '#34C759',
-    };
+  const renderPrioritySection = (
+    priorityLevel: PriorityType,
+    tasks: Task[],
+    label: string
+  ) => {
+    if (tasks.length === 0) return null;
 
     return (
-      <Swipeable renderRightActions={() => renderRightActions(item)}>
-        <View style={[styles.taskCard, { borderLeftColor: priorityColors[item.priority] }]}>
-          <View style={styles.taskHeader}>
-            <Text style={styles.taskTitle}>{item.title}</Text>
-            <View style={[styles.priorityBadge, { backgroundColor: priorityColors[item.priority] }]}>
-              <Text style={styles.priorityText}>{item.priority.toUpperCase()}</Text>
-            </View>
-          </View>
-          
-          <Text style={styles.taskDuration}>{item.estimatedMinutes} minutes</Text>
-          
-          {item.timeConstraints?.businessHours && (
-            <Text style={styles.constraint}>Business hours only</Text>
-          )}
-          
-          {item.timeConstraints?.preferredTimeWindow && (
-            <Text style={styles.constraint}>
-              Preferred: {item.timeConstraints.preferredTimeWindow.start}:00 - {item.timeConstraints.preferredTimeWindow.end}:00
-            </Text>
-          )}
-
-          {suggestion && (
-            <View style={styles.suggestionContainer}>
-              <View style={styles.suggestionChip}>
-                <Ionicons name="time-outline" size={16} color="#007AFF" />
-                <Text style={styles.suggestionText}>
-                  Suggested: {format(suggestion, 'h:mm a')} - {format(new Date(suggestion.getTime() + item.estimatedMinutes * 60000), 'h:mm a')}
-                </Text>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.acceptButton}
-                onPress={() => handleAcceptSuggestion(item)}
-              >
-                <Text style={styles.acceptButtonText}>Accept</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {!suggestion && (
-            <Text style={styles.noSuggestion}>No available time slot found</Text>
-          )}
-        </View>
-      </Swipeable>
+      <View style={styles.prioritySection}>
+        <Text style={styles.priorityLabel}>{label}</Text>
+        <FlatList
+          data={tasks}
+          renderItem={renderTaskCard}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+        />
+      </View>
     );
   };
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Tasks</Text>
-          <Text style={styles.headerSubtitle}>{activeTasks.length} active</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Tasks</Text>
+        <View style={styles.filterTabs}>
+          <TouchableOpacity
+            style={[styles.filterTab, filter === 'all' && styles.filterTabActive]}
+            onPress={() => setFilter('all')}
+          >
+            <Text style={[styles.filterTabText, filter === 'all' && styles.filterTabTextActive]}>
+              All
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterTab, filter === 'today' && styles.filterTabActive]}
+            onPress={() => setFilter('today')}
+          >
+            <Text style={[styles.filterTabText, filter === 'today' && styles.filterTabTextActive]}>
+              Today
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterTab, filter === 'overdue' && styles.filterTabActive]}
+            onPress={() => setFilter('overdue')}
+          >
+            <Text
+              style={[styles.filterTabText, filter === 'overdue' && styles.filterTabTextActive]}
+            >
+              Overdue
+            </Text>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        <FlatList
-          data={activeTasks}
-          renderItem={renderTaskItem}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            <View style={styles.emptyState}>
-              <Ionicons name="checkbox-outline" size={64} color="#ccc" />
-              <Text style={styles.emptyText}>No tasks yet</Text>
-              <Text style={styles.emptySubtext}>Add your first task to get started</Text>
+      <FlatList
+        data={[1]}
+        renderItem={() => (
+          <View>
+            {renderPrioritySection('high', groupedTasks.high, 'High Priority')}
+            {renderPrioritySection('medium', groupedTasks.medium, 'Medium Priority')}
+            {renderPrioritySection('low', groupedTasks.low, 'Low Priority')}
+          </View>
+        )}
+        keyExtractor={() => 'tasks'}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="checkbox-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No tasks yet</Text>
+            <Text style={styles.emptySubtext}>Tap + to add your first task</Text>
+          </View>
+        }
+      />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setModalVisible(true)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={32} color="#fff" />
+      </TouchableOpacity>
+
+      <Modal
+        visible={modalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Task</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <Ionicons name="close" size={28} color="#333" />
+              </TouchableOpacity>
             </View>
-          }
-        />
 
-        <TouchableOpacity
-          style={styles.fab}
-          onPress={() => setModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="add" size={32} color="#fff" />
-        </TouchableOpacity>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Title</Text>
+              <TextInput
+                style={styles.input}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="e.g., Call dentist, Buy groceries"
+                placeholderTextColor="#999"
+              />
+            </View>
 
-        <Modal
-          visible={modalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Add Task</Text>
-                <TouchableOpacity onPress={() => setModalVisible(false)}>
-                  <Ionicons name="close" size={28} color="#333" />
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Priority</Text>
+              <View style={styles.priorityPicker}>
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    priority === 'high' && styles.priorityOptionActive,
+                  ]}
+                  onPress={() => setPriority('high')}
+                >
+                  <Text
+                    style={[
+                      styles.priorityOptionText,
+                      priority === 'high' && styles.priorityOptionTextActive,
+                    ]}
+                  >
+                    High
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    priority === 'medium' && styles.priorityOptionActive,
+                  ]}
+                  onPress={() => setPriority('medium')}
+                >
+                  <Text
+                    style={[
+                      styles.priorityOptionText,
+                      priority === 'medium' && styles.priorityOptionTextActive,
+                    ]}
+                  >
+                    Medium
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.priorityOption,
+                    priority === 'low' && styles.priorityOptionActive,
+                  ]}
+                  onPress={() => setPriority('low')}
+                >
+                  <Text
+                    style={[
+                      styles.priorityOptionText,
+                      priority === 'low' && styles.priorityOptionTextActive,
+                    ]}
+                  >
+                    Low
+                  </Text>
                 </TouchableOpacity>
               </View>
+            </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Title</Text>
-                <TextInput
-                  style={styles.input}
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="e.g., Call dentist, Buy groceries"
-                  placeholderTextColor="#999"
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Estimated Duration (minutes)</Text>
+              <TextInput
+                style={styles.input}
+                value={duration}
+                onChangeText={setDuration}
+                placeholder="e.g., 30"
+                placeholderTextColor="#999"
+                keyboardType="number-pad"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <TouchableOpacity
+                style={styles.checkboxRow}
+                onPress={() => setBusinessHours(!businessHours)}
+              >
+                <Ionicons
+                  name={businessHours ? 'checkbox' : 'square-outline'}
+                  size={24}
+                  color="#007AFF"
                 />
-              </View>
+                <Text style={styles.checkboxLabel}>Business hours only (9 AM - 5 PM)</Text>
+              </TouchableOpacity>
+            </View>
 
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Priority</Text>
-                <View style={styles.prioritySelector}>
-                  {(['high', 'medium', 'low'] as const).map((p) => (
-                    <TouchableOpacity
-                      key={p}
-                      style={[
-                        styles.priorityOption,
-                        priority === p && styles.priorityOptionSelected,
-                      ]}
-                      onPress={() => setPriority(p)}
-                    >
-                      <Text
-                        style={[
-                          styles.priorityOptionText,
-                          priority === p && styles.priorityOptionTextSelected,
-                        ]}
-                      >
-                        {p.charAt(0).toUpperCase() + p.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Estimated Minutes</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Preferred Time Window (optional)</Text>
+              <View style={styles.timeWindowRow}>
                 <TextInput
-                  style={styles.input}
-                  value={estimatedMinutes}
-                  onChangeText={setEstimatedMinutes}
-                  placeholder="30"
+                  style={[styles.input, styles.timeInput]}
+                  value={preferredStart}
+                  onChangeText={setPreferredStart}
+                  placeholder="Start (0-23)"
+                  placeholderTextColor="#999"
+                  keyboardType="number-pad"
+                />
+                <Text style={styles.timeSeparator}>to</Text>
+                <TextInput
+                  style={[styles.input, styles.timeInput]}
+                  value={preferredEnd}
+                  onChangeText={setPreferredEnd}
+                  placeholder="End (1-24)"
                   placeholderTextColor="#999"
                   keyboardType="number-pad"
                 />
               </View>
-
-              <View style={styles.inputGroup}>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setBusinessHours(!businessHours)}
-                >
-                  <Ionicons
-                    name={businessHours ? 'checkbox' : 'square-outline'}
-                    size={24}
-                    color="#007AFF"
-                  />
-                  <Text style={styles.checkboxLabel}>Business hours only (9 AM - 5 PM)</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Preferred Time Window (Optional)</Text>
-                <View style={styles.timeWindowRow}>
-                  <TextInput
-                    style={[styles.input, styles.timeInput]}
-                    value={preferredStart}
-                    onChangeText={setPreferredStart}
-                    placeholder="Start (0-23)"
-                    placeholderTextColor="#999"
-                    keyboardType="number-pad"
-                  />
-                  <Text style={styles.timeSeparator}>to</Text>
-                  <TextInput
-                    style={[styles.input, styles.timeInput]}
-                    value={preferredEnd}
-                    onChangeText={setPreferredEnd}
-                    placeholder="End (1-24)"
-                    placeholderTextColor="#999"
-                    keyboardType="number-pad"
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.saveButton,
-                  (!title.trim() || !estimatedMinutes.trim()) && styles.saveButtonDisabled,
-                ]}
-                onPress={handleAddTask}
-                disabled={!title.trim() || !estimatedMinutes.trim()}
-              >
-                <Text style={styles.saveButtonText}>Add Task</Text>
-              </TouchableOpacity>
             </View>
+
+            <TouchableOpacity
+              style={[
+                styles.saveButton,
+                (!title.trim() || !duration.trim()) && styles.saveButtonDisabled,
+              ]}
+              onPress={handleAddTask}
+              disabled={!title.trim() || !duration.trim()}
+            >
+              <Text style={styles.saveButtonText}>Add Task</Text>
+            </TouchableOpacity>
           </View>
-        </Modal>
-      </SafeAreaView>
-    </GestureHandlerRootView>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -328,22 +421,47 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 16,
   },
-  headerSubtitle: {
+  filterTabs: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  filterTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  filterTabActive: {
+    backgroundColor: '#007AFF',
+  },
+  filterTabText: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#666',
-    marginTop: 4,
+  },
+  filterTabTextActive: {
+    color: '#fff',
   },
   listContent: {
     padding: 16,
     paddingBottom: 100,
+  },
+  prioritySection: {
+    marginBottom: 24,
+  },
+  priorityLabel: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#333',
+    marginBottom: 12,
   },
   taskCard: {
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -354,87 +472,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  taskTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  priorityDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
+  },
+  priorityHigh: {
+    backgroundColor: '#F44336',
+  },
+  priorityMedium: {
+    backgroundColor: '#FF9800',
+  },
+  priorityLow: {
+    backgroundColor: '#4CAF50',
   },
   taskTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
     flex: 1,
-    marginRight: 8,
   },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  taskActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  priorityText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
+  actionButton: {
+    padding: 4,
   },
-  taskDuration: {
+  taskDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  taskDetailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  taskDetailText: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
   },
-  constraint: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 2,
-  },
-  suggestionContainer: {
-    marginTop: 12,
+  suggestedChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  suggestionChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 4,
     backgroundColor: '#E3F2FD',
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-    flex: 1,
-    marginRight: 8,
-  },
-  suggestionText: {
-    fontSize: 12,
-    color: '#007AFF',
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  acceptButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  acceptButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  noSuggestion: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  completeAction: {
-    backgroundColor: '#34C759',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 100,
-    marginBottom: 12,
+    paddingVertical: 4,
     borderRadius: 12,
   },
-  completeActionText: {
-    color: '#fff',
+  suggestedText: {
     fontSize: 12,
+    color: '#007AFF',
     fontWeight: '600',
-    marginTop: 4,
   },
   emptyState: {
     alignItems: 'center',
@@ -510,7 +609,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e0e0e0',
   },
-  prioritySelector: {
+  priorityPicker: {
     flexDirection: 'row',
     gap: 8,
   },
@@ -519,12 +618,12 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
     borderColor: '#e0e0e0',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
-  priorityOptionSelected: {
+  priorityOptionActive: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
@@ -533,17 +632,17 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666',
   },
-  priorityOptionTextSelected: {
+  priorityOptionTextActive: {
     color: '#fff',
   },
   checkboxRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   checkboxLabel: {
     fontSize: 14,
     color: '#333',
-    marginLeft: 8,
   },
   timeWindowRow: {
     flexDirection: 'row',
