@@ -4,6 +4,8 @@ import { Audio } from 'expo-av';
 export const useAudio = () => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [playbackStatus, setPlaybackStatus] = useState<Audio.PlaybackStatus | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -14,18 +16,39 @@ export const useAudio = () => {
   }, [sound]);
 
   const playAudio = async (audioFile: string) => {
+    setIsLoading(true);
+    setError(null);
+
     try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         require(`../assets/voices/${audioFile}`),
-        { shouldPlay: true }
+        {
+          shouldPlay: true,
+          progressUpdateIntervalMillis: 500,
+        }
       );
+
       setSound(newSound);
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         setPlaybackStatus(status);
+
+        if (status.isLoaded) {
+          // You can add additional status handling here if needed
+        }
       });
-    } catch (error) {
-      console.error('Error playing audio:', error);
+
+      return newSound;
+    } catch (err) {
+      console.error('Error playing audio:', err);
+      setError('Failed to load audio file');
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -44,5 +67,12 @@ export const useAudio = () => {
     }
   };
 
-  return { playAudio, pauseAudio, stopAudio, playbackStatus };
+  return {
+    playAudio,
+    pauseAudio,
+    stopAudio,
+    playbackStatus,
+    isLoading,
+    error,
+  };
 };

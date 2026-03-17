@@ -1,5 +1,5 @@
-import React, { useContext, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import React, { useContext, useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useGoals } from '../../hooks/useGoals';
 import { useStreak } from '../../hooks/useStreak';
 import { useVoicePrompts } from '../../hooks/useVoicePrompts';
@@ -8,16 +8,37 @@ import StreakBadge from '../../components/StreakBadge';
 import MoodSelector from '../../components/MoodSelector';
 import VoicePlayer from '../../components/VoicePlayer';
 import { SubscriptionContext } from '../../context/SubscriptionContext';
+import { useAudio } from '../../hooks/useAudio';
 
 export default function HomeScreen() {
   const { goals } = useGoals();
   const { currentStreak, recordCheckIn } = useStreak();
-  const { scheduledPrompts, playPrompt } = useVoicePrompts();
+  const { scheduledPrompts } = useVoicePrompts();
   const { isPremium } = useContext(SubscriptionContext);
+  const { playAudio, stopAudio, isLoading, error } = useAudio();
+  const [currentClip, setCurrentClip] = useState<string | null>(null);
 
   useEffect(() => {
     recordCheckIn();
   }, []);
+
+  const handlePlayClip = async (clipId: string) => {
+    try {
+      if (currentClip === clipId) {
+        await stopAudio();
+        setCurrentClip(null);
+      } else {
+        await stopAudio();
+        const clip = scheduledPrompts.find(p => p.clip.id === clipId)?.clip;
+        if (clip) {
+          await playAudio(clip.audioFile);
+          setCurrentClip(clipId);
+        }
+      }
+    } catch (err) {
+      console.error('Error playing clip:', err);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -38,10 +59,18 @@ export default function HomeScreen() {
           <VoicePlayer
             key={prompt.id}
             clip={prompt.clip}
-            onPlay={() => playPrompt(prompt.id)}
+            onPlay={() => handlePlayClip(prompt.clip.id)}
+            isLocked={prompt.clip.isPremium && !isPremium}
           />
         ))}
+        {isLoading && <Text style={styles.loadingText}>Loading audio...</Text>}
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
+      {currentClip && (
+        <TouchableOpacity style={styles.stopAllButton} onPress={stopAudio}>
+          <Text style={styles.stopAllButtonText}>Stop All</Text>
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -68,5 +97,26 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
+  },
+  loadingText: {
+    textAlign: 'center',
+    color: '#673ab7',
+    marginTop: 8,
+  },
+  errorText: {
+    textAlign: 'center',
+    color: '#e53935',
+    marginTop: 8,
+  },
+  stopAllButton: {
+    backgroundColor: '#673ab7',
+    padding: 12,
+    margin: 16,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  stopAllButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });

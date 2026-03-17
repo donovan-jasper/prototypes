@@ -10,13 +10,26 @@ export const playVoiceClip = async (audioFile: string) => {
 
     const { sound: newSound } = await Audio.Sound.createAsync(
       require(`../assets/voices/${audioFile}`),
-      { shouldPlay: true }
+      {
+        shouldPlay: true,
+        progressUpdateIntervalMillis: 500,
+      }
     );
+
     sound = newSound;
 
+    // Set up playback status updates
+    sound.setOnPlaybackStatusUpdate((status) => {
+      if (status.isLoaded) {
+        // You can add additional status handling here if needed
+      }
+    });
+
     await sound.playAsync();
+    return sound;
   } catch (error) {
     console.error('Error playing audio:', error);
+    throw error;
   }
 };
 
@@ -39,4 +52,11 @@ export const getPlaybackStatus = async () => {
     return await sound.getStatusAsync();
   }
   return null;
+};
+
+export const cleanupAudio = async () => {
+  if (sound) {
+    await sound.unloadAsync();
+    sound = null;
+  }
 };
