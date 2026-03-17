@@ -5,7 +5,20 @@ export interface CanvasElement {
   path?: string;
   color?: string;
   strokeWidth?: number;
-  // Add other element properties as needed
+  // Rectangle properties
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  // Circle properties
+  centerX?: number;
+  centerY?: number;
+  radius?: number;
+  // Line properties
+  startX?: number;
+  startY?: number;
+  endX?: number;
+  endY?: number;
 }
 
 export const serializeCanvas = (elements: CanvasElement[]): string => {
