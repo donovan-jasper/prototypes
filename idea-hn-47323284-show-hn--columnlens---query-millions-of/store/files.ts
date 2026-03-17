@@ -5,7 +5,7 @@ interface FileMetadata {
   name: string;
   size: number;
   rowCount: number;
-  importedAt: number;
+  importedAt: string;
 }
 
 interface FilesStore {
