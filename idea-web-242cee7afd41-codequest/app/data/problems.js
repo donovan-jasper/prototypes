@@ -1,21 +1,20 @@
-// Logic Problems
-const logicProblems = [
-  // Easy
+const problems = [
+  // Logic - Easy
   {
     question: "If all roses are flowers and some flowers fade quickly, which statement must be true?",
     options: [
       "All roses fade quickly",
       "Some roses are flowers",
-      "No roses fade quickly",
-      "All flowers are roses"
+      "No flowers are roses",
+      "All flowers fade quickly"
     ],
     correctAnswer: 1,
     domain: "logic",
     difficulty: "easy"
   },
   {
-    question: "A train leaves at 3 PM and arrives at 7 PM. How long was the journey?",
-    options: ["3 hours", "4 hours", "5 hours", "6 hours"],
+    question: "Which number comes next in the sequence: 2, 4, 6, 8, ?",
+    options: ["9", "10", "11", "12"],
     correctAnswer: 1,
     domain: "logic",
     difficulty: "easy"
@@ -39,6 +38,8 @@ const logicProblems = [
     domain: "logic",
     difficulty: "easy"
   },
+
+  // Logic - Medium
   {
     question: "If it rains, the ground gets wet. The ground is wet. What can we conclude?",
     options: [
@@ -49,13 +50,19 @@ const logicProblems = [
     ],
     correctAnswer: 1,
     domain: "logic",
-    difficulty: "easy"
+    difficulty: "medium"
   },
-  // Medium
   {
-    question: "In a race, you overtake the person in second place. What position are you in now?",
-    options: ["First", "Second", "Third", "Fourth"],
+    question: "In a group of 5 people, everyone shakes hands with everyone else exactly once. How many handshakes occur?",
+    options: ["5", "10", "15", "20"],
     correctAnswer: 1,
+    domain: "logic",
+    difficulty: "medium"
+  },
+  {
+    question: "Which word does NOT belong: Apple, Banana, Carrot, Orange?",
+    options: ["Apple", "Banana", "Carrot", "Orange"],
+    correctAnswer: 2,
     domain: "logic",
     difficulty: "medium"
   },
@@ -71,39 +78,14 @@ const logicProblems = [
     domain: "logic",
     difficulty: "medium"
   },
-  {
-    question: "A bat and ball cost $1.10 total. The bat costs $1 more than the ball. How much does the ball cost?",
-    options: ["$0.10", "$0.05", "$0.15", "$0.20"],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  {
-    question: "Five people can build 5 houses in 5 days. How many days would it take 10 people to build 10 houses?",
-    options: ["5 days", "10 days", "2.5 days", "15 days"],
-    correctAnswer: 0,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  {
-    question: "If no A is B, and all C is A, what can we conclude about C and B?",
-    options: [
-      "Some C is B",
-      "No C is B",
-      "All C is B",
-      "Cannot determine"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  // Hard
+
+  // Logic - Hard
   {
     question: "Three switches outside a room control three bulbs inside. You can flip switches but enter only once. How do you determine which switch controls which bulb?",
     options: [
       "Flip all switches and check",
-      "Flip one, wait, flip another, then check temperature and light",
-      "Flip switches in sequence",
+      "Flip one switch, wait, flip another, then check temperature and light",
+      "Flip switches randomly",
       "It's impossible"
     ],
     correctAnswer: 1,
@@ -111,412 +93,308 @@ const logicProblems = [
     difficulty: "hard"
   },
   {
-    question: "You have 12 balls, one is slightly heavier. Using a balance scale only 3 times, how do you find it?",
+    question: "A bat and ball cost $1.10 total. The bat costs $1 more than the ball. How much does the ball cost?",
+    options: ["$0.10", "$0.05", "$0.15", "$0.20"],
+    correctAnswer: 1,
+    domain: "logic",
+    difficulty: "hard"
+  },
+  {
+    question: "You have 12 balls, one is slightly heavier. Using a balance scale only 3 times, how can you find the heavy ball?",
     options: [
-      "Weigh them one by one",
+      "Weigh them all individually",
       "Divide into groups of 4, then narrow down",
       "Divide into groups of 6",
-      "It requires more than 3 weighings"
+      "It cannot be done in 3 weighings"
     ],
     correctAnswer: 1,
     domain: "logic",
     difficulty: "hard"
   },
-  {
-    question: "A man says 'I am lying.' Is this statement true or false?",
-    options: [
-      "True",
-      "False",
-      "It's a paradox",
-      "Depends on context"
-    ],
-    correctAnswer: 2,
-    domain: "logic",
-    difficulty: "hard"
-  },
-  {
-    question: "If it takes 5 machines 5 minutes to make 5 widgets, how long would it take 100 machines to make 100 widgets?",
-    options: ["5 minutes", "100 minutes", "20 minutes", "10 minutes"],
-    correctAnswer: 0,
-    domain: "logic",
-    difficulty: "hard"
-  }
-];
 
-// Math Problems
-const mathProblems = [
-  // Easy
+  // Math - Easy
   {
-    question: "What is 15% of 200?",
-    options: ["25", "30", "35", "40"],
+    question: "What is 15 + 27?",
+    options: ["40", "42", "43", "45"],
     correctAnswer: 1,
     domain: "math",
     difficulty: "easy"
   },
   {
-    question: "If x + 5 = 12, what is x?",
-    options: ["5", "6", "7", "8"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    question: "What is the area of a rectangle with length 8 and width 5?",
-    options: ["13", "26", "40", "45"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    question: "What is 3² + 4²?",
-    options: ["25", "49", "12", "14"],
-    correctAnswer: 0,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    question: "If a shirt costs $40 and is on sale for 25% off, what is the sale price?",
-    options: ["$30", "$35", "$25", "$20"],
-    correctAnswer: 0,
-    domain: "math",
-    difficulty: "easy"
-  },
-  // Medium
-  {
-    question: "If 3x - 7 = 14, what is x?",
-    options: ["5", "6", "7", "8"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    question: "What is the next number in the sequence: 2, 6, 12, 20, 30, ?",
-    options: ["38", "40", "42", "44"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    question: "A car travels 240 miles in 4 hours. What is its average speed in mph?",
-    options: ["50", "55", "60", "65"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    question: "If the probability of rain is 0.3, what is the probability it won't rain?",
-    options: ["0.3", "0.5", "0.7", "1.0"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    question: "What is 20% of 25% of 400?",
-    options: ["15", "20", "25", "30"],
+    question: "What is 8 × 7?",
+    options: ["54", "56", "58", "60"],
     correctAnswer: 1,
     domain: "math",
-    difficulty: "medium"
-  },
-  // Hard
-  {
-    question: "If f(x) = 2x + 3 and g(x) = x², what is f(g(2))?",
-    options: ["11", "13", "14", "19"],
-    correctAnswer: 0,
-    domain: "math",
-    difficulty: "hard"
+    difficulty: "easy"
   },
   {
-    question: "A number is increased by 20% and then decreased by 20%. What is the net change?",
-    options: ["0%", "-4%", "+4%", "-2%"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "hard"
-  },
-  {
-    question: "What is the sum of all integers from 1 to 100?",
-    options: ["5000", "5050", "5100", "5500"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "hard"
-  },
-  {
-    question: "If log₂(x) = 5, what is x?",
-    options: ["10", "25", "32", "64"],
+    question: "What is 50% of 80?",
+    options: ["30", "35", "40", "45"],
     correctAnswer: 2,
     domain: "math",
-    difficulty: "hard"
-  }
-];
+    difficulty: "easy"
+  },
+  {
+    question: "If a rectangle has length 6 and width 4, what is its area?",
+    options: ["20", "22", "24", "26"],
+    correctAnswer: 2,
+    domain: "math",
+    difficulty: "easy"
+  },
 
-// Verbal Problems
-const verbalProblems = [
-  // Easy
+  // Math - Medium
   {
-    question: "Which word is most similar to 'happy'?",
+    question: "What is the value of x in: 3x + 5 = 20?",
+    options: ["3", "4", "5", "6"],
+    correctAnswer: 2,
+    domain: "math",
+    difficulty: "medium"
+  },
+  {
+    question: "A train travels 120 miles in 2 hours. What is its average speed?",
+    options: ["50 mph", "55 mph", "60 mph", "65 mph"],
+    correctAnswer: 2,
+    domain: "math",
+    difficulty: "medium"
+  },
+  {
+    question: "What is 25% of 200?",
+    options: ["40", "45", "50", "55"],
+    correctAnswer: 2,
+    domain: "math",
+    difficulty: "medium"
+  },
+  {
+    question: "If a shirt costs $40 after a 20% discount, what was the original price?",
+    options: ["$45", "$48", "$50", "$52"],
+    correctAnswer: 2,
+    domain: "math",
+    difficulty: "medium"
+  },
+
+  // Math - Hard
+  {
+    question: "What is the sum of the first 10 prime numbers?",
+    options: ["127", "129", "131", "133"],
+    correctAnswer: 1,
+    domain: "math",
+    difficulty: "hard"
+  },
+  {
+    question: "If f(x) = 2x² - 3x + 1, what is f(3)?",
+    options: ["8", "10", "12", "14"],
+    correctAnswer: 1,
+    domain: "math",
+    difficulty: "hard"
+  },
+  {
+    question: "A cylinder has radius 3 and height 5. What is its volume? (Use π ≈ 3.14)",
+    options: ["141.3", "145.5", "147.0", "150.2"],
+    correctAnswer: 0,
+    domain: "math",
+    difficulty: "hard"
+  },
+
+  // Verbal - Easy
+  {
+    question: "Which word is closest in meaning to 'happy'?",
     options: ["Sad", "Joyful", "Angry", "Tired"],
     correctAnswer: 1,
     domain: "verbal",
     difficulty: "easy"
   },
   {
-    question: "Complete the analogy: Hot is to Cold as Day is to ___",
-    options: ["Sun", "Night", "Light", "Morning"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "easy"
-  },
-  {
-    question: "Which word does NOT belong: Apple, Banana, Carrot, Orange",
-    options: ["Apple", "Banana", "Carrot", "Orange"],
+    question: "Which word is the opposite of 'hot'?",
+    options: ["Warm", "Cool", "Cold", "Freezing"],
     correctAnswer: 2,
     domain: "verbal",
     difficulty: "easy"
   },
   {
-    question: "What is the opposite of 'expand'?",
-    options: ["Grow", "Contract", "Increase", "Enlarge"],
-    correctAnswer: 1,
+    question: "Complete the analogy: Cat is to Kitten as Dog is to ___",
+    options: ["Puppy", "Cub", "Calf", "Foal"],
+    correctAnswer: 0,
     domain: "verbal",
     difficulty: "easy"
   },
   {
-    question: "Which word means 'to make better'?",
-    options: ["Worsen", "Improve", "Maintain", "Destroy"],
-    correctAnswer: 1,
+    question: "Which word does NOT belong: Run, Jump, Sleep, Sprint?",
+    options: ["Run", "Jump", "Sleep", "Sprint"],
+    correctAnswer: 2,
     domain: "verbal",
     difficulty: "easy"
   },
-  // Medium
+
+  // Verbal - Medium
   {
-    question: "Meticulous is to Careless as Generous is to ___",
-    options: ["Kind", "Stingy", "Wealthy", "Poor"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    question: "Which word best describes someone who is 'eloquent'?",
-    options: ["Silent", "Articulate", "Confused", "Shy"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    question: "Ephemeral most nearly means:",
-    options: ["Eternal", "Temporary", "Beautiful", "Mysterious"],
+    question: "Which word best completes: 'The evidence was ___; it could not be disputed.'",
+    options: ["Ambiguous", "Irrefutable", "Questionable", "Dubious"],
     correctAnswer: 1,
     domain: "verbal",
     difficulty: "medium"
   },
   {
     question: "Book is to Library as Art is to ___",
-    options: ["Paint", "Museum", "Canvas", "Artist"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    question: "Which word is most opposite to 'ambiguous'?",
-    options: ["Clear", "Vague", "Uncertain", "Doubtful"],
+    options: ["Museum", "Theater", "Concert", "Stadium"],
     correctAnswer: 0,
     domain: "verbal",
     difficulty: "medium"
   },
-  // Hard
   {
-    question: "Obfuscate most nearly means:",
-    options: ["Clarify", "Confuse", "Simplify", "Explain"],
+    question: "Which word means 'to make worse'?",
+    options: ["Ameliorate", "Exacerbate", "Mitigate", "Alleviate"],
     correctAnswer: 1,
     domain: "verbal",
-    difficulty: "hard"
+    difficulty: "medium"
   },
   {
-    question: "Cacophony is to Sound as Pandemonium is to ___",
-    options: ["Peace", "Chaos", "Music", "Silence"],
+    question: "What is the meaning of 'ephemeral'?",
+    options: ["Lasting forever", "Very short-lived", "Extremely large", "Highly valuable"],
     correctAnswer: 1,
     domain: "verbal",
-    difficulty: "hard"
+    difficulty: "medium"
   },
-  {
-    question: "Which word best describes 'perspicacious'?",
-    options: ["Confused", "Insightful", "Sweaty", "Obvious"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "hard"
-  },
-  {
-    question: "Iconoclast most nearly means:",
-    options: ["Traditionalist", "Rebel", "Artist", "Follower"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "hard"
-  }
-];
 
-// Strategy Problems
-const strategyProblems = [
-  // Easy
+  // Verbal - Hard
   {
-    question: "You have $100 to invest. Option A guarantees 5% return. Option B has 50% chance of 15% return or 50% chance of -5%. Which is safer?",
+    question: "Which word is most nearly opposite to 'laconic'?",
+    options: ["Verbose", "Brief", "Concise", "Terse"],
+    correctAnswer: 0,
+    domain: "verbal",
+    difficulty: "hard"
+  },
+  {
+    question: "Mendacious is to Truthful as Parsimonious is to ___",
+    options: ["Generous", "Stingy", "Careful", "Wealthy"],
+    correctAnswer: 0,
+    domain: "verbal",
+    difficulty: "hard"
+  },
+  {
+    question: "What does 'obfuscate' mean?",
+    options: ["To clarify", "To confuse or obscure", "To simplify", "To organize"],
+    correctAnswer: 1,
+    domain: "verbal",
+    difficulty: "hard"
+  },
+
+  // Strategy - Easy
+  {
+    question: "You have $100 to invest. Option A returns 10% guaranteed. Option B might return 20% or lose 10%. Which is safer?",
     options: ["Option A", "Option B", "Both equal", "Neither"],
     correctAnswer: 0,
     domain: "strategy",
     difficulty: "easy"
   },
   {
-    question: "In a game, you can take 1, 2, or 3 coins per turn. There are 10 coins. You go first. What's your winning first move?",
-    options: ["Take 1", "Take 2", "Take 3", "Doesn't matter"],
-    correctAnswer: 0,
+    question: "To finish a project faster, should you: work longer hours, delegate tasks, or skip quality checks?",
+    options: ["Work longer hours", "Delegate tasks", "Skip quality checks", "Do nothing"],
+    correctAnswer: 1,
     domain: "strategy",
     difficulty: "easy"
   },
   {
-    question: "You need to cross a bridge that takes 10 minutes. You have a torch that lasts 12 minutes. A friend can cross in 5 minutes. What's the optimal strategy?",
+    question: "You're lost in a city. What's the best first step?",
+    options: ["Keep walking randomly", "Ask for directions", "Panic", "Sit down"],
+    correctAnswer: 1,
+    domain: "strategy",
+    difficulty: "easy"
+  },
+
+  // Strategy - Medium
+  {
+    question: "A company can invest in marketing or R&D. Marketing gives quick returns, R&D gives long-term advantage. Budget allows only one. What factors matter most?",
     options: [
-      "Go alone",
-      "Send friend first, then follow",
-      "Go together",
-      "Send friend back and forth"
+      "Only current cash flow",
+      "Market position and competition timeline",
+      "Employee preferences",
+      "Random choice"
     ],
-    correctAnswer: 2,
-    domain: "strategy",
-    difficulty: "easy"
-  },
-  {
-    question: "In rock-paper-scissors, your opponent has played rock 3 times in a row. What should you play?",
-    options: [
-      "Rock",
-      "Paper",
-      "Scissors",
-      "It doesn't matter"
-    ],
-    correctAnswer: 3,
-    domain: "strategy",
-    difficulty: "easy"
-  },
-  // Medium
-  {
-    question: "You're managing a project with 3 tasks: A (2 days), B (3 days, requires A), C (1 day, independent). What's the minimum completion time?",
-    options: ["4 days", "5 days", "6 days", "3 days"],
     correctAnswer: 1,
     domain: "strategy",
     difficulty: "medium"
   },
   {
-    question: "In a negotiation, you value an item at $100. The seller values it at $60. What's the optimal outcome?",
+    question: "You manage a team with conflicting priorities. How do you resolve it?",
     options: [
-      "Pay $100",
-      "Pay $60",
-      "Pay between $60-$100",
-      "Don't buy"
+      "Ignore the conflict",
+      "Align priorities with business goals and communicate",
+      "Let them fight it out",
+      "Choose randomly"
     ],
-    correctAnswer: 2,
-    domain: "strategy",
-    difficulty: "medium"
-  },
-  {
-    question: "You have 3 job offers: A ($80k, stable), B ($70k, high growth), C ($90k, risky). You're risk-averse. Which do you choose?",
-    options: ["A", "B", "C", "Negotiate with all"],
-    correctAnswer: 0,
-    domain: "strategy",
-    difficulty: "medium"
-  },
-  {
-    question: "In a tournament, you can choose your opponent. You're ranked 3rd. Ranks 1, 2, 4, 5 remain. Who do you challenge?",
-    options: ["Rank 1", "Rank 2", "Rank 4", "Rank 5"],
     correctAnswer: 1,
     domain: "strategy",
     difficulty: "medium"
   },
   {
-    question: "You're allocating budget across 3 projects with diminishing returns. Which strategy maximizes total value?",
+    question: "In a negotiation, the other party makes an aggressive first offer. Your best response?",
     options: [
-      "All in one project",
-      "Equal distribution",
-      "Weighted by initial returns",
-      "Focus on two projects"
+      "Accept immediately",
+      "Counter with data and alternative proposals",
+      "Walk away immediately",
+      "Get angry"
     ],
-    correctAnswer: 2,
+    correctAnswer: 1,
     domain: "strategy",
     difficulty: "medium"
   },
-  // Hard
+
+  // Strategy - Hard
   {
-    question: "In the Prisoner's Dilemma (one round), what's the Nash equilibrium?",
+    question: "A startup has 6 months of runway. Should they: cut costs and extend runway, pivot product, or raise more funding?",
     options: [
-      "Both cooperate",
-      "Both defect",
-      "One cooperates, one defects",
-      "No equilibrium"
+      "Always cut costs",
+      "Depends on product-market fit and growth trajectory",
+      "Always pivot",
+      "Always raise funding"
     ],
     correctAnswer: 1,
     domain: "strategy",
     difficulty: "hard"
   },
   {
-    question: "You're in a sealed-bid auction. Your valuation is $100. What's your optimal bid?",
+    question: "You discover a competitor's weakness. Do you: exploit it immediately, build long-term moat, or ignore it?",
     options: [
-      "$100",
-      "Less than $100",
-      "More than $100",
-      "Depends on others' bids"
+      "Exploit immediately",
+      "Build sustainable competitive advantage",
+      "Ignore it",
+      "Tell the competitor"
     ],
     correctAnswer: 1,
     domain: "strategy",
     difficulty: "hard"
   },
   {
-    question: "In a multi-stage game, you can invest now for future advantage or maximize current gains. Discount rate is high. What do you do?",
+    question: "Your team is burned out but a critical deadline looms. Best approach?",
     options: [
-      "Invest for future",
-      "Maximize current gains",
-      "Balance both",
-      "Wait and see"
+      "Push harder regardless",
+      "Assess critical path, cut scope, and protect team health",
+      "Miss the deadline",
+      "Hire more people immediately"
     ],
     correctAnswer: 1,
-    domain: "strategy",
-    difficulty: "hard"
-  },
-  {
-    question: "You're designing a pricing strategy. Demand is elastic. Costs are fixed. What maximizes profit?",
-    options: [
-      "High price, low volume",
-      "Low price, high volume",
-      "Medium price",
-      "Dynamic pricing"
-    ],
-    correctAnswer: 3,
     domain: "strategy",
     difficulty: "hard"
   }
 ];
 
-const allProblems = [
-  ...logicProblems,
-  ...mathProblems,
-  ...verbalProblems,
-  ...strategyProblems
-];
-
-export function getRandomProblems(count = 3, difficulty = null) {
-  let pool = allProblems;
+export function getRandomProblems(count, difficulty = null) {
+  let filtered = difficulty 
+    ? problems.filter(p => p.difficulty === difficulty)
+    : problems;
   
-  if (difficulty) {
-    pool = allProblems.filter(p => p.difficulty === difficulty);
-  }
-  
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+  const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
-export function getProblemsByDomain(domain, count = 5) {
-  const domainProblems = allProblems.filter(p => p.domain === domain);
-  const shuffled = [...domainProblems].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, count);
+export function getProblemsByDomain(domain, count) {
+  const filtered = problems.filter(p => p.domain === domain);
+  const shuffled = [...filtered].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
 export function getProblemsByDifficulty(difficulty) {
-  return allProblems.filter(p => p.difficulty === difficulty);
+  return problems.filter(p => p.difficulty === difficulty);
 }
 
-export default allProblems;
+export default problems;
