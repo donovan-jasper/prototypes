@@ -11,4 +11,8 @@ export const CONFIG = {
   STORAGE: {
     ORGANIZED_FOLDER: 'NightOwlOrganized',
   },
+  BATTERY: {
+    PAUSE_THRESHOLD: 15, // Pause if battery is below 15%
+    RESUME_THRESHOLD: 30, // Resume if battery is above 30%
+  },
 };

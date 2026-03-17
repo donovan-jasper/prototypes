@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import * as MediaLibrary from 'expo-media-library';
 import { v4 as uuidv4 } from 'uuid';
+import { CONFIG } from '@/constants/Config';
 
 export class FileManager {
   async scanPhotos(): Promise<Array<{ id: string; uri: string; type: string }>> {
@@ -65,9 +66,19 @@ export class FileManager {
   }
 
   async moveFile(uri: string, destination: string): Promise<void> {
+    // Create destination directory if it doesn't exist
+    await FileSystem.makeDirectoryAsync(destination, { intermediates: true });
+
+    // Get the filename from the URI
+    const filename = uri.split('/').pop();
+    if (!filename) {
+      throw new Error('Invalid file URI');
+    }
+
+    // Move the file
     await FileSystem.moveAsync({
       from: uri,
-      to: destination,
+      to: `${destination}/${filename}`,
     });
   }
 
@@ -75,16 +86,42 @@ export class FileManager {
     await FileSystem.deleteAsync(uri);
   }
 
+  getOrganizedFolder(): string {
+    return `${FileSystem.documentDirectory}${CONFIG.STORAGE.ORGANIZED_FOLDER}`;
+  }
+
   private async categorizePhoto(uri: string): Promise<string> {
-    // Implement photo categorization logic
-    // This is a simplified version
-    return 'uncategorized';
+    // In a real implementation, this would use the ImageClassifier
+    // For now, we'll use a simple heuristic based on filename
+    const filename = uri.toLowerCase();
+
+    if (filename.includes('receipt') || filename.includes('invoice')) {
+      return 'Receipts';
+    } else if (filename.includes('screenshot')) {
+      return 'Screenshots';
+    } else if (filename.includes('profile') || filename.includes('selfie')) {
+      return 'People';
+    } else if (filename.includes('food') || filename.includes('meal')) {
+      return 'Food';
+    } else {
+      return 'General';
+    }
   }
 
   private async categorizeDocument(uri: string): Promise<string> {
-    // Implement document categorization logic
-    // This is a simplified version
-    return 'uncategorized';
+    // In a real implementation, this would analyze the document content
+    // For now, we'll use a simple heuristic based on filename and extension
+    const filename = uri.toLowerCase();
+
+    if (filename.includes('receipt') || filename.includes('invoice')) {
+      return 'Receipts';
+    } else if (filename.includes('contract') || filename.includes('agreement')) {
+      return 'Contracts';
+    } else if (filename.includes('resume') || filename.includes('cv')) {
+      return 'Resumes';
+    } else {
+      return 'Documents';
+    }
   }
 
   private getMimeType(filename: string): string {

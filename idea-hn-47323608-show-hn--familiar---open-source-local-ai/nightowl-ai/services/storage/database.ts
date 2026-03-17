@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Task } from '@/types';
+import { Task, ProcessedContent } from '@/types';
 
 export class Database {
   private db: SQLite.WebSQLDatabase | null = null;
@@ -93,6 +93,13 @@ export class Database {
     await this.executeSql(
       'UPDATE tasks SET progress = ?, files_processed = ? WHERE id = ?',
       [progress, filesProcessed, id]
+    );
+  }
+
+  async saveProcessedContent(content: ProcessedContent): Promise<void> {
+    await this.executeSql(
+      'INSERT INTO processed_content (id, file_id, content, summary, entities) VALUES (?, ?, ?, ?, ?)',
+      [content.id, content.fileId, content.content, content.summary, content.entities]
     );
   }
 
