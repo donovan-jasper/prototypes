@@ -1,7 +1,13 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { initDB } from '../lib/db';
 
 export default function AppLayout() {
+  useEffect(() => {
+    initDB();
+  }, []);
+
   return (
     <Tabs>
       <Tabs.Screen

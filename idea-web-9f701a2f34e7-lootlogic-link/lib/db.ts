@@ -41,6 +41,20 @@ export const initDB = () => {
       );`
     );
   });
+  
+  seedDatabase();
+};
+
+export const seedDatabase = () => {
+  db.transaction(tx => {
+    tx.executeSql('SELECT COUNT(*) as count FROM games', [], (_, { rows }) => {
+      if (rows._array[0].count === 0) {
+        tx.executeSql('INSERT INTO games (name, platform) VALUES (?, ?)', ['Fortnite', 'PC/Console']);
+        tx.executeSql('INSERT INTO games (name, platform) VALUES (?, ?)', ['Genshin Impact', 'Mobile/PC']);
+        tx.executeSql('INSERT INTO games (name, platform) VALUES (?, ?)', ['Destiny 2', 'PC/Console']);
+      }
+    });
+  });
 };
 
 export const insertItem = (item) => {
@@ -63,6 +77,32 @@ export const getItemsByGame = (gameId) => {
         'SELECT * FROM items WHERE game_id = ?',
         [gameId],
         (_, { rows }) => resolve(rows._array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getAllItems = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM items',
+        [],
+        (_, { rows }) => resolve(rows._array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getGameByName = (name) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM games WHERE name = ?',
+        [name],
+        (_, { rows }) => resolve(rows._array[0]),
         (_, error) => reject(error)
       );
     });
