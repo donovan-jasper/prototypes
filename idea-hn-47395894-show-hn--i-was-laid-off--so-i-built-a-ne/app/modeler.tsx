@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons, Card } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import PremiumGate from '../components/PremiumGate';
-import { calculateEquityValue, calculateTaxImpact } from '../lib/calculations';
+import { calculateEquityValue, calculateTaxImpact, calculateAMT } from '../lib/calculations';
 import { useEquityStore } from '../store/equityStore';
 import ScenarioChart from '../components/ScenarioChart';
 
@@ -12,12 +12,14 @@ interface ScenarioForm {
   saleType: 'ipo' | 'acquisition' | 'secondary';
   holdingPeriod: 'short' | 'long';
   annualIncome: string;
+  exercisePrice: string;
 }
 
 export default function ScenarioModeler() {
   const [results, setResults] = useState<{
     equityValue: number;
     taxImpact: number;
+    amtImpact: number;
     chartData: { x: number; y: number }[];
   } | null>(null);
 
@@ -28,7 +30,8 @@ export default function ScenarioModeler() {
       valuation: '10000000',
       saleType: 'ipo',
       holdingPeriod: 'short',
-      annualIncome: '100000'
+      annualIncome: '100000',
+      exercisePrice: '10'
     }
   });
 
@@ -37,16 +40,20 @@ export default function ScenarioModeler() {
   const onSubmit = (data: ScenarioForm) => {
     const valuation = parseFloat(data.valuation);
     const annualIncome = parseFloat(data.annualIncome);
+    const exercisePrice = parseFloat(data.exercisePrice);
 
     // Calculate based on user's actual equity positions
     let totalEquityValue = 0;
     let totalTaxImpact = 0;
+    let totalAmtImpact = 0;
 
     equities.forEach(equity => {
       const equityValue = calculateEquityValue(equity.shares, equity.strikePrice, valuation / 1000000);
       const taxImpact = calculateTaxImpact(equityValue, data.holdingPeriod, annualIncome);
+      const amtImpact = calculateAMT(equity.shares, exercisePrice, valuation / 1000000);
       totalEquityValue += equityValue;
       totalTaxImpact += taxImpact;
+      totalAmtImpact += amtImpact;
     });
 
     // Generate chart data based on user's equity
@@ -68,6 +75,7 @@ export default function ScenarioModeler() {
     setResults({
       equityValue: totalEquityValue,
       taxImpact: totalTaxImpact,
+      amtImpact: totalAmtImpact,
       chartData
     });
   };
@@ -115,21 +123,37 @@ export default function ScenarioModeler() {
             />
 
             {saleType === 'secondary' && (
-              <Controller
-                control={control}
-                name="holdingPeriod"
-                render={({ field: { onChange, value } }) => (
-                  <SegmentedButtons
-                    value={value}
-                    onValueChange={onChange}
-                    buttons={[
-                      { value: 'short', label: 'Short-term' },
-                      { value: 'long', label: 'Long-term' }
-                    ]}
-                    style={styles.segmented}
-                  />
-                )}
-              />
+              <>
+                <Controller
+                  control={control}
+                  name="holdingPeriod"
+                  render={({ field: { onChange, value } }) => (
+                    <SegmentedButtons
+                      value={value}
+                      onValueChange={onChange}
+                      buttons={[
+                        { value: 'short', label: 'Short-term' },
+                        { value: 'long', label: 'Long-term' }
+                      ]}
+                      style={styles.segmented}
+                    />
+                  )}
+                />
+
+                <Controller
+                  control={control}
+                  name="exercisePrice"
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      label="Exercise Price ($)"
+                      value={value}
+                      onChangeText={onChange}
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  )}
+                />
+              </>
             )}
 
             <Controller
@@ -174,6 +198,15 @@ export default function ScenarioModeler() {
                   ${results.taxImpact.toLocaleString()}
                 </Text>
               </View>
+
+              {saleType === 'secondary' && (
+                <View style={styles.resultRow}>
+                  <Text variant="bodyLarge">AMT Impact:</Text>
+                  <Text variant="bodyLarge" style={styles.resultValue}>
+                    ${results.amtImpact.toLocaleString()}
+                  </Text>
+                </View>
+              )}
 
               <ScenarioChart
                 data={results.chartData}
