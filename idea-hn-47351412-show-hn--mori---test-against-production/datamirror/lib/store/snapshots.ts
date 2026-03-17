@@ -20,6 +20,11 @@ const useSnapshots = create((set) => ({
     await saveSnapshot(snapshot);
     set((state) => ({ snapshots: [...state.snapshots, snapshot] }));
   },
+
+  getSnapshotById: (id) => {
+    const state = useSnapshots.getState();
+    return state.snapshots.find(snapshot => snapshot.id === id);
+  }
 }));
 
 export default useSnapshots;
