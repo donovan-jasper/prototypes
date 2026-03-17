@@ -1,7 +1,7 @@
 import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
 import { analyzeMotion } from '../utils/motionAnalysis';
-import { analyzeAudio } from '../utils/audioAnalysis';
+import { analyzeMeteringLevel, resetMeteringHistory } from '../utils/audioAnalysis';
 
 interface SleepDetectionResult {
   isSleeping: boolean;
@@ -10,17 +10,20 @@ interface SleepDetectionResult {
 
 export class SleepDetector {
   private isDetecting: boolean = false;
-  private motionSubscription: number | null = null;
+  private motionSubscription: any = null;
   private audioRecording: Audio.Recording | null = null;
   private motionData: { x: number; y: number; z: number }[] = [];
-  private audioData: Float32Array[] = [];
   private onUpdateCallback: ((result: SleepDetectionResult) => void) | null = null;
+  private meteringCheckInterval: NodeJS.Timeout | null = null;
 
   public async startDetection(onUpdate: (result: SleepDetectionResult) => void) {
     if (this.isDetecting) return;
 
     this.isDetecting = true;
     this.onUpdateCallback = onUpdate;
+
+    // Reset metering history
+    resetMeteringHistory();
 
     // Start motion detection
     this.motionSubscription = Accelerometer.addListener((data) => {
@@ -31,15 +34,26 @@ export class SleepDetector {
     });
     Accelerometer.setUpdateInterval(100);
 
-    // Start audio recording
+    // Start audio recording for metering
     try {
+      await Audio.requestPermissionsAsync();
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
       const recording = new Audio.Recording();
-      await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await recording.prepareToRecordAsync({
+        ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+        isMeteringEnabled: true,
+      });
       await recording.startAsync();
       this.audioRecording = recording;
 
-      // Set up periodic audio analysis
-      this.setupAudioAnalysis();
+      // Check metering level every 5 seconds
+      this.meteringCheckInterval = setInterval(() => {
+        this.checkMeteringLevel();
+      }, 5000);
     } catch (error) {
       console.error('Failed to start audio recording:', error);
     }
@@ -56,51 +70,40 @@ export class SleepDetector {
 
     // Stop motion detection
     if (this.motionSubscription) {
-      Accelerometer.removeSubscription(this.motionSubscription);
+      this.motionSubscription.remove();
       this.motionSubscription = null;
+    }
+
+    // Stop metering check
+    if (this.meteringCheckInterval) {
+      clearInterval(this.meteringCheckInterval);
+      this.meteringCheckInterval = null;
     }
 
     // Stop audio recording
     if (this.audioRecording) {
-      this.audioRecording.stopAndUnloadAsync();
+      this.audioRecording.stopAndUnloadAsync().catch(err => {
+        console.error('Error stopping recording:', err);
+      });
       this.audioRecording = null;
     }
 
     this.motionData = [];
-    this.audioData = [];
+    resetMeteringHistory();
   }
 
-  private async setupAudioAnalysis() {
+  private async checkMeteringLevel() {
     if (!this.audioRecording) return;
 
-    setInterval(async () => {
-      if (!this.audioRecording) return;
-
-      try {
-        const status = await this.audioRecording.getStatusAsync();
-        if (status.isDoneRecording) {
-          // Restart recording if it's done
-          await this.audioRecording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-          await this.audioRecording.startAsync();
-        } else {
-          // Get audio data
-          const uri = this.audioRecording.getURI();
-          if (uri) {
-            const { sound } = await Audio.Sound.createAsync({ uri });
-            const samples = await sound.getAudioSamplesAsync(1000); // Get 1 second of samples
-            if (samples.isLoaded) {
-              this.audioData.push(samples.samples);
-              if (this.audioData.length > 10) {
-                this.audioData.shift();
-              }
-            }
-            await sound.unloadAsync();
-          }
-        }
-      } catch (error) {
-        console.error('Audio analysis error:', error);
+    try {
+      const status = await this.audioRecording.getStatusAsync();
+      if (status.isRecording && status.metering !== undefined) {
+        // Metering level is in dB, typically ranges from -160 (silence) to 0 (max)
+        analyzeMeteringLevel(status.metering);
       }
-    }, 30000); // Analyze every 30 seconds
+    } catch (error) {
+      console.error('Error checking metering level:', error);
+    }
   }
 
   private detectionLoop() {
@@ -109,18 +112,37 @@ export class SleepDetector {
     // Analyze motion data
     const motionResult = analyzeMotion(this.motionData);
 
-    // Analyze audio data
-    const audioResult = analyzeAudio(this.audioData);
+    // Get latest audio analysis from metering
+    let audioConfidence = 0;
+    if (this.audioRecording) {
+      this.audioRecording.getStatusAsync().then(status => {
+        if (status.isRecording && status.metering !== undefined) {
+          const audioResult = analyzeMeteringLevel(status.metering);
+          audioConfidence = audioResult.confidence;
+          
+          // Combine results
+          const combinedConfidence = (motionResult.confidence + audioConfidence) / 2;
+          const isSleeping = combinedConfidence > 0.7; // 70% confidence threshold
 
-    // Combine results
-    const combinedConfidence = (motionResult.confidence + audioResult.confidence) / 2;
-    const isSleeping = combinedConfidence > 0.7; // 70% confidence threshold
-
-    if (this.onUpdateCallback) {
-      this.onUpdateCallback({
-        isSleeping,
-        confidence: combinedConfidence,
+          if (this.onUpdateCallback) {
+            this.onUpdateCallback({
+              isSleeping,
+              confidence: combinedConfidence,
+            });
+          }
+        }
+      }).catch(err => {
+        console.error('Error in detection loop:', err);
       });
+    } else {
+      // If no audio, use motion only
+      const isSleeping = motionResult.confidence > 0.7;
+      if (this.onUpdateCallback) {
+        this.onUpdateCallback({
+          isSleeping,
+          confidence: motionResult.confidence,
+        });
+      }
     }
 
     // Continue detection loop

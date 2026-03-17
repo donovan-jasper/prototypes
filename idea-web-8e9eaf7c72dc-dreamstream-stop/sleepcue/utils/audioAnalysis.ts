@@ -1,59 +1,110 @@
 interface AudioAnalysisResult {
   isSleepPattern: boolean;
   confidence: number;
+  averageAmplitude: number;
+  standardDeviation: number;
 }
 
-export function analyzeAudio(data: Float32Array[]): AudioAnalysisResult {
-  if (data.length === 0) {
-    return { isSleepPattern: false, confidence: 0 };
+interface MeteringReading {
+  level: number;
+  timestamp: number;
+}
+
+const METERING_HISTORY_SIZE = 10;
+const SLEEP_THRESHOLD_DB = -40;
+const SLEEP_STDDEV_THRESHOLD = 5;
+const SLEEP_DURATION_THRESHOLD = 3 * 60 * 1000; // 3 minutes in milliseconds
+
+let meteringHistory: MeteringReading[] = [];
+let firstLowReadingTime: number | null = null;
+
+export function analyzeMeteringLevel(meteringLevel: number): AudioAnalysisResult {
+  const now = Date.now();
+  
+  // Add new reading to history
+  meteringHistory.push({
+    level: meteringLevel,
+    timestamp: now,
+  });
+
+  // Keep only last 10 readings
+  if (meteringHistory.length > METERING_HISTORY_SIZE) {
+    meteringHistory.shift();
   }
 
-  // Combine all audio samples into one array
-  const allSamples = data.reduce((acc, val) => [...acc, ...val], []);
+  // Need at least 10 readings for analysis
+  if (meteringHistory.length < METERING_HISTORY_SIZE) {
+    return {
+      isSleepPattern: false,
+      confidence: 0,
+      averageAmplitude: meteringLevel,
+      standardDeviation: 0,
+    };
+  }
 
   // Calculate average amplitude
-  const sum = allSamples.reduce((acc, val) => acc + Math.abs(val), 0);
-  const averageAmplitude = sum / allSamples.length;
+  const sum = meteringHistory.reduce((acc, reading) => acc + reading.level, 0);
+  const averageAmplitude = sum / meteringHistory.length;
 
-  // Calculate frequency spectrum (simplified)
-  // In a real app, you would use FFT to get frequency bins
-  const frequencyBins = calculateFrequencyBins(allSamples);
+  // Calculate standard deviation
+  const squaredDiffs = meteringHistory.map(reading => {
+    const diff = reading.level - averageAmplitude;
+    return diff * diff;
+  });
+  const variance = squaredDiffs.reduce((acc, val) => acc + val, 0) / squaredDiffs.length;
+  const standardDeviation = Math.sqrt(variance);
 
-  // Analyze frequency spectrum for sleep indicators
-  // Sleep often has low-frequency breathing patterns (0.1-0.5 Hz)
-  const lowFrequencyEnergy = frequencyBins.slice(0, 5).reduce((acc, val) => acc + val, 0);
-  const totalEnergy = frequencyBins.reduce((acc, val) => acc + val, 0);
+  // Check if current pattern indicates sleep
+  const isLowAmplitude = averageAmplitude < SLEEP_THRESHOLD_DB;
+  const isLowVariation = standardDeviation < SLEEP_STDDEV_THRESHOLD;
 
-  // Calculate confidence (0-1 scale)
-  // Lower average amplitude and higher low-frequency energy = higher confidence
-  const amplitudeConfidence = Math.min(1, Math.max(0, 1 - averageAmplitude * 10));
-  const frequencyConfidence = Math.min(1, lowFrequencyEnergy / totalEnergy * 2);
-  const confidence = (amplitudeConfidence + frequencyConfidence) / 2;
+  // Track duration of consistent low pattern
+  if (isLowAmplitude && isLowVariation) {
+    if (firstLowReadingTime === null) {
+      firstLowReadingTime = now;
+    }
+    
+    const durationInPattern = now - firstLowReadingTime;
+    const hasBeenLongEnough = durationInPattern >= SLEEP_DURATION_THRESHOLD;
 
-  // Determine if sleep pattern is detected
-  const isSleepPattern = confidence > 0.6; // 60% confidence threshold
+    // Calculate confidence based on how long pattern has been consistent
+    const durationFactor = Math.min(1, durationInPattern / SLEEP_DURATION_THRESHOLD);
+    const amplitudeFactor = Math.min(1, Math.abs(averageAmplitude / SLEEP_THRESHOLD_DB));
+    const variationFactor = Math.min(1, 1 - (standardDeviation / SLEEP_STDDEV_THRESHOLD));
+    
+    const confidence = (durationFactor * 0.5 + amplitudeFactor * 0.25 + variationFactor * 0.25);
 
-  return {
-    isSleepPattern,
-    confidence,
-  };
+    return {
+      isSleepPattern: hasBeenLongEnough,
+      confidence,
+      averageAmplitude,
+      standardDeviation,
+    };
+  } else {
+    // Reset tracking if pattern breaks
+    firstLowReadingTime = null;
+    
+    return {
+      isSleepPattern: false,
+      confidence: 0,
+      averageAmplitude,
+      standardDeviation,
+    };
+  }
 }
 
-// Simplified frequency bin calculation
-function calculateFrequencyBins(samples: Float32Array): number[] {
-  // In a real app, you would use FFT to get actual frequency bins
-  // This is a simplified placeholder
+export function resetMeteringHistory() {
+  meteringHistory = [];
+  firstLowReadingTime = null;
+}
 
-  const numBins = 10;
-  const binSize = samples.length / numBins;
-  const bins = new Array(numBins).fill(0);
-
-  for (let i = 0; i < samples.length; i++) {
-    const binIndex = Math.floor(i / binSize);
-    if (binIndex < numBins) {
-      bins[binIndex] += Math.abs(samples[i]);
-    }
-  }
-
-  return bins;
+// Legacy function for backward compatibility - now deprecated
+export function analyzeAudio(data: Float32Array[]): AudioAnalysisResult {
+  console.warn('analyzeAudio is deprecated. Use analyzeMeteringLevel instead.');
+  return {
+    isSleepPattern: false,
+    confidence: 0,
+    averageAmplitude: 0,
+    standardDeviation: 0,
+  };
 }
