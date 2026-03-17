@@ -33,6 +33,15 @@ export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const addTask = async (content: string, type: 'note' | 'task' | 'reminder', dueDate?: Date) => {
     await TaskService.addTask(content, type, dueDate);
+    
+    if (type === 'reminder' && dueDate) {
+      const tasks = await TaskService.getTasks();
+      const newTask = tasks.find(t => t.content === content && t.type === type);
+      if (newTask) {
+        await NotificationService.scheduleReminder(newTask);
+      }
+    }
+    
     await refreshTasks();
   };
 
