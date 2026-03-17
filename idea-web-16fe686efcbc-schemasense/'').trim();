@@ -1,0 +1,129 @@
+  } catch (error: any) {
+    console.error('OpenAI API error:', error);
+    
+    if (error.message?.includes('API key') || error.status === 401) {
+      return generateOfflineSQL(prompt, schema);
+    }
+    
+    if (error.status === 429 || error.status === 503) {
+      return generateOfflineSQL(prompt, schema);
+    }
+    
+    throw new Error(`Failed to generate SQL: ${error.message}`);
+  }
+};
+
+const generateOfflineSQL = (prompt: string, schema: Schema): string => {
+  const lowerPrompt = prompt.toLowerCase();
+  
+  for (const template of queryTemplates) {
+    const keywords = template.description.toLowerCase().split(' ');
+    const matchCount = keywords.filter(keyword => lowerPrompt.includes(keyword)).length;
+    
+    if (matchCount >= 2) {
+      let sql = template.sql;
+      
+      for (const table of schema.tables) {
+        if (lowerPrompt.includes(table.toLowerCase())) {
+          sql = sql.replace(/\b(FROM|JOIN)\s+\w+/gi, (match) => {
+            return match.replace(/\w+$/, table);
+          });
+        }
+      }
+      
+      const numberMatch = lowerPrompt.match(/\b(\d+)\b/);
+      if (numberMatch) {
+        sql = sql.replace(/LIMIT\s+\d+/i, `LIMIT ${numberMatch[1]}`);
+        sql = sql.replace(/[<>]=?\s*\d+/g, (match) => {
+          const operator = match.match(/[<>]=?/)?.[0] || '>';
+          return `${operator} ${numberMatch[1]}`;
+        });
+      }
+      
+      return sql;
+    }
+  }
+  
+  const firstTable = schema.tables[0];
+  if (!firstTable) {
+    throw new Error('No tables available in schema');
+  }
+  
+  if (lowerPrompt.includes('count') || lowerPrompt.includes('how many')) {
+    return `SELECT COUNT(*) as count FROM ${firstTable}`;
+  }
+  
+  if (lowerPrompt.includes('all') || lowerPrompt.includes('show') || lowerPrompt.includes('list')) {
+    return `SELECT * FROM ${firstTable} LIMIT 100`;
+  }
+  
+  return `SELECT * FROM ${firstTable} LIMIT 10`;
+};
+
+export const validateQuery = (sql: string): boolean => {
+  if (!sql || typeof sql !== 'string') {
+    return false;
+  }
+  
+  const trimmed = sql.trim().toUpperCase();
+  
+  if (!trimmed.startsWith('SELECT')) {
+    return false;
+  }
+  
+  const dangerousKeywords = ['DROP', 'DELETE', 'TRUNCATE', 'ALTER', 'CREATE', 'INSERT', 'UPDATE'];
+  for (const keyword of dangerousKeywords) {
+    if (trimmed.includes(keyword)) {
+      return false;
+    }
+  }
+  
+  const hasFrom = /\bFROM\s+\w+/i.test(sql);
+  if (!hasFrom) {
+    return false;
+  }
+  
+  return true;
+};
+
+export const explainQuery = async (sql: string): Promise<string> => {
+  try {
+    const client = getOpenAIClient();
+    
+    const response = await client.chat.completions.create({
+      model: 'gpt-4',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a SQL expert. Explain SQL queries in simple, plain English for non-technical users.'
+        },
+        {
+          role: 'user',
+          content: `Explain this SQL query in one or two sentences:\n\n${sql}`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 150,
+    });
+
+    return response.choices[0]?.message?.content?.trim() || 'This query retrieves data from your database.';
+  } catch (error: any) {
+    console.error('Error explaining query:', error);
+    
+    const lowerSQL = sql.toLowerCase();
+    if (lowerSQL.includes('count')) {
+      return 'This query counts the number of records in your database.';
+    }
+    if (lowerSQL.includes('sum')) {
+      return 'This query calculates the total sum of a numeric column.';
+    }
+    if (lowerSQL.includes('group by')) {
+      return 'This query groups and summarizes your data by category.';
+    }
+    if (lowerSQL.includes('order by')) {
+      return 'This query sorts your data in a specific order.';
+    }
+    
+    return 'This query retrieves data from your database based on your question.';
+  }
+};
