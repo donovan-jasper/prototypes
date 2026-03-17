@@ -1,41 +1,86 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { signOut } from 'firebase/auth';
+import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import { auth, db } from '../../App';
 import OTPList from '../components/OTPList';
-import SMSList from '../components/SMSList';
-import { generateOTP } from '../utils/otp';
-import { getSMSS } from '../utils/sms';
+import { generateTOTP, getTimeRemaining } from '../utils/otp';
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
+  const [otpAccounts, setOtpAccounts] = useState([]);
   const [otps, setOtps] = useState([]);
-  const [smss, setSmss] = useState([]);
 
   useEffect(() => {
-    // Initial fetch
-    const fetchData = async () => {
-      const otps = await generateOTP();
-      const smss = await getSMSS();
-      setOtps(otps);
-      setSmss(smss);
+    const user = auth.currentUser;
+    if (!user) return;
+
+    const q = query(
+      collection(db, 'users', user.uid, 'otpAccounts'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const accounts = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setOtpAccounts(accounts);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const updateOTPs = () => {
+      const updatedOtps = otpAccounts.map(account => ({
+        id: account.id,
+        name: account.name,
+        code: generateTOTP(account.secret),
+        timeRemaining: getTimeRemaining(),
+      }));
+      setOtps(updatedOtps);
     };
 
-    fetchData();
-
-    // Update OTP codes every second
-    const interval = setInterval(async () => {
-      const updatedOtps = await generateOTP();
-      setOtps(updatedOtps);
-    }, 1000);
+    updateOTPs();
+    const interval = setInterval(updateOTPs, 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [otpAccounts]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>SyncVault</Text>
-      <Text style={styles.sectionTitle}>OTPs</Text>
-      <OTPList otps={otps} />
-      <Text style={styles.sectionTitle}>SMSs</Text>
-      <SMSList smss={smss} />
+      <View style={styles.header}>
+        <Text style={styles.title}>SyncVault</Text>
+        <TouchableOpacity onPress={handleSignOut}>
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.sectionTitle}>OTP Accounts</Text>
+      
+      {otps.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No OTP accounts yet</Text>
+          <Text style={styles.emptySubtext}>Tap the + button to add your first account</Text>
+        </View>
+      ) : (
+        <OTPList otps={otps} />
+      )}
+
+      <TouchableOpacity 
+        style={styles.addButton}
+        onPress={() => navigation.navigate('AddOTP')}
+      >
+        <Text style={styles.addButtonText}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -43,20 +88,71 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 60,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
   title: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 16,
-    marginTop: 40,
+    color: '#007AFF',
+  },
+  signOutText: {
+    fontSize: 16,
+    color: '#007AFF',
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 16,
+    marginTop: 24,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  addButton: {
+    position: 'absolute',
+    right: 24,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  addButtonText: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '300',
   },
 });
 

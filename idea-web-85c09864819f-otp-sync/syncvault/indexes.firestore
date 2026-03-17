@@ -1,0 +1,15 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "otpAccounts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

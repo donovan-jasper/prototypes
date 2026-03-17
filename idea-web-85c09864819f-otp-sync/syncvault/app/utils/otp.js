@@ -1,8 +1,4 @@
-import * as SQLite from 'expo-sqlite';
-import { encrypt, decrypt } from './encryption';
 import CryptoJS from 'crypto-js';
-
-const db = SQLite.openDatabase('syncvault.db');
 
 // Base32 decode function
 const base32Decode = (base32) => {
@@ -26,7 +22,7 @@ const base32Decode = (base32) => {
 };
 
 // Generate TOTP code
-const generateTOTP = (secret, timeStep = 30) => {
+export const generateTOTP = (secret, timeStep = 30) => {
   try {
     // Decode base32 secret
     const key = base32Decode(secret);
@@ -57,28 +53,9 @@ const generateTOTP = (secret, timeStep = 30) => {
 };
 
 // Calculate time remaining in current 30-second window
-const getTimeRemaining = () => {
+export const getTimeRemaining = () => {
   const epoch = Math.floor(Date.now() / 1000);
   return 30 - (epoch % 30);
-};
-
-// Mock OTP accounts (in real app, these would come from database)
-const mockAccounts = [
-  { id: '1', name: 'Google', secret: 'JBSWY3DPEHPK3PXP' },
-  { id: '2', name: 'GitHub', secret: 'JBSWY3DPEHPK3PXP' },
-  { id: '3', name: 'AWS', secret: 'JBSWY3DPEHPK3PXP' },
-];
-
-export const generateOTP = async () => {
-  // Generate OTP codes for all accounts
-  const otps = mockAccounts.map(account => ({
-    id: account.id,
-    name: account.name,
-    code: generateTOTP(account.secret),
-    timeRemaining: getTimeRemaining(),
-  }));
-
-  return otps;
 };
 
 export const validateOTP = (secret, otp) => {
