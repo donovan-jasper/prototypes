@@ -3,7 +3,15 @@ import { View, Image, StyleSheet, Text, ScrollView, TouchableOpacity, Alert } fr
 import { saveRestoration } from '../services/StorageService';
 
 const ResultScreen = ({ route, navigation }) => {
-  const { originalImage, restoredImage, quality } = route.params;
+  const { originalImage, restoredImage, quality, enhancement } = route.params;
+
+  const enhancementLabels = {
+    auto: 'Auto Enhancement',
+    brighten: 'Brightened',
+    sharpen: 'Sharpened',
+    vintage: 'Vintage Style',
+    modern: 'Modern Style',
+  };
 
   const handleSave = async () => {
     const restoration = {
@@ -11,6 +19,7 @@ const ResultScreen = ({ route, navigation }) => {
       originalUri: originalImage,
       restoredUri: restoredImage,
       quality: quality,
+      enhancement: enhancement,
       timestamp: Date.now(),
     };
 
@@ -39,7 +48,10 @@ const ResultScreen = ({ route, navigation }) => {
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Restoration Complete!</Text>
-      <Text style={styles.qualityText}>Quality Score: {(quality * 100).toFixed(0)}%</Text>
+      <View style={styles.infoRow}>
+        <Text style={styles.qualityText}>Quality: {(quality * 100).toFixed(0)}%</Text>
+        <Text style={styles.enhancementText}>{enhancementLabels[enhancement] || enhancement}</Text>
+      </View>
       
       <View style={styles.imageSection}>
         <Text style={styles.label}>Original</Text>
@@ -68,13 +80,24 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 12,
     color: '#333',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 24,
   },
   qualityText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  enhancementText: {
+    fontSize: 16,
     color: '#666',
-    marginBottom: 24,
+    fontStyle: 'italic',
   },
   imageSection: {
     width: '100%',

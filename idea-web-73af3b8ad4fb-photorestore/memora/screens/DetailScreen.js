@@ -5,6 +5,14 @@ import { deleteRestoration } from '../services/StorageService';
 const DetailScreen = ({ route, navigation }) => {
   const { restoration } = route.params;
 
+  const enhancementLabels = {
+    auto: 'Auto Enhancement',
+    brighten: 'Brightened',
+    sharpen: 'Sharpened',
+    vintage: 'Vintage Style',
+    modern: 'Modern Style',
+  };
+
   const handleDelete = () => {
     Alert.alert(
       'Delete Photo',
@@ -39,6 +47,11 @@ const DetailScreen = ({ route, navigation }) => {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.infoSection}>
         <Text style={styles.qualityText}>Quality: {(restoration.quality * 100).toFixed(0)}%</Text>
+        {restoration.enhancement && (
+          <Text style={styles.enhancementText}>
+            {enhancementLabels[restoration.enhancement] || restoration.enhancement}
+          </Text>
+        )}
         <Text style={styles.dateText}>{formatDate(restoration.timestamp)}</Text>
       </View>
 
@@ -75,6 +88,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#007AFF',
+    marginBottom: 4,
+  },
+  enhancementText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
     marginBottom: 4,
   },
   dateText: {
