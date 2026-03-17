@@ -18,12 +18,51 @@ export default function HomeScreen() {
 
   const loadInitialData = async () => {
     const tasks = await loadTasks();
-    const { currentStreak, longestStreak } = await loadStreak();
     
-    setDailyTasks(tasks);
-    setStreakCount(currentStreak);
-    setLongestStreak(longestStreak);
-    generateEncouragementMessage(currentStreak);
+    // Check if this is first launch (no tasks exist)
+    if (tasks.length === 0) {
+      // Create sample tasks
+      const sampleTasks: Task[] = [
+        {
+          id: Date.now(),
+          title: 'Drink 8 glasses of water',
+          completed: false,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: Date.now() + 1,
+          title: 'Take a 10-minute walk',
+          completed: false,
+          created_at: new Date().toISOString(),
+        },
+        {
+          id: Date.now() + 2,
+          title: 'Read for 15 minutes',
+          completed: false,
+          created_at: new Date().toISOString(),
+        },
+      ];
+      
+      // Save sample tasks
+      await saveTasks(sampleTasks);
+      setDailyTasks(sampleTasks);
+      
+      // Initialize streak to 0
+      await saveStreak(0, 0);
+      setStreakCount(0);
+      setLongestStreak(0);
+      
+      // Initialize stats
+      await saveStats(3, 0);
+    } else {
+      // Load existing data
+      const { currentStreak, longestStreak } = await loadStreak();
+      setDailyTasks(tasks);
+      setStreakCount(currentStreak);
+      setLongestStreak(longestStreak);
+    }
+    
+    generateEncouragementMessage(streakCount);
   };
 
   const generateEncouragementMessage = (streak: number) => {
