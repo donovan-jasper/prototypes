@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
 import QueryInput from '../../components/QueryInput';
 import ResultsTable from '../../components/ResultsTable';
 import { useQuery } from '../../hooks/useQuery';
+import useStore from '../../lib/store';
 
 const QueryScreen = () => {
   const [query, setQuery] = useState('');
-  const { results, loading, error, executeQuery } = useQuery();
+  const { results, loading, error, runQuery } = useQuery();
+  const databases = useStore((state) => state.databases);
 
-  const handleQuerySubmit = async (text) => {
+  const handleQuerySubmit = async (text: string) => {
     setQuery(text);
-    await executeQuery(text);
+    if (databases.length > 0) {
+      await runQuery(text, databases[0].id);
+    }
   };
 
   return (

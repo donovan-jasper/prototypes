@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import useStore from '../lib/store';
-import { importDatabase, getSchema } from '../lib/database';
+import { importDatabase } from '../lib/database';
 
 export const useDatabase = () => {
   const { databases, addDatabase } = useStore();

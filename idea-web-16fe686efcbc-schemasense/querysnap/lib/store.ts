@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SQLite from 'expo-sqlite';
+import * as FileSystem from 'expo-file-system';
 
 interface Database {
   id: string;
@@ -31,13 +33,15 @@ interface StoreState {
   queries: Query[];
   subscription: Subscription;
   addDatabase: (database: Database) => void;
+  updateDatabaseConnection: (id: string, connection: any) => void;
   addQuery: (query: Query) => void;
   updateSubscription: (status: Partial<Subscription>) => void;
+  rehydrateConnections: () => Promise<void>;
 }
 
 const useStore = create<StoreState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       databases: [],
       queries: [],
       subscription: {
@@ -48,6 +52,12 @@ const useStore = create<StoreState>()(
         set((state) => ({ 
           databases: [...state.databases, database] 
         })),
+      updateDatabaseConnection: (id, connection) =>
+        set((state) => ({
+          databases: state.databases.map(db =>
+            db.id === id ? { ...db, connection } : db
+          )
+        })),
       addQuery: (query) =>
         set((state) => ({ 
           queries: [...state.queries, { ...query, timestamp: new Date().toISOString() }] 
@@ -56,6 +66,27 @@ const useStore = create<StoreState>()(
         set((state) => ({ 
           subscription: { ...state.subscription, ...status } 
         })),
+      rehydrateConnections: async () => {
+        const { databases } = get();
+        
+        for (const db of databases) {
+          try {
+            const dbPath = `${FileSystem.documentDirectory}SQLite/${db.name}.db`;
+            const fileInfo = await FileSystem.getInfoAsync(dbPath);
+            
+            if (fileInfo.exists) {
+              const connection = SQLite.openDatabase(db.name);
+              set((state) => ({
+                databases: state.databases.map(database =>
+                  database.id === db.id ? { ...database, connection } : database
+                )
+              }));
+            }
+          } catch (error) {
+            console.error(`Failed to rehydrate connection for ${db.name}:`, error);
+          }
+        }
+      },
     }),
     {
       name: 'querysnap-storage',
