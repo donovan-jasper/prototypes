@@ -37,6 +37,25 @@ export default function EmailCard({ sender, isPro }: EmailCardProps) {
     }
   };
 
+  const getTagStyle = (tag: string) => {
+    switch (tag) {
+      case 'subscription':
+        return styles.subscriptionTag;
+      case 'important':
+        return styles.importantTag;
+      case 'promotional':
+        return styles.promotionalTag;
+      case 'newsletter':
+        return styles.newsletterTag;
+      case 'marketing':
+        return styles.marketingTag;
+      case 'subscription-service':
+        return styles.subscriptionServiceTag;
+      default:
+        return styles.defaultTag;
+    }
+  };
+
   return (
     <Swipeable
       renderRightActions={renderRightActions}
@@ -48,13 +67,10 @@ export default function EmailCard({ sender, isPro }: EmailCardProps) {
           <Text style={styles.senderName}>{sender.name}</Text>
         </View>
         <Text style={styles.emailCount}>{sender.emailCount} emails in last 30 days</Text>
-        {isPro && (
+        {isPro && sender.tags && sender.tags.length > 0 && (
           <View style={styles.aiTags}>
-            {sender.tags?.map((tag) => (
-              <Text key={tag} style={[
-                styles.tag,
-                tag === 'subscription' && styles.subscriptionTag
-              ]}>
+            {sender.tags.map((tag) => (
+              <Text key={tag} style={[styles.tag, getTagStyle(tag)]}>
                 {tag}
               </Text>
             ))}
@@ -105,7 +121,6 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   tag: {
-    backgroundColor: '#e0e0e0',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
@@ -116,6 +131,30 @@ const styles = StyleSheet.create({
   subscriptionTag: {
     backgroundColor: '#E1BEE7',
     color: '#4A148C',
+  },
+  importantTag: {
+    backgroundColor: '#C8E6C9',
+    color: '#1B5E20',
+  },
+  promotionalTag: {
+    backgroundColor: '#FFE0B2',
+    color: '#E65100',
+  },
+  newsletterTag: {
+    backgroundColor: '#BBDEFB',
+    color: '#0D47A1',
+  },
+  marketingTag: {
+    backgroundColor: '#FFCDD2',
+    color: '#B71C1C',
+  },
+  subscriptionServiceTag: {
+    backgroundColor: '#D1C4E9',
+    color: '#311B92',
+  },
+  defaultTag: {
+    backgroundColor: '#E0E0E0',
+    color: '#212121',
   },
   swipeAction: {
     backgroundColor: '#4CAF50',

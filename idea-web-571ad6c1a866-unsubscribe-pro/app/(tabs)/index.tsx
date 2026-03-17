@@ -8,11 +8,14 @@ import UnsubscribeButton from '../../components/UnsubscribeButton';
 import { useUserStore } from '../../store/user-store';
 
 export default function DashboardScreen() {
-  const { isScanning, scanInbox, emails } = useEmailScan();
+  const { isScanning, scanInbox, senders } = useEmailScan();
   const { score, timeSaved, streak } = useHealthScore();
   const { isPro } = useUserStore();
 
-  const topSenders = emails.slice(0, 5);
+  const topSenders = senders.slice(0, 5);
+  const subscriptionSenders = senders.filter(sender =>
+    sender.tags?.includes('subscription') || sender.tags?.includes('subscription-service')
+  );
 
   return (
     <ScrollView style={styles.container}>
@@ -62,7 +65,7 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Email Spending Tracker</Text>
           <Text style={styles.recommendation}>
-            We've identified {emails.filter(e => e.tags?.includes('subscription')).length} subscription services you're paying for via email receipts
+            We've identified {subscriptionSenders.length} subscription services you're paying for via email receipts
           </Text>
           <UnsubscribeButton
             title="View All Subscriptions"
