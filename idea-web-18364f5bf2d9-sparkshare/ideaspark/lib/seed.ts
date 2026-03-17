@@ -56,30 +56,46 @@ export const seedDatabase = () => {
   
   return new Promise((resolve, reject) => {
     db.transaction((tx) => {
-      // Create demo user
+      // Check if ideas table is already populated
       tx.executeSql(
-        'INSERT OR IGNORE INTO users (id, name, email, sparkScore, bio) VALUES (?, ?, ?, ?, ?)',
-        [1, 'Demo User', 'demo@ideaspark.com', 150, 'Passionate about innovation and helping others bring their ideas to life!']
-      );
-
-      // Insert sample ideas
-      sampleIdeas.forEach((idea, index) => {
-        tx.executeSql(
-          'INSERT INTO ideas (title, description, category) VALUES (?, ?, ?)',
-          [idea.title, idea.description, idea.category],
-          (_, result) => {
-            // Add 1-3 feedback items per idea
-            const feedbackCount = Math.floor(Math.random() * 3) + 1;
-            for (let i = 0; i < feedbackCount; i++) {
-              const randomFeedback = sampleFeedback[Math.floor(Math.random() * sampleFeedback.length)];
-              tx.executeSql(
-                'INSERT INTO feedback (ideaId, comment) VALUES (?, ?)',
-                [result.insertId, randomFeedback]
-              );
-            }
+        'SELECT COUNT(*) as count FROM ideas',
+        [],
+        (_, { rows: { _array } }) => {
+          const ideaCount = _array[0].count;
+          
+          if (ideaCount > 0) {
+            // Database already has data, skip seeding
+            resolve();
+            return;
           }
-        );
-      });
+
+          // Create demo user
+          tx.executeSql(
+            'INSERT OR IGNORE INTO users (id, name, email, sparkScore, bio) VALUES (?, ?, ?, ?, ?)',
+            [1, 'Demo User', 'demo@ideaspark.com', 150, 'Passionate about innovation and helping others bring their ideas to life!']
+          );
+
+          // Insert sample ideas
+          sampleIdeas.forEach((idea) => {
+            tx.executeSql(
+              'INSERT INTO ideas (title, description, category) VALUES (?, ?, ?)',
+              [idea.title, idea.description, idea.category],
+              (_, result) => {
+                // Add 1-3 feedback items per idea
+                const feedbackCount = Math.floor(Math.random() * 3) + 1;
+                for (let i = 0; i < feedbackCount; i++) {
+                  const randomFeedback = sampleFeedback[Math.floor(Math.random() * sampleFeedback.length)];
+                  tx.executeSql(
+                    'INSERT INTO feedback (ideaId, comment) VALUES (?, ?)',
+                    [result.insertId, randomFeedback]
+                  );
+                }
+              }
+            );
+          });
+        },
+        (_, error) => reject(error)
+      );
     }, reject, resolve);
   });
 };
