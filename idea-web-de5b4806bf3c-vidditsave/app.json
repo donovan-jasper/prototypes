@@ -16,20 +16,47 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.savestack.app"
+      "bundleIdentifier": "com.savestack.app",
+      "infoPlist": {
+        "NSExtension": {
+          "NSExtensionAttributes": {
+            "NSExtensionActivationRule": {
+              "NSExtensionActivationSupportsWebURLWithMaxCount": 1
+            }
+          },
+          "NSExtensionPointIdentifier": "com.apple.share-services"
+        }
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.savestack.app"
+      "package": "com.savestack.app",
+      "intentFilters": [
+        {
+          "action": "SEND",
+          "category": ["DEFAULT"],
+          "data": [
+            {
+              "mimeType": "text/plain"
+            }
+          ]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-sharing",
+        {
+          "photosPermission": "Allow SaveStack to access your photos to save images."
+        }
+      ]
     ]
   }
 }

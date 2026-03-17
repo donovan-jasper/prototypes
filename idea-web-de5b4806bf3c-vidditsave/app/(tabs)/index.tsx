@@ -12,7 +12,7 @@ import {
   RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { getItems, addItem } from '@/lib/db';
 import { downloadMedia } from '@/lib/downloader';
 import { SavedItem } from '@/types';
@@ -31,6 +31,12 @@ export default function LibraryScreen() {
   useEffect(() => {
     loadItems();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadItems();
+    }, [])
+  );
 
   const loadItems = async () => {
     try {
@@ -170,6 +176,9 @@ export default function LibraryScreen() {
           <Text style={styles.emptyText}>
             Tap the + button to save your first video, article, or image
           </Text>
+          <Text style={styles.emptyHint}>
+            Or share any URL to SaveStack from other apps
+          </Text>
         </View>
       ) : (
         <FlatList
@@ -282,6 +291,13 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     lineHeight: 20,
+    marginBottom: 8,
+  },
+  emptyHint: {
+    fontSize: 12,
+    color: '#007AFF',
+    textAlign: 'center',
+    lineHeight: 18,
   },
   fab: {
     position: 'absolute',
