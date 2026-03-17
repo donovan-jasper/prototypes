@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert, Modal, TextInput } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
 import { Camera, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import * as SQLite from 'expo-sqlite';
 import PremiumGate from '../components/PremiumGate';
 import { textToMorse } from '../lib/morse';
+
+// Initialize database
+const db = SQLite.openDatabaseSync('morsemate.db');
 
 export default function SOSScreen() {
   const [active, setActive] = useState(false);
@@ -12,12 +16,43 @@ export default function SOSScreen() {
   const [customMessage, setCustomMessage] = useState('SOS');
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check premium status in production
+    // Check premium status and load custom message
+    checkPremiumStatus();
+    loadCustomMessage();
+  }, []);
+
+  const checkPremiumStatus = async () => {
+    // In a real app, check with your payment service
     // For demo, we'll simulate it
     setIsPremium(false);
-  }, []);
+    setLoading(false);
+  };
+
+  const loadCustomMessage = async () => {
+    try {
+      const result = db.getFirstSync('SELECT message FROM custom_sos WHERE id = 1');
+      if (result) {
+        setCustomMessage(result.message);
+      }
+    } catch (error) {
+      console.log('Error loading custom message:', error);
+    }
+  };
+
+  const saveCustomMessage = async (message: string) => {
+    try {
+      db.runSync(
+        'INSERT OR REPLACE INTO custom_sos (id, message) VALUES (1, ?)',
+        [message]
+      );
+      setCustomMessage(message);
+    } catch (error) {
+      console.log('Error saving custom message:', error);
+    }
+  };
 
   const flashSOS = async () => {
     if (!permission?.granted) {
@@ -70,13 +105,21 @@ export default function SOSScreen() {
     setShowCustomModal(true);
   };
 
-  const saveCustomMessage = () => {
+  const handleSaveMessage = () => {
     if (newMessage.trim()) {
-      setCustomMessage(newMessage.trim());
+      saveCustomMessage(newMessage.trim());
       setShowCustomModal(false);
       setNewMessage('');
     }
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -135,7 +178,7 @@ export default function SOSScreen() {
               />
               <Button
                 title="Save"
-                onPress={saveCustomMessage}
+                onPress={handleSaveMessage}
                 disabled={!newMessage.trim()}
               />
             </View>
@@ -152,6 +195,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     fontSize: 32,
