@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { Achievement } from '../../types';
+import { loadStreak, loadStats, loadAchievements } from '../../lib/storage';
 
 export default function ProfileScreen() {
   const [stats, setStats] = useState({
@@ -10,30 +11,28 @@ export default function ProfileScreen() {
     currentStreak: 0,
   });
   
-  const [achievements, setAchievements] = useState<any[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
     fetchProfileData();
   }, []);
 
   const fetchProfileData = async () => {
-    // In a real app, this would fetch from Supabase
+    const { currentStreak, longestStreak } = await loadStreak();
+    const { totalTasks, completedTasks } = await loadStats();
+    const loadedAchievements = await loadAchievements();
+    
     setStats({
-      totalTasks: 42,
-      completedTasks: 38,
-      longestStreak: 12,
-      currentStreak: 5,
+      totalTasks,
+      completedTasks,
+      longestStreak,
+      currentStreak,
     });
     
-    setAchievements([
-      { id: 1, title: 'First Steps', description: 'Complete your first task', earned: true },
-      { id: 2, title: 'Week Warrior', description: 'Maintain a 7-day streak', earned: true },
-      { id: 3, title: 'Habit Master', description: 'Complete 20 tasks', earned: true },
-      { id: 4, title: 'Consistency King', description: 'Maintain a 30-day streak', earned: false },
-    ]);
+    setAchievements(loadedAchievements);
   };
 
-  const renderAchievement = ({ item }: { item: any }) => (
+  const renderAchievement = ({ item }: { item: Achievement }) => (
     <View style={[styles.achievementItem, !item.earned && styles.achievementLocked]}>
       <View style={styles.achievementIcon}>
         {item.earned ? (

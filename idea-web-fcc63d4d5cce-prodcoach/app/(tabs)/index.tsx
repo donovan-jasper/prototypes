@@ -2,54 +2,107 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
-import { supabase } from '../../lib/supabase';
+import { Task } from '../../types';
+import { loadTasks, saveTasks, loadStreak, saveStreak, loadStats, saveStats, loadAchievements, saveAchievements } from '../../lib/storage';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const [dailyTasks, setDailyTasks] = useState<any[]>([]);
+  const [dailyTasks, setDailyTasks] = useState<Task[]>([]);
   const [streakCount, setStreakCount] = useState(0);
+  const [longestStreak, setLongestStreak] = useState(0);
   const [encouragementMessage, setEncouragementMessage] = useState('');
 
   useEffect(() => {
-    fetchDailyTasks();
-    fetchStreakCount();
-    generateEncouragementMessage();
+    loadInitialData();
   }, []);
 
-  const fetchDailyTasks = async () => {
-    // In a real app, this would fetch from Supabase
-    setDailyTasks([
-      { id: 1, title: 'Drink water', completed: false },
-      { id: 2, title: 'Take a walk', completed: true },
-      { id: 3, title: 'Read for 10 min', completed: false },
-    ]);
-  };
-
-  const fetchStreakCount = async () => {
-    // In a real app, this would fetch from Supabase
-    setStreakCount(5);
-  };
-
-  const generateEncouragementMessage = async () => {
-    // In a real app, this would call OpenAI API
-    setEncouragementMessage("You're doing amazing! Keep up the great work today.");
-  };
-
-  const toggleTaskCompletion = async (taskId: number) => {
-    // In a real app, this would update Supabase
-    setDailyTasks(prevTasks => 
-      prevTasks.map(task => 
-        task.id === taskId ? { ...task, completed: !task.completed } : task
-      )
-    );
+  const loadInitialData = async () => {
+    const tasks = await loadTasks();
+    const { currentStreak, longestStreak } = await loadStreak();
     
-    if (!dailyTasks.find(t => t.id === taskId)?.completed) {
-      setStreakCount(prev => prev + 1);
-      generateEncouragementMessage();
+    setDailyTasks(tasks);
+    setStreakCount(currentStreak);
+    setLongestStreak(longestStreak);
+    generateEncouragementMessage(currentStreak);
+  };
+
+  const generateEncouragementMessage = (streak: number) => {
+    const messages = [
+      "You're doing amazing! Keep up the great work today.",
+      "Every task completed is a step forward. You've got this!",
+      "Your consistency is inspiring. Keep building those habits!",
+      `${streak} days strong! You're on fire! 🔥`,
+      "Small wins lead to big victories. Keep going!",
+    ];
+    const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+    setEncouragementMessage(randomMessage);
+  };
+
+  const checkAndUpdateAchievements = async (completedCount: number, currentStreak: number) => {
+    const achievements = await loadAchievements();
+    let updated = false;
+
+    // First Steps - Complete first task
+    if (completedCount >= 1 && !achievements[0].earned) {
+      achievements[0].earned = true;
+      achievements[0].earned_at = new Date().toISOString();
+      updated = true;
+    }
+
+    // Week Warrior - 7 day streak
+    if (currentStreak >= 7 && !achievements[1].earned) {
+      achievements[1].earned = true;
+      achievements[1].earned_at = new Date().toISOString();
+      updated = true;
+    }
+
+    // Habit Master - 20 completed tasks
+    if (completedCount >= 20 && !achievements[2].earned) {
+      achievements[2].earned = true;
+      achievements[2].earned_at = new Date().toISOString();
+      updated = true;
+    }
+
+    // Consistency King - 30 day streak
+    if (currentStreak >= 30 && !achievements[3].earned) {
+      achievements[3].earned = true;
+      achievements[3].earned_at = new Date().toISOString();
+      updated = true;
+    }
+
+    if (updated) {
+      await saveAchievements(achievements);
     }
   };
 
-  const renderTaskItem = ({ item }: { item: any }) => (
+  const toggleTaskCompletion = async (taskId: number) => {
+    const updatedTasks = dailyTasks.map(task => 
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    );
+    
+    setDailyTasks(updatedTasks);
+    await saveTasks(updatedTasks);
+
+    const task = dailyTasks.find(t => t.id === taskId);
+    if (task && !task.completed) {
+      const newStreak = streakCount + 1;
+      const newLongest = Math.max(newStreak, longestStreak);
+      
+      setStreakCount(newStreak);
+      setLongestStreak(newLongest);
+      await saveStreak(newStreak, newLongest);
+      
+      generateEncouragementMessage(newStreak);
+
+      const { totalTasks, completedTasks } = await loadStats();
+      const newCompletedTasks = completedTasks + 1;
+      await saveStats(totalTasks, newCompletedTasks);
+      
+      await checkAndUpdateAchievements(newCompletedTasks, newStreak);
+    }
+  };
+
+  const renderTaskItem = ({ item }: { item: Task }) => (
     <TouchableOpacity 
       style={[styles.taskItem, item.completed && styles.taskCompleted]}
       onPress={() => toggleTaskCompletion(item.id)}
@@ -99,6 +152,11 @@ export default function HomeScreen() {
         renderItem={renderTaskItem}
         keyExtractor={(item) => item.id.toString()}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No tasks yet. Add your first task to get started!</Text>
+          </View>
+        }
       />
 
       <TouchableOpacity 
@@ -212,6 +270,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6c757d',
+    textAlign: 'center',
   },
   newTaskButton: {
     backgroundColor: '#4ecdc4',
