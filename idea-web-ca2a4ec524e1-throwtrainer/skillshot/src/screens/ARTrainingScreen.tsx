@@ -1,29 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
+import { GLView } from 'expo-gl';
 import { useNavigation } from '@react-navigation/native';
 import { Audio } from 'expo-av';
-import ARTargetOverlay from '../components/ARTargetOverlay';
 import MotionDetector from '../components/MotionDetector';
 import SessionTimer from '../components/SessionTimer';
 import { useSessionStore } from '../store/useSessionStore';
 import { setTargetPosition } from '../services/motionAnalyzer';
+import { initAR, placeTarget, renderAR, updateTargetFeedback, getTargetWorldPosition } from '../services/arService';
 
 const ARTrainingScreen = () => {
   const [hasPermission, setHasPermission] = useState(null);
-  const [targetPosition, setTargetPositionState] = useState(null);
+  const [targetPlaced, setTargetPlaced] = useState(false);
   const [lastResult, setLastResult] = useState<'hit' | 'miss' | null>(null);
   const [hitSound, setHitSound] = useState<Audio.Sound | null>(null);
   const [missSound, setMissSound] = useState<Audio.Sound | null>(null);
+  const [glReady, setGlReady] = useState(false);
   const navigation = useNavigation();
   const { startSession, endSession, logAttempt } = useSessionStore();
+  const glViewRef = useRef<any>(null);
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
       
-      // Load sounds
       try {
         const { sound: hit } = await Audio.Sound.createAsync(
           require('../../assets/ding.mp3')
@@ -49,35 +51,50 @@ const ARTrainingScreen = () => {
     };
   }, []);
 
+  const onContextCreate = async (gl: any) => {
+    await initAR(gl);
+    setGlReady(true);
+    
+    const animate = () => {
+      renderAR();
+      gl.endFrameEXP();
+      requestAnimationFrame(animate);
+    };
+    animate();
+  };
+
   const handleScreenTap = (event: any) => {
+    if (!glReady) return;
+    
     const { locationX, locationY } = event.nativeEvent;
     const { width, height } = event.nativeEvent.target.measure 
-      ? { width: 375, height: 667 } // Default fallback
+      ? { width: 375, height: 667 }
       : { width: 375, height: 667 };
     
-    // Normalize coordinates to 0-1 range
     const normalizedX = locationX / width;
     const normalizedY = locationY / height;
+    const estimatedDepth = 2 + (normalizedY * 3);
     
-    // Estimate depth based on screen position (simple heuristic)
-    // Objects higher on screen are assumed to be further away
-    const estimatedDepth = 2 + (normalizedY * 3); // 2-5 meters
-    
-    const position = {
+    const screenPosition = {
       x: normalizedX,
       y: normalizedY,
       depth: estimatedDepth,
     };
     
-    setTargetPositionState(position);
-    setTargetPosition(position);
+    const result = placeTarget(screenPosition);
+    
+    if (result) {
+      setTargetPosition(result.worldPosition);
+      setTargetPlaced(true);
+    }
   };
 
   const handleThrowDetected = async (result: any) => {
     logAttempt(result);
     setLastResult(result.hit ? 'hit' : 'miss');
     
-    // Play sound
+    updateTargetFeedback(result.hit ? 'hit' : 'miss');
+    
     try {
       if (result.hit && hitSound) {
         await hitSound.replayAsync();
@@ -88,7 +105,6 @@ const ARTrainingScreen = () => {
       console.log('Error playing sound:', error);
     }
     
-    // Clear result after animation
     setTimeout(() => {
       setLastResult(null);
     }, 1000);
@@ -112,28 +128,34 @@ const ARTrainingScreen = () => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        style={styles.cameraContainer} 
-        onPress={handleScreenTap}
-        activeOpacity={1}
-      >
-        <Camera style={styles.camera} type={Camera.Constants.Type.back}>
-          {targetPosition && (
-            <ARTargetOverlay 
-              position={targetPosition} 
-              result={lastResult}
-            />
-          )}
-        </Camera>
-      </TouchableOpacity>
+      <Camera style={styles.camera} type={Camera.Constants.Type.back}>
+        <TouchableOpacity 
+          style={styles.touchOverlay} 
+          onPress={handleScreenTap}
+          activeOpacity={1}
+        >
+          <GLView
+            style={styles.glView}
+            onContextCreate={onContextCreate}
+          />
+        </TouchableOpacity>
+      </Camera>
       <MotionDetector onThrowDetected={handleThrowDetected} />
       <SessionTimer onEndSession={handleEndSession} />
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          {targetPosition 
+          {targetPlaced 
             ? 'Make a throwing motion to shoot!' 
             : 'Tap screen to place target'}
         </Text>
+        {lastResult && (
+          <Text style={[
+            styles.resultText,
+            { color: lastResult === 'hit' ? '#00ff00' : '#ff0000' }
+          ]}>
+            {lastResult === 'hit' ? 'HIT!' : 'MISS!'}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -143,10 +165,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  cameraContainer: {
+  camera: {
     flex: 1,
   },
-  camera: {
+  touchOverlay: {
+    flex: 1,
+  },
+  glView: {
     flex: 1,
   },
   instructions: {
@@ -162,6 +187,12 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     textAlign: 'center',
+  },
+  resultText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 

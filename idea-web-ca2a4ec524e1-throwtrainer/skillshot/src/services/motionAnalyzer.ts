@@ -10,7 +10,7 @@ interface ThrowData {
 interface TargetPosition {
   x: number;
   y: number;
-  depth: number;
+  z: number;
 }
 
 interface AccelerometerData {
@@ -20,15 +20,22 @@ interface AccelerometerData {
   timestamp?: number;
 }
 
-const GRAVITY = 9.8; // m/s²
-const WINDOW_SIZE = 500; // ms
-const ACCELERATION_THRESHOLD = 2.5; // m/s²
-const DECELERATION_THRESHOLD = 1.0; // m/s²
-const HIT_ZONE_RADIUS = 0.3; // meters
-const HIT_ZONE_DEPTH = 0.2; // meters
+interface GyroscopeData {
+  x: number;
+  y: number;
+  z: number;
+}
+
+const GRAVITY = 9.8;
+const WINDOW_SIZE = 500;
+const ACCELERATION_THRESHOLD = 2.5;
+const DECELERATION_THRESHOLD = 1.0;
+const HIT_ZONE_RADIUS = 0.15;
+const HIT_ZONE_DEPTH = 0.2;
 
 let motionWindow: AccelerometerData[] = [];
 let targetPosition: TargetPosition | null = null;
+let deviceOrientation: GyroscopeData = { x: 0, y: 0, z: 0 };
 
 export const setTargetPosition = (position: TargetPosition) => {
   targetPosition = position;
@@ -36,53 +43,47 @@ export const setTargetPosition = (position: TargetPosition) => {
 
 export const analyzeMotion = (callback: (result: ThrowData) => void) => {
   let lastAcceleration = { x: 0, y: 0, z: 0 };
-  let lastRotation = { x: 0, y: 0, z: 0 };
   let throwInProgress = false;
   let peakAcceleration = 0;
   let peakAccelerationData: AccelerometerData | null = null;
+  let throwStartTime = 0;
+
+  const gyroscopeSubscription = Gyroscope.addListener((gyroscopeData) => {
+    deviceOrientation = gyroscopeData;
+  });
 
   const accelerometerSubscription = Accelerometer.addListener((accelerometerData) => {
     const now = Date.now();
     const { x, y, z } = accelerometerData;
     
-    // Add to motion window
     motionWindow.push({ x, y, z, timestamp: now });
-    
-    // Remove old data outside window
     motionWindow = motionWindow.filter(data => 
       data.timestamp && (now - data.timestamp) <= WINDOW_SIZE
     );
 
     const accelerationMagnitude = Math.sqrt(x * x + y * y + z * z);
 
-    // Detect throw initiation (acceleration spike)
     if (accelerationMagnitude > ACCELERATION_THRESHOLD && !throwInProgress) {
       throwInProgress = true;
+      throwStartTime = now;
       peakAcceleration = accelerationMagnitude;
       peakAccelerationData = { x, y, z, timestamp: now };
     }
 
-    // Track peak during throw
     if (throwInProgress && accelerationMagnitude > peakAcceleration) {
       peakAcceleration = accelerationMagnitude;
       peakAccelerationData = { x, y, z, timestamp: now };
     }
 
-    // Detect throw completion (deceleration)
     if (throwInProgress && accelerationMagnitude < DECELERATION_THRESHOLD) {
       throwInProgress = false;
       
       if (peakAccelerationData) {
-        // Calculate initial velocity from peak acceleration
-        const velocity = calculateInitialVelocity(peakAccelerationData);
-        
-        // Project trajectory
+        const throwDuration = (now - throwStartTime) / 1000;
+        const velocity = calculateInitialVelocity(peakAccelerationData, throwDuration);
         const trajectory = projectTrajectory(velocity);
-        
-        // Check for hit
         const hit = targetPosition ? checkHit(trajectory, targetPosition) : false;
         
-        // Calculate speed and angle
         const speed = Math.sqrt(
           velocity.x * velocity.x + 
           velocity.y * velocity.y + 
@@ -93,7 +94,6 @@ export const analyzeMotion = (callback: (result: ThrowData) => void) => {
         callback({ speed, angle, hit, trajectory });
       }
       
-      // Reset for next throw
       peakAcceleration = 0;
       peakAccelerationData = null;
       motionWindow = [];
@@ -102,17 +102,12 @@ export const analyzeMotion = (callback: (result: ThrowData) => void) => {
     lastAcceleration = accelerometerData;
   });
 
-  const gyroscopeSubscription = Gyroscope.addListener((gyroscopeData) => {
-    lastRotation = gyroscopeData;
-  });
-
   return {
     remove: () => {
       accelerometerSubscription.remove();
       gyroscopeSubscription.remove();
     },
     accelerometerCallback: (data: AccelerometerData) => {
-      // For testing
       const now = Date.now();
       motionWindow.push({ ...data, timestamp: now });
       motionWindow = motionWindow.filter(d => 
@@ -121,7 +116,7 @@ export const analyzeMotion = (callback: (result: ThrowData) => void) => {
       
       const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
       if (magnitude > ACCELERATION_THRESHOLD) {
-        const velocity = calculateInitialVelocity(data);
+        const velocity = calculateInitialVelocity(data, 0.1);
         const trajectory = projectTrajectory(velocity);
         const hit = targetPosition ? checkHit(trajectory, targetPosition) : false;
         const speed = Math.sqrt(
@@ -136,15 +131,47 @@ export const analyzeMotion = (callback: (result: ThrowData) => void) => {
   };
 };
 
-const calculateInitialVelocity = (peakAcceleration: AccelerometerData): { x: number; y: number; z: number } => {
-  // Estimate velocity from acceleration
-  // v = a * t (simplified, assuming constant acceleration over short period)
-  const dt = 0.1; // 100ms estimation window
+const calculateInitialVelocity = (
+  peakAcceleration: AccelerometerData,
+  duration: number
+): { x: number; y: number; z: number } => {
+  const dt = Math.max(duration, 0.05);
+  
+  const rotationMatrix = getRotationMatrix(deviceOrientation);
+  const worldAcceleration = applyRotation(peakAcceleration, rotationMatrix);
   
   return {
-    x: peakAcceleration.x * dt,
-    y: peakAcceleration.y * dt,
-    z: peakAcceleration.z * dt,
+    x: worldAcceleration.x * dt * 10,
+    y: worldAcceleration.y * dt * 10,
+    z: worldAcceleration.z * dt * 10,
+  };
+};
+
+const getRotationMatrix = (orientation: GyroscopeData): number[][] => {
+  const { x, y, z } = orientation;
+  
+  const cosX = Math.cos(x);
+  const sinX = Math.sin(x);
+  const cosY = Math.cos(y);
+  const sinY = Math.sin(y);
+  const cosZ = Math.cos(z);
+  const sinZ = Math.sin(z);
+  
+  return [
+    [cosY * cosZ, -cosY * sinZ, sinY],
+    [sinX * sinY * cosZ + cosX * sinZ, -sinX * sinY * sinZ + cosX * cosZ, -sinX * cosY],
+    [-cosX * sinY * cosZ + sinX * sinZ, cosX * sinY * sinZ + sinX * cosZ, cosX * cosY],
+  ];
+};
+
+const applyRotation = (
+  vector: { x: number; y: number; z: number },
+  matrix: number[][]
+): { x: number; y: number; z: number } => {
+  return {
+    x: matrix[0][0] * vector.x + matrix[0][1] * vector.y + matrix[0][2] * vector.z,
+    y: matrix[1][0] * vector.x + matrix[1][1] * vector.y + matrix[1][2] * vector.z,
+    z: matrix[2][0] * vector.x + matrix[2][1] * vector.y + matrix[2][2] * vector.z,
   };
 };
 
@@ -152,8 +179,8 @@ const projectTrajectory = (
   initialVelocity: { x: number; y: number; z: number }
 ): { x: number; y: number; z: number }[] => {
   const trajectory: { x: number; y: number; z: number }[] = [];
-  const dt = 0.05; // 50ms time steps
-  const maxTime = 2.0; // 2 seconds max flight time
+  const dt = 0.05;
+  const maxTime = 2.0;
   
   let x = 0, y = 0, z = 0;
   let vx = initialVelocity.x;
@@ -161,18 +188,15 @@ const projectTrajectory = (
   let vz = initialVelocity.z;
   
   for (let t = 0; t < maxTime; t += dt) {
-    // Update position
     x += vx * dt;
     y += vy * dt;
     z += vz * dt;
     
-    // Apply gravity (assuming y is vertical)
     vy -= GRAVITY * dt;
     
     trajectory.push({ x, y, z });
     
-    // Stop if trajectory goes below ground
-    if (y < 0) break;
+    if (y < -5) break;
   }
   
   return trajectory;
@@ -182,24 +206,14 @@ const checkHit = (
   trajectory: { x: number; y: number; z: number }[],
   target: TargetPosition
 ): boolean => {
-  // Convert target screen position to 3D space
-  // Assuming screen coordinates are normalized (0-1)
-  // and depth is in meters
-  const targetX = (target.x - 0.5) * 2; // Convert to -1 to 1 range
-  const targetY = (0.5 - target.y) * 2; // Invert Y and convert
-  const targetZ = target.depth;
-  
-  // Check if any point in trajectory intersects cylindrical hit zone
   for (const point of trajectory) {
-    // Calculate distance from target center in XY plane
-    const dx = point.x - targetX;
-    const dy = point.y - targetY;
+    const dx = point.x - target.x;
+    const dy = point.y - target.y;
+    const dz = point.z - target.z;
+    
     const radialDistance = Math.sqrt(dx * dx + dy * dy);
+    const depthDistance = Math.abs(dz);
     
-    // Check depth distance
-    const depthDistance = Math.abs(point.z - targetZ);
-    
-    // Hit if within cylindrical zone
     if (radialDistance <= HIT_ZONE_RADIUS && depthDistance <= HIT_ZONE_DEPTH) {
       return true;
     }
@@ -209,7 +223,6 @@ const checkHit = (
 };
 
 const calculateAngle = (velocity: { x: number; y: number; z: number }): number => {
-  // Calculate angle from horizontal (in degrees)
   const horizontalSpeed = Math.sqrt(velocity.x * velocity.x + velocity.z * velocity.z);
   const angle = Math.atan2(velocity.y, horizontalSpeed) * (180 / Math.PI);
   return angle;
