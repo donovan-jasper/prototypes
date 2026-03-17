@@ -70,10 +70,31 @@ export const createOrder = (order, callback) => {
 export const fetchOrders = (callback) => {
   db.transaction(tx => {
     tx.executeSql(
-      'SELECT * FROM orders;',
+      `SELECT 
+        orders.*,
+        json_group_array(DISTINCT json_object(
+          'id', cart_items.id,
+          'name', cart_items.name,
+          'price', cart_items.price,
+          'quantity', cart_items.quantity,
+          'participantId', cart_items.participantId
+        )) as items,
+        json_group_array(DISTINCT json_object(
+          'id', group_members.id,
+          'name', group_members.name
+        )) as participants
+      FROM orders
+      LEFT JOIN cart_items ON orders.id = cart_items.orderId
+      LEFT JOIN group_members ON orders.id = group_members.groupId
+      GROUP BY orders.id;`,
       [],
       (_, { rows: { _array } }) => {
-        callback(_array);
+        const parsedOrders = _array.map(order => ({
+          ...order,
+          items: JSON.parse(order.items).filter(item => item.id !== null),
+          participants: JSON.parse(order.participants).filter(participant => participant.id !== null)
+        }));
+        callback(parsedOrders);
       }
     );
   });
