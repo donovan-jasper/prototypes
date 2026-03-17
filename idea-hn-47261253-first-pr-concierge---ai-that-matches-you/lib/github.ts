@@ -60,6 +60,7 @@ export const fetchGoodFirstIssues = async (repos: any[]): Promise<Issue[]> => {
           url: repo.html_url,
         },
         difficulty: Math.min(5, Math.max(1, Math.floor(Math.random() * 5) + 1)), // Simplified difficulty calculation
+        created_at: issue.created_at,
       })));
     } catch (error) {
       console.error(`Error fetching issues for ${repo.name}:`, error);
@@ -74,14 +75,14 @@ export const fetchGoodFirstIssues = async (repos: any[]): Promise<Issue[]> => {
   );
 };
 
-export const commentOnIssue = async (issueId: number, comment: string): Promise<void> => {
+export const commentOnIssue = async (issueId: number, comment: string, repoOwner: string, repoName: string): Promise<void> => {
   if (!octokit) throw new Error('GitHub client not initialized');
 
   try {
     await octokit.rest.issues.createComment({
       issue_number: issueId,
-      owner: 'owner', // This would be dynamic in a real implementation
-      repo: 'repo',   // This would be dynamic in a real implementation
+      owner: repoOwner,
+      repo: repoName,
       body: comment,
     });
   } catch (error) {

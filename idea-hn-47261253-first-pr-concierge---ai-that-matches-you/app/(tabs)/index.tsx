@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, ActivityIndicator, Text, StyleSheet } from 'react-native';
+import { View, FlatList, ActivityIndicator, Text, StyleSheet, RefreshControl } from 'react-native';
 import { useIssuesStore } from '../../store/issuesStore';
 import IssueCard from '../../components/IssueCard';
 import { Issue } from '../../types';
@@ -25,7 +25,7 @@ const SmartMatchFeed = () => {
   if (loading && matchedIssues.length === 0) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#2196F3" />
         <Text style={styles.loadingText}>Finding your perfect issues...</Text>
       </View>
     );
@@ -57,8 +57,14 @@ const SmartMatchFeed = () => {
           onClaim={() => handleClaim(item)}
         />
       )}
-      refreshing={refreshing}
-      onRefresh={handleRefresh}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          colors={['#2196F3']}
+          tintColor="#2196F3"
+        />
+      }
       contentContainerStyle={styles.listContainer}
     />
   );
@@ -77,7 +83,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   errorText: {
-    color: 'red',
+    color: '#F44336',
     fontSize: 16,
   },
   emptyText: {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
 import { Issue } from '../types';
 
 interface IssueCardProps {
@@ -14,26 +14,32 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue, onClaim }) => {
     return '#F44336'; // Red
   };
 
+  const handleOpenIssue = () => {
+    Linking.openURL(issue.url);
+  };
+
   return (
     <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.repoName}>{issue.repository.name}</Text>
-        <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(issue.difficulty) }]}>
-          <Text style={styles.difficultyText}>
-            {issue.difficulty <= 2 ? 'Easy' : issue.difficulty <= 4 ? 'Medium' : 'Hard'}
-          </Text>
-        </View>
-      </View>
-
-      <Text style={styles.title}>{issue.title}</Text>
-
-      <View style={styles.labelsContainer}>
-        {issue.labels.map((label, index) => (
-          <View key={index} style={styles.label}>
-            <Text style={styles.labelText}>{label}</Text>
+      <TouchableOpacity onPress={handleOpenIssue}>
+        <View style={styles.header}>
+          <Text style={styles.repoName}>{issue.repository.name}</Text>
+          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(issue.difficulty) }]}>
+            <Text style={styles.difficultyText}>
+              {issue.difficulty <= 2 ? 'Easy' : issue.difficulty <= 4 ? 'Medium' : 'Hard'}
+            </Text>
           </View>
-        ))}
-      </View>
+        </View>
+
+        <Text style={styles.title}>{issue.title}</Text>
+
+        <View style={styles.labelsContainer}>
+          {issue.labels.map((label, index) => (
+            <View key={index} style={styles.label}>
+              <Text style={styles.labelText}>{label}</Text>
+            </View>
+          ))}
+        </View>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.claimButton}
