@@ -42,8 +42,11 @@ export async function initializeDatabase() {
         `CREATE TABLE IF NOT EXISTS ai_messages (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           streak_length INTEGER,
+          longest_streak INTEGER,
           missed_days INTEGER,
           habit_name TEXT,
+          completion_rate REAL,
+          status TEXT,
           user_tone TEXT,
           message TEXT,
           created_at TEXT
@@ -66,6 +69,18 @@ export async function initializeDatabase() {
           coach_tone TEXT DEFAULT 'supportive',
           notification_time TEXT DEFAULT '09:00',
           FOREIGN KEY (user_id) REFERENCES users (id)
+        );`
+      );
+
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS social_feed (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id TEXT,
+          habit_id TEXT,
+          action TEXT,
+          timestamp TEXT,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (habit_id) REFERENCES habits (id)
         );`
       );
     }, (error) => {
@@ -141,6 +156,55 @@ export async function updateUserPreferences(userId: string, preferences: Partial
         (_, error) => {
           console.error('Error updating preferences:', error);
           resolve(false);
+        }
+      );
+    });
+  });
+}
+
+export async function addSocialFeedItem(userId: string, habitId: string, action: string) {
+  return new Promise((resolve) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO social_feed (user_id, habit_id, action, timestamp) VALUES (?, ?, ?, ?)',
+        [userId, habitId, action, new Date().toISOString()],
+        () => resolve(true),
+        (_, error) => {
+          console.error('Error adding social feed item:', error);
+          resolve(false);
+        }
+      );
+    });
+  });
+}
+
+export async function getSocialFeed(userId: string, limit: number = 20) {
+  return new Promise((resolve) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT sf.*, u.name as user_name, h.name as habit_name
+         FROM social_feed sf
+         JOIN users u ON sf.user_id = u.id
+         JOIN habits h ON sf.habit_id = h.id
+         WHERE sf.user_id = ? OR EXISTS (
+           SELECT 1 FROM group_members gm
+           WHERE gm.user_id = ? AND gm.group_id IN (
+             SELECT group_id FROM group_members WHERE user_id = sf.user_id
+           )
+         )
+         ORDER BY sf.timestamp DESC
+         LIMIT ?`,
+        [userId, userId, limit],
+        (_, { rows }) => {
+          const feedItems = [];
+          for (let i = 0; i < rows.length; i++) {
+            feedItems.push(rows.item(i));
+          }
+          resolve(feedItems);
+        },
+        (_, error) => {
+          console.error('Error fetching social feed:', error);
+          resolve([]);
         }
       );
     });

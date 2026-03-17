@@ -4,12 +4,24 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface AICoachMessageProps {
   message: string;
-  isUser: boolean;
+  isUser?: boolean;
+  streakContext?: {
+    currentStreak: number;
+    longestStreak: number;
+    habitName: string;
+    completionRate: number;
+    status: 'active' | 'at-risk' | 'broken';
+  };
 }
 
-const AICoachMessage: React.FC<AICoachMessageProps> = ({ message, isUser }) => {
+const AICoachMessage: React.FC<AICoachMessageProps> = ({
+  message,
+  isUser = false,
+  streakContext
+}) => {
   const [displayedText, setDisplayedText] = useState('');
   const [typingAnimation] = useState(new Animated.Value(0));
+  const [showTyping, setShowTyping] = useState(true);
 
   useEffect(() => {
     // Typing animation
@@ -27,39 +39,69 @@ const AICoachMessage: React.FC<AICoachMessageProps> = ({ message, isUser }) => {
         i++;
       } else {
         clearInterval(typingInterval);
+        setShowTyping(false);
       }
     }, 20);
 
     return () => clearInterval(typingInterval);
   }, [message]);
 
+  const getStatusColor = () => {
+    if (!streakContext) return '#6C63FF';
+    switch (streakContext.status) {
+      case 'active':
+        return '#4CAF50'; // Green for good progress
+      case 'at-risk':
+        return '#FF9800'; // Orange for warning
+      case 'broken':
+        return '#F44336'; // Red for broken streak
+      default:
+        return '#6C63FF';
+    }
+  };
+
   return (
     <View style={[styles.container, isUser ? styles.userContainer : styles.coachContainer]}>
       {!isUser && (
-        <View style={styles.avatarContainer}>
+        <View style={[styles.avatarContainer, { backgroundColor: getStatusColor() }]}>
           <MaterialCommunityIcons name="robot-happy" size={24} color="#fff" />
         </View>
       )}
       <View style={[styles.messageBubble, isUser ? styles.userBubble : styles.coachBubble]}>
         <Text style={styles.messageText}>{displayedText}</Text>
-        <Animated.View
-          style={[
-            styles.typingIndicator,
-            {
-              opacity: typingAnimation,
-              transform: [
-                {
-                  translateX: typingAnimation.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [-10, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <Text style={styles.typingText}>...</Text>
-        </Animated.View>
+        {showTyping && (
+          <Animated.View
+            style={[
+              styles.typingIndicator,
+              {
+                opacity: typingAnimation,
+                transform: [
+                  {
+                    translateX: typingAnimation.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-10, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            <Text style={styles.typingText}>...</Text>
+          </Animated.View>
+        )}
+        {streakContext && (
+          <View style={styles.streakContextContainer}>
+            <Text style={styles.contextText}>
+              {`${streakContext.habitName} streak: ${streakContext.currentStreak} days`}
+            </Text>
+            <Text style={styles.contextText}>
+              {`Longest: ${streakContext.longestStreak} days`}
+            </Text>
+            <Text style={styles.contextText}>
+              {`Completion: ${streakContext.completionRate.toFixed(0)}%`}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -84,7 +126,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 8,
@@ -106,6 +147,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 22,
     color: '#333',
+    marginBottom: 8,
   },
   typingIndicator: {
     position: 'absolute',
@@ -115,6 +157,17 @@ const styles = StyleSheet.create({
   typingText: {
     fontSize: 16,
     color: '#666',
+  },
+  streakContextContainer: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+  },
+  contextText: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
   },
 });
 
