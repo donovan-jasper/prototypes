@@ -1,21 +1,10 @@
 import { Drill, DrillResult, Score } from './types';
 import { initDatabase } from './database';
+import { DRILLS } from '../constants/Drills';
 
 export const getDrills = async (): Promise<Drill[]> => {
   await initDatabase();
-  // In a real app, you would fetch drills from the database
-  return [
-    {
-      id: 'aim-training-1',
-      name: 'Aim Training',
-      description: 'Tap the targets as fast as you can',
-      type: 'aim',
-      difficulty: 'Beginner',
-      duration: 30,
-      bestScore: 0,
-    },
-    // Add more drills here
-  ];
+  return DRILLS;
 };
 
 export interface Target {

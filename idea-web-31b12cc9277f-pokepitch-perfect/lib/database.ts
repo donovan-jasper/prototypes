@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { DrillResult, UserStats, Achievement } from './types';
+import { DRILLS } from '../constants/Drills';
 
 let db: SQLite.SQLiteDatabase | null = null;
 let isInitialized = false;
@@ -56,6 +57,20 @@ export const initDatabase = async () => {
       unlocked BOOLEAN
     );
   `);
+  
+  // Seed drills if table is empty
+  const drillCount = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM drills'
+  );
+  
+  if (drillCount && drillCount.count === 0) {
+    for (const drill of DRILLS) {
+      await database.runAsync(
+        'INSERT INTO drills (id, name, description, type, difficulty, duration, bestScore) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [drill.id, drill.name, drill.description, drill.type, drill.difficulty, drill.duration, drill.bestScore]
+      );
+    }
+  }
   
   isInitialized = true;
 };
