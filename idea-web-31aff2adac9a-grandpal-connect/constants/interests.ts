@@ -1,0 +1,73 @@
+export const INTERESTS = [
+  'Cooking',
+  'Gardening',
+  'Technology',
+  'History',
+  'Music',
+  'Travel',
+  'Photography',
+  'Reading',
+  'Sports',
+  'Art',
+  'Knitting',
+  'Woodworking',
+  'Painting',
+  'Writing',
+  'Dancing',
+  'Yoga',
+  'Meditation',
+  'Fishing',
+  'Hiking',
+  'Birdwatching',
+  'Chess',
+  'Board Games',
+  'Languages',
+  'Astronomy',
+  'Volunteering',
+  'Genealogy',
+  'Crafts',
+  'Baking',
+  'Wine Tasting',
+  'Theater'
+];
+
+export const INTEREST_CATEGORIES = {
+  hobbies: [
+    'Cooking',
+    'Gardening',
+    'Photography',
+    'Reading',
+    'Sports',
+    'Art',
+    'Knitting',
+    'Painting',
+    'Dancing',
+    'Fishing',
+    'Hiking',
+    'Birdwatching',
+    'Chess',
+    'Board Games',
+    'Baking',
+    'Wine Tasting',
+    'Theater'
+  ],
+  skills_teach: [
+    'Technology',
+    'History',
+    'Music',
+    'Woodworking',
+    'Writing',
+    'Languages',
+    'Genealogy',
+    'Crafts'
+  ],
+  skills_learn: [
+    'Technology',
+    'Music',
+    'Languages',
+    'Yoga',
+    'Meditation',
+    'Astronomy',
+    'Volunteering'
+  ]
+};
