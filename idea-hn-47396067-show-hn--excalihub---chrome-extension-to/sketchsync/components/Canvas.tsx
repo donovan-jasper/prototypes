@@ -1,69 +1,43 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Canvas as SkiaCanvas, Path, Skia } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { useSharedValue } from 'react-native-reanimated';
 import { useDrawingStore } from '@/store/useDrawingStore';
-import { useGestures } from '@/hooks/useGestures';
 
 export function Canvas() {
   const { elements, addElement, currentTool, currentColor, strokeWidth } = useDrawingStore();
-  const canvasRef = useRef(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const currentPath = useSharedValue<string>('');
-  const { panGesture, pinchGesture } = useGestures();
+  const [currentPath, setCurrentPath] = useState<string>('');
 
-  const combinedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
-
-  const handleTouchStart = (event: any) => {
-    if (currentTool !== 'pen') return;
-    
-    const { locationX, locationY } = event.nativeEvent;
-    setIsDrawing(true);
-    
-    const path = Skia.Path.Make();
-    path.moveTo(locationX, locationY);
-    currentPath.value = path.toSVGString();
-  };
-
-  const handleTouchMove = (event: any) => {
-    if (!isDrawing || currentTool !== 'pen') return;
-    
-    const { locationX, locationY } = event.nativeEvent;
-    const path = Skia.Path.MakeFromSVGString(currentPath.value);
-    
-    if (path) {
-      path.lineTo(locationX, locationY);
-      currentPath.value = path.toSVGString();
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!isDrawing || currentTool !== 'pen') return;
-    
-    setIsDrawing(false);
-    
-    if (currentPath.value) {
-      addElement({
-        type: 'path',
-        path: currentPath.value,
-        color: currentColor,
-        strokeWidth: strokeWidth,
-      });
-      currentPath.value = '';
-    }
-  };
+  const drawingGesture = Gesture.Pan()
+    .enabled(currentTool === 'pen')
+    .onStart((e) => {
+      const path = Skia.Path.Make();
+      path.moveTo(e.x, e.y);
+      setCurrentPath(path.toSVGString());
+    })
+    .onUpdate((e) => {
+      const path = Skia.Path.MakeFromSVGString(currentPath);
+      if (path) {
+        path.lineTo(e.x, e.y);
+        setCurrentPath(path.toSVGString());
+      }
+    })
+    .onEnd(() => {
+      if (currentPath) {
+        addElement({
+          type: 'path',
+          path: currentPath,
+          color: currentColor,
+          strokeWidth: strokeWidth,
+        });
+        setCurrentPath('');
+      }
+    });
 
   return (
-    <GestureDetector gesture={combinedGesture}>
+    <GestureDetector gesture={drawingGesture}>
       <View style={styles.container}>
-        <SkiaCanvas
-          ref={canvasRef}
-          style={styles.canvas}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
+        <SkiaCanvas style={styles.canvas}>
           {elements.map((element, index) => (
             <Path
               key={index}
@@ -73,9 +47,9 @@ export function Canvas() {
               strokeWidth={element.strokeWidth}
             />
           ))}
-          {isDrawing && currentPath.value && (
+          {currentPath && (
             <Path
-              path={currentPath.value}
+              path={currentPath}
               color={currentColor}
               style="stroke"
               strokeWidth={strokeWidth}
