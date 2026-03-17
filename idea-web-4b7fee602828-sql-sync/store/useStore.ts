@@ -1,8 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Database, Field, SyncOperation } from '../lib/schema'; // Import types
 
-const useStore = create(
+interface AppState {
+  databases: Database[];
+  currentDb: Database | null;
+  syncQueue: SyncOperation[];
+  user: any; // Define a proper User type if available
+  isOnline: boolean;
+  addDatabase: (database: Database) => void;
+  removeDatabase: (id: string) => void;
+  setCurrentDb: (database: Database | null) => void;
+  queueSync: (operation: SyncOperation) => void;
+  clearSyncQueue: () => void;
+  setUser: (user: any) => void;
+  setOnlineStatus: (isOnline: boolean) => void;
+  getDatabaseById: (id: string) => Database | undefined;
+}
+
+const useStore = create<AppState>()(
   persist(
     (set, get) => ({
       databases: [],
@@ -11,10 +28,11 @@ const useStore = create(
       user: null,
       isOnline: true,
       addDatabase: (database) => set((state) => {
-        // Ensure the database has a unique ID
+        // The database object now comes with a unique ID from createDatabase
+        // This logic ensures the ID is present, but createDatabase will provide it.
         const dbWithId = {
           ...database,
-          id: database.id || `db_${Date.now()}`
+          id: database.id || `db_${Date.now()}` // Fallback, but createDatabase will provide it
         };
         return { databases: [...state.databases, dbWithId] };
       }),

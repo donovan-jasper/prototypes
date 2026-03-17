@@ -1,13 +1,18 @@
 import * as SQLite from 'expo-sqlite';
+import 'react-native-get-random-values'; // Required for uuid v4 in React Native
+import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { Field, Database } from './schema'; // Import types
 
-const openDatabase = (dbName) => {
-  return SQLite.openDatabase(`${dbName}.db`);
+const openDatabase = (dbId: string) => {
+  return SQLite.openDatabase(`${dbId}.db`);
 };
 
-const createDatabase = async (name, schema) => {
-  const db = openDatabase(name);
+const createDatabase = async (name: string, schema: Field[]): Promise<Database> => {
+  const dbId = uuidv4(); // Generate a unique ID for the database
+  const db = openDatabase(dbId);
 
-  // Create the database with the specified schema
+  // Create the database table with the specified schema
+  // Ensure 'id' is always present as a primary key
   const columns = schema.map(field => `${field.name} ${field.type}`).join(', ');
   await db.execAsync([{
     sql: `CREATE TABLE IF NOT EXISTS rows (id INTEGER PRIMARY KEY AUTOINCREMENT, ${columns})`,
@@ -20,10 +25,11 @@ const createDatabase = async (name, schema) => {
     args: []
   }]);
 
-  return { id: name, name, schema };
+  // Return the full database object including the generated unique ID
+  return { id: dbId, name, schema };
 };
 
-const addRow = async (dbId, data) => {
+const addRow = async (dbId: string, data: { [key: string]: any }) => {
   const db = openDatabase(dbId);
 
   // Prepare the SQL statement
@@ -40,20 +46,20 @@ const addRow = async (dbId, data) => {
   return result.lastInsertRowId;
 };
 
-const queryRows = async (dbId, sql) => {
+const queryRows = async (dbId: string, sql: string) => {
   const db = openDatabase(dbId);
 
   try {
     // Execute the query
     const result = await db.getAllAsync(sql);
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Query execution error:', error);
     throw new Error(`Failed to execute query: ${error.message}`);
   }
 };
 
-const updateRow = async (dbId, rowId, data) => {
+const updateRow = async (dbId: string, rowId: number, data: { [key: string]: any }) => {
   const db = openDatabase(dbId);
 
   // Prepare the update statement
@@ -67,7 +73,7 @@ const updateRow = async (dbId, rowId, data) => {
   );
 };
 
-const deleteRow = async (dbId, rowId) => {
+const deleteRow = async (dbId: string, rowId: number) => {
   const db = openDatabase(dbId);
 
   // Execute the delete
@@ -77,7 +83,7 @@ const deleteRow = async (dbId, rowId) => {
   );
 };
 
-const deleteDatabase = async (dbId) => {
+const deleteDatabase = async (dbId: string) => {
   const db = openDatabase(dbId);
 
   // Drop the table
@@ -87,10 +93,10 @@ const deleteDatabase = async (dbId) => {
   }]);
 
   // Close the database connection
-  db.closeAsync();
+  // db.closeAsync(); // This might not be necessary or desired in Expo SQLite's lifecycle
 };
 
-const getDatabaseSchema = async (dbId) => {
+const getDatabaseSchema = async (dbId: string): Promise<Field[]> => {
   const db = openDatabase(dbId);
 
   // Get the schema information
@@ -101,19 +107,19 @@ const getDatabaseSchema = async (dbId) => {
   if (result.length > 0) {
     const createTableSql = result[0].sql;
     // Parse the schema from the CREATE TABLE statement
-    const schema = [];
+    const schema: Field[] = [];
     const columnMatches = createTableSql.match(/\(([^)]+)\)/);
 
     if (columnMatches && columnMatches[1]) {
       const columns = columnMatches[1].split(',').map(col => col.trim());
 
       for (const column of columns) {
-        if (column.toLowerCase().startsWith('id')) continue;
+        if (column.toLowerCase().startsWith('id')) continue; // Skip the primary key 'id' column
 
         const [name, type] = column.split(/\s+/);
         schema.push({
-          name: name.replace(/"/g, ''),
-          type: type.toUpperCase()
+          name: name.replace(/"/g, ''), // Remove quotes from column names
+          type: type.toUpperCase() as Field['type']
         });
       }
     }
