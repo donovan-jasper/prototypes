@@ -25,3 +25,12 @@ export interface Chat {
   interestedUserId: string;
   createdAt: string;
 }
+
+export interface Message {
+  id: string;
+  chatId: string;
+  senderId: string;
+  content: string;
+  createdAt: string;
+  read: boolean;
+}
