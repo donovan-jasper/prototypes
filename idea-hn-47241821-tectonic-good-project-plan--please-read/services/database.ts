@@ -37,6 +37,27 @@ export const initDatabase = async () => {
         },
         (_, error) => reject(error)
       );
+
+      // Create offline resources table if it doesn't exist
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS offline_resources (
+          id INTEGER PRIMARY KEY,
+          name TEXT NOT NULL,
+          type TEXT NOT NULL,
+          address TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          phone TEXT,
+          hours TEXT,
+          wheelchair_accessible BOOLEAN,
+          pet_friendly BOOLEAN,
+          open_now BOOLEAN,
+          last_updated INTEGER
+        );`,
+        [],
+        () => {},
+        (_, error) => reject(error)
+      );
     });
   });
 };
@@ -100,6 +121,66 @@ const seedDatabase = (tx: SQLite.SQLTransaction) => {
       longitude: -122.4394,
       phone: '(415) 555-7890',
       hours: 'Mon-Fri 8am-6pm',
+      wheelchair_accessible: true,
+      pet_friendly: false,
+      open_now: true
+    },
+    {
+      name: 'City Shelter',
+      type: 'shelter',
+      address: '101 Mission St, San Francisco, CA 94105',
+      latitude: 37.7919,
+      longitude: -122.3949,
+      phone: '(415) 555-6789',
+      hours: '24/7',
+      wheelchair_accessible: true,
+      pet_friendly: false,
+      open_now: true
+    },
+    {
+      name: 'Food Pantry',
+      type: 'food',
+      address: '202 Sutter St, San Francisco, CA 94108',
+      latitude: 37.7899,
+      longitude: -122.4084,
+      phone: '(415) 555-2345',
+      hours: 'Mon-Fri 10am-2pm',
+      wheelchair_accessible: false,
+      pet_friendly: false,
+      open_now: true
+    },
+    {
+      name: 'Legal Clinic',
+      type: 'legal',
+      address: '303 Bush St, San Francisco, CA 94108',
+      latitude: 37.7909,
+      longitude: -122.4014,
+      phone: '(415) 555-3456',
+      hours: 'Tue-Thu 1pm-5pm',
+      wheelchair_accessible: true,
+      pet_friendly: false,
+      open_now: false
+    },
+    {
+      name: 'Pet Adoption Center',
+      type: 'shelter',
+      address: '404 Van Ness Ave, San Francisco, CA 94102',
+      latitude: 37.7869,
+      longitude: -122.4209,
+      phone: '(415) 555-4567',
+      hours: 'Mon-Sun 11am-7pm',
+      wheelchair_accessible: true,
+      pet_friendly: true,
+      open_now: true
+    },
+    {
+      name: 'Healthcare Clinic',
+      type: 'health',
+      address: '505 Market St, San Francisco, CA 94105',
+      latitude: 37.7919,
+      longitude: -122.3949,
+      phone: '(415) 555-5678',
+      hours: 'Mon-Fri 8am-4pm',
       wheelchair_accessible: true,
       pet_friendly: false,
       open_now: true
@@ -168,5 +249,59 @@ export const getResourceById = async (id: number) => {
         (_, error) => reject(error)
       );
     });
+  });
+};
+
+export const getOfflineResources = async () => {
+  return new Promise<any[]>((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM offline_resources`,
+        [],
+        (_, result) => {
+          const resources = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            resources.push(result.rows.item(i));
+          }
+          resolve(resources);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const cacheResourcesOffline = async (resources: any[]) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Clear existing cached resources
+      tx.executeSql('DELETE FROM offline_resources', []);
+
+      // Insert new resources
+      resources.forEach(resource => {
+        tx.executeSql(
+          `INSERT INTO offline_resources (
+            id, name, type, address, latitude, longitude, phone, hours,
+            wheelchair_accessible, pet_friendly, open_now, last_updated
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            resource.id,
+            resource.name,
+            resource.type,
+            resource.address,
+            resource.latitude,
+            resource.longitude,
+            resource.phone,
+            resource.hours,
+            resource.wheelchair_accessible ? 1 : 0,
+            resource.pet_friendly ? 1 : 0,
+            resource.open_now ? 1 : 0,
+            Date.now()
+          ]
+        );
+      });
+
+      resolve(true);
+    }, (error) => reject(error));
   });
 };

@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, ActivityIndicator, Switch } from 'react-native';
-import * as Location from 'expo-location';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Switch, ActivityIndicator } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { FontAwesome } from '@expo/vector-icons';
-import { initDatabase, getResourcesByLocation } from '../../services/database';
-import { calculateDistance } from '../../services/location';
+import { getCurrentLocation, calculateDistance } from '../../services/location';
+import { getResourcesByLocation } from '../../services/database';
 
-interface Resource {
+type ResourceType = {
   id: number;
   name: string;
   type: string;
@@ -18,57 +17,47 @@ interface Resource {
   wheelchair_accessible: boolean;
   pet_friendly: boolean;
   open_now: boolean;
-  distance?: number;
-}
+};
+
+const resourceTypes = [
+  { id: 'shelter', name: 'Shelters', icon: 'home' },
+  { id: 'food', name: 'Food Banks', icon: 'cutlery' },
+  { id: 'legal', name: 'Legal Aid', icon: 'gavel' },
+  { id: 'health', name: 'Healthcare', icon: 'medkit' },
+];
 
 export default function ResourceFinderScreen() {
-  const [resources, setResources] = useState<Resource[]>([]);
-  const [filteredResources, setFilteredResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [distanceFilter, setDistanceFilter] = useState(5);
-  const [showMap, setShowMap] = useState(false);
+  const [resources, setResources] = useState<ResourceType[]>([]);
+  const [filteredResources, setFilteredResources] = useState<ResourceType[]>([]);
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filters, setFilters] = useState({
-    openNow: false,
-    wheelchairAccessible: false,
+    wheelchair: false,
     petFriendly: false,
-    type: 'all'
+    openNow: false,
+    selectedTypes: resourceTypes.map(type => type.id),
   });
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    const initialize = async () => {
+    const loadData = async () => {
       try {
-        // Initialize database
-        await initDatabase();
+        const currentLocation = await getCurrentLocation();
+        setLocation(currentLocation);
 
-        // Get user location
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permission to access location was denied');
-          return;
-        }
-
-        const location = await Location.getCurrentPositionAsync({});
-        setUserLocation({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude
-        });
-
-        // Fetch resources
-        const fetchedResources = await getResourcesByLocation(
-          location.coords.latitude,
-          location.coords.longitude,
-          distanceFilter
+        const allResources = await getResourcesByLocation(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          10 // 10km radius
         );
 
         // Calculate distance for each resource
-        const resourcesWithDistance = fetchedResources.map(resource => ({
+        const resourcesWithDistance = allResources.map(resource => ({
           ...resource,
           distance: calculateDistance(
-            location.coords.latitude,
-            location.coords.longitude,
+            currentLocation.latitude,
+            currentLocation.longitude,
             resource.latitude,
             resource.longitude
           )
@@ -76,16 +65,15 @@ export default function ResourceFinderScreen() {
 
         setResources(resourcesWithDistance);
         setFilteredResources(resourcesWithDistance);
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
         setLoading(false);
-      } catch (err) {
-        setError('Failed to load resources');
-        setLoading(false);
-        console.error(err);
       }
     };
 
-    initialize();
-  }, [distanceFilter]);
+    loadData();
+  }, []);
 
   useEffect(() => {
     // Apply filters
@@ -99,63 +87,94 @@ export default function ResourceFinderScreen() {
       );
     }
 
-    // Type filter
-    if (filters.type !== 'all') {
-      filtered = filtered.filter(resource => resource.type === filters.type);
+    // Type filters
+    if (filters.selectedTypes.length > 0) {
+      filtered = filtered.filter(resource =>
+        filters.selectedTypes.includes(resource.type)
+      );
     }
 
-    // Open now filter
-    if (filters.openNow) {
-      filtered = filtered.filter(resource => resource.open_now);
-    }
-
-    // Wheelchair accessible filter
-    if (filters.wheelchairAccessible) {
+    // Accessibility filters
+    if (filters.wheelchair) {
       filtered = filtered.filter(resource => resource.wheelchair_accessible);
     }
 
-    // Pet friendly filter
     if (filters.petFriendly) {
       filtered = filtered.filter(resource => resource.pet_friendly);
+    }
+
+    if (filters.openNow) {
+      filtered = filtered.filter(resource => resource.open_now);
     }
 
     setFilteredResources(filtered);
   }, [searchQuery, filters, resources]);
 
-  const toggleFilter = (filter: keyof typeof filters) => {
+  const toggleFilter = (filter: string) => {
     setFilters(prev => ({
       ...prev,
       [filter]: !prev[filter]
     }));
   };
 
-  const renderResourceItem = ({ item }: { item: Resource }) => (
+  const toggleTypeFilter = (type: string) => {
+    setFilters(prev => {
+      const newSelectedTypes = prev.selectedTypes.includes(type)
+        ? prev.selectedTypes.filter(t => t !== type)
+        : [...prev.selectedTypes, type];
+
+      return {
+        ...prev,
+        selectedTypes: newSelectedTypes
+      };
+    });
+  };
+
+  const renderResourceItem = ({ item }: { item: ResourceType }) => (
     <View style={styles.resourceCard}>
-      <Text style={styles.resourceName}>{item.name}</Text>
-      <Text style={styles.resourceType}>{item.type}</Text>
+      <View style={styles.resourceHeader}>
+        <FontAwesome
+          name={resourceTypes.find(t => t.id === item.type)?.icon || 'info'}
+          size={20}
+          color="#007AFF"
+        />
+        <Text style={styles.resourceName}>{item.name}</Text>
+      </View>
       <Text style={styles.resourceAddress}>{item.address}</Text>
-      <Text style={styles.resourceDistance}>{item.distance?.toFixed(1)} km away</Text>
       <View style={styles.resourceDetails}>
+        <Text style={styles.resourceDistance}>
+          {item.distance ? `${item.distance.toFixed(1)} km` : 'Distance unknown'}
+        </Text>
         <Text style={styles.resourceHours}>{item.hours}</Text>
-        <Text style={styles.resourcePhone}>{item.phone}</Text>
       </View>
       <View style={styles.resourceTags}>
-        {item.open_now && <Text style={styles.tag}>Open Now</Text>}
-        {item.wheelchair_accessible && <Text style={styles.tag}>Wheelchair Accessible</Text>}
-        {item.pet_friendly && <Text style={styles.tag}>Pet Friendly</Text>}
+        {item.wheelchair_accessible && (
+          <View style={styles.tag}>
+            <FontAwesome name="wheelchair" size={12} color="#4CAF50" />
+            <Text style={styles.tagText}>Wheelchair</Text>
+          </View>
+        )}
+        {item.pet_friendly && (
+          <View style={styles.tag}>
+            <FontAwesome name="paw" size={12} color="#FF9800" />
+            <Text style={styles.tagText}>Pet-friendly</Text>
+          </View>
+        )}
+        {item.open_now && (
+          <View style={[styles.tag, styles.openTag]}>
+            <FontAwesome name="clock-o" size={12} color="#2196F3" />
+            <Text style={[styles.tagText, styles.openTagText]}>Open now</Text>
+          </View>
+        )}
       </View>
       <View style={styles.resourceActions}>
         <TouchableOpacity style={styles.actionButton}>
-          <FontAwesome name="phone" size={20} color="#007AFF" />
+          <FontAwesome name="phone" size={16} color="#007AFF" />
           <Text style={styles.actionText}>Call</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton}>
-          <FontAwesome name="map-marker" size={20} color="#007AFF" />
+          <FontAwesome name="map-marker" size={16} color="#007AFF" />
           <Text style={styles.actionText}>Directions</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionButton}>
-          <FontAwesome name="bookmark" size={20} color="#007AFF" />
-          <Text style={styles.actionText}>Save</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -165,18 +184,7 @@ export default function ResourceFinderScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text>Loading resources...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => window.location.reload()}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.loadingText}>Loading resources...</Text>
       </View>
     );
   }
@@ -184,149 +192,156 @@ export default function ResourceFinderScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.searchContainer}>
+        <FontAwesome name="search" size={20} color="#888" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search resources..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
-        <TouchableOpacity style={styles.filterButton} onPress={() => setShowMap(!showMap)}>
-          <FontAwesome name={showMap ? "list" : "map"} size={20} color="#007AFF" />
-        </TouchableOpacity>
       </View>
 
       <View style={styles.filtersContainer}>
+        <Text style={styles.filtersTitle}>Filters</Text>
         <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Distance: {distanceFilter} km</Text>
-          <View style={styles.distanceSlider}>
-            <TouchableOpacity onPress={() => setDistanceFilter(Math.max(1, distanceFilter - 1))}>
-              <FontAwesome name="minus" size={20} color="#007AFF" />
-            </TouchableOpacity>
-            <Text style={styles.distanceValue}>{distanceFilter} km</Text>
-            <TouchableOpacity onPress={() => setDistanceFilter(distanceFilter + 1)}>
-              <FontAwesome name="plus" size={20} color="#007AFF" />
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filters.wheelchair && styles.filterChipActive
+            ]}
+            onPress={() => toggleFilter('wheelchair')}
+          >
+            <FontAwesome name="wheelchair" size={14} color={filters.wheelchair ? '#fff' : '#4CAF50'} />
+            <Text style={[
+              styles.filterChipText,
+              filters.wheelchair && styles.filterChipTextActive
+            ]}>Wheelchair</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filters.petFriendly && styles.filterChipActive
+            ]}
+            onPress={() => toggleFilter('petFriendly')}
+          >
+            <FontAwesome name="paw" size={14} color={filters.petFriendly ? '#fff' : '#FF9800'} />
+            <Text style={[
+              styles.filterChipText,
+              filters.petFriendly && styles.filterChipTextActive
+            ]}>Pet-friendly</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.filterChip,
+              filters.openNow && styles.filterChipActive
+            ]}
+            onPress={() => toggleFilter('openNow')}
+          >
+            <FontAwesome name="clock-o" size={14} color={filters.openNow ? '#fff' : '#2196F3'} />
+            <Text style={[
+              styles.filterChipText,
+              filters.openNow && styles.filterChipTextActive
+            ]}>Open now</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Type:</Text>
-          <View style={styles.typeFilters}>
+        <View style={styles.typeFiltersContainer}>
+          {resourceTypes.map(type => (
             <TouchableOpacity
-              style={[styles.typeButton, filters.type === 'all' && styles.typeButtonActive]}
-              onPress={() => setFilters(prev => ({ ...prev, type: 'all' }))}
+              key={type.id}
+              style={[
+                styles.typeFilterChip,
+                filters.selectedTypes.includes(type.id) && styles.typeFilterChipActive
+              ]}
+              onPress={() => toggleTypeFilter(type.id)}
             >
-              <Text style={styles.typeButtonText}>All</Text>
+              <FontAwesome
+                name={type.icon}
+                size={14}
+                color={filters.selectedTypes.includes(type.id) ? '#fff' : '#007AFF'}
+              />
+              <Text style={[
+                styles.typeFilterChipText,
+                filters.selectedTypes.includes(type.id) && styles.typeFilterChipTextActive
+              ]}>{type.name}</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, filters.type === 'shelter' && styles.typeButtonActive]}
-              onPress={() => setFilters(prev => ({ ...prev, type: 'shelter' }))}
-            >
-              <Text style={styles.typeButtonText}>Shelter</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, filters.type === 'food' && styles.typeButtonActive]}
-              onPress={() => setFilters(prev => ({ ...prev, type: 'food' }))}
-            >
-              <Text style={styles.typeButtonText}>Food</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.typeButton, filters.type === 'legal' && styles.typeButtonActive]}
-              onPress={() => setFilters(prev => ({ ...prev, type: 'legal' }))}
-            >
-              <Text style={styles.typeButtonText}>Legal</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.filterRow}>
-          <View style={styles.toggleFilter}>
-            <Text style={styles.filterLabel}>Open Now</Text>
-            <Switch
-              value={filters.openNow}
-              onValueChange={() => toggleFilter('openNow')}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={filters.openNow ? '#007AFF' : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.toggleFilter}>
-            <Text style={styles.filterLabel}>Wheelchair Accessible</Text>
-            <Switch
-              value={filters.wheelchairAccessible}
-              onValueChange={() => toggleFilter('wheelchairAccessible')}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={filters.wheelchairAccessible ? '#007AFF' : '#f4f3f4'}
-            />
-          </View>
-          <View style={styles.toggleFilter}>
-            <Text style={styles.filterLabel}>Pet Friendly</Text>
-            <Switch
-              value={filters.petFriendly}
-              onValueChange={() => toggleFilter('petFriendly')}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={filters.petFriendly ? '#007AFF' : '#f4f3f4'}
-            />
-          </View>
+          ))}
         </View>
       </View>
 
-      {showMap ? (
+      <View style={styles.viewToggleContainer}>
+        <TouchableOpacity
+          style={[
+            styles.viewToggleButton,
+            viewMode === 'list' && styles.viewToggleButtonActive
+          ]}
+          onPress={() => setViewMode('list')}
+        >
+          <FontAwesome name="list" size={16} color={viewMode === 'list' ? '#fff' : '#007AFF'} />
+          <Text style={[
+            styles.viewToggleText,
+            viewMode === 'list' && styles.viewToggleTextActive
+          ]}>List</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.viewToggleButton,
+            viewMode === 'map' && styles.viewToggleButtonActive
+          ]}
+          onPress={() => setViewMode('map')}
+        >
+          <FontAwesome name="map" size={16} color={viewMode === 'map' ? '#fff' : '#007AFF'} />
+          <Text style={[
+            styles.viewToggleText,
+            viewMode === 'map' && styles.viewToggleTextActive
+          ]}>Map</Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === 'list' ? (
+        <FlatList
+          data={filteredResources}
+          renderItem={renderResourceItem}
+          keyExtractor={item => item.id.toString()}
+          contentContainerStyle={styles.listContainer}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <FontAwesome name="search" size={40} color="#ccc" />
+              <Text style={styles.emptyText}>No resources found</Text>
+              <Text style={styles.emptySubtext}>Try adjusting your filters or search</Text>
+            </View>
+          }
+        />
+      ) : (
         <View style={styles.mapContainer}>
-          {userLocation && (
+          {location && (
             <MapView
               style={styles.map}
               initialRegion={{
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: 0.0922,
-                longitudeDelta: 0.0421,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                latitudeDelta: 0.05,
+                longitudeDelta: 0.05,
               }}
+              showsUserLocation={true}
             >
-              <Marker
-                coordinate={{
-                  latitude: userLocation.latitude,
-                  longitude: userLocation.longitude
-                }}
-                title="Your Location"
-                pinColor="blue"
-              />
               {filteredResources.map(resource => (
                 <Marker
                   key={resource.id}
                   coordinate={{
                     latitude: resource.latitude,
-                    longitude: resource.longitude
+                    longitude: resource.longitude,
                   }}
                   title={resource.name}
-                  description={resource.type}
+                  description={`${resource.distance?.toFixed(1)} km away`}
                 />
               ))}
             </MapView>
           )}
         </View>
-      ) : (
-        <FlatList
-          data={filteredResources}
-          renderItem={renderResourceItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No resources found matching your criteria</Text>
-              <TouchableOpacity style={styles.clearFiltersButton} onPress={() => {
-                setSearchQuery('');
-                setFilters({
-                  openNow: false,
-                  wheelchairAccessible: false,
-                  petFriendly: false,
-                  type: 'all'
-                });
-              }}>
-                <Text style={styles.clearFiltersText}>Clear Filters</Text>
-              </TouchableOpacity>
-            </View>
-          }
-        />
       )}
     </View>
   );
@@ -342,145 +357,161 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: 'red',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryText: {
-    color: 'white',
-    fontWeight: 'bold',
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   searchContainer: {
     flexDirection: 'row',
-    padding: 10,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    margin: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
-    borderColor: '#e0e0e0',
-    borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#f0f0f0',
-  },
-  filterButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 10,
+    fontSize: 16,
   },
   filtersContainer: {
-    padding: 10,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    paddingHorizontal: 10,
+    paddingBottom: 10,
+    backgroundColor: '#fff',
+  },
+  filtersTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
   },
   filterRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    marginBottom: 8,
   },
-  filterLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 10,
-  },
-  distanceSlider: {
+  filterChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
   },
-  distanceValue: {
-    marginHorizontal: 10,
-    fontSize: 14,
+  filterChipActive: {
+    backgroundColor: '#007AFF',
+  },
+  filterChipText: {
+    marginLeft: 4,
+    fontSize: 12,
     color: '#333',
   },
-  typeFilters: {
+  filterChipTextActive: {
+    color: '#fff',
+  },
+  typeFiltersContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 8,
   },
-  typeButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    marginRight: 5,
-    marginBottom: 5,
-  },
-  typeButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  typeButtonText: {
-    color: '#333',
-  },
-  toggleFilter: {
+  typeFilterChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15,
+    backgroundColor: '#e6f2ff',
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  typeFilterChipActive: {
+    backgroundColor: '#007AFF',
+  },
+  typeFilterChipText: {
+    marginLeft: 4,
+    fontSize: 12,
+    color: '#007AFF',
+  },
+  typeFilterChipTextActive: {
+    color: '#fff',
+  },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginVertical: 10,
+  },
+  viewToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginHorizontal: 4,
+  },
+  viewToggleButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  viewToggleText: {
+    marginLeft: 6,
+    fontSize: 14,
+    color: '#007AFF',
+  },
+  viewToggleTextActive: {
+    color: '#fff',
   },
   listContainer: {
-    padding: 10,
+    paddingHorizontal: 10,
+    paddingBottom: 20,
   },
   resourceCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     elevation: 2,
   },
-  resourceName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+  resourceHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 5,
   },
-  resourceType: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+  resourceName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+    color: '#333',
   },
   resourceAddress: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
-  },
-  resourceDistance: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   resourceDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  resourceDistance: {
+    fontSize: 14,
+    color: '#007AFF',
   },
   resourceHours: {
-    fontSize: 14,
-    color: '#666',
-  },
-  resourcePhone: {
     fontSize: 14,
     color: '#666',
   },
@@ -490,53 +521,69 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   tag: {
-    backgroundColor: '#e0f7fa',
-    color: '#00838f',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+    paddingVertical: 4,
+    marginRight: 6,
+    marginBottom: 6,
+  },
+  openTag: {
+    backgroundColor: '#e6f2ff',
+  },
+  tagText: {
+    marginLeft: 4,
     fontSize: 12,
-    marginRight: 5,
-    marginBottom: 5,
+    color: '#333',
+  },
+  openTagText: {
+    color: '#2196F3',
   },
   resourceActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginLeft: 8,
   },
   actionText: {
-    marginLeft: 5,
-    color: '#007AFF',
+    marginLeft: 6,
     fontSize: 14,
+    color: '#007AFF',
   },
   mapContainer: {
     flex: 1,
+    margin: 10,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   map: {
     flex: 1,
   },
-  emptyContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 10,
+    color: '#333',
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: '#666',
-    marginBottom: 20,
+    marginTop: 5,
     textAlign: 'center',
-  },
-  clearFiltersButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-  },
-  clearFiltersText: {
-    color: 'white',
-    fontWeight: 'bold',
   },
 });
