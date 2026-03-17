@@ -63,6 +63,14 @@ const SettingsScreen = () => {
           <Text style={styles.buttonText}>Terms of Service</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Premium Features</Text>
+        <Text style={styles.text}>Unlock advanced analytics with machine learning insights</Text>
+        <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
+          <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };

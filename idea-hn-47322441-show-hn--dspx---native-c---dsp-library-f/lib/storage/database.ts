@@ -85,6 +85,17 @@ export const initDatabase = async () => {
             UNIQUE(owner_email, member_email)
           );`
         );
+
+        // Create analytics reports table
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS analytics_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sensor_id TEXT NOT NULL,
+            generated_at INTEGER NOT NULL,
+            report_data TEXT NOT NULL,
+            FOREIGN KEY(sensor_id) REFERENCES sensors(id)
+          );`
+        );
       },
       (error) => {
         console.error('Database initialization failed:', error);
@@ -177,6 +188,44 @@ export const removeFamilyMember = async (ownerEmail: string, memberEmail: string
           'DELETE FROM family_sharing WHERE owner_email = ? AND member_email = ?',
           [ownerEmail, memberEmail],
           (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
+export const saveAnalyticsReport = async (sensorId: string, reportData: any) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'INSERT INTO analytics_reports (sensor_id, generated_at, report_data) VALUES (?, ?, ?)',
+          [sensorId, Date.now(), JSON.stringify(reportData)],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
+export const getAnalyticsReports = async (sensorId: string, limit: number = 5) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'SELECT * FROM analytics_reports WHERE sensor_id = ? ORDER BY generated_at DESC LIMIT ?',
+          [sensorId, limit],
+          (_, { rows }) => {
+            const reports = rows._array.map(row => ({
+              ...row,
+              reportData: JSON.parse(row.report_data)
+            }));
+            resolve(reports);
+          },
           (_, error) => reject(error)
         );
       },

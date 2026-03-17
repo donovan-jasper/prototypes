@@ -1,5 +1,6 @@
 import asyncio
 import os
+import subprocess
 import time
 import traceback
 import httpx
@@ -17,6 +18,16 @@ from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
 
 SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
+_state = {"llm_failures": 0}
+MAX_LLM_FAILURES_BEFORE_RESTART = 3
+
+
+def _restart_omniroute():
+    """Restart OmniRoute when it gets stuck."""
+    print("  [health] OmniRoute appears stuck, restarting...")
+    subprocess.run(["sudo", "systemctl", "restart", "omniroute"], timeout=15)
+    time.sleep(5)
+    print("  [health] OmniRoute restarted")
 
 
 async def analyze_batch(db: IdeaDB, limit: int = 10):
@@ -132,6 +143,7 @@ async def run_loop():
             if buildable:
                 print(f"\n=== BUILDING ===")
                 await build_next_prototype()
+                _state["llm_failures"] = 0
                 continue
 
             # Priority 2: Improve existing prototypes (make them shippable)
@@ -142,6 +154,7 @@ async def run_loop():
                 idea = improvable[0]
                 print(f"\n=== IMPROVING: {idea['title'][:50]} (round {idea.get('improvement_count', 0) + 1}) ===")
                 await improve_prototype(idea)
+                _state["llm_failures"] = 0
                 continue
 
             # Priority 3: Competition check for 7+ ideas (unlocks builds)
@@ -149,12 +162,14 @@ async def run_loop():
             if needs_comp:
                 print(f"\n=== COMPETITION CHECK (high priority) ===")
                 await competition_batch(db, limit=5)
+                _state["llm_failures"] = 0
                 continue
 
             # Priority 4: Analyze unscored ideas (small batches)
             if unanalyzed:
                 print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
                 await analyze_batch(db, limit=10)
+                _state["llm_failures"] = 0
                 continue
 
             # Priority 5: Competition check for lower-scoring ideas
@@ -162,6 +177,7 @@ async def run_loop():
             if needs_comp_low:
                 print(f"\n=== COMPETITION CHECK ===")
                 await competition_batch(db, limit=5)
+                _state["llm_failures"] = 0
                 continue
 
             # Priority 6: Scout for NEW ideas — only if backlog is low
@@ -176,11 +192,26 @@ async def run_loop():
             await asyncio.sleep(IDLE_SLEEP_MINUTES * 60)
 
         except Exception as e:
-            print(f"Daemon error: {type(e).__name__}: {e}\n{traceback.format_exc()[-500:]}")
+            err_name = type(e).__name__
             err_str = str(e)
-            if "429" not in err_str and "406" not in err_str and "circuit" not in err_str.lower() and "ReadTimeout" not in type(e).__name__:
-                await notify_daemon(f"Error: {err_str[:200]}", tags="warning")
-            await asyncio.sleep(60)
+            print(f"Daemon error: {err_name}: {e}\n{traceback.format_exc()[-500:]}")
+
+            # Track LLM failures and restart OmniRoute if stuck
+            if err_name in ("ReadTimeout", "RemoteProtocolError", "ConnectError"):
+                _state["llm_failures"] += 1
+                if _state["llm_failures"] >= MAX_LLM_FAILURES_BEFORE_RESTART:
+                    _restart_omniroute()
+                    _state["llm_failures"] = 0
+                await asyncio.sleep(30)
+            elif "429" in err_str:
+                # Rate limited — wait longer but reset failure count
+                _state["llm_failures"] = 0
+                await asyncio.sleep(90)
+            else:
+                _state["llm_failures"] = 0
+                if "406" not in err_str and "circuit" not in err_str.lower():
+                    await notify_daemon(f"Error: {err_str[:200]}", tags="warning")
+                await asyncio.sleep(60)
 
 
 def main():

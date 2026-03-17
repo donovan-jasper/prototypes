@@ -3,12 +3,17 @@ import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert } 
 import { useStore } from '@/store';
 
 const FamilySharingScreen = () => {
-  const { familyMembers, addFamilyMember, removeFamilyMember } = useStore();
+  const { familyMembers, addFamilyMember, removeFamilyMember, subscriptionStatus } = useStore();
   const [email, setEmail] = useState('');
 
   const handleAddMember = () => {
     if (!email) {
       Alert.alert('Error', 'Please enter an email address');
+      return;
+    }
+
+    if (subscriptionStatus !== 'premium') {
+      Alert.alert('Premium Feature', 'Family sharing requires a premium subscription');
       return;
     }
 
@@ -44,6 +49,15 @@ const FamilySharingScreen = () => {
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
+
+      {subscriptionStatus !== 'premium' && (
+        <View style={styles.premiumNotice}>
+          <Text style={styles.premiumText}>Family sharing is a premium feature</Text>
+          <TouchableOpacity style={styles.upgradeButton} onPress={() => useStore.getState().upgradeToPremium()}>
+            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <Text style={styles.subtitle}>Current Family Members ({familyMembers.length}/5)</Text>
 
@@ -99,6 +113,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  premiumNotice: {
+    backgroundColor: '#fff8e1',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  premiumText: {
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  upgradeButton: {
+    backgroundColor: '#ff9800',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  upgradeButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',

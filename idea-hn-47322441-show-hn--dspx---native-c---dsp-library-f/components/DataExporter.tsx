@@ -4,6 +4,7 @@ import { getSensorReadings } from '@/lib/storage/database';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { generateShareLink } from '@/lib/export/share';
+import { useStore } from '@/store';
 
 type DataExporterProps = {
   sensorId: string;
@@ -13,6 +14,7 @@ type DataExporterProps = {
 const DataExporter = ({ sensorId, sensorName }: DataExporterProps) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const { subscriptionStatus } = useStore();
 
   const exportToCSV = async () => {
     setIsExporting(true);
@@ -61,6 +63,17 @@ const DataExporter = ({ sensorId, sensorName }: DataExporterProps) => {
     }
   };
 
+  const generateAnalyticsReport = async () => {
+    if (subscriptionStatus !== 'premium') {
+      Alert.alert('Premium Feature', 'Advanced analytics requires a premium subscription');
+      return;
+    }
+
+    Alert.alert('Analytics Report', 'Generating machine learning insights...');
+    // In a real implementation, this would call a backend service
+    // to generate and return analytics reports
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Export Data</Text>
@@ -88,6 +101,15 @@ const DataExporter = ({ sensorId, sensorName }: DataExporterProps) => {
           <Text style={styles.buttonText}>Generate Shareable Link</Text>
         )}
       </TouchableOpacity>
+
+      {subscriptionStatus === 'premium' && (
+        <TouchableOpacity
+          style={[styles.button, styles.analyticsButton]}
+          onPress={generateAnalyticsReport}
+        >
+          <Text style={styles.buttonText}>Generate Analytics Report</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -113,6 +135,9 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     backgroundColor: '#2196F3',
+  },
+  analyticsButton: {
+    backgroundColor: '#9C27B0',
   },
   buttonText: {
     color: 'white',

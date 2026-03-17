@@ -14,9 +14,9 @@ type Sensor = {
 type Alert = {
   id: string;
   sensorId: string;
-  type: 'threshold' | 'disconnection' | 'battery';
+  type: 'threshold' | 'disconnection' | 'battery' | 'pattern';
   value?: number;
-  condition?: 'above' | 'below';
+  condition?: 'above' | 'below' | 'rising' | 'falling';
   hysteresis?: number;
   isActive: boolean;
 };
@@ -47,6 +47,7 @@ type StoreState = {
   upgradeToPremium: () => void;
   addFamilyMember: (email: string) => void;
   removeFamilyMember: (email: string) => void;
+  generateAnalyticsReport: (sensorId: string) => Promise<any>;
 };
 
 export const useStore = create<StoreState>()(
@@ -113,6 +114,38 @@ export const useStore = create<StoreState>()(
         set((state) => ({
           familyMembers: state.familyMembers.filter((member) => member !== email),
         })),
+
+      generateAnalyticsReport: async (sensorId) => {
+        const { subscriptionStatus } = useStore.getState();
+
+        if (subscriptionStatus !== 'premium') {
+          throw new Error('Analytics reports require a premium subscription');
+        }
+
+        // In a real implementation, this would call a backend service
+        // to generate and return analytics reports
+        return {
+          sensorId,
+          generatedAt: Date.now(),
+          insights: [
+            {
+              title: 'Daily Pattern Analysis',
+              description: 'Your sensor shows a consistent pattern with peaks at 8 AM and 8 PM',
+              confidence: 0.92
+            },
+            {
+              title: 'Anomaly Detection',
+              description: 'Unusual reading detected at 3:45 PM today - possible sensor issue',
+              confidence: 0.87
+            },
+            {
+              title: 'Correlation Analysis',
+              description: 'This sensor shows a strong correlation with your heart rate monitor',
+              confidence: 0.89
+            }
+          ]
+        };
+      }
     }),
     {
       name: 'sensor-sync-storage',
