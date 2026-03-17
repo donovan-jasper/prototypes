@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons, Card } from 'react-native-paper';
-import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme } from 'victory-native';
 import { useForm, Controller } from 'react-hook-form';
 import PremiumGate from '../components/PremiumGate';
 import { calculateEquityValue, calculateTaxImpact } from '../lib/calculations';
+import { useEquityStore } from '../store/equityStore';
+import ScenarioChart from '../components/ScenarioChart';
 
 interface ScenarioForm {
   valuation: string;
@@ -19,6 +20,8 @@ export default function ScenarioModeler() {
     taxImpact: number;
     chartData: { x: number; y: number }[];
   } | null>(null);
+
+  const { equities } = useEquityStore();
 
   const { control, handleSubmit, watch } = useForm<ScenarioForm>({
     defaultValues: {
@@ -35,18 +38,38 @@ export default function ScenarioModeler() {
     const valuation = parseFloat(data.valuation);
     const annualIncome = parseFloat(data.annualIncome);
 
-    // Simulate scenario calculation
-    const equityValue = calculateEquityValue(1000, 10, valuation / 1000000);
-    const taxImpact = calculateTaxImpact(equityValue, data.holdingPeriod, annualIncome);
+    // Calculate based on user's actual equity positions
+    let totalEquityValue = 0;
+    let totalTaxImpact = 0;
 
-    // Generate chart data
-    const chartData = Array.from({ length: 10 }, (_, i) => {
-      const x = i + 1;
-      const y = calculateEquityValue(1000, 10, (valuation / 1000000) * (1 + i * 0.1));
-      return { x, y };
+    equities.forEach(equity => {
+      const equityValue = calculateEquityValue(equity.shares, equity.strikePrice, valuation / 1000000);
+      const taxImpact = calculateTaxImpact(equityValue, data.holdingPeriod, annualIncome);
+      totalEquityValue += equityValue;
+      totalTaxImpact += taxImpact;
     });
 
-    setResults({ equityValue, taxImpact, chartData });
+    // Generate chart data based on user's equity
+    const chartData = Array.from({ length: 10 }, (_, i) => {
+      const x = i + 1;
+      let scenarioValue = 0;
+
+      equities.forEach(equity => {
+        scenarioValue += calculateEquityValue(
+          equity.shares,
+          equity.strikePrice,
+          (valuation / 1000000) * (1 + i * 0.1)
+        );
+      });
+
+      return { x, y: scenarioValue };
+    });
+
+    setResults({
+      equityValue: totalEquityValue,
+      taxImpact: totalTaxImpact,
+      chartData
+    });
   };
 
   return (
@@ -139,7 +162,7 @@ export default function ScenarioModeler() {
               <Text variant="titleMedium">Results</Text>
 
               <View style={styles.resultRow}>
-                <Text variant="bodyLarge">Equity Value:</Text>
+                <Text variant="bodyLarge">Total Equity Value:</Text>
                 <Text variant="bodyLarge" style={styles.resultValue}>
                   ${results.equityValue.toLocaleString()}
                 </Text>
@@ -152,31 +175,10 @@ export default function ScenarioModeler() {
                 </Text>
               </View>
 
-              <Text variant="bodyMedium" style={styles.chartTitle}>
-                Equity Value Projection
-              </Text>
-
-              <VictoryChart
-                theme={VictoryTheme.material}
-                height={300}
-                width={350}
-                padding={{ top: 20, bottom: 50, left: 50, right: 20 }}
-              >
-                <VictoryAxis
-                  dependentAxis
-                  tickFormat={(x) => `$${x / 1000}k`}
-                />
-                <VictoryAxis
-                  tickFormat={(x) => `${x * 10}%`}
-                />
-                <VictoryLine
-                  data={results.chartData}
-                  style={{
-                    data: { stroke: '#4CAF50' },
-                    parent: { border: '1px solid #ccc' }
-                  }}
-                />
-              </VictoryChart>
+              <ScenarioChart
+                data={results.chartData}
+                title="Equity Value Projection"
+              />
             </Card.Content>
           </Card>
         )}
@@ -215,10 +217,5 @@ const styles = StyleSheet.create({
   resultValue: {
     fontWeight: 'bold',
     color: '#4CAF50'
-  },
-  chartTitle: {
-    marginTop: 16,
-    marginBottom: 8,
-    textAlign: 'center'
   }
 });
