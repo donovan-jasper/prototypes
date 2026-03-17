@@ -1,20 +1,19 @@
 import { findMatches, generateCompatibilityInsights } from '../lib/ai/matchingEngine';
-import { getBehaviorVector } from '../lib/database/queries';
+import { getRemoteBehaviorVector } from '../lib/supabase'; // Import from Supabase
 
-jest.mock('../lib/database/queries');
+// Mock the entire lib/supabase module, but keep actual implementations for other functions
+jest.mock('../lib/supabase', () => ({
+  ...jest.requireActual('../lib/supabase'),
+  getRemoteBehaviorVector: jest.fn(), // Mock only getRemoteBehaviorVector
+}));
 
 describe('matchingEngine', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('should find matches based on behavior vectors', async () => {
-    const mockUserVector = {
-      id: 1,
-      user_id: 'user1',
-      vector_data: [0.5, 0.3, 0.7, 0.2],
-      updated_at: '2023-01-01T00:00:00Z',
-    };
+  it('should find matches based on behavior vectors from Supabase', async () => {
+    const mockUserVectorData = [0.5, 0.3, 0.7, 0.2];
 
     const mockPotentialMatches = [
       {
@@ -29,32 +28,61 @@ describe('matchingEngine', () => {
       },
     ];
 
-    const mockMatchVectors = [
-      {
-        id: 2,
-        user_id: 'user2',
-        vector_data: [0.6, 0.4, 0.5, 0.3],
-        updated_at: '2023-01-01T00:00:00Z',
-      },
-      {
-        id: 3,
-        user_id: 'user3',
-        vector_data: [0.4, 0.2, 0.6, 0.1],
-        updated_at: '2023-01-01T00:00:00Z',
-      },
-    ];
+    const mockMatchVectorData1 = [0.6, 0.4, 0.5, 0.3];
+    const mockMatchVectorData2 = [0.4, 0.2, 0.6, 0.1];
 
-    getBehaviorVector
-      .mockResolvedValueOnce(mockUserVector)
-      .mockResolvedValueOnce(mockMatchVectors[0])
-      .mockResolvedValueOnce(mockMatchVectors[1]);
+    // Mock the new getRemoteBehaviorVector function
+    (getRemoteBehaviorVector as jest.Mock)
+      .mockResolvedValueOnce(mockUserVectorData) // For the current user ('user1')
+      .mockResolvedValueOnce(mockMatchVectorData1) // For potentialMatch 'user2'
+      .mockResolvedValueOnce(mockMatchVectorData2); // For potentialMatch 'user3'
 
     const matches = await findMatches('user1', mockPotentialMatches);
+
+    expect(getRemoteBehaviorVector).toHaveBeenCalledTimes(3); // 1 for user1, 1 for user2, 1 for user3
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user1');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user2');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user3');
 
     expect(matches).toHaveLength(2);
     expect(matches[0].id).toBe('user2');
     expect(matches[1].id).toBe('user3');
     expect(matches[0].compatibilityScore).toBeGreaterThan(matches[1].compatibilityScore);
+  });
+
+  it('should handle missing user vector gracefully', async () => {
+    (getRemoteBehaviorVector as jest.Mock).mockResolvedValueOnce(null); // No vector for current user
+
+    const mockPotentialMatches = [
+      { id: 'user2', name: 'User 2', age: 25 },
+    ];
+
+    const matches = await findMatches('user1', mockPotentialMatches);
+    expect(matches).toHaveLength(0);
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user1');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledTimes(1); // Only tried to get user1's vector
+  });
+
+  it('should skip potential matches with missing vectors', async () => {
+    const mockUserVectorData = [0.5, 0.3, 0.7, 0.2];
+    const mockPotentialMatches = [
+      { id: 'user2', name: 'User 2', age: 25 },
+      { id: 'user3', name: 'User 3', age: 30 },
+    ];
+    const mockMatchVectorData2 = [0.6, 0.4, 0.5, 0.3];
+
+    (getRemoteBehaviorVector as jest.Mock)
+      .mockResolvedValueOnce(mockUserVectorData) // For current user
+      .mockResolvedValueOnce(mockMatchVectorData2) // For user2
+      .mockResolvedValueOnce(null); // No vector for user3
+
+    const matches = await findMatches('user1', mockPotentialMatches);
+    expect(matches).toHaveLength(1); // Only user2 should be matched
+    expect(matches[0].id).toBe('user2');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledTimes(3);
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user1');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user2');
+    expect(getRemoteBehaviorVector).toHaveBeenCalledWith('user3');
   });
 
   it('should generate compatibility insights', () => {
