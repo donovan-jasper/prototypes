@@ -1,10 +1,16 @@
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import * as Battery from 'expo-battery';
+import * as SecureStore from 'expo-secure-store';
 import { TaskExecutor } from '../ai/taskExecutor';
 import { Database } from '../storage/database';
 import { NotificationService } from '../notifications/notificationService';
 import { NightShiftSchedule } from '@/types';
+import { ModelLoader } from '../ai/modelLoader';
+import { ImageClassifier } from '../ai/imageClassifier';
+import { TextProcessor } from '../ai/textProcessor';
+import { BatteryMonitor } from './batteryMonitor';
+import { FileManager } from '../storage/fileManager';
 
 const NIGHT_SHIFT_TASK_NAME = 'night-shift-task';
 
