@@ -12,6 +12,7 @@ const FileCard = ({ file, onDelete }) => {
   };
 
   const formatTime = (hours) => {
+    if (hours < 1) return `${Math.floor(hours * 60)} minutes`;
     if (hours < 24) return `${hours} hours`;
     return `${Math.floor(hours / 24)} days`;
   };

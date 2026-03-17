@@ -9,7 +9,11 @@ const TransferProgress = ({ progress, isSending }) => {
       <Text style={styles.title}>
         {isSending ? 'Sending File' : 'Receiving File'}
       </Text>
-      <ProgressBar progress={progress / 100} style={styles.progressBar} />
+      <ProgressBar
+        progress={progress / 100}
+        style={styles.progressBar}
+        color={Colors.light.tint}
+      />
       <Text style={styles.percentage}>{progress}%</Text>
     </View>
   );
@@ -21,6 +25,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.card,
     borderRadius: 8,
     margin: 16,
+    elevation: 3,
   },
   title: {
     fontSize: 16,

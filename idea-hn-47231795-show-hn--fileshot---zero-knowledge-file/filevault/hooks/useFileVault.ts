@@ -23,6 +23,7 @@ export const useFileVault = () => {
     const file = await saveFile(name, JSON.stringify(encryptedData));
     await addFile(file);
     await refreshFiles();
+    return file;
   };
 
   const removeFile = async (id) => {
@@ -63,6 +64,15 @@ export const useFileVault = () => {
     await addNewFile('Received File', mockData);
   };
 
+  const getFile = async (id) => {
+    const fileInfo = await getFile(id);
+    const decryptedData = await decrypt(JSON.parse(fileInfo.data));
+    return {
+      ...fileInfo,
+      data: decryptedData
+    };
+  };
+
   return {
     files,
     refreshFiles,
@@ -71,5 +81,6 @@ export const useFileVault = () => {
     shareFile,
     validateLink,
     receiveFile,
+    getFile,
   };
 };

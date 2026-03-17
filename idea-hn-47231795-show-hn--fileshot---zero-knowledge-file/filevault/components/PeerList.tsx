@@ -1,14 +1,26 @@
-import React, { useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { Text, ActivityIndicator } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useP2PTransfer } from '@/hooks/useP2PTransfer';
 import { Colors } from '@/constants/Colors';
 
 const PeerList = ({ onSelectPeer }) => {
   const { peers, discoverPeers, isTransferring } = useP2PTransfer();
+  const [isDiscovering, setIsDiscovering] = useState(false);
+
+  const refreshPeers = async () => {
+    setIsDiscovering(true);
+    try {
+      await discoverPeers();
+    } catch (error) {
+      console.error('Discovery error:', error);
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
 
   useEffect(() => {
-    discoverPeers();
+    refreshPeers();
   }, []);
 
   if (isTransferring) {
@@ -20,11 +32,23 @@ const PeerList = ({ onSelectPeer }) => {
     );
   }
 
+  if (isDiscovering) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator animating={true} size="large" />
+        <Text style={styles.loadingText}>Searching for devices...</Text>
+      </View>
+    );
+  }
+
   if (peers.length === 0) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No devices found on your network</Text>
         <Text style={styles.hintText}>Make sure both devices are on the same WiFi network</Text>
+        <TouchableOpacity onPress={refreshPeers} style={styles.refreshButton}>
+          <Text style={styles.refreshText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -95,6 +119,16 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: Colors.light.text,
+  },
+  refreshButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: Colors.light.tint,
+    borderRadius: 5,
+  },
+  refreshText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

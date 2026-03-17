@@ -17,9 +17,9 @@ export default function ShareScreen() {
   const [expiration, setExpiration] = useState(24);
   const [showPeerList, setShowPeerList] = useState(false);
   const [selectedPeer, setSelectedPeer] = useState(null);
-  const { shareFile } = useFileVault();
-  const { canShare, showPremiumGate } = useSubscription();
-  const { isTransferring, progress, sendFileP2P } = useP2PTransfer();
+  const { shareFile, addNewFile } = useFileVault();
+  const { canShare, showPremiumGate, incrementShareCount } = useSubscription();
+  const { isTransferring, progress, sendFileP2P, discoverPeers } = useP2PTransfer();
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -29,7 +29,15 @@ export default function ShareScreen() {
     });
 
     if (!result.canceled) {
-      setFile(result.assets[0]);
+      const asset = result.assets[0];
+      const fileData = await fetch(asset.uri);
+      const blob = await fileData.blob();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        await addNewFile(asset.fileName || 'image.jpg', reader.result);
+        setFile({ id: Date.now().toString(), name: asset.fileName || 'image.jpg' });
+      };
+      reader.readAsDataURL(blob);
     }
   };
 
@@ -39,7 +47,14 @@ export default function ShareScreen() {
     });
 
     if (result.type === 'success') {
-      setFile(result);
+      const fileData = await fetch(result.uri);
+      const blob = await fileData.blob();
+      const reader = new FileReader();
+      reader.onload = async () => {
+        await addNewFile(result.name, reader.result);
+        setFile({ id: Date.now().toString(), name: result.name });
+      };
+      reader.readAsDataURL(blob);
     }
   };
 
@@ -54,15 +69,40 @@ export default function ShareScreen() {
       return;
     }
 
-    setShowPeerList(true);
+    try {
+      const link = await shareFile(file, expiration);
+      Alert.alert('Share Link', `Share this link: ${link}`);
+      incrementShareCount();
+    } catch (error) {
+      Alert.alert('Error', error.message);
+    }
   };
 
-  const handlePeerSelect = (peerId) => {
+  const handleP2PShare = async () => {
+    if (!file) {
+      Alert.alert('No file selected', 'Please select a file to share');
+      return;
+    }
+
+    try {
+      await discoverPeers();
+      setShowPeerList(true);
+    } catch (error) {
+      Alert.alert('Error', 'Could not discover devices on your network');
+    }
+  };
+
+  const handlePeerSelect = async (peerId) => {
     setSelectedPeer(peerId);
     setShowPeerList(false);
-    // In a real app, you would start the transfer here
+
     if (file) {
-      sendFileP2P(file.id, peerId);
+      try {
+        await sendFileP2P(file.id, peerId);
+        incrementShareCount();
+      } catch (error) {
+        Alert.alert('Transfer Failed', error.message);
+      }
     }
   };
 
@@ -90,7 +130,7 @@ export default function ShareScreen() {
       {file && (
         <>
           <Text style={styles.fileInfo}>
-            Selected: {file.name || file.fileName || 'Unnamed file'}
+            Selected: {file.name}
           </Text>
           <ExpirationPicker
             value={expiration}
@@ -106,7 +146,7 @@ export default function ShareScreen() {
           </Button>
           <Button
             mode="outlined"
-            onPress={() => setShowPeerList(true)}
+            onPress={handleP2PShare}
             style={styles.p2pButton}
             icon="lan"
           >
