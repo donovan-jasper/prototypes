@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useGiftStore } from '../../store/giftStore';
+import useGiftStore from '../../store/giftStore';
 import RestaurantPicker from '../../components/RestaurantPicker';
 import MessageComposer from '../../components/MessageComposer';
 
@@ -10,23 +10,35 @@ const SendGiftScreen = () => {
   const [recipientName, setRecipientName] = useState('');
   const [restaurant, setRestaurant] = useState(null);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
   const { addGift } = useGiftStore();
   const router = useRouter();
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (step === 1 && recipientName) {
       setStep(2);
     } else if (step === 2 && restaurant) {
       setStep(3);
     } else if (step === 3 && message) {
-      const newGift = {
-        recipientName,
-        restaurant: restaurant.name,
-        message,
-        status: 'preparing',
-      };
-      addGift(newGift);
-      router.push('/(tabs)/history');
+      setLoading(true);
+      try {
+        const newGift = {
+          recipientName,
+          restaurant: restaurant.name,
+          message,
+          status: 'preparing',
+        };
+        await addGift(newGift);
+        router.push('/(tabs)/history');
+      } catch (error) {
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to send gift. Please try again.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -56,8 +68,14 @@ const SendGiftScreen = () => {
           <MessageComposer onMessageChange={setMessage} />
         </View>
       )}
-      <TouchableOpacity style={styles.button} onPress={handleNext}>
-        <Text style={styles.buttonText}>{step === 3 ? 'Send Gift' : 'Next'}</Text>
+      <TouchableOpacity 
+        style={[styles.button, loading && styles.buttonDisabled]} 
+        onPress={handleNext}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? 'Sending...' : step === 3 ? 'Send Gift' : 'Next'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -92,6 +110,9 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 5,
     marginTop: 20,
+  },
+  buttonDisabled: {
+    backgroundColor: '#A5D6A7',
   },
   buttonText: {
     color: 'white',

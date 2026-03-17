@@ -1,7 +1,25 @@
+import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { initDatabase } from '../services/database';
+import useGiftStore from '../store/giftStore';
 
 export default function TabLayout() {
+  const { loadGifts } = useGiftStore();
+
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        await initDatabase();
+        await loadGifts();
+      } catch (error) {
+        console.error('Failed to initialize app:', error);
+      }
+    };
+
+    initialize();
+  }, []);
+
   return (
     <Tabs>
       <Tabs.Screen
