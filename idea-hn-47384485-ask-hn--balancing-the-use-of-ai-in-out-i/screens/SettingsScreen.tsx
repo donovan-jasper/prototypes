@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, ScrollView, Alert } from 'react-native';
 
 const SettingsScreen = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -8,7 +8,21 @@ const SettingsScreen = () => {
 
   const toggleNotifications = () => setNotificationsEnabled(previousState => !previousState);
   const toggleDarkMode = () => setDarkModeEnabled(previousState => !previousState);
-  const togglePremium = () => setPremiumEnabled(previousState => !previousState);
+
+  const togglePremium = () => {
+    if (!premiumEnabled) {
+      Alert.alert(
+        "Upgrade to Premium",
+        "You're about to upgrade to the premium version for $6.99/month. This will enable all premium features including real-time message analysis in browser extensions.",
+        [
+          { text: "Cancel" },
+          { text: "Upgrade", onPress: () => setPremiumEnabled(true) }
+        ]
+      );
+    } else {
+      setPremiumEnabled(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -47,14 +61,14 @@ const SettingsScreen = () => {
         <View style={styles.premiumInfo}>
           <Text style={styles.premiumTitle}>Premium Features:</Text>
           <Text style={styles.premiumFeature}>- Unlimited analyses</Text>
-          <Text style={styles.premiumFeature}>- Advanced detection</Text>
-          <Text style={styles.premiumFeature}>- Unlimited conversation history</Text>
+          <Text style={styles.premiumFeature}>- Advanced detection (identifies specific AI models)</Text>
+          <Text style={styles.premiumFeature}>- Unlimited conversation history with search</Text>
           <Text style={styles.premiumFeature}>- Multi-platform relationship tracking</Text>
           <Text style={styles.premiumFeature}>- Response coaching with personalized strategies</Text>
           <Text style={styles.premiumFeature}>- Authenticity trend alerts</Text>
-          <Text style={styles.premiumFeature}>- Export detailed reports</Text>
-          <Text style={styles.premiumFeature}>- Priority cloud processing</Text>
-          <Text style={styles.premiumFeature}>- Browser extension for desktop messaging</Text>
+          <Text style={styles.premiumFeature}>- Export detailed reports (PDF/CSV)</Text>
+          <Text style={styles.premiumFeature}>- Priority cloud processing (faster results)</Text>
+          <Text style={styles.premiumFeature}>- Browser extension for desktop messaging (NEW!)</Text>
         </View>
       )}
       <TouchableOpacity style={styles.button}>

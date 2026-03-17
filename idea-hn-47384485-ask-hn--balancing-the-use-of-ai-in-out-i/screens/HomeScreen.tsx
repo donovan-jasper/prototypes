@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Platform, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as SQLite from 'expo-sqlite';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
   const [message, setMessage] = useState('');
@@ -12,6 +13,9 @@ const HomeScreen = () => {
   const [authenticityStatus, setAuthenticityStatus] = useState('');
   const [db, setDb] = useState<SQLite.SQLiteDatabase | null>(null);
   const [platform, setPlatform] = useState('');
+  const [isPremium, setIsPremium] = useState(false);
+  const [analysisCount, setAnalysisCount] = useState(0);
+  const navigation = useNavigation();
 
   useEffect(() => {
     const initDb = async () => {
@@ -36,6 +40,18 @@ const HomeScreen = () => {
   const analyzeMessage = async () => {
     if (!db) return;
 
+    if (!isPremium && analysisCount >= 10) {
+      Alert.alert(
+        "Premium Feature",
+        "You've reached your daily limit of 10 analyses. Upgrade to premium for unlimited analyses.",
+        [
+          { text: "Cancel" },
+          { text: "Upgrade", onPress: () => navigation.navigate('Settings') }
+        ]
+      );
+      return;
+    }
+
     const score = Math.floor(Math.random() * 100) + 1;
     let status = '';
 
@@ -49,6 +65,7 @@ const HomeScreen = () => {
 
     setAuthenticityScore(score);
     setAuthenticityStatus(status);
+    setAnalysisCount(prev => prev + 1);
 
     await db.runAsync(
       'INSERT INTO messages (text, score, status, platform) VALUES (?, ?, ?, ?);',
@@ -82,6 +99,12 @@ const HomeScreen = () => {
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>AuthentiChat</Text>
       <Text style={styles.subtitle}>Analyze message authenticity</Text>
+
+      {!isPremium && (
+        <View style={styles.limitContainer}>
+          <Text style={styles.limitText}>Free tier: {10 - analysisCount} analyses remaining today</Text>
+        </View>
+      )}
 
       <View style={styles.platformSelector}>
         <Text style={styles.platformLabel}>Platform:</Text>
@@ -151,6 +174,16 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     marginBottom: 20,
+    textAlign: 'center',
+    color: '#666',
+  },
+  limitContainer: {
+    backgroundColor: '#f5f5f5',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  limitText: {
     textAlign: 'center',
     color: '#666',
   },
