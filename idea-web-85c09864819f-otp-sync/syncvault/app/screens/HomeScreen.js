@@ -10,7 +10,7 @@ const HomeScreen = () => {
   const [smss, setSmss] = useState([]);
 
   useEffect(() => {
-    // Fetch OTPs and SMSs from the server or local storage
+    // Initial fetch
     const fetchData = async () => {
       const otps = await generateOTP();
       const smss = await getSMSS();
@@ -19,6 +19,14 @@ const HomeScreen = () => {
     };
 
     fetchData();
+
+    // Update OTP codes every second
+    const interval = setInterval(async () => {
+      const updatedOtps = await generateOTP();
+      setOtps(updatedOtps);
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -36,11 +44,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 16,
+    marginTop: 40,
   },
   sectionTitle: {
     fontSize: 20,
