@@ -1,50 +1,76 @@
-import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-react-native';
-import { getAppUsage } from '../database';
+import * as SQLite from 'expo-sqlite';
 
-let model: tf.LayersModel | null = null;
+const db = SQLite.openDatabase('flowhome.db');
 
-export const initModel = async () => {
-  await tf.ready();
-  model = tf.sequential();
-  model.add(tf.layers.dense({ units: 10, inputShape: [3], activation: 'relu' }));
-  model.add(tf.layers.dense({ units: 8, activation: 'softmax' }));
-  model.compile({ optimizer: 'adam', loss: 'categoricalCrossentropy' });
-};
+interface AppUsageCount {
+  package_name: string;
+  count: number;
+}
 
-export const trainModel = async () => {
-  if (!model) {
-    await initModel();
-  }
-
-  getAppUsage(async (usage) => {
-    const inputs: number[][] = [];
-    const outputs: number[][] = [];
-
-    usage.forEach((item) => {
-      const hour = new Date(item.timestamp).getHours();
-      const dayOfWeek = new Date(item.timestamp).getDay();
-      const locationId = item.context_location === 'home' ? 0 : item.context_location === 'work' ? 1 : 2;
-
-      inputs.push([hour, dayOfWeek, locationId]);
-      outputs.push([usage.filter(u => u.package_name === item.package_name).length]);
+export const getTopAppsByContext = (
+  hour: number,
+  dayOfWeek: number,
+  location: string
+): Promise<string[]> => {
+  return new Promise((resolve) => {
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT package_name, COUNT(*) as count 
+         FROM app_usage 
+         WHERE context_time = ? AND context_location = ?
+         GROUP BY package_name 
+         ORDER BY count DESC 
+         LIMIT 8;`,
+        [getTimeContext(hour), location],
+        (_, { rows }) => {
+          const results = rows._array as AppUsageCount[];
+          resolve(results.map((row) => row.package_name));
+        },
+        (_, error) => {
+          console.error('Error querying top apps by context:', error);
+          resolve([]);
+          return false;
+        }
+      );
     });
-
-    const xs = tf.tensor2d(inputs);
-    const ys = tf.tensor2d(outputs);
-
-    await model?.fit(xs, ys, { epochs: 10 });
   });
 };
 
-export const predictApps = async (hour: number, dayOfWeek: number, locationId: number) => {
-  if (!model) {
-    await initModel();
+export const getGlobalTopApps = (): Promise<string[]> => {
+  return new Promise((resolve) => {
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    
+    db.transaction((tx) => {
+      tx.executeSql(
+        `SELECT package_name, COUNT(*) as count 
+         FROM app_usage 
+         WHERE timestamp >= ?
+         GROUP BY package_name 
+         ORDER BY count DESC 
+         LIMIT 8;`,
+        [sevenDaysAgo],
+        (_, { rows }) => {
+          const results = rows._array as AppUsageCount[];
+          resolve(results.map((row) => row.package_name));
+        },
+        (_, error) => {
+          console.error('Error querying global top apps:', error);
+          resolve([]);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+const getTimeContext = (hour: number): string => {
+  if (hour >= 6 && hour < 9) {
+    return 'morning';
+  } else if (hour >= 9 && hour < 17) {
+    return 'work';
+  } else if (hour >= 17 && hour < 22) {
+    return 'evening';
+  } else {
+    return 'night';
   }
-
-  const input = tf.tensor2d([[hour, dayOfWeek, locationId]]);
-  const prediction = model?.predict(input) as tf.Tensor;
-  const probabilities = await prediction.data();
-
-  return probabilities;
 };

@@ -1,5 +1,5 @@
 import create from 'zustand';
-import { predictApps } from '@/lib/ml/predictor';
+import { getTopAppsByContext, getGlobalTopApps } from '@/lib/ml/predictor';
 import { detectContext } from '@/lib/context/detector';
 
 interface PredictionsState {
@@ -13,10 +13,13 @@ export const usePredictionsStore = create<PredictionsState>((set) => ({
     const context = await detectContext();
     const hour = new Date().getHours();
     const dayOfWeek = new Date().getDay();
-    const locationId = context.location === 'home' ? 0 : context.location === 'work' ? 1 : 2;
 
-    const predictions = await predictApps(hour, dayOfWeek, locationId);
-    const predictedApps = predictions.map((_, index) => index.toString());
-    set({ predictedApps });
+    let predictions = await getTopAppsByContext(hour, dayOfWeek, context.location);
+    
+    if (predictions.length === 0) {
+      predictions = await getGlobalTopApps();
+    }
+
+    set({ predictedApps: predictions });
   },
 }));
