@@ -30,3 +30,11 @@ export async function updatePostStatus(id: string, status: 'published' | 'failed
     console.log('[DB] Post status updated:', id, status);
   }
 }
+
+export async function deleteScheduledPost(id: string): Promise<void> {
+  const index = scheduledPosts.findIndex(p => p.id === id);
+  if (index !== -1) {
+    scheduledPosts.splice(index, 1);
+    console.log('[DB] Scheduled post deleted:', id);
+  }
+}
