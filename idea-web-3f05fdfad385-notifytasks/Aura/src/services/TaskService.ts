@@ -2,7 +2,13 @@ import db from './DatabaseService';
 import { Task } from '../types/TaskTypes';
 import { AppConstants } from '../constants/AppConstants';
 
+let isPremium = false;
+
 export const TaskService = {
+  setPremiumStatus: (status: boolean) => {
+    isPremium = status;
+  },
+
   addTask: async (content: string, type: 'note' | 'task' | 'reminder', dueDate?: Date) => {
     return new Promise<void>((resolve, reject) => {
       db.transaction(
@@ -138,7 +144,6 @@ export const TaskService = {
     const tasks = await TaskService.getTasks();
     const activeTasks = tasks.filter((task) => !task.isCompleted);
 
-    // Apply free tier limits
     if (!isPremium) {
       return activeTasks.slice(0, AppConstants.MAX_FREE_GLANCEABLE_TASKS);
     }

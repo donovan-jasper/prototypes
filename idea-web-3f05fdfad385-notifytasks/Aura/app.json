@@ -6,6 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "userInterfaceStyle": "automatic",
+    "scheme": "aura",
     "splash": {
       "image": "./assets/images/splash.png",
       "resizeMode": "contain",
@@ -22,7 +23,15 @@
       "bundleIdentifier": "com.yourcompany.aura",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"],
-        "NSLocationWhenInUseUsageDescription": "This app uses your location to provide location-based reminders."
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to provide location-based reminders.",
+        "CFBundleURLTypes": [
+          {
+            "CFBundleURLSchemes": ["aura"]
+          }
+        ]
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.yourcompany.aura"]
       }
     },
     "android": {
@@ -34,6 +43,17 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "aura"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
       ]
     },
     "plugins": [

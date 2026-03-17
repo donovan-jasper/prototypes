@@ -3,6 +3,7 @@ import { Task } from '../types/TaskTypes';
 import { TaskService } from '../services/TaskService';
 import { NotificationService } from '../services/NotificationService';
 import { WidgetService } from '../services/WidgetService';
+import { usePremiumStatus } from '../hooks/usePremiumStatus';
 
 interface TaskContextType {
   tasks: Task[];
@@ -16,6 +17,11 @@ const TaskContext = createContext<TaskContextType | undefined>(undefined);
 
 export const TaskProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const isPremium = usePremiumStatus();
+
+  useEffect(() => {
+    TaskService.setPremiumStatus(isPremium);
+  }, [isPremium]);
 
   const refreshTasks = async () => {
     const fetchedTasks = await TaskService.getTasks();
