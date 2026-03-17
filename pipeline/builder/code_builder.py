@@ -14,14 +14,14 @@ async def llm_call(client: httpx.AsyncClient, model: str, messages: list[dict], 
             resp = await client.post(
                 f"{OMNIROUTE_BASE}/chat/completions",
                 json={"model": model, "messages": messages, "temperature": temperature},
-                timeout=120,
+                timeout=60,
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429 and attempt < MAX_429_RETRIES - 1:
+            if e.response.status_code in (429, 503) and attempt < MAX_429_RETRIES - 1:
                 delay = RETRY_DELAYS[attempt]
-                print(f"    [llm] 429 rate limited, waiting {delay}s (attempt {attempt + 1}/{MAX_429_RETRIES})")
+                print(f"    [llm] {e.response.status_code}, waiting {delay}s (attempt {attempt + 1}/{MAX_429_RETRIES})")
                 await asyncio.sleep(delay)
                 continue
             raise

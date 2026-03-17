@@ -19,7 +19,7 @@ from builder.improver import improve_prototype
 
 SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
 _state = {"llm_failures": 0}
-MAX_LLM_FAILURES_BEFORE_RESTART = 3
+MAX_LLM_FAILURES_BEFORE_RESTART = 2
 
 
 def _restart_omniroute():
