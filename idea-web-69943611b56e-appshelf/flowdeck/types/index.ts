@@ -29,3 +29,9 @@ export interface Gesture {
   pattern: { x: number; y: number }[];
   action: string;
 }
+
+declare global {
+  type Mode = import('./index').Mode;
+  type App = import('./index').App;
+  type Gesture = import('./index').Gesture;
+}
