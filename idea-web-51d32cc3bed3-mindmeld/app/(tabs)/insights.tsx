@@ -1,19 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { useReminders } from '../../store/reminders';
 import { useHabits } from '../../store/habits';
 import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
-import { format, parseISO, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval } from 'date-fns';
+import { format, parseISO, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, getHours } from 'date-fns';
+import { analyzePatterns } from '../../lib/ml-engine';
+import SmartSuggestion from '../../components/SmartSuggestion';
 
 const screenWidth = Dimensions.get('window').width;
+
+interface TimePattern {
+  hour: number;
+  count: number;
+  completionRate: number;
+}
+
+interface TaskPattern {
+  title: string;
+  count: number;
+  completionRate: number;
+}
 
 export default function InsightsScreen() {
   const { reminders } = useReminders();
   const { habits } = useHabits();
   const [completionRate, setCompletionRate] = useState(0);
-  const [busiestTimes, setBusiestTimes] = useState<{ hour: number; count: number }[]>([]);
-  const [forgottenTasks, setForgottenTasks] = useState<{ title: string; count: number }[]>([]);
+  const [timePatterns, setTimePatterns] = useState<TimePattern[]>([]);
+  const [taskPatterns, setTaskPatterns] = useState<TaskPattern[]>([]);
   const [weeklyCompletion, setWeeklyCompletion] = useState<{ date: string; completed: number; total: number }[]>([]);
+  const [suggestedTimes, setSuggestedTimes] = useState<string[]>([]);
 
   useEffect(() => {
     // Calculate completion rate
@@ -21,35 +36,58 @@ export default function InsightsScreen() {
     const totalReminders = reminders.length;
     setCompletionRate(totalReminders > 0 ? (completedReminders / totalReminders) * 100 : 0);
 
-    // Calculate busiest times
-    const timeCounts: Record<number, number> = {};
+    // Calculate time patterns
+    const timeCounts: Record<number, { completed: number; total: number }> = {};
+
     reminders.forEach(reminder => {
       const date = parseISO(reminder.date);
       const hour = date.getHours();
-      timeCounts[hour] = (timeCounts[hour] || 0) + 1;
-    });
 
-    const sortedTimes = Object.entries(timeCounts)
-      .map(([hour, count]) => ({ hour: parseInt(hour), count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
+      if (!timeCounts[hour]) {
+        timeCounts[hour] = { completed: 0, total: 0 };
+      }
 
-    setBusiestTimes(sortedTimes);
-
-    // Calculate forgotten tasks
-    const forgottenCounts: Record<string, number> = {};
-    reminders.forEach(reminder => {
-      if (!reminder.completed) {
-        forgottenCounts[reminder.title] = (forgottenCounts[reminder.title] || 0) + 1;
+      timeCounts[hour].total += 1;
+      if (reminder.completed) {
+        timeCounts[hour].completed += 1;
       }
     });
 
-    const sortedForgotten = Object.entries(forgottenCounts)
-      .map(([title, count]) => ({ title, count }))
-      .sort((a, b) => b.count - a.count)
+    const sortedTimes = Object.entries(timeCounts)
+      .map(([hour, counts]) => ({
+        hour: parseInt(hour),
+        count: counts.total,
+        completionRate: counts.total > 0 ? (counts.completed / counts.total) * 100 : 0
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate)
       .slice(0, 3);
 
-    setForgottenTasks(sortedForgotten);
+    setTimePatterns(sortedTimes);
+
+    // Calculate task patterns
+    const taskCounts: Record<string, { completed: number; total: number }> = {};
+
+    reminders.forEach(reminder => {
+      if (!taskCounts[reminder.title]) {
+        taskCounts[reminder.title] = { completed: 0, total: 0 };
+      }
+
+      taskCounts[reminder.title].total += 1;
+      if (reminder.completed) {
+        taskCounts[reminder.title].completed += 1;
+      }
+    });
+
+    const sortedTasks = Object.entries(taskCounts)
+      .map(([title, counts]) => ({
+        title,
+        count: counts.total,
+        completionRate: counts.total > 0 ? (counts.completed / counts.total) * 100 : 0
+      }))
+      .sort((a, b) => b.completionRate - a.completionRate)
+      .slice(0, 3);
+
+    setTaskPatterns(sortedTasks);
 
     // Calculate weekly completion
     const now = new Date();
@@ -70,6 +108,10 @@ export default function InsightsScreen() {
     });
 
     setWeeklyCompletion(weeklyData);
+
+    // Analyze patterns for suggested times
+    const patterns = analyzePatterns(reminders);
+    setSuggestedTimes(patterns.suggestions);
   }, [reminders]);
 
   const chartConfig = {
@@ -79,6 +121,11 @@ export default function InsightsScreen() {
     strokeWidth: 2,
     barPercentage: 0.5,
     useShadowColorFromDataset: false,
+  };
+
+  const handleAcceptSuggestion = (suggestion: string) => {
+    // In a real app, this would add the suggestion as a new reminder
+    console.log('Accepted suggestion:', suggestion);
   };
 
   return (
@@ -91,6 +138,21 @@ export default function InsightsScreen() {
         <Text style={styles.completionText}>
           {reminders.filter(r => r.completed).length} of {reminders.length} tasks completed
         </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Suggested Times</Text>
+        {suggestedTimes.length > 0 ? (
+          suggestedTimes.map((suggestion, index) => (
+            <SmartSuggestion
+              key={index}
+              suggestion={suggestion}
+              onAccept={() => handleAcceptSuggestion(suggestion)}
+            />
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No suggestions yet. Complete more tasks to see patterns.</Text>
+        )}
       </View>
 
       <View style={styles.card}>
@@ -116,32 +178,32 @@ export default function InsightsScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Busiest Times</Text>
+        <Text style={styles.cardTitle}>Best Times for Tasks</Text>
         <BarChart
           data={{
-            labels: busiestTimes.map(item => `${item.hour}:00`),
+            labels: timePatterns.map(item => `${item.hour}:00`),
             datasets: [
               {
-                data: busiestTimes.map(item => item.count)
+                data: timePatterns.map(item => item.completionRate)
               }
             ]
           }}
           width={screenWidth - 40}
           height={220}
           yAxisLabel=""
-          yAxisSuffix=""
+          yAxisSuffix="%"
           chartConfig={chartConfig}
           style={styles.chart}
         />
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Most Forgotten Tasks</Text>
-        {forgottenTasks.length > 0 ? (
+        <Text style={styles.cardTitle}>Most Consistent Tasks</Text>
+        {taskPatterns.length > 0 ? (
           <PieChart
-            data={forgottenTasks.map((task, index) => ({
+            data={taskPatterns.map((task, index) => ({
               name: task.title,
-              population: task.count,
+              population: task.completionRate,
               color: `hsl(${(index * 120) % 360}, 70%, 50%)`,
               legendFontColor: '#7F7F7F',
               legendFontSize: 12,
@@ -155,7 +217,7 @@ export default function InsightsScreen() {
             style={styles.chart}
           />
         ) : (
-          <Text style={styles.emptyText}>No forgotten tasks yet</Text>
+          <Text style={styles.emptyText}>No task patterns yet</Text>
         )}
       </View>
 

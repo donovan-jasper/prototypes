@@ -9,9 +9,9 @@ interface SmartSuggestionProps {
 export default function SmartSuggestion({ suggestion, onAccept }: SmartSuggestionProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.text}>Suggested: {suggestion}</Text>
-      <TouchableOpacity onPress={onAccept}>
-        <Text style={styles.link}>Add to reminders</Text>
+      <Text style={styles.text}>{suggestion}</Text>
+      <TouchableOpacity onPress={onAccept} style={styles.button}>
+        <Text style={styles.buttonText}>Apply Suggestion</Text>
       </TouchableOpacity>
     </View>
   );
@@ -26,9 +26,17 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 16,
+    marginBottom: 10,
   },
-  link: {
-    color: '#007AFF',
-    marginTop: 5,
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
