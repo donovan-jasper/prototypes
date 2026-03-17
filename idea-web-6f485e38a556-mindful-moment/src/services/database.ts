@@ -38,7 +38,7 @@ export const initializeDatabase = async () => {
           completed_at TEXT NOT NULL,
           mood_rating INTEGER,
           context TEXT,
-          FOREIGN KEY (moment_id) REFERENCES moments(id)
+          FOREIGN KEY (moment_id) REFERENCES moments (id)
         );`
       );
 
@@ -50,13 +50,13 @@ export const initializeDatabase = async () => {
           preferred_categories TEXT DEFAULT '["Calm","Focus","Energy"]',
           notification_style TEXT DEFAULT 'gentle',
           preferred_voice TEXT DEFAULT 'Calm Female',
-          FOREIGN KEY (id) REFERENCES users(id)
+          FOREIGN KEY (id) REFERENCES users (id)
         );`
       );
 
       tx.executeSql(
         `CREATE TABLE IF NOT EXISTS analytics (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          id TEXT PRIMARY KEY,
           date TEXT NOT NULL,
           moments_taken INTEGER DEFAULT 0,
           notifications_sent INTEGER DEFAULT 0,
@@ -71,10 +71,19 @@ export const initializeDatabase = async () => {
           user_id TEXT NOT NULL,
           moment_id TEXT NOT NULL,
           scheduled_time TEXT NOT NULL,
-          is_delivered INTEGER DEFAULT 0,
-          is_ignored INTEGER DEFAULT 0,
-          FOREIGN KEY (user_id) REFERENCES users(id),
-          FOREIGN KEY (moment_id) REFERENCES moments(id)
+          notification_id TEXT,
+          FOREIGN KEY (user_id) REFERENCES users (id),
+          FOREIGN KEY (moment_id) REFERENCES moments (id)
+        );`
+      );
+
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS user_patterns (
+          user_id TEXT PRIMARY KEY,
+          active_times TEXT DEFAULT '[]',
+          ignored_times TEXT DEFAULT '[]',
+          preferred_categories TEXT DEFAULT '["Calm","Focus","Energy"]',
+          FOREIGN KEY (user_id) REFERENCES users (id)
         );`
       );
 
@@ -88,7 +97,7 @@ export const initializeDatabase = async () => {
           }
         }
       );
-    }, error => {
+    }, (error) => {
       reject(error);
     }, () => {
       resolve(true);
@@ -98,24 +107,37 @@ export const initializeDatabase = async () => {
 
 const seedMoments = (tx) => {
   const moments = [
-    // Calm moments
     {
-      id: 'calm1',
+      id: '1',
       category: 'Calm',
       title: 'Deep Breathing Exercise',
       description: 'A simple breathing exercise to help you relax',
       script: 'Take a deep breath in through your nose... and slowly exhale through your mouth... Repeat this cycle for 5 minutes...',
       duration: 60,
-      audio_path: 'calm-breathing.mp3',
-      is_premium: 0
+      audioPath: 'calm-voice-1/deep-breathing.mp3',
+      voiceType: 'Calm Female',
+      isPremium: false,
+      isCustom: false
     },
-    // Add more moments...
+    {
+      id: '2',
+      category: 'Focus',
+      title: 'Grounding Technique',
+      description: 'Bring your attention to the present moment',
+      script: 'Name 5 things you can see... 4 things you can touch... 3 things you can hear... 2 things you can smell... 1 thing you can taste...',
+      duration: 45,
+      audioPath: 'calm-voice-1/grounding.mp3',
+      voiceType: 'Calm Female',
+      isPremium: false,
+      isCustom: false
+    },
+    // Add more moments here...
   ];
 
   moments.forEach(moment => {
     tx.executeSql(
-      `INSERT INTO moments (id, category, title, description, script, duration, audio_path, is_premium)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+      `INSERT INTO moments (id, category, title, description, script, duration, audio_path, voice_type, is_premium, is_custom)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
       [
         moment.id,
         moment.category,
@@ -123,8 +145,10 @@ const seedMoments = (tx) => {
         moment.description,
         moment.script,
         moment.duration,
-        moment.audio_path,
-        moment.is_premium
+        moment.audioPath,
+        moment.voiceType,
+        moment.isPremium ? 1 : 0,
+        moment.isCustom ? 1 : 0
       ]
     );
   });
@@ -146,25 +170,33 @@ export const getOrCreateUser = async (): Promise<User> => {
               onboardingCompleted: user.onboarding_completed === 1
             });
           } else {
-            const newUserId = Date.now().toString();
+            const userId = Date.now().toString();
             const now = new Date().toISOString();
 
             tx.executeSql(
               `INSERT INTO users (id, created_at) VALUES (?, ?);`,
-              [newUserId, now]
-            );
+              [userId, now],
+              () => {
+                // Create default settings for the new user
+                tx.executeSql(
+                  `INSERT INTO settings (id) VALUES (?);`,
+                  [userId]
+                );
 
-            tx.executeSql(
-              `INSERT INTO settings (id) VALUES (?);`,
-              [newUserId]
-            );
+                // Create default patterns for the new user
+                tx.executeSql(
+                  `INSERT INTO user_patterns (user_id) VALUES (?);`,
+                  [userId]
+                );
 
-            resolve({
-              id: newUserId,
-              createdAt: new Date(now),
-              isPremium: false,
-              onboardingCompleted: false
-            });
+                resolve({
+                  id: userId,
+                  createdAt: new Date(now),
+                  isPremium: false,
+                  onboardingCompleted: false
+                });
+              }
+            );
           }
         },
         (_, error) => {
@@ -213,15 +245,15 @@ export const getAllMoments = async (): Promise<Moment[]> => {
 export const getRandomMoment = async (category?: string): Promise<Moment | null> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      let query = 'SELECT * FROM moments';
+      let query = `SELECT * FROM moments`;
       const params = [];
 
       if (category) {
-        query += ' WHERE category = ?';
+        query += ` WHERE category = ?`;
         params.push(category);
       }
 
-      query += ' ORDER BY RANDOM() LIMIT 1;';
+      query += ` ORDER BY RANDOM() LIMIT 1;`;
 
       tx.executeSql(
         query,
@@ -257,27 +289,44 @@ export const getRandomMoment = async (category?: string): Promise<Moment | null>
 export const completeMoment = async (momentId: string, moodRating?: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      const now = new Date().toISOString();
       const completedId = Date.now().toString();
+      const completedAt = new Date().toISOString();
 
+      // Record the completed moment
       tx.executeSql(
         `INSERT INTO completed_moments (id, moment_id, completed_at, mood_rating)
          VALUES (?, ?, ?, ?);`,
-        [completedId, momentId, now, moodRating || null]
+        [completedId, momentId, completedAt, moodRating || null]
       );
 
-      // Update analytics
+      // Update analytics for today
       const today = new Date().toISOString().split('T')[0];
       tx.executeSql(
-        `INSERT OR IGNORE INTO analytics (date) VALUES (?);`,
-        [today]
-      );
+        `SELECT * FROM analytics WHERE date = ?;`,
+        [today],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            // Update existing record
+            const analyticsId = result.rows.item(0).id;
+            const momentsTaken = result.rows.item(0).moments_taken + 1;
 
-      tx.executeSql(
-        `UPDATE analytics SET moments_taken = moments_taken + 1 WHERE date = ?;`,
-        [today]
+            tx.executeSql(
+              `UPDATE analytics SET moments_taken = ? WHERE id = ?;`,
+              [momentsTaken, analyticsId]
+            );
+          } else {
+            // Create new record
+            const analyticsId = Date.now().toString();
+
+            tx.executeSql(
+              `INSERT INTO analytics (id, date, moments_taken)
+               VALUES (?, ?, ?);`,
+              [analyticsId, today, 1]
+            );
+          }
+        }
       );
-    }, error => {
+    }, (error) => {
       reject(error);
     }, () => {
       resolve();
@@ -306,17 +355,18 @@ export const getUserSettings = async (userId: string): Promise<Settings> => {
             // Create default settings if none exist
             tx.executeSql(
               `INSERT INTO settings (id) VALUES (?);`,
-              [userId]
+              [userId],
+              () => {
+                resolve({
+                  id: userId,
+                  quietHoursStart: 22,
+                  quietHoursEnd: 8,
+                  preferredCategories: ['Calm', 'Focus', 'Energy'],
+                  notificationStyle: 'gentle',
+                  preferredVoice: 'Calm Female'
+                });
+              }
             );
-
-            resolve({
-              id: userId,
-              quietHoursStart: 22,
-              quietHoursEnd: 8,
-              preferredCategories: ['Calm', 'Focus', 'Energy'],
-              notificationStyle: 'gentle',
-              preferredVoice: 'Calm Female'
-            });
           }
         },
         (_, error) => {
@@ -333,12 +383,12 @@ export const updateUserSettings = async (settings: Settings): Promise<void> => {
     db.transaction(tx => {
       tx.executeSql(
         `UPDATE settings SET
-          quiet_hours_start = ?,
-          quiet_hours_end = ?,
-          preferred_categories = ?,
-          notification_style = ?,
-          preferred_voice = ?
-        WHERE id = ?;`,
+         quiet_hours_start = ?,
+         quiet_hours_end = ?,
+         preferred_categories = ?,
+         notification_style = ?,
+         preferred_voice = ?
+         WHERE id = ?;`,
         [
           settings.quietHoursStart,
           settings.quietHoursEnd,
@@ -346,35 +396,9 @@ export const updateUserSettings = async (settings: Settings): Promise<void> => {
           settings.notificationStyle,
           settings.preferredVoice,
           settings.id
-        ]
-      );
-    }, error => {
-      reject(error);
-    }, () => {
-      resolve();
-    });
-  });
-};
-
-export const getCompletedMoments = async (): Promise<CompletedMoment[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT * FROM completed_moments ORDER BY completed_at DESC;`,
-        [],
-        (_, result) => {
-          const completedMoments = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            const row = result.rows.item(i);
-            completedMoments.push({
-              id: row.id,
-              momentId: row.moment_id,
-              completedAt: new Date(row.completed_at),
-              moodRating: row.mood_rating,
-              context: row.context
-            });
-          }
-          resolve(completedMoments);
+        ],
+        () => {
+          resolve();
         },
         (_, error) => {
           reject(error);
@@ -388,40 +412,24 @@ export const getCompletedMoments = async (): Promise<CompletedMoment[]> => {
 export const getUserPatterns = async (userId: string): Promise<any> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      // Get ignored notification times
       tx.executeSql(
-        `SELECT scheduled_time FROM scheduled_notifications
-         WHERE user_id = ? AND is_ignored = 1
-         ORDER BY scheduled_time DESC LIMIT 5;`,
+        `SELECT * FROM user_patterns WHERE user_id = ?;`,
         [userId],
         (_, result) => {
-          const ignoredTimes = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            const time = new Date(result.rows.item(i).scheduled_time);
-            ignoredTimes.push(time.toTimeString().split(' ')[0]);
+          if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            resolve({
+              activeTimes: JSON.parse(row.active_times),
+              ignoredTimes: JSON.parse(row.ignored_times),
+              preferredCategories: JSON.parse(row.preferred_categories)
+            });
+          } else {
+            resolve({
+              activeTimes: [],
+              ignoredTimes: [],
+              preferredCategories: ['Calm', 'Focus', 'Energy']
+            });
           }
-
-          // Get preferred categories from completed moments
-          tx.executeSql(
-            `SELECT m.category, COUNT(*) as count
-             FROM completed_moments cm
-             JOIN moments m ON cm.moment_id = m.id
-             GROUP BY m.category
-             ORDER BY count DESC LIMIT 3;`,
-            [],
-            (_, result) => {
-              const preferredCategories = [];
-              for (let i = 0; i < result.rows.length; i++) {
-                preferredCategories.push(result.rows.item(i).category);
-              }
-
-              resolve({
-                activeTimes: [], // Would be populated with actual active times in a real app
-                ignoredTimes,
-                preferredCategories: preferredCategories.length > 0 ? preferredCategories : ['Calm', 'Focus', 'Energy']
-              });
-            }
-          );
         },
         (_, error) => {
           reject(error);
@@ -435,23 +443,57 @@ export const getUserPatterns = async (userId: string): Promise<any> => {
 export const logIgnoredNotification = async (userId: string, notificationId: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      tx.executeSql(
-        `UPDATE scheduled_notifications SET is_ignored = 1 WHERE id = ? AND user_id = ?;`,
-        [notificationId, userId]
-      );
-
-      // Update analytics
+      // Update analytics for today
       const today = new Date().toISOString().split('T')[0];
       tx.executeSql(
-        `INSERT OR IGNORE INTO analytics (date) VALUES (?);`,
-        [today]
+        `SELECT * FROM analytics WHERE date = ?;`,
+        [today],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            // Update existing record
+            const analyticsId = result.rows.item(0).id;
+            const notificationsIgnored = result.rows.item(0).notifications_ignored + 1;
+
+            tx.executeSql(
+              `UPDATE analytics SET notifications_ignored = ? WHERE id = ?;`,
+              [notificationsIgnored, analyticsId]
+            );
+          } else {
+            // Create new record
+            const analyticsId = Date.now().toString();
+
+            tx.executeSql(
+              `INSERT INTO analytics (id, date, notifications_ignored)
+               VALUES (?, ?, ?);`,
+              [analyticsId, today, 1]
+            );
+          }
+        }
       );
 
+      // Update user patterns
       tx.executeSql(
-        `UPDATE analytics SET notifications_ignored = notifications_ignored + 1 WHERE date = ?;`,
-        [today]
+        `SELECT * FROM user_patterns WHERE user_id = ?;`,
+        [userId],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            const ignoredTimes = JSON.parse(row.ignored_times);
+
+            // Get the time from the notification ID
+            const time = notificationId.split('_')[2];
+            if (!ignoredTimes.includes(time)) {
+              ignoredTimes.push(time);
+
+              tx.executeSql(
+                `UPDATE user_patterns SET ignored_times = ? WHERE user_id = ?;`,
+                [JSON.stringify(ignoredTimes), userId]
+              );
+            }
+          }
+        }
       );
-    }, error => {
+    }, (error) => {
       reject(error);
     }, () => {
       resolve();
@@ -462,23 +504,57 @@ export const logIgnoredNotification = async (userId: string, notificationId: str
 export const logEngagedNotification = async (userId: string, notificationId: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      tx.executeSql(
-        `UPDATE scheduled_notifications SET is_delivered = 1 WHERE id = ? AND user_id = ?;`,
-        [notificationId, userId]
-      );
-
-      // Update analytics
+      // Update analytics for today
       const today = new Date().toISOString().split('T')[0];
       tx.executeSql(
-        `INSERT OR IGNORE INTO analytics (date) VALUES (?);`,
-        [today]
+        `SELECT * FROM analytics WHERE date = ?;`,
+        [today],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            // Update existing record
+            const analyticsId = result.rows.item(0).id;
+            const notificationsSent = result.rows.item(0).notifications_sent + 1;
+
+            tx.executeSql(
+              `UPDATE analytics SET notifications_sent = ? WHERE id = ?;`,
+              [notificationsSent, analyticsId]
+            );
+          } else {
+            // Create new record
+            const analyticsId = Date.now().toString();
+
+            tx.executeSql(
+              `INSERT INTO analytics (id, date, notifications_sent)
+               VALUES (?, ?, ?);`,
+              [analyticsId, today, 1]
+            );
+          }
+        }
       );
 
+      // Update user patterns
       tx.executeSql(
-        `UPDATE analytics SET notifications_sent = notifications_sent + 1 WHERE date = ?;`,
-        [today]
+        `SELECT * FROM user_patterns WHERE user_id = ?;`,
+        [userId],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            const activeTimes = JSON.parse(row.active_times);
+
+            // Get the time from the notification ID
+            const time = notificationId.split('_')[2];
+            if (!activeTimes.includes(time)) {
+              activeTimes.push(time);
+
+              tx.executeSql(
+                `UPDATE user_patterns SET active_times = ? WHERE user_id = ?;`,
+                [JSON.stringify(activeTimes), userId]
+              );
+            }
+          }
+        }
       );
-    }, error => {
+    }, (error) => {
       reject(error);
     }, () => {
       resolve();
@@ -489,27 +565,21 @@ export const logEngagedNotification = async (userId: string, notificationId: str
 export const scheduleNotification = async (userId: string, notificationId: string, momentId: string, time: Date): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      tx.executeSql(
-        `INSERT INTO scheduled_notifications (id, user_id, moment_id, scheduled_time)
-         VALUES (?, ?, ?, ?);`,
-        [notificationId, userId, momentId, time.toISOString()]
-      );
-
-      // Update analytics
-      const today = new Date().toISOString().split('T')[0];
-      tx.executeSql(
-        `INSERT OR IGNORE INTO analytics (date) VALUES (?);`,
-        [today]
-      );
+      const scheduledId = Date.now().toString();
+      const scheduledTime = time.toISOString();
 
       tx.executeSql(
-        `UPDATE analytics SET notifications_sent = notifications_sent + 1 WHERE date = ?;`,
-        [today]
+        `INSERT INTO scheduled_notifications (id, user_id, moment_id, scheduled_time, notification_id)
+         VALUES (?, ?, ?, ?, ?);`,
+        [scheduledId, userId, momentId, scheduledTime, notificationId],
+        () => {
+          resolve();
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
-    }, error => {
-      reject(error);
-    }, () => {
-      resolve();
     });
   });
 };
@@ -524,8 +594,7 @@ export const getScheduledMomentsForToday = async (userId: string): Promise<Momen
       tx.executeSql(
         `SELECT m.* FROM moments m
          JOIN scheduled_notifications sn ON m.id = sn.moment_id
-         WHERE sn.user_id = ? AND sn.scheduled_time BETWEEN ? AND ?
-         ORDER BY sn.scheduled_time ASC;`,
+         WHERE sn.user_id = ? AND sn.scheduled_time BETWEEN ? AND ?;`,
         [userId, startOfDay, endOfDay],
         (_, result) => {
           const moments = [];
@@ -559,9 +628,8 @@ export const createCustomMoment = async (moment: Moment): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        `INSERT INTO moments (
-          id, category, title, description, script, duration, audio_path, is_premium, is_custom
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+        `INSERT INTO moments (id, category, title, description, script, duration, audio_path, voice_type, is_premium, is_custom)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
         [
           moment.id,
           moment.category,
@@ -570,14 +638,47 @@ export const createCustomMoment = async (moment: Moment): Promise<void> => {
           moment.script,
           moment.duration,
           moment.audioPath || null,
-          1, // Custom moments are always premium
-          1
-        ]
+          moment.voiceType || null,
+          moment.isPremium ? 1 : 0,
+          1 // is_custom is always true for custom moments
+        ],
+        () => {
+          resolve();
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
-    }, error => {
-      reject(error);
-    }, () => {
-      resolve();
+    });
+  });
+};
+
+export const getCompletedMoments = async (): Promise<CompletedMoment[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM completed_moments ORDER BY completed_at DESC;`,
+        [],
+        (_, result) => {
+          const completedMoments = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            const row = result.rows.item(i);
+            completedMoments.push({
+              id: row.id,
+              momentId: row.moment_id,
+              completedAt: new Date(row.completed_at),
+              moodRating: row.mood_rating,
+              context: row.context
+            });
+          }
+          resolve(completedMoments);
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
     });
   });
 };
@@ -641,6 +742,43 @@ export const getAnalyticsBetweenDates = async (startDate: Date, endDate: Date): 
           return false;
         }
       );
+    });
+  });
+};
+
+export const updateUser = async (user: Partial<User>): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      const updates = [];
+      const params = [];
+
+      if (user.isPremium !== undefined) {
+        updates.push('is_premium = ?');
+        params.push(user.isPremium ? 1 : 0);
+      }
+
+      if (user.onboardingCompleted !== undefined) {
+        updates.push('onboarding_completed = ?');
+        params.push(user.onboardingCompleted ? 1 : 0);
+      }
+
+      if (updates.length > 0) {
+        params.push(user.id);
+
+        tx.executeSql(
+          `UPDATE users SET ${updates.join(', ')} WHERE id = ?;`,
+          params,
+          () => {
+            resolve();
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      } else {
+        resolve();
+      }
     });
   });
 };

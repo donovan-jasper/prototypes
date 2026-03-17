@@ -67,6 +67,19 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <View style={styles.customMomentSection}>
+        <Text style={styles.sectionTitle}>Create Your Own Moment</Text>
+        <Text style={styles.customMomentDescription}>
+          Premium members can create personalized mindfulness prompts with their own voice.
+        </Text>
+        <TouchableOpacity
+          style={styles.createMomentButton}
+          onPress={() => router.push('/moment/create')}
+        >
+          <Text style={styles.createMomentButtonText}>Create a Moment</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -121,6 +134,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   premiumButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  customMomentSection: {
+    marginTop: 24,
+    padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+  },
+  customMomentDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+  },
+  createMomentButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  createMomentButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },

@@ -143,6 +143,16 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      <View style={styles.settingItem}>
+        <Text style={styles.settingLabel}>Custom Moments</Text>
+        <TouchableOpacity
+          style={styles.createMomentButton}
+          onPress={() => router.push('/moment/create')}
+        >
+          <Text style={styles.createMomentButtonText}>Create Your Own Moment</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -272,6 +282,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   premiumButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  createMomentButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  createMomentButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
