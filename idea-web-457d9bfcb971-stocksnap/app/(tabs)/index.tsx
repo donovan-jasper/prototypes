@@ -5,7 +5,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../types/navigation';
 import LessonCard from '../../components/LessonCard';
 import { lessons } from '../../constants/lessons';
-import { getLessonProgress, saveLessonProgress } from '../../lib/database';
+import { getLessonProgress } from '../../lib/database';
 import { useLessonsStore } from '../../store/useLessonsStore';
 
 type LearnScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Learn'>;
