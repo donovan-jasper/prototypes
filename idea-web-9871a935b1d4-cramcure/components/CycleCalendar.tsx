@@ -8,22 +8,10 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import * as SQLite from 'expo-sqlite';
-import { getSymptomsByDateRange } from '@/services/database';
-import { Symptom } from '@/types/database';
-import {
-  startOfMonth,
-  endOfMonth,
-  eachDayOfInterval,
-  format,
-  isSameDay,
-  addMonths,
-  subMonths,
-  getDay,
-  startOfWeek,
-  endOfWeek,
-} from 'date-fns';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as SQLite from 'expo-sqlite';
+import { getSymptomsByDateRange, deleteSymptom, Symptom } from '@/services/database';
+import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek } from 'date-fns';
 
 interface CycleCalendarProps {
   db: SQLite.SQLiteDatabase;
@@ -32,67 +20,88 @@ interface CycleCalendarProps {
 interface DayData {
   date: Date;
   symptoms: Symptom[];
-  painLevel: number;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  isPredictedPeriod: boolean;
 }
-
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export default function CycleCalendar({ db }: CycleCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [daysData, setDaysData] = useState<DayData[]>([]);
+  const [calendarDays, setCalendarDays] = useState<DayData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<DayData | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    loadMonthData();
+    loadCalendarData();
   }, [currentMonth, db]);
 
-  const loadMonthData = async () => {
+  const loadCalendarData = async () => {
     setIsLoading(true);
     try {
       const monthStart = startOfMonth(currentMonth);
       const monthEnd = endOfMonth(currentMonth);
+      const calendarStart = startOfWeek(monthStart);
+      const calendarEnd = endOfWeek(monthEnd);
+
+      const symptoms = await getSymptomsByDateRange(db, calendarStart, calendarEnd);
+
+      const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
       
-      const symptoms = await getSymptomsByDateRange(db, monthStart, monthEnd);
-      
-      const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-      
-      const daysWithData: DayData[] = days.map(date => {
-        const daySymptoms = symptoms.filter(s => 
-          isSameDay(new Date(s.date), date)
-        );
-        
-        const maxPain = daySymptoms.length > 0
-          ? Math.max(...daySymptoms.map(s => s.painLevel))
-          : 0;
-        
+      const dayDataArray: DayData[] = days.map(day => {
+        const daySymptoms = symptoms.filter(s => {
+          const symptomDate = new Date(s.date);
+          return isSameDay(symptomDate, day);
+        });
+
         return {
-          date,
+          date: day,
           symptoms: daySymptoms,
-          painLevel: maxPain,
+          isCurrentMonth: day.getMonth() === currentMonth.getMonth(),
+          isToday: isSameDay(day, new Date()),
+          isPredictedPeriod: false,
         };
       });
-      
-      setDaysData(daysWithData);
+
+      setCalendarDays(dayDataArray);
     } catch (error) {
-      console.error('Failed to load month data:', error);
+      console.error('Failed to load calendar data:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getPainColor = (painLevel: number): string => {
-    if (painLevel === 0) return '#F9FAFB';
-    if (painLevel <= 3) return '#86EFAC';
-    if (painLevel <= 6) return '#FDE047';
-    return '#FCA5A5';
+  const getDayColor = (dayData: DayData): string => {
+    if (dayData.symptoms.length === 0) return '#F3F4F6';
+
+    const avgPain = dayData.symptoms.reduce((sum, s) => sum + s.painLevel, 0) / dayData.symptoms.length;
+
+    if (avgPain >= 7) return '#FCA5A5';
+    if (avgPain >= 4) return '#FDE047';
+    return '#86EFAC';
   };
 
   const handleDayPress = (dayData: DayData) => {
-    if (dayData.symptoms.length > 0) {
-      setSelectedDay(dayData);
-      setModalVisible(true);
+    setSelectedDay(dayData);
+    setModalVisible(true);
+  };
+
+  const handleDeleteSymptom = async (symptomId: number) => {
+    try {
+      await deleteSymptom(db, symptomId);
+      await loadCalendarData();
+      
+      if (selectedDay) {
+        const updatedDay = calendarDays.find(d => isSameDay(d.date, selectedDay.date));
+        if (updatedDay) {
+          setSelectedDay(updatedDay);
+          if (updatedDay.symptoms.length === 0) {
+            setModalVisible(false);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete symptom:', error);
     }
   };
 
@@ -104,57 +113,48 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
     setCurrentMonth(prev => addMonths(prev, 1));
   };
 
-  const renderCalendarGrid = () => {
-    const monthStart = startOfMonth(currentMonth);
-    const startDate = startOfWeek(monthStart);
-    const monthEnd = endOfMonth(currentMonth);
-    const endDate = endOfWeek(monthEnd);
-    
-    const allDays = eachDayOfInterval({ start: startDate, end: endDate });
-    
+  const renderDay = (dayData: DayData, index: number) => {
+    const dayColor = getDayColor(dayData);
+    const isGrayedOut = !dayData.isCurrentMonth;
+
     return (
-      <View style={styles.calendarGrid}>
-        {WEEKDAYS.map(day => (
-          <View key={day} style={styles.weekdayCell}>
-            <Text style={styles.weekdayText}>{day}</Text>
+      <TouchableOpacity
+        key={index}
+        style={[
+          styles.dayCell,
+          { backgroundColor: dayColor },
+          isGrayedOut && styles.dayCellGrayed,
+          dayData.isToday && styles.dayCellToday,
+          dayData.isPredictedPeriod && styles.dayCellPredicted,
+        ]}
+        onPress={() => handleDayPress(dayData)}
+        disabled={isGrayedOut}
+      >
+        <Text
+          style={[
+            styles.dayText,
+            isGrayedOut && styles.dayTextGrayed,
+            dayData.isToday && styles.dayTextToday,
+          ]}
+        >
+          {format(dayData.date, 'd')}
+        </Text>
+        {dayData.symptoms.length > 0 && (
+          <View style={styles.symptomIndicator}>
+            <Text style={styles.symptomCount}>{dayData.symptoms.length}</Text>
           </View>
-        ))}
-        
-        {allDays.map(date => {
-          const isCurrentMonth = date.getMonth() === currentMonth.getMonth();
-          const dayData = daysData.find(d => isSameDay(d.date, date));
-          const painLevel = dayData?.painLevel || 0;
-          const hasSymptoms = dayData && dayData.symptoms.length > 0;
-          
-          return (
-            <TouchableOpacity
-              key={date.toISOString()}
-              style={[
-                styles.dayCell,
-                { backgroundColor: isCurrentMonth ? getPainColor(painLevel) : '#F9FAFB' },
-                !isCurrentMonth && styles.dayCellInactive,
-              ]}
-              onPress={() => dayData && handleDayPress(dayData)}
-              disabled={!hasSymptoms}
-            >
-              <Text
-                style={[
-                  styles.dayText,
-                  !isCurrentMonth && styles.dayTextInactive,
-                  painLevel > 6 && styles.dayTextLight,
-                ]}
-              >
-                {format(date, 'd')}
-              </Text>
-              {hasSymptoms && (
-                <View style={styles.symptomDot} />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
+        )}
+      </TouchableOpacity>
     );
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#8B5CF6" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -170,37 +170,34 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
         </TouchableOpacity>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8B5CF6" />
+      <View style={styles.weekDaysRow}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <Text key={day} style={styles.weekDayText}>{day}</Text>
+        ))}
+      </View>
+
+      <View style={styles.calendarGrid}>
+        {calendarDays.map((dayData, index) => renderDay(dayData, index))}
+      </View>
+
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#86EFAC' }]} />
+          <Text style={styles.legendText}>Low pain</Text>
         </View>
-      ) : (
-        <>
-          {renderCalendarGrid()}
-          
-          <View style={styles.legend}>
-            <Text style={styles.legendTitle}>Pain Level:</Text>
-            <View style={styles.legendItems}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#F9FAFB' }]} />
-                <Text style={styles.legendText}>None</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#86EFAC' }]} />
-                <Text style={styles.legendText}>Low (0-3)</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#FDE047' }]} />
-                <Text style={styles.legendText}>Medium (4-6)</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: '#FCA5A5' }]} />
-                <Text style={styles.legendText}>High (7-10)</Text>
-              </View>
-            </View>
-          </View>
-        </>
-      )}
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#FDE047' }]} />
+          <Text style={styles.legendText}>Medium</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#FCA5A5' }]} />
+          <Text style={styles.legendText}>High pain</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendColor, { backgroundColor: '#F3F4F6' }]} />
+          <Text style={styles.legendText}>No data</Text>
+        </View>
+      </View>
 
       <Modal
         visible={modalVisible}
@@ -214,74 +211,76 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
               <Text style={styles.modalTitle}>
                 {selectedDay && format(selectedDay.date, 'MMMM d, yyyy')}
               </Text>
-              <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}
-              >
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.modalScroll}>
-              {selectedDay?.symptoms.map((symptom, index) => (
-                <View key={symptom.id || index} style={styles.symptomCard}>
-                  <View style={styles.symptomHeader}>
-                    <Text style={styles.symptomTime}>
-                      {format(new Date(symptom.date), 'h:mm a')}
-                    </Text>
-                    <View style={[
-                      styles.painBadge,
-                      { backgroundColor: getPainColor(symptom.painLevel) }
-                    ]}>
-                      <Text style={[
-                        styles.painBadgeText,
-                        symptom.painLevel > 6 && styles.painBadgeTextLight
-                      ]}>
-                        Pain: {symptom.painLevel}/10
-                      </Text>
+              {selectedDay?.symptoms.length === 0 ? (
+                <Text style={styles.noSymptomsText}>No symptoms logged for this day</Text>
+              ) : (
+                selectedDay?.symptoms.map((symptom, index) => (
+                  <View key={symptom.id || index} style={styles.symptomCard}>
+                    <View style={styles.symptomHeader}>
+                      <View style={styles.symptomHeaderLeft}>
+                        <Text style={styles.symptomTime}>
+                          {format(new Date(symptom.date), 'h:mm a')}
+                        </Text>
+                        <View style={[
+                          styles.painBadge,
+                          symptom.painLevel >= 7 && styles.painBadgeHigh,
+                          symptom.painLevel >= 4 && symptom.painLevel < 7 && styles.painBadgeMedium,
+                          symptom.painLevel < 4 && styles.painBadgeLow,
+                        ]}>
+                          <Text style={styles.painBadgeText}>Pain: {symptom.painLevel}/10</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => symptom.id && handleDeleteSymptom(symptom.id)}
+                        style={styles.deleteButton}
+                      >
+                        <MaterialCommunityIcons name="delete" size={20} color="#DC2626" />
+                      </TouchableOpacity>
                     </View>
+
+                    {symptom.location && (
+                      <View style={styles.symptomDetail}>
+                        <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
+                        <Text style={styles.symptomDetailText}>{symptom.location}</Text>
+                      </View>
+                    )}
+
+                    {symptom.type && (
+                      <View style={styles.symptomDetail}>
+                        <MaterialCommunityIcons name="alert-circle" size={16} color="#6B7280" />
+                        <Text style={styles.symptomDetailText}>{symptom.type}</Text>
+                      </View>
+                    )}
+
+                    {symptom.mood && (
+                      <View style={styles.symptomDetail}>
+                        <MaterialCommunityIcons name="emoticon" size={16} color="#6B7280" />
+                        <Text style={styles.symptomDetailText}>Mood: {symptom.mood}</Text>
+                      </View>
+                    )}
+
+                    {symptom.energy !== undefined && symptom.energy !== null && (
+                      <View style={styles.symptomDetail}>
+                        <MaterialCommunityIcons name="lightning-bolt" size={16} color="#6B7280" />
+                        <Text style={styles.symptomDetailText}>Energy: {symptom.energy}/5</Text>
+                      </View>
+                    )}
+
+                    {symptom.notes && (
+                      <View style={styles.notesContainer}>
+                        <Text style={styles.notesLabel}>Notes:</Text>
+                        <Text style={styles.notesText}>{symptom.notes}</Text>
+                      </View>
+                    )}
                   </View>
-
-                  {symptom.location && (
-                    <View style={styles.symptomRow}>
-                      <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
-                      <Text style={styles.symptomLabel}>Location:</Text>
-                      <Text style={styles.symptomValue}>{symptom.location}</Text>
-                    </View>
-                  )}
-
-                  {symptom.type && (
-                    <View style={styles.symptomRow}>
-                      <MaterialCommunityIcons name="alert-circle" size={16} color="#6B7280" />
-                      <Text style={styles.symptomLabel}>Type:</Text>
-                      <Text style={styles.symptomValue}>{symptom.type}</Text>
-                    </View>
-                  )}
-
-                  {symptom.mood && (
-                    <View style={styles.symptomRow}>
-                      <MaterialCommunityIcons name="emoticon" size={16} color="#6B7280" />
-                      <Text style={styles.symptomLabel}>Mood:</Text>
-                      <Text style={styles.symptomValue}>{symptom.mood}</Text>
-                    </View>
-                  )}
-
-                  {symptom.energy !== null && symptom.energy !== undefined && (
-                    <View style={styles.symptomRow}>
-                      <MaterialCommunityIcons name="lightning-bolt" size={16} color="#6B7280" />
-                      <Text style={styles.symptomLabel}>Energy:</Text>
-                      <Text style={styles.symptomValue}>{symptom.energy}/5</Text>
-                    </View>
-                  )}
-
-                  {symptom.notes && (
-                    <View style={styles.notesContainer}>
-                      <Text style={styles.notesLabel}>Notes:</Text>
-                      <Text style={styles.notesText}>{symptom.notes}</Text>
-                    </View>
-                  )}
-                </View>
-              ))}
+                ))
+              )}
             </ScrollView>
           </View>
         </View>
@@ -303,6 +302,11 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  loadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -310,31 +314,28 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   navButton: {
-    padding: 4,
+    padding: 8,
   },
   monthTitle: {
     fontSize: 18,
     fontWeight: '700',
     color: '#111827',
   },
-  loadingContainer: {
-    height: 300,
-    justifyContent: 'center',
-    alignItems: 'center',
+  weekDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 8,
+  },
+  weekDayText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#6B7280',
+    width: 40,
+    textAlign: 'center',
   },
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-  },
-  weekdayCell: {
-    width: '14.28%',
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  weekdayText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#6B7280',
   },
   dayCell: {
     width: '14.28%',
@@ -345,54 +346,67 @@ const styles = StyleSheet.create({
     borderColor: '#E5E7EB',
     position: 'relative',
   },
-  dayCellInactive: {
+  dayCellGrayed: {
     opacity: 0.3,
+  },
+  dayCellToday: {
+    borderWidth: 2,
+    borderColor: '#8B5CF6',
+    borderRadius: 8,
+  },
+  dayCellPredicted: {
+    borderWidth: 2,
+    borderColor: '#F59E0B',
+    borderStyle: 'dashed',
   },
   dayText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#111827',
   },
-  dayTextInactive: {
+  dayTextGrayed: {
     color: '#9CA3AF',
   },
-  dayTextLight: {
-    color: '#FFFFFF',
+  dayTextToday: {
+    color: '#8B5CF6',
+    fontWeight: '700',
   },
-  symptomDot: {
+  symptomIndicator: {
     position: 'absolute',
-    bottom: 4,
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    top: 2,
+    right: 2,
     backgroundColor: '#8B5CF6',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  symptomCount: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
   legend: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-around',
     marginTop: 16,
     paddingTop: 16,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
   },
-  legendTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  legendItems: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    marginBottom: 8,
   },
   legendColor: {
-    width: 20,
-    height: 20,
+    width: 16,
+    height: 16,
     borderRadius: 4,
+    marginRight: 6,
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
@@ -421,15 +435,18 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E7EB',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#111827',
   },
-  closeButton: {
-    padding: 4,
-  },
   modalScroll: {
     padding: 20,
+  },
+  noSymptomsText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    paddingVertical: 40,
   },
   symptomCard: {
     backgroundColor: '#F9FAFB',
@@ -442,42 +459,49 @@ const styles = StyleSheet.create({
   symptomHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 12,
   },
+  symptomHeaderLeft: {
+    flex: 1,
+  },
   symptomTime: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
     color: '#6B7280',
+    marginBottom: 6,
   },
   painBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  painBadgeLow: {
+    backgroundColor: '#D1FAE5',
+  },
+  painBadgeMedium: {
+    backgroundColor: '#FEF3C7',
+  },
+  painBadgeHigh: {
+    backgroundColor: '#FEE2E2',
   },
   painBadgeText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#111827',
   },
-  painBadgeTextLight: {
-    color: '#FFFFFF',
+  deleteButton: {
+    padding: 4,
   },
-  symptomRow: {
+  symptomDetail: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    gap: 6,
   },
-  symptomLabel: {
+  symptomDetailText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  symptomValue: {
-    fontSize: 14,
-    color: '#111827',
-    flex: 1,
+    color: '#374151',
+    marginLeft: 8,
   },
   notesContainer: {
     marginTop: 8,
@@ -486,14 +510,14 @@ const styles = StyleSheet.create({
     borderTopColor: '#E5E7EB',
   },
   notesLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#6B7280',
     marginBottom: 4,
   },
   notesText: {
     fontSize: 14,
-    color: '#111827',
+    color: '#374151',
     lineHeight: 20,
   },
 });
