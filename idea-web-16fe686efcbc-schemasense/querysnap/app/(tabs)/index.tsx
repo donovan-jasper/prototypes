@@ -1,14 +1,29 @@
 import React from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
+import { View, FlatList, StyleSheet, Text } from 'react-native';
 import { FAB } from 'react-native-paper';
+import * as DocumentPicker from 'expo-document-picker';
 import DatabaseCard from '../../components/DatabaseCard';
 import { useDatabase } from '../../hooks/useDatabase';
 
 const IndexScreen = () => {
   const { databases, addDatabase } = useDatabase();
 
-  const handleImport = () => {
-    // Implement import functionality
+  const handleImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['text/csv', 'application/vnd.sqlite3', 'application/x-sqlite3'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled) {
+        return;
+      }
+
+      const file = result.assets[0];
+      await addDatabase(file);
+    } catch (error) {
+      console.error('Error importing database:', error);
+    }
   };
 
   return (
