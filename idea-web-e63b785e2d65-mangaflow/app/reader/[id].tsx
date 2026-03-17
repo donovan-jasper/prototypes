@@ -1,5 +1,5 @@
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
-import { View, StyleSheet, Text, StatusBar, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, StatusBar, TouchableOpacity, Modal } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useState, useEffect } from 'react';
 import GestureReader from '../../components/GestureReader';
@@ -14,6 +14,7 @@ export default function ReaderScreen() {
   const [pages, setPages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     loadManga();
@@ -45,6 +46,21 @@ export default function ReaderScreen() {
     }
   };
 
+  const handleReadingModeChange = async (mode: 'ltr' | 'rtl' | 'vertical') => {
+    if (!manga) return;
+    
+    const db = await import('../../lib/db');
+    await db.initDB();
+    const database = await import('expo-sqlite').then(m => m.openDatabaseAsync('pageturn.db'));
+    await database.runAsync(
+      'UPDATE manga SET readingMode = ? WHERE id = ?',
+      [mode, manga.id]
+    );
+    
+    setManga({ ...manga, readingMode: mode });
+    setShowSettings(false);
+  };
+
   if (loading || !manga || pages.length === 0) {
     return (
       <View style={styles.loadingContainer}>
@@ -66,6 +82,7 @@ export default function ReaderScreen() {
         pages={pages.map((uri) => ({ uri }))}
         currentPage={currentPage}
         onPageChange={handlePageChange}
+        readingMode={manga.readingMode}
       />
 
       <TouchableOpacity
@@ -75,11 +92,81 @@ export default function ReaderScreen() {
         <Text style={styles.backButtonText}>←</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={styles.settingsButton}
+        onPress={() => setShowSettings(true)}
+      >
+        <Text style={styles.settingsButtonText}>⚙</Text>
+      </TouchableOpacity>
+
       <View style={styles.pageCounter}>
         <Text style={styles.pageCounterText}>
           {currentPage + 1}/{pages.length}
         </Text>
       </View>
+
+      <Modal
+        visible={showSettings}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSettings(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowSettings(false)}
+        >
+          <View style={styles.settingsModal}>
+            <Text style={styles.settingsTitle}>Reading Mode</Text>
+            
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                manga.readingMode === 'ltr' && styles.modeButtonActive,
+              ]}
+              onPress={() => handleReadingModeChange('ltr')}
+            >
+              <Text style={styles.modeButtonText}>Left to Right</Text>
+              {manga.readingMode === 'ltr' && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                manga.readingMode === 'rtl' && styles.modeButtonActive,
+              ]}
+              onPress={() => handleReadingModeChange('rtl')}
+            >
+              <Text style={styles.modeButtonText}>Right to Left</Text>
+              {manga.readingMode === 'rtl' && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.modeButton,
+                manga.readingMode === 'vertical' && styles.modeButtonActive,
+              ]}
+              onPress={() => handleReadingModeChange('vertical')}
+            >
+              <Text style={styles.modeButtonText}>Vertical Scroll</Text>
+              {manga.readingMode === 'vertical' && (
+                <Text style={styles.checkmark}>✓</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowSettings(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </GestureHandlerRootView>
   );
 }
@@ -115,6 +202,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '600',
   },
+  settingsButton: {
+    position: 'absolute',
+    top: 50,
+    right: 16,
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsButtonText: {
+    color: '#fff',
+    fontSize: 24,
+  },
   pageCounter: {
     position: 'absolute',
     bottom: 40,
@@ -128,5 +230,59 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingsModal: {
+    backgroundColor: '#1c1c1e',
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 400,
+  },
+  settingsTitle: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  modeButton: {
+    backgroundColor: '#2c2c2e',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modeButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  modeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  closeButton: {
+    backgroundColor: '#2c2c2e',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 });

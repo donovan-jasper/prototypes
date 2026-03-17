@@ -8,21 +8,25 @@ import Animated, {
 } from 'react-native-reanimated';
 import PageView from './PageView';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.3;
+const VERTICAL_SWIPE_THRESHOLD = SCREEN_HEIGHT * 0.2;
 
 interface GestureReaderProps {
   pages: any[];
   currentPage: number;
   onPageChange: (page: number) => void;
+  readingMode: 'ltr' | 'rtl' | 'vertical';
 }
 
 export default function GestureReader({
   pages,
   currentPage,
   onPageChange,
+  readingMode,
 }: GestureReaderProps) {
   const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
   const scale = useSharedValue(1);
   const savedScale = useSharedValue(1);
 
@@ -35,17 +39,37 @@ export default function GestureReader({
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       if (scale.value === 1) {
-        translateX.value = event.translationX;
+        if (readingMode === 'vertical') {
+          translateY.value = event.translationY;
+        } else {
+          translateX.value = event.translationX;
+        }
       }
     })
     .onEnd((event) => {
       if (scale.value === 1) {
-        if (event.translationX > SWIPE_THRESHOLD && currentPage > 0) {
-          runOnJS(changePage)(currentPage - 1);
-        } else if (event.translationX < -SWIPE_THRESHOLD && currentPage < pages.length - 1) {
-          runOnJS(changePage)(currentPage + 1);
+        if (readingMode === 'vertical') {
+          if (event.translationY > VERTICAL_SWIPE_THRESHOLD && currentPage > 0) {
+            runOnJS(changePage)(currentPage - 1);
+          } else if (event.translationY < -VERTICAL_SWIPE_THRESHOLD && currentPage < pages.length - 1) {
+            runOnJS(changePage)(currentPage + 1);
+          }
+          translateY.value = withSpring(0);
+        } else if (readingMode === 'rtl') {
+          if (event.translationX < -SWIPE_THRESHOLD && currentPage > 0) {
+            runOnJS(changePage)(currentPage - 1);
+          } else if (event.translationX > SWIPE_THRESHOLD && currentPage < pages.length - 1) {
+            runOnJS(changePage)(currentPage + 1);
+          }
+          translateX.value = withSpring(0);
+        } else {
+          if (event.translationX > SWIPE_THRESHOLD && currentPage > 0) {
+            runOnJS(changePage)(currentPage - 1);
+          } else if (event.translationX < -SWIPE_THRESHOLD && currentPage < pages.length - 1) {
+            runOnJS(changePage)(currentPage + 1);
+          }
+          translateX.value = withSpring(0);
         }
-        translateX.value = withSpring(0);
       }
     });
 
@@ -86,6 +110,7 @@ export default function GestureReader({
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value },
+      { translateY: translateY.value },
       { scale: scale.value },
     ],
   }));
