@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { TouchableOpacity, StyleSheet, Text, View, ActivityIndicator, Linking, Alert } from 'react-native';
-import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
-import * as Linking from 'expo-linking';
+import { checkPermissions, requestPermissions, startRecording, stopRecording, transcribeAudio } from '../lib/voice';
 
 type VoiceButtonProps = {
   onTranscript: (text: string) => void;
@@ -16,19 +14,8 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
   const [recordingError, setRecordingError] = useState<string | null>(null);
 
   useEffect(() => {
-    checkPermissions();
+    checkPermissions().then(setPermissionStatus);
   }, []);
-
-  const checkPermissions = async () => {
-    const { status } = await Audio.getPermissionsAsync();
-    setPermissionStatus(status);
-  };
-
-  const requestPermissions = async () => {
-    const { status } = await Audio.requestPermissionsAsync();
-    setPermissionStatus(status);
-    return status;
-  };
 
   const openSettings = () => {
     Linking.openSettings();
@@ -49,6 +36,7 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
 
     if (permissionStatus === 'undetermined') {
       const status = await requestPermissions();
+      setPermissionStatus(status);
       if (status === 'denied') return;
     }
 
@@ -77,63 +65,6 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
         setRecordingError('Failed to start recording. Please check microphone permissions.');
         onError?.('Recording failed to start');
       }
-    }
-  };
-
-  const startRecording = async () => {
-    try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      return recording;
-    } catch (error) {
-      console.error('Failed to start recording:', error);
-      throw error;
-    }
-  };
-
-  const stopRecording = async () => {
-    if (!recording) return null;
-
-    await recording.stopAndUnloadAsync();
-    const uri = recording.getURI();
-    return uri;
-  };
-
-  const transcribeAudio = async (audioUri: string): Promise<{ text: string }> => {
-    try {
-      // Read audio file as base64
-      const base64 = await FileSystem.readAsStringAsync(audioUri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Call OpenAI Whisper API
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.EXPO_PUBLIC_OPENAI_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          file: base64,
-          model: 'whisper-1',
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Transcription failed');
-      }
-
-      const data = await response.json();
-      return { text: data.text };
-    } catch (error) {
-      console.error('Transcription error:', error);
-      throw error;
     }
   };
 
