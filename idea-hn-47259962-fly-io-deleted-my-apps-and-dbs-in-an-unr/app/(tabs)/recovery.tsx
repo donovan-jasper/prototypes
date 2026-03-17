@@ -24,6 +24,7 @@ type RecoveryWorkflow = {
 export default function RecoveryScreen() {
   const [workflows, setWorkflows] = useState<RecoveryWorkflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<RecoveryWorkflow | null>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const services = useStore((state) => state.services);
 
   useEffect(() => {
@@ -50,13 +51,18 @@ export default function RecoveryScreen() {
     );
   }
 
+  function getServiceName(serviceId: string) {
+    const service = services.find(s => s.id === serviceId);
+    return service ? service.name : 'Unknown Service';
+  }
+
   return (
     <View style={styles.container}>
       {!selectedWorkflow ? (
         <View style={styles.workflowList}>
           <Text style={styles.header}>Recovery Workflows</Text>
           <FlatList
-            data={services}
+            data={services.filter(s => s.status !== 'healthy')}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <View style={styles.serviceSection}>
@@ -65,7 +71,10 @@ export default function RecoveryScreen() {
                   <TouchableOpacity
                     key={workflow.id}
                     style={styles.workflowItem}
-                    onPress={() => setSelectedWorkflow(workflow)}
+                    onPress={() => {
+                      setSelectedWorkflow(workflow);
+                      setSelectedServiceId(item.id);
+                    }}
                   >
                     <Text style={styles.workflowTitle}>{workflow.name}</Text>
                     <Text style={styles.workflowSteps}>{workflow.steps.length} steps</Text>
@@ -73,17 +82,27 @@ export default function RecoveryScreen() {
                 ))}
               </View>
             )}
+            ListEmptyComponent={
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>All services are healthy!</Text>
+                <Text style={styles.emptySubtext}>No recovery workflows needed at this time.</Text>
+              </View>
+            }
           />
         </View>
       ) : (
         <View style={styles.workflowDetail}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => setSelectedWorkflow(null)}
+            onPress={() => {
+              setSelectedWorkflow(null);
+              setSelectedServiceId(null);
+            }}
           >
             <Text style={styles.backButtonText}>← Back</Text>
           </TouchableOpacity>
           <Text style={styles.workflowHeader}>{selectedWorkflow.name}</Text>
+          <Text style={styles.serviceInfo}>For: {getServiceName(selectedServiceId || '')}</Text>
           <FlatList
             data={selectedWorkflow.steps}
             keyExtractor={(item) => item.id}
@@ -92,6 +111,7 @@ export default function RecoveryScreen() {
                 step={item}
                 stepNumber={index + 1}
                 totalSteps={selectedWorkflow.steps.length}
+                serviceId={selectedServiceId || ''}
               />
             )}
           />
@@ -158,7 +178,28 @@ const styles = StyleSheet.create({
   workflowHeader: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 8,
     color: '#1F2937',
+  },
+  serviceInfo: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
