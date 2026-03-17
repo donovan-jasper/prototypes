@@ -18,6 +18,8 @@ const ARTrainingScreen = () => {
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const targetMeshesRef = useRef([]);
+  const raycasterRef = useRef(new THREE.Raycaster());
+  const mouseVectorRef = useRef(new THREE.Vector2());
 
   useEffect(() => {
     (async () => {
@@ -59,9 +61,10 @@ const ARTrainingScreen = () => {
     const targetCount = 5;
 
     for (let i = 0; i < targetCount; i++) {
+      // Position targets in front of the camera at varying distances
       const x = (Math.random() - 0.5) * 2;
       const y = (Math.random() - 0.5) * 2;
-      const z = -5 - Math.random() * 3;
+      const z = -5 - Math.random() * 3; // Between -5 and -8 units from camera
       newTargets.push({ x, y, z });
 
       if (sceneRef.current) {
@@ -104,16 +107,16 @@ const ARTrainingScreen = () => {
     // Get normalized device coordinates
     const { locationX, locationY } = event.nativeEvent;
     const rect = event.nativeEvent.target.getBoundingClientRect();
-    const x = (locationX / rect.width) * 2 - 1;
-    const y = -(locationY / rect.height) * 2 + 1;
 
-    // Create raycast
-    const raycaster = new THREE.Raycaster();
-    const mouseVector = new THREE.Vector2(x, y);
-    raycaster.setFromCamera(mouseVector, cameraRef.current);
+    // Convert screen coordinates to normalized device coordinates (-1 to +1)
+    mouseVectorRef.current.x = (locationX / rect.width) * 2 - 1;
+    mouseVectorRef.current.y = -(locationY / rect.height) * 2 + 1;
+
+    // Update the raycaster
+    raycasterRef.current.setFromCamera(mouseVectorRef.current, cameraRef.current);
 
     // Check for intersections
-    const intersects = raycaster.intersectObjects(targetMeshesRef.current);
+    const intersects = raycasterRef.current.intersectObjects(targetMeshesRef.current);
 
     if (intersects.length > 0) {
       const targetIndex = targetMeshesRef.current.indexOf(intersects[0].object);
