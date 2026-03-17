@@ -1,97 +1,111 @@
 import { Audio } from 'expo-av';
 
 export class AudioController {
-  private sound: Audio.Sound | null = null;
-  private isPlaying: boolean = false;
-  private position: number = 0;
-  private duration: number = 0;
-  private onPlaybackStatusUpdate: ((status: Audio.AudioPlaybackStatus) => void) | null = null;
+  private lastKnownPosition: number = 0;
+  private isExternalAudioPlaying: boolean = false;
 
-  public async play() {
-    if (this.isPlaying) return;
-
+  public async initialize() {
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        require('../assets/sounds/sample.mp3')
-      );
-      this.sound = sound;
-      await sound.playAsync();
-      this.isPlaying = true;
-
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          this.position = status.positionMillis;
-          this.duration = status.durationMillis || 0;
-          if (this.onPlaybackStatusUpdate) {
-            this.onPlaybackStatusUpdate(status);
-          }
-        }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+        interruptionModeIOS: 1,
+        interruptionModeAndroid: 1,
       });
     } catch (error) {
-      console.error('Failed to play audio:', error);
+      console.error('Failed to initialize audio mode:', error);
     }
   }
 
-  public async pause() {
-    if (!this.isPlaying || !this.sound) return;
-
+  public async detectExternalAudio(): Promise<boolean> {
     try {
-      await this.sound.pauseAsync();
-      this.isPlaying = false;
+      const status = await Audio.getStatusAsync();
+      this.isExternalAudioPlaying = status.isPlaying || false;
+      if (status.positionMillis !== undefined) {
+        this.lastKnownPosition = status.positionMillis;
+      }
+      return this.isExternalAudioPlaying;
     } catch (error) {
-      console.error('Failed to pause audio:', error);
+      console.error('Failed to detect external audio:', error);
+      return false;
     }
   }
 
-  public async rewind(seconds: number) {
-    if (!this.sound) return;
-
+  public async pauseSystemAudio(): Promise<boolean> {
     try {
-      const newPosition = Math.max(0, this.position - seconds * 1000);
-      await this.sound.setPositionAsync(newPosition);
-      this.position = newPosition;
+      const isPlaying = await this.detectExternalAudio();
+      if (isPlaying) {
+        await Audio.setIsPlayingAsync(false);
+        return true;
+      }
+      return false;
     } catch (error) {
-      console.error('Failed to rewind audio:', error);
+      console.error('Failed to pause system audio:', error);
+      return false;
     }
   }
 
-  public async fadeOutAndPause(duration: number = 3000) {
-    if (!this.sound || !this.isPlaying) return;
-
+  public async resumeSystemAudio(rewindSeconds: number = 0): Promise<boolean> {
     try {
-      // Gradually reduce volume
+      if (rewindSeconds > 0 && this.lastKnownPosition > 0) {
+        const newPosition = Math.max(0, this.lastKnownPosition - rewindSeconds * 1000);
+        try {
+          await Audio.setPositionAsync(newPosition);
+        } catch (seekError) {
+          console.warn('Could not seek to position, continuing with resume:', seekError);
+        }
+      }
+
+      await Audio.setIsPlayingAsync(true);
+      return true;
+    } catch (error) {
+      console.error('Failed to resume system audio:', error);
+      return false;
+    }
+  }
+
+  public async fadeOutAndPause(duration: number = 3000): Promise<boolean> {
+    try {
+      const isPlaying = await this.detectExternalAudio();
+      if (!isPlaying) return false;
+
       const steps = 10;
       const interval = duration / steps;
-      const currentVolume = 1.0;
 
       for (let i = steps; i >= 0; i--) {
-        const volume = currentVolume * (i / steps);
-        await this.sound.setVolumeAsync(volume);
+        const volume = i / steps;
+        try {
+          await Audio.setVolumeAsync(volume);
+        } catch (volumeError) {
+          console.warn('Volume control not supported, skipping fade:', volumeError);
+          break;
+        }
         await new Promise(resolve => setTimeout(resolve, interval));
       }
 
-      // Pause the audio
-      await this.pause();
-      await this.sound.setVolumeAsync(1.0); // Reset volume
+      const paused = await this.pauseSystemAudio();
+
+      try {
+        await Audio.setVolumeAsync(1.0);
+      } catch (volumeError) {
+        console.warn('Could not reset volume:', volumeError);
+      }
+
+      return paused;
     } catch (error) {
-      console.error('Failed to fade out audio:', error);
+      console.error('Failed to fade out and pause:', error);
+      return false;
     }
   }
 
-  public setOnPlaybackStatusUpdate(callback: (status: Audio.AudioPlaybackStatus) => void) {
-    this.onPlaybackStatusUpdate = callback;
+  public getLastKnownPosition(): number {
+    return this.lastKnownPosition;
   }
 
-  public getPlaybackStatus(): Audio.AudioPlaybackStatus | null {
-    if (!this.sound) return null;
-
-    return {
-      isLoaded: true,
-      isPlaying: this.isPlaying,
-      positionMillis: this.position,
-      durationMillis: this.duration,
-      androidImplementation: 'Simple',
-      iosImplementation: 'AVPlayer',
-    };
+  public isPlaying(): boolean {
+    return this.isExternalAudioPlaying;
   }
 }

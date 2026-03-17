@@ -2,18 +2,14 @@ import { AudioController } from '../services/audioControl';
 
 jest.mock('expo-av', () => ({
   Audio: {
-    Sound: {
-      createAsync: jest.fn().mockResolvedValue({
-        sound: {
-          playAsync: jest.fn(),
-          pauseAsync: jest.fn(),
-          setPositionAsync: jest.fn(),
-          setVolumeAsync: jest.fn(),
-          setOnPlaybackStatusUpdate: jest.fn(),
-          unloadAsync: jest.fn(),
-        },
-      }),
-    },
+    setAudioModeAsync: jest.fn().mockResolvedValue(undefined),
+    getStatusAsync: jest.fn().mockResolvedValue({
+      isPlaying: true,
+      positionMillis: 30000,
+    }),
+    setIsPlayingAsync: jest.fn().mockResolvedValue(undefined),
+    setPositionAsync: jest.fn().mockResolvedValue(undefined),
+    setVolumeAsync: jest.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -22,29 +18,43 @@ describe('AudioController', () => {
 
   beforeEach(() => {
     audioController = new AudioController();
+    jest.clearAllMocks();
   });
 
-  it('should play audio', async () => {
-    await audioController.play();
-    expect(require('expo-av').Audio.Sound.createAsync).toHaveBeenCalled();
+  it('should initialize audio mode', async () => {
+    await audioController.initialize();
+    expect(require('expo-av').Audio.setAudioModeAsync).toHaveBeenCalled();
   });
 
-  it('should pause audio', async () => {
-    await audioController.play();
-    await audioController.pause();
-    expect(require('expo-av').Audio.Sound.createAsync().sound.pauseAsync).toHaveBeenCalled();
+  it('should detect external audio playing', async () => {
+    const isPlaying = await audioController.detectExternalAudio();
+    expect(isPlaying).toBe(true);
+    expect(require('expo-av').Audio.getStatusAsync).toHaveBeenCalled();
   });
 
-  it('should rewind audio', async () => {
-    await audioController.play();
-    await audioController.rewind(5);
-    expect(require('expo-av').Audio.Sound.createAsync().sound.setPositionAsync).toHaveBeenCalled();
+  it('should pause system audio', async () => {
+    const success = await audioController.pauseSystemAudio();
+    expect(success).toBe(true);
+    expect(require('expo-av').Audio.setIsPlayingAsync).toHaveBeenCalledWith(false);
   });
 
-  it('should fade out and pause audio', async () => {
-    await audioController.play();
-    await audioController.fadeOutAndPause(1000);
-    expect(require('expo-av').Audio.Sound.createAsync().sound.setVolumeAsync).toHaveBeenCalled();
-    expect(require('expo-av').Audio.Sound.createAsync().sound.pauseAsync).toHaveBeenCalled();
+  it('should resume system audio with rewind', async () => {
+    await audioController.detectExternalAudio();
+    const success = await audioController.resumeSystemAudio(5);
+    expect(success).toBe(true);
+    expect(require('expo-av').Audio.setPositionAsync).toHaveBeenCalled();
+    expect(require('expo-av').Audio.setIsPlayingAsync).toHaveBeenCalledWith(true);
+  });
+
+  it('should fade out and pause', async () => {
+    const success = await audioController.fadeOutAndPause(1000);
+    expect(success).toBe(true);
+    expect(require('expo-av').Audio.setIsPlayingAsync).toHaveBeenCalledWith(false);
+  });
+
+  it('should store last known position', async () => {
+    await audioController.detectExternalAudio();
+    const position = audioController.getLastKnownPosition();
+    expect(position).toBe(30000);
   });
 });

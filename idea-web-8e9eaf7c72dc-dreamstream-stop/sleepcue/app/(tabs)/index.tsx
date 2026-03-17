@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, Button, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Link } from 'expo-router';
 import { useSleepDetection } from '../../hooks/useSleepDetection';
+import AudioController from '../../components/AudioController';
 
 export default function HomeScreen() {
   const { isSleeping, confidence, isDetecting, startDetection, stopDetection } = useSleepDetection();
@@ -52,65 +53,72 @@ export default function HomeScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>SleepCue</Text>
-      <Text style={styles.subtitle}>Never lose your place or drain your battery</Text>
-      
-      {isDetecting && (
-        <View style={styles.statusContainer}>
-          <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]}>
-            <Text style={styles.statusEmoji}>{getStatusEmoji()}</Text>
-            <Text style={styles.statusText}>{detectionStatus.toUpperCase()}</Text>
-          </View>
-          <View style={styles.confidenceContainer}>
-            <Text style={styles.confidenceLabel}>Detection Confidence</Text>
-            <View style={styles.confidenceBar}>
-              <View 
-                style={[
-                  styles.confidenceFill, 
-                  { 
-                    width: `${confidence * 100}%`,
-                    backgroundColor: getStatusColor()
-                  }
-                ]} 
-              />
+    <ScrollView style={styles.scrollView}>
+      <View style={styles.container}>
+        <Text style={styles.title}>SleepCue</Text>
+        <Text style={styles.subtitle}>Never lose your place or drain your battery</Text>
+        
+        <AudioController />
+
+        {isDetecting && (
+          <View style={styles.statusContainer}>
+            <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]}>
+              <Text style={styles.statusEmoji}>{getStatusEmoji()}</Text>
+              <Text style={styles.statusText}>{detectionStatus.toUpperCase()}</Text>
             </View>
-            <Text style={styles.confidencePercentage}>{Math.round(confidence * 100)}%</Text>
+            <View style={styles.confidenceContainer}>
+              <Text style={styles.confidenceLabel}>Detection Confidence</Text>
+              <View style={styles.confidenceBar}>
+                <View 
+                  style={[
+                    styles.confidenceFill, 
+                    { 
+                      width: `${confidence * 100}%`,
+                      backgroundColor: getStatusColor()
+                    }
+                  ]} 
+                />
+              </View>
+              <Text style={styles.confidencePercentage}>{Math.round(confidence * 100)}%</Text>
+            </View>
           </View>
+        )}
+
+        <TouchableOpacity 
+          style={[styles.mainButton, isDetecting && styles.mainButtonActive]} 
+          onPress={handleToggleDetection}
+        >
+          <Text style={styles.mainButtonText}>
+            {isDetecting ? 'Stop Detection' : 'Start Sleep Detection'}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.linksContainer}>
+          <Link href="/timer" style={styles.link}>
+            <Text style={styles.linkText}>⏱️ Sleep Timer</Text>
+          </Link>
+          <Link href="/insights" style={styles.link}>
+            <Text style={styles.linkText}>📊 Sleep Insights</Text>
+          </Link>
+          <Link href="/settings" style={styles.link}>
+            <Text style={styles.linkText}>⚙️ Settings</Text>
+          </Link>
         </View>
-      )}
-
-      <TouchableOpacity 
-        style={[styles.mainButton, isDetecting && styles.mainButtonActive]} 
-        onPress={handleToggleDetection}
-      >
-        <Text style={styles.mainButtonText}>
-          {isDetecting ? 'Stop Detection' : 'Start Sleep Detection'}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.linksContainer}>
-        <Link href="/timer" style={styles.link}>
-          <Text style={styles.linkText}>⏱️ Sleep Timer</Text>
-        </Link>
-        <Link href="/insights" style={styles.link}>
-          <Text style={styles.linkText}>📊 Sleep Insights</Text>
-        </Link>
-        <Link href="/settings" style={styles.link}>
-          <Text style={styles.linkText}>⚙️ Settings</Text>
-        </Link>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
+  scrollView: {
+    flex: 1,
+    backgroundColor: '#F9FAFB',
+  },
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#F9FAFB',
   },
   title: {
     fontSize: 32,
@@ -120,12 +128,13 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
-    marginBottom: 40,
+    marginBottom: 30,
     textAlign: 'center',
     color: '#6B7280',
   },
   statusContainer: {
     width: '100%',
+    marginTop: 20,
     marginBottom: 30,
     alignItems: 'center',
   },
@@ -166,7 +175,6 @@ const styles = StyleSheet.create({
   confidenceFill: {
     height: '100%',
     borderRadius: 6,
-    transition: 'width 0.3s ease',
   },
   confidencePercentage: {
     fontSize: 20,

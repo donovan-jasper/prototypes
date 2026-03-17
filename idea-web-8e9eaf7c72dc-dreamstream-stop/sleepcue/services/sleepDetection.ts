@@ -27,10 +27,12 @@ export class SleepDetector {
     this.audioController = audioController || null;
     this.hasTriggeredSleep = false;
 
-    // Reset metering history
+    if (this.audioController) {
+      await this.audioController.initialize();
+    }
+
     resetMeteringHistory();
 
-    // Start motion detection
     this.motionSubscription = Accelerometer.addListener((data) => {
       this.motionData.push(data);
       if (this.motionData.length > 100) {
@@ -39,7 +41,6 @@ export class SleepDetector {
     });
     Accelerometer.setUpdateInterval(100);
 
-    // Start audio recording for metering
     try {
       await Audio.requestPermissionsAsync();
       await Audio.setAudioModeAsync({
@@ -55,7 +56,6 @@ export class SleepDetector {
       await recording.startAsync();
       this.audioRecording = recording;
 
-      // Check metering level every 5 seconds
       this.meteringCheckInterval = setInterval(() => {
         this.checkMeteringLevel();
       }, 5000);
@@ -63,7 +63,6 @@ export class SleepDetector {
       console.error('Failed to start audio recording:', error);
     }
 
-    // Start detection loop
     this.detectionLoop();
   }
 
@@ -75,19 +74,16 @@ export class SleepDetector {
     this.audioController = null;
     this.hasTriggeredSleep = false;
 
-    // Stop motion detection
     if (this.motionSubscription) {
       this.motionSubscription.remove();
       this.motionSubscription = null;
     }
 
-    // Stop metering check
     if (this.meteringCheckInterval) {
       clearInterval(this.meteringCheckInterval);
       this.meteringCheckInterval = null;
     }
 
-    // Stop audio recording
     if (this.audioRecording) {
       this.audioRecording.stopAndUnloadAsync().catch(err => {
         console.error('Error stopping recording:', err);
@@ -105,7 +101,6 @@ export class SleepDetector {
     try {
       const status = await this.audioRecording.getStatusAsync();
       if (status.isRecording && status.metering !== undefined) {
-        // Metering level is in dB, typically ranges from -160 (silence) to 0 (max)
         analyzeMeteringLevel(status.metering);
       }
     } catch (error) {
@@ -116,10 +111,8 @@ export class SleepDetector {
   private async detectionLoop() {
     if (!this.isDetecting) return;
 
-    // Analyze motion data
     const motionResult = analyzeMotion(this.motionData);
 
-    // Get latest audio analysis from metering
     let audioConfidence = 0;
     if (this.audioRecording) {
       try {
@@ -128,9 +121,8 @@ export class SleepDetector {
           const audioResult = analyzeMeteringLevel(status.metering);
           audioConfidence = audioResult.confidence;
           
-          // Combine results
           const combinedConfidence = (motionResult.confidence + audioConfidence) / 2;
-          const isSleeping = combinedConfidence > 0.7; // 70% confidence threshold
+          const isSleeping = combinedConfidence > 0.7;
 
           if (this.onUpdateCallback) {
             this.onUpdateCallback({
@@ -139,7 +131,6 @@ export class SleepDetector {
             });
           }
 
-          // Trigger audio pause when sleep detected (only once)
           if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
             this.hasTriggeredSleep = true;
             await this.audioController.fadeOutAndPause();
@@ -149,7 +140,6 @@ export class SleepDetector {
         console.error('Error in detection loop:', err);
       }
     } else {
-      // If no audio, use motion only
       const isSleeping = motionResult.confidence > 0.7;
       if (this.onUpdateCallback) {
         this.onUpdateCallback({
@@ -158,14 +148,12 @@ export class SleepDetector {
         });
       }
 
-      // Trigger audio pause when sleep detected (only once)
       if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
         this.hasTriggeredSleep = true;
         await this.audioController.fadeOutAndPause();
       }
     }
 
-    // Continue detection loop
     setTimeout(() => this.detectionLoop(), 1000);
   }
 }
