@@ -112,6 +112,22 @@ const RealTimeAnalysisScreen = () => {
           4. View detailed analysis of each message in the app
         </Text>
       </View>
+
+      <View style={styles.browserExtensionInfo}>
+        <Text style={styles.sectionTitle}>Browser Extension</Text>
+        <Text style={styles.instruction}>
+          Install our browser extension to analyze messages in your web browsers (Chrome, Firefox, Edge)
+        </Text>
+        <Text style={styles.instruction}>
+          The extension works alongside the mobile app for complete coverage
+        </Text>
+        <Text style={styles.instruction}>
+          Premium users get access to the extension and all its features
+        </Text>
+        <TouchableOpacity style={styles.extensionButton}>
+          <Text style={styles.extensionButtonText}>Install Browser Extension</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -238,6 +254,23 @@ const styles = StyleSheet.create({
   instruction: {
     fontSize: 16,
     marginBottom: 10,
+  },
+  browserExtensionInfo: {
+    marginTop: 30,
+    padding: 15,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 5,
+  },
+  extensionButton: {
+    backgroundColor: '#4285f4',
+    padding: 12,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  extensionButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });
 
