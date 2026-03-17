@@ -1,0 +1,71 @@
+import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
+import { useFonts } from 'expo-font';
+import { Stack } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect } from 'react';
+import 'react-native-reanimated';
+
+import { useColorScheme } from '@/hooks/useColorScheme';
+import { initDatabase } from '@/lib/database';
+
+// Prevent the splash screen from auto-hiding before asset loading is complete.
+SplashScreen.preventAutoHideAsync();
+
+export default function RootLayout() {
+  const colorScheme = useColorScheme();
+  const [loaded] = useFonts({
+    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
+  });
+
+  useEffect(() => {
+    if (loaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded]);
+
+  useEffect(() => {
+    // Initialize database on app launch
+    initDatabase().catch((error) => {
+      console.error('Failed to initialize database:', error);
+    });
+  }, []);
+
+  if (!loaded) {
+    return null;
+  }
+
+  return (
+    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" />
+        <Stack.Screen 
+          name="gift/[id]" 
+          options={{ 
+            headerShown: true,
+            title: 'Gift Details',
+            headerBackTitle: 'Back',
+          }} 
+        />
+        <Stack.Screen 
+          name="gift/send" 
+          options={{ 
+            headerShown: true,
+            title: 'Send Gift',
+            headerBackTitle: 'Back',
+          }} 
+        />
+        <Stack.Screen 
+          name="checkout" 
+          options={{ 
+            headerShown: true,
+            title: 'Checkout',
+            headerBackTitle: 'Back',
+          }} 
+        />
+      </Stack>
+      <StatusBar style="auto" />
+    </ThemeProvider>
+  );
+}
