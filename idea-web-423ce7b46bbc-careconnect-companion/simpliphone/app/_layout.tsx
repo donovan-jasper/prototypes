@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { initDB } from '../database/db';
+import { registerNotificationHandlers } from '../services/notifications';
 
 export default function RootLayout() {
   const [isDBReady, setIsDBReady] = useState(false);
@@ -18,7 +19,6 @@ export default function RootLayout() {
         console.error('Database initialization failed:', err);
         setError('Failed to initialize database. Using fallback storage.');
         
-        // Fallback: Ensure AsyncStorage is accessible
         try {
           await AsyncStorage.setItem('db_fallback', 'true');
           setIsDBReady(true);
@@ -30,6 +30,11 @@ export default function RootLayout() {
     };
 
     setupDatabase();
+  }, []);
+
+  useEffect(() => {
+    const subscription = registerNotificationHandlers();
+    return () => subscription?.remove();
   }, []);
 
   if (error && !isDBReady) {
