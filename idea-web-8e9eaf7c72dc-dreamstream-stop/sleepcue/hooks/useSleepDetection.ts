@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SleepDetector } from '../services/sleepDetection';
 import { AudioController } from '../services/audioControl';
 import { DatabaseService } from '../services/database';
+import { Audio } from 'expo-av';
 
 interface SleepDetectionResult {
   isSleeping: boolean;
@@ -13,36 +14,59 @@ export function useSleepDetection() {
   const [confidence, setConfidence] = useState(0);
   const [isDetecting, setIsDetecting] = useState(false);
 
-  const sleepDetector = new SleepDetector();
-  const audioController = new AudioController();
-  const database = new DatabaseService();
+  const sleepDetectorRef = useRef<SleepDetector | null>(null);
+  const audioControllerRef = useRef<AudioController | null>(null);
+  const databaseRef = useRef<DatabaseService | null>(null);
+
+  useEffect(() => {
+    sleepDetectorRef.current = new SleepDetector();
+    audioControllerRef.current = new AudioController();
+    databaseRef.current = new DatabaseService();
+
+    return () => {
+      if (sleepDetectorRef.current && isDetecting) {
+        sleepDetectorRef.current.stopDetection();
+      }
+    };
+  }, []);
 
   const handleDetectionUpdate = useCallback((result: SleepDetectionResult) => {
     setIsSleeping(result.isSleeping);
     setConfidence(result.confidence);
 
-    if (result.isSleeping) {
-      // Pause audio when sleep is detected
-      audioController.fadeOutAndPause();
-
+    if (result.isSleeping && databaseRef.current) {
       // Log sleep session to database
       const now = new Date();
-      database.addSleepSession({
+      databaseRef.current.addSleepSession({
         startTime: now.toISOString(),
         endTime: now.toISOString(),
-        duration: 0, // Will be updated when session ends
+        duration: 0,
         confidence: result.confidence,
-        batterySaved: 0, // Will be calculated based on duration
+        batterySaved: 0,
+      }).catch(err => {
+        console.error('Failed to log sleep session:', err);
       });
     }
   }, []);
 
   const startDetection = useCallback(async () => {
-    if (isDetecting) return;
+    if (isDetecting || !sleepDetectorRef.current || !audioControllerRef.current) return;
 
     try {
+      // Set up audio mode to control system playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        playThroughEarpieceAndroid: false,
+      });
+
       setIsDetecting(true);
-      await sleepDetector.startDetection(handleDetectionUpdate);
+      await sleepDetectorRef.current.startDetection(
+        handleDetectionUpdate,
+        audioControllerRef.current
+      );
     } catch (error) {
       console.error('Failed to start sleep detection:', error);
       setIsDetecting(false);
@@ -50,21 +74,13 @@ export function useSleepDetection() {
   }, [isDetecting, handleDetectionUpdate]);
 
   const stopDetection = useCallback(() => {
-    if (!isDetecting) return;
+    if (!isDetecting || !sleepDetectorRef.current) return;
 
-    sleepDetector.stopDetection();
+    sleepDetectorRef.current.stopDetection();
     setIsDetecting(false);
     setIsSleeping(false);
     setConfidence(0);
   }, [isDetecting]);
-
-  useEffect(() => {
-    return () => {
-      if (isDetecting) {
-        stopDetection();
-      }
-    };
-  }, [isDetecting, stopDetection]);
 
   return {
     isSleeping,

@@ -2,6 +2,7 @@ import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
 import { analyzeMotion } from '../utils/motionAnalysis';
 import { analyzeMeteringLevel, resetMeteringHistory } from '../utils/audioAnalysis';
+import { AudioController } from './audioControl';
 
 interface SleepDetectionResult {
   isSleeping: boolean;
@@ -15,12 +16,16 @@ export class SleepDetector {
   private motionData: { x: number; y: number; z: number }[] = [];
   private onUpdateCallback: ((result: SleepDetectionResult) => void) | null = null;
   private meteringCheckInterval: NodeJS.Timeout | null = null;
+  private audioController: AudioController | null = null;
+  private hasTriggeredSleep: boolean = false;
 
-  public async startDetection(onUpdate: (result: SleepDetectionResult) => void) {
+  public async startDetection(onUpdate: (result: SleepDetectionResult) => void, audioController?: AudioController) {
     if (this.isDetecting) return;
 
     this.isDetecting = true;
     this.onUpdateCallback = onUpdate;
+    this.audioController = audioController || null;
+    this.hasTriggeredSleep = false;
 
     // Reset metering history
     resetMeteringHistory();
@@ -67,6 +72,8 @@ export class SleepDetector {
 
     this.isDetecting = false;
     this.onUpdateCallback = null;
+    this.audioController = null;
+    this.hasTriggeredSleep = false;
 
     // Stop motion detection
     if (this.motionSubscription) {
@@ -106,7 +113,7 @@ export class SleepDetector {
     }
   }
 
-  private detectionLoop() {
+  private async detectionLoop() {
     if (!this.isDetecting) return;
 
     // Analyze motion data
@@ -115,7 +122,8 @@ export class SleepDetector {
     // Get latest audio analysis from metering
     let audioConfidence = 0;
     if (this.audioRecording) {
-      this.audioRecording.getStatusAsync().then(status => {
+      try {
+        const status = await this.audioRecording.getStatusAsync();
         if (status.isRecording && status.metering !== undefined) {
           const audioResult = analyzeMeteringLevel(status.metering);
           audioConfidence = audioResult.confidence;
@@ -130,10 +138,16 @@ export class SleepDetector {
               confidence: combinedConfidence,
             });
           }
+
+          // Trigger audio pause when sleep detected (only once)
+          if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
+            this.hasTriggeredSleep = true;
+            await this.audioController.fadeOutAndPause();
+          }
         }
-      }).catch(err => {
+      } catch (err) {
         console.error('Error in detection loop:', err);
-      });
+      }
     } else {
       // If no audio, use motion only
       const isSleeping = motionResult.confidence > 0.7;
@@ -142,6 +156,12 @@ export class SleepDetector {
           isSleeping,
           confidence: motionResult.confidence,
         });
+      }
+
+      // Trigger audio pause when sleep detected (only once)
+      if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
+        this.hasTriggeredSleep = true;
+        await this.audioController.fadeOutAndPause();
       }
     }
 
