@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TouchableOpacity, StyleSheet, Text, View, ActivityIndicator, Linking, Alert } from 'react-native';
+import { TouchableOpacity, StyleSheet, Text, View, ActivityIndicator, Linking, Alert, Platform } from 'react-native';
 import { checkPermissions, requestPermissions, startRecording, stopRecording, transcribeAudio } from '../lib/voice';
 
 type VoiceButtonProps = {
@@ -12,20 +12,25 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
   const [isLoading, setIsLoading] = useState(false);
   const [permissionStatus, setPermissionStatus] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
   const [recordingError, setRecordingError] = useState<string | null>(null);
+  const [showRationale, setShowRationale] = useState(false);
 
   useEffect(() => {
     checkPermissions().then(setPermissionStatus);
   }, []);
 
   const openSettings = () => {
-    Linking.openSettings();
+    if (Platform.OS === 'ios') {
+      Linking.openURL('app-settings:');
+    } else {
+      Linking.openSettings();
+    }
   };
 
   const handlePress = async () => {
     if (permissionStatus === 'denied') {
       Alert.alert(
         'Microphone Access Required',
-        'Please enable microphone access in settings to use voice features',
+        'VoxCrew needs microphone access to record your voice messages. Please enable this permission in your device settings.',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Open Settings', onPress: openSettings }
@@ -35,8 +40,10 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
     }
 
     if (permissionStatus === 'undetermined') {
+      setShowRationale(true);
       const status = await requestPermissions();
       setPermissionStatus(status);
+      setShowRationale(false);
       if (status === 'denied') return;
     }
 
@@ -67,6 +74,23 @@ export default function VoiceButton({ onTranscript, onError }: VoiceButtonProps)
       }
     }
   };
+
+  if (showRationale) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.rationaleContainer}>
+          <Text style={styles.rationaleTitle}>Microphone Access</Text>
+          <Text style={styles.rationaleText}>
+            VoxCrew needs access to your microphone to record and transcribe your voice messages.
+            This helps you communicate hands-free while working in the field.
+          </Text>
+          <TouchableOpacity style={styles.rationaleButton} onPress={handlePress}>
+            <Text style={styles.rationaleButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   if (permissionStatus === 'denied') {
     return (
@@ -118,6 +142,40 @@ const styles = StyleSheet.create({
   container: {
     padding: 16,
     alignItems: 'center',
+  },
+  rationaleContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '90%',
+    maxWidth: 400,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  rationaleTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  rationaleText: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  rationaleButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 20,
+    alignItems: 'center',
+  },
+  rationaleButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   button: {
     backgroundColor: '#007AFF',
