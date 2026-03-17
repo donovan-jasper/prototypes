@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { Text, Button, Divider, Card, Chip } from 'react-native-paper';
+import { Text, Button, Divider, Card, Chip, ProgressBar } from 'react-native-paper';
 import CostChart from '../../components/CostChart';
 import { getUsageHistory, getMonthlyTotal } from '../../services/database';
 import { UsageEntry } from '../../types/models';
@@ -11,6 +11,7 @@ export default function TrackerScreen() {
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
   const [projectedCost, setProjectedCost] = useState<number | null>(null);
   const [savingsOpportunities, setSavingsOpportunities] = useState<string[]>([]);
+  const [budgetLimit, setBudgetLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,11 +43,27 @@ export default function TrackerScreen() {
       const { projectedCost, savingsOpportunities } = await projectMonthlyCost(chartData);
       setProjectedCost(projectedCost);
       setSavingsOpportunities(savingsOpportunities);
+
+      // Load budget limit
+      const limit = await getSetting('budget_limit');
+      if (limit) setBudgetLimit(parseFloat(limit));
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getBudgetProgress = () => {
+    if (!budgetLimit || !projectedCost) return 0;
+    return Math.min(projectedCost / budgetLimit, 1);
+  };
+
+  const getBudgetStatusColor = () => {
+    const progress = getBudgetProgress();
+    if (progress > 0.9) return '#f44336'; // Red
+    if (progress > 0.7) return '#ff9800'; // Orange
+    return '#4CAF50'; // Green
   };
 
   if (loading) {
@@ -89,6 +106,23 @@ export default function TrackerScreen() {
               </View>
             )}
           </View>
+
+          {budgetLimit && projectedCost && (
+            <View style={styles.budgetContainer}>
+              <Text variant="bodyMedium" style={styles.budgetLabel}>
+                Budget: ${budgetLimit.toFixed(2)}
+              </Text>
+              <ProgressBar
+                progress={getBudgetProgress()}
+                color={getBudgetStatusColor()}
+                style={styles.budgetProgress}
+              />
+              <Text variant="bodySmall" style={styles.budgetStatus}>
+                {getBudgetProgress() > 0.9 ? 'Warning: Approaching limit' :
+                 getBudgetProgress() > 0.7 ? 'Caution: Near limit' : 'On track'}
+              </Text>
+            </View>
+          )}
         </Card.Content>
       </Card>
 
@@ -182,6 +216,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
   totalAmount: {
     fontWeight: 'bold',
@@ -197,6 +232,22 @@ const styles = StyleSheet.create({
   projectionAmount: {
     fontWeight: 'bold',
     color: '#2196F3',
+  },
+  budgetContainer: {
+    marginTop: 16,
+  },
+  budgetLabel: {
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  budgetProgress: {
+    height: 8,
+    borderRadius: 4,
+  },
+  budgetStatus: {
+    marginTop: 4,
+    textAlign: 'right',
+    fontWeight: 'bold',
   },
   savingsSection: {
     marginVertical: 24,
