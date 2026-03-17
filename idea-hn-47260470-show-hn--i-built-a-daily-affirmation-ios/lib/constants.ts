@@ -6,4 +6,5 @@ export const STREAK_COLORS = {
   regular: '#4CAF50',
   grace: '#FFD700',
   today: '#2196F3',
+  milestone: '#0066cc',
 };

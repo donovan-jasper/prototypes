@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
+import { MILESTONE_DAYS, STREAK_COLORS } from '../lib/constants';
 
 interface StreakDay {
   date: string;
@@ -24,6 +25,13 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     streakMap.set(day.date, day.isGraceDay || false);
   });
 
+  // Get all milestone dates in the current month
+  const milestoneDates = MILESTONE_DAYS.map(days => {
+    const milestoneDate = new Date();
+    milestoneDate.setDate(today.getDate() - days);
+    return format(milestoneDate, 'yyyy-MM-dd');
+  });
+
   return (
     <View style={styles.container}>
       <Text style={styles.monthHeader}>{format(today, 'MMMM yyyy')}</Text>
@@ -37,24 +45,42 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
           const dayString = format(day, 'yyyy-MM-dd');
           const isStreakDay = streakMap.has(dayString);
           const isGraceDay = streakMap.get(dayString);
+          const isMilestone = milestoneDates.includes(dayString);
 
           return (
             <View key={index} style={styles.dayContainer}>
               <Text style={[
                 styles.dayNumber,
-                isSameDay(day, today) ? styles.today : null
+                isSameDay(day, today) ? styles.today : null,
+                isMilestone ? styles.milestone : null
               ]}>
                 {format(day, 'd')}
               </Text>
               {isStreakDay && (
                 <View style={[
                   styles.dot,
-                  { backgroundColor: isGraceDay ? '#FFD700' : '#4CAF50' }
+                  { backgroundColor: isGraceDay ? STREAK_COLORS.grace : STREAK_COLORS.regular }
                 ]} />
+              )}
+              {isMilestone && (
+                <Text style={styles.milestoneBadge}>🎉</Text>
               )}
             </View>
           );
         })}
+      </View>
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
+          <Text style={styles.legendText}>Regular Day</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.grace }]} />
+          <Text style={styles.legendText}>Grace Day</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <Text style={styles.legendText}>🎉 Milestone</Text>
+        </View>
       </View>
     </View>
   );
@@ -91,19 +117,50 @@ const styles = StyleSheet.create({
     width: '14.28%',
     alignItems: 'center',
     paddingVertical: 8,
+    position: 'relative',
   },
   dayNumber: {
     fontSize: 16,
     marginBottom: 4,
   },
   today: {
-    color: '#2196F3',
+    color: STREAK_COLORS.today,
+    fontWeight: 'bold',
+  },
+  milestone: {
+    color: '#0066cc',
     fontWeight: 'bold',
   },
   dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+  },
+  milestoneBadge: {
+    position: 'absolute',
+    top: -5,
+    right: 5,
+    fontSize: 12,
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 15,
+    paddingHorizontal: 10,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 5,
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 

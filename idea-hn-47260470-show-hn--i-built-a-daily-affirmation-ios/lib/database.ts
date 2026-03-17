@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import { format, isSameDay, subDays, startOfWeek, addDays } from 'date-fns';
+import { format, isSameDay, subDays, startOfWeek, addDays, isWithinInterval } from 'date-fns';
+import { GRACE_DAYS_PER_WEEK } from './constants';
 
 let db: SQLite.SQLiteDatabase;
 
@@ -120,19 +121,19 @@ export const updateStreak = async () => {
   // Calculate streak with grace days
   let currentStreak = 1;
   let lastDate = new Date(sessions[0].timestamp);
-  let graceDaysUsed = 0;
   const today = new Date();
 
   // Get the start of the current week to track grace days per week
   const weekStart = startOfWeek(today);
+  const weekEnd = endOfWeek(today);
 
   // Count how many grace days have been used this week
   const graceDaysThisWeek = await db.getFirstAsync(
-    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date >= ?',
-    [format(weekStart, 'yyyy-MM-dd')]
+    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date BETWEEN ? AND ?',
+    [format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')]
   );
 
-  graceDaysUsed = graceDaysThisWeek.count;
+  const graceDaysUsed = graceDaysThisWeek.count;
 
   // Check if the last session was yesterday
   const yesterday = subDays(today, 1);
@@ -142,9 +143,8 @@ export const updateStreak = async () => {
     // Check if we can use a grace day
     const daysSinceLastSession = Math.floor((today.getTime() - new Date(sessions[0].timestamp).getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysSinceLastSession === 2 && graceDaysUsed < 2) {
+    if (daysSinceLastSession === 2 && graceDaysUsed < GRACE_DAYS_PER_WEEK) {
       // Use a grace day
-      graceDaysUsed++;
       currentStreak = 1;
 
       // Add the grace day to the streaks table
@@ -192,20 +192,19 @@ export const getCurrentStreak = async () => {
 
   // Calculate streak with grace days
   let currentStreak = 1;
-  let lastDate = new Date(sessions[0].timestamp);
-  let graceDaysUsed = 0;
   const today = new Date();
 
   // Get the start of the current week to track grace days per week
   const weekStart = startOfWeek(today);
+  const weekEnd = endOfWeek(today);
 
   // Count how many grace days have been used this week
   const graceDaysThisWeek = await db.getFirstAsync(
-    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date >= ?',
-    [format(weekStart, 'yyyy-MM-dd')]
+    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date BETWEEN ? AND ?',
+    [format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')]
   );
 
-  graceDaysUsed = graceDaysThisWeek.count;
+  const graceDaysUsed = graceDaysThisWeek.count;
 
   // Check if the last session was yesterday
   const yesterday = subDays(today, 1);
@@ -215,9 +214,8 @@ export const getCurrentStreak = async () => {
     // Check if we can use a grace day
     const daysSinceLastSession = Math.floor((today.getTime() - new Date(sessions[0].timestamp).getTime()) / (1000 * 60 * 60 * 24));
 
-    if (daysSinceLastSession === 2 && graceDaysUsed < 2) {
+    if (daysSinceLastSession === 2 && graceDaysUsed < GRACE_DAYS_PER_WEEK) {
       // Use a grace day
-      graceDaysUsed++;
       currentStreak = 1;
     } else {
       // Reset streak
@@ -225,5 +223,50 @@ export const getCurrentStreak = async () => {
     }
   }
 
-  return currentStreak;
+  // Calculate the actual streak length by counting consecutive days
+  let streakLength = 1;
+  let previousDate = new Date(sessions[0].timestamp);
+
+  for (let i = 1; i < sessions.length; i++) {
+    const currentDate = new Date(sessions[i].timestamp);
+    const diffDays = Math.floor((previousDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 1) {
+      streakLength++;
+      previousDate = currentDate;
+    } else if (diffDays === 2) {
+      // Check if this was a grace day
+      const graceDayDate = subDays(previousDate, 1);
+      const isGraceDay = await db.getFirstAsync(
+        'SELECT * FROM streaks WHERE date = ? AND is_grace_day = 1',
+        [format(graceDayDate, 'yyyy-MM-dd')]
+      );
+
+      if (isGraceDay) {
+        streakLength++;
+        previousDate = currentDate;
+      } else {
+        break;
+      }
+    } else {
+      break;
+    }
+  }
+
+  return streakLength;
+};
+
+export const getGraceDaysUsedThisWeek = async () => {
+  if (!db) await initDatabase();
+
+  const today = new Date();
+  const weekStart = startOfWeek(today);
+  const weekEnd = endOfWeek(today);
+
+  const result = await db.getFirstAsync(
+    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date BETWEEN ? AND ?',
+    [format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')]
+  );
+
+  return result.count;
 };

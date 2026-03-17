@@ -1,8 +1,16 @@
-import { initDatabase, addGoal, getGoals, logSession, getCurrentStreak, updateStreak } from '../lib/database';
+import { initDatabase, addGoal, getGoals, logSession, getCurrentStreak, updateStreak, getGraceDaysUsedThisWeek } from '../lib/database';
+import { format, startOfWeek, endOfWeek, subDays } from 'date-fns';
 
 describe('Database', () => {
   beforeAll(async () => {
     await initDatabase();
+  });
+
+  beforeEach(async () => {
+    // Clear all tables before each test
+    await db.runAsync('DELETE FROM user_sessions');
+    await db.runAsync('DELETE FROM streaks');
+    await db.runAsync('DELETE FROM goals');
   });
 
   test('addGoal creates a new goal', async () => {
@@ -36,16 +44,10 @@ describe('Database', () => {
   });
 
   test('streak calculation with grace day', async () => {
-    // Clear existing data
-    await db.runAsync('DELETE FROM user_sessions');
-    await db.runAsync('DELETE FROM streaks');
-
     // Add sessions with a gap that should use a grace day
     const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const twoDaysAgo = new Date(today);
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+    const yesterday = subDays(today, 1);
+    const twoDaysAgo = subDays(today, 2);
 
     // Log sessions in reverse chronological order
     await db.runAsync(
@@ -59,5 +61,44 @@ describe('Database', () => {
 
     const streak = await getCurrentStreak();
     expect(streak).toBe(2); // Should count as 2 days with one grace day
+  });
+
+  test('grace days reset weekly', async () => {
+    // Add a grace day from last week
+    const lastWeek = subDays(new Date(), 7);
+    await db.runAsync(
+      'INSERT INTO streaks (date, is_grace_day) VALUES (?, ?)',
+      [format(lastWeek, 'yyyy-MM-dd'), 1]
+    );
+
+    // Add a grace day from this week
+    const thisWeek = subDays(new Date(), 1);
+    await db.runAsync(
+      'INSERT INTO streaks (date, is_grace_day) VALUES (?, ?)',
+      [format(thisWeek, 'yyyy-MM-dd'), 1]
+    );
+
+    const graceDays = await getGraceDaysUsedThisWeek();
+    expect(graceDays).toBe(1); // Only counts this week's grace day
+  });
+
+  test('grace days limit per week', async () => {
+    // Add two grace days this week
+    const today = new Date();
+    const yesterday = subDays(today, 1);
+
+    await db.runAsync(
+      'INSERT INTO streaks (date, is_grace_day) VALUES (?, ?)',
+      [format(yesterday, 'yyyy-MM-dd'), 1]
+    );
+
+    await db.runAsync(
+      'INSERT INTO streaks (date, is_grace_day) VALUES (?, ?)',
+      [format(today, 'yyyy-MM-dd'), 1]
+    );
+
+    // Try to use a third grace day
+    const result = await updateStreak();
+    expect(result).toBe(1); // Should not allow third grace day
   });
 });

@@ -1,6 +1,7 @@
 import { initDatabase, seedAffirmations, getCurrentStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
 import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { MILESTONE_DAYS } from './constants';
 
 let initialized = false;
 
@@ -42,7 +43,7 @@ export const calculateStreak = async (sessions: any[]) => {
 };
 
 export const shouldShowMilestone = (streakCount: number) => {
-  return [7, 30, 100, 365].includes(streakCount);
+  return MILESTONE_DAYS.includes(streakCount);
 };
 
 export const getStreakDataForCalendar = async () => {
@@ -63,4 +64,12 @@ export const getStreakDataForCalendar = async () => {
     date: streak.date,
     isGraceDay: streak.is_grace_day === 1
   }));
+};
+
+export const getMilestoneDates = (currentDate: Date) => {
+  return MILESTONE_DAYS.map(days => {
+    const milestoneDate = new Date(currentDate);
+    milestoneDate.setDate(currentDate.getDate() - days);
+    return format(milestoneDate, 'yyyy-MM-dd');
+  });
 };
