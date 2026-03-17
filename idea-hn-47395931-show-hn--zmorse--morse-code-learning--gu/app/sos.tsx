@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Button, Alert } from 'react-native';
+import { View, Text, StyleSheet, Button, Alert, Modal, TextInput } from 'react-native';
 import { Camera, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import PremiumGate from '../components/PremiumGate';
+import { textToMorse } from '../lib/morse';
 
 export default function SOSScreen() {
   const [active, setActive] = useState(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [isPremium, setIsPremium] = useState(false);
   const [customMessage, setCustomMessage] = useState('SOS');
+  const [showCustomModal, setShowCustomModal] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
 
   useEffect(() => {
     // Check premium status in production
@@ -28,8 +31,24 @@ export default function SOSScreen() {
     setActive(true);
 
     try {
-      // SOS pattern: ... --- ...
-      const pattern = [100, 100, 100, 100, 100, 300, 300, 300, 300, 300, 300, 100, 100, 100, 100, 100];
+      // Convert message to Morse code
+      const morse = textToMorse(customMessage);
+
+      // Create pattern from Morse code
+      const pattern = [];
+      for (const char of morse) {
+        if (char === '.') {
+          pattern.push(100); // Dot duration
+        } else if (char === '-') {
+          pattern.push(300); // Dash duration
+        } else if (char === ' ') {
+          pattern.push(100); // Space between symbols
+        }
+        pattern.push(100); // Gap between symbols
+      }
+
+      // Add a short pause at the end
+      pattern.push(500);
 
       for (const duration of pattern) {
         // Toggle flashlight
@@ -48,8 +67,15 @@ export default function SOSScreen() {
     if (!isPremium) {
       return;
     }
-    // In a real app, this would open a modal to set custom message
-    Alert.alert('Custom Message', 'Premium feature: Set your custom SOS message');
+    setShowCustomModal(true);
+  };
+
+  const saveCustomMessage = () => {
+    if (newMessage.trim()) {
+      setCustomMessage(newMessage.trim());
+      setShowCustomModal(false);
+      setNewMessage('');
+    }
   };
 
   return (
@@ -84,6 +110,38 @@ export default function SOSScreen() {
           />
         </View>
       )}
+
+      <Modal
+        visible={showCustomModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowCustomModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Set Custom SOS Message</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Enter your message"
+              value={newMessage}
+              onChangeText={setNewMessage}
+              autoFocus
+            />
+            <View style={styles.buttonRow}>
+              <Button
+                title="Cancel"
+                onPress={() => setShowCustomModal(false)}
+                color="#999"
+              />
+              <Button
+                title="Save"
+                onPress={saveCustomMessage}
+                disabled={!newMessage.trim()}
+              />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -122,5 +180,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 15,
     color: '#007AFF',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 25,
+    borderRadius: 15,
+    width: '85%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
 });
