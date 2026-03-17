@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, ScrollView, StyleSheet, TextInput, Switch } from 'react-native';
+import { View, Text, Button, ScrollView, StyleSheet, TextInput, Switch, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { useFilesStore } from '../store/files';
+import { useNavigation } from '@react-navigation/native';
 
 interface Column {
   name: string;
@@ -19,7 +20,8 @@ interface Sort {
   direction: 'ASC' | 'DESC';
 }
 
-const QueryBuilder = ({ onGenerate }) => {
+const QueryBuilder = () => {
+  const navigation = useNavigation();
   const { files } = useFilesStore();
   const [selectedTable, setSelectedTable] = useState<string>('');
   const [columns, setColumns] = useState<Column[]>([]);
@@ -37,7 +39,8 @@ const QueryBuilder = ({ onGenerate }) => {
       { name: 'name', type: 'TEXT' },
       { name: 'age', type: 'INTEGER' },
       { name: 'price', type: 'REAL' },
-      { name: 'active', type: 'BOOLEAN' }
+      { name: 'active', type: 'BOOLEAN' },
+      { name: 'date', type: 'TEXT' }
     ];
   };
 
@@ -58,7 +61,11 @@ const QueryBuilder = ({ onGenerate }) => {
   };
 
   const handleAddFilter = () => {
-    setFilters(prev => [...prev, { column: '', operator: '=', value: '' }]);
+    if (columns.length === 0) {
+      Alert.alert('Error', 'Please select a table first');
+      return;
+    }
+    setFilters(prev => [...prev, { column: columns[0].name, operator: '=', value: '' }]);
   };
 
   const handleUpdateFilter = (index: number, field: keyof Filter, value: string) => {
@@ -78,6 +85,11 @@ const QueryBuilder = ({ onGenerate }) => {
   };
 
   const generateSQL = () => {
+    if (!selectedTable) {
+      Alert.alert('Error', 'Please select a table');
+      return;
+    }
+
     const selectClause = selectedColumns.length > 0
       ? selectedColumns.map(col => `"${col}"`).join(', ')
       : '*';
@@ -105,7 +117,18 @@ const QueryBuilder = ({ onGenerate }) => {
 
     const sql = `SELECT ${selectClause} FROM ${fromClause} ${whereClause} ${orderByClause} ${limitClause}`;
     setGeneratedSQL(sql);
-    onGenerate(sql);
+  };
+
+  const handleRunQuery = () => {
+    if (!generatedSQL) {
+      Alert.alert('Error', 'Please generate SQL first');
+      return;
+    }
+
+    navigation.navigate('Query', {
+      id: Date.now().toString(),
+      sql: generatedSQL
+    });
   };
 
   return (
@@ -152,7 +175,6 @@ const QueryBuilder = ({ onGenerate }) => {
               onValueChange={(value) => handleUpdateFilter(index, 'column', value)}
               style={styles.filterPicker}
             >
-              <Picker.Item label="Select column" value="" />
               {columns.map((col) => (
                 <Picker.Item key={col.name} label={col.name} value={col.name} />
               ))}
@@ -167,6 +189,9 @@ const QueryBuilder = ({ onGenerate }) => {
               <Picker.Item label=">" value=">" />
               <Picker.Item label="<" value="<" />
               <Picker.Item label="LIKE" value="LIKE" />
+              <Picker.Item label=">=" value=">=" />
+              <Picker.Item label="<=" value="<=" />
+              <Picker.Item label="!=" value="!=" />
             </Picker>
 
             <TextInput
@@ -225,11 +250,18 @@ const QueryBuilder = ({ onGenerate }) => {
       </View>
 
       {/* Generate SQL Button */}
-      <Button
-        title="Generate SQL"
-        onPress={generateSQL}
-        disabled={!selectedTable}
-      />
+      <View style={styles.buttonContainer}>
+        <Button
+          title="Generate SQL"
+          onPress={generateSQL}
+          disabled={!selectedTable}
+        />
+        <Button
+          title="Run Query"
+          onPress={handleRunQuery}
+          disabled={!generatedSQL}
+        />
+      </View>
 
       {/* SQL Output */}
       {generatedSQL && (
@@ -320,6 +352,11 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 4,
     paddingHorizontal: 8,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   sqlOutput: {
     marginTop: 20,
