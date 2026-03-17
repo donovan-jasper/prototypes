@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { TextInput, Button, Text, HelperText, Checkbox } from 'react-native-paper';
 import { router } from 'expo-router';
-import { insertUser } from '@/lib/database';
+import { insertUser, getUsers } from '@/lib/database';
 import { User } from '@/lib/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -23,6 +23,12 @@ export default function SignupScreen() {
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
     const ageNum = parseInt(age, 10);
     if (isNaN(ageNum) || ageNum < 18) {
       setError('You must be 18 or older to use BridgeCircle');
@@ -37,6 +43,17 @@ export default function SignupScreen() {
     setLoading(true);
 
     try {
+      const existingUsers = await getUsers();
+      const emailExists = existingUsers.some(
+        u => u.email.toLowerCase() === email.toLowerCase().trim()
+      );
+
+      if (emailExists) {
+        setError('An account with this email already exists');
+        setLoading(false);
+        return;
+      }
+
       const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const newUser: User = {
@@ -57,3 +74,157 @@ export default function SignupScreen() {
       router.replace('/(auth)/select-interests');
     } catch (err) {
       setError('Signup failed. Please try again.');
+      console.error('Signup error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView 
+      style={styles.container} 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.content}>
+          <Text variant="headlineLarge" style={styles.title}>Create Account</Text>
+          <Text variant="bodyLarge" style={styles.subtitle}>
+            Join BridgeCircle to connect across generations
+          </Text>
+
+          <TextInput
+            label="Full Name"
+            value={name}
+            onChangeText={setName}
+            mode="outlined"
+            autoCapitalize="words"
+            autoComplete="name"
+            style={styles.input}
+            disabled={loading}
+          />
+
+          <TextInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            mode="outlined"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            style={styles.input}
+            disabled={loading}
+          />
+
+          <TextInput
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            mode="outlined"
+            secureTextEntry
+            autoComplete="password"
+            style={styles.input}
+            disabled={loading}
+          />
+
+          <TextInput
+            label="Age"
+            value={age}
+            onChangeText={setAge}
+            mode="outlined"
+            keyboardType="number-pad"
+            style={styles.input}
+            disabled={loading}
+          />
+
+          <View style={styles.checkboxContainer}>
+            <Checkbox
+              status={acceptedTerms ? 'checked' : 'unchecked'}
+              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              disabled={loading}
+            />
+            <Text variant="bodyMedium" style={styles.checkboxLabel}>
+              I accept the Terms of Service and Privacy Policy
+            </Text>
+          </View>
+
+          <Text variant="bodySmall" style={styles.ageNotice}>
+            You must be 18 or older to use BridgeCircle
+          </Text>
+
+          {error ? (
+            <HelperText type="error" visible={true} style={styles.error}>
+              {error}
+            </HelperText>
+          ) : null}
+
+          <Button
+            mode="contained"
+            onPress={handleSignup}
+            loading={loading}
+            disabled={loading}
+            style={styles.button}
+          >
+            Create Account
+          </Button>
+
+          <Button
+            mode="text"
+            onPress={() => router.push('/(auth)/login')}
+            disabled={loading}
+            style={styles.linkButton}
+          >
+            Already have an account? Sign in
+          </Button>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  content: {
+    padding: 24,
+  },
+  title: {
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    marginBottom: 32,
+    color: '#666',
+  },
+  input: {
+    marginBottom: 16,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  checkboxLabel: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  ageNotice: {
+    color: '#666',
+    marginBottom: 16,
+  },
+  button: {
+    marginTop: 8,
+    paddingVertical: 6,
+  },
+  linkButton: {
+    marginTop: 16,
+  },
+  error: {
+    marginBottom: 8,
+  },
+});
