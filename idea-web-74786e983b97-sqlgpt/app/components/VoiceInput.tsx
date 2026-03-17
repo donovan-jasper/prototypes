@@ -1,31 +1,37 @@
-import React, { useState } from 'react';
-import { View, Button } from 'react-native';
+import React from 'react';
+import { View, Button, StyleSheet } from 'react-native';
+import useVoiceRecognition from '../hooks/useVoiceRecognition';
 
 interface VoiceInputProps {
   onSpeechResults: (text: string) => void;
 }
 
 const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
-  const [isListening, setIsListening] = useState(false);
+  const { isListening, transcript, startListening, stopListening } = useVoiceRecognition();
 
-  const startListening = () => {
-    setIsListening(true);
-    // Simulate speech recognition
-    setTimeout(() => {
-      onSpeechResults('Show me sales last quarter');
-      setIsListening(false);
-    }, 1000);
-  };
+  React.useEffect(() => {
+    if (transcript) {
+      onSpeechResults(transcript);
+    }
+  }, [transcript, onSpeechResults]);
 
   return (
-    <View>
+    <View style={styles.container}>
       <Button
         title={isListening ? 'Listening...' : 'Start Listening'}
         onPress={startListening}
         disabled={isListening}
+        color="#007AFF"
       />
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    marginVertical: 16,
+    alignItems: 'center',
+  },
+});
 
 export default VoiceInput;

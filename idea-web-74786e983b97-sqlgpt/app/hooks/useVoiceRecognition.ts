@@ -1,20 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as Speech from 'expo-speech';
+import * as SpeechRecognition from 'expo-speech-recognition';
 
 const useVoiceRecognition = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
 
-  const startListening = () => {
+  useEffect(() => {
+    (async () => {
+      const { status } = await SpeechRecognition.requestPermissionsAsync();
+      if (status !== 'granted') {
+        console.error('Permission to access microphone was denied');
+      }
+    })();
+  }, []);
+
+  const startListening = async () => {
     setIsListening(true);
-    // Simulate speech recognition
-    setTimeout(() => {
-      setTranscript('Show me sales last quarter');
+    try {
+      await SpeechRecognition.startAsync({
+        language: 'en-US',
+        onRecognized: (result) => {
+          setTranscript(result.text);
+        },
+        onError: (error) => {
+          console.error('Speech recognition error:', error);
+        },
+      });
+    } catch (error) {
+      console.error('Speech recognition error:', error);
+    } finally {
       setIsListening(false);
-    }, 1000);
+    }
   };
 
-  const stopListening = () => {
-    setIsListening(false);
+  const stopListening = async () => {
+    try {
+      await SpeechRecognition.stopAsync();
+    } catch (error) {
+      console.error('Error stopping speech recognition:', error);
+    } finally {
+      setIsListening(false);
+    }
   };
 
   return { isListening, transcript, startListening, stopListening };
