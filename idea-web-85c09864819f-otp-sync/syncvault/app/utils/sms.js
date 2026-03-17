@@ -1,21 +1,28 @@
-import * as SQLite from 'expo-sqlite';
-import { encrypt, decrypt } from './encryption';
-
-const db = SQLite.openDatabase('syncvault.db');
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { db, auth } from '../../App';
 
 export const getSMSS = async () => {
-  // Fetch SMSs from the server or local storage
-  // ...
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      return [];
+    }
 
-  // Store the SMSs in the database
-  db.transaction((tx) => {
-    tx.executeSql(
-      'INSERT INTO smss (sender, body) VALUES (?, ?)',
-      [sms.sender, sms.body],
-      (_, result) => console.log('SMS stored successfully'),
-      (_, error) => console.log('Error storing SMS:', error)
+    const q = query(
+      collection(db, 'users', user.uid, 'smsMessages'),
+      orderBy('timestamp', 'desc')
     );
-  });
 
-  return smss;
+    const snapshot = await getDocs(q);
+    const messages = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate(),
+    }));
+
+    return messages;
+  } catch (error) {
+    console.error('Error fetching SMS messages:', error);
+    return [];
+  }
 };

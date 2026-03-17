@@ -4,11 +4,14 @@ import { signOut } from 'firebase/auth';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { auth, db } from '../../App';
 import OTPList from '../components/OTPList';
+import SMSScreen from './SMSScreen';
 import { generateTOTP, getTimeRemaining } from '../utils/otp';
+import { startSMSListener } from '../utils/smsListener';
 
 const HomeScreen = ({ navigation }) => {
   const [otpAccounts, setOtpAccounts] = useState([]);
   const [otps, setOtps] = useState([]);
+  const [activeTab, setActiveTab] = useState('otp');
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -28,6 +31,10 @@ const HomeScreen = ({ navigation }) => {
     });
 
     return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    startSMSListener();
   }, []);
 
   useEffect(() => {
@@ -64,23 +71,48 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.sectionTitle}>OTP Accounts</Text>
-      
-      {otps.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No OTP accounts yet</Text>
-          <Text style={styles.emptySubtext}>Tap the + button to add your first account</Text>
-        </View>
-      ) : (
-        <OTPList otps={otps} />
-      )}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'otp' && styles.activeTab]}
+          onPress={() => setActiveTab('otp')}
+        >
+          <Text style={[styles.tabText, activeTab === 'otp' && styles.activeTabText]}>
+            OTP
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'sms' && styles.activeTab]}
+          onPress={() => setActiveTab('sms')}
+        >
+          <Text style={[styles.tabText, activeTab === 'sms' && styles.activeTabText]}>
+            SMS
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity 
-        style={styles.addButton}
-        onPress={() => navigation.navigate('AddOTP')}
-      >
-        <Text style={styles.addButtonText}>+</Text>
-      </TouchableOpacity>
+      {activeTab === 'otp' ? (
+        <>
+          <Text style={styles.sectionTitle}>OTP Accounts</Text>
+          
+          {otps.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No OTP accounts yet</Text>
+              <Text style={styles.emptySubtext}>Tap the + button to add your first account</Text>
+            </View>
+          ) : (
+            <OTPList otps={otps} />
+          )}
+
+          <TouchableOpacity 
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddOTP')}
+          >
+            <Text style={styles.addButtonText}>+</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <SMSScreen />
+      )}
     </View>
   );
 };
@@ -108,6 +140,29 @@ const styles = StyleSheet.create({
   signOutText: {
     fontSize: 16,
     color: '#007AFF',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeTabText: {
+    color: '#007AFF',
+    fontWeight: '600',
   },
   sectionTitle: {
     fontSize: 20,
