@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { OrderContext } from '../../contexts/OrderContext';
 import { PaymentContext } from '../../contexts/PaymentContext';
 import PaymentSplitView from '../../components/PaymentSplitView';
-import { Stripe } from '@stripe/stripe-react-native';
+import { updateOrderPaymentStatus } from '../../lib/database';
 
 export default function PaymentSplitScreen() {
   const router = useRouter();
@@ -30,9 +30,9 @@ export default function PaymentSplitScreen() {
   useEffect(() => {
     if (order) {
       const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const tax = total * 0.08; // Assuming 8% tax
-      const tip = total * 0.15; // Assuming 15% tip
-      const deliveryFee = 5.00; // Fixed delivery fee
+      const tax = total * 0.08;
+      const tip = total * 0.15;
+      const deliveryFee = 5.00;
       const grandTotal = total + tax + tip + deliveryFee;
 
       const perPerson = grandTotal / order.participants.length;
@@ -58,21 +58,22 @@ export default function PaymentSplitScreen() {
 
     setLoading(true);
     try {
-      // In a real app, you would:
-      // 1. Get the payment method from the user's saved methods
-      // 2. Confirm each payment intent with the payment method
-      // 3. Handle the payment confirmation responses
-
-      // For this prototype, we'll simulate the payment process
       const result = await processPayment(order);
 
       if (result.status === 'success') {
-        setPaymentStatus('Payment successful!');
-        // Update order status in database
-        // In a real app, you would navigate to a confirmation screen
-        router.push({
-          pathname: `/order/${order.id}`,
-          params: { paymentStatus: 'success' }
+        updateOrderPaymentStatus(order.id, 'paid', (updateResult) => {
+          if (updateResult.success) {
+            setPaymentStatus('Payment successful! Order marked as paid.');
+            setTimeout(() => {
+              fetchOrders();
+              router.push({
+                pathname: `/order/${order.id}`,
+                params: { paymentStatus: 'success' }
+              });
+            }, 2000);
+          } else {
+            setPaymentStatus('Payment processed but failed to update order status.');
+          }
         });
       } else {
         setPaymentStatus('Payment failed. Please try again.');
@@ -128,6 +129,13 @@ export default function PaymentSplitScreen() {
           <Divider style={styles.divider} />
           <Text variant="titleLarge">Participants</Text>
           <PaymentSplitView split={split} />
+          
+          {loading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" />
+              <Text style={styles.loadingText}>Processing payment...</Text>
+            </View>
+          )}
         </Card.Content>
         <Card.Actions>
           <Button
@@ -167,5 +175,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  loadingContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
   },
 });

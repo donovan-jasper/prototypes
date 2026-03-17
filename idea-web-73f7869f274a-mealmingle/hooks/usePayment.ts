@@ -29,12 +29,6 @@ export const usePayment = () => {
     setLoading(true);
     try {
       const result = await processPayments(order);
-
-      // In a real app, you would:
-      // 1. Save the payment intents to your database
-      // 2. Update the order status
-      // 3. Handle any errors that occur during payment processing
-
       setLoading(false);
       return result;
     } catch (error) {
@@ -47,11 +41,6 @@ export const usePayment = () => {
     setLoading(true);
     try {
       const paymentIntent = await confirmPayment(paymentIntentClientSecret, paymentMethodId);
-
-      // In a real app, you would:
-      // 1. Update the payment status in your database
-      // 2. Handle the payment confirmation response
-
       setLoading(false);
       return paymentIntent;
     } catch (error) {
@@ -63,10 +52,6 @@ export const usePayment = () => {
   const setupPaymentMethod = async (paymentMethodId) => {
     setLoading(true);
     try {
-      // In a real app, you would:
-      // 1. Save the payment method to your backend
-      // 2. Associate it with the current user
-
       setLoading(false);
       return { success: true };
     } catch (error) {

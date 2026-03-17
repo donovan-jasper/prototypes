@@ -1,12 +1,10 @@
-import { Stripe } from '@stripe/stripe-react-native';
-
-const stripe = Stripe('YOUR_STRIPE_PUBLISHABLE_KEY');
+import { createMockPaymentIntent, confirmMockPaymentIntent } from './mockStripe';
 
 export const calculateSplit = (order, splitType) => {
   const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const tax = total * 0.08; // Assuming 8% tax
-  const tip = total * 0.15; // Assuming 15% tip
-  const deliveryFee = 5.00; // Fixed delivery fee
+  const tax = total * 0.08;
+  const tip = total * 0.15;
+  const deliveryFee = 5.00;
   const grandTotal = total + tax + tip + deliveryFee;
 
   if (splitType === 'equal') {
@@ -20,7 +18,6 @@ export const calculateSplit = (order, splitType) => {
       })),
     };
   }
-  // Add custom split logic here
   return null;
 };
 
@@ -28,11 +25,10 @@ export const createPaymentIntents = async (order, participants) => {
   const paymentIntents = [];
   for (const participant of participants) {
     try {
-      const paymentIntent = await stripe.createPaymentIntent({
-        amount: Math.round(participant.amount * 100), // Stripe uses cents
-        currency: 'usd',
-        paymentMethodType: 'Card',
-      });
+      const paymentIntent = createMockPaymentIntent(
+        Math.round(participant.amount * 100),
+        'usd'
+      );
       paymentIntents.push(paymentIntent);
     } catch (error) {
       console.error('Error creating payment intent:', error);
@@ -47,13 +43,14 @@ export const processPayments = async (order) => {
     const split = calculateSplit(order, 'equal');
     const paymentIntents = await createPaymentIntents(order, split.participants);
 
-    // In a real app, you would confirm each payment intent with the payment method
-    // and handle the responses
+    // Simulate payment confirmation for all intents
+    const confirmedIntents = await Promise.all(
+      paymentIntents.map(intent => confirmMockPaymentIntent(intent.clientSecret))
+    );
 
-    // Update payment status in database
     return {
       status: 'success',
-      paymentIntents,
+      paymentIntents: confirmedIntents,
       split
     };
   } catch (error) {
@@ -64,16 +61,7 @@ export const processPayments = async (order) => {
 
 export const confirmPayment = async (paymentIntentClientSecret, paymentMethodId) => {
   try {
-    const { paymentIntent, error } = await stripe.confirmPaymentIntent({
-      clientSecret: paymentIntentClientSecret,
-      paymentMethodId: paymentMethodId,
-    });
-
-    if (error) {
-      console.error('Error confirming payment:', error);
-      throw error;
-    }
-
+    const paymentIntent = await confirmMockPaymentIntent(paymentIntentClientSecret);
     return paymentIntent;
   } catch (error) {
     console.error('Error in confirmPayment:', error);

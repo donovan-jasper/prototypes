@@ -1,57 +1,33 @@
-import React, { useContext, useState } from 'react';
+import React, { useState } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
 import { Button, Text, Snackbar } from 'react-native-paper';
 import { useRouter } from 'expo-router';
-import { CardField, useStripe } from '@stripe/stripe-react-native';
-import { PaymentContext } from '../../contexts/PaymentContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createMockPaymentMethod, saveMockPaymentMethod } from '../../lib/mockStripe';
 
 export default function PaymentSetupScreen() {
   const router = useRouter();
-  const { confirmSetupIntent } = useStripe();
-  const { setupPaymentMethod } = useContext(PaymentContext);
-  const [cardDetails, setCardDetails] = useState(null);
   const [loading, setLoading] = useState(false);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const handleSetupPayment = async () => {
-    if (!cardDetails?.complete) {
-      setSnackbarMessage('Please enter complete card details');
-      setSnackbarVisible(true);
-      return;
-    }
-
     setLoading(true);
 
     try {
-      // In a real app, you would:
-      // 1. Create a setup intent on your backend
-      // 2. Get the client secret from your backend
-      // 3. Use that client secret here
-
-      // For this prototype, we'll simulate the setup process
-      const { error, setupIntent } = await confirmSetupIntent({
-        clientSecret: 'YOUR_SETUP_INTENT_CLIENT_SECRET', // Replace with actual client secret
-      });
-
-      if (error) {
-        setSnackbarMessage(error.message);
-        setSnackbarVisible(true);
-        return;
-      }
-
-      // In a real app, you would save the payment method to your backend
-      await setupPaymentMethod(setupIntent.paymentMethodId);
+      const paymentMethod = createMockPaymentMethod();
+      await saveMockPaymentMethod(paymentMethod.id);
+      
+      await AsyncStorage.setItem('paymentMethodId', paymentMethod.id);
 
       setSnackbarMessage('Payment method added successfully!');
       setSnackbarVisible(true);
 
-      // Navigate back to profile after a short delay
       setTimeout(() => {
         router.push('/(tabs)/profile');
       }, 1500);
     } catch (error) {
-      setSnackbarMessage(error.message);
+      setSnackbarMessage('Failed to add payment method');
       setSnackbarVisible(true);
     } finally {
       setLoading(false);
@@ -62,19 +38,20 @@ export default function PaymentSetupScreen() {
     <View style={styles.container}>
       <Text variant="headlineMedium" style={styles.title}>Add Payment Method</Text>
       <Text variant="bodyLarge" style={styles.subtitle}>
-        Enter your card details to enable payments
+        This is a mock payment setup. In production, you would enter real card details.
       </Text>
 
-      <CardField
-        postalCodeEnabled={false}
-        onCardChange={cardDetails => setCardDetails(cardDetails)}
-        style={styles.cardField}
-      />
+      <View style={styles.mockCard}>
+        <Text variant="bodyLarge">Mock Card: Visa •••• 4242</Text>
+        <Text variant="bodyMedium" style={styles.mockCardSubtext}>
+          This simulates a saved payment method
+        </Text>
+      </View>
 
       <Button
         mode="contained"
         onPress={handleSetupPayment}
-        disabled={!cardDetails?.complete || loading}
+        disabled={loading}
         style={styles.button}
       >
         {loading ? <ActivityIndicator color="#fff" /> : 'Save Payment Method'}
@@ -103,10 +80,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     color: '#666',
   },
-  cardField: {
-    width: '100%',
-    height: 50,
+  mockCard: {
+    backgroundColor: '#f5f5f5',
+    padding: 20,
+    borderRadius: 8,
     marginVertical: 30,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  mockCardSubtext: {
+    marginTop: 8,
+    color: '#666',
   },
   button: {
     marginTop: 16,
