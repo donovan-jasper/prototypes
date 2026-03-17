@@ -71,7 +71,9 @@ export async function loadSnapshot(id) {
 async function createLocalTables(db, schema) {
   for (const table of schema.tables) {
     const columns = table.columns.map((col) => `${col.name} ${col.type}`).join(', ');
-    await db.execAsync(`CREATE TABLE IF NOT EXISTS ${table.name} (${columns})`);
+    await db.transactionAsync(async (tx) => {
+      await tx.executeSqlAsync(`CREATE TABLE IF NOT EXISTS ${table.name} (${columns})`);
+    });
   }
 }
 

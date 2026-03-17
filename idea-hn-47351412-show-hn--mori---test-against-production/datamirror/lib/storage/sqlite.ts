@@ -38,103 +38,122 @@ export function initDatabase() {
 }
 
 export function saveSnapshot(snapshot) {
-  db.exec(
-    [
-      {
-        sql: 'INSERT INTO snapshots (id, name, source_connection, created_at, row_count, file_path) VALUES (?, ?, ?, ?, ?, ?)',
-        args: [
-          snapshot.id,
-          snapshot.name,
-          snapshot.source_connection,
-          snapshot.created_at,
-          snapshot.row_count,
-          snapshot.file_path,
-        ],
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'INSERT INTO snapshots (id, name, source_connection, created_at, row_count, file_path) VALUES (?, ?, ?, ?, ?, ?)',
+          [
+            snapshot.id,
+            snapshot.name,
+            snapshot.source_connection,
+            snapshot.created_at,
+            snapshot.row_count,
+            snapshot.file_path,
+          ],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
       },
-    ],
-    false,
-    () => console.log('Snapshot saved'),
-    (error) => console.error('Failed to save snapshot', error)
-  );
+      (error) => reject(error),
+      () => console.log('Snapshot saved')
+    );
+  });
 }
 
 export function getSnapshots() {
   return new Promise((resolve, reject) => {
-    db.exec(
-      [{ sql: 'SELECT * FROM snapshots', args: [] }],
-      false,
-      (_, result) => resolve(result.rows._array),
-      (_, error) => reject(error)
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'SELECT * FROM snapshots',
+          [],
+          (_, result) => resolve(result.rows._array),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
     );
   });
 }
 
 export function saveConnection(connection) {
-  db.exec(
-    [
-      {
-        sql: 'INSERT INTO connections (id, name, type, host, port, database, username, encrypted_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        args: [
-          connection.id,
-          connection.name,
-          connection.type,
-          connection.host,
-          connection.port,
-          connection.database,
-          connection.username,
-          connection.encrypted_password,
-        ],
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'INSERT INTO connections (id, name, type, host, port, database, username, encrypted_password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            connection.id,
+            connection.name,
+            connection.type,
+            connection.host,
+            connection.port,
+            connection.database,
+            connection.username,
+            connection.encrypted_password,
+          ],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
       },
-    ],
-    false,
-    () => console.log('Connection saved'),
-    (error) => console.error('Failed to save connection', error)
-  );
+      (error) => reject(error),
+      () => console.log('Connection saved')
+    );
+  });
 }
 
 export function getConnections() {
   return new Promise((resolve, reject) => {
-    db.exec(
-      [{ sql: 'SELECT * FROM connections', args: [] }],
-      false,
-      (_, result) => resolve(result.rows._array),
-      (_, error) => reject(error)
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'SELECT * FROM connections',
+          [],
+          (_, result) => resolve(result.rows._array),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
     );
   });
 }
 
 export function saveQuery(query) {
-  db.exec(
-    [
-      {
-        sql: 'INSERT INTO query_history (id, snapshot_id, query, executed_at, duration_ms) VALUES (?, ?, ?, ?, ?)',
-        args: [
-          query.id,
-          query.snapshot_id,
-          query.query,
-          query.executed_at,
-          query.duration_ms,
-        ],
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'INSERT INTO query_history (id, snapshot_id, query, executed_at, duration_ms) VALUES (?, ?, ?, ?, ?)',
+          [
+            query.id,
+            query.snapshot_id,
+            query.query,
+            query.executed_at,
+            query.duration_ms,
+          ],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
       },
-    ],
-    false,
-    () => console.log('Query saved'),
-    (error) => console.error('Failed to save query', error)
-  );
+      (error) => reject(error),
+      () => console.log('Query saved')
+    );
+  });
 }
 
 export function getQueryHistory(snapshotId) {
   return new Promise((resolve, reject) => {
-    db.exec(
-      [
-        {
-          sql: 'SELECT * FROM query_history WHERE snapshot_id = ? ORDER BY executed_at DESC',
-          args: [snapshotId],
-        },
-      ],
-      false,
-      (_, result) => resolve(result.rows._array),
-      (_, error) => reject(error)
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'SELECT * FROM query_history WHERE snapshot_id = ? ORDER BY executed_at DESC',
+          [snapshotId],
+          (_, result) => resolve(result.rows._array),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
     );
   });
 }

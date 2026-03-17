@@ -17,8 +17,13 @@ const useSnapshots = create((set) => ({
   },
 
   addSnapshot: async (snapshot) => {
+    // Save to local SQLite database
     await saveSnapshot(snapshot);
-    set((state) => ({ snapshots: [...state.snapshots, snapshot] }));
+
+    // Update Zustand store
+    set((state) => ({
+      snapshots: [...state.snapshots, snapshot]
+    }));
   },
 
   getSnapshotById: (id) => {

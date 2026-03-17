@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { FAB, Portal, Provider as PaperProvider, ActivityIndicator } from 'react-native-paper';
+import { FAB, Portal, Provider as PaperProvider, ActivityIndicator, Text } from 'react-native-paper';
 import { useSnapshots } from '../../lib/store/snapshots';
 import SnapshotCard from '../../components/SnapshotCard';
 import ConnectionForm from '../../components/ConnectionForm';
@@ -18,11 +18,17 @@ export default function SnapshotsScreen() {
   const handleCreateSnapshot = async (connection) => {
     setIsCreatingSnapshot(true);
     try {
+      // Create snapshot with the provided connection details
       const snapshot = await createSnapshot(connection, { limit: 1000 });
+
+      // Save the snapshot to Zustand store and local SQLite database
       await addSnapshot(snapshot);
+
+      // Close the connection form
       setShowConnectionForm(false);
     } catch (error) {
       console.error('Failed to create snapshot:', error);
+      alert('Failed to create snapshot. Please check your connection details and try again.');
     } finally {
       setIsCreatingSnapshot(false);
     }

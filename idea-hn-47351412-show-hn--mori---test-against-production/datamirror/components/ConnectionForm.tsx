@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Modal } from 'react-native';
 import { TextInput, Button, RadioButton, Text, HelperText } from 'react-native-paper';
-import { useConnections } from '../lib/store/connections';
 
 export default function ConnectionForm({ visible, onDismiss, onSubmit }) {
   const [name, setName] = useState('');
