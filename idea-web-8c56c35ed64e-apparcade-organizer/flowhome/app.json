@@ -51,6 +51,7 @@
       "expo-application",
       "expo-device",
       "expo-task-manager",
+      "expo-intent-launcher",
       "@tensorflow/tfjs-react-native"
     ]
   }
