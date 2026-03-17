@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Svg, Circle } from 'react-native-svg';
 
@@ -11,14 +11,29 @@ interface SessionTimerProps {
 const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPaused }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [progress, setProgress] = useState(100);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (isPaused) return;
+    setTimeLeft(duration * 60);
+    setProgress(100);
+  }, [duration]);
 
-    const timer = setInterval(() => {
+  useEffect(() => {
+    if (isPaused) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      return;
+    }
+
+    intervalRef.current = setInterval(() => {
       setTimeLeft((prevTime) => {
         if (prevTime <= 1) {
-          clearInterval(timer);
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+            intervalRef.current = null;
+          }
           onComplete();
           return 0;
         }
@@ -26,8 +41,13 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [isPaused, duration]);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [isPaused, onComplete]);
 
   useEffect(() => {
     setProgress((timeLeft / (duration * 60)) * 100);
