@@ -1,10 +1,44 @@
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Linking } from 'react-native';
 import { useContext } from 'react';
+import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import BigButton from '../../components/BigButton';
 
 export default function HomeScreen() {
   const { theme } = useContext(SettingsContext);
+  const router = useRouter();
+
+  const handleCall = () => {
+    Linking.openURL('tel:');
+  };
+
+  const handleMessages = () => {
+    router.push('/contacts');
+  };
+
+  const handlePhotos = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status === 'granted') {
+      await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 1,
+      });
+    }
+  };
+
+  const handleEmergency = () => {
+    router.push('/emergency');
+  };
+
+  const handleMedications = () => {
+    router.push('/medications');
+  };
+
+  const handleSettings = () => {
+    router.push('/settings');
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -12,36 +46,36 @@ export default function HomeScreen() {
         <BigButton
           icon="phone"
           label="Call"
-          onPress={() => console.log('Call pressed')}
+          onPress={handleCall}
         />
         <BigButton
           icon="message"
           label="Messages"
-          onPress={() => console.log('Messages pressed')}
+          onPress={handleMessages}
         />
       </View>
       <View style={styles.buttonRow}>
         <BigButton
           icon="photo"
           label="Photos"
-          onPress={() => console.log('Photos pressed')}
+          onPress={handlePhotos}
         />
         <BigButton
           icon="warning"
           label="Emergency"
-          onPress={() => console.log('Emergency pressed')}
+          onPress={handleEmergency}
         />
       </View>
       <View style={styles.buttonRow}>
         <BigButton
           icon="medication"
           label="Medications"
-          onPress={() => console.log('Medications pressed')}
+          onPress={handleMedications}
         />
         <BigButton
           icon="settings"
           label="Settings"
-          onPress={() => console.log('Settings pressed')}
+          onPress={handleSettings}
         />
       </View>
     </View>
