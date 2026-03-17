@@ -5,68 +5,43 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  RefreshControl,
-  TextInput,
   Modal,
+  TextInput,
   Alert,
-  Dimensions,
+  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getItems, addItem } from '@/lib/db';
-import { parseUrl } from '@/lib/parser';
-import { SavedItem, ContentType } from '@/types';
 import { useRouter } from 'expo-router';
-
-const { width } = Dimensions.get('window');
-const CARD_WIDTH = (width - 48) / 2;
-
-const FILTER_OPTIONS: { label: string; value: ContentType | 'all' }[] = [
-  { label: 'All', value: 'all' },
-  { label: 'Videos', value: 'video' },
-  { label: 'Articles', value: 'article' },
-  { label: 'Images', value: 'image' },
-];
+import { getItems, addItem } from '@/lib/db';
+import { downloadMedia } from '@/lib/downloader';
+import { SavedItem } from '@/types';
+import ItemCard from '@/components/ItemCard';
 
 export default function LibraryScreen() {
   const [items, setItems] = useState<SavedItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<SavedItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<ContentType | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [urlInput, setUrlInput] = useState('');
+  const [url, setUrl] = useState('');
+  const [downloading, setDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
   const router = useRouter();
 
   useEffect(() => {
     loadItems();
   }, []);
 
-  useEffect(() => {
-    applyFilters();
-  }, [items, selectedFilter, searchQuery]);
-
   const loadItems = async () => {
-    const allItems = await getItems();
-    setItems(allItems);
-  };
-
-  const applyFilters = () => {
-    let filtered = [...items];
-
-    if (selectedFilter !== 'all') {
-      filtered = filtered.filter(item => item.type === selectedFilter);
+    try {
+      const fetchedItems = await getItems();
+      setItems(fetchedItems);
+    } catch (error) {
+      console.error('Error loading items:', error);
+      Alert.alert('Error', 'Failed to load items');
+    } finally {
+      setLoading(false);
     }
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        item =>
-          item.title.toLowerCase().includes(query) ||
-          item.source.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredItems(filtered);
   };
 
   const onRefresh = useCallback(async () => {
@@ -75,131 +50,146 @@ export default function LibraryScreen() {
     setRefreshing(false);
   }, []);
 
-  const handleAddUrl = async () => {
-    if (!urlInput.trim()) {
+  const handleDownload = async () => {
+    if (!url.trim()) {
       Alert.alert('Error', 'Please enter a URL');
       return;
     }
 
     try {
-      const parsed = parseUrl(urlInput);
-      
-      const newItem = {
-        url: parsed.url,
-        title: parsed.title,
-        type: parsed.type,
-        source: parsed.source,
-        createdAt: Date.now(),
-        fileUri: null,
-        thumbnailUri: null,
-        collectionId: null,
-      };
+      new URL(url);
+    } catch {
+      Alert.alert('Error', 'Please enter a valid URL');
+      return;
+    }
 
-      await addItem(newItem);
-      setUrlInput('');
+    setDownloading(true);
+    setDownloadProgress({ current: 0, total: 0 });
+
+    try {
+      const result = await downloadMedia(url, (current, total) => {
+        setDownloadProgress({ current, total });
+      });
+
+      const itemId = await addItem({
+        url,
+        title: result.title,
+        type: result.type,
+        fileUri: result.fileUri,
+        thumbnailUri: result.thumbnailUri || null,
+        source: result.source,
+        createdAt: Date.now(),
+        collectionId: null,
+        duration: result.duration,
+        fileSize: result.fileSize,
+      });
+
+      setUrl('');
       setShowAddModal(false);
-      loadItems();
-      Alert.alert('Success', 'Item saved to library');
+      await loadItems();
+      
+      Alert.alert('Success', `${result.title} saved successfully!`);
     } catch (error) {
-      Alert.alert('Error', 'Failed to parse URL. Please check the URL and try again.');
+      console.error('Download error:', error);
+      Alert.alert(
+        'Download Failed',
+        error instanceof Error ? error.message : 'Failed to download content'
+      );
+    } finally {
+      setDownloading(false);
+      setDownloadProgress({ current: 0, total: 0 });
     }
   };
 
   const renderItem = ({ item }: { item: SavedItem }) => (
-    <TouchableOpacity
-      style={styles.card}
+    <ItemCard
+      item={item}
       onPress={() => router.push(`/item/${item.id}`)}
-    >
-      <View style={styles.thumbnail}>
-        {item.type === 'video' && <Ionicons name="play-circle" size={48} color="#007AFF" />}
-        {item.type === 'article' && <Ionicons name="document-text" size={48} color="#34C759" />}
-        {item.type === 'image' && <Ionicons name="image" size={48} color="#FF9500" />}
-      </View>
-      <View style={styles.cardContent}>
-        <Text style={styles.cardTitle} numberOfLines={2}>
-          {item.title}
+      onLongPress={() => {
+        Alert.alert(
+          item.title,
+          'What would you like to do?',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: async () => {
+                const { deleteItem } = await import('@/lib/db');
+                const { deleteFile } = await import('@/lib/storage');
+                
+                if (item.fileUri) {
+                  await deleteFile(item.fileUri);
+                }
+                if (item.thumbnailUri) {
+                  await deleteFile(item.thumbnailUri);
+                }
+                await deleteItem(item.id);
+                await loadItems();
+              },
+            },
+          ]
+        );
+      }}
+    />
+  );
+
+  const renderProgressBar = () => {
+    if (!downloading || downloadProgress.total === 0) return null;
+
+    const progress = (downloadProgress.current / downloadProgress.total) * 100;
+    const currentMB = (downloadProgress.current / 1024 / 1024).toFixed(1);
+    const totalMB = (downloadProgress.total / 1024 / 1024).toFixed(1);
+
+    return (
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressText}>
+          Downloading... {currentMB}MB / {totalMB}MB
         </Text>
-        <Text style={styles.cardSource} numberOfLines={1}>
-          {item.source}
-        </Text>
-        <View style={styles.cardFooter}>
-          <View style={styles.typeChip}>
-            <Text style={styles.typeChipText}>{item.type}</Text>
-          </View>
-          <Text style={styles.cardDate}>
-            {new Date(item.createdAt).toLocaleDateString()}
-          </Text>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progress}%` }]} />
         </View>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search library..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color="#999" />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.filterContainer}>
-        {FILTER_OPTIONS.map(option => (
-          <TouchableOpacity
-            key={option.value}
-            style={[
-              styles.filterChip,
-              selectedFilter === option.value && styles.filterChipActive,
-            ]}
-            onPress={() => setSelectedFilter(option.value)}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                selectedFilter === option.value && styles.filterChipTextActive,
-              ]}
-            >
-              {option.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {filteredItems.length === 0 ? (
+      {items.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="library-outline" size={80} color="#ccc" />
-          <Text style={styles.emptyTitle}>
-            {searchQuery || selectedFilter !== 'all' ? 'No items found' : 'Your library is empty'}
-          </Text>
+          <Ionicons name="cloud-download-outline" size={80} color="#ccc" />
+          <Text style={styles.emptyTitle}>No saved items yet</Text>
           <Text style={styles.emptyText}>
-            {searchQuery || selectedFilter !== 'all'
-              ? 'Try adjusting your filters or search'
-              : 'Tap the + button to save your first item'}
+            Tap the + button to save your first video, article, or image
           </Text>
         </View>
       ) : (
         <FlatList
-          data={filteredItems}
+          data={items}
           keyExtractor={item => item.id.toString()}
           renderItem={renderItem}
           numColumns={2}
+          columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         />
       )}
 
-      <TouchableOpacity style={styles.fab} onPress={() => setShowAddModal(true)}>
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}
+        disabled={downloading}
+      >
         <Ionicons name="add" size={32} color="#fff" />
       </TouchableOpacity>
 
@@ -207,31 +197,49 @@ export default function LibraryScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add URL</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+              <Text style={styles.modalTitle}>Save Content</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  if (!downloading) {
+                    setShowAddModal(false);
+                    setUrl('');
+                  }
+                }}
+                disabled={downloading}
+              >
                 <Ionicons name="close" size={28} color="#333" />
               </TouchableOpacity>
             </View>
 
             <TextInput
-              style={styles.urlInput}
-              placeholder="Paste URL here..."
-              value={urlInput}
-              onChangeText={setUrlInput}
+              style={styles.input}
+              placeholder="Paste URL here"
+              value={url}
+              onChangeText={setUrl}
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              editable={!downloading}
               multiline
-              autoFocus
             />
 
+            {renderProgressBar()}
+
             <TouchableOpacity
-              style={[styles.saveButton, !urlInput.trim() && styles.saveButtonDisabled]}
-              onPress={handleAddUrl}
-              disabled={!urlInput.trim()}
+              style={[styles.downloadButton, downloading && styles.downloadButtonDisabled]}
+              onPress={handleDownload}
+              disabled={downloading}
             >
-              <Text style={styles.saveButtonText}>Save</Text>
+              {downloading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.downloadButtonText}>Download & Save</Text>
+              )}
             </TouchableOpacity>
+
+            <Text style={styles.hint}>
+              Supports direct video/image URLs. YouTube and social media require additional setup.
+            </Text>
           </View>
         </View>
       </Modal>
@@ -244,114 +252,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    margin: 16,
-    marginBottom: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    height: 44,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
+  centerContainer: {
     flex: 1,
-    fontSize: 16,
-  },
-  filterContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    gap: 8,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  filterChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  filterChipText: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-  },
-  filterChipTextActive: {
-    color: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f8f8',
   },
   listContent: {
     padding: 16,
   },
-  columnWrapper: {
+  row: {
     justifyContent: 'space-between',
-  },
-  card: {
-    width: CARD_WIDTH,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginBottom: 16,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  thumbnail: {
-    width: '100%',
-    height: 120,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cardContent: {
-    padding: 12,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  cardSource: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 8,
-  },
-  cardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  typeChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#f0f0f0',
-  },
-  typeChipText: {
-    fontSize: 10,
-    color: '#666',
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  cardDate: {
-    fontSize: 10,
-    color: '#999',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    padding: 32,
   },
   emptyTitle: {
     fontSize: 20,
@@ -364,6 +281,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    lineHeight: 20,
   },
   fab: {
     position: 'absolute',
@@ -378,7 +296,7 @@ const styles = StyleSheet.create({
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
   },
   modalOverlay: {
@@ -391,40 +309,68 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     padding: 24,
-    paddingBottom: 40,
+    minHeight: 300,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: '#333',
   },
-  urlInput: {
-    backgroundColor: '#f8f8f8',
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 12,
     padding: 16,
     fontSize: 16,
-    minHeight: 100,
+    backgroundColor: '#f8f8f8',
+    marginBottom: 16,
+    minHeight: 80,
     textAlignVertical: 'top',
+  },
+  progressContainer: {
     marginBottom: 16,
   },
-  saveButton: {
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+  },
+  downloadButton: {
     backgroundColor: '#007AFF',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
+    marginBottom: 12,
   },
-  saveButtonDisabled: {
+  downloadButtonDisabled: {
     backgroundColor: '#ccc',
   },
-  saveButtonText: {
+  downloadButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  hint: {
+    fontSize: 12,
+    color: '#999',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });
