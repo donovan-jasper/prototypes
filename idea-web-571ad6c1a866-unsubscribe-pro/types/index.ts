@@ -5,7 +5,7 @@ export interface Email {
   date: string;
   headers: Record<string, string>;
   body: string;
-  category?: 'important' | 'promotional' | 'spam';
+  category?: 'important' | 'promotional' | 'spam' | 'subscription';
   tags?: string[];
 }
 
@@ -15,6 +15,6 @@ export interface Sender {
   domain: string;
   emailCount: number;
   lastEmailDate: string;
-  category?: 'important' | 'promotional' | 'spam';
+  category?: 'important' | 'promotional' | 'spam' | 'subscription';
   tags?: string[];
 }

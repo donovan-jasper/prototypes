@@ -30,6 +30,8 @@ export default function EmailCard({ sender, isPro }: EmailCardProps) {
         return '#FF9800';
       case 'spam':
         return '#F44336';
+      case 'subscription':
+        return '#9C27B0';
       default:
         return '#9E9E9E';
     }
@@ -49,7 +51,10 @@ export default function EmailCard({ sender, isPro }: EmailCardProps) {
         {isPro && (
           <View style={styles.aiTags}>
             {sender.tags?.map((tag) => (
-              <Text key={tag} style={styles.tag}>
+              <Text key={tag} style={[
+                styles.tag,
+                tag === 'subscription' && styles.subscriptionTag
+              ]}>
                 {tag}
               </Text>
             ))}
@@ -107,6 +112,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginRight: 5,
     marginBottom: 5,
+  },
+  subscriptionTag: {
+    backgroundColor: '#E1BEE7',
+    color: '#4A148C',
   },
   swipeAction: {
     backgroundColor: '#4CAF50',

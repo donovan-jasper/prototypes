@@ -10,7 +10,12 @@ const IMPORTANT_KEYWORDS = [
   'reminder', 'alert', 'update', 'notification'
 ];
 
-export async function classifyEmail(email: Email): Promise<'important' | 'promotional' | 'spam'> {
+const SUBSCRIPTION_KEYWORDS = [
+  'subscription', 'renewal', 'billing', 'payment', 'invoice',
+  'receipt', 'order confirmation', 'auto-renew', 'cancel subscription'
+];
+
+export async function classifyEmail(email: Email): Promise<'important' | 'promotional' | 'spam' | 'subscription'> {
   // Check headers first
   if (email.headers['X-Priority'] === '1' || email.headers['Importance'] === 'high') {
     return 'important';
@@ -20,6 +25,11 @@ export async function classifyEmail(email: Email): Promise<'important' | 'promot
   const subject = email.subject.toLowerCase();
   if (IMPORTANT_KEYWORDS.some(keyword => subject.includes(keyword))) {
     return 'important';
+  }
+
+  if (SUBSCRIPTION_KEYWORDS.some(keyword => subject.includes(keyword) ||
+      email.body.toLowerCase().includes(keyword))) {
+    return 'subscription';
   }
 
   if (PROMOTIONAL_KEYWORDS.some(keyword => subject.includes(keyword))) {

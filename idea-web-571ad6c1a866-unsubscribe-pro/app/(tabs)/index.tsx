@@ -57,6 +57,20 @@ export default function DashboardScreen() {
           />
         )}
       </View>
+
+      {isPro && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Email Spending Tracker</Text>
+          <Text style={styles.recommendation}>
+            We've identified {emails.filter(e => e.tags?.includes('subscription')).length} subscription services you're paying for via email receipts
+          </Text>
+          <UnsubscribeButton
+            title="View All Subscriptions"
+            onPress={() => {}}
+            style={styles.subscriptionButton}
+          />
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -104,5 +118,8 @@ const styles = StyleSheet.create({
   },
   upgradeButton: {
     backgroundColor: '#4CAF50',
+  },
+  subscriptionButton: {
+    backgroundColor: '#2196F3',
   },
 });

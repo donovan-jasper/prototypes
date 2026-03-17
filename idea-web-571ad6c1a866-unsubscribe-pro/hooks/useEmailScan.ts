@@ -29,13 +29,26 @@ export function useEmailScan() {
   const getAITags = async (email: any) => {
     // In a real implementation, this would call an AI service
     // For demo purposes, we'll return mock tags
+    const tags = [];
+
     if (email.category === 'important') {
-      return ['work', 'urgent'];
+      tags.push('work', 'urgent');
     } else if (email.category === 'promotional') {
-      return ['marketing', 'newsletter'];
+      tags.push('marketing', 'newsletter');
+    } else if (email.category === 'subscription') {
+      tags.push('subscription', 'billing');
     } else {
-      return ['potential spam'];
+      tags.push('potential spam');
     }
+
+    // Add subscription tag if email appears to be a receipt
+    if (email.subject.toLowerCase().includes('receipt') ||
+        email.subject.toLowerCase().includes('invoice') ||
+        email.body.toLowerCase().includes('payment confirmation')) {
+      tags.push('subscription');
+    }
+
+    return [...new Set(tags)]; // Remove duplicates
   };
 
   return { isScanning, scanInbox, emails };
