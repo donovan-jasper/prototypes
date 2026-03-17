@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 
 interface StreakDay {
   date: string;
@@ -12,41 +12,50 @@ interface StreakCalendarProps {
 }
 
 const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
-  // Group streak data by month
-  const groupedByMonth: Record<string, StreakDay[]> = {};
+  // Get the current month and create an array of all days in the month
+  const today = new Date();
+  const monthStart = startOfMonth(today);
+  const monthEnd = endOfMonth(today);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
+  // Create a map of streak dates for quick lookup
+  const streakMap = new Map<string, boolean>();
   streakData.forEach(day => {
-    const date = parseISO(day.date);
-    const monthKey = format(date, 'MMMM yyyy');
-
-    if (!groupedByMonth[monthKey]) {
-      groupedByMonth[monthKey] = [];
-    }
-
-    groupedByMonth[monthKey].push(day);
+    streakMap.set(day.date, day.isGraceDay || false);
   });
 
   return (
     <View style={styles.container}>
-      {Object.entries(groupedByMonth).map(([month, days]) => (
-        <View key={month} style={styles.monthContainer}>
-          <Text style={styles.monthHeader}>{month}</Text>
-          <View style={styles.calendar}>
-            {days.map((day, index) => {
-              const date = parseISO(day.date);
-              return (
-                <View key={index} style={styles.day}>
-                  <Text style={styles.dayNumber}>{format(date, 'd')}</Text>
-                  <View style={[
-                    styles.dot,
-                    { backgroundColor: day.isGraceDay ? '#ffcc00' : '#00cc00' }
-                  ]} />
-                </View>
-              );
-            })}
-          </View>
-        </View>
-      ))}
+      <Text style={styles.monthHeader}>{format(today, 'MMMM yyyy')}</Text>
+      <View style={styles.weekdays}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+          <Text key={day} style={styles.weekday}>{day}</Text>
+        ))}
+      </View>
+      <View style={styles.calendar}>
+        {daysInMonth.map((day, index) => {
+          const dayString = format(day, 'yyyy-MM-dd');
+          const isStreakDay = streakMap.has(dayString);
+          const isGraceDay = streakMap.get(dayString);
+
+          return (
+            <View key={index} style={styles.dayContainer}>
+              <Text style={[
+                styles.dayNumber,
+                isSameDay(day, today) ? styles.today : null
+              ]}>
+                {format(day, 'd')}
+              </Text>
+              {isStreakDay && (
+                <View style={[
+                  styles.dot,
+                  { backgroundColor: isGraceDay ? '#FFD700' : '#4CAF50' }
+                ]} />
+              )}
+            </View>
+          );
+        })}
+      </View>
     </View>
   );
 };
@@ -54,32 +63,47 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  monthContainer: {
-    marginBottom: 30,
+    marginVertical: 20,
   },
   monthHeader: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  weekdays: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     marginBottom: 10,
+  },
+  weekday: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#666',
+    width: 40,
+    textAlign: 'center',
   },
   calendar: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  day: {
+  dayContainer: {
     width: '14.28%',
     alignItems: 'center',
-    marginBottom: 15,
+    paddingVertical: 8,
   },
   dayNumber: {
-    fontSize: 14,
-    marginBottom: 5,
+    fontSize: 16,
+    marginBottom: 4,
+  },
+  today: {
+    color: '#2196F3',
+    fontWeight: 'bold',
   },
   dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });
 

@@ -11,6 +11,7 @@ interface StoreState {
   updateStreak: () => Promise<void>;
   addGoal: (goal: any) => void;
   setMoodRating: (rating: number) => void;
+  setStreakCount: (count: number) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -26,4 +27,5 @@ export const useStore = create<StoreState>((set) => ({
   },
   addGoal: (goal) => set((state) => ({ goals: [...state.goals, goal] })),
   setMoodRating: (rating) => set({ lastMoodRating: rating }),
+  setStreakCount: (count) => set({ streakCount: count }),
 }));

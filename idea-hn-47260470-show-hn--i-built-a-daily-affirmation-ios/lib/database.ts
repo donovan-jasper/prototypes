@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { format, isSameDay, subDays } from 'date-fns';
+import { format, isSameDay, subDays, startOfWeek, addDays } from 'date-fns';
 
 let db: SQLite.SQLiteDatabase;
 
@@ -39,13 +39,21 @@ export const initDatabase = async () => {
     CREATE TABLE IF NOT EXISTS streaks (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT,
-      is_grace_day INTEGER DEFAULT 0
+      is_grace_day INTEGER DEFAULT 0,
+      UNIQUE(date)
     );
   `);
+
+  // Create index for faster date lookups
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_streaks_date ON streaks(date)');
 };
 
 export const seedAffirmations = async (affirmations: any[]) => {
   if (!db) await initDatabase();
+
+  // Check if we already have affirmations
+  const count = await db.getFirstAsync('SELECT COUNT(*) as count FROM affirmations');
+  if (count.count > 0) return;
 
   for (const affirmation of affirmations) {
     await db.runAsync(
@@ -72,7 +80,16 @@ export const logSession = async (affirmationId: number, moodRating: number) => {
 export const getStreakData = async () => {
   if (!db) await initDatabase();
 
-  const result = await db.getAllAsync('SELECT * FROM streaks ORDER BY date DESC');
+  // Get all streak records for the current month
+  const today = new Date();
+  const monthStart = format(startOfMonth(today), 'yyyy-MM-dd');
+  const monthEnd = format(endOfMonth(today), 'yyyy-MM-dd');
+
+  const result = await db.getAllAsync(
+    'SELECT * FROM streaks WHERE date BETWEEN ? AND ? ORDER BY date ASC',
+    [monthStart, monthEnd]
+  );
+
   return result;
 };
 
@@ -104,39 +121,44 @@ export const updateStreak = async () => {
   let currentStreak = 1;
   let lastDate = new Date(sessions[0].timestamp);
   let graceDaysUsed = 0;
+  const today = new Date();
 
-  for (let i = 1; i < sessions.length; i++) {
-    const sessionDate = new Date(sessions[i].timestamp);
-    const daysDiff = Math.floor((lastDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Get the start of the current week to track grace days per week
+  const weekStart = startOfWeek(today);
 
-    if (daysDiff === 1) {
-      currentStreak++;
-      lastDate = sessionDate;
-    } else if (daysDiff > 1 && graceDaysUsed < 1) {
-      // Check if we can use a grace day
-      const previousSessionDate = new Date(sessions[i - 1].timestamp);
-      const daysSinceLastSession = Math.floor((new Date().getTime() - previousSessionDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Count how many grace days have been used this week
+  const graceDaysThisWeek = await db.getFirstAsync(
+    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date >= ?',
+    [format(weekStart, 'yyyy-MM-dd')]
+  );
 
-      if (daysSinceLastSession <= 2) {
-        graceDaysUsed++;
-        currentStreak++;
-        lastDate = sessionDate;
+  graceDaysUsed = graceDaysThisWeek.count;
 
-        // Mark this as a grace day in the streaks table
-        await db.runAsync(
-          'INSERT INTO streaks (date, is_grace_day) VALUES (?, ?)',
-          [format(sessionDate, 'yyyy-MM-dd'), 1]
-        );
-      } else {
-        break;
-      }
+  // Check if the last session was yesterday
+  const yesterday = subDays(today, 1);
+  if (isSameDay(new Date(sessions[0].timestamp), yesterday)) {
+    currentStreak = 1;
+  } else {
+    // Check if we can use a grace day
+    const daysSinceLastSession = Math.floor((today.getTime() - new Date(sessions[0].timestamp).getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceLastSession === 2 && graceDaysUsed < 2) {
+      // Use a grace day
+      graceDaysUsed++;
+      currentStreak = 1;
+
+      // Add the grace day to the streaks table
+      await db.runAsync(
+        'INSERT OR IGNORE INTO streaks (date, is_grace_day) VALUES (?, ?)',
+        [format(yesterday, 'yyyy-MM-dd'), 1]
+      );
     } else {
-      break;
+      // Reset streak
+      currentStreak = 1;
     }
   }
 
   // Update streaks table with current streak days
-  const today = new Date();
   for (let i = 0; i < currentStreak; i++) {
     const date = subDays(today, i);
     const dateStr = format(date, 'yyyy-MM-dd');
@@ -172,28 +194,34 @@ export const getCurrentStreak = async () => {
   let currentStreak = 1;
   let lastDate = new Date(sessions[0].timestamp);
   let graceDaysUsed = 0;
+  const today = new Date();
 
-  for (let i = 1; i < sessions.length; i++) {
-    const sessionDate = new Date(sessions[i].timestamp);
-    const daysDiff = Math.floor((lastDate.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Get the start of the current week to track grace days per week
+  const weekStart = startOfWeek(today);
 
-    if (daysDiff === 1) {
-      currentStreak++;
-      lastDate = sessionDate;
-    } else if (daysDiff > 1 && graceDaysUsed < 1) {
-      // Check if we can use a grace day
-      const previousSessionDate = new Date(sessions[i - 1].timestamp);
-      const daysSinceLastSession = Math.floor((new Date().getTime() - previousSessionDate.getTime()) / (1000 * 60 * 60 * 24));
+  // Count how many grace days have been used this week
+  const graceDaysThisWeek = await db.getFirstAsync(
+    'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date >= ?',
+    [format(weekStart, 'yyyy-MM-dd')]
+  );
 
-      if (daysSinceLastSession <= 2) {
-        graceDaysUsed++;
-        currentStreak++;
-        lastDate = sessionDate;
-      } else {
-        break;
-      }
+  graceDaysUsed = graceDaysThisWeek.count;
+
+  // Check if the last session was yesterday
+  const yesterday = subDays(today, 1);
+  if (isSameDay(new Date(sessions[0].timestamp), yesterday)) {
+    currentStreak = 1;
+  } else {
+    // Check if we can use a grace day
+    const daysSinceLastSession = Math.floor((today.getTime() - new Date(sessions[0].timestamp).getTime()) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceLastSession === 2 && graceDaysUsed < 2) {
+      // Use a grace day
+      graceDaysUsed++;
+      currentStreak = 1;
     } else {
-      break;
+      // Reset streak
+      currentStreak = 1;
     }
   }
 

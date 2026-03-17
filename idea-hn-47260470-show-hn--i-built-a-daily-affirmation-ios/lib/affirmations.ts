@@ -1,6 +1,6 @@
 import { initDatabase, seedAffirmations, getCurrentStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
-import { format } from 'date-fns';
+import { format, startOfWeek, endOfWeek } from 'date-fns';
 
 let initialized = false;
 
@@ -48,8 +48,15 @@ export const shouldShowMilestone = (streakCount: number) => {
 export const getStreakDataForCalendar = async () => {
   await initDatabase();
 
-  // Get all streak records
-  const streaks = await db.getAllAsync('SELECT * FROM streaks ORDER BY date ASC');
+  // Get all streak records for the current month
+  const today = new Date();
+  const monthStart = format(startOfWeek(today), 'yyyy-MM-dd');
+  const monthEnd = format(endOfWeek(today), 'yyyy-MM-dd');
+
+  const streaks = await db.getAllAsync(
+    'SELECT * FROM streaks WHERE date BETWEEN ? AND ? ORDER BY date ASC',
+    [monthStart, monthEnd]
+  );
 
   // Format for calendar display
   return streaks.map(streak => ({
