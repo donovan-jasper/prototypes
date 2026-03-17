@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getSavedLocations, removeLocation } from '@/services/database';
+import { getSavedLocations, removeLocation, getRecallAlertsForEstablishment } from '@/services/database';
 import { Establishment } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,7 +16,19 @@ const SavedLocationsScreen = () => {
     try {
       setLoading(true);
       const locations = await getSavedLocations();
-      setSavedLocations(locations);
+
+      // For each location, get the recall count
+      const locationsWithRecalls = await Promise.all(
+        locations.map(async (location) => {
+          const recalls = await getRecallAlertsForEstablishment(location.establishmentId);
+          return {
+            ...location,
+            recallCount: recalls.length
+          };
+        })
+      );
+
+      setSavedLocations(locationsWithRecalls);
     } catch (err) {
       setError('Failed to load saved locations');
       console.error(err);
@@ -41,7 +53,7 @@ const SavedLocationsScreen = () => {
     }
   };
 
-  const renderItem = ({ item }: { item: Establishment }) => (
+  const renderItem = ({ item }: { item: Establishment & { recallCount: number } }) => (
     <TouchableOpacity
       style={styles.itemContainer}
       onPress={() => router.push({
@@ -50,7 +62,14 @@ const SavedLocationsScreen = () => {
       })}
     >
       <View style={styles.itemContent}>
-        <Text style={styles.name}>{item.name}</Text>
+        <View style={styles.header}>
+          <Text style={styles.name}>{item.name}</Text>
+          {item.recallCount > 0 && (
+            <View style={styles.recallBadge}>
+              <Text style={styles.recallCount}>{item.recallCount}</Text>
+            </View>
+          )}
+        </View>
         <Text style={styles.address}>{item.address}</Text>
         <View style={styles.scoreContainer}>
           <SafetyBadge grade={item.safetyScore} size={24} />
@@ -179,10 +198,29 @@ const styles = StyleSheet.create({
   itemContent: {
     flex: 1,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   name: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+  },
+  recallBadge: {
+    backgroundColor: '#ff3b30',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  recallCount: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   address: {
     fontSize: 14,
