@@ -3,9 +3,9 @@ const API_BASE_URL = 'https://api.bridgegen.com';
 export const fetchMatches = async (userId) => {
   // Mock API call
   const mockMatches = [
-    { id: '1', name: 'Margaret Smith', age: 72, photo: 'https://example.com/margaret.jpg', interests: ['cooking', 'gardening', 'reading'], distance: 5.2, compatibilityScore: 85 },
-    { id: '2', name: 'Sarah Johnson', age: 28, photo: 'https://example.com/sarah.jpg', interests: ['reading', 'hiking', 'photography'], distance: 3.1, compatibilityScore: 78 },
-    { id: '3', name: 'David Lee', age: 65, photo: 'https://example.com/david.jpg', interests: ['cooking', 'gardening', 'fishing'], distance: 7.4, compatibilityScore: 82 },
+    { id: '1', name: 'Margaret Smith', age: 72, photo: 'https://example.com/margaret.jpg', interests: ['cooking', 'gardening', 'reading'], lat: 40.7128, lon: -74.0060, distance: 5.2, compatibilityScore: 85 },
+    { id: '2', name: 'Sarah Johnson', age: 28, photo: 'https://example.com/sarah.jpg', interests: ['reading', 'hiking', 'photography'], lat: 40.7580, lon: -73.9855, distance: 3.1, compatibilityScore: 78 },
+    { id: '3', name: 'David Lee', age: 65, photo: 'https://example.com/david.jpg', interests: ['cooking', 'gardening', 'fishing'], lat: 40.7200, lon: -74.0100, distance: 7.4, compatibilityScore: 82 },
   ];
   return mockMatches;
 };
