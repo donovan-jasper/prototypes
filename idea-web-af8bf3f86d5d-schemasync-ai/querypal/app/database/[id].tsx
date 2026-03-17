@@ -1,18 +1,18 @@
 import React, { useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { Button, Text } from 'react-native-paper';
-import { useLocalSearchParams, useNavigation } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useDatabaseStore } from '@/store/database-store';
 
 const DatabaseDetailScreen = () => {
   const { id } = useLocalSearchParams();
-  const navigation = useNavigation();
+  const router = useRouter();
   const { databases, removeDatabase } = useDatabaseStore();
   const database = databases.find(db => db.id === id);
 
   useEffect(() => {
     if (!database) {
-      navigation.goBack();
+      router.back();
     }
   }, [database]);
 
@@ -22,7 +22,7 @@ const DatabaseDetailScreen = () => {
 
   const handleDelete = () => {
     removeDatabase(database.id);
-    navigation.goBack();
+    router.back();
   };
 
   return (
@@ -30,7 +30,7 @@ const DatabaseDetailScreen = () => {
       <Text style={styles.title}>{database.name}</Text>
       <Text>Type: {database.type}</Text>
       <Text>Last Sync: {database.lastSync.toLocaleString()}</Text>
-      <Button mode="contained" onPress={() => navigation.navigate('explore')}>
+      <Button mode="contained" onPress={() => router.push('/explore')}>
         View Schema
       </Button>
       <Button mode="outlined" onPress={handleDelete} style={styles.deleteButton}>

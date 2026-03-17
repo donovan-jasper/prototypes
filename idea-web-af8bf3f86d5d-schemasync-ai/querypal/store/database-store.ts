@@ -16,6 +16,7 @@ interface DatabaseState {
   currentDatabase: Database | null;
   offlineMode: boolean;
   fetchDatabases: () => Promise<void>;
+  refreshDatabases: () => Promise<void>;
   addDatabase: (database: Database) => Promise<void>;
   removeDatabase: (id: string) => Promise<void>;
   setCurrentDatabase: (id: string) => void;
@@ -32,6 +33,10 @@ export const useDatabaseStore = create<DatabaseState>((set, get) => ({
   fetchDatabases: async () => {
     const databases = await getDatabases();
     set({ databases });
+  },
+
+  refreshDatabases: async () => {
+    await get().fetchDatabases();
   },
 
   addDatabase: async (database) => {

@@ -1,13 +1,17 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, FlatList, StyleSheet } from 'react-native';
-import { Button, FAB } from 'react-native-paper';
-import { useNavigation } from '@react-navigation/native';
+import { FAB } from 'react-native-paper';
+import { useRouter } from 'expo-router';
 import DatabaseCard from '@/components/DatabaseCard';
 import { useDatabaseStore } from '@/store/database-store';
 
 const HomeScreen = () => {
-  const navigation = useNavigation();
-  const { databases, refreshDatabases } = useDatabaseStore();
+  const router = useRouter();
+  const { databases, fetchDatabases } = useDatabaseStore();
+
+  useEffect(() => {
+    fetchDatabases();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -17,16 +21,16 @@ const HomeScreen = () => {
         renderItem={({ item }) => (
           <DatabaseCard
             database={item}
-            onPress={() => navigation.navigate('database/[id]', { id: item.id })}
+            onPress={() => router.push(`/database/${item.id}`)}
           />
         )}
-        onRefresh={refreshDatabases}
+        onRefresh={fetchDatabases}
         refreshing={false}
       />
       <FAB
         style={styles.fab}
         icon="plus"
-        onPress={() => navigation.navigate('database/add')}
+        onPress={() => router.push('/database/add')}
       />
     </View>
   );
