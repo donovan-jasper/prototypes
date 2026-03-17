@@ -2,23 +2,39 @@ import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { TextInput, Button } from 'react-native-paper';
 
-const QueryInput = ({ onGenerateQuery, onExecuteQuery }) => {
+interface QueryInputProps {
+  onGenerateQuery: (query: string) => void;
+  onExecuteQuery: () => void;
+  disabled?: boolean;
+}
+
+const QueryInput = ({ onGenerateQuery, onExecuteQuery, disabled = false }: QueryInputProps) => {
   const [query, setQuery] = useState('');
+
+  const handleGenerate = () => {
+    if (query.trim()) {
+      onGenerateQuery(query);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <TextInput
-        label="Natural Language Query"
+        label="Ask a question about your data"
         value={query}
         onChangeText={setQuery}
         multiline
+        numberOfLines={3}
         style={styles.input}
+        placeholder="e.g., Show me all users who signed up last week"
+        disabled={disabled}
       />
       <View style={styles.buttonContainer}>
         <Button
           mode="contained"
-          onPress={() => onGenerateQuery(query)}
+          onPress={handleGenerate}
           style={styles.button}
+          disabled={disabled || !query.trim()}
         >
           Generate SQL
         </Button>
@@ -26,6 +42,7 @@ const QueryInput = ({ onGenerateQuery, onExecuteQuery }) => {
           mode="outlined"
           onPress={onExecuteQuery}
           style={styles.button}
+          disabled={disabled}
         >
           Execute Query
         </Button>

@@ -33,6 +33,9 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "EXPO_PUBLIC_OPENAI_API_KEY": ""
     }
   }
 }
