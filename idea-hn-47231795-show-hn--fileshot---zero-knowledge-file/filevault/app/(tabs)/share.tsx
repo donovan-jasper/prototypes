@@ -1,19 +1,25 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Button, Text } from 'react-native-paper';
+import { Button, Text, Dialog, Portal } from 'react-native-paper';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useFileVault } from '@/hooks/useFileVault';
 import { useSubscription } from '@/hooks/useSubscription';
+import { useP2PTransfer } from '@/hooks/useP2PTransfer';
 import ExpirationPicker from '@/components/ExpirationPicker';
 import PremiumGate from '@/components/PremiumGate';
+import PeerList from '@/components/PeerList';
+import TransferProgress from '@/components/TransferProgress';
 import { Colors } from '@/constants/Colors';
 
 export default function ShareScreen() {
   const [file, setFile] = useState(null);
   const [expiration, setExpiration] = useState(24);
+  const [showPeerList, setShowPeerList] = useState(false);
+  const [selectedPeer, setSelectedPeer] = useState(null);
   const { shareFile } = useFileVault();
   const { canShare, showPremiumGate } = useSubscription();
+  const { isTransferring, progress, sendFileP2P } = useP2PTransfer();
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -48,11 +54,15 @@ export default function ShareScreen() {
       return;
     }
 
-    try {
-      const link = await shareFile(file, expiration);
-      Alert.alert('Share link generated', link);
-    } catch (error) {
-      Alert.alert('Error', error.message);
+    setShowPeerList(true);
+  };
+
+  const handlePeerSelect = (peerId) => {
+    setSelectedPeer(peerId);
+    setShowPeerList(false);
+    // In a real app, you would start the transfer here
+    if (file) {
+      sendFileP2P(file.id, peerId);
     }
   };
 
@@ -94,9 +104,36 @@ export default function ShareScreen() {
           >
             Generate Share Link
           </Button>
+          <Button
+            mode="outlined"
+            onPress={() => setShowPeerList(true)}
+            style={styles.p2pButton}
+            icon="lan"
+          >
+            Send via P2P
+          </Button>
         </>
       )}
       <PremiumGate />
+
+      <Portal>
+        <Dialog visible={showPeerList} onDismiss={() => setShowPeerList(false)}>
+          <Dialog.Title>Select Device</Dialog.Title>
+          <Dialog.Content>
+            <PeerList onSelectPeer={handlePeerSelect} />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowPeerList(false)}>Cancel</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {isTransferring && (
+        <TransferProgress
+          progress={progress}
+          isSending={true}
+        />
+      )}
     </View>
   );
 }
@@ -128,5 +165,8 @@ const styles = StyleSheet.create({
   },
   shareButton: {
     marginTop: 20,
+  },
+  p2pButton: {
+    marginTop: 10,
   },
 });
