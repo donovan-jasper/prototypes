@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
-import { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStore } from '@/store/useStore';
 import { MotionDetector } from '@/components/MotionDetector';
 import { postureDetector } from '@/lib/motion';
@@ -9,12 +9,12 @@ export default function ActiveRoutineScreen() {
   const { exercises, completeExercise, incrementStreak } = useStore();
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [showCalibrationModal, setShowCalibrationModal] = useState(true);
+  const [showCalibrationModal, setShowCalibrationModal] = useState(false); // Initially false
+  const [hasCalibratedForSession, setHasCalibratedForSession] = useState(false); // New state to track calibration for current routine session
   const [holdTimer, setHoldTimer] = useState(0);
   const [isHoldingCorrectly, setIsHoldingCorrectly] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [postureAngle, setPostureAngle] = useState(0);
-  const [postureFeedback, setPostureFeedback] = useState("");
+  const [isDetectorLoading, setIsDetectorLoading] = useState(true); // To wait for MotionDetector to load calibration
 
   const currentExercise = exercises[currentExerciseIndex];
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -28,7 +28,7 @@ export default function ActiveRoutineScreen() {
         sound.unloadAsync();
       }
     };
-  }, []);
+  }, [sound]);
 
   const playSound = async (type: 'start' | 'complete' | 'error') => {
     try {
@@ -45,6 +45,8 @@ export default function ActiveRoutineScreen() {
         case 'error':
           source = require('../../assets/sounds/error.mp3');
           break;
+        default:
+          return;
       }
 
       await soundObject.loadAsync(source);
@@ -55,22 +57,22 @@ export default function ActiveRoutineScreen() {
     }
   };
 
-  const handleNextExercise = () => {
+  const handleNextExercise = useCallback(() => {
     if (currentExerciseIndex < exercises.length - 1) {
-      setCurrentExerciseIndex(currentExerciseIndex + 1);
-      setShowCalibrationModal(true);
+      setCurrentExerciseIndex(prevIndex => prevIndex + 1);
       setHoldTimer(0);
       setIsHoldingCorrectly(false);
+      // Calibration modal logic is now handled by initial check and hasCalibratedForSession
       playSound('start');
     } else {
       setIsComplete(true);
-      completeExercise(currentExercise.id);
+      completeExercise(currentExercise.id); // Assuming currentExercise is still valid here
       incrementStreak();
       playSound('complete');
     }
-  };
+  }, [currentExerciseIndex, exercises, completeExercise, incrementStreak, playSound, currentExercise]);
 
-  const handlePostureCorrect = () => {
+  const handlePostureCorrect = useCallback(() => {
     if (!isHoldingCorrectly) {
       setIsHoldingCorrectly(true);
       playSound('start');
@@ -78,13 +80,13 @@ export default function ActiveRoutineScreen() {
       timerRef.current = setInterval(() => {
         setHoldTimer(prev => {
           const newTime = prev + 1;
-          const isComplete = postureDetector.isHoldingCorrectly(
+          const isExerciseComplete = postureDetector.isHoldingCorrectly(
             newTime * 1000,
             currentExercise.duration * 1000,
             currentExercise.id
           );
 
-          if (isComplete) {
+          if (isExerciseComplete) {
             if (timerRef.current) {
               clearInterval(timerRef.current);
             }
@@ -96,12 +98,22 @@ export default function ActiveRoutineScreen() {
         });
       }, 1000);
     }
-  };
+  }, [isHoldingCorrectly, playSound, currentExercise]);
 
-  const handleCalibrationComplete = () => {
+  const handleCalibrationComplete = useCallback(() => {
     setShowCalibrationModal(false);
+    setHasCalibratedForSession(true); // Calibration is done for this session
     playSound('start');
-  };
+  }, [playSound]);
+
+  const handleInitialCalibrationStatusLoaded = useCallback((calibrated: boolean) => {
+    setIsDetectorLoading(false);
+    if (!calibrated) {
+      setShowCalibrationModal(true); // Show modal if not calibrated initially
+    } else {
+      setHasCalibratedForSession(true); // Already calibrated from previous session, no need to show modal
+    }
+  }, []);
 
   if (isComplete) {
     return (
@@ -112,6 +124,15 @@ export default function ActiveRoutineScreen() {
         <TouchableOpacity style={styles.button} onPress={() => setIsComplete(false)}>
           <Text style={styles.buttonText}>Back to Home</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (isDetectorLoading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.title}>Preparing Motion Detector...</Text>
       </View>
     );
   }
@@ -133,6 +154,7 @@ export default function ActiveRoutineScreen() {
         exerciseId={currentExercise.id}
         onCalibrationComplete={handleCalibrationComplete}
         onPostureCorrect={handlePostureCorrect}
+        onInitialCalibrationStatusLoaded={handleInitialCalibrationStatusLoaded}
       />
 
       {isHoldingCorrectly && (
@@ -145,8 +167,9 @@ export default function ActiveRoutineScreen() {
         </TouchableOpacity>
       )}
 
+      {/* Only show modal if calibration is required AND not yet calibrated for this session */}
       <Modal
-        visible={showCalibrationModal}
+        visible={showCalibrationModal && !hasCalibratedForSession}
         transparent={true}
         animationType="slide"
       >
@@ -154,14 +177,14 @@ export default function ActiveRoutineScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Calibration Required</Text>
             <Text style={styles.modalText}>
-              Please hold your phone in your ideal posture for the {currentExercise.name} exercise.
+              To ensure accurate posture detection, please calibrate your device.
             </Text>
             <Text style={styles.modalText}>
-              Keep your head aligned with the screen and maintain this position.
+              Hold your phone in your ideal posture for the {currentExercise.name} exercise and tap "Start Calibration" below.
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => setShowCalibrationModal(false)}
+              onPress={() => setShowCalibrationModal(false)} // Allow dismissing the modal, but calibration still needed
             >
               <Text style={styles.modalButtonText}>Got it</Text>
             </TouchableOpacity>

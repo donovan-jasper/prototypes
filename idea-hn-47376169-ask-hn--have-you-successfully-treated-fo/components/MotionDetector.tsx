@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useState, useEffect, useRef } from 'react';
 import { Accelerometer, Gyroscope } from 'expo-sensors';
 import { postureDetector } from '@/lib/motion';
 
@@ -7,26 +7,50 @@ interface MotionDetectorProps {
   exerciseId: string;
   onCalibrationComplete?: () => void;
   onPostureCorrect?: () => void;
+  // New prop to inform parent about initial calibration status
+  onInitialCalibrationStatusLoaded?: (isCalibrated: boolean) => void;
 }
 
-export function MotionDetector({ exerciseId, onCalibrationComplete, onPostureCorrect }: MotionDetectorProps) {
+export function MotionDetector({ exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded }: MotionDetectorProps) {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [isCorrect, setIsCorrect] = useState(false);
   const [angle, setAngle] = useState(0);
-  const [feedback, setFeedback] = useState("Please calibrate your posture");
+  const [feedback, setFeedback] = useState("Loading calibration...");
   const [calibrationProgress, setCalibrationProgress] = useState(0);
   const [calibrationOffset, setCalibrationOffset] = useState(0);
+  const [isDetectorReady, setIsDetectorReady] = useState(false); // Indicates if calibration data is loaded/available
+
+  const isMounted = useRef(true); // To prevent state updates on unmounted component
 
   useEffect(() => {
-    // Load calibration data when component mounts
-    postureDetector.loadCalibrationData();
+    isMounted.current = true;
+    const loadAndSetCalibration = async () => {
+      await postureDetector.loadCalibrationData();
+      if (isMounted.current) {
+        setCalibrationOffset(postureDetector.calibrationOffset);
+        const calibrated = postureDetector.getIsCalibrated();
+        onInitialCalibrationStatusLoaded?.(calibrated); // Inform parent
+        if (calibrated) {
+          setIsDetectorReady(true);
+          setFeedback("Ready for exercise.");
+        } else {
+          setIsDetectorReady(true); // Still ready, but needs calibration
+          setFeedback("Please calibrate your posture.");
+        }
+      }
+    };
+
+    loadAndSetCalibration();
 
     Accelerometer.setUpdateInterval(100);
     Gyroscope.setUpdateInterval(100);
 
     const accelerometerSubscription = Accelerometer.addListener((accelerometerData) => {
+      if (!isMounted.current) return;
+
       if (isCalibrating) {
         Gyroscope.getDataAsync().then((gyroscopeData) => {
+          if (!isMounted.current) return;
           postureDetector.addCalibrationSample(accelerometerData, gyroscopeData);
           const progress = Math.min(100, (postureDetector['calibrationData'].length / 100) * 100);
           setCalibrationProgress(progress);
@@ -34,18 +58,19 @@ export function MotionDetector({ exerciseId, onCalibrationComplete, onPostureCor
           if (progress >= 100) {
             setIsCalibrating(false);
             setFeedback("Calibration complete. Now perform the exercise.");
-            setCalibrationOffset(postureDetector['calibrationOffset']);
-            postureDetector.saveCalibrationData();
+            setCalibrationOffset(postureDetector.calibrationOffset);
+            postureDetector.saveCalibrationData(); // Save after successful calibration
             onCalibrationComplete?.();
           }
         });
-      } else {
+      } else if (postureDetector.getIsCalibrated()) { // Only detect if calibrated
         Gyroscope.getDataAsync().then((gyroscopeData) => {
+          if (!isMounted.current) return;
           const result = postureDetector.detectPosture(accelerometerData, gyroscopeData, exerciseId);
           setIsCorrect(result.isCorrect);
           setAngle(result.angle);
           setFeedback(result.feedback);
-          setCalibrationOffset(result.calibrationOffset);
+          setCalibrationOffset(result.calibrationOffset); // Update from detector result
 
           if (result.isCorrect) {
             onPostureCorrect?.();
@@ -55,9 +80,10 @@ export function MotionDetector({ exerciseId, onCalibrationComplete, onPostureCor
     });
 
     return () => {
+      isMounted.current = false;
       accelerometerSubscription.remove();
     };
-  }, [isCalibrating, exerciseId]);
+  }, [isCalibrating, exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded]);
 
   const startCalibration = () => {
     postureDetector.startCalibration();
@@ -66,16 +92,35 @@ export function MotionDetector({ exerciseId, onCalibrationComplete, onPostureCor
     setCalibrationProgress(0);
   };
 
+  if (!isDetectorReady) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.title}>Loading Motion Detector...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Posture Detection</Text>
 
-      {isCalibrating ? (
+      {isCalibrating || !postureDetector.getIsCalibrated() ? ( // Show calibration UI if calibrating or not calibrated
         <View style={styles.calibrationContainer}>
-          <Text style={styles.calibrationText}>Calibrating: {Math.round(calibrationProgress)}%</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${calibrationProgress}%` }]} />
-          </View>
+          <Text style={styles.calibrationText}>
+            {isCalibrating ? `Calibrating: ${Math.round(calibrationProgress)}%` : "Calibration Required"}
+          </Text>
+          {isCalibrating && (
+            <View style={styles.progressBar}>
+              <View style={[styles.progressFill, { width: `${calibrationProgress}%` }]} />
+            </View>
+          )}
+          <Text style={styles.calibrationInstructions}>
+            {isCalibrating ? "Hold your phone steady in your ideal posture." : "Tap 'Start Calibration' to begin."}
+          </Text>
+          <TouchableOpacity style={styles.calibrateButton} onPress={startCalibration}>
+            <Text style={styles.calibrateButtonText}>{isCalibrating ? "Cancel Calibration" : "Start Calibration"}</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <>
@@ -153,12 +198,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 10,
   },
+  calibrationInstructions: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
   progressBar: {
     height: 10,
     width: '100%',
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
+    marginBottom: 10,
   },
   progressFill: {
     height: '100%',

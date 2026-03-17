@@ -1,4 +1,7 @@
 import { AccelerometerData, GyroscopeData } from 'expo-sensors';
+import * as FileSystem from 'expo-file-system';
+
+const CALIBRATION_FILE = FileSystem.documentDirectory + 'postureCalibration.json';
 
 interface PostureResult {
   isCorrect: boolean;
@@ -15,8 +18,8 @@ interface CalibrationData {
 
 export class PostureDetector {
   private calibrationData: CalibrationData[] = [];
-  private isCalibrated = false;
-  private calibrationOffset = 0;
+  public isCalibrated = false; // Made public for easier access
+  public calibrationOffset = 0; // Made public for easier access
   private exerciseThresholds: Record<string, { min: number; max: number }> = {
     'chin-tuck': { min: -15, max: 15 },
     'shoulder-squeeze': { min: -10, max: 10 },
@@ -36,6 +39,7 @@ export class PostureDetector {
   public startCalibration(): void {
     this.calibrationData = [];
     this.isCalibrated = false;
+    this.calibrationOffset = 0; // Reset offset on new calibration
   }
 
   public addCalibrationSample(accelerometer: AccelerometerData, gyroscope: GyroscopeData): void {
@@ -45,7 +49,7 @@ export class PostureDetector {
       timestamp: Date.now()
     });
 
-    if (this.calibrationData.length >= 100) {
+    if (this.calibrationData.length >= 100) { // Collect 100 samples for calibration
       this.calculateCalibrationOffset();
       this.isCalibrated = true;
     }
@@ -54,6 +58,9 @@ export class PostureDetector {
   private calculateCalibrationOffset(): void {
     const angles = this.calibrationData.map(data => {
       const { x, y, z } = data.accelerometer;
+      // Calculate pitch angle (rotation around Y-axis)
+      // This assumes the phone is held upright, with its screen facing forward.
+      // If the phone is held differently, this calculation might need adjustment.
       return Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
     });
 
@@ -63,7 +70,7 @@ export class PostureDetector {
 
   public detectPosture(
     accelerometer: AccelerometerData,
-    gyroscope: GyroscopeData,
+    gyroscope: GyroscopeData, // Gyroscope data is not currently used in this detection logic, but kept for future expansion
     exerciseId: string
   ): PostureResult {
     if (!this.isCalibrated) {
@@ -71,12 +78,13 @@ export class PostureDetector {
         isCorrect: false,
         angle: 0,
         feedback: "Please complete calibration first",
-        calibrationOffset: 0
+        calibrationOffset: this.calibrationOffset // Return current offset even if not calibrated
       };
     }
 
     const { x, y, z } = accelerometer;
-    const angle = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI) - this.calibrationOffset;
+    const currentAngle = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
+    const angle = currentAngle - this.calibrationOffset; // Apply calibration offset
 
     const thresholds = this.exerciseThresholds[exerciseId] || { min: -10, max: 10 };
     const isCorrect = angle >= thresholds.min && angle <= thresholds.max;
@@ -110,25 +118,43 @@ export class PostureDetector {
     return currentDuration >= requiredDuration;
   }
 
-  public saveCalibrationData(): void {
-    // Save calibration data to AsyncStorage for persistence
+  public async saveCalibrationData(): Promise<void> {
     const dataToSave = {
       calibrationOffset: this.calibrationOffset,
+      isCalibrated: this.isCalibrated,
       timestamp: Date.now()
     };
-    // In a real app, you would use AsyncStorage here
-    // AsyncStorage.setItem('postureCalibration', JSON.stringify(dataToSave));
+    try {
+      await FileSystem.writeAsStringAsync(CALIBRATION_FILE, JSON.stringify(dataToSave));
+      console.log('Calibration data saved successfully.');
+    } catch (error) {
+      console.error('Failed to save calibration data:', error);
+    }
   }
 
-  public loadCalibrationData(): void {
-    // Load calibration data from AsyncStorage
-    // In a real app, you would use AsyncStorage here
-    // const savedData = await AsyncStorage.getItem('postureCalibration');
-    // if (savedData) {
-    //   const parsedData = JSON.parse(savedData);
-    //   this.calibrationOffset = parsedData.calibrationOffset;
-    //   this.isCalibrated = true;
-    // }
+  public async loadCalibrationData(): Promise<void> {
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(CALIBRATION_FILE);
+      if (fileInfo.exists) {
+        const savedData = await FileSystem.readAsStringAsync(CALIBRATION_FILE);
+        const parsedData = JSON.parse(savedData);
+        this.calibrationOffset = parsedData.calibrationOffset;
+        this.isCalibrated = parsedData.isCalibrated;
+        console.log('Calibration data loaded successfully.');
+      } else {
+        console.log('No calibration data found.');
+        this.isCalibrated = false;
+        this.calibrationOffset = 0;
+      }
+    } catch (error) {
+      console.error('Failed to load calibration data:', error);
+      this.isCalibrated = false;
+      this.calibrationOffset = 0;
+    }
+  }
+
+  public getIsCalibrated(): boolean {
+    return this.isCalibrated;
   }
 }
 
