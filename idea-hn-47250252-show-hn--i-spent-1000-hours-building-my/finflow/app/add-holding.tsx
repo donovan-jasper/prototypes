@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { usePortfolio } from '../hooks/usePortfolio';
-import { fetchAssetPrice } from '../lib/priceService';
+// Removed: import { fetchAssetPrice } from '../lib/priceService'; // No longer needed here
 
 const AddHoldingScreen = () => {
   const navigation = useNavigation();
-  const { addHolding } = usePortfolio();
+  const { addHolding } = usePortfolio(); // usePortfolio's addHolding now handles price fetching
 
   const [symbol, setSymbol] = useState('');
   const [shares, setShares] = useState('');
@@ -20,20 +20,21 @@ const AddHoldingScreen = () => {
     }
 
     try {
-      const currentPrice = await fetchAssetPrice(symbol);
+      // Removed: const currentPrice = await fetchAssetPrice(symbol);
+      // The addHolding function from usePortfolio will now internally handle fetching the initial price.
 
       const holding = {
         symbol: symbol.toUpperCase(),
         shares: parseFloat(shares),
         costBasis: parseFloat(costBasis),
-        currentPrice,
+        // Removed: currentPrice, // currentPrice is now handled by usePortfolio's addHolding
         assetType,
       };
 
-      await addHolding(holding);
+      await addHolding(holding); // Pass holding without currentPrice
       navigation.goBack();
     } catch (error) {
-      Alert.alert('Error', 'Failed to add holding or fetch price');
+      Alert.alert('Error', `Failed to add holding: ${error.message || 'Unknown error'}`);
     }
   };
 
