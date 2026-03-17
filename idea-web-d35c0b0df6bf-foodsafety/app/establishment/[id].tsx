@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getEstablishmentDetails, getInspections } from '@/services/api';
-import { getRecallAlertsForEstablishment } from '@/services/database';
+import { getEstablishmentDetails, getInspections, getRecalls } from '@/services/api';
+import { getRecallAlertsForEstablishment, saveLocation, isLocationSaved, removeLocation } from '@/services/database';
 import SafetyBadge from '@/components/SafetyBadge';
 import InspectionTimeline from '@/components/InspectionTimeline';
 import RecallAlert from '@/components/RecallAlert';
 import { Establishment, Inspection, RecallAlert as RecallAlertType } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
 
 const EstablishmentDetailScreen = () => {
   const { id } = useLocalSearchParams();
@@ -14,30 +15,61 @@ const EstablishmentDetailScreen = () => {
   const [establishment, setEstablishment] = useState<Establishment | null>(null);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [recallAlerts, setRecallAlerts] = useState<RecallAlertType[]>([]);
+  const [isSaved, setIsSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const establishmentData = await getEstablishmentDetails(id as string);
-        const inspectionsData = await getInspections(id as string);
-        const recallAlertsData = await getRecallAlertsForEstablishment(id as string);
+  const fetchData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const establishmentData = await getEstablishmentDetails(id as string);
+      const inspectionsData = await getInspections(id as string);
+      const recallAlertsData = await getRecalls(id as string);
 
-        setEstablishment(establishmentData);
-        setInspections(inspectionsData);
-        setRecallAlerts(recallAlertsData);
-      } catch (err) {
-        setError('Failed to load establishment details');
-        console.error(err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      setEstablishment(establishmentData);
+      setInspections(inspectionsData);
+      setRecallAlerts(recallAlertsData);
 
-    fetchData();
+      // Check if location is saved
+      const saved = await isLocationSaved(id as string);
+      setIsSaved(saved);
+    } catch (err) {
+      setError('Failed to load establishment details');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   }, [id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const handleSaveLocation = async () => {
+    try {
+      if (isSaved) {
+        await removeLocation(id as string);
+        setIsSaved(false);
+        Alert.alert('Location removed', 'This establishment has been removed from your saved locations.');
+      } else {
+        if (establishment) {
+          await saveLocation({
+            establishmentId: establishment.id,
+            name: establishment.name,
+            address: establishment.address,
+            safetyScore: establishment.safetyScore,
+            lastInspectionDate: establishment.lastInspectionDate,
+            savedDate: new Date().toISOString()
+          });
+          setIsSaved(true);
+          Alert.alert('Location saved', 'You will receive alerts for this location.');
+        }
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Failed to save location. Please try again.');
+      console.error(err);
+    }
+  };
 
   if (loading) {
     return (
@@ -72,14 +104,26 @@ const EstablishmentDetailScreen = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.name}>{establishment.name}</Text>
-        <Text style={styles.address}>{establishment.address}</Text>
-        <View style={styles.scoreContainer}>
-          <SafetyBadge grade={establishment.safetyScore} />
-          <Text style={styles.lastInspection}>
-            Last inspected: {new Date(establishment.lastInspectionDate).toLocaleDateString()}
-          </Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.name}>{establishment.name}</Text>
+          <Text style={styles.address}>{establishment.address}</Text>
+          <View style={styles.scoreContainer}>
+            <SafetyBadge grade={establishment.safetyScore} />
+            <Text style={styles.lastInspection}>
+              Last inspected: {new Date(establishment.lastInspectionDate).toLocaleDateString()}
+            </Text>
+          </View>
         </View>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveLocation}
+        >
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={24}
+            color={isSaved ? '#007AFF' : '#666'}
+          />
+        </TouchableOpacity>
       </View>
 
       {recallAlerts.length > 0 && (
@@ -134,6 +178,12 @@ const styles = StyleSheet.create({
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerContent: {
+    flex: 1,
   },
   name: {
     fontSize: 24,
@@ -154,6 +204,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginLeft: 12,
+  },
+  saveButton: {
+    padding: 8,
+    marginTop: 4,
   },
   section: {
     marginTop: 16,

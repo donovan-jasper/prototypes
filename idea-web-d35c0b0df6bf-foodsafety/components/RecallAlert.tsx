@@ -12,11 +12,16 @@ const RecallAlert: React.FC<RecallAlertProps> = ({ recallDate, description }) =>
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Recall Alert</Text>
-      <Text style={styles.date}>{formattedDate}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>⚠️ Recall Alert</Text>
+        <Text style={styles.date}>{formattedDate}</Text>
+      </View>
       <Text style={styles.description}>{description}</Text>
       <View style={styles.warningBox}>
-        <Text style={styles.warningText}>This establishment has been recalled. Exercise caution when consuming food from this location.</Text>
+        <Text style={styles.warningText}>
+          This establishment has been recalled. Exercise caution when consuming food from this location.
+          Please check with the establishment for more information about affected products.
+        </Text>
       </View>
     </View>
   );
@@ -30,31 +35,44 @@ const styles = StyleSheet.create({
     marginVertical: 8,
     borderLeftWidth: 4,
     borderLeftColor: '#ff3b30',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#ff3b30',
-    marginBottom: 4,
   },
   date: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
   },
   description: {
     fontSize: 16,
     color: '#333',
     marginBottom: 12,
+    lineHeight: 22,
   },
   warningBox: {
     backgroundColor: '#ffebee',
     padding: 12,
     borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: '#c62828',
   },
   warningText: {
     color: '#c62828',
     fontSize: 14,
+    lineHeight: 20,
   },
 });
 
