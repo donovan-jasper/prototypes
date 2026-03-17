@@ -1,19 +1,41 @@
 import { View, StyleSheet } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
-import { useContactStore } from '../store/contactStore';
+import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
+import { useState, useEffect } from 'react';
+import { calculateStreakDays } from '../lib/analytics';
 
 interface StreakDisplayProps {
   contactId: string;
 }
 
 export default function StreakDisplay({ contactId }: StreakDisplayProps) {
-  const { contacts } = useContactStore();
   const theme = useTheme();
+  const [streakDays, setStreakDays] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const contact = contacts.find(c => c.id === contactId);
-  if (!contact) return null;
+  useEffect(() => {
+    loadStreak();
+  }, [contactId]);
 
-  const streakDays = calculateStreakDays(contact);
+  const loadStreak = async () => {
+    setLoading(true);
+    try {
+      const days = await calculateStreakDays(contactId);
+      setStreakDays(days);
+    } catch (error) {
+      console.error('Error loading streak:', error);
+      setStreakDays(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="small" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

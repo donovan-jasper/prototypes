@@ -1,25 +1,74 @@
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { Text, useTheme, ActivityIndicator } from 'react-native-paper';
+import { useState, useEffect } from 'react';
 import { useContactStore } from '../../store/contactStore';
 import InsightChart from '../../components/InsightChart';
 import StreakDisplay from '../../components/StreakDisplay';
+import { calculateStreakDays, getMonthlyStats } from '../../lib/analytics';
+import { getInteractionsByContact } from '../../lib/database';
 
 export default function InsightsScreen() {
-  const { contacts } = useContactStore();
+  const { contacts, interactions } = useContactStore();
   const theme = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [activeStreaks, setActiveStreaks] = useState(0);
+  const [mostContacted, setMostContacted] = useState<any>(null);
+  const [monthlyStats, setMonthlyStats] = useState<any>(null);
 
-  // Calculate insights
+  useEffect(() => {
+    loadInsights();
+  }, [contacts]);
+
+  const loadInsights = async () => {
+    setLoading(true);
+    try {
+      // Calculate active streaks
+      const streakPromises = contacts.map(async (contact) => {
+        const streakDays = await calculateStreakDays(contact.id);
+        return streakDays > 0 ? 1 : 0;
+      });
+      const streakResults = await Promise.all(streakPromises);
+      const activeStreakCount = streakResults.reduce((sum, val) => sum + val, 0);
+      setActiveStreaks(activeStreakCount);
+
+      // Find most contacted
+      if (contacts.length > 0) {
+        const interactionCounts = await Promise.all(
+          contacts.map(async (contact) => {
+            const contactInteractions = await getInteractionsByContact(contact.id);
+            return { contact, count: contactInteractions.length };
+          })
+        );
+        
+        const mostContactedData = interactionCounts.reduce((prev, current) => 
+          current.count > prev.count ? current : prev
+        );
+        setMostContacted(mostContactedData.contact);
+      }
+
+      // Get monthly stats
+      const allInteractions = await Promise.all(
+        contacts.map(contact => getInteractionsByContact(contact.id))
+      );
+      const flatInteractions = allInteractions.flat();
+      const stats = await getMonthlyStats(contacts, flatInteractions);
+      setMonthlyStats(stats);
+    } catch (error) {
+      console.error('Error loading insights:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
+
   const totalContacts = contacts.length;
-  const activeStreaks = contacts.filter(contact => {
-    const streakDays = calculateStreakDays(contact);
-    return streakDays > 0;
-  }).length;
-
-  const mostContacted = contacts.reduce((prev, current) => {
-    const prevInteractions = getInteractionsByContact(prev.id).length;
-    const currentInteractions = getInteractionsByContact(current.id).length;
-    return prevInteractions > currentInteractions ? prev : current;
-  }, contacts[0]);
 
   return (
     <ScrollView style={styles.container}>
@@ -50,17 +99,39 @@ export default function InsightsScreen() {
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Most Contacted
-        </Text>
-        {mostContacted && (
+      {monthlyStats && (
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            This Month
+          </Text>
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Text variant="bodyLarge">{monthlyStats.totalCheckIns}</Text>
+              <Text variant="bodyMedium">Check-ins</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text variant="bodyLarge">{monthlyStats.longestStreak}</Text>
+              <Text variant="bodyMedium">Longest Streak</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text variant="bodyLarge">{monthlyStats.averageScore}</Text>
+              <Text variant="bodyMedium">Avg Score</Text>
+            </View>
+          </View>
+        </View>
+      )}
+
+      {mostContacted && (
+        <View style={styles.section}>
+          <Text variant="titleMedium" style={styles.sectionTitle}>
+            Most Contacted
+          </Text>
           <View style={styles.mostContacted}>
             <Text variant="titleSmall">{mostContacted.name}</Text>
             <StreakDisplay contactId={mostContacted.id} />
           </View>
-        )}
-      </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -69,6 +140,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
     marginBottom: 24,
