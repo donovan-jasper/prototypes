@@ -1,4 +1,4 @@
-import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 export const getMessages = (eventId, callback) => {
@@ -17,6 +17,10 @@ export const sendMessage = async (eventId, text) => {
   const messagesRef = collection(db, 'events', eventId, 'messages');
   await addDoc(messagesRef, {
     text,
-    timestamp: new Date(),
+    timestamp: serverTimestamp(),
   });
+};
+
+export const validateMessage = (text: string): boolean => {
+  return text.trim().length > 0;
 };
