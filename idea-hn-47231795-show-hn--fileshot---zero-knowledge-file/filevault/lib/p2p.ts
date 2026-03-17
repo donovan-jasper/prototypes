@@ -20,7 +20,7 @@ export const useP2PTransfer = () => {
   const [peerConnection, setPeerConnection] = useState(null);
   const [dataChannel, setDataChannel] = useState(null);
   const [peers, setPeers] = useState([]);
-  const { getFile } = useFileVault();
+  const { getFile, addNewFile } = useFileVault();
 
   const discoverPeers = async () => {
     try {
@@ -60,13 +60,38 @@ export const useP2PTransfer = () => {
   };
 
   const setupDataChannel = (channel) => {
+    let receivedData = [];
+    let fileName = 'Received File';
+    let fileSize = 0;
+
     channel.onopen = () => {
       console.log('Data channel opened');
     };
 
     channel.onmessage = (event) => {
-      console.log('Received message:', event.data);
-      // Handle incoming file data
+      if (typeof event.data === 'string') {
+        // Handle metadata
+        const metadata = JSON.parse(event.data);
+        fileName = metadata.name;
+        fileSize = metadata.size;
+      } else {
+        // Handle file data
+        receivedData.push(event.data);
+        const progress = Math.round((receivedData.length * 16384 / fileSize) * 100);
+        setProgress(progress);
+
+        if (receivedData.length * 16384 >= fileSize) {
+          // File transfer complete
+          const fileData = new Blob(receivedData);
+          const reader = new FileReader();
+          reader.onload = async () => {
+            await addNewFile(fileName, reader.result);
+            setIsTransferring(false);
+            Alert.alert('Success', 'File received successfully');
+          };
+          reader.readAsText(fileData);
+        }
+      }
     };
 
     channel.onclose = () => {
@@ -93,6 +118,13 @@ export const useP2PTransfer = () => {
 
       // In a real implementation, you would send the offer to the peer
       // and handle the answer and ICE candidates
+
+      // Send metadata first
+      const metadata = {
+        name: file.name,
+        size: file.size
+      };
+      channel.send(JSON.stringify(metadata));
 
       // Simulate transfer progress
       const chunkSize = 16384; // 16KB chunks
