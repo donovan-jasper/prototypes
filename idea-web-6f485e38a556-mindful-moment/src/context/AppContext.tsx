@@ -10,6 +10,7 @@ interface AppContextType {
   isPremium: boolean;
   settings: any;
   timingEngine: TimingEngine | null;
+  togglePremium: () => void; // For testing purposes only
 }
 
 const AppContext = createContext<AppContextType>({
@@ -19,6 +20,7 @@ const AppContext = createContext<AppContextType>({
   isPremium: false,
   settings: {},
   timingEngine: null,
+  togglePremium: () => {},
 });
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -57,6 +59,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setHasNotificationPermission(status === 'granted');
   };
 
+  // For testing purposes only - in a real app this would be handled by a payment processor
+  const togglePremium = async () => {
+    const newPremiumStatus = !isPremium;
+    setIsPremium(newPremiumStatus);
+
+    // Update in database
+    await db.updateUser({
+      id: userId,
+      isPremium: newPremiumStatus
+    });
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -66,6 +80,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isPremium,
         settings,
         timingEngine,
+        togglePremium,
       }}
     >
       {children}

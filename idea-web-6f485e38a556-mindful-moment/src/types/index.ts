@@ -8,6 +8,7 @@ export interface Moment {
   audioPath?: string;
   voiceType?: string;
   isPremium: boolean;
+  isCustom?: boolean;
 }
 
 export interface User {

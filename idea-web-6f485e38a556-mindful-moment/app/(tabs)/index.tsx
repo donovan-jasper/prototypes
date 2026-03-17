@@ -10,18 +10,19 @@ export default function HomeScreen() {
   const { moments, loading, error } = useMoments();
   const { streak } = useStreak();
   const { settings } = useSettings();
-  const { hasNotificationPermission, requestNotificationPermission } = useAppContext();
+  const { hasNotificationPermission, requestNotificationPermission, isPremium } = useAppContext();
   const [todayMoments, setTodayMoments] = useState([]);
 
   useEffect(() => {
     if (moments && moments.length > 0) {
       // Filter moments for today based on user preferences
       const filtered = moments.filter(moment =>
-        settings.preferredCategories.includes(moment.category)
+        settings.preferredCategories.includes(moment.category) &&
+        (!moment.isPremium || isPremium)
       );
-      setTodayMoments(filtered.slice(0, settings.isPremium ? 10 : 3));
+      setTodayMoments(filtered.slice(0, isPremium ? 10 : 3));
     }
-  }, [moments, settings]);
+  }, [moments, settings, isPremium]);
 
   if (loading) return <Text>Loading your moments...</Text>;
   if (error) return <Text>Error loading moments: {error.message}</Text>;
@@ -54,6 +55,18 @@ export default function HomeScreen() {
       >
         <Text style={styles.takeNowText}>Take a Moment Now</Text>
       </TouchableOpacity>
+
+      {!isPremium && (
+        <View style={styles.premiumPrompt}>
+          <Text style={styles.premiumText}>Unlock more moments with Premium</Text>
+          <TouchableOpacity
+            style={styles.premiumButton}
+            onPress={() => router.push('/premium')}
+          >
+            <Text style={styles.premiumButtonText}>Upgrade Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -85,6 +98,30 @@ const styles = StyleSheet.create({
   takeNowText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
+  },
+  premiumPrompt: {
+    backgroundColor: '#e3f2fd',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  premiumText: {
+    fontSize: 16,
+    color: '#1976d2',
+    marginBottom: 12,
+    fontWeight: 'bold',
+  },
+  premiumButton: {
+    backgroundColor: '#1976d2',
+    padding: 12,
+    borderRadius: 4,
+    width: '100%',
+    alignItems: 'center',
+  },
+  premiumButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
 });

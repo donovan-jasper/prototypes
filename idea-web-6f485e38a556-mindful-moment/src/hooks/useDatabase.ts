@@ -20,9 +20,16 @@ export function useDatabase() {
     getRandomMoment: database.getRandomMoment,
     completeMoment: database.completeMoment,
     getUserSettings: database.getUserSettings,
+    updateUserSettings: database.updateUserSettings,
     getUserPatterns: database.getUserPatterns,
     logIgnoredNotification: database.logIgnoredNotification,
     logEngagedNotification: database.logEngagedNotification,
-    scheduleMoments: database.scheduleMoments,
+    scheduleNotification: database.scheduleNotification,
+    getScheduledMomentsForToday: database.getScheduledMomentsForToday,
+    createCustomMoment: database.createCustomMoment,
+    getCompletedMoments: database.getCompletedMoments,
+    getDailyAnalytics: database.getDailyAnalytics,
+    getAnalyticsBetweenDates: database.getAnalyticsBetweenDates,
+    updateUser: database.updateUser,
   };
 }
