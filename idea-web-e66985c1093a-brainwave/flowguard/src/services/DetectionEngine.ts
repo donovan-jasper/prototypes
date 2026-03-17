@@ -1,14 +1,20 @@
 import { SensorData } from '../types';
 
+type DrowsinessState = 'normal' | 'drowsy' | 'alert';
+
 export class DetectionEngine {
   private profileId: string;
   private sensitivity: number;
   private stillnessThreshold: number;
   private stillnessDuration: number;
   private stillnessStartTime: number | null = null;
-  private isDrowsyState: boolean = false;
+  private drowsinessState: DrowsinessState = 'normal';
   private dataBuffer: SensorData[] = [];
   private bufferSize: number = 30; // Store last 30 readings (3 seconds at 100ms interval)
+  private movementVarianceHistory: number[] = [];
+  private varianceHistorySize: number = 60; // Store last 60 variance readings (6 seconds)
+  private lastMovementTime: number = Date.now();
+  private movementThreshold: number = 0.5; // Threshold for detecting movement
 
   constructor(profileId: string, sensitivity: number = 5) {
     this.profileId = profileId;
@@ -50,41 +56,97 @@ export class DetectionEngine {
       this.dataBuffer.shift();
     }
 
-    // Check for stillness
-    if (this.isStill()) {
-      if (this.stillnessStartTime === null) {
-        this.stillnessStartTime = Date.now();
-      } else if (Date.now() - this.stillnessStartTime >= this.stillnessDuration) {
-        this.isDrowsyState = true;
-      }
-    } else {
-      this.stillnessStartTime = null;
-      this.isDrowsyState = false;
+    // Calculate movement variance
+    const variance = this.calculateMovementVariance();
+
+    // Update movement variance history
+    this.movementVarianceHistory.push(variance);
+    if (this.movementVarianceHistory.length > this.varianceHistorySize) {
+      this.movementVarianceHistory.shift();
     }
+
+    // Check for significant movement
+    if (variance > this.movementThreshold) {
+      this.lastMovementTime = Date.now();
+    }
+
+    // Update drowsiness state
+    this.updateDrowsinessState();
   }
 
-  private isStill(): boolean {
+  private calculateMovementVariance(): number {
     if (this.dataBuffer.length < this.bufferSize) {
-      return false;
+      return 0;
     }
 
-    // Calculate variance of the last 30 readings
+    // Calculate mean of each axis
     const meanX = this.dataBuffer.reduce((sum, data) => sum + data.x, 0) / this.bufferSize;
     const meanY = this.dataBuffer.reduce((sum, data) => sum + data.y, 0) / this.bufferSize;
     const meanZ = this.dataBuffer.reduce((sum, data) => sum + data.z, 0) / this.bufferSize;
 
+    // Calculate variance of each axis
     const varianceX = this.dataBuffer.reduce((sum, data) => sum + Math.pow(data.x - meanX, 2), 0) / this.bufferSize;
     const varianceY = this.dataBuffer.reduce((sum, data) => sum + Math.pow(data.y - meanY, 2), 0) / this.bufferSize;
     const varianceZ = this.dataBuffer.reduce((sum, data) => sum + Math.pow(data.z - meanZ, 2), 0) / this.bufferSize;
 
-    // Check if all axes are below threshold
-    return varianceX < this.stillnessThreshold &&
-           varianceY < this.stillnessThreshold &&
-           varianceZ < this.stillnessThreshold;
+    // Return the maximum variance across all axes
+    return Math.max(varianceX, varianceY, varianceZ);
+  }
+
+  private updateDrowsinessState(): void {
+    const currentTime = Date.now();
+    const timeSinceLastMovement = currentTime - this.lastMovementTime;
+
+    // Check for stillness
+    if (timeSinceLastMovement >= this.stillnessDuration) {
+      // Check if recent movement variance is below threshold
+      const recentVariance = this.movementVarianceHistory.slice(-10); // Last 1 second of data
+      const avgVariance = recentVariance.reduce((sum, v) => sum + v, 0) / recentVariance.length;
+
+      if (avgVariance < this.stillnessThreshold) {
+        // Check for subtle head movements (nods)
+        if (this.detectSubtleHeadMovements()) {
+          this.drowsinessState = 'drowsy';
+        } else {
+          this.drowsinessState = 'alert';
+        }
+      } else {
+        this.drowsinessState = 'normal';
+      }
+    } else {
+      this.drowsinessState = 'normal';
+    }
+  }
+
+  private detectSubtleHeadMovements(): boolean {
+    // Analyze the movement pattern for subtle nods
+    // This is a simplified version - a real implementation would use more sophisticated pattern recognition
+
+    // Check if there are any significant peaks in the movement variance history
+    // that could indicate subtle head movements
+    const peakThreshold = this.stillnessThreshold * 2;
+    const recentVariance = this.movementVarianceHistory.slice(-30); // Last 3 seconds of data
+
+    // Find peaks in the variance data
+    let peakCount = 0;
+    for (let i = 1; i < recentVariance.length - 1; i++) {
+      if (recentVariance[i] > peakThreshold &&
+          recentVariance[i] > recentVariance[i-1] &&
+          recentVariance[i] > recentVariance[i+1]) {
+        peakCount++;
+      }
+    }
+
+    // If we have multiple small peaks, it might indicate subtle head movements
+    return peakCount >= 2;
   }
 
   isDrowsy(): boolean {
-    return this.isDrowsyState;
+    return this.drowsinessState === 'drowsy' || this.drowsinessState === 'alert';
+  }
+
+  getDrowsinessState(): DrowsinessState {
+    return this.drowsinessState;
   }
 
   getSensitivity(): number {
@@ -95,5 +157,10 @@ export class DetectionEngine {
     this.sensitivity = sensitivity;
     this.stillnessThreshold = this.calculateThreshold();
     this.stillnessDuration = this.calculateDuration();
+  }
+
+  getMovementVariance(): number {
+    if (this.movementVarianceHistory.length === 0) return 0;
+    return this.movementVarianceHistory[this.movementVarianceHistory.length - 1];
   }
 }
