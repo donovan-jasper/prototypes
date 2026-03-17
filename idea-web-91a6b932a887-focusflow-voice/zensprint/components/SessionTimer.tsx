@@ -5,10 +5,11 @@ import { Svg, Circle } from 'react-native-svg';
 interface SessionTimerProps {
   duration: number;
   onComplete: () => void;
+  onProgress?: (elapsedSeconds: number) => void;
   isPaused: boolean;
 }
 
-const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPaused }) => {
+const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, onProgress, isPaused }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [progress, setProgress] = useState(100);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -37,7 +38,12 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
           onComplete();
           return 0;
         }
-        return prevTime - 1;
+        const newTime = prevTime - 1;
+        const elapsedSeconds = (duration * 60) - newTime;
+        if (onProgress) {
+          onProgress(elapsedSeconds);
+        }
+        return newTime;
       });
     }, 1000);
 
@@ -47,7 +53,7 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
         intervalRef.current = null;
       }
     };
-  }, [isPaused, onComplete]);
+  }, [isPaused, onComplete, onProgress, duration]);
 
   useEffect(() => {
     setProgress((timeLeft / (duration * 60)) * 100);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStore } from '../../store/useStore';
@@ -10,6 +10,8 @@ export default function ActiveSessionScreen() {
   const router = useRouter();
   const { currentSession, completeSession, pauseSession, resumeSession } = useStore();
   const [isPaused, setIsPaused] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [sessionComplete, setSessionComplete] = useState(false);
 
   const handlePauseResume = () => {
     if (isPaused) {
@@ -21,8 +23,15 @@ export default function ActiveSessionScreen() {
   };
 
   const handleComplete = () => {
-    completeSession();
-    router.push('/(tabs)/index');
+    setSessionComplete(true);
+    setTimeout(() => {
+      completeSession();
+      router.push('/(tabs)/index');
+    }, 2000);
+  };
+
+  const handleProgress = (elapsed: number) => {
+    setElapsedSeconds(elapsed);
   };
 
   if (!currentSession) {
@@ -35,12 +44,17 @@ export default function ActiveSessionScreen() {
 
   return (
     <View style={styles.container}>
-      <VoiceCoach />
+      <VoiceCoach
+        elapsedSeconds={elapsedSeconds}
+        sessionDuration={currentSession.duration}
+        onSessionComplete={sessionComplete}
+      />
 
       <View style={styles.timerContainer}>
         <SessionTimer
           duration={currentSession.duration}
           onComplete={handleComplete}
+          onProgress={handleProgress}
           isPaused={isPaused}
         />
       </View>

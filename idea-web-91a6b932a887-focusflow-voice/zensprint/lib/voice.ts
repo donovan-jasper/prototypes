@@ -23,12 +23,13 @@ export const generateCoachingMessage = (
 export const speakMessage = async (text: string, packName: string): Promise<void> => {
   const pack = VoicePacks.find((p) => p.name === packName) || VoicePacks[0];
 
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     Speech.speak(text, {
       language: 'en-US',
       pitch: pack.pitch,
       rate: pack.rate,
       onDone: () => resolve(),
+      onError: (error) => reject(error),
     });
   });
 };
