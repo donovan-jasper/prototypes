@@ -27,11 +27,11 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isPaused]);
+  }, [isPaused, duration]);
 
   useEffect(() => {
     setProgress((timeLeft / (duration * 60)) * 100);
-  }, [timeLeft]);
+  }, [timeLeft, duration]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
