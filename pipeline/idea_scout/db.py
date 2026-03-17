@@ -47,6 +47,7 @@ class IdeaDB:
             "improvement_count": "INTEGER DEFAULT 0",
             "last_improved_at": "TIMESTAMP",
             "digest_sent_at": "TIMESTAMP",
+            "feasibility_score": "INTEGER",
         }
         for col, col_type in new_cols.items():
             if col not in existing:
@@ -76,10 +77,10 @@ class IdeaDB:
         ).fetchone()
         return dict(row) if row else None
 
-    def save_analysis(self, post_id: str, analysis: str, viability_score: int):
+    def save_analysis(self, post_id: str, analysis: str, viability_score: int, feasibility_score: int = None):
         self.conn.execute(
-            "UPDATE posts SET analysis = ?, viability_score = ? WHERE id = ?",
-            (analysis, viability_score, post_id),
+            "UPDATE posts SET analysis = ?, viability_score = ?, feasibility_score = ? WHERE id = ?",
+            (analysis, viability_score, feasibility_score, post_id),
         )
         self.conn.commit()
 
@@ -118,11 +119,13 @@ class IdeaDB:
         return [dict(r) for r in rows]
 
     def get_buildable_ideas(self, limit: int = 1) -> list[dict]:
-        """Get unbuilt ideas ranked by combined viability + competition score.
+        """Get unbuilt ideas ranked by viability + competition + feasibility.
         Requires both viability AND competition analysis to be complete."""
         rows = self.conn.execute(
             """SELECT *,
-                      (viability_score * 0.6 + competition_score * 0.4) AS combined_score
+                      (viability_score * 0.4 +
+                       competition_score * 0.3 +
+                       COALESCE(feasibility_score, 5) * 0.3) AS combined_score
                FROM posts
                WHERE viability_score >= 7
                  AND competition_score IS NOT NULL

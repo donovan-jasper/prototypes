@@ -24,7 +24,14 @@ Respond ONLY with valid JSON, no markdown:
   "monetization": "specific strategy (subscription $X/mo, freemium, one-time $X) and why people would pay",
   "saturated": true/false — true if dominant well-funded apps already nail this (e.g. password managers, basic notes),
   "difficulty": "Easy/Medium/Hard — brief explanation",
-  "viability_score": <1-10 integer, 10 = most viable. Score 0 if saturated by incumbents.>
+  "viability_score": <1-10 integer, 10 = most viable. Score 0 if saturated by incumbents.>,
+  "feasibility_score": <1-10 integer. How buildable is this as a React Native (Expo) prototype?
+    10 = pure UI + local storage, trivial to prototype
+    8 = standard APIs (REST, auth, camera, maps)
+    6 = needs moderate native modules or complex state
+    4 = needs heavy native code (bluetooth, AR, background processing)
+    2 = needs hardware/platform features Expo can't access
+    1 = essentially impossible without native development>
 }}"""
 
 
@@ -44,6 +51,8 @@ def parse_analysis_response(text: str) -> dict:
         data = json.loads(cleaned)
         score = int(data.get("viability_score", 0))
         score = max(0, min(10, score))
+        feasibility = int(data.get("feasibility_score", 5))
+        feasibility = max(1, min(10, feasibility))
         # Score 0 for saturated markets
         if data.get("saturated", False):
             score = 0
@@ -54,11 +63,12 @@ def parse_analysis_response(text: str) -> dict:
             f"Competitors: {data.get('competitors', 'Unknown')}\n"
             f"Gap: {data.get('gap', 'Unknown')}\n"
             f"Monetization: {data.get('monetization', 'Unknown')}\n"
-            f"Difficulty: {data.get('difficulty', 'Unknown')}"
+            f"Difficulty: {data.get('difficulty', 'Unknown')}\n"
+            f"Feasibility: {feasibility}/10"
         )
-        return {"analysis": analysis, "viability_score": score}
+        return {"analysis": analysis, "viability_score": score, "feasibility_score": feasibility}
     except (json.JSONDecodeError, ValueError, IndexError):
-        return {"analysis": f"Failed to parse LLM response: {text[:200]}", "viability_score": 0}
+        return {"analysis": f"Failed to parse LLM response: {text[:200]}", "viability_score": 0, "feasibility_score": 5}
 
 
 async def analyze_post(client: httpx.AsyncClient, post: dict) -> dict:

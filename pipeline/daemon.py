@@ -35,8 +35,9 @@ async def analyze_batch(db: IdeaDB, limit: int = 10):
         for post in unanalyzed:
             try:
                 result = await analyze_post(client, post)
-                db.save_analysis(post["id"], result["analysis"], result["viability_score"])
-                print(f"    [{result['viability_score']}/10] {post['title'][:50]}")
+                db.save_analysis(post["id"], result["analysis"], result["viability_score"], result.get("feasibility_score"))
+                feas = result.get("feasibility_score", "?")
+                print(f"    [{result['viability_score']}/10 f={feas}] {post['title'][:50]}")
                 scored += 1
 
                 if result["viability_score"] >= 7:

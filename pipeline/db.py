@@ -46,6 +46,8 @@ class IdeaDB:
             "demand_signal": "TEXT",
             "improvement_count": "INTEGER DEFAULT 0",
             "last_improved_at": "TIMESTAMP",
+            "digest_sent_at": "TIMESTAMP",
+            "feasibility_score": "INTEGER",
         }
         for col, col_type in new_cols.items():
             if col not in existing:
@@ -75,10 +77,10 @@ class IdeaDB:
         ).fetchone()
         return dict(row) if row else None
 
-    def save_analysis(self, post_id: str, analysis: str, viability_score: int):
+    def save_analysis(self, post_id: str, analysis: str, viability_score: int, feasibility_score: int = None):
         self.conn.execute(
-            "UPDATE posts SET analysis = ?, viability_score = ? WHERE id = ?",
-            (analysis, viability_score, post_id),
+            "UPDATE posts SET analysis = ?, viability_score = ?, feasibility_score = ? WHERE id = ?",
+            (analysis, viability_score, feasibility_score, post_id),
         )
         self.conn.commit()
 
@@ -91,7 +93,7 @@ class IdeaDB:
 
     def get_unanalyzed_posts(self, limit: int = 20) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT * FROM posts WHERE analysis IS NULL ORDER BY score DESC LIMIT ?",
+            "SELECT * FROM posts WHERE analysis IS NULL ORDER BY rowid DESC LIMIT ?",
             (limit,),
         ).fetchall()
         return [dict(r) for r in rows]
@@ -117,14 +119,17 @@ class IdeaDB:
         return [dict(r) for r in rows]
 
     def get_buildable_ideas(self, limit: int = 1) -> list[dict]:
-        """Get unbuilt ideas ranked by combined viability + competition score."""
+        """Get unbuilt ideas ranked by viability + competition + feasibility.
+        Requires both viability AND competition analysis to be complete."""
         rows = self.conn.execute(
             """SELECT *,
-                      (COALESCE(viability_score, 0) * 0.6 +
-                       COALESCE(competition_score, 0) * 0.4) AS combined_score
+                      (viability_score * 0.4 +
+                       competition_score * 0.3 +
+                       COALESCE(feasibility_score, 5) * 0.3) AS combined_score
                FROM posts
                WHERE viability_score >= 7
-                 AND COALESCE(competition_score, 5) >= 4
+                 AND competition_score IS NOT NULL
+                 AND competition_score >= 4
                  AND prototype_started = 0
                ORDER BY combined_score DESC
                LIMIT ?""",
@@ -161,6 +166,41 @@ class IdeaDB:
             "UPDATE posts SET prototype_started = 1 WHERE id = ?", (post_id,),
         )
         self.conn.commit()
+
+    def get_unsent_top_ideas(self, limit: int = 5) -> list[dict]:
+        """Get top ideas that have NOT been included in a digest yet."""
+        rows = self.conn.execute(
+            """SELECT * FROM posts
+               WHERE viability_score IS NOT NULL
+                 AND digest_sent_at IS NULL
+               ORDER BY viability_score DESC, score DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def mark_digest_sent(self, post_ids: list[str]):
+        """Mark ideas as included in a digest."""
+        if not post_ids:
+            return
+        self.conn.executemany(
+            "UPDATE posts SET digest_sent_at = CURRENT_TIMESTAMP WHERE id = ?",
+            [(pid,) for pid in post_ids],
+        )
+        self.conn.commit()
+
+    def get_ideas_needing_competition(self, min_score: int = 5, limit: int = 5) -> list[dict]:
+        """Get analyzed ideas scoring >= min_score that lack competition analysis."""
+        rows = self.conn.execute(
+            """SELECT * FROM posts
+               WHERE viability_score >= ?
+                 AND viability_score IS NOT NULL
+                 AND competition_score IS NULL
+               ORDER BY viability_score DESC
+               LIMIT ?""",
+            (min_score, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
 
     def count_unbuilt_ideas(self, min_score: int = 7) -> int:
         row = self.conn.execute(
