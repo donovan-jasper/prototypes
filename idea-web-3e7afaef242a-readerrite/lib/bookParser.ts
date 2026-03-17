@@ -1,3 +1,6 @@
+import * as FileSystem from 'expo-file-system';
+import { loadEpubContent } from './epubParser';
+
 export interface BookMetadata {
   title: string;
   author: string;
@@ -27,12 +30,16 @@ export async function extractMetadata(
 
 async function extractEpubMetadata(filePath: string, fallbackTitle: string): Promise<BookMetadata> {
   try {
+    const epubContent = await loadEpubContent(filePath, 0);
+    
     return {
-      title: fallbackTitle,
-      author: 'Unknown Author',
-      format: 'epub'
+      title: epubContent.metadata.title !== 'Unknown' ? epubContent.metadata.title : fallbackTitle,
+      author: epubContent.metadata.author,
+      format: 'epub',
+      coverPath: epubContent.metadata.coverHref
     };
   } catch (error) {
+    console.error('Failed to extract EPUB metadata:', error);
     return {
       title: fallbackTitle,
       author: 'Unknown Author',

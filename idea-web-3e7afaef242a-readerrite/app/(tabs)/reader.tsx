@@ -12,7 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { WebView } from 'react-native-webview';
 import { getBook, updateBook } from '../../lib/database';
-import { loadEpubContent } from '../../lib/epubParser';
+import { loadEpubContent, EpubContent } from '../../lib/epubParser';
 import type { Book } from '../../lib/database';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -26,9 +26,8 @@ export default function ReaderScreen() {
   
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
-  const [htmlContent, setHtmlContent] = useState<string>('');
+  const [epubContent, setEpubContent] = useState<EpubContent | null>(null);
   const [currentChapter, setCurrentChapter] = useState(0);
-  const [totalChapters, setTotalChapters] = useState(0);
   const [theme, setTheme] = useState<Theme>('light');
   const [showControls, setShowControls] = useState(false);
   
@@ -85,29 +84,33 @@ export default function ReaderScreen() {
       setBook(loadedBook);
       
       if (loadedBook.format.toLowerCase() === 'epub') {
-        const { chapters, currentChapter: savedChapter } = await loadEpubContent(
+        const content = await loadEpubContent(
           loadedBook.filePath,
           loadedBook.currentPage
         );
         
-        setTotalChapters(chapters.length);
-        setCurrentChapter(savedChapter);
-        
-        if (chapters.length > 0) {
-          setHtmlContent(chapters[savedChapter]);
-        }
+        setEpubContent(content);
+        setCurrentChapter(content.currentChapter);
       } else {
-        setHtmlContent(`
-          <html>
-            <body style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: -apple-system; text-align: center; padding: 20px;">
-              <div>
-                <h2>Format Not Supported</h2>
-                <p>Currently only EPUB files are supported in the reader.</p>
-                <p>Support for ${loadedBook.format.toUpperCase()} files is coming soon.</p>
+        setEpubContent({
+          metadata: { title: loadedBook.title, author: loadedBook.author },
+          chapters: [{
+            id: 'unsupported',
+            href: '',
+            title: 'Unsupported Format',
+            content: `
+              <div style="display: flex; justify-content: center; align-items: center; height: 100vh; text-align: center; padding: 20px;">
+                <div>
+                  <h2>Format Not Supported</h2>
+                  <p>Currently only EPUB files are supported in the reader.</p>
+                  <p>Support for ${loadedBook.format.toUpperCase()} files is coming soon.</p>
+                </div>
               </div>
-            </body>
-          </html>
-        `);
+            `
+          }],
+          currentChapter: 0,
+          toc: []
+        });
       }
     } catch (error) {
       console.error('Failed to load book:', error);
@@ -137,25 +140,17 @@ export default function ReaderScreen() {
   };
 
   const previousPage = async () => {
-    if (currentChapter > 0 && book?.format.toLowerCase() === 'epub') {
+    if (currentChapter > 0 && epubContent && book) {
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
-      
-      const { chapters } = await loadEpubContent(book.filePath, newChapter);
-      setHtmlContent(chapters[newChapter]);
-      
       await updateBook(book.id, { currentPage: newChapter });
     }
   };
 
   const nextPage = async () => {
-    if (currentChapter < totalChapters - 1 && book?.format.toLowerCase() === 'epub') {
+    if (epubContent && currentChapter < epubContent.chapters.length - 1 && book) {
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
-      
-      const { chapters } = await loadEpubContent(book.filePath, newChapter);
-      setHtmlContent(chapters[newChapter]);
-      
       await updateBook(book.id, { currentPage: newChapter });
     }
   };
@@ -203,20 +198,10 @@ export default function ReaderScreen() {
         margin-top: 1.5em;
         margin-bottom: 0.5em;
       }
+      a {
+        color: ${theme === 'dark' ? '#4da6ff' : '#007AFF'};
+      }
     </style>
-  `;
-
-  const wrappedHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        ${injectedCSS}
-      </head>
-      <body>
-        ${htmlContent}
-      </body>
-    </html>
   `;
 
   if (loading) {
@@ -227,7 +212,7 @@ export default function ReaderScreen() {
     );
   }
 
-  if (!book) {
+  if (!book || !epubContent) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>Book not found</Text>
@@ -235,7 +220,24 @@ export default function ReaderScreen() {
     );
   }
 
-  const progress = totalChapters > 0 ? ((currentChapter + 1) / totalChapters) * 100 : 0;
+  const currentChapterContent = epubContent.chapters[currentChapter]?.content || '';
+  
+  const wrappedHtml = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        ${injectedCSS}
+      </head>
+      <body>
+        ${currentChapterContent}
+      </body>
+    </html>
+  `;
+
+  const progress = epubContent.chapters.length > 0 
+    ? ((currentChapter + 1) / epubContent.chapters.length) * 100 
+    : 0;
 
   return (
     <View style={styles.container}>
@@ -258,9 +260,14 @@ export default function ReaderScreen() {
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>←</Text>
           </TouchableOpacity>
-          <Text style={styles.bookTitle} numberOfLines={1}>
-            {book.title}
-          </Text>
+          <View style={styles.titleContainer}>
+            <Text style={styles.bookTitle} numberOfLines={1}>
+              {book.title}
+            </Text>
+            <Text style={styles.chapterTitle} numberOfLines={1}>
+              {epubContent.chapters[currentChapter]?.title || ''}
+            </Text>
+          </View>
           <TouchableOpacity style={styles.themeButton} onPress={cycleTheme}>
             <Text style={styles.themeButtonText}>
               {theme === 'light' ? '☀️' : theme === 'dark' ? '🌙' : '📄'}
@@ -274,7 +281,7 @@ export default function ReaderScreen() {
               <View style={[styles.progressFill, { width: `${progress}%` }]} />
             </View>
             <Text style={styles.progressText}>
-              {currentChapter + 1} / {totalChapters}
+              {currentChapter + 1} / {epubContent.chapters.length}
             </Text>
           </View>
         </View>
@@ -330,12 +337,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     color: '#fff',
   },
-  bookTitle: {
+  titleContainer: {
     flex: 1,
+    marginHorizontal: 12,
+  },
+  bookTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#fff',
-    marginHorizontal: 12,
+  },
+  chapterTitle: {
+    fontSize: 14,
+    color: '#ccc',
+    marginTop: 2,
   },
   themeButton: {
     width: 40,
