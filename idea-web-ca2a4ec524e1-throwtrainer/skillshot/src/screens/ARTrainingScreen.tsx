@@ -1,25 +1,22 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { Camera } from 'expo-camera';
-import { GLView } from 'expo-gl';
 import { useNavigation } from '@react-navigation/native';
 import { Audio } from 'expo-av';
 import MotionDetector from '../components/MotionDetector';
 import SessionTimer from '../components/SessionTimer';
+import ARTargetOverlay from '../components/ARTargetOverlay';
 import { useSessionStore } from '../store/useSessionStore';
 import { setTargetPosition } from '../services/motionAnalyzer';
-import { initAR, placeTarget, renderAR, updateTargetFeedback, getTargetWorldPosition } from '../services/arService';
 
 const ARTrainingScreen = () => {
   const [hasPermission, setHasPermission] = useState(null);
-  const [targetPlaced, setTargetPlaced] = useState(false);
+  const [targetPosition, setTargetPositionState] = useState<{ x: number; y: number } | null>(null);
   const [lastResult, setLastResult] = useState<'hit' | 'miss' | null>(null);
   const [hitSound, setHitSound] = useState<Audio.Sound | null>(null);
   const [missSound, setMissSound] = useState<Audio.Sound | null>(null);
-  const [glReady, setGlReady] = useState(false);
   const navigation = useNavigation();
   const { startSession, endSession, logAttempt } = useSessionStore();
-  const glViewRef = useRef<any>(null);
 
   useEffect(() => {
     (async () => {
@@ -51,49 +48,20 @@ const ARTrainingScreen = () => {
     };
   }, []);
 
-  const onContextCreate = async (gl: any) => {
-    await initAR(gl);
-    setGlReady(true);
-    
-    const animate = () => {
-      renderAR();
-      gl.endFrameEXP();
-      requestAnimationFrame(animate);
-    };
-    animate();
-  };
-
   const handleScreenTap = (event: any) => {
-    if (!glReady) return;
-    
     const { locationX, locationY } = event.nativeEvent;
-    const { width, height } = event.nativeEvent.target.measure 
-      ? { width: 375, height: 667 }
-      : { width: 375, height: 667 };
+    const { width, height } = Dimensions.get('window');
     
     const normalizedX = locationX / width;
     const normalizedY = locationY / height;
-    const estimatedDepth = 2 + (normalizedY * 3);
     
-    const screenPosition = {
-      x: normalizedX,
-      y: normalizedY,
-      depth: estimatedDepth,
-    };
-    
-    const result = placeTarget(screenPosition);
-    
-    if (result) {
-      setTargetPosition(result.worldPosition);
-      setTargetPlaced(true);
-    }
+    setTargetPositionState({ x: normalizedX, y: normalizedY });
+    setTargetPosition({ x: normalizedX, y: normalizedY });
   };
 
   const handleThrowDetected = async (result: any) => {
     logAttempt(result);
     setLastResult(result.hit ? 'hit' : 'miss');
-    
-    updateTargetFeedback(result.hit ? 'hit' : 'miss');
     
     try {
       if (result.hit && hitSound) {
@@ -134,17 +102,16 @@ const ARTrainingScreen = () => {
           onPress={handleScreenTap}
           activeOpacity={1}
         >
-          <GLView
-            style={styles.glView}
-            onContextCreate={onContextCreate}
-          />
+          {targetPosition && (
+            <ARTargetOverlay position={targetPosition} result={lastResult} />
+          )}
         </TouchableOpacity>
       </Camera>
       <MotionDetector onThrowDetected={handleThrowDetected} />
       <SessionTimer onEndSession={handleEndSession} />
       <View style={styles.instructions}>
         <Text style={styles.instructionText}>
-          {targetPlaced 
+          {targetPosition 
             ? 'Make a throwing motion to shoot!' 
             : 'Tap screen to place target'}
         </Text>
@@ -169,9 +136,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   touchOverlay: {
-    flex: 1,
-  },
-  glView: {
     flex: 1,
   },
   instructions: {

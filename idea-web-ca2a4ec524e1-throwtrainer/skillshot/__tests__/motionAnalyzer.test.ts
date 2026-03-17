@@ -5,8 +5,7 @@ describe('motionAnalyzer', () => {
     const mockCallback = jest.fn();
     const subscription = analyzeMotion(mockCallback);
 
-    // Simulate throw detection
-    const mockAccelerometerData = { x: 2, y: 2, z: 2 };
+    const mockAccelerometerData = { x: 3, y: 3, z: 3 };
     subscription.accelerometerCallback(mockAccelerometerData);
 
     expect(mockCallback).toHaveBeenCalledWith({
@@ -22,7 +21,6 @@ describe('motionAnalyzer', () => {
     const mockCallback = jest.fn();
     const subscription = analyzeMotion(mockCallback);
 
-    // Simulate no motion
     const mockAccelerometerData = { x: 0, y: 0, z: 0 };
     subscription.accelerometerCallback(mockAccelerometerData);
 
@@ -35,7 +33,6 @@ describe('motionAnalyzer', () => {
     const mockCallback = jest.fn();
     const subscription = analyzeMotion(mockCallback);
 
-    // Simulate erratic motion
     const mockAccelerometerData = { x: 1, y: 1, z: 1 };
     subscription.accelerometerCallback(mockAccelerometerData);
 

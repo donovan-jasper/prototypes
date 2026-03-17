@@ -40,8 +40,6 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-gl",
-      "expo-three",
       "expo-sensors",
       "expo-av",
       "expo-sqlite"
