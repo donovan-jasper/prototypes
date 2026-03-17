@@ -11,18 +11,31 @@ import { useRouter } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { sessionManager } from '@/lib/session/sessionManager';
 import { initDatabase } from '@/lib/database/schema';
+import { getUserPreferences } from '@/lib/database/queries';
 
 const { width } = Dimensions.get('window');
 
-const QUICK_START_DURATIONS = [15];
+const QUICK_START_DURATIONS = [10, 15, 20, 25];
 
 export default function HomeScreen() {
   const router = useRouter();
   const [selectedDuration, setSelectedDuration] = useState(15);
 
   useEffect(() => {
-    initDatabase();
+    loadDefaultDuration();
   }, []);
+
+  const loadDefaultDuration = async () => {
+    try {
+      await initDatabase();
+      const prefs = await getUserPreferences();
+      if (prefs) {
+        setSelectedDuration(prefs.default_duration);
+      }
+    } catch (error) {
+      console.error('Error loading preferences:', error);
+    }
+  };
 
   const handleStartSession = async () => {
     const session = await sessionManager.createSession(selectedDuration, 'rain');

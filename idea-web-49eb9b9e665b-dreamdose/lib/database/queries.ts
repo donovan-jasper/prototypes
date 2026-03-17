@@ -1,4 +1,4 @@
-import { getDatabase, SessionRecord } from './schema';
+import { getDatabase, SessionRecord, UserPreferencesRecord } from './schema';
 
 export async function createSession(
   id: string,
@@ -91,4 +91,28 @@ export async function getSessionsByDateRange(
   );
   
   return results;
+}
+
+export async function getUserPreferences(): Promise<UserPreferencesRecord | null> {
+  const db = await getDatabase();
+  
+  const result = await db.getFirstAsync<UserPreferencesRecord>(
+    'SELECT * FROM user_preferences LIMIT 1'
+  );
+  
+  return result || null;
+}
+
+export async function updatePreferences(prefs: {
+  default_duration: number;
+  haptic_enabled: number;
+  notifications_enabled: number;
+}): Promise<void> {
+  const db = await getDatabase();
+  const now = Date.now();
+  
+  await db.runAsync(
+    'UPDATE user_preferences SET default_duration = ?, haptic_enabled = ?, notifications_enabled = ?, updated_at = ? WHERE id = 1',
+    [prefs.default_duration, prefs.haptic_enabled, prefs.notifications_enabled, now]
+  );
 }
