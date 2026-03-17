@@ -11,7 +11,7 @@ from idea_scout.notify import notify_improvement
 from builder.code_builder import llm_call, parse_code_blocks
 from builder.orchestrator import write_files, try_install_and_test, PROTOTYPES_DIR
 
-ASSESS_PROMPT = """You are reviewing an existing mobile app prototype (React Native/Expo). Read the spec and code below.
+ASSESS_PROMPT = """You are a senior React Native developer reviewing a mobile app prototype. Read the spec and code carefully.
 
 ## Spec
 {spec}
@@ -19,32 +19,49 @@ ASSESS_PROMPT = """You are reviewing an existing mobile app prototype (React Nat
 ## Current Files
 {file_listing}
 
-Pick the SINGLE highest-impact improvement that increases the app's MONETIZATION potential:
-1. Add a compelling feature that makes users willing to pay (subscription/IAP worthy)
-2. Add AI integration via an OpenAI-compatible API at http://localhost:20128/v1 (model: "coder")
-3. Improve the mobile UI — better styling, smooth UX, native feel
-4. Add onboarding flow or paywall skeleton
-5. Add or improve tests
+Analyze the code critically. What is the BIGGEST GAP between what the spec promises and what the code actually does?
+
+Common problems in prototypes (check for these):
+- Screens that render placeholder text instead of real UI components
+- Functions that return hardcoded data instead of computing results
+- Navigation that doesn't work or is missing
+- State management that doesn't persist
+- Core features from the spec that have no implementation at all
+- Screens with no interactivity (no buttons, inputs, or user actions)
+
+Pick the ONE improvement that would make the biggest difference to a user actually trying the app. Do NOT suggest:
+- "AI-powered" anything unless the spec specifically calls for it
+- Generic "premium features" — be specific about what the feature does
+- Vague enhancements like "improve UX" — say exactly what to build
 
 Return JSON:
 {{
-  "improvement": "one sentence describing what to do",
-  "category": "feature|ai|ui|monetization|tests",
+  "problem": "what's wrong or missing right now (be specific, reference file names)",
+  "improvement": "exactly what to build, with enough detail that a developer could implement it",
+  "category": "missing-feature|broken-logic|placeholder-code|no-persistence|ui-incomplete",
   "files_to_change": ["list of file paths to create or modify"]
 }}
 
 Only JSON, no commentary."""
 
-IMPLEMENT_PROMPT = """Implement this improvement to an existing prototype.
+IMPLEMENT_PROMPT = """You are implementing a specific improvement to a React Native (Expo) prototype.
 
-## Improvement
+## What to build
 {improvement}
 
 ## Current Spec
 {spec}
 
-## Current Files
+## Current Code
 {file_listing}
+
+IMPORTANT:
+- Write REAL, WORKING code — not placeholder components or TODO comments
+- If a screen needs UI, build actual interactive components with proper state
+- If a feature needs data, implement real logic (calculations, filtering, sorting)
+- Use proper React Native components (FlatList, TextInput, TouchableOpacity, etc.)
+- Style things properly — consistent colors, spacing, readable text
+- If you're fixing a screen, make sure it actually DOES something when the user taps buttons
 
 Output the COMPLETE updated files (not diffs). Format each as:
 ```path/to/file.ext

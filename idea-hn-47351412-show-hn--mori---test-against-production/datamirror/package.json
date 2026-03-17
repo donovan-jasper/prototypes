@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@expo/vector-icons": "^14.0.2",
+    "@faker-js/faker": "^8.4.1",
     "expo": "~52.0.0",
     "expo-file-system": "~17.0.1",
     "expo-router": "~3.5.16",
