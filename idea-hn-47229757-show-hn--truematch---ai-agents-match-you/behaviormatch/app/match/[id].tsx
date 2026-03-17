@@ -1,9 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useMatches } from '../../hooks/useMatches';
 import BehaviorInsight from '../../components/BehaviorInsight';
 import ConversationStarter from '../../components/ConversationStarter';
+import CompatibilityScore from '../../components/CompatibilityScore';
 import Colors from '../../constants/Colors';
 
 export default function MatchDetailScreen() {
@@ -30,11 +31,16 @@ export default function MatchDetailScreen() {
       <View style={styles.header}>
         <Text style={styles.name}>{match.matchedUser.name}</Text>
         <Text style={styles.age}>{match.matchedUser.age}</Text>
+        <View style={styles.scoreContainer}>
+          <CompatibilityScore score={match.compatibilityScore} />
+        </View>
       </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Compatibility Insights</Text>
         <BehaviorInsight match={match} detailed />
       </View>
+
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Conversation Starters</Text>
         <ConversationStarter match={match} />
@@ -56,28 +62,36 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
+    alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    backgroundColor: Colors.card,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
+    marginBottom: 5,
   },
   age: {
     fontSize: 18,
     color: Colors.text,
-    marginTop: 5,
+    marginBottom: 15,
+  },
+  scoreContainer: {
+    marginBottom: 10,
   },
   section: {
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
+    backgroundColor: Colors.card,
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 10,
+    marginBottom: 15,
   },
 });
