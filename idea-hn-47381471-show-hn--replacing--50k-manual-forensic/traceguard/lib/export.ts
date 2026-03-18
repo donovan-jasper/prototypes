@@ -1,4 +1,4 @@
-import { PDFDocument, rgb } from '@react-native-pdf/pdf-lib';
+import { PDFDocument, rgb, degrees } from '@react-native-pdf/pdf-lib';
 import { Transaction } from './types';
 import { format } from 'date-fns';
 import { canExportPDF } from './subscription';
