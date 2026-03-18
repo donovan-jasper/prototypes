@@ -1,344 +1,544 @@
 export interface MockApp {
-  id: string;
   name: string;
   description: string;
   icon: string;
   storeUrl: string;
-  tags: string[];
   category: string;
+  tags: string[];
   useCases: string[];
   rating: number;
 }
 
 export const mockApps: MockApp[] = [
+  // Productivity Apps
   {
-    id: '1',
     name: 'Notion',
     description: 'All-in-one workspace for notes, tasks, wikis, and databases',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/notion',
-    tags: ['productivity', 'notes', 'organization', 'collaboration', 'workspace'],
+    storeUrl: 'https://apps.apple.com/app/notion/id1232780281',
     category: 'productivity',
-    useCases: ['take notes', 'organize projects', 'manage tasks', 'create wikis', 'team collaboration'],
+    tags: ['notes', 'tasks', 'collaboration', 'workspace', 'organization'],
+    useCases: ['project management', 'note-taking', 'team collaboration', 'personal wiki'],
     rating: 4.8
   },
   {
-    id: '2',
     name: 'Todoist',
     description: 'Simple yet powerful task manager and to-do list app',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/todoist',
-    tags: ['productivity', 'tasks', 'todo', 'reminders', 'planning'],
+    storeUrl: 'https://apps.apple.com/app/todoist/id572688855',
     category: 'productivity',
-    useCases: ['manage tasks', 'set reminders', 'organize daily activities', 'track habits'],
+    tags: ['tasks', 'to-do', 'reminders', 'productivity', 'organization'],
+    useCases: ['task management', 'daily planning', 'project tracking', 'habit building'],
     rating: 4.7
   },
   {
-    id: '3',
-    name: 'Headspace',
-    description: 'Meditation and mindfulness made simple',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/headspace',
-    tags: ['health', 'meditation', 'mindfulness', 'wellness', 'mental health'],
-    category: 'health',
-    useCases: ['meditate', 'reduce stress', 'improve sleep', 'practice mindfulness', 'mental wellness'],
-    rating: 4.9
-  },
-  {
-    id: '4',
-    name: 'MyFitnessPal',
-    description: 'Calorie counter and diet tracker for weight loss',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/myfitnesspal',
-    tags: ['health', 'fitness', 'diet', 'calories', 'weight loss', 'nutrition'],
-    category: 'health',
-    useCases: ['track calories', 'lose weight', 'monitor nutrition', 'log meals', 'fitness tracking'],
-    rating: 4.6
-  },
-  {
-    id: '5',
-    name: 'Duolingo',
-    description: 'Learn languages for free with fun, bite-sized lessons',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/duolingo',
-    tags: ['education', 'language', 'learning', 'study', 'practice'],
-    category: 'education',
-    useCases: ['learn languages', 'practice vocabulary', 'study grammar', 'improve pronunciation'],
-    rating: 4.7
-  },
-  {
-    id: '6',
-    name: 'Khan Academy',
-    description: 'Free courses, lessons, and practice in math, science, and more',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/khan-academy',
-    tags: ['education', 'learning', 'math', 'science', 'courses', 'study'],
-    category: 'education',
-    useCases: ['learn math', 'study science', 'take courses', 'practice skills', 'homework help'],
-    rating: 4.8
-  },
-  {
-    id: '7',
-    name: 'Google Maps',
-    description: 'Real-time GPS navigation and local recommendations',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/google-maps',
-    tags: ['travel', 'navigation', 'maps', 'directions', 'location'],
-    category: 'travel',
-    useCases: ['get directions', 'find places', 'navigate', 'explore locations', 'plan routes'],
-    rating: 4.5
-  },
-  {
-    id: '8',
-    name: 'Airbnb',
-    description: 'Book unique homes and experiences around the world',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/airbnb',
-    tags: ['travel', 'accommodation', 'booking', 'vacation', 'lodging'],
-    category: 'travel',
-    useCases: ['book accommodation', 'find vacation rentals', 'plan trips', 'discover experiences'],
-    rating: 4.8
-  },
-  {
-    id: '9',
-    name: 'Minecraft',
-    description: 'Build, explore, and survive in infinite worlds',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/minecraft',
-    tags: ['gaming', 'sandbox', 'creative', 'multiplayer', 'adventure'],
-    category: 'gaming',
-    useCases: ['play games', 'build worlds', 'creative mode', 'multiplayer gaming', 'adventure'],
-    rating: 4.6
-  },
-  {
-    id: '10',
-    name: 'Among Us',
-    description: 'Multiplayer game of teamwork and betrayal',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/among-us',
-    tags: ['gaming', 'multiplayer', 'social', 'strategy', 'party game'],
-    category: 'gaming',
-    useCases: ['play with friends', 'multiplayer gaming', 'party games', 'social gaming'],
-    rating: 4.4
-  },
-  {
-    id: '11',
     name: 'Trello',
-    description: 'Organize projects with boards, lists, and cards',
+    description: 'Visual project management with boards, lists, and cards',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/trello',
-    tags: ['productivity', 'project management', 'organization', 'collaboration', 'kanban'],
+    storeUrl: 'https://apps.apple.com/app/trello/id461504587',
     category: 'productivity',
-    useCases: ['manage projects', 'organize tasks', 'team collaboration', 'track progress', 'kanban boards'],
-    rating: 4.7
+    tags: ['project management', 'kanban', 'collaboration', 'workflow'],
+    useCases: ['team projects', 'workflow management', 'task tracking', 'agile planning'],
+    rating: 4.6
   },
   {
-    id: '12',
     name: 'Evernote',
-    description: 'Note-taking app for capturing and organizing ideas',
+    description: 'Note-taking app with powerful organization and search',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/evernote',
-    tags: ['productivity', 'notes', 'organization', 'documents', 'sync'],
+    storeUrl: 'https://apps.apple.com/app/evernote/id281796108',
     category: 'productivity',
-    useCases: ['take notes', 'organize documents', 'save ideas', 'clip web pages', 'sync across devices'],
+    tags: ['notes', 'organization', 'documents', 'scanning'],
+    useCases: ['note-taking', 'document scanning', 'research organization', 'meeting notes'],
     rating: 4.5
   },
   {
-    id: '13',
-    name: 'Calm',
-    description: 'Sleep, meditation, and relaxation app',
+    name: 'Microsoft To Do',
+    description: 'Smart task management with intelligent suggestions',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/calm',
-    tags: ['health', 'meditation', 'sleep', 'relaxation', 'wellness', 'mental health'],
-    category: 'health',
-    useCases: ['improve sleep', 'meditate', 'reduce anxiety', 'relax', 'breathing exercises'],
-    rating: 4.8
-  },
-  {
-    id: '14',
-    name: 'Strava',
-    description: 'Track running and cycling with GPS',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/strava',
-    tags: ['health', 'fitness', 'running', 'cycling', 'tracking', 'exercise'],
-    category: 'health',
-    useCases: ['track runs', 'log cycling', 'monitor fitness', 'join challenges', 'social fitness'],
+    storeUrl: 'https://apps.apple.com/app/microsoft-to-do/id1212616790',
+    category: 'productivity',
+    tags: ['tasks', 'lists', 'reminders', 'microsoft'],
+    useCases: ['daily tasks', 'shopping lists', 'work planning', 'personal organization'],
     rating: 4.6
   },
   {
-    id: '15',
-    name: 'Coursera',
-    description: 'Online courses from top universities and companies',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/coursera',
-    tags: ['education', 'learning', 'courses', 'certificates', 'professional development'],
-    category: 'education',
-    useCases: ['take online courses', 'earn certificates', 'learn new skills', 'professional development'],
-    rating: 4.7
-  },
-  {
-    id: '16',
-    name: 'Photomath',
-    description: 'Scan and solve math problems instantly',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/photomath',
-    tags: ['education', 'math', 'homework', 'calculator', 'learning'],
-    category: 'education',
-    useCases: ['solve math problems', 'homework help', 'learn math', 'step-by-step solutions'],
-    rating: 4.8
-  },
-  {
-    id: '17',
-    name: 'TripAdvisor',
-    description: 'Travel reviews, hotel bookings, and restaurant recommendations',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/tripadvisor',
-    tags: ['travel', 'reviews', 'hotels', 'restaurants', 'tourism'],
-    category: 'travel',
-    useCases: ['find hotels', 'read reviews', 'discover restaurants', 'plan trips', 'book accommodation'],
-    rating: 4.6
-  },
-  {
-    id: '18',
-    name: 'Hopper',
-    description: 'Predict and book flights and hotels at the best prices',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/hopper',
-    tags: ['travel', 'flights', 'hotels', 'booking', 'deals', 'price prediction'],
-    category: 'travel',
-    useCases: ['book flights', 'find deals', 'predict prices', 'save money on travel', 'hotel booking'],
-    rating: 4.7
-  },
-  {
-    id: '19',
-    name: 'Genshin Impact',
-    description: 'Open-world action RPG with stunning visuals',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/genshin-impact',
-    tags: ['gaming', 'rpg', 'action', 'adventure', 'open world', 'multiplayer'],
-    category: 'gaming',
-    useCases: ['play rpg', 'explore worlds', 'action gaming', 'multiplayer adventure'],
-    rating: 4.5
-  },
-  {
-    id: '20',
-    name: 'Chess.com',
-    description: 'Play chess online with millions of players',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/chess',
-    tags: ['gaming', 'chess', 'strategy', 'multiplayer', 'puzzles'],
-    category: 'gaming',
-    useCases: ['play chess', 'solve puzzles', 'learn strategy', 'online multiplayer', 'improve skills'],
-    rating: 4.8
-  },
-  {
-    id: '21',
     name: 'Slack',
     description: 'Team communication and collaboration platform',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/slack',
-    tags: ['productivity', 'communication', 'collaboration', 'team', 'messaging', 'work'],
+    storeUrl: 'https://apps.apple.com/app/slack/id618783545',
     category: 'productivity',
-    useCases: ['team chat', 'collaborate', 'share files', 'organize channels', 'remote work'],
+    tags: ['communication', 'team', 'messaging', 'collaboration'],
+    useCases: ['team chat', 'project communication', 'file sharing', 'remote work'],
+    rating: 4.7
+  },
+  {
+    name: 'Asana',
+    description: 'Work management platform for teams and projects',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/asana/id489969512',
+    category: 'productivity',
+    tags: ['project management', 'tasks', 'team', 'workflow'],
+    useCases: ['project planning', 'team coordination', 'deadline tracking', 'workflow automation'],
+    rating: 4.5
+  },
+
+  // Password Managers
+  {
+    name: '1Password',
+    description: 'Secure password manager and digital vault',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/1password/id568903335',
+    category: 'password manager',
+    tags: ['security', 'passwords', 'vault', 'encryption'],
+    useCases: ['password storage', 'secure notes', 'credit card storage', 'identity protection'],
+    rating: 4.8
+  },
+  {
+    name: 'LastPass',
+    description: 'Password manager with autofill and secure sharing',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/lastpass/id324613447',
+    category: 'password manager',
+    tags: ['passwords', 'security', 'autofill', 'vault'],
+    useCases: ['password management', 'secure sharing', 'form filling', 'password generation'],
     rating: 4.6
   },
   {
-    id: '22',
-    name: 'Forest',
-    description: 'Stay focused and build healthy phone usage habits',
+    name: 'Bitwarden',
+    description: 'Open-source password manager with cloud sync',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/forest',
-    tags: ['productivity', 'focus', 'habits', 'time management', 'wellness'],
-    category: 'productivity',
-    useCases: ['stay focused', 'reduce phone usage', 'build habits', 'time management', 'productivity'],
+    storeUrl: 'https://apps.apple.com/app/bitwarden/id1137397744',
+    category: 'password manager',
+    tags: ['passwords', 'open-source', 'security', 'encryption'],
+    useCases: ['password storage', 'secure notes', 'two-factor auth', 'password sharing'],
     rating: 4.7
   },
   {
-    id: '23',
-    name: 'Nike Training Club',
-    description: 'Free workouts and fitness training programs',
+    name: 'Dashlane',
+    description: 'Password manager with dark web monitoring',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/nike-training-club',
-    tags: ['health', 'fitness', 'workout', 'training', 'exercise'],
-    category: 'health',
-    useCases: ['workout at home', 'fitness training', 'exercise routines', 'build strength', 'cardio'],
-    rating: 4.8
-  },
-  {
-    id: '24',
-    name: 'Sleep Cycle',
-    description: 'Smart alarm clock that tracks your sleep patterns',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/sleep-cycle',
-    tags: ['health', 'sleep', 'tracking', 'alarm', 'wellness'],
-    category: 'health',
-    useCases: ['track sleep', 'smart alarm', 'improve sleep quality', 'sleep analysis', 'wake up refreshed'],
+    storeUrl: 'https://apps.apple.com/app/dashlane/id517914548',
+    category: 'password manager',
+    tags: ['passwords', 'security', 'monitoring', 'vpn'],
+    useCases: ['password management', 'identity monitoring', 'secure browsing', 'password health'],
     rating: 4.5
   },
+
+  // Note-Taking Apps
   {
-    id: '25',
-    name: 'Quizlet',
-    description: 'Study tools including flashcards, games, and practice tests',
+    name: 'Bear',
+    description: 'Beautiful writing app for notes and prose',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/quizlet',
-    tags: ['education', 'study', 'flashcards', 'learning', 'test prep'],
-    category: 'education',
-    useCases: ['study flashcards', 'prepare for tests', 'memorize vocabulary', 'practice quizzes'],
-    rating: 4.7
-  },
-  {
-    id: '26',
-    name: 'Spotify',
-    description: 'Music streaming with millions of songs and podcasts',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/spotify',
-    tags: ['entertainment', 'music', 'streaming', 'podcasts', 'audio'],
-    category: 'productivity',
-    useCases: ['listen to music', 'discover podcasts', 'create playlists', 'stream audio', 'background music'],
+    storeUrl: 'https://apps.apple.com/app/bear/id1016366447',
+    category: 'note-taking',
+    tags: ['notes', 'writing', 'markdown', 'organization'],
+    useCases: ['note-taking', 'writing', 'journaling', 'code snippets'],
     rating: 4.8
   },
   {
-    id: '27',
-    name: 'Canva',
-    description: 'Design graphics, presentations, and social media posts',
+    name: 'Obsidian',
+    description: 'Knowledge base that works on local markdown files',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/canva',
-    tags: ['productivity', 'design', 'graphics', 'creative', 'templates'],
-    category: 'productivity',
-    useCases: ['create graphics', 'design posts', 'make presentations', 'edit photos', 'social media content'],
-    rating: 4.8
-  },
-  {
-    id: '28',
-    name: 'Splitwise',
-    description: 'Split bills and track shared expenses with friends',
-    icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/splitwise',
-    tags: ['productivity', 'finance', 'expenses', 'bills', 'money', 'sharing'],
-    category: 'productivity',
-    useCases: ['split bills', 'track expenses', 'share costs', 'manage group finances', 'settle debts'],
+    storeUrl: 'https://apps.apple.com/app/obsidian/id1557175442',
+    category: 'note-taking',
+    tags: ['notes', 'markdown', 'knowledge', 'linking'],
+    useCases: ['personal knowledge base', 'research notes', 'zettelkasten', 'writing'],
     rating: 4.7
   },
   {
-    id: '29',
-    name: 'Pokémon GO',
-    description: 'Explore the real world and catch Pokémon',
+    name: 'GoodNotes',
+    description: 'Digital notebook for handwriting and PDF annotation',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/pokemon-go',
-    tags: ['gaming', 'ar', 'adventure', 'outdoor', 'collection'],
+    storeUrl: 'https://apps.apple.com/app/goodnotes-5/id1444383602',
+    category: 'note-taking',
+    tags: ['handwriting', 'notes', 'pdf', 'annotation'],
+    useCases: ['handwritten notes', 'pdf annotation', 'digital planning', 'studying'],
+    rating: 4.9
+  },
+  {
+    name: 'Notability',
+    description: 'Note-taking with audio recording and handwriting',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/notability/id360593530',
+    category: 'note-taking',
+    tags: ['notes', 'handwriting', 'audio', 'annotation'],
+    useCases: ['lecture notes', 'meeting notes', 'sketching', 'document annotation'],
+    rating: 4.7
+  },
+
+  // Calendar Apps
+  {
+    name: 'Fantastical',
+    description: 'Calendar app with natural language input',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/fantastical/id718043190',
+    category: 'calendar',
+    tags: ['calendar', 'scheduling', 'events', 'reminders'],
+    useCases: ['event scheduling', 'meeting planning', 'time management', 'calendar sync'],
+    rating: 4.8
+  },
+  {
+    name: 'Google Calendar',
+    description: 'Smart calendar with event suggestions and reminders',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/google-calendar/id909319292',
+    category: 'calendar',
+    tags: ['calendar', 'google', 'scheduling', 'events'],
+    useCases: ['event management', 'meeting scheduling', 'reminders', 'team calendars'],
+    rating: 4.6
+  },
+  {
+    name: 'Calendly',
+    description: 'Automated scheduling and meeting booking',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/calendly/id1451094657',
+    category: 'calendar',
+    tags: ['scheduling', 'meetings', 'booking', 'automation'],
+    useCases: ['meeting scheduling', 'appointment booking', 'availability sharing', 'client meetings'],
+    rating: 4.7
+  },
+
+  // Health & Fitness Apps
+  {
+    name: 'MyFitnessPal',
+    description: 'Calorie counter and nutrition tracker',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/myfitnesspal/id341232718',
+    category: 'health',
+    tags: ['fitness', 'nutrition', 'calories', 'diet'],
+    useCases: ['calorie tracking', 'meal planning', 'weight loss', 'nutrition monitoring'],
+    rating: 4.6
+  },
+  {
+    name: 'Strava',
+    description: 'Social network for athletes and fitness tracking',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/strava/id426826309',
+    category: 'health',
+    tags: ['fitness', 'running', 'cycling', 'tracking'],
+    useCases: ['run tracking', 'cycling routes', 'fitness challenges', 'athlete community'],
+    rating: 4.7
+  },
+  {
+    name: 'Headspace',
+    description: 'Meditation and mindfulness made simple',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/headspace/id493145008',
+    category: 'health',
+    tags: ['meditation', 'mindfulness', 'mental health', 'wellness'],
+    useCases: ['meditation', 'stress relief', 'sleep improvement', 'mindfulness practice'],
+    rating: 4.8
+  },
+  {
+    name: 'Calm',
+    description: 'Sleep, meditation, and relaxation app',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/calm/id571800810',
+    category: 'health',
+    tags: ['meditation', 'sleep', 'relaxation', 'mental health'],
+    useCases: ['sleep stories', 'meditation', 'anxiety relief', 'relaxation'],
+    rating: 4.8
+  },
+  {
+    name: 'Peloton',
+    description: 'Home fitness with live and on-demand classes',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/peloton/id792750948',
+    category: 'health',
+    tags: ['fitness', 'workouts', 'classes', 'training'],
+    useCases: ['home workouts', 'cycling classes', 'strength training', 'yoga'],
+    rating: 4.7
+  },
+  {
+    name: 'Nike Training Club',
+    description: 'Free workouts and training plans from Nike',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/nike-training-club/id301521403',
+    category: 'health',
+    tags: ['fitness', 'workouts', 'training', 'exercise'],
+    useCases: ['home workouts', 'strength training', 'cardio', 'flexibility'],
+    rating: 4.8
+  },
+
+  // Sleep Tracking Apps
+  {
+    name: 'Sleep Cycle',
+    description: 'Intelligent alarm clock and sleep tracker',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/sleep-cycle/id320606217',
+    category: 'sleep tracking',
+    tags: ['sleep', 'tracking', 'alarm', 'health'],
+    useCases: ['sleep tracking', 'smart alarm', 'sleep analysis', 'snore detection'],
+    rating: 4.6
+  },
+  {
+    name: 'AutoSleep',
+    description: 'Automatic sleep tracker for Apple Watch',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/autosleep/id1164801111',
+    category: 'sleep tracking',
+    tags: ['sleep', 'apple watch', 'tracking', 'health'],
+    useCases: ['automatic sleep tracking', 'sleep quality', 'heart rate monitoring', 'sleep goals'],
+    rating: 4.7
+  },
+  {
+    name: 'Pillow',
+    description: 'Sleep tracker with audio recordings and analysis',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/pillow/id878691772',
+    category: 'sleep tracking',
+    tags: ['sleep', 'tracking', 'audio', 'analysis'],
+    useCases: ['sleep tracking', 'snore recording', 'sleep stages', 'nap tracking'],
+    rating: 4.5
+  },
+
+  // Meditation Apps
+  {
+    name: 'Insight Timer',
+    description: 'Free meditation app with thousands of guided sessions',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/insight-timer/id337472899',
+    category: 'meditation',
+    tags: ['meditation', 'mindfulness', 'free', 'community'],
+    useCases: ['guided meditation', 'music for meditation', 'sleep sounds', 'mindfulness courses'],
+    rating: 4.8
+  },
+  {
+    name: 'Ten Percent Happier',
+    description: 'Meditation for skeptics and beginners',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/ten-percent-happier/id992210239',
+    category: 'meditation',
+    tags: ['meditation', 'mindfulness', 'beginner', 'practical'],
+    useCases: ['meditation practice', 'stress management', 'sleep improvement', 'anxiety relief'],
+    rating: 4.7
+  },
+  {
+    name: 'Waking Up',
+    description: 'Meditation and philosophy from Sam Harris',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/waking-up/id1307736395',
+    category: 'meditation',
+    tags: ['meditation', 'philosophy', 'mindfulness', 'consciousness'],
+    useCases: ['meditation practice', 'philosophical exploration', 'mindfulness training', 'consciousness study'],
+    rating: 4.9
+  },
+
+  // Travel Apps
+  {
+    name: 'Google Maps',
+    description: 'Navigation, transit, and local exploration',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/google-maps/id585027354',
+    category: 'travel',
+    tags: ['maps', 'navigation', 'transit', 'directions'],
+    useCases: ['navigation', 'local search', 'transit directions', 'traffic updates'],
+    rating: 4.7
+  },
+  {
+    name: 'Airbnb',
+    description: 'Book unique homes and experiences worldwide',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/airbnb/id401626263',
+    category: 'travel',
+    tags: ['accommodation', 'travel', 'booking', 'vacation'],
+    useCases: ['vacation rentals', 'travel booking', 'local experiences', 'trip planning'],
+    rating: 4.8
+  },
+  {
+    name: 'Hopper',
+    description: 'Flight and hotel booking with price predictions',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/hopper/id904052407',
+    category: 'travel',
+    tags: ['flights', 'hotels', 'booking', 'deals'],
+    useCases: ['flight booking', 'price tracking', 'hotel deals', 'travel planning'],
+    rating: 4.6
+  },
+  {
+    name: 'TripIt',
+    description: 'Travel organizer and itinerary planner',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/tripit/id311035142',
+    category: 'travel',
+    tags: ['itinerary', 'planning', 'organization', 'travel'],
+    useCases: ['trip organization', 'itinerary management', 'travel documents', 'flight tracking'],
+    rating: 4.7
+  },
+  {
+    name: 'Citymapper',
+    description: 'Urban transit navigation and journey planning',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/citymapper/id469463298',
+    category: 'travel',
+    tags: ['transit', 'navigation', 'urban', 'public transport'],
+    useCases: ['public transit', 'city navigation', 'route planning', 'real-time updates'],
+    rating: 4.8
+  },
+  {
+    name: 'PackPoint',
+    description: 'Smart packing list based on trip details',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/packpoint/id896337401',
+    category: 'travel',
+    tags: ['packing', 'travel', 'checklist', 'planning'],
+    useCases: ['packing lists', 'travel preparation', 'trip planning', 'luggage organization'],
+    rating: 4.5
+  },
+
+  // Gaming Apps
+  {
+    name: 'Steam Link',
+    description: 'Stream PC games to your mobile device',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/steam-link/id1246969117',
     category: 'gaming',
-    useCases: ['catch pokemon', 'explore outdoors', 'ar gaming', 'collect creatures', 'social gaming'],
+    tags: ['gaming', 'streaming', 'pc', 'remote'],
+    useCases: ['game streaming', 'remote gaming', 'pc to mobile', 'controller support'],
     rating: 4.3
   },
   {
-    id: '30',
-    name: 'Goodreads',
-    description: 'Track your reading and discover new books',
+    name: 'Discord',
+    description: 'Voice, video, and text chat for gamers',
     icon: 'https://via.placeholder.com/50',
-    storeUrl: 'https://apps.apple.com/app/goodreads',
-    tags: ['education', 'reading', 'books', 'tracking', 'recommendations'],
-    category: 'education',
-    useCases: ['track reading', 'discover books', 'read reviews', 'join book clubs', 'set reading goals'],
+    storeUrl: 'https://apps.apple.com/app/discord/id985746746',
+    category: 'gaming',
+    tags: ['chat', 'voice', 'community', 'gaming'],
+    useCases: ['gaming chat', 'community building', 'voice calls', 'server management'],
+    rating: 4.7
+  },
+  {
+    name: 'Twitch',
+    description: 'Live streaming platform for gamers',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/twitch/id460177396',
+    category: 'gaming',
+    tags: ['streaming', 'gaming', 'live', 'entertainment'],
+    useCases: ['watch streams', 'gaming content', 'live chat', 'esports'],
     rating: 4.6
+  },
+  {
+    name: 'Xbox Game Pass',
+    description: 'Access to hundreds of games with cloud gaming',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/xbox/id736179781',
+    category: 'gaming',
+    tags: ['gaming', 'subscription', 'cloud', 'xbox'],
+    useCases: ['cloud gaming', 'game library', 'remote play', 'game discovery'],
+    rating: 4.5
+  },
+  {
+    name: 'Razer Cortex',
+    description: 'Game launcher and performance optimizer',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/razer-cortex/id1234567890',
+    category: 'gaming',
+    tags: ['gaming', 'optimization', 'launcher', 'performance'],
+    useCases: ['game management', 'performance boost', 'game deals', 'system optimization'],
+    rating: 4.4
+  },
+
+  // Education Apps
+  {
+    name: 'Duolingo',
+    description: 'Learn languages with fun, bite-sized lessons',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/duolingo/id570060128',
+    category: 'education',
+    tags: ['language', 'learning', 'education', 'gamified'],
+    useCases: ['language learning', 'vocabulary building', 'grammar practice', 'daily lessons'],
+    rating: 4.7
+  },
+  {
+    name: 'Khan Academy',
+    description: 'Free education for anyone, anywhere',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/khan-academy/id469863705',
+    category: 'education',
+    tags: ['education', 'learning', 'free', 'courses'],
+    useCases: ['math learning', 'science education', 'test prep', 'skill building'],
+    rating: 4.8
+  },
+  {
+    name: 'Coursera',
+    description: 'Online courses from top universities',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/coursera/id736535961',
+    category: 'education',
+    tags: ['education', 'courses', 'university', 'certificates'],
+    useCases: ['online learning', 'professional development', 'degree programs', 'skill certification'],
+    rating: 4.6
+  },
+  {
+    name: 'Brilliant',
+    description: 'Learn by doing with interactive lessons',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/brilliant/id913335252',
+    category: 'education',
+    tags: ['education', 'math', 'science', 'interactive'],
+    useCases: ['math learning', 'problem solving', 'science education', 'critical thinking'],
+    rating: 4.7
+  },
+  {
+    name: 'Anki',
+    description: 'Powerful flashcard app with spaced repetition',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/ankimobile-flashcards/id373493387',
+    category: 'education',
+    tags: ['flashcards', 'learning', 'memory', 'studying'],
+    useCases: ['memorization', 'language learning', 'exam prep', 'knowledge retention'],
+    rating: 4.8
+  },
+  {
+    name: 'Quizlet',
+    description: 'Study tools including flashcards and games',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/quizlet/id546473125',
+    category: 'education',
+    tags: ['flashcards', 'studying', 'learning', 'education'],
+    useCases: ['flashcard creation', 'study games', 'test prep', 'collaborative learning'],
+    rating: 4.7
+  },
+  {
+    name: 'Photomath',
+    description: 'Scan and solve math problems with step-by-step explanations',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/photomath/id919087726',
+    category: 'education',
+    tags: ['math', 'education', 'homework', 'calculator'],
+    useCases: ['math homework', 'problem solving', 'learning math', 'step-by-step solutions'],
+    rating: 4.6
+  },
+
+  // Fitness Apps
+  {
+    name: 'Strong',
+    description: 'Workout tracker for strength training',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/strong-workout-tracker/id464254577',
+    category: 'fitness',
+    tags: ['fitness', 'strength', 'workout', 'tracking'],
+    useCases: ['workout logging', 'strength training', 'progress tracking', 'exercise planning'],
+    rating: 4.9
+  },
+  {
+    name: 'Fitbod',
+    description: 'AI-powered workout planner',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/fitbod/id1041517543',
+    category: 'fitness',
+    tags: ['fitness', 'ai', 'workout', 'personalized'],
+    useCases: ['personalized workouts', 'strength training', 'gym routines', 'progress tracking'],
+    rating: 4.8
+  },
+  {
+    name: 'JEFIT',
+    description: 'Workout planner and fitness tracker',
+    icon: 'https://via.placeholder.com/50',
+    storeUrl: 'https://apps.apple.com/app/jefit/id449810000',
+    category: 'fitness',
+    tags: ['fitness', 'workout', 'tracking', 'bodybuilding'],
+    useCases: ['workout planning', 'exercise tracking', 'progress photos', 'community support'],
+    rating: 4.7
   }
 ];
