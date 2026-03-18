@@ -1,27 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  useColorScheme,
+  Modal,
   TextInput,
   Alert,
-  useColorScheme,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProjectManager } from '@/lib/storage/ProjectManager';
 import { Project } from '@/lib/database/db';
-import { COMPILATION_TARGETS } from '@/constants/targets';
+import { COMPILATION_TARGETS, LANGUAGES } from '@/constants/targets';
+import { useRouter } from 'expo-router';
 
 export default function ProjectsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [isCreateModalVisible, setIsCreateModalVisible] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [selectedTarget, setSelectedTarget] = useState('x86');
   const [selectedLanguage, setSelectedLanguage] = useState('c');
+  const [isLoading, setIsLoading] = useState(true);
   const projectManager = new ProjectManager();
 
   useEffect(() => {
@@ -29,9 +33,11 @@ export default function ProjectsScreen() {
   }, []);
 
   const loadProjects = async () => {
+    setIsLoading(true);
     await projectManager.initialize();
     const allProjects = await projectManager.listProjects();
     setProjects(allProjects);
+    setIsLoading(false);
   };
 
   const handleCreateProject = async () => {
@@ -42,164 +48,228 @@ export default function ProjectsScreen() {
 
     try {
       await projectManager.createProject({
-        name: newProjectName,
+        name: newProjectName.trim(),
         target: selectedTarget,
         language: selectedLanguage,
       });
+      setIsCreateModalVisible(false);
       setNewProjectName('');
-      setShowCreateModal(false);
-      loadProjects();
+      setSelectedTarget('x86');
+      setSelectedLanguage('c');
+      await loadProjects();
     } catch (error) {
       Alert.alert('Error', 'Failed to create project');
     }
   };
 
-  const handleDeleteProject = (project: Project) => {
+  const handleDeleteProject = async (id: number, name: string) => {
     Alert.alert(
       'Delete Project',
-      `Are you sure you want to delete "${project.name}"?`,
+      `Are you sure you want to delete "${name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await projectManager.deleteProject(project.id);
-            loadProjects();
+            await projectManager.deleteProject(id);
+            await loadProjects();
           },
         },
       ]
     );
   };
 
-  const renderProject = ({ item }: { item: Project }) => {
+  const handleProjectPress = (project: Project) => {
+    router.push('/editor');
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  const renderProjectCard = ({ item }: { item: Project }) => {
     const target = COMPILATION_TARGETS.find((t) => t.id === item.target);
-    const lastModified = new Date(item.updated_at).toLocaleDateString();
+    const language = LANGUAGES.find((l) => l.id === item.language);
 
     return (
-      <View style={[styles.projectCard, isDark && styles.projectCardDark]}>
-        <View style={styles.projectHeader}>
-          <Text style={[styles.projectName, isDark && styles.textDark]}>{item.name}</Text>
-          <TouchableOpacity onPress={() => handleDeleteProject(item)}>
-            <Ionicons name="trash-outline" size={20} color={isDark ? '#ff6b6b' : '#e74c3c'} />
+      <TouchableOpacity
+        style={[styles.projectCard, isDark && styles.projectCardDark]}
+        onPress={() => handleProjectPress(item)}
+        activeOpacity={0.7}>
+        <View style={styles.projectCardHeader}>
+          <View style={styles.projectCardIcon}>
+            <Ionicons name="code-slash" size={24} color={isDark ? '#fff' : '#000'} />
+          </View>
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => handleDeleteProject(item.id, item.name)}>
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
           </TouchableOpacity>
         </View>
-        <Text style={[styles.projectTarget, isDark && styles.textDark]}>
-          {target?.name || item.target}
+        <Text style={[styles.projectName, isDark && styles.textDark]}>{item.name}</Text>
+        <View style={styles.projectMeta}>
+          <View style={styles.metaTag}>
+            <Text style={[styles.metaText, isDark && styles.metaTextDark]}>
+              {target?.name || item.target.toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.metaTag}>
+            <Text style={[styles.metaText, isDark && styles.metaTextDark]}>
+              {language?.name || item.language.toUpperCase()}
+            </Text>
+          </View>
+        </View>
+        <Text style={[styles.projectDate, isDark && styles.textSecondaryDark]}>
+          Modified {formatDate(item.updated_at)}
         </Text>
-        <Text style={[styles.projectLanguage, isDark && styles.textSecondaryDark]}>
-          {item.language.toUpperCase()} • {lastModified}
-        </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
+
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="folder-open-outline" size={80} color={isDark ? '#555' : '#ccc'} />
+      <Text style={[styles.emptyTitle, isDark && styles.textDark]}>No projects yet</Text>
+      <Text style={[styles.emptySubtitle, isDark && styles.textSecondaryDark]}>
+        Create your first project to start coding
+      </Text>
+      <TouchableOpacity
+        style={styles.emptyButton}
+        onPress={() => setIsCreateModalVisible(true)}>
+        <Ionicons name="add" size={24} color="#fff" />
+        <Text style={styles.emptyButtonText}>Create Project</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={[styles.container, isDark && styles.containerDark]}>
       <View style={styles.header}>
         <Text style={[styles.title, isDark && styles.textDark]}>Projects</Text>
-        <TouchableOpacity
-          style={[styles.createButton, isDark && styles.createButtonDark]}
-          onPress={() => setShowCreateModal(true)}>
-          <Ionicons name="add" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
-      {showCreateModal && (
-        <View style={[styles.modal, isDark && styles.modalDark]}>
-          <Text style={[styles.modalTitle, isDark && styles.textDark]}>New Project</Text>
-          
-          <TextInput
-            style={[styles.input, isDark && styles.inputDark]}
-            placeholder="Project name"
-            placeholderTextColor={isDark ? '#888' : '#999'}
-            value={newProjectName}
-            onChangeText={setNewProjectName}
-          />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <Text style={[styles.loadingText, isDark && styles.textSecondaryDark]}>
+            Loading projects...
+          </Text>
+        </View>
+      ) : projects.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        <FlatList
+          data={projects}
+          renderItem={renderProjectCard}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.projectList}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
 
-          <Text style={[styles.label, isDark && styles.textDark]}>Target Platform</Text>
-          <View style={styles.targetGrid}>
-            {COMPILATION_TARGETS.filter((t) => !t.isPremium).map((target) => (
-              <TouchableOpacity
-                key={target.id}
-                style={[
-                  styles.targetButton,
-                  selectedTarget === target.id && styles.targetButtonSelected,
-                  isDark && styles.targetButtonDark,
-                  selectedTarget === target.id && isDark && styles.targetButtonSelectedDark,
-                ]}
-                onPress={() => setSelectedTarget(target.id)}>
-                <Text
-                  style={[
-                    styles.targetButtonText,
-                    selectedTarget === target.id && styles.targetButtonTextSelected,
-                    isDark && styles.textDark,
-                  ]}>
-                  {target.name}
-                </Text>
+      {projects.length > 0 && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => setIsCreateModalVisible(true)}
+          activeOpacity={0.8}>
+          <Ionicons name="add" size={28} color="#fff" />
+        </TouchableOpacity>
+      )}
+
+      <Modal
+        visible={isCreateModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsCreateModalVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, isDark && styles.modalContentDark]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, isDark && styles.textDark]}>New Project</Text>
+              <TouchableOpacity onPress={() => setIsCreateModalVisible(false)}>
+                <Ionicons name="close" size={28} color={isDark ? '#fff' : '#000'} />
               </TouchableOpacity>
-            ))}
-          </View>
+            </View>
 
-          <Text style={[styles.label, isDark && styles.textDark]}>Language</Text>
-          <View style={styles.languageRow}>
-            {['c', 'cpp', 'asm'].map((lang) => (
-              <TouchableOpacity
-                key={lang}
-                style={[
-                  styles.languageButton,
-                  selectedLanguage === lang && styles.languageButtonSelected,
-                  isDark && styles.languageButtonDark,
-                  selectedLanguage === lang && isDark && styles.languageButtonSelectedDark,
-                ]}
-                onPress={() => setSelectedLanguage(lang)}>
-                <Text
+            <Text style={[styles.label, isDark && styles.textDark]}>Project Name</Text>
+            <TextInput
+              style={[styles.input, isDark && styles.inputDark]}
+              value={newProjectName}
+              onChangeText={setNewProjectName}
+              placeholder="My Awesome Project"
+              placeholderTextColor={isDark ? '#666' : '#999'}
+              autoFocus
+            />
+
+            <Text style={[styles.label, isDark && styles.textDark]}>Target Architecture</Text>
+            <View style={styles.optionsGrid}>
+              {COMPILATION_TARGETS.slice(0, 6).map((target) => (
+                <TouchableOpacity
+                  key={target.id}
                   style={[
-                    styles.languageButtonText,
-                    selectedLanguage === lang && styles.languageButtonTextSelected,
-                    isDark && styles.textDark,
-                  ]}>
-                  {lang.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+                    styles.optionCard,
+                    selectedTarget === target.id && styles.optionCardSelected,
+                    isDark && styles.optionCardDark,
+                    selectedTarget === target.id && isDark && styles.optionCardSelectedDark,
+                  ]}
+                  onPress={() => setSelectedTarget(target.id)}>
+                  <Text
+                    style={[
+                      styles.optionTitle,
+                      selectedTarget === target.id && styles.optionTitleSelected,
+                      isDark && styles.textDark,
+                    ]}>
+                    {target.name}
+                  </Text>
+                  {target.isPremium && (
+                    <View style={styles.premiumBadge}>
+                      <Text style={styles.premiumText}>PRO</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
 
-          <View style={styles.modalButtons}>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => {
-                setShowCreateModal(false);
-                setNewProjectName('');
-              }}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modalButton, styles.confirmButton]}
-              onPress={handleCreateProject}>
-              <Text style={styles.confirmButtonText}>Create</Text>
+            <Text style={[styles.label, isDark && styles.textDark]}>Language</Text>
+            <View style={styles.languageButtons}>
+              {LANGUAGES.map((lang) => (
+                <TouchableOpacity
+                  key={lang.id}
+                  style={[
+                    styles.languageButton,
+                    selectedLanguage === lang.id && styles.languageButtonSelected,
+                    isDark && styles.languageButtonDark,
+                    selectedLanguage === lang.id && isDark && styles.languageButtonSelectedDark,
+                  ]}
+                  onPress={() => setSelectedLanguage(lang.id)}>
+                  <Text
+                    style={[
+                      styles.languageButtonText,
+                      selectedLanguage === lang.id && styles.languageButtonTextSelected,
+                      isDark && styles.textDark,
+                    ]}>
+                    {lang.name}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={styles.createButton} onPress={handleCreateProject}>
+              <Text style={styles.createButtonText}>Create Project</Text>
             </TouchableOpacity>
           </View>
         </View>
-      )}
-
-      <FlatList
-        data={projects}
-        renderItem={renderProject}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="folder-open-outline" size={64} color={isDark ? '#555' : '#ccc'} />
-            <Text style={[styles.emptyText, isDark && styles.textSecondaryDark]}>
-              No projects yet
-            </Text>
-            <Text style={[styles.emptySubtext, isDark && styles.textSecondaryDark]}>
-              Tap + to create your first project
-            </Text>
-          </View>
-        }
-      />
+      </Modal>
     </View>
   );
 }
@@ -213,9 +283,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#1a1a1a',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 20,
     paddingTop: 60,
   },
@@ -230,202 +297,260 @@ const styles = StyleSheet.create({
   textSecondaryDark: {
     color: '#888',
   },
-  createButton: {
-    backgroundColor: '#007AFF',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
+  loadingContainer: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  createButtonDark: {
-    backgroundColor: '#0A84FF',
+  loadingText: {
+    fontSize: 16,
+    color: '#666',
   },
-  list: {
+  projectList: {
     padding: 20,
     paddingTop: 0,
   },
   projectCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
     elevation: 3,
   },
   projectCardDark: {
     backgroundColor: '#2a2a2a',
   },
-  projectHeader: {
+  projectCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  projectName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000',
-  },
-  projectTarget: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  projectLanguage: {
-    fontSize: 12,
-    color: '#666',
-  },
-  emptyState: {
+  projectCardIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 100,
   },
-  emptyText: {
-    fontSize: 18,
+  deleteButton: {
+    padding: 8,
+  },
+  projectName: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  projectMeta: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  metaTag: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  metaText: {
+    fontSize: 12,
+    color: '#666',
+    fontWeight: '500',
+  },
+  metaTextDark: {
+    color: '#aaa',
+  },
+  projectDate: {
+    fontSize: 12,
     color: '#999',
-    marginTop: 16,
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+  emptyState: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
   },
-  modal: {
-    backgroundColor: '#fff',
-    margin: 20,
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000',
+    marginTop: 20,
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+  },
+  emptyButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
+    gap: 8,
   },
-  modalDark: {
+  emptyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007AFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '90%',
+  },
+  modalContentDark: {
     backgroundColor: '#2a2a2a',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
   },
   modalTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#000',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    marginBottom: 20,
-    backgroundColor: '#fff',
-  },
-  inputDark: {
-    borderColor: '#444',
-    backgroundColor: '#1a1a1a',
-    color: '#fff',
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#000',
     marginBottom: 12,
+    marginTop: 16,
+  },
+  input: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
     color: '#000',
   },
-  targetGrid: {
+  inputDark: {
+    backgroundColor: '#1a1a1a',
+    color: '#fff',
+  },
+  optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 20,
+    gap: 12,
   },
-  targetButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    backgroundColor: '#fff',
-  },
-  targetButtonDark: {
-    borderColor: '#444',
-    backgroundColor: '#1a1a1a',
-  },
-  targetButtonSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  targetButtonSelectedDark: {
-    backgroundColor: '#0A84FF',
-    borderColor: '#0A84FF',
-  },
-  targetButtonText: {
-    fontSize: 14,
-    color: '#000',
-  },
-  targetButtonTextSelected: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  languageRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 20,
-  },
-  languageButton: {
+  optionCard: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    minWidth: '45%',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  languageButtonDark: {
-    borderColor: '#444',
+  optionCardDark: {
     backgroundColor: '#1a1a1a',
   },
-  languageButtonSelected: {
-    backgroundColor: '#007AFF',
+  optionCardSelected: {
     borderColor: '#007AFF',
+    backgroundColor: '#E3F2FF',
   },
-  languageButtonSelectedDark: {
-    backgroundColor: '#0A84FF',
+  optionCardSelectedDark: {
     borderColor: '#0A84FF',
+    backgroundColor: '#1a3a5a',
   },
-  languageButtonText: {
+  optionTitle: {
     fontSize: 14,
+    fontWeight: '600',
     color: '#000',
   },
-  languageButtonTextSelected: {
-    color: '#fff',
-    fontWeight: '600',
+  optionTitleSelected: {
+    color: '#007AFF',
   },
-  modalButtons: {
+  premiumBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 4,
+  },
+  premiumText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#000',
+  },
+  languageButtons: {
     flexDirection: 'row',
     gap: 12,
   },
-  modalButton: {
+  languageButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 14,
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
+  languageButtonDark: {
+    backgroundColor: '#1a1a1a',
   },
-  cancelButtonText: {
-    fontSize: 16,
+  languageButtonSelected: {
+    borderColor: '#007AFF',
+    backgroundColor: '#E3F2FF',
+  },
+  languageButtonSelectedDark: {
+    borderColor: '#0A84FF',
+    backgroundColor: '#1a3a5a',
+  },
+  languageButtonText: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#000',
   },
-  confirmButton: {
-    backgroundColor: '#007AFF',
+  languageButtonTextSelected: {
+    color: '#007AFF',
   },
-  confirmButtonText: {
+  createButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  createButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
   },
 });
