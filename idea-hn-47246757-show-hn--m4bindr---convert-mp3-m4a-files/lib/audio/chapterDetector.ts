@@ -5,8 +5,8 @@ export const detectChaptersByTime = (duration: number, count: number) => {
   for (let i = 0; i < count; i++) {
     chapters.push({
       title: `Chapter ${i + 1}`,
-      startTime: i * chapterDuration,
-      endTime: (i + 1) * chapterDuration,
+      startTime: Math.round(i * chapterDuration),
+      endTime: Math.round((i + 1) * chapterDuration),
     });
   }
 

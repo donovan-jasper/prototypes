@@ -1,10 +1,16 @@
+import { extractAudioDuration } from './processor';
+
 export const extractMetadata = async (filePath: string) => {
-  // In a real implementation, this would use FFmpeg or a metadata library
-  // For this prototype, we'll return mock data
+  const duration = await extractAudioDuration(filePath);
+  
+  // Extract filename without extension as title
+  const fileName = filePath.split('/').pop() || 'Unknown';
+  const title = fileName.replace(/\.[^/.]+$/, '');
+  
   return {
-    title: 'Sample Audiobook',
+    title,
     author: 'Unknown Author',
-    duration: 1800000, // 30 minutes
+    duration,
     coverArt: null,
   };
 };

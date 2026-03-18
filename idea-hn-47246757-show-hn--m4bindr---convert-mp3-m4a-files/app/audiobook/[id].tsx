@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { Audio } from 'expo-av';
 import { getAudiobookById, updateProgress } from '@/lib/db/audiobooks';
@@ -14,12 +14,24 @@ export default function AudiobookScreen() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [fileUris, setFileUris] = useState([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [fileDurations, setFileDurations] = useState([]);
 
   useEffect(() => {
     const loadAudiobook = async () => {
       const book = await getAudiobookById(id);
       setAudiobook(book);
       setPosition(book.currentPosition || 0);
+      setDuration(book.duration);
+
+      // Parse file URIs from JSON
+      try {
+        const uris = JSON.parse(book.filePath);
+        setFileUris(Array.isArray(uris) ? uris : [book.filePath]);
+      } catch {
+        setFileUris([book.filePath]);
+      }
 
       const chapterList = await getChaptersByAudiobookId(id);
       setChapters(chapterList);
@@ -33,24 +45,48 @@ export default function AudiobookScreen() {
     };
   }, [id]);
 
-  const loadAudio = async () => {
-    if (!audiobook) return;
+  useEffect(() => {
+    if (fileUris.length > 0) {
+      loadCurrentFile();
+    }
+  }, [fileUris, currentFileIndex]);
 
-    const { sound: newSound } = await Audio.Sound.createAsync(
-      { uri: audiobook.filePath },
-      { positionMillis: position },
-      onPlaybackStatusUpdate
-    );
-    setSound(newSound);
-    setDuration(audiobook.duration);
+  const loadCurrentFile = async () => {
+    try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: fileUris[currentFileIndex] },
+        { shouldPlay: false },
+        onPlaybackStatusUpdate
+      );
+      
+      setSound(newSound);
+      
+      const status = await newSound.getStatusAsync();
+      if (status.isLoaded && status.durationMillis) {
+        const newDurations = [...fileDurations];
+        newDurations[currentFileIndex] = status.durationMillis;
+        setFileDurations(newDurations);
+      }
+    } catch (error) {
+      console.error('Error loading audio file:', error);
+      Alert.alert('Error', 'Failed to load audio file');
+    }
   };
 
-  const onPlaybackStatusUpdate = (status) => {
+  const onPlaybackStatusUpdate = async (status) => {
     if (status.isLoaded) {
       setPosition(status.positionMillis);
       setIsPlaying(status.isPlaying);
 
-      if (status.didJustFinish) {
+      // Check if current file finished and move to next
+      if (status.didJustFinish && currentFileIndex < fileUris.length - 1) {
+        setCurrentFileIndex(currentFileIndex + 1);
+        setIsPlaying(false);
+      } else if (status.didJustFinish) {
         setIsPlaying(false);
       }
     }
@@ -58,7 +94,7 @@ export default function AudiobookScreen() {
 
   const playPause = async () => {
     if (!sound) {
-      await loadAudio();
+      await loadCurrentFile();
     }
 
     if (isPlaying) {
@@ -70,9 +106,12 @@ export default function AudiobookScreen() {
 
   const skipForward = async () => {
     if (sound) {
-      const newPosition = Math.min(position + 15000, duration);
-      await sound.setPositionAsync(newPosition);
-      setPosition(newPosition);
+      const status = await sound.getStatusAsync();
+      if (status.isLoaded && status.durationMillis) {
+        const newPosition = Math.min(position + 15000, status.durationMillis);
+        await sound.setPositionAsync(newPosition);
+        setPosition(newPosition);
+      }
     }
   };
 
@@ -109,6 +148,12 @@ export default function AudiobookScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>{audiobook.title}</Text>
       <Text style={styles.author}>{audiobook.author}</Text>
+      
+      {fileUris.length > 1 && (
+        <Text style={styles.fileInfo}>
+          Playing file {currentFileIndex + 1} of {fileUris.length}
+        </Text>
+      )}
 
       <PlayerControls
         isPlaying={isPlaying}
@@ -119,6 +164,7 @@ export default function AudiobookScreen() {
         onSkipBackward={skipBackward}
       />
 
+      <Text style={styles.chaptersTitle}>Chapters</Text>
       <FlatList
         data={chapters}
         keyExtractor={(item) => item.id.toString()}
@@ -127,8 +173,8 @@ export default function AudiobookScreen() {
             style={styles.chapterItem}
             onPress={() => jumpToChapter(item)}
           >
-            <Text>{item.title}</Text>
-            <Text>{formatTime(item.startTime)}</Text>
+            <Text style={styles.chapterTitle}>{item.title}</Text>
+            <Text style={styles.chapterTime}>{formatTime(item.startTime)}</Text>
           </TouchableOpacity>
         )}
       />
@@ -137,9 +183,14 @@ export default function AudiobookScreen() {
 }
 
 const formatTime = (millis) => {
-  const minutes = Math.floor(millis / 60000);
-  const seconds = ((millis % 60000) / 1000).toFixed(0);
-  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  const hours = Math.floor(millis / 3600000);
+  const minutes = Math.floor((millis % 3600000) / 60000);
+  const seconds = Math.floor((millis % 60000) / 1000);
+  
+  if (hours > 0) {
+    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+  }
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
 const styles = StyleSheet.create({
@@ -156,7 +207,18 @@ const styles = StyleSheet.create({
   author: {
     fontSize: 18,
     color: '#666',
+    marginBottom: 10,
+  },
+  fileInfo: {
+    fontSize: 14,
+    color: '#007AFF',
     marginBottom: 20,
+  },
+  chaptersTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 20,
+    marginBottom: 10,
   },
   chapterItem: {
     padding: 15,
@@ -164,5 +226,12 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  chapterTitle: {
+    fontSize: 16,
+  },
+  chapterTime: {
+    fontSize: 14,
+    color: '#666',
   },
 });
