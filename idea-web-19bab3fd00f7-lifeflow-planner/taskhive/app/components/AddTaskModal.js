@@ -8,11 +8,14 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from 'react-native';
 
 const AddTaskModal = ({ visible, onClose, onSubmit }) => {
   const [title, setTitle] = useState('');
   const [notes, setNotes] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [enableNotification, setEnableNotification] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = () => {
@@ -21,14 +24,26 @@ const AddTaskModal = ({ visible, onClose, onSubmit }) => {
       return;
     }
 
-    onSubmit({
+    const taskData = {
       id: Date.now().toString(),
       title: title.trim(),
       notes: notes.trim(),
-    });
+    };
+
+    if (dueDate.trim()) {
+      const parsedDate = new Date(dueDate.trim());
+      if (!isNaN(parsedDate.getTime())) {
+        taskData.dueDate = parsedDate.toISOString();
+        taskData.enableNotification = enableNotification;
+      }
+    }
+
+    onSubmit(taskData);
 
     setTitle('');
     setNotes('');
+    setDueDate('');
+    setEnableNotification(false);
     setError('');
     onClose();
   };
@@ -36,6 +51,8 @@ const AddTaskModal = ({ visible, onClose, onSubmit }) => {
   const handleClose = () => {
     setTitle('');
     setNotes('');
+    setDueDate('');
+    setEnableNotification(false);
     setError('');
     onClose();
   };
@@ -83,6 +100,27 @@ const AddTaskModal = ({ visible, onClose, onSubmit }) => {
               numberOfLines={4}
               textAlignVertical="top"
             />
+
+            <Text style={styles.label}>Due Date</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="YYYY-MM-DD HH:MM (optional)"
+              value={dueDate}
+              onChangeText={setDueDate}
+            />
+            <Text style={styles.helperText}>Format: 2026-03-20 14:30</Text>
+
+            {dueDate.trim() && (
+              <View style={styles.notificationRow}>
+                <Text style={styles.label}>Enable Notification</Text>
+                <Switch
+                  value={enableNotification}
+                  onValueChange={setEnableNotification}
+                  trackColor={{ false: '#ddd', true: '#007AFF' }}
+                  thumbColor="#fff"
+                />
+              </View>
+            )}
 
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -158,6 +196,18 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     paddingTop: 12,
+  },
+  helperText: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
   },
   errorText: {
     color: '#e74c3c',
