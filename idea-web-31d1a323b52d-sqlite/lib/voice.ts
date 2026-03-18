@@ -1,6 +1,11 @@
 import * as Speech from 'expo-speech';
 import { Audio } from 'expo-av';
 import { Platform } from 'react-native';
+import {
+  ExpoSpeechRecognitionModule,
+  addSpeechRecognitionListener,
+  removeSpeechRecognitionListener,
+} from 'expo-speech-recognition';
 
 export interface VoiceRecognitionResult {
   transcription: string;
@@ -13,6 +18,8 @@ export interface VoiceRecognitionError {
 }
 
 let recognition: any = null;
+let currentResolve: ((value: string) => void) | null = null;
+let currentReject: ((error: VoiceRecognitionError) => void) | null = null;
 
 export const requestMicrophonePermission = async (): Promise<boolean> => {
   try {
@@ -77,22 +84,75 @@ export const startListening = (): Promise<string> => {
 
         recognition.start();
       } else {
-        // For native platforms, use expo-speech's recognition if available
-        // Note: expo-speech primarily handles TTS, not STT
-        // For production, you'd integrate with native modules or cloud APIs
-        
-        // Fallback implementation using mock for now
-        // In production, integrate with:
-        // - iOS: Speech framework via native module
-        // - Android: SpeechRecognizer via native module
-        // - Or cloud APIs: Google Cloud Speech-to-Text, AWS Transcribe, etc.
-        
-        setTimeout(() => {
+        // Native platforms using expo-speech-recognition
+        currentResolve = resolve;
+        currentReject = reject;
+
+        // Check if speech recognition is available
+        const result = await ExpoSpeechRecognitionModule.getStateAsync();
+        if (!result.isRecognitionAvailable) {
           reject({
-            code: 'NOT_IMPLEMENTED',
-            message: 'Native speech recognition requires additional native modules. Please use web version or integrate cloud STT service.'
+            code: 'NOT_AVAILABLE',
+            message: 'Speech recognition is not available on this device'
           } as VoiceRecognitionError);
-        }, 100);
+          return;
+        }
+
+        // Request permissions
+        const permissionResult = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
+        if (!permissionResult.granted) {
+          reject({
+            code: 'PERMISSION_DENIED',
+            message: 'Speech recognition permission not granted'
+          } as VoiceRecognitionError);
+          return;
+        }
+
+        // Add event listeners
+        const resultListener = addSpeechRecognitionListener('result', (event) => {
+          if (event.isFinal && event.results && event.results.length > 0) {
+            const transcript = event.results[0]?.transcript || '';
+            if (currentResolve) {
+              currentResolve(transcript);
+              currentResolve = null;
+              currentReject = null;
+            }
+          }
+        });
+
+        const errorListener = addSpeechRecognitionListener('error', (event) => {
+          if (currentReject) {
+            currentReject({
+              code: event.error || 'UNKNOWN_ERROR',
+              message: event.message || 'Speech recognition error occurred'
+            } as VoiceRecognitionError);
+            currentResolve = null;
+            currentReject = null;
+          }
+        });
+
+        const endListener = addSpeechRecognitionListener('end', () => {
+          removeSpeechRecognitionListener(resultListener);
+          removeSpeechRecognitionListener(errorListener);
+          removeSpeechRecognitionListener(endListener);
+          
+          if (currentReject) {
+            currentReject({
+              code: 'NO_SPEECH',
+              message: 'No speech detected'
+            } as VoiceRecognitionError);
+            currentResolve = null;
+            currentReject = null;
+          }
+        });
+
+        // Start recognition
+        await ExpoSpeechRecognitionModule.start({
+          lang: 'en-US',
+          interimResults: false,
+          maxAlternatives: 1,
+          continuous: false,
+        });
       }
     } catch (error) {
       reject({
@@ -103,11 +163,22 @@ export const startListening = (): Promise<string> => {
   });
 };
 
-export const stopListening = () => {
-  if (recognition) {
-    recognition.stop();
-    recognition = null;
+export const stopListening = async () => {
+  if (Platform.OS === 'web') {
+    if (recognition) {
+      recognition.stop();
+      recognition = null;
+    }
+  } else {
+    try {
+      await ExpoSpeechRecognitionModule.stop();
+    } catch (error) {
+      console.error('Error stopping speech recognition:', error);
+    }
   }
+  
+  currentResolve = null;
+  currentReject = null;
 };
 
 export const speak = (text: string) => {

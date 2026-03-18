@@ -47,6 +47,13 @@
         {
           "microphonePermission": "Allow DataPal to access your microphone for voice commands."
         }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow DataPal to access your microphone.",
+          "speechRecognitionPermission": "Allow DataPal to use speech recognition."
+        }
       ]
     ]
   }
