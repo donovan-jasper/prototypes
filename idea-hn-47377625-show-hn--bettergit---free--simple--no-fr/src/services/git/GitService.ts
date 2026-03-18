@@ -1,6 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
+import { FileSystemAdapter } from './FileSystemAdapter';
 
 export interface CloneProgress {
   phase: string;
@@ -28,7 +29,7 @@ export class GitService {
     }
 
     await git.clone({
-      fs: FileSystem,
+      fs: FileSystemAdapter,
       http,
       dir,
       url,
