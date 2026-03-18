@@ -17,6 +17,11 @@ const createTables = async (db) => {
       name TEXT,
       type TEXT
     );
+    CREATE TABLE IF NOT EXISTS screen_time (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      date TEXT,
+      seconds INTEGER
+    );
   `);
 };
 
@@ -29,4 +34,9 @@ const getFocusModes = async (db) => {
   return result;
 };
 
-export { openDatabase, createTables, saveFocusMode, getFocusModes };
+const isFocusModesEmpty = async (db) => {
+  const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM focus_modes');
+  return result.count === 0;
+};
+
+export { openDatabase, createTables, saveFocusMode, getFocusModes, isFocusModesEmpty };

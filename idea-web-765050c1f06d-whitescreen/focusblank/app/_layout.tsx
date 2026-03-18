@@ -1,7 +1,12 @@
 import { Tabs } from 'expo-router';
-import React from 'react';
+import React, { useEffect } from 'react';
+import { initializeApp } from '../utils/initializeApp';
 
 const Layout = () => {
+  useEffect(() => {
+    initializeApp();
+  }, []);
+
   return (
     <Tabs>
       <Tabs.Screen
