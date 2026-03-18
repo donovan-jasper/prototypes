@@ -1,25 +1,40 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useStore } from '../store/useStore';
-import { seedDatabase } from '../lib/database';
+import { initDatabase } from '../lib/database';
+import { seedDatabase } from '../lib/vocabulary';
 import { requestNotificationPermissions } from '../lib/notifications';
 
 export default function OnboardingScreen() {
   const router = useRouter();
   const { updateSettings } = useStore();
   const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleStartLearning = async () => {
-    // Request notification permissions
-    const granted = await requestNotificationPermissions();
-    updateSettings({ notificationsEnabled: granted });
+    setIsLoading(true);
+    setError(null);
 
-    // Seed database with vocabulary
-    await seedDatabase();
+    try {
+      // Initialize database first
+      await initDatabase();
+      
+      // Request notification permissions
+      const granted = await requestNotificationPermissions();
+      updateSettings({ notificationsEnabled: granted });
 
-    // Navigate to main app
-    router.replace('/(tabs)');
+      // Seed database with vocabulary
+      await seedDatabase();
+
+      // Navigate to main app
+      router.replace('/(tabs)');
+    } catch (err) {
+      console.error('Error during onboarding:', err);
+      setError('Failed to initialize app. Please try again.');
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -53,11 +68,21 @@ export default function OnboardingScreen() {
           <Text style={styles.subtitle}>
             Our app uses spaced repetition to optimize your learning. Just 5 minutes a day!
           </Text>
+          
+          {error && (
+            <Text style={styles.errorText}>{error}</Text>
+          )}
+          
           <TouchableOpacity
-            style={styles.button}
+            style={[styles.button, isLoading && styles.buttonDisabled]}
             onPress={handleStartLearning}
+            disabled={isLoading}
           >
-            <Text style={styles.buttonText}>Start Learning</Text>
+            {isLoading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>Start Learning</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}
@@ -100,10 +125,21 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 30,
+    minWidth: 150,
+    alignItems: 'center',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
+    marginBottom: 15,
+    textAlign: 'center',
   },
 });

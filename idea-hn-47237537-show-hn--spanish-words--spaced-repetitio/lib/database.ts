@@ -127,8 +127,9 @@ export const getDueWords = async (limit: number = 10) => {
           `SELECT w.*, up.lastReviewed, up.nextReview, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
            FROM words w
            LEFT JOIN user_progress up ON w.id = up.wordId
-           WHERE up.nextReview IS NULL OR up.nextReview <= ?
+           WHERE up.wordId IS NULL OR up.nextReview IS NULL OR up.nextReview <= ?
            ORDER BY 
+             CASE WHEN up.wordId IS NULL THEN 0 ELSE 1 END,
              CASE WHEN up.nextReview IS NULL THEN 0 ELSE 1 END,
              w.frequency ASC
            LIMIT ?`,
@@ -216,6 +217,21 @@ export const updateSettings = async (settings: any) => {
             settings.currentLanguage
           ],
           (_, result) => resolve(result.rowsAffected),
+          (_, error) => reject(error)
+        );
+      }
+    );
+  });
+};
+
+export const isDatabaseEmpty = async (): Promise<boolean> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'SELECT COUNT(*) as count FROM words',
+          [],
+          (_, { rows }) => resolve(rows._array[0].count === 0),
           (_, error) => reject(error)
         );
       }
