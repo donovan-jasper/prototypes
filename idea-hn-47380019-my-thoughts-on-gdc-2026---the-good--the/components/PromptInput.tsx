@@ -2,6 +2,7 @@ import { View, TextInput, Button, Alert } from 'react-native';
 import { useState } from 'react';
 import { useAppStore } from '../store/app-store';
 import { generateImage } from '../lib/ai-service';
+import { saveToMediaLibrary } from '../lib/storage';
 
 export default function PromptInput() {
   const [prompt, setPrompt] = useState('');
@@ -23,16 +24,37 @@ export default function PromptInput() {
     setIsGenerating(true);
     try {
       const result = await generateImage(prompt);
-      addGeneration({
-        id: Date.now(),
-        prompt,
-        imageUri: result.imageUrl,
-        attribution: result.attribution,
-        timestamp: new Date()
-      });
+      
+      // Save to media library and get the asset URI
+      const saved = await saveToMediaLibrary(result.imageUrl);
+      
+      if (saved) {
+        Alert.alert('Success', 'Image saved to your photo library');
+        
+        // Store the generation with the media library asset URI
+        await addGeneration({
+          id: Date.now(),
+          prompt,
+          imageUri: saved,
+          attribution: result.attribution,
+          timestamp: new Date()
+        });
+      } else {
+        Alert.alert('Warning', 'Image generated but could not be saved to photo library');
+        
+        // Still store the generation with the temp URI
+        await addGeneration({
+          id: Date.now(),
+          prompt,
+          imageUri: result.imageUrl,
+          attribution: result.attribution,
+          timestamp: new Date()
+        });
+      }
+      
       setPrompt('');
-    } catch (error) {
-      Alert.alert('Error', 'Failed to generate image');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to generate image');
     } finally {
       setIsGenerating(false);
     }

@@ -1,11 +1,11 @@
 import * as MediaLibrary from 'expo-media-library';
 import * as FileSystem from 'expo-file-system';
 
-export const saveToMediaLibrary = async (uri: string): Promise<boolean> => {
+export const saveToMediaLibrary = async (uri: string): Promise<string | false> => {
   try {
     const asset = await MediaLibrary.createAssetAsync(uri);
     await MediaLibrary.createAlbumAsync('CrediGen', asset, false);
-    return true;
+    return asset.uri;
   } catch (error) {
     console.error('Error saving to media library:', error);
     return false;

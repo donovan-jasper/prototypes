@@ -1,32 +1,43 @@
 import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
-import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import { Attribution } from '../types';
 
-// These should come from environment variables in production
-const OPENAI_API_KEY = Constants.expoConfig?.extra?.openaiApiKey || '';
-const ANTHROPIC_API_KEY = Constants.expoConfig?.extra?.anthropicApiKey || '';
-
-const openai = new OpenAI({ apiKey: OPENAI_API_KEY });
-const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
+const OPENAI_KEY_STORAGE = '@credigen_openai_key';
+const ANTHROPIC_KEY_STORAGE = '@credigen_anthropic_key';
 
 export interface GenerationResult {
   imageUrl: string;
   attribution: Attribution;
 }
 
+const getApiKeys = async () => {
+  const [openaiKey, anthropicKey] = await Promise.all([
+    AsyncStorage.getItem(OPENAI_KEY_STORAGE),
+    AsyncStorage.getItem(ANTHROPIC_KEY_STORAGE)
+  ]);
+  
+  return {
+    openaiKey: openaiKey?.trim() || '',
+    anthropicKey: anthropicKey?.trim() || ''
+  };
+};
+
 export const generateImage = async (prompt: string): Promise<GenerationResult> => {
   if (!prompt || prompt.trim().length === 0) {
     throw new Error('Prompt cannot be empty');
   }
 
-  if (!OPENAI_API_KEY) {
-    throw new Error('OpenAI API key not configured');
+  const { openaiKey } = await getApiKeys();
+  
+  if (!openaiKey) {
+    throw new Error('OpenAI API key not configured. Please add your API key in the Profile tab.');
   }
 
+  const openai = new OpenAI({ apiKey: openaiKey });
+
   try {
-    // Call OpenAI DALL-E 3 API
     const response = await openai.images.generate({
       model: 'dall-e-3',
       prompt: prompt,
@@ -41,7 +52,6 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
       throw new Error('No image URL returned from OpenAI');
     }
 
-    // Download the image to local storage
     const filename = `credigen_${Date.now()}.png`;
     const localUri = `${FileSystem.documentDirectory}${filename}`;
     
@@ -51,7 +61,6 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
       throw new Error(`Failed to download image: ${downloadResult.status}`);
     }
 
-    // Generate attribution metadata
     const attribution: Attribution = {
       model: 'dall-e-3',
       prompt: prompt,
@@ -64,11 +73,10 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
       attribution
     };
   } catch (error: any) {
-    // Handle specific OpenAI errors
     if (error?.status === 429) {
       throw new Error('Rate limit exceeded. Please try again in a moment.');
     } else if (error?.status === 401) {
-      throw new Error('Invalid API key. Please check your configuration.');
+      throw new Error('Invalid API key. Please check your API key in the Profile tab.');
     } else if (error?.status === 400) {
       throw new Error('Invalid prompt. Please try a different description.');
     } else if (error?.code === 'ENOTFOUND' || error?.message?.includes('network')) {
@@ -85,9 +93,13 @@ export const generateText = async (prompt: string): Promise<string> => {
     throw new Error('Prompt cannot be empty');
   }
 
-  if (!ANTHROPIC_API_KEY) {
-    throw new Error('Anthropic API key not configured');
+  const { anthropicKey } = await getApiKeys();
+  
+  if (!anthropicKey) {
+    throw new Error('Anthropic API key not configured. Please add your API key in the Profile tab.');
   }
+
+  const anthropic = new Anthropic({ apiKey: anthropicKey });
 
   try {
     const message = await anthropic.messages.create({
@@ -105,11 +117,10 @@ export const generateText = async (prompt: string): Promise<string> => {
 
     return textContent.text;
   } catch (error: any) {
-    // Handle specific Anthropic errors
     if (error?.status === 429) {
       throw new Error('Rate limit exceeded. Please try again in a moment.');
     } else if (error?.status === 401) {
-      throw new Error('Invalid API key. Please check your configuration.');
+      throw new Error('Invalid API key. Please check your API key in the Profile tab.');
     } else if (error?.code === 'ENOTFOUND' || error?.message?.includes('network')) {
       throw new Error('Network error. Please check your internet connection.');
     }
