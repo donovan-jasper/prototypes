@@ -1,8 +1,5 @@
-import axios from 'axios';
-import * as pdfjsLib from 'pdfjs-dist';
-import { DocumentPicker } from 'expo-document-picker';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.10.377/build/pdf.worker.min.js';
+import * as DocumentPicker from 'expo-document-picker';
+import * as FileSystem from 'expo-file-system';
 
 interface ExtractedContent {
   title: string;
@@ -10,39 +7,47 @@ interface ExtractedContent {
 }
 
 export const extractContentFromURL = async (url: string): Promise<ExtractedContent> => {
-  const response = await axios.get(url);
-  const html = response.data;
-  const titleRegex = /<title>(.*?)<\/title>/;
-  const bodyRegex = /<body>(.*?)<\/body>/;
-  const titleMatch = html.match(titleRegex);
-  const bodyMatch = html.match(bodyRegex);
+  const response = await fetch(url);
+  const html = await response.text();
 
-  if (!titleMatch || !bodyMatch) {
-    throw new Error('Could not extract title or body from HTML');
+  // Extract title from <h1> or <title>
+  let title = '';
+  const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
+  if (h1Match) {
+    title = h1Match[1].replace(/<[^>]*>/g, '').trim();
+  } else {
+    const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
+    if (titleMatch) {
+      title = titleMatch[1].replace(/<[^>]*>/g, '').trim();
+    }
   }
 
-  const title = titleMatch[1].trim();
-  const body = bodyMatch[1].trim();
+  // Extract body from <article> or all <p> tags
+  let body = '';
+  const articleMatch = html.match(/<article[^>]*>(.*?)<\/article>/is);
+  if (articleMatch) {
+    body = articleMatch[1];
+  } else {
+    const pMatches = html.match(/<p[^>]*>.*?<\/p>/gi);
+    if (pMatches) {
+      body = pMatches.join('\n\n');
+    }
+  }
+
+  // Clean HTML tags and entities
+  body = body.replace(/<[^>]*>/g, '').trim();
+  body = body.replace(/&nbsp;/g, ' ');
+  body = body.replace(/&amp;/g, '&');
+  body = body.replace(/&lt;/g, '<');
+  body = body.replace(/&gt;/g, '>');
+  body = body.replace(/&quot;/g, '"');
+
+  if (!title || !body) {
+    throw new Error('Could not extract title or body from HTML');
+  }
 
   return { title, body };
 };
 
-export const convertPDFToText = async (fileUri: string): Promise<string> => {
-  const file = await DocumentPicker.getDocumentAsync({
-    type: 'application/pdf',
-    copyToCacheDirectory: true,
-  });
-
-  if (!file || !file.assets || file.assets.length === 0) {
-    throw new Error('Could not read PDF file');
-  }
-
-  const pdfFile = await pdfjsLib.getDocument(file.assets[0].uri).promise;
-  const text = await pdfFile.getTextContent().then((textContent) => {
-    const textItems = textContent.items;
-    const textString = textItems.map((item) => item.str).join('');
-    return textString;
-  });
-
-  return text;
-};
+export const convertFileToText = async (): Promise<{ title: string; content: string }> => {
+  const
