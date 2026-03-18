@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useStore } from '../store/useStore';
 import { endFocusSession } from '../lib/focus-engine';
+import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, setupNotificationHandler } from '../lib/app-blocker';
 
 export default function FocusSessionScreen() {
   const router = useRouter();
@@ -13,21 +14,35 @@ export default function FocusSessionScreen() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
+    setupNotificationHandler();
+    requestNotificationPermissions();
+  }, []);
+
+  useEffect(() => {
     if (!activeSession && params.duration) {
       const duration = parseInt(params.duration as string, 10);
+      const blockedAppsParam = params.blockedApps as string;
+      const blockedAppsList = blockedAppsParam ? blockedAppsParam.split(',') : [];
+      
       const newSession = {
         id: Date.now().toString(),
         duration,
         startTime: Date.now(),
         endTime: Date.now() + duration * 60 * 1000,
+        blockedApps: blockedAppsList,
       };
+      
       setActiveSession(newSession);
       setTimeRemaining(duration * 60);
+      
+      if (blockedAppsList.length > 0) {
+        blockApps(blockedAppsList);
+      }
     } else if (activeSession) {
       const remaining = Math.max(0, Math.floor((activeSession.endTime - Date.now()) / 1000));
       setTimeRemaining(remaining);
     }
-  }, [params.duration, activeSession, setActiveSession]);
+  }, [params.duration, params.blockedApps, activeSession, setActiveSession]);
 
   useEffect(() => {
     if (!activeSession) return;
@@ -55,6 +70,7 @@ export default function FocusSessionScreen() {
     if (activeSession) {
       endFocusSession(activeSession.id, true);
     }
+    unblockApps();
     clearActiveSession();
     Alert.alert(
       'Session Complete!',
@@ -79,6 +95,7 @@ export default function FocusSessionScreen() {
             if (activeSession) {
               endFocusSession(activeSession.id, false);
             }
+            unblockApps();
             clearActiveSession();
             router.replace('/(tabs)');
           },
@@ -99,6 +116,13 @@ export default function FocusSessionScreen() {
     return ((totalSeconds - timeRemaining) / totalSeconds) * 100;
   };
 
+  const getBlockedAppNames = (): string[] => {
+    if (!activeSession || activeSession.blockedApps.length === 0) return [];
+    return activeSession.blockedApps
+      .map(appId => COMMON_APPS.find(app => app.id === appId)?.name)
+      .filter((name): name is string => name !== undefined);
+  };
+
   if (!activeSession) {
     return (
       <View style={styles.container}>
@@ -113,8 +137,10 @@ export default function FocusSessionScreen() {
     );
   }
 
+  const blockedAppNames = getBlockedAppNames();
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Focus Session</Text>
         <Text style={styles.durationText}>{activeSession.duration} minutes</Text>
@@ -143,6 +169,19 @@ export default function FocusSessionScreen() {
         </View>
       </View>
 
+      {blockedAppNames.length > 0 && (
+        <View style={styles.blockedAppsSection}>
+          <Text style={styles.blockedAppsTitle}>Blocked Apps</Text>
+          <View style={styles.blockedAppsList}>
+            {blockedAppNames.map((appName, index) => (
+              <View key={index} style={styles.blockedAppChip}>
+                <Text style={styles.blockedAppText}>{appName}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.endButton}
@@ -158,7 +197,7 @@ export default function FocusSessionScreen() {
           Stay present. Breathe. You've got this.
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -166,7 +205,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     marginTop: 60,
@@ -225,7 +267,7 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 40,
+    marginBottom: 32,
     paddingHorizontal: 20,
   },
   statItem: {
@@ -240,6 +282,36 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: '#666',
+  },
+  blockedAppsSection: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 24,
+  },
+  blockedAppsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 12,
+  },
+  blockedAppsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  blockedAppChip: {
+    backgroundColor: '#f0f0ff',
+    borderRadius: 16,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  blockedAppText: {
+    fontSize: 14,
+    color: '#6366f1',
+    fontWeight: '500',
   },
   actions: {
     paddingHorizontal: 20,

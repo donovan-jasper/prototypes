@@ -5,6 +5,7 @@ interface FocusSession {
   duration: number;
   startTime: number;
   endTime: number;
+  blockedApps: string[];
   completed?: boolean;
 }
 
