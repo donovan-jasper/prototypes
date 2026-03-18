@@ -5,6 +5,7 @@ export default function RootLayout() {
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="audiobook/[id]" options={{ title: 'Audiobook' }} />
+      <Stack.Screen name="chapter-editor/[id]" options={{ title: 'Edit Chapters' }} />
       <Stack.Screen name="+not-found" />
     </Stack>
   );

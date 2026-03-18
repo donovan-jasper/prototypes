@@ -41,20 +41,22 @@ export default function ImportScreen() {
       // Extract metadata from first file
       const metadata = await extractMetadata(fileUris[0]);
 
-      // Create audiobook with all file URIs stored as JSON
+      // Create temporary audiobook with all file URIs stored as JSON
       const audiobook = await createAudiobook({
         title: metadata.title,
         author: metadata.author,
         duration: totalDuration,
-        filePath: JSON.stringify(fileUris), // Store all URIs as JSON array
+        filePath: JSON.stringify(fileUris),
       });
 
-      // Generate chapters based on actual total duration
+      // Generate initial chapters based on actual total duration
       const chapters = detectChaptersByTime(totalDuration, Math.max(4, files.length));
       await createChapters(audiobook.id, chapters);
 
       setLoading(false);
-      router.push(`/audiobook/${audiobook.id}`);
+      
+      // Navigate to chapter editor instead of player
+      router.push(`/chapter-editor/${audiobook.id}`);
     } catch (error) {
       setLoading(false);
       console.error('Error processing audiobook:', error);
