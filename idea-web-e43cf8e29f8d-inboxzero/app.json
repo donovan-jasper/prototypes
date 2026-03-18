@@ -5,6 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./icon.png",
+    "scheme": "subsync",
     "splash": {
       "image": "./splash.png",
       "resizeMode": "contain",
@@ -18,7 +19,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.subsync.app"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +30,8 @@
       "permissions": [
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.SCHEDULE_EXACT_ALARM"
-      ]
+      ],
+      "package": "com.subsync.app"
     },
     "plugins": [
       [

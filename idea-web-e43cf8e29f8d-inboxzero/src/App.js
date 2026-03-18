@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import AddSubscriptionScreen from './screens/AddSubscriptionScreen';
+import ScanEmailScreen from './screens/ScanEmailScreen';
 import { initDatabase, seedDatabase } from './services/SubscriptionService';
 import { requestPermissions, checkUpcomingRenewals } from './services/NotificationService';
 
@@ -23,6 +24,11 @@ const HomeStack = () => {
         name="AddSubscription" 
         component={AddSubscriptionScreen}
         options={{ title: 'Add Subscription' }}
+      />
+      <Stack.Screen 
+        name="ScanEmail" 
+        component={ScanEmailScreen}
+        options={{ title: 'Scan Email' }}
       />
     </Stack.Navigator>
   );

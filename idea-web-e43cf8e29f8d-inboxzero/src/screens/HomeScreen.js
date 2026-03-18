@@ -22,6 +22,12 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Subsync</Text>
+        <TouchableOpacity 
+          style={styles.scanButton}
+          onPress={() => navigation.navigate('ScanEmail')}
+        >
+          <Text style={styles.scanButtonText}>📧 Scan Email</Text>
+        </TouchableOpacity>
       </View>
       <SubscriptionList subscriptions={subscriptions} onRefresh={loadSubscriptions} />
       <TouchableOpacity 
@@ -50,6 +56,19 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 12,
+  },
+  scanButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  scanButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
