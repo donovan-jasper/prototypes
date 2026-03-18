@@ -10,12 +10,6 @@ A universal plant care log app for tracking growth, watering, and health across 
 
 **Viability: 7/10 | Competition: 8/10 | Difficulty: Medium — requires plant care expertise to build accurate recommendations**
 
-## Run
+## Setup
 
-```bash
-npx expo start
-```
-
-## Origin
-
-Inspired by: https://www.reddit.com/r/Bonsai/comments/zp4ijo/is_there_still_no_good_app_for_organizing_and/
+### Frontend

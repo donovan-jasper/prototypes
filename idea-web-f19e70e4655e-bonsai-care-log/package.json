@@ -8,7 +8,10 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "setup-db": "node scripts/setup-db.js"
+    "server": "cd server && npm start",
+    "server:dev": "cd server && npm run dev",
+    "seed": "cd server && node scripts/seed.js",
+    "dev": "concurrently \"npm start\" \"npm run server:dev\""
   },
   "dependencies": {
     "react": "^17.0.2",
@@ -18,5 +21,6 @@
   },
   "devDependencies": {
     "concurrently": "^6.2.0"
-  }
+  },
+  "proxy": "http://localhost:3001"
 }
