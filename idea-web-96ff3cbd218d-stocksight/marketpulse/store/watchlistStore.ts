@@ -13,6 +13,7 @@ interface WatchlistStore {
   stocks: Stock[];
   addStock: (symbol: string) => void;
   removeStock: (symbol: string) => void;
+  updateStockPrice: (symbol: string, price: number, change: number) => void;
   loadFromDB: () => void;
   saveToDB: () => void;
 }
@@ -34,6 +35,14 @@ export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
   removeStock: (symbol) => {
     set((state) => ({
       stocks: state.stocks.filter((stock) => stock.symbol !== symbol),
+    }));
+    get().saveToDB();
+  },
+  updateStockPrice: (symbol, price, change) => {
+    set((state) => ({
+      stocks: state.stocks.map((stock) =>
+        stock.symbol === symbol ? { ...stock, price, change } : stock
+      ),
     }));
     get().saveToDB();
   },

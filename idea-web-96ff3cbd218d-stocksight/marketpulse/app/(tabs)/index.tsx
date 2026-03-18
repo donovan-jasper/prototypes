@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, Text, TouchableOpacity, Modal, TextInput, Keyboard } from 'react-native';
+import { View, FlatList, StyleSheet, Text, TouchableOpacity, Modal, TextInput, Keyboard, RefreshControl, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWatchlistStore } from '../../store/watchlistStore';
 import { useUserStore } from '../../store/userStore';
 import StockCard from '../../components/StockCard';
 import PremiumBanner from '../../components/PremiumBanner';
+import { fetchStockPrice, getCachedStockPrice } from '../../services/stocks';
 
 const POPULAR_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.' },
@@ -18,15 +19,55 @@ const POPULAR_STOCKS = [
 ];
 
 const WatchlistScreen = () => {
-  const { stocks, loadFromDB, addStock } = useWatchlistStore();
+  const { stocks, loadFromDB, addStock, updateStockPrice } = useWatchlistStore();
   const { isPremium } = useUserStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showPremiumBanner, setShowPremiumBanner] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadFromDB();
+    fetchAllPrices();
   }, []);
+
+  const fetchAllPrices = async () => {
+    setLoading(true);
+    setErrors({});
+    
+    const pricePromises = stocks.map(async (stock) => {
+      try {
+        const cachedPrice = await getCachedStockPrice(stock.symbol);
+        if (cachedPrice !== null) {
+          updateStockPrice(stock.symbol, cachedPrice as number, 0);
+          return;
+        }
+
+        const priceData = await fetchStockPrice(stock.symbol);
+        if (priceData && priceData.price !== undefined) {
+          const change = priceData.change || 0;
+          updateStockPrice(stock.symbol, priceData.price, change);
+        }
+      } catch (error) {
+        console.error(`Error fetching price for ${stock.symbol}:`, error);
+        setErrors(prev => ({
+          ...prev,
+          [stock.symbol]: 'Failed to fetch price'
+        }));
+      }
+    });
+
+    await Promise.all(pricePromises);
+    setLoading(false);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAllPrices();
+    setRefreshing(false);
+  };
 
   const filteredStocks = POPULAR_STOCKS.filter(
     (stock) =>
@@ -46,6 +87,71 @@ const WatchlistScreen = () => {
     setModalVisible(false);
     setSearchQuery('');
     Keyboard.dismiss();
+    
+    fetchStockPrice(symbol)
+      .then((priceData) => {
+        if (priceData && priceData.price !== undefined) {
+          const change = priceData.change || 0;
+          updateStockPrice(symbol, priceData.price, change);
+        }
+      })
+      .catch((error) => {
+        console.error(`Error fetching price for ${symbol}:`, error);
+        setErrors(prev => ({
+          ...prev,
+          [symbol]: 'Failed to fetch price'
+        }));
+      });
+  };
+
+  const renderStockCard = ({ item }: { item: any }) => {
+    const hasError = errors[item.symbol];
+    
+    if (loading && item.price === 0) {
+      return (
+        <View style={styles.skeletonCard}>
+          <View style={styles.skeletonSymbol} />
+          <View style={styles.skeletonPrice} />
+          <View style={styles.skeletonChange} />
+        </View>
+      );
+    }
+
+    if (hasError) {
+      return (
+        <View style={styles.errorCard}>
+          <Text style={styles.errorSymbol}>{item.symbol}</Text>
+          <Text style={styles.errorText}>{hasError}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[item.symbol];
+                return newErrors;
+              });
+              fetchStockPrice(item.symbol)
+                .then((priceData) => {
+                  if (priceData && priceData.price !== undefined) {
+                    const change = priceData.change || 0;
+                    updateStockPrice(item.symbol, priceData.price, change);
+                  }
+                })
+                .catch((error) => {
+                  console.error(`Error fetching price for ${item.symbol}:`, error);
+                  setErrors(prev => ({
+                    ...prev,
+                    [item.symbol]: 'Failed to fetch price'
+                  }));
+                });
+            }}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return <StockCard stock={item} />;
   };
 
   return (
@@ -55,8 +161,24 @@ const WatchlistScreen = () => {
       <FlatList
         data={stocks}
         keyExtractor={(item) => item.symbol}
-        renderItem={({ item }) => <StockCard stock={item} />}
-        ListEmptyComponent={<Text style={styles.emptyText}>Add your first stock</Text>}
+        renderItem={renderStockCard}
+        ListEmptyComponent={
+          loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.loadingText}>Loading watchlist...</Text>
+            </View>
+          ) : (
+            <Text style={styles.emptyText}>Add your first stock</Text>
+          )
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#007AFF"
+          />
+        }
       />
 
       <TouchableOpacity
@@ -136,6 +258,78 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 16,
     color: '#666',
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  skeletonCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  skeletonSymbol: {
+    width: 60,
+    height: 20,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
+  skeletonPrice: {
+    width: 80,
+    height: 20,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
+  skeletonChange: {
+    width: 60,
+    height: 20,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+  },
+  errorCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ffcccc',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  errorSymbol: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  errorText: {
+    fontSize: 14,
+    color: '#cc0000',
+    flex: 1,
+    marginLeft: 12,
+  },
+  retryText: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: 'bold',
   },
   fab: {
     position: 'absolute',
