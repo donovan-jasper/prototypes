@@ -1,15 +1,20 @@
-import React, { useEffect } from 'react';
-import { View, ScrollView, StyleSheet, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, ScrollView, StyleSheet, Image, Alert } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePlants } from '../../hooks/usePlants';
 import PhotoTimeline from '../../components/PhotoTimeline';
 import SymptomChecker from '../../components/SymptomChecker';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera } from 'expo-camera';
+import { saveImage } from '../../lib/storage';
+import { updatePlant } from '../../lib/database';
 
 export default function PlantDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { plant, loadPlant, deletePlant } = usePlants();
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -17,9 +22,39 @@ export default function PlantDetailScreen() {
     }
   }, [id]);
 
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
+
   const handleDelete = async () => {
     await deletePlant(id as string);
     router.back();
+  };
+
+  const handleTakePhoto = async () => {
+    if (hasPermission === false) {
+      Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      const photoUri = result.assets[0].uri;
+      const savedUri = await saveImage(photoUri, id as string);
+      
+      const updatedPhotoUris = [...(plant.photoUris || []), savedUri];
+      await updatePlant(id as string, { photoUris: JSON.stringify(updatedPhotoUris) });
+      
+      await loadPlant(id as string);
+    }
   };
 
   if (!plant) {
@@ -46,6 +81,14 @@ export default function PlantDetailScreen() {
             Notes: {plant.notes}
           </Text>
         )}
+        <Button 
+          mode="contained" 
+          onPress={handleTakePhoto} 
+          style={styles.photoButton}
+          icon="camera"
+        >
+          Take Photo
+        </Button>
         <PhotoTimeline photos={plant.photoUris} />
         <SymptomChecker />
         <Button mode="contained" onPress={handleDelete} style={styles.deleteButton}>
@@ -70,6 +113,10 @@ const styles = StyleSheet.create({
   },
   info: {
     marginTop: 8,
+  },
+  photoButton: {
+    marginTop: 16,
+    backgroundColor: '#4caf50',
   },
   deleteButton: {
     marginTop: 24,

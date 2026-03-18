@@ -1,7 +1,8 @@
 import * as FileSystem from 'expo-file-system';
 
 export const saveImage = async (uri: string, plantId: string) => {
-  const filename = `${plantId}_${Date.now()}.jpg`;
+  const timestamp = Date.now();
+  const filename = `${plantId}_${timestamp}.jpg`;
   const directory = `${FileSystem.documentDirectory}plants/`;
   
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
