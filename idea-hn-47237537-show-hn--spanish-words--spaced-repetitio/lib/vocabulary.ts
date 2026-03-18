@@ -21,7 +21,25 @@ export const getWordsByCategory = (category: string): Word[] => {
 };
 
 export const seedDatabase = async () => {
+  const currentTime = Date.now();
+  
   for (const word of spanishWords) {
-    await addWord(word);
+    const wordId = await addWord(word);
+    
+    // Create initial user_progress record for each word
+    await new Promise((resolve, reject) => {
+      const db = require('expo-sqlite').openDatabase('vocavault.db');
+      db.transaction(
+        (tx: any) => {
+          tx.executeSql(
+            `INSERT INTO user_progress (wordId, lastReviewed, nextReview, difficulty, stability, retrievability, correctCount, incorrectCount)
+             VALUES (?, NULL, ?, 2.5, 1, 0, 0, 0)`,
+            [wordId, currentTime],
+            (_: any, result: any) => resolve(result.insertId),
+            (_: any, error: any) => reject(error)
+          );
+        }
+      );
+    });
   }
 };

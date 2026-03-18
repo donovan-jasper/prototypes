@@ -124,11 +124,13 @@ export const getDueWords = async (limit: number = 10) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          `SELECT w.*, up.*
+          `SELECT w.*, up.lastReviewed, up.nextReview, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
            FROM words w
            LEFT JOIN user_progress up ON w.id = up.wordId
-           WHERE up.nextReview <= ? OR up.nextReview IS NULL
-           ORDER BY up.nextReview ASC
+           WHERE up.nextReview IS NULL OR up.nextReview <= ?
+           ORDER BY 
+             CASE WHEN up.nextReview IS NULL THEN 0 ELSE 1 END,
+             w.frequency ASC
            LIMIT ?`,
           [Date.now(), limit],
           (_, { rows }) => resolve(rows._array),

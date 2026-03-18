@@ -1,902 +1,402 @@
 [
   {
-    "word": "hola",
-    "translation": "hello",
+    "word": "el",
+    "translation": "the (masculine)",
     "frequency": 1,
     "category": "survival",
-    "example": "Hola, Â¿cÃ³mo estÃ¡s?",
-    "audioUrl": "hola.mp3",
-    "imageUrl": "hola.png"
+    "example": "El libro está en la mesa.",
+    "audioUrl": "https://example.com/audio/el.mp3"
   },
   {
-    "word": "gracias",
-    "translation": "thank you",
+    "word": "de",
+    "translation": "of, from",
     "frequency": 2,
     "category": "survival",
-    "example": "Gracias por la ayuda.",
-    "audioUrl": "gracias.mp3",
-    "imageUrl": "gracias.png"
+    "example": "Soy de España.",
+    "audioUrl": "https://example.com/audio/de.mp3"
   },
   {
-    "word": "por favor",
-    "translation": "please",
+    "word": "que",
+    "translation": "that, which",
     "frequency": 3,
     "category": "survival",
-    "example": "Por favor, Â¿puede ayudarme?",
-    "audioUrl": "por_favor.mp3",
-    "imageUrl": "por_favor.png"
+    "example": "Creo que es verdad.",
+    "audioUrl": "https://example.com/audio/que.mp3"
   },
   {
-    "word": "lo siento",
-    "translation": "I'm sorry",
+    "word": "y",
+    "translation": "and",
     "frequency": 4,
     "category": "survival",
-    "example": "Lo siento, no te entiendo.",
-    "audioUrl": "lo_siento.mp3",
-    "imageUrl": "lo_siento.png"
+    "example": "Pan y agua, por favor.",
+    "audioUrl": "https://example.com/audio/y.mp3"
   },
   {
-    "word": "adios",
-    "translation": "goodbye",
+    "word": "a",
+    "translation": "to, at",
     "frequency": 5,
     "category": "survival",
-    "example": "Adios, hasta luego.",
-    "audioUrl": "adios.mp3",
-    "imageUrl": "adios.png"
+    "example": "Voy a la tienda.",
+    "audioUrl": "https://example.com/audio/a.mp3"
   },
   {
-    "word": "sÃ­",
-    "translation": "yes",
+    "word": "en",
+    "translation": "in, on",
     "frequency": 6,
     "category": "survival",
-    "example": "Â¿Quieres cafÃ©? SÃ­, por favor.",
-    "audioUrl": "si.mp3",
-    "imageUrl": "si.png"
+    "example": "Estoy en casa.",
+    "audioUrl": "https://example.com/audio/en.mp3"
+  },
+  {
+    "word": "un",
+    "translation": "a, an (masculine)",
+    "frequency": 7,
+    "category": "survival",
+    "example": "Necesito un café.",
+    "audioUrl": "https://example.com/audio/un.mp3"
+  },
+  {
+    "word": "ser",
+    "translation": "to be",
+    "frequency": 8,
+    "category": "survival",
+    "example": "Quiero ser médico.",
+    "audioUrl": "https://example.com/audio/ser.mp3"
+  },
+  {
+    "word": "la",
+    "translation": "the (feminine)",
+    "frequency": 9,
+    "category": "survival",
+    "example": "La casa es grande.",
+    "audioUrl": "https://example.com/audio/la.mp3"
   },
   {
     "word": "no",
-    "translation": "no",
-    "frequency": 7,
-    "category": "survival",
-    "example": "Â¿Quieres cafÃ©? No, gracias.",
-    "audioUrl": "no.mp3",
-    "imageUrl": "no.png"
-  },
-  {
-    "word": "por favor",
-    "translation": "please",
-    "frequency": 8,
-    "category": "survival",
-    "example": "Por favor, Â¿puede ayudarme?",
-    "audioUrl": "por_favor.mp3",
-    "imageUrl": "por_favor.png"
-  },
-  {
-    "word": "de nada",
-    "translation": "you're welcome",
-    "frequency": 9,
-    "category": "survival",
-    "example": "De nada, Â¡fue un placer!",
-    "audioUrl": "de_nada.mp3",
-    "imageUrl": "de_nada.png"
-  },
-  {
-    "word": "perdÃ³n",
-    "translation": "excuse me",
+    "translation": "no, not",
     "frequency": 10,
     "category": "survival",
-    "example": "PerdÃ³n, Â¿dÃ³nde estÃ¡ el baÃ±o?",
-    "audioUrl": "perdon.mp3",
-    "imageUrl": "perdon.png"
+    "example": "No tengo dinero.",
+    "audioUrl": "https://example.com/audio/no.mp3"
   },
   {
-    "word": "agua",
-    "translation": "water",
+    "word": "haber",
+    "translation": "to have (auxiliary)",
     "frequency": 11,
     "category": "survival",
-    "example": "Â¿Quiere agua, por favor?",
-    "audioUrl": "agua.mp3",
-    "imageUrl": "agua.png"
+    "example": "He comido ya.",
+    "audioUrl": "https://example.com/audio/haber.mp3"
   },
   {
-    "word": "cafÃ©",
-    "translation": "coffee",
+    "word": "por",
+    "translation": "for, by, through",
     "frequency": 12,
     "category": "survival",
-    "example": "Â¿Quiere cafÃ©, por favor?",
-    "audioUrl": "cafe.mp3",
-    "imageUrl": "cafe.png"
+    "example": "Gracias por todo.",
+    "audioUrl": "https://example.com/audio/por.mp3"
   },
   {
-    "word": "comida",
-    "translation": "food",
+    "word": "con",
+    "translation": "with",
     "frequency": 13,
     "category": "survival",
-    "example": "Â¿Quiere comida, por favor?",
-    "audioUrl": "comida.mp3",
-    "imageUrl": "comida.png"
+    "example": "Voy con mi amigo.",
+    "audioUrl": "https://example.com/audio/con.mp3"
   },
   {
-    "word": "bebida",
-    "translation": "drink",
+    "word": "su",
+    "translation": "his, her, their",
     "frequency": 14,
     "category": "survival",
-    "example": "Â¿Quiere bebida, por favor?",
-    "audioUrl": "bebida.mp3",
-    "imageUrl": "bebida.png"
+    "example": "Es su libro.",
+    "audioUrl": "https://example.com/audio/su.mp3"
   },
   {
-    "word": "plato",
-    "translation": "dish",
+    "word": "para",
+    "translation": "for, to",
     "frequency": 15,
     "category": "survival",
-    "example": "Â¿Quiere plato, por favor?",
-    "audioUrl": "plato.mp3",
-    "imageUrl": "plato.png"
+    "example": "Esto es para ti.",
+    "audioUrl": "https://example.com/audio/para.mp3"
   },
   {
-    "word": "precio",
-    "translation": "price",
+    "word": "como",
+    "translation": "like, as, how",
     "frequency": 16,
     "category": "survival",
-    "example": "Â¿CuÃ¡nto cuesta esto?",
-    "audioUrl": "precio.mp3",
-    "imageUrl": "precio.png"
+    "example": "¿Cómo estás?",
+    "audioUrl": "https://example.com/audio/como.mp3"
   },
   {
-    "word": "dinero",
-    "translation": "money",
+    "word": "estar",
+    "translation": "to be (location/state)",
     "frequency": 17,
     "category": "survival",
-    "example": "Â¿Tiene dinero?",
-    "audioUrl": "dinero.mp3",
-    "imageUrl": "dinero.png"
+    "example": "Estoy en Madrid.",
+    "audioUrl": "https://example.com/audio/estar.mp3"
   },
   {
-    "word": "efectivo",
-    "translation": "cash",
+    "word": "tener",
+    "translation": "to have",
     "frequency": 18,
     "category": "survival",
-    "example": "Â¿Acepta efectivo?",
-    "audioUrl": "efectivo.mp3",
-    "imageUrl": "efectivo.png"
+    "example": "Tengo hambre.",
+    "audioUrl": "https://example.com/audio/tener.mp3"
   },
   {
-    "word": "tarjeta",
-    "translation": "card",
+    "word": "le",
+    "translation": "him, her, you (formal)",
     "frequency": 19,
     "category": "survival",
-    "example": "Â¿Acepta tarjeta?",
-    "audioUrl": "tarjeta.mp3",
-    "imageUrl": "tarjeta.png"
+    "example": "Le doy el libro.",
+    "audioUrl": "https://example.com/audio/le.mp3"
   },
   {
-    "word": "cambio",
-    "translation": "change",
+    "word": "lo",
+    "translation": "it, him",
     "frequency": 20,
     "category": "survival",
-    "example": "Â¿Puedo tener el cambio?",
-    "audioUrl": "cambio.mp3",
-    "imageUrl": "cambio.png"
+    "example": "Lo veo ahora.",
+    "audioUrl": "https://example.com/audio/lo.mp3"
   },
   {
-    "word": "factura",
-    "translation": "bill",
+    "word": "todo",
+    "translation": "all, everything",
     "frequency": 21,
-    "category": "survival",
-    "example": "Â¿Puedo tener la factura?",
-    "audioUrl": "factura.mp3",
-    "imageUrl": "factura.png"
+    "category": "conversation",
+    "example": "Todo está bien.",
+    "audioUrl": "https://example.com/audio/todo.mp3"
   },
   {
-    "word": "propina",
-    "translation": "tip",
+    "word": "pero",
+    "translation": "but",
     "frequency": 22,
-    "category": "survival",
-    "example": "Â¿CuÃ¡nto es la propina?",
-    "audioUrl": "propina.mp3",
-    "imageUrl": "propina.png"
+    "category": "conversation",
+    "example": "Quiero ir, pero no puedo.",
+    "audioUrl": "https://example.com/audio/pero.mp3"
   },
   {
-    "word": "mesa",
-    "translation": "table",
+    "word": "más",
+    "translation": "more",
     "frequency": 23,
-    "category": "survival",
-    "example": "Â¿Quiere mesa, por favor?",
-    "audioUrl": "mesa.mp3",
-    "imageUrl": "mesa.png"
+    "category": "conversation",
+    "example": "Quiero más agua.",
+    "audioUrl": "https://example.com/audio/mas.mp3"
   },
   {
-    "word": "silla",
-    "translation": "chair",
+    "word": "hacer",
+    "translation": "to do, to make",
     "frequency": 24,
-    "category": "survival",
-    "example": "Â¿Quiere silla, por favor?",
-    "audioUrl": "silla.mp3",
-    "imageUrl": "silla.png"
+    "category": "conversation",
+    "example": "¿Qué haces?",
+    "audioUrl": "https://example.com/audio/hacer.mp3"
   },
   {
-    "word": "menÃº",
-    "translation": "menu",
+    "word": "o",
+    "translation": "or",
     "frequency": 25,
-    "category": "survival",
-    "example": "Â¿Quiere menÃº, por favor?",
-    "audioUrl": "menu.mp3",
-    "imageUrl": "menu.png"
+    "category": "conversation",
+    "example": "¿Café o té?",
+    "audioUrl": "https://example.com/audio/o.mp3"
   },
   {
-    "word": "carta",
-    "translation": "card",
+    "word": "poder",
+    "translation": "to be able to, can",
     "frequency": 26,
-    "category": "survival",
-    "example": "Â¿Quiere carta, por favor?",
-    "audioUrl": "carta.mp3",
-    "imageUrl": "carta.png"
+    "category": "conversation",
+    "example": "¿Puedes ayudarme?",
+    "audioUrl": "https://example.com/audio/poder.mp3"
   },
   {
-    "word": "pedido",
-    "translation": "order",
+    "word": "decir",
+    "translation": "to say, to tell",
     "frequency": 27,
-    "category": "survival",
-    "example": "Â¿Quiere pedido, por favor?",
-    "audioUrl": "pedido.mp3",
-    "imageUrl": "pedido.png"
+    "category": "conversation",
+    "example": "¿Qué dices?",
+    "audioUrl": "https://example.com/audio/decir.mp3"
   },
   {
-    "word": "cuenta",
-    "translation": "bill",
+    "word": "este",
+    "translation": "this",
     "frequency": 28,
-    "category": "survival",
-    "example": "Â¿Quiere cuenta, por favor?",
-    "audioUrl": "cuenta.mp3",
-    "imageUrl": "cuenta.png"
+    "category": "conversation",
+    "example": "Este libro es mío.",
+    "audioUrl": "https://example.com/audio/este.mp3"
   },
   {
-    "word": "pagar",
-    "translation": "to pay",
+    "word": "ir",
+    "translation": "to go",
     "frequency": 29,
-    "category": "survival",
-    "example": "Â¿Quiere pagar, por favor?",
-    "audioUrl": "pagar.mp3",
-    "imageUrl": "pagar.png"
+    "category": "conversation",
+    "example": "Voy al mercado.",
+    "audioUrl": "https://example.com/audio/ir.mp3"
   },
   {
-    "word": "reservar",
-    "translation": "to reserve",
+    "word": "otro",
+    "translation": "other, another",
     "frequency": 30,
-    "category": "survival",
-    "example": "Â¿Quiere reservar, por favor?",
-    "audioUrl": "reservar.mp3",
-    "imageUrl": "reservar.png"
+    "category": "conversation",
+    "example": "Dame otro café.",
+    "audioUrl": "https://example.com/audio/otro.mp3"
   },
   {
-    "word": "horario",
-    "translation": "schedule",
+    "word": "ese",
+    "translation": "that",
     "frequency": 31,
-    "category": "survival",
-    "example": "Â¿Quiere horario, por favor?",
-    "audioUrl": "horario.mp3",
-    "imageUrl": "horario.png"
+    "category": "conversation",
+    "example": "Ese coche es rojo.",
+    "audioUrl": "https://example.com/audio/ese.mp3"
   },
   {
-    "word": "abierto",
-    "translation": "open",
+    "word": "si",
+    "translation": "if",
     "frequency": 32,
-    "category": "survival",
-    "example": "Â¿Quiere abierto, por favor?",
-    "audioUrl": "abierto.mp3",
-    "imageUrl": "abierto.png"
+    "category": "conversation",
+    "example": "Si llueve, me quedo.",
+    "audioUrl": "https://example.com/audio/si.mp3"
   },
   {
-    "word": "cerrado",
-    "translation": "closed",
+    "word": "me",
+    "translation": "me",
     "frequency": 33,
-    "category": "survival",
-    "example": "Â¿Quiere cerrado, por favor?",
-    "audioUrl": "cerrado.mp3",
-    "imageUrl": "cerrado.png"
+    "category": "conversation",
+    "example": "Me gusta el chocolate.",
+    "audioUrl": "https://example.com/audio/me.mp3"
   },
   {
-    "word": "direcciÃ³n",
-    "translation": "address",
+    "word": "ya",
+    "translation": "already, now",
     "frequency": 34,
-    "category": "survival",
-    "example": "Â¿Quiere direcciÃ³n, por favor?",
-    "audioUrl": "direccion.mp3",
-    "imageUrl": "direccion.png"
+    "category": "conversation",
+    "example": "Ya terminé.",
+    "audioUrl": "https://example.com/audio/ya.mp3"
   },
   {
-    "word": "telÃ©fono",
-    "translation": "phone",
+    "word": "ver",
+    "translation": "to see",
     "frequency": 35,
-    "category": "survival",
-    "example": "Â¿Quiere telÃ©fono, por favor?",
-    "audioUrl": "telefono.mp3",
-    "imageUrl": "telefono.png"
+    "category": "conversation",
+    "example": "Veo la montaña.",
+    "audioUrl": "https://example.com/audio/ver.mp3"
   },
   {
-    "word": "correo",
-    "translation": "mail",
+    "word": "porque",
+    "translation": "because",
     "frequency": 36,
-    "category": "survival",
-    "example": "Â¿Quiere correo, por favor?",
-    "audioUrl": "correo.mp3",
-    "imageUrl": "correo.png"
+    "category": "conversation",
+    "example": "No voy porque estoy cansado.",
+    "audioUrl": "https://example.com/audio/porque.mp3"
   },
   {
-    "word": "internet",
-    "translation": "internet",
+    "word": "dar",
+    "translation": "to give",
     "frequency": 37,
-    "category": "survival",
-    "example": "Â¿Quiere internet, por favor?",
-    "audioUrl": "internet.mp3",
-    "imageUrl": "internet.png"
+    "category": "conversation",
+    "example": "Dame el libro.",
+    "audioUrl": "https://example.com/audio/dar.mp3"
   },
   {
-    "word": "wifi",
-    "translation": "wifi",
+    "word": "cuando",
+    "translation": "when",
     "frequency": 38,
-    "category": "survival",
-    "example": "Â¿Quiere wifi, por favor?",
-    "audioUrl": "wifi.mp3",
-    "imageUrl": "wifi.png"
+    "category": "conversation",
+    "example": "¿Cuándo vienes?",
+    "audioUrl": "https://example.com/audio/cuando.mp3"
   },
   {
-    "word": "contraseÃ±a",
-    "translation": "password",
+    "word": "él",
+    "translation": "he",
     "frequency": 39,
-    "category": "survival",
-    "example": "Â¿Quiere contraseÃ±a, por favor?",
-    "audioUrl": "contrasena.mp3",
-    "imageUrl": "contrasena.png"
+    "category": "conversation",
+    "example": "Él es mi hermano.",
+    "audioUrl": "https://example.com/audio/el-pronoun.mp3"
   },
   {
-    "word": "usuario",
-    "translation": "user",
+    "word": "muy",
+    "translation": "very",
     "frequency": 40,
-    "category": "survival",
-    "example": "Â¿Quiere usuario, por favor?",
-    "audioUrl": "usuario.mp3",
-    "imageUrl": "usuario.png"
+    "category": "conversation",
+    "example": "Estoy muy feliz.",
+    "audioUrl": "https://example.com/audio/muy.mp3"
   },
   {
-    "word": "nombre",
-    "translation": "name",
+    "word": "sin",
+    "translation": "without",
     "frequency": 41,
-    "category": "survival",
-    "example": "Â¿Quiere nombre, por favor?",
-    "audioUrl": "nombre.mp3",
-    "imageUrl": "nombre.png"
+    "category": "conversation",
+    "example": "Café sin azúcar.",
+    "audioUrl": "https://example.com/audio/sin.mp3"
   },
   {
-    "word": "apellido",
-    "translation": "surname",
+    "word": "vez",
+    "translation": "time (occurrence)",
     "frequency": 42,
-    "category": "survival",
-    "example": "Â¿Quiere apellido, por favor?",
-    "audioUrl": "apellido.mp3",
-    "imageUrl": "apellido.png"
+    "category": "conversation",
+    "example": "Una vez más.",
+    "audioUrl": "https://example.com/audio/vez.mp3"
   },
   {
-    "word": "edad",
-    "translation": "age",
+    "word": "mucho",
+    "translation": "much, many",
     "frequency": 43,
-    "category": "survival",
-    "example": "Â¿Quiere edad, por favor?",
-    "audioUrl": "edad.mp3",
-    "imageUrl": "edad.png"
+    "category": "conversation",
+    "example": "Tengo mucho trabajo.",
+    "audioUrl": "https://example.com/audio/mucho.mp3"
   },
   {
-    "word": "fecha",
-    "translation": "date",
+    "word": "saber",
+    "translation": "to know (facts)",
     "frequency": 44,
-    "category": "survival",
-    "example": "Â¿Quiere fecha, por favor?",
-    "audioUrl": "fecha.mp3",
-    "imageUrl": "fecha.png"
+    "category": "conversation",
+    "example": "No sé la respuesta.",
+    "audioUrl": "https://example.com/audio/saber.mp3"
   },
   {
-    "word": "hora",
-    "translation": "time",
+    "word": "qué",
+    "translation": "what",
     "frequency": 45,
-    "category": "survival",
-    "example": "Â¿Quiere hora, por favor?",
-    "audioUrl": "hora.mp3",
-    "imageUrl": "hora.png"
+    "category": "conversation",
+    "example": "¿Qué quieres?",
+    "audioUrl": "https://example.com/audio/que-question.mp3"
   },
   {
-    "word": "dÃ­a",
-    "translation": "day",
-    "frequency": 46,
-    "category": "survival",
-    "example": "Â¿Quiere dÃ­a, por favor?",
-    "audioUrl": "dia.mp3",
-    "imageUrl": "dia.png"
-  },
-  {
-    "word": "semana",
-    "translation": "week",
-    "frequency": 47,
-    "category": "survival",
-    "example": "Â¿Quiere semana, por favor?",
-    "audioUrl": "semana.mp3",
-    "imageUrl": "semana.png"
-  },
-  {
-    "word": "mes",
-    "translation": "month",
-    "frequency": 48,
-    "category": "survival",
-    "example": "Â¿Quiere mes, por favor?",
-    "audioUrl": "mes.mp3",
-    "imageUrl": "mes.png"
-  },
-  {
-    "word": "aÃ±o",
+    "word": "año",
     "translation": "year",
+    "frequency": 46,
+    "category": "conversation",
+    "example": "El año pasado viajé.",
+    "audioUrl": "https://example.com/audio/ano.mp3"
+  },
+  {
+    "word": "hasta",
+    "translation": "until, even",
+    "frequency": 47,
+    "category": "conversation",
+    "example": "Hasta mañana.",
+    "audioUrl": "https://example.com/audio/hasta.mp3"
+  },
+  {
+    "word": "dos",
+    "translation": "two",
+    "frequency": 48,
+    "category": "conversation",
+    "example": "Tengo dos hermanos.",
+    "audioUrl": "https://example.com/audio/dos.mp3"
+  },
+  {
+    "word": "también",
+    "translation": "also, too",
     "frequency": 49,
-    "category": "survival",
-    "example": "Â¿Quiere aÃ±o, por favor?",
-    "audioUrl": "ano.mp3",
-    "imageUrl": "ano.png"
+    "category": "conversation",
+    "example": "Yo también quiero ir.",
+    "audioUrl": "https://example.com/audio/tambien.mp3"
   },
   {
-    "word": "paÃ­s",
-    "translation": "country",
+    "word": "donde",
+    "translation": "where",
     "frequency": 50,
-    "category": "survival",
-    "example": "Â¿Quiere paÃ­s, por favor?",
-    "audioUrl": "pais.mp3",
-    "imageUrl": "pais.png"
-  },
-  {
-    "word": "ciudad",
-    "translation": "city",
-    "frequency": 51,
-    "category": "survival",
-    "example": "Â¿Quiere ciudad, por favor?",
-    "audioUrl": "ciudad.mp3",
-    "imageUrl": "ciudad.png"
-  },
-  {
-    "word": "calle",
-    "translation": "street",
-    "frequency": 52,
-    "category": "survival",
-    "example": "Â¿Quiere calle, por favor?",
-    "audioUrl": "calle.mp3",
-    "imageUrl": "calle.png"
-  },
-  {
-    "word": "nÃºmero",
-    "translation": "number",
-    "frequency": 53,
-    "category": "survival",
-    "example": "Â¿Quiere nÃºmero, por favor?",
-    "audioUrl": "numero.mp3",
-    "imageUrl": "numero.png"
-  },
-  {
-    "word": "cÃ³digo",
-    "translation": "code",
-    "frequency": 54,
-    "category": "survival",
-    "example": "Â¿Quiere cÃ³digo, por favor?",
-    "audioUrl": "codigo.mp3",
-    "imageUrl": "codigo.png"
-  },
-  {
-    "word": "postal",
-    "translation": "postal",
-    "frequency": 55,
-    "category": "survival",
-    "example": "Â¿Quiere postal, por favor?",
-    "audioUrl": "postal.mp3",
-    "imageUrl": "postal.png"
-  },
-  {
-    "word": "paquete",
-    "translation": "package",
-    "frequency": 56,
-    "category": "survival",
-    "example": "Â¿Quiere paquete, por favor?",
-    "audioUrl": "paquete.mp3",
-    "imageUrl": "paquete.png"
-  },
-  {
-    "word": "caja",
-    "translation": "box",
-    "frequency": 57,
-    "category": "survival",
-    "example": "Â¿Quiere caja, por favor?",
-    "audioUrl": "caja.mp3",
-    "imageUrl": "caja.png"
-  },
-  {
-    "word": "bolsa",
-    "translation": "bag",
-    "frequency": 58,
-    "category": "survival",
-    "example": "Â¿Quiere bolsa, por favor?",
-    "audioUrl": "bolsa.mp3",
-    "imageUrl": "bolsa.png"
-  },
-  {
-    "word": "saco",
-    "translation": "sack",
-    "frequency": 59,
-    "category": "survival",
-    "example": "Â¿Quiere saco, por favor?",
-    "audioUrl": "saco.mp3",
-    "imageUrl": "saco.png"
-  },
-  {
-    "word": "botella",
-    "translation": "bottle",
-    "frequency": 60,
-    "category": "survival",
-    "example": "Â¿Quiere botella, por favor?",
-    "audioUrl": "botella.mp3",
-    "imageUrl": "botella.png"
-  },
-  {
-    "word": "vaso",
-    "translation": "glass",
-    "frequency": 61,
-    "category": "survival",
-    "example": "Â¿Quiere vaso, por favor?",
-    "audioUrl": "vaso.mp3",
-    "imageUrl": "vaso.png"
-  },
-  {
-    "word": "taza",
-    "translation": "cup",
-    "frequency": 62,
-    "category": "survival",
-    "example": "Â¿Quiere taza, por favor?",
-    "audioUrl": "taza.mp3",
-    "imageUrl": "taza.png"
-  },
-  {
-    "word": "plato",
-    "translation": "plate",
-    "frequency": 63,
-    "category": "survival",
-    "example": "Â¿Quiere plato, por favor?",
-    "audioUrl": "plato.mp3",
-    "imageUrl": "plato.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 64,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 65,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 66,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 67,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 68,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 69,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 70,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 71,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 72,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 73,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 74,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 75,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 76,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 77,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 78,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 79,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 80,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 81,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 82,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 83,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 84,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 85,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 86,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 87,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 88,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 89,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 90,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 91,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 92,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 93,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 94,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 95,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 96,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 97,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
-  },
-  {
-    "word": "tenedor",
-    "translation": "fork",
-    "frequency": 98,
-    "category": "survival",
-    "example": "Â¿Quiere tenedor, por favor?",
-    "audioUrl": "tenedor.mp3",
-    "imageUrl": "tenedor.png"
-  },
-  {
-    "word": "cuchillo",
-    "translation": "knife",
-    "frequency": 99,
-    "category": "survival",
-    "example": "Â¿Quiere cuchillo, por favor?",
-    "audioUrl": "cuchillo.mp3",
-    "imageUrl": "cuchillo.png"
-  },
-  {
-    "word": "cuchara",
-    "translation": "spoon",
-    "frequency": 100,
-    "category": "survival",
-    "example": "Â¿Quiere cuchara, por favor?",
-    "audioUrl": "cuchara.mp3",
-    "imageUrl": "cuchara.png"
+    "category": "conversation",
+    "example": "¿Dónde está el baño?",
+    "audioUrl": "https://example.com/audio/donde.mp3"
   }
 ]
