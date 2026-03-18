@@ -125,6 +125,19 @@ export const addChallenge = (challenge) => {
   });
 };
 
+export const updateChallengeStatus = (challengeId, status) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'UPDATE challenges SET status = ?, completed_at = CURRENT_TIMESTAMP WHERE id = ?;',
+        [status, challengeId],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
 export const getSettings = () => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {

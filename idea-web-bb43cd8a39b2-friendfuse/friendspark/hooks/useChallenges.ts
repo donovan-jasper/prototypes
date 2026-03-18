@@ -9,9 +9,13 @@ export const useChallenges = () => {
     setChallenges(challengesData);
   };
 
+  const refreshChallenges = async () => {
+    await loadChallenges();
+  };
+
   useEffect(() => {
     loadChallenges();
   }, []);
 
-  return { challenges };
+  return { challenges, refreshChallenges };
 };

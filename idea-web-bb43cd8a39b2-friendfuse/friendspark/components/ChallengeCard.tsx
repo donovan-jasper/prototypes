@@ -1,19 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-const ChallengeCard = ({ challenge }) => {
+const ChallengeCard = ({ challenge, onComplete }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>{challenge.title}</Text>
+        <Text style={styles.title}>{challenge.challenge_type || challenge.title}</Text>
         {challenge.premium && <Text style={styles.premium}>Pro</Text>}
       </View>
       <Text style={styles.description}>{challenge.description}</Text>
       {challenge.friend && (
         <Text style={styles.friend}>For: {challenge.friend.name}</Text>
       )}
-      {challenge.status === 'active' && (
-        <TouchableOpacity style={styles.completeButton}>
+      {challenge.status === 'active' && onComplete && (
+        <TouchableOpacity style={styles.completeButton} onPress={() => onComplete(challenge.id)}>
           <Text style={styles.completeText}>Mark Complete</Text>
         </TouchableOpacity>
       )}
