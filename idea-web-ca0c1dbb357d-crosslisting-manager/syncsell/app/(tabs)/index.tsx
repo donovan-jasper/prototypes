@@ -1,36 +1,64 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useProductStore } from '../../lib/store/useProductStore';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { getSales } from '../../lib/db';
+import { calculateWeeklyEarnings, getTopProducts, suggestPostingTime } from '../../lib/utils/analytics';
 import AnalyticsChart from '../../components/AnalyticsChart';
 
 export default function Dashboard() {
-  const { products, sales } = useProductStore();
+  const [sales, setSales] = useState([]);
+  const [weeklyEarnings, setWeeklyEarnings] = useState({ total: 0, change: 0 });
+  const [topProducts, setTopProducts] = useState([]);
+  const [optimalPostingTime, setOptimalPostingTime] = useState('');
 
-  const weeklyEarnings = calculateWeeklyEarnings(sales);
-  const topProducts = getTopProducts(sales, 5);
-  const optimalPostingTime = suggestPostingTime(sales);
+  useEffect(() => {
+    getSales((fetchedSales) => {
+      setSales(fetchedSales);
+      
+      if (fetchedSales.length > 0) {
+        const earnings = calculateWeeklyEarnings(fetchedSales);
+        setWeeklyEarnings(earnings);
+        
+        const products = getTopProducts(fetchedSales, 5);
+        setTopProducts(products);
+        
+        const postingTime = suggestPostingTime(fetchedSales);
+        setOptimalPostingTime(postingTime);
+      }
+    });
+  }, []);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.earningsCard}>
         <Text style={styles.earningsText}>Weekly Earnings</Text>
-        <Text style={styles.earningsAmount}>${weeklyEarnings.total}</Text>
-        <Text style={styles.earningsChange}>{weeklyEarnings.change}%</Text>
+        <Text style={styles.earningsAmount}>${weeklyEarnings.total.toFixed(2)}</Text>
+        <Text style={[styles.earningsChange, { color: weeklyEarnings.change >= 0 ? '#4CAF50' : '#F44336' }]}>
+          {weeklyEarnings.change >= 0 ? '+' : ''}{weeklyEarnings.change.toFixed(1)}%
+        </Text>
       </View>
-      <AnalyticsChart sales={sales} />
+      
+      {sales.length > 0 && <AnalyticsChart sales={sales} />}
+      
       <View style={styles.topProducts}>
         <Text style={styles.sectionTitle}>Top Selling Products</Text>
-        {topProducts.map((product, index) => (
-          <Text key={index} style={styles.productItem}>
-            {product.title} - ${product.total}
-          </Text>
-        ))}
+        {topProducts.length > 0 ? (
+          topProducts.map((product, index) => (
+            <Text key={index} style={styles.productItem}>
+              {product.title} - ${product.total.toFixed(2)}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No sales data yet</Text>
+        )}
       </View>
+      
       <View style={styles.postingTime}>
         <Text style={styles.sectionTitle}>Optimal Posting Time</Text>
-        <Text style={styles.postingTimeText}>{optimalPostingTime}</Text>
+        <Text style={styles.postingTimeText}>
+          {optimalPostingTime || 'Not enough data yet'}
+        </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -61,7 +89,6 @@ const styles = StyleSheet.create({
   },
   earningsChange: {
     fontSize: 16,
-    color: '#4CAF50',
   },
   topProducts: {
     backgroundColor: '#fff',
@@ -83,10 +110,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 4,
   },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    fontStyle: 'italic',
+  },
   postingTime: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -97,15 +130,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
-function calculateWeeklyEarnings(sales) {
-  // Implementation for calculating weekly earnings
-}
-
-function getTopProducts(sales, limit) {
-  // Implementation for getting top products
-}
-
-function suggestPostingTime(sales) {
-  // Implementation for suggesting optimal posting time
-}
