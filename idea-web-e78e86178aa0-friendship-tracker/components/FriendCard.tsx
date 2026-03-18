@@ -1,33 +1,76 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Friend } from '@/lib/database';
 import { getConnectionColor, getDaysSinceLastContact } from '@/lib/scoring';
+import InteractionLogger from './InteractionLogger';
 
 interface FriendCardProps {
   friend: Friend;
   onPress: () => void;
+  onInteractionLogged?: () => void;
 }
 
-export default function FriendCard({ friend, onPress }: FriendCardProps) {
+export default function FriendCard({ friend, onPress, onInteractionLogged }: FriendCardProps) {
+  const [showLogger, setShowLogger] = useState(false);
   const daysSince = getDaysSinceLastContact(friend.lastContact);
   const scoreColor = getConnectionColor(friend.connectionScore);
 
+  const handleLogInteraction = async (
+    type: 'call' | 'text' | 'hangout' | 'gift',
+    date: string,
+    notes?: string
+  ) => {
+    const { logInteraction, updateFriend, calculateConnectionScore } = await import('@/lib/database');
+    
+    await logInteraction(friend.id, type, date, notes);
+    
+    const newScore = calculateConnectionScore(date);
+    await updateFriend(friend.id, {
+      lastContact: date,
+      connectionScore: newScore,
+    });
+    
+    if (onInteractionLogged) {
+      onInteractionLogged();
+    }
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.content}>
-        <View style={styles.leftSection}>
-          <Text style={styles.name}>{friend.name}</Text>
-          <Text style={styles.lastContact}>
-            {friend.lastContact
-              ? `${daysSince} ${daysSince === 1 ? 'day' : 'days'} ago`
-              : 'Never contacted'}
-          </Text>
+    <>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+        <View style={styles.content}>
+          <View style={styles.leftSection}>
+            <Text style={styles.name}>{friend.name}</Text>
+            <Text style={styles.lastContact}>
+              {friend.lastContact
+                ? `${daysSince} ${daysSince === 1 ? 'day' : 'days'} ago`
+                : 'Never contacted'}
+            </Text>
+          </View>
+          <View style={styles.rightSection}>
+            <View style={[styles.scoreCircle, { backgroundColor: scoreColor }]}>
+              <Text style={styles.scoreText}>{friend.connectionScore}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.logButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                setShowLogger(true);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.logButtonText}>Log</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <View style={[styles.scoreCircle, { backgroundColor: scoreColor }]}>
-          <Text style={styles.scoreText}>{friend.connectionScore}</Text>
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      <InteractionLogger
+        visible={showLogger}
+        onClose={() => setShowLogger(false)}
+        onSubmit={handleLogInteraction}
+      />
+    </>
   );
 }
 
@@ -62,6 +105,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  rightSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   scoreCircle: {
     width: 50,
     height: 50,
@@ -73,5 +121,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
+  },
+  logButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  logButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

@@ -91,7 +91,11 @@ export default function FriendsScreen() {
         data={friends}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item }) => (
-          <FriendCard friend={item} onPress={() => handleFriendPress(item)} />
+          <FriendCard
+            friend={item}
+            onPress={() => handleFriendPress(item)}
+            onInteractionLogged={loadFriends}
+          />
         )}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
