@@ -2,15 +2,15 @@ import React, { useState } from 'react';
 import { View, Button, StyleSheet, ScrollView } from 'react-native';
 import DebateTree from '../components/DebateTree';
 import ArgumentModal from '../components/ArgumentModal';
-import { buildDebateTree, addArgument, updateVotes } from '../utils/debateTree';
+import { buildDebateTree, addArgument, updateVotes, Evidence } from '../utils/debateTree';
 
 const DebateScreen: React.FC = () => {
   const [debateTree, setDebateTree] = useState(buildDebateTree('Main Topic'));
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedParentId, setSelectedParentId] = useState<string>('root');
 
-  const handleAddArgument = (title: string, type: 'pro' | 'con') => {
-    const newTree = addArgument(debateTree, selectedParentId, title, type);
+  const handleAddArgument = (title: string, type: 'pro' | 'con', evidence: Evidence[]) => {
+    const newTree = addArgument(debateTree, selectedParentId, title, type, evidence);
     setDebateTree({ ...newTree });
     setModalVisible(false);
   };

@@ -1,9 +1,16 @@
+interface Evidence {
+  type: 'link' | 'image' | 'pdf';
+  url: string;
+  title: string;
+}
+
 interface DebateNode {
   id: string;
   title: string;
   type: 'root' | 'pro' | 'con';
   votes: number;
   children: DebateNode[];
+  evidence: Evidence[];
 }
 
 interface DebateTree {
@@ -18,6 +25,7 @@ export const buildDebateTree = (rootTitle: string): DebateTree => {
     type: 'root',
     votes: 0,
     children: [],
+    evidence: [],
   };
 
   return {
@@ -30,7 +38,8 @@ export const addArgument = (
   tree: DebateTree,
   parentId: string,
   title: string,
-  type: 'pro' | 'con'
+  type: 'pro' | 'con',
+  evidence?: Evidence[]
 ): DebateTree => {
   const parent = tree.nodes[parentId];
   if (!parent) {
@@ -43,6 +52,7 @@ export const addArgument = (
     type,
     votes: 0,
     children: [],
+    evidence: evidence || [],
   };
 
   parent.children.push(newNode);
@@ -65,4 +75,4 @@ export const updateVotes = (
   return tree;
 };
 
-export type { DebateNode, DebateTree };
+export type { DebateNode, DebateTree, Evidence };

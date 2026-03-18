@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { DebateNode } from '../utils/debateTree';
 
 interface DebateTreeProps {
@@ -9,6 +9,10 @@ interface DebateTreeProps {
 }
 
 const DebateTree: React.FC<DebateTreeProps> = ({ tree, onVote, onNodePress }) => {
+  const handleEvidencePress = (url: string) => {
+    Linking.openURL(url).catch(err => console.error('Failed to open URL:', err));
+  };
+
   const renderNode = (node: DebateNode, depth: number = 0) => {
     return (
       <View key={node.id} style={[styles.node, { marginLeft: depth * 20 }]}>
@@ -37,6 +41,23 @@ const DebateTree: React.FC<DebateTreeProps> = ({ tree, onVote, onNodePress }) =>
             <Text style={styles.voteButtonText}>▼</Text>
           </TouchableOpacity>
         </View>
+
+        {node.evidence && node.evidence.length > 0 && (
+          <View style={styles.evidenceContainer}>
+            {node.evidence.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.evidenceChip}
+                onPress={() => handleEvidencePress(item.url)}
+              >
+                <Text style={styles.evidenceChipType}>{item.type.toUpperCase()}</Text>
+                <Text style={styles.evidenceChipTitle} numberOfLines={1}>
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
         {node.children.map(child => renderNode(child, depth + 1))}
       </View>
@@ -102,6 +123,34 @@ const styles = StyleSheet.create({
     color: '#333',
     minWidth: 30,
     textAlign: 'center',
+  },
+  evidenceContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    marginLeft: 12,
+  },
+  evidenceChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#e3f2fd',
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 6,
+    maxWidth: 200,
+  },
+  evidenceChipType: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#1976d2',
+    marginRight: 6,
+  },
+  evidenceChipTitle: {
+    fontSize: 12,
+    color: '#1976d2',
+    flex: 1,
   },
 });
 
