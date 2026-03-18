@@ -5,7 +5,7 @@ const db = SQLite.openDatabase('taskhive.db');
 export const setupDatabase = () => {
   db.transaction(tx => {
     tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT, notes TEXT, category TEXT, dueDate TEXT, enableNotification INTEGER, notificationId TEXT);'
+      'CREATE TABLE IF NOT EXISTS tasks (id TEXT PRIMARY KEY, title TEXT, notes TEXT, category TEXT, dueDate TEXT, enableNotification INTEGER, notificationId TEXT, status TEXT DEFAULT "todo", priority TEXT DEFAULT "medium");'
     );
   });
 };
@@ -20,6 +20,8 @@ export const getTasks = () => {
           const tasks = _array.map(task => ({
             ...task,
             enableNotification: task.enableNotification === 1,
+            status: task.status || 'todo',
+            priority: task.priority || 'medium',
           }));
           resolve(tasks);
         },
@@ -35,7 +37,7 @@ export const saveTasks = (tasks) => {
       tx.executeSql('DELETE FROM tasks;');
       tasks.forEach(task => {
         tx.executeSql(
-          'INSERT INTO tasks (id, title, notes, category, dueDate, enableNotification, notificationId) VALUES (?, ?, ?, ?, ?, ?, ?);',
+          'INSERT INTO tasks (id, title, notes, category, dueDate, enableNotification, notificationId, status, priority) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
           [
             task.id,
             task.title,
@@ -44,6 +46,8 @@ export const saveTasks = (tasks) => {
             task.dueDate || null,
             task.enableNotification ? 1 : 0,
             task.notificationId || null,
+            task.status || 'todo',
+            task.priority || 'medium',
           ]
         );
       });
