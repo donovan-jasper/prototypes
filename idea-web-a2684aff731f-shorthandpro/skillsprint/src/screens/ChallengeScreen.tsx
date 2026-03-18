@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-nativ
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootTabParamList } from '../types/navigation';
+import { completeChallenge } from '../utils/challenges';
 
 type ChallengeScreenRouteProp = RouteProp<RootTabParamList, 'Challenge'>;
 type ChallengeScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Challenge'>;
@@ -14,6 +15,7 @@ const ChallengeScreen: React.FC = () => {
   const [feedback, setFeedback] = useState('');
   const [score, setScore] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
+  const [earnedXP, setEarnedXP] = useState(0);
 
   const challengeData = route.params || {
     id: '1',
@@ -21,11 +23,28 @@ const ChallengeScreen: React.FC = () => {
     description: 'Improve your typing speed and accuracy',
   };
 
-  const handleSubmit = () => {
+  const getChallengeType = (id: string): string => {
+    if (id === '1') return 'typing';
+    if (id === '2') return 'memory';
+    if (id === '3') return 'math';
+    return 'typing';
+  };
+
+  const handleSubmit = async () => {
     const wordCount = text.trim().split(/\s+/).length;
     const calculatedScore = Math.min(wordCount * 10, 100);
     setScore(calculatedScore);
-    setFeedback(`Great job! You typed ${wordCount} words. Score: ${calculatedScore}/100`);
+
+    const challengeType = getChallengeType(challengeData.id);
+    const result = await completeChallenge(
+      challengeData.id,
+      challengeType,
+      challengeData.title,
+      calculatedScore
+    );
+
+    setEarnedXP(result.xp);
+    setFeedback(`Great job! You typed ${wordCount} words. Score: ${calculatedScore}/100. You earned ${result.xp} XP!`);
     setIsCompleted(true);
   };
 
@@ -33,6 +52,7 @@ const ChallengeScreen: React.FC = () => {
     setText('');
     setFeedback('');
     setScore(0);
+    setEarnedXP(0);
     setIsCompleted(false);
   };
 
