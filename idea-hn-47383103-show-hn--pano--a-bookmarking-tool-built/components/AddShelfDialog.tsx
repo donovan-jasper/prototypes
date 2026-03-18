@@ -42,4 +42,44 @@ export const AddShelfDialog: React.FC<AddShelfDialogProps> = ({
     }
   };
 
-  
+  return (
+    <Portal>
+      <Dialog visible={visible} onDismiss={onDismiss}>
+        <Dialog.Title>{editShelf ? 'Edit Shelf' : 'Create Shelf'}</Dialog.Title>
+        <Dialog.Content>
+          <TextInput
+            label="Shelf Name"
+            value={name}
+            onChangeText={setName}
+            mode="outlined"
+            style={styles.input}
+            autoFocus
+          />
+          <TextInput
+            label="Description (optional)"
+            value={description}
+            onChangeText={setDescription}
+            mode="outlined"
+            multiline
+            numberOfLines={3}
+            style={styles.input}
+          />
+        </Dialog.Content>
+        <Dialog.Actions>
+          <Button onPress={onDismiss} disabled={saving}>
+            Cancel
+          </Button>
+          <Button onPress={handleSave} disabled={!name.trim() || saving} loading={saving}>
+            {editShelf ? 'Save' : 'Create'}
+          </Button>
+        </Dialog.Actions>
+      </Dialog>
+    </Portal>
+  );
+};
+
+const styles = StyleSheet.create({
+  input: {
+    marginBottom: 12,
+  },
+});
