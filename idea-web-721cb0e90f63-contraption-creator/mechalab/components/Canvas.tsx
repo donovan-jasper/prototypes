@@ -5,6 +5,7 @@ import { Svg, Rect, Circle, Polygon } from 'react-native-svg';
 import Matter from 'matter-js';
 import { useStore } from '../lib/store';
 import { createEngine, addPart, removePart, runSimulation } from '../lib/physics';
+import { PARTS } from '../lib/parts';
 
 const Canvas = React.forwardRef((props, ref) => {
   const { parts, isPlaying, selectedPart, addPart: addPartToStore, removePart: removePartFromStore, updatePart } = useStore();
@@ -13,7 +14,7 @@ const Canvas = React.forwardRef((props, ref) => {
   const lastTimeRef = useRef(0);
   const [, forceUpdate] = useState({});
   const draggedPartRef = useRef<string | null>(null);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const initialScaleRef = useRef<number>(1);
 
   useEffect(() => {
     const engine = createEngine();
@@ -27,7 +28,14 @@ const Canvas = React.forwardRef((props, ref) => {
       bodiesMapRef.current.set(part.id, body);
     });
 
-    // Animation loop
+    return () => {
+      if (engineRef.current) {
+        Matter.Engine.clear(engineRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     let animationFrameId: number;
     const animate = (time: number) => {
       if (!lastTimeRef.current) {
@@ -38,6 +46,25 @@ const Canvas = React.forwardRef((props, ref) => {
 
       if (isPlaying && engineRef.current) {
         runSimulation(engineRef.current, deltaTime);
+        
+        // Sync physics bodies back to store
+        bodiesMapRef.current.forEach((body, partId) => {
+          const part = parts.find(p => p.id === partId);
+          if (part) {
+            const positionChanged = 
+              Math.abs(body.position.x - part.position.x) > 0.1 ||
+              Math.abs(body.position.y - part.position.y) > 0.1;
+            const rotationChanged = Math.abs(body.angle - part.rotation) > 0.01;
+            
+            if (positionChanged || rotationChanged) {
+              updatePart(partId, {
+                position: { x: body.position.x, y: body.position.y },
+                rotation: body.angle,
+              });
+            }
+          }
+        });
+        
         forceUpdate({});
       }
 
@@ -50,11 +77,32 @@ const Canvas = React.forwardRef((props, ref) => {
       if (animationFrameId) {
         cancelAnimationFrame(animationFrameId);
       }
-      if (engineRef.current) {
-        Matter.Engine.clear(engineRef.current);
-      }
     };
-  }, [parts.length, isPlaying]);
+  }, [isPlaying, parts]);
+
+  // Sync store changes to physics bodies
+  useEffect(() => {
+    if (!engineRef.current) return;
+
+    // Add new parts
+    parts.forEach((part) => {
+      if (!bodiesMapRef.current.has(part.id)) {
+        const body = addPart(engineRef.current!, part.type, part.position);
+        body.angle = part.rotation;
+        Matter.Body.scale(body, part.scale, part.scale);
+        bodiesMapRef.current.set(part.id, body);
+      }
+    });
+
+    // Remove deleted parts
+    const partIds = new Set(parts.map(p => p.id));
+    bodiesMapRef.current.forEach((body, id) => {
+      if (!partIds.has(id)) {
+        removePart(engineRef.current!, body);
+        bodiesMapRef.current.delete(id);
+      }
+    });
+  }, [parts.length]);
 
   const findBodyAtPoint = (x: number, y: number): string | null => {
     if (!engineRef.current) return null;
@@ -100,6 +148,8 @@ const Canvas = React.forwardRef((props, ref) => {
       const body = bodiesMapRef.current.get(draggedPartRef.current);
       if (body) {
         Matter.Body.setPosition(body, { x: event.x, y: event.y });
+        Matter.Body.setVelocity(body, { x: 0, y: 0 });
+        Matter.Body.setAngularVelocity(body, 0);
         updatePart(draggedPartRef.current, { position: { x: event.x, y: event.y } });
         forceUpdate({});
       }
@@ -140,6 +190,8 @@ const Canvas = React.forwardRef((props, ref) => {
       const partId = findBodyAtPoint(event.focalX, event.focalY);
       if (partId) {
         draggedPartRef.current = partId;
+        const currentPart = parts.find(p => p.id === partId);
+        initialScaleRef.current = currentPart?.scale || 1;
       }
     })
     .onUpdate((event) => {
@@ -149,8 +201,10 @@ const Canvas = React.forwardRef((props, ref) => {
       if (body) {
         const currentPart = parts.find(p => p.id === draggedPartRef.current);
         if (currentPart) {
-          const newScale = currentPart.scale * event.scale;
-          Matter.Body.scale(body, event.scale, event.scale);
+          const newScale = initialScaleRef.current * event.scale;
+          const scaleFactor = newScale / currentPart.scale;
+          
+          Matter.Body.scale(body, scaleFactor, scaleFactor);
           updatePart(draggedPartRef.current, { scale: newScale });
           forceUpdate({});
         }
@@ -158,6 +212,7 @@ const Canvas = React.forwardRef((props, ref) => {
     })
     .onEnd(() => {
       draggedPartRef.current = null;
+      initialScaleRef.current = 1;
     });
 
   const composedGesture = Gesture.Race(
@@ -167,8 +222,8 @@ const Canvas = React.forwardRef((props, ref) => {
 
   const renderBody = (body: Matter.Body, partId: string) => {
     const { position, vertices, circleRadius, label } = body;
-    const part = parts.find(p => p.id === partId);
-    const color = label === 'RAMP' ? '#6200ee' : label === 'BALL' ? '#03dac6' : '#018786';
+    const partConfig = PARTS[label];
+    const color = partConfig?.color || '#6200ee';
 
     if (circleRadius) {
       return (

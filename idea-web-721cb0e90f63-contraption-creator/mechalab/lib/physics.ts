@@ -1,4 +1,5 @@
 import Matter from 'matter-js';
+import { PARTS } from './parts';
 
 export const createEngine = () => {
   const engine = Matter.Engine.create();
@@ -6,35 +7,40 @@ export const createEngine = () => {
   return engine;
 };
 
-export const addPart = (engine, partType, position) => {
-  let body;
+export const addPart = (engine: Matter.Engine, partType: string, position: { x: number; y: number }) => {
+  const partConfig = PARTS[partType];
+  if (!partConfig) {
+    throw new Error(`Unknown part type: ${partType}`);
+  }
 
-  switch (partType) {
-    case 'RAMP':
+  let body: Matter.Body;
+
+  switch (partConfig.shape) {
+    case 'rectangle':
       body = Matter.Bodies.rectangle(position.x, position.y, 100, 20, {
-        isStatic: true,
-        angle: Math.PI / 6, // 30 degrees
-        label: 'RAMP',
+        isStatic: partType === 'RAMP',
+        angle: partType === 'RAMP' ? Math.PI / 6 : 0,
+        label: partType,
+        friction: partConfig.friction,
+        restitution: partConfig.restitution,
+        density: partConfig.mass > 0 ? partConfig.mass / 2000 : 0,
       });
       break;
-    case 'BALL':
-      body = Matter.Bodies.circle(position.x, position.y, 20, {
-        restitution: 0.8,
-        friction: 0.01,
-        label: 'BALL',
+    case 'circle':
+      const radius = partType === 'BALL' ? 20 : 30;
+      body = Matter.Bodies.circle(position.x, position.y, radius, {
+        label: partType,
+        friction: partConfig.friction,
+        restitution: partConfig.restitution,
+        density: partConfig.mass > 0 ? partConfig.mass / (Math.PI * radius * radius) : 0,
       });
       break;
-    case 'WHEEL':
-      body = Matter.Bodies.circle(position.x, position.y, 30, {
-        restitution: 0.5,
-        friction: 0.1,
-        label: 'WHEEL',
-      });
-      break;
-    // Add cases for other part types
     default:
       body = Matter.Bodies.rectangle(position.x, position.y, 50, 50, {
         label: partType,
+        friction: partConfig.friction,
+        restitution: partConfig.restitution,
+        density: partConfig.mass > 0 ? partConfig.mass / 2500 : 0,
       });
   }
 
@@ -42,10 +48,10 @@ export const addPart = (engine, partType, position) => {
   return body;
 };
 
-export const removePart = (engine, body) => {
+export const removePart = (engine: Matter.Engine, body: Matter.Body) => {
   Matter.World.remove(engine.world, body);
 };
 
-export const runSimulation = (engine, deltaTime) => {
+export const runSimulation = (engine: Matter.Engine, deltaTime: number) => {
   Matter.Engine.update(engine, deltaTime);
 };
