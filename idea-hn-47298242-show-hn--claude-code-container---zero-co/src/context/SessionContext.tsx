@@ -21,7 +21,8 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-const API_URL = 'http://localhost:3000';
+// Replace with your deployed backend URL (e.g., Railway, Render, AWS)
+const API_URL = 'https://your-backend-url.com';
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);

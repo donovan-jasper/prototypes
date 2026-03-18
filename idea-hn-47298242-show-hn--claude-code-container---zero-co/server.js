@@ -26,9 +26,22 @@ const docker = new Docker();
 // In-memory storage for sessions (in production, use Redis or DB)
 const sessions = new Map();
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // Routes
 app.get('/', (req, res) => {
-  res.sendFile(__dirname + '/public/index.html');
+  res.json({ 
+    service: 'CodeCapsule Backend',
+    version: '1.0.0',
+    endpoints: {
+      session: 'POST /api/session',
+      run: 'POST /api/run/:sessionId',
+      health: 'GET /health'
+    }
+  });
 });
 
 app.post('/api/session', (req, res) => {
@@ -64,7 +77,9 @@ app.post('/api/run/:sessionId', async (req, res) => {
       HostConfig: {
         Memory: 128 * 1024 * 1024, // 128MB memory limit
         NetworkMode: 'none', // No network access
-        Binds: ['/tmp:/tmp'] // Limited volume access
+        AutoRemove: true, // Auto-remove container after execution
+        ReadonlyRootfs: true, // Read-only filesystem
+        SecurityOpt: ['no-new-privileges'], // Security hardening
       },
       AttachStdin: false,
       AttachStdout: true,
@@ -74,17 +89,23 @@ app.post('/api/run/:sessionId', async (req, res) => {
     
     await container.start();
     
-    const logs = await container.logs({
-      stdout: true,
-      stderr: true,
-      timestamps: false
+    // Set timeout for execution (30 seconds max)
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Execution timeout')), 30000);
     });
     
+    const logsPromise = container.logs({
+      stdout: true,
+      stderr: true,
+      timestamps: false,
+      follow: true
+    });
+    
+    const logs = await Promise.race([logsPromise, timeoutPromise]);
     const output = logs.toString();
     
-    // Clean up container
-    await container.stop();
-    await container.remove();
+    // Wait for container to finish
+    await container.wait();
     
     session.output.push({
       timestamp: new Date(),
@@ -154,6 +175,9 @@ function getDockerImage(language) {
 }
 
 function getCodeExecutionCommand(code, language) {
+  // Escape code for shell execution
+  const escapedCode = code.replace(/"/g, '\\"').replace(/\$/g, '\\$').replace(/`/g, '\\`');
+  
   switch (language.toLowerCase()) {
     case 'python':
       return ['python', '-c', code];
@@ -161,18 +185,27 @@ function getCodeExecutionCommand(code, language) {
     case 'nodejs':
       return ['node', '-e', code];
     case 'go':
-      return ['sh', '-c', `echo "${code}" | go run -`];
+      return ['sh', '-c', `echo "${escapedCode}" | go run -`];
     case 'java':
-      return ['sh', '-c', `echo "${code}" > Main.java && javac Main.java && java Main`];
+      return ['sh', '-c', `echo "${escapedCode}" > Main.java && javac Main.java && java Main`];
     case 'c++':
     case 'cpp':
-      return ['sh', '-c', `echo "${code}" > main.cpp && g++ main.cpp -o main && ./main`];
+      return ['sh', '-c', `echo "${escapedCode}" > main.cpp && g++ main.cpp -o main && ./main`];
     default:
       return ['node', '-e', code];
   }
 }
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`CodeCapsule server running on port ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  server.close(() => {
+    console.log('HTTP server closed');
+  });
 });
