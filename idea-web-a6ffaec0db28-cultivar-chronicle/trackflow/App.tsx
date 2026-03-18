@@ -2,13 +2,26 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './src/screens/HomeScreen';
 import AnalyticsScreen from './src/screens/AnalyticsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
+import AddEntryScreen from './src/screens/AddEntryScreen';
 import { AppProvider } from './src/context/AppContext';
 import { initDatabase } from './src/services/database';
 
 const Tab = createBottomTabNavigator();
+const Stack = createStackNavigator();
+
+function HomeTabs() {
+  return (
+    <Tab.Navigator>
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+      <Tab.Screen name="Settings" component={SettingsScreen} />
+    </Tab.Navigator>
+  );
+}
 
 export default function App() {
   const [isReady, setIsReady] = useState(false);
@@ -47,11 +60,18 @@ export default function App() {
   return (
     <AppProvider>
       <NavigationContainer>
-        <Tab.Navigator>
-          <Tab.Screen name="Home" component={HomeScreen} />
-          <Tab.Screen name="Analytics" component={AnalyticsScreen} />
-          <Tab.Screen name="Settings" component={SettingsScreen} />
-        </Tab.Navigator>
+        <Stack.Navigator>
+          <Stack.Screen 
+            name="Main" 
+            component={HomeTabs} 
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="AddEntry" 
+            component={AddEntryScreen}
+            options={{ title: 'Add Entry' }}
+          />
+        </Stack.Navigator>
       </NavigationContainer>
     </AppProvider>
   );
