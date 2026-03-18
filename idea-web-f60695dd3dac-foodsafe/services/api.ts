@@ -129,3 +129,60 @@ const mockInspections: Record<string, Inspection[]> = {
       date: '2024-01-20',
       score: 88,
       violations: [
+        { id: 'v3', description: 'Improper food storage temperature', severity: 'medium' },
+        { id: 'v4', description: 'Missing handwashing signage', severity: 'low' },
+        { id: 'v5', description: 'Inadequate pest control', severity: 'medium' },
+      ],
+    },
+    {
+      id: 'i2-2',
+      restaurantId: '2',
+      date: '2023-10-15',
+      score: 92,
+      violations: [
+        { id: 'v6', description: 'Minor cleaning issue', severity: 'low' },
+      ],
+    },
+    {
+      id: 'i2-3',
+      restaurantId: '2',
+      date: '2023-07-20',
+      score: 90,
+      violations: [
+        { id: 'v7', description: 'Equipment maintenance needed', severity: 'low' },
+      ],
+    },
+  ],
+};
+
+export const searchRestaurants = async (query: string): Promise<Restaurant[]> => {
+  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  return mockRestaurants.filter(
+    (restaurant) =>
+      restaurant.name.toLowerCase().includes(lowerQuery) ||
+      restaurant.cuisine.toLowerCase().includes(lowerQuery) ||
+      restaurant.address.toLowerCase().includes(lowerQuery)
+  );
+};
+
+export const getRestaurantsByLocation = async (
+  latitude: number,
+  longitude: number,
+  radius: number = 5
+): Promise<Restaurant[]> => {
+  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  return mockRestaurants;
+};
+
+export const getRestaurantById = async (id: string): Promise<Restaurant | null> => {
+  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  return mockRestaurants.find((r) => r.id === id) || null;
+};
+
+export const getInspectionHistory = async (restaurantId: string): Promise<Inspection[]> => {
+  await new Promise((resolve) => setTimeout(resolve, MOCK_DELAY));
+  return mockInspections[restaurantId] || [];
+};
