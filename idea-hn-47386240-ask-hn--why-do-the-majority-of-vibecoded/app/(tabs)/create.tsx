@@ -3,6 +3,9 @@ import { Text, TextInput, Button, ActivityIndicator } from 'react-native-paper';
 import { useState } from 'react';
 import { useProjectStore } from '@/store/projectStore';
 import { useRouter } from 'expo-router';
+import { parseIntent } from '@/lib/ai/intentParser';
+import { suggestComponents } from '@/lib/ai/componentSuggester';
+import { createScreen as dbCreateScreen, createComponent as dbCreateComponent } from '@/lib/db/queries';
 
 export default function CreateScreen() {
   const [name, setName] = useState('');
@@ -24,24 +27,57 @@ export default function CreateScreen() {
 
     setLoading(true);
     try {
-      await addProject({
+      // 1. Call parseIntent
+      const intentResult = await parseIntent(description.trim());
+      console.log('Parsed Intent:', intentResult);
+
+      // 2. Use results from parseIntent to call suggestComponents
+      const suggestedScreens = suggestComponents(intentResult);
+      console.log('Suggested Screens & Components:', suggestedScreens);
+
+      // 3. Orchestrate the creation of the new project
+      const newProject = await addProject({
         name: name.trim(),
         description: description.trim(),
-        appType: 'general',
+        appType: intentResult.appType, // Use AI-determined app type
       });
-      
-      Alert.alert('Success', 'Project created successfully', [
+
+      // Create screens and components for the new project
+      for (let i = 0; i < suggestedScreens.length; i++) {
+        const suggestedScreen = suggestedScreens[i];
+        const createdScreen = await dbCreateScreen({
+          projectId: newProject.id,
+          name: suggestedScreen.name,
+          order: i,
+          layout: {}, // Layout can be empty for now, or filled with AI suggestions later
+        });
+
+        for (let j = 0; j < suggestedScreen.components.length; j++) {
+          const suggestedComponent = suggestedScreen.components[j];
+          await dbCreateComponent({
+            screenId: createdScreen.id,
+            type: suggestedComponent.type,
+            props: suggestedComponent.props,
+            position: suggestedComponent.position,
+            order: j,
+          });
+        }
+      }
+
+      // 4. Upon successful creation, navigate the user directly to the new project's editor
+      Alert.alert('Success', 'Project created successfully with AI suggestions!', [
         {
           text: 'OK',
           onPress: () => {
             setName('');
             setDescription('');
-            router.push('/(tabs)/');
+            router.replace(`/project/${newProject.id}`); // Use replace to prevent going back to create screen
           },
         },
       ]);
     } catch (error) {
-      Alert.alert('Error', 'Failed to create project');
+      console.error('Project creation failed:', error);
+      Alert.alert('Error', `Failed to create project: ${(error as Error).message}`);
     } finally {
       setLoading(false);
     }
@@ -88,7 +124,7 @@ export default function CreateScreen() {
           disabled={loading}
           loading={loading}
         >
-          {loading ? 'Creating...' : 'Create Project'}
+          {loading ? 'Generating Prototype...' : 'Create Project'}
         </Button>
       </View>
 
