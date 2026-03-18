@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, TouchableOpacity, Text, StyleSheet, TextInput, Modal, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useMemoryStore } from '../store/memoryStore';
+import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
 import { parseNaturalLanguage } from '../lib/ai';
 
 const VoiceInput = () => {
   const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [capturedText, setCapturedText] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -14,28 +16,77 @@ const VoiceInput = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const { addMemory } = useMemoryStore();
 
-  const handleVoiceInput = async () => {
-    setIsRecording(true);
+  const startRecording = async () => {
     try {
-      // Simulate voice recording - in real implementation, this would use actual speech recognition
-      const result = await new Promise<string>((resolve) => {
-        setTimeout(() => resolve('Remind me to call mom tomorrow at 5 PM'), 2000);
-      });
-
-      // Wait for user to stop speaking
-      let isSpeaking = true;
-      while (isSpeaking) {
-        isSpeaking = await Speech.isSpeakingAsync();
-        await new Promise(resolve => setTimeout(resolve, 100));
+      const permission = await Audio.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Permission Required', 'Microphone permission is required to record audio');
+        return;
       }
 
-      setCapturedText(result);
-      setShowEditModal(true);
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+
+      const { recording: newRecording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      
+      setRecording(newRecording);
+      setIsRecording(true);
     } catch (error) {
-      console.error('Voice input error:', error);
-      Alert.alert('Error', 'Failed to capture voice input');
-    } finally {
+      console.error('Failed to start recording:', error);
+      Alert.alert('Error', 'Failed to start recording');
+    }
+  };
+
+  const stopRecording = async () => {
+    if (!recording) return;
+
+    try {
       setIsRecording(false);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      if (uri) {
+        await transcribeAudio(uri);
+      }
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      Alert.alert('Error', 'Failed to stop recording');
+    }
+  };
+
+  const transcribeAudio = async (uri: string) => {
+    setIsProcessing(true);
+    
+    try {
+      const result = await Speech.recognize({
+        uri,
+        language: 'en-US',
+      });
+
+      if (result && result.transcript) {
+        setCapturedText(result.transcript);
+        setShowEditModal(true);
+      } else {
+        Alert.alert('Error', 'Could not transcribe audio. Please try again.');
+      }
+    } catch (error) {
+      console.error('Transcription error:', error);
+      Alert.alert('Error', 'Speech recognition failed. Please try typing instead.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleVoiceInput = async () => {
+    if (isRecording) {
+      await stopRecording();
+    } else {
+      await startRecording();
     }
   };
 
@@ -96,12 +147,13 @@ const VoiceInput = () => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={handleVoiceInput} disabled={isRecording}>
+      <TouchableOpacity style={styles.button} onPress={handleVoiceInput} disabled={isProcessing}>
         <Ionicons name="mic" size={24} color={isRecording ? 'red' : 'black'} />
-        <Text style={styles.buttonText}>{isRecording ? 'Recording...' : 'Voice Input'}</Text>
+        <Text style={styles.buttonText}>
+          {isRecording ? 'Tap to Stop' : 'Voice Input'}
+        </Text>
       </TouchableOpacity>
 
-      {/* Edit Modal */}
       <Modal
         visible={showEditModal}
         transparent
@@ -140,7 +192,6 @@ const VoiceInput = () => {
         </View>
       </Modal>
 
-      {/* Processing Indicator */}
       <Modal visible={isProcessing} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.processingContainer}>
@@ -150,7 +201,6 @@ const VoiceInput = () => {
         </View>
       </Modal>
 
-      {/* Confirmation Modal */}
       <Modal
         visible={showConfirmModal}
         transparent
