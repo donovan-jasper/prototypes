@@ -28,7 +28,8 @@
     "zustand": "^4.0.0",
     "jszip": "^3.10.0",
     "diff": "^5.1.0",
-    "react-native-purchases": "^5.0.0"
+    "react-native-purchases": "^5.0.0",
+    "java-class-tools": "^1.1.0"
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
