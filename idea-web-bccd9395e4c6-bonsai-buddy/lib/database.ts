@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { getNextWateringDate } from './notifications';
 
 let db: SQLite.SQLiteDatabase;
 
@@ -60,7 +61,22 @@ export const addPlant = async (plant: any) => {
      VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
     [plant.name, plant.species, plant.wateringFrequency, plant.lastWatered || null, plant.lastFertilized || null, JSON.stringify(plant.photoUris || []), plant.notes || null, new Date().toISOString()]
   );
-  return { ...plant, id: result.lastInsertRowId.toString() };
+  
+  const plantId = result.lastInsertRowId.toString();
+  
+  // Create initial care reminder
+  const nextWateringDate = getNextWateringDate(
+    plant.lastWatered || new Date().toISOString(), 
+    plant.wateringFrequency
+  );
+  
+  await db.runAsync(
+    `INSERT INTO care_reminders (plantId, type, scheduledFor, completed)
+     VALUES (?, ?, ?, ?);`,
+    [plantId, 'water', nextWateringDate.toISOString(), 0]
+  );
+  
+  return { ...plant, id: plantId };
 };
 
 export const getPlants = async () => {
@@ -79,10 +95,28 @@ export const updatePlant = async (id: string, data: any) => {
     `UPDATE plants SET ${setClause} WHERE id = ?;`,
     [...values, id]
   );
+  
+  // If lastWatered was updated, create a new reminder
+  if (data.lastWatered) {
+    const plant = await db.getFirstAsync('SELECT * FROM plants WHERE id = ?;', [id]) as any;
+    if (plant) {
+      const nextWateringDate = getNextWateringDate(
+        data.lastWatered, 
+        plant.wateringFrequency
+      );
+      
+      await db.runAsync(
+        `INSERT INTO care_reminders (plantId, type, scheduledFor, completed)
+         VALUES (?, ?, ?, ?);`,
+        [id, 'water', nextWateringDate.toISOString(), 0]
+      );
+    }
+  }
 };
 
 export const deletePlant = async (id: string) => {
   await db.runAsync('DELETE FROM plants WHERE id = ?;', [id]);
+  await db.runAsync('DELETE FROM care_reminders WHERE plantId = ?;', [id]);
 };
 
 export const getCareReminders = async () => {
@@ -90,7 +124,31 @@ export const getCareReminders = async () => {
 };
 
 export const completeReminder = async (id: string) => {
-  await db.runAsync('UPDATE care_reminders SET completed = 1 WHERE id = ?;', [id]);
+  // Get the reminder details
+  const reminder = await db.getFirstAsync('SELECT * FROM care_reminders WHERE id = ?;', [id]) as any;
+  
+  if (reminder) {
+    // Mark reminder as completed
+    await db.runAsync('UPDATE care_reminders SET completed = 1 WHERE id = ?;', [id]);
+    
+    // Update plant's lastWatered field
+    const now = new Date().toISOString();
+    await db.runAsync('UPDATE plants SET lastWatered = ? WHERE id = ?;', [now, reminder.plantId]);
+    
+    // Get plant's watering frequency
+    const plant = await db.getFirstAsync('SELECT * FROM plants WHERE id = ?;', [reminder.plantId]) as any;
+    
+    if (plant) {
+      // Create new reminder for next watering
+      const nextWateringDate = getNextWateringDate(now, plant.wateringFrequency);
+      
+      await db.runAsync(
+        `INSERT INTO care_reminders (plantId, type, scheduledFor, completed)
+         VALUES (?, ?, ?, ?);`,
+        [reminder.plantId, 'water', nextWateringDate.toISOString(), 0]
+      );
+    }
+  }
 };
 
 export const snoozeReminder = async (id: string, hours: number) => {

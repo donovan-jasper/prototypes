@@ -22,8 +22,7 @@ export const useCareReminders = () => {
     setLoading(true);
     try {
       await completeReminderDb(id);
-      const updatedReminders = reminders.filter(reminder => reminder.id !== id);
-      setReminders(updatedReminders);
+      await loadReminders();
     } catch (err) {
       setError(err);
     } finally {
@@ -35,15 +34,7 @@ export const useCareReminders = () => {
     setLoading(true);
     try {
       await snoozeReminderDb(id, hours);
-      const updatedReminders = reminders.map(reminder => {
-        if (reminder.id === id) {
-          const newDate = new Date();
-          newDate.setHours(newDate.getHours() + hours);
-          return { ...reminder, scheduledFor: newDate.toISOString() };
-        }
-        return reminder;
-      });
-      setReminders(updatedReminders);
+      await loadReminders();
     } catch (err) {
       setError(err);
     } finally {
