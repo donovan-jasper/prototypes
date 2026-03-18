@@ -29,3 +29,11 @@ export interface LocationData {
   carrier: string;
   timestamp: number;
 }
+
+export interface SpeedTestResult {
+  timestamp: number;
+  downloadSpeed: number;
+  uploadSpeed: number;
+  latency: number;
+  networkType: string;
+}

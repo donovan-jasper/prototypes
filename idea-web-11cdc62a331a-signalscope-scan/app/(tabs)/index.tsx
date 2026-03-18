@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, ScrollView, View, Text } from 'react-native';
 import SignalMeter from '@/components/SignalMeter';
+import SpeedTest from '@/components/SpeedTest';
 
 export default function DashboardScreen() {
   return (
@@ -12,6 +13,10 @@ export default function DashboardScreen() {
       
       <View style={styles.content}>
         <SignalMeter />
+        
+        <View style={styles.spacer} />
+        
+        <SpeedTest />
       </View>
     </ScrollView>
   );
@@ -41,5 +46,8 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+  },
+  spacer: {
+    height: 16,
   },
 });
