@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { scanDocument } from '@/lib/ocr';
+import { scanDocument, hasValidOCR } from '@/lib/ocr';
 import { extractTransaction } from '@/lib/parser';
 import { hashDocument } from '@/lib/crypto';
 import { addDocument, addTransaction } from '@/lib/database';
@@ -86,19 +86,32 @@ export default function CaptureScreen() {
       const text = await scanDocument(uri);
       setOcrText(text);
 
-      // Parse transaction details
-      const transaction = extractTransaction(text);
-      
-      if (transaction) {
-        setDate(transaction.date.toISOString().split('T')[0]);
-        setAmount(Math.abs(transaction.amount).toString());
-        setPayee(transaction.payee);
+      // Check if OCR was successful
+      if (hasValidOCR(text)) {
+        // Parse transaction details
+        const transaction = extractTransaction(text);
+        
+        if (transaction) {
+          setDate(transaction.date.toISOString().split('T')[0]);
+          setAmount(Math.abs(transaction.amount).toString());
+          setPayee(transaction.payee);
+        } else {
+          // If parsing fails, allow manual entry
+          setError('Could not automatically extract transaction details. Please enter manually.');
+        }
       } else {
-        // If parsing fails, allow manual entry
-        setError('Could not automatically extract transaction details. Please enter manually.');
+        // OCR returned empty or failed
+        setError('Could not extract text from image. Please enter details manually.');
       }
-    } catch (err) {
-      setError('Failed to process image. Please enter details manually.');
+    } catch (err: any) {
+      // Handle specific error types
+      if (err.message?.includes('Network error')) {
+        setError('Network error: Please check your internet connection and try again.');
+      } else if (err.message?.includes('OCR service configuration')) {
+        setError('OCR service is not configured. Please enter details manually.');
+      } else {
+        setError('Failed to process image. Please enter details manually.');
+      }
       console.error('OCR error:', err);
     } finally {
       setIsProcessing(false);
@@ -114,6 +127,20 @@ export default function CaptureScreen() {
 
     if (!date || !amount || !payee) {
       Alert.alert('Error', 'Please fill in all fields (date, amount, and payee).');
+      return;
+    }
+
+    // Validate date format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      Alert.alert('Error', 'Please enter date in YYYY-MM-DD format.');
+      return;
+    }
+
+    // Validate amount
+    const parsedAmount = parseFloat(amount);
+    if (isNaN(parsedAmount)) {
+      Alert.alert('Error', 'Please enter a valid amount.');
       return;
     }
 
@@ -145,7 +172,6 @@ export default function CaptureScreen() {
       });
 
       // Add transaction to database
-      const parsedAmount = parseFloat(amount);
       await addTransaction({
         id: '',
         date: new Date(date),
