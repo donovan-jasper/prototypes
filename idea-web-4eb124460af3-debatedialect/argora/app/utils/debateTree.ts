@@ -2,6 +2,7 @@ interface DebateNode {
   id: string;
   title: string;
   type: 'root' | 'pro' | 'con';
+  votes: number;
   children: DebateNode[];
 }
 
@@ -15,6 +16,7 @@ export const buildDebateTree = (rootTitle: string): DebateTree => {
     id: 'root',
     title: rootTitle,
     type: 'root',
+    votes: 0,
     children: [],
   };
 
@@ -39,6 +41,7 @@ export const addArgument = (
     id: Date.now().toString(),
     title,
     type,
+    votes: 0,
     children: [],
   };
 
@@ -47,3 +50,19 @@ export const addArgument = (
 
   return tree;
 };
+
+export const updateVotes = (
+  tree: DebateTree,
+  nodeId: string,
+  delta: number
+): DebateTree => {
+  const node = tree.nodes[nodeId];
+  if (!node) {
+    throw new Error('Node not found');
+  }
+
+  node.votes += delta;
+  return tree;
+};
+
+export type { DebateNode, DebateTree };
