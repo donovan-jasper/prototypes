@@ -1,4 +1,4 @@
-import { openDatabase, createTables, isFocusModesEmpty, saveFocusMode, getFocusModes } from './database';
+import { openDatabase, createTables, isFocusModesEmpty, saveFocusMode, getFocusModes, getWidgetPositions } from './database';
 import { focusModes } from '../constants/focusModes';
 import useAppStore from '../store/useAppStore';
 
@@ -17,7 +17,9 @@ export const initializeApp = async () => {
     }
     
     const modes = await getFocusModes(db);
-    useAppStore.setState({ focusModes: modes });
+    const widgets = await getWidgetPositions(db);
+    
+    useAppStore.setState({ focusModes: modes, widgets: widgets as any });
     
   } catch (error) {
     console.error('Failed to initialize app:', error);

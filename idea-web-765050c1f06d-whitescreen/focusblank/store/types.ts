@@ -13,4 +13,11 @@ export interface Widget {
   id: string;
   name: string;
   type: string;
+  x: number;
+  y: number;
+}
+
+export interface AppInfo {
+  name: string;
+  packageName: string;
 }

@@ -1,10 +1,10 @@
 import * as SQLite from 'expo-sqlite';
 
 const openDatabase = async () => {
-  return SQLite.openDatabase('focusblank.db');
+  return SQLite.openDatabaseAsync('focusblank.db');
 };
 
-const createTables = async (db) => {
+const createTables = async (db: SQLite.SQLiteDatabase) => {
   await db.execAsync(`
     PRAGMA journal_mode = WAL;
     CREATE TABLE IF NOT EXISTS focus_modes (
@@ -15,7 +15,9 @@ const createTables = async (db) => {
     CREATE TABLE IF NOT EXISTS widgets (
       id TEXT PRIMARY KEY,
       name TEXT,
-      type TEXT
+      type TEXT,
+      x REAL,
+      y REAL
     );
     CREATE TABLE IF NOT EXISTS screen_time (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,18 +27,27 @@ const createTables = async (db) => {
   `);
 };
 
-const saveFocusMode = async (db, mode) => {
-  await db.runAsync('INSERT INTO focus_modes (id, name, color) VALUES (?, ?, ?)', [mode.id, mode.name, mode.color]);
+const saveFocusMode = async (db: SQLite.SQLiteDatabase, mode: any) => {
+  await db.runAsync('INSERT OR REPLACE INTO focus_modes (id, name, color) VALUES (?, ?, ?)', [mode.id, mode.name, mode.color]);
 };
 
-const getFocusModes = async (db) => {
+const getFocusModes = async (db: SQLite.SQLiteDatabase) => {
   const result = await db.getAllAsync('SELECT * FROM focus_modes');
   return result;
 };
 
-const isFocusModesEmpty = async (db) => {
-  const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM focus_modes');
+const isFocusModesEmpty = async (db: SQLite.SQLiteDatabase) => {
+  const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM focus_modes') as any;
   return result.count === 0;
 };
 
-export { openDatabase, createTables, saveFocusMode, getFocusModes, isFocusModesEmpty };
+const saveWidgetPosition = async (db: SQLite.SQLiteDatabase, id: string, x: number, y: number) => {
+  await db.runAsync('UPDATE widgets SET x = ?, y = ? WHERE id = ?', [x, y, id]);
+};
+
+const getWidgetPositions = async (db: SQLite.SQLiteDatabase) => {
+  const result = await db.getAllAsync('SELECT * FROM widgets');
+  return result;
+};
+
+export { openDatabase, createTables, saveFocusMode, getFocusModes, isFocusModesEmpty, saveWidgetPosition, getWidgetPositions };
