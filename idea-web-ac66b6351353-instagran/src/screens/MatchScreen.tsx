@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { getMatchingScore } from '../utils/matching';
 import { useUser } from '../context/UserContext';
+import { generateMockUsers, MockUser } from '../utils/mockUsers';
 
 type MatchScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchScreen'>;
 
@@ -11,21 +12,43 @@ type Props = {
   navigation: MatchScreenNavigationProp;
 };
 
+interface MatchedUser extends MockUser {
+  matchScore: number;
+}
+
 const MatchScreen = ({ navigation }: Props) => {
   const { currentUser } = useUser();
-  const [users, setUsers] = useState<Array<{ id: string; name: string; hobbies: string[] }>>([]);
+  const [matches, setMatches] = useState<MatchedUser[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const generateMatches = () => {
+    if (!currentUser) return;
+
+    const mockUsers = generateMockUsers(25);
+    
+    const usersWithScores: MatchedUser[] = mockUsers
+      .map(user => ({
+        ...user,
+        matchScore: getMatchingScore({ hobbies: currentUser.hobbies }, user)
+      }))
+      .filter(user => user.matchScore > 0)
+      .sort((a, b) => b.matchScore - a.matchScore)
+      .slice(0, 10);
+
+    setMatches(usersWithScores);
+  };
 
   useEffect(() => {
-    const mockUsers = [
-      { id: '1', name: 'Alice', hobbies: ['hiking', 'reading', 'photography'] },
-      { id: '2', name: 'Bob', hobbies: ['reading', 'cooking', 'gardening'] },
-      { id: '3', name: 'Carol', hobbies: ['hiking', 'yoga', 'painting'] },
-      { id: '4', name: 'David', hobbies: ['cooking', 'music', 'travel'] },
-    ];
-    setUsers(mockUsers);
-  }, []);
+    generateMatches();
+  }, [currentUser]);
 
-  const handleMatch = (user: { id: string; name: string; hobbies: string[] }) => {
+  const handleRefresh = () => {
+    setRefreshing(true);
+    generateMatches();
+    setTimeout(() => setRefreshing(false), 500);
+  };
+
+  const handleMatch = (user: MockUser) => {
     navigation.navigate('EventScreen', { user });
   };
 
@@ -43,30 +66,61 @@ const MatchScreen = ({ navigation }: Props) => {
     );
   }
 
+  if (matches.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>No matches found</Text>
+        <Text style={styles.emptySubtext}>
+          Try adding more hobbies to your profile or refresh to see new users
+        </Text>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={handleRefresh}
+        >
+          <Text style={styles.buttonText}>Refresh Matches</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => navigation.navigate('ProfileScreen')}
+        >
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>Edit Profile</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Potential Matches</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Your Top Matches</Text>
+        <TouchableOpacity 
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+        >
+          <Text style={styles.refreshButtonText}>↻ Refresh</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
-        data={users}
+        data={matches}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => {
-          const score = getMatchingScore({ hobbies: currentUser.hobbies }, item);
-          return (
-            <View style={styles.userCard}>
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{item.name}</Text>
-                <Text style={styles.hobbies}>{item.hobbies.join(', ')}</Text>
-                <Text style={styles.score}>Match Score: {score}%</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.matchButton}
-                onPress={() => handleMatch(item)}
-              >
-                <Text style={styles.matchButtonText}>Connect</Text>
-              </TouchableOpacity>
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
+        }
+        renderItem={({ item }) => (
+          <View style={styles.userCard}>
+            <View style={styles.userInfo}>
+              <Text style={styles.userName}>{item.name}</Text>
+              <Text style={styles.hobbies}>{item.hobbies.join(', ')}</Text>
+              <Text style={styles.score}>Match Score: {item.matchScore}%</Text>
             </View>
-          );
-        }}
+            <TouchableOpacity 
+              style={styles.matchButton}
+              onPress={() => handleMatch(item)}
+            >
+              <Text style={styles.matchButtonText}>Connect</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       />
     </View>
   );
@@ -78,18 +132,41 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#333',
+  },
+  refreshButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyText: {
     fontSize: 18,
     color: '#666',
     textAlign: 'center',
     marginTop: 50,
-    marginBottom: 20,
+    marginBottom: 10,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginBottom: 30,
+    paddingHorizontal: 20,
   },
   button: {
     backgroundColor: '#007AFF',
@@ -97,11 +174,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 40,
+    marginBottom: 15,
+  },
+  secondaryButton: {
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#007AFF',
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
   },
   userCard: {
     backgroundColor: '#fff',
