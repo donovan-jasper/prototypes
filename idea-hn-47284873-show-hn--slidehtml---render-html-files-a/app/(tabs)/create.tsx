@@ -1,18 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, ActivityIndicator, Surface } from 'react-native-paper';
+import { TextInput, Button, Text, ActivityIndicator, Surface, SegmentedButtons, Banner } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { generateSlides } from '../../lib/ai/generateSlides';
-import { saveDeck } from '../../lib/db/queries';
+import { saveDeck, getSettings } from '../../lib/db/queries';
+import { themes } from '../../lib/html/slideTemplate';
 import SlideViewer from '../../components/SlideViewer';
 
 export default function CreateScreen() {
   const router = useRouter();
   const [prompt, setPrompt] = useState('');
+  const [selectedTheme, setSelectedTheme] = useState('minimal');
   const [loading, setLoading] = useState(false);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [slideCount, setSlideCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [isDemo, setIsDemo] = useState(false);
+  const [showDemoBanner, setShowDemoBanner] = useState(true);
+
+  useEffect(() => {
+    checkApiKey();
+  }, []);
+
+  const checkApiKey = async () => {
+    const settings = await getSettings();
+    setHasApiKey(!!settings.apiKey);
+  };
+
+  const themeOptions = Object.keys(themes).map(key => ({
+    value: key,
+    label: themes[key].name,
+  }));
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -25,14 +44,22 @@ export default function CreateScreen() {
     setGeneratedHtml(null);
 
     try {
-      const result = await generateSlides(prompt);
+      const result = await generateSlides(prompt, selectedTheme);
       setGeneratedHtml(result.html);
       setSlideCount(result.slideCount);
+      setIsDemo(result.isDemo || false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate slides');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleTryDemo = async () => {
+    setPrompt('Create a pitch deck for a coffee shop startup');
+    setTimeout(() => {
+      handleGenerate();
+    }, 100);
   };
 
   const handleSave = async () => {
@@ -53,6 +80,7 @@ export default function CreateScreen() {
       setPrompt('');
       setGeneratedHtml(null);
       setSlideCount(0);
+      setIsDemo(false);
       
       router.push('/(tabs)/');
     } catch (err) {
@@ -78,7 +106,54 @@ export default function CreateScreen() {
           </Text>
         </Surface>
 
+        {!hasApiKey && showDemoBanner && (
+          <Banner
+            visible={true}
+            actions={[
+              {
+                label: 'Dismiss',
+                onPress: () => setShowDemoBanner(false),
+              },
+              {
+                label: 'Settings',
+                onPress: () => router.push('/(tabs)/settings'),
+              },
+            ]}
+            icon="information"
+            style={styles.banner}
+          >
+            Using demo mode - add your API key in Settings for custom AI generation
+          </Banner>
+        )}
+
+        {isDemo && generatedHtml && (
+          <Banner
+            visible={true}
+            actions={[
+              {
+                label: 'Add API Key',
+                onPress: () => router.push('/(tabs)/settings'),
+              },
+            ]}
+            icon="lightbulb-on"
+            style={styles.demoBanner}
+          >
+            This is a demo template. Add your API key for custom AI-generated slides.
+          </Banner>
+        )}
+
         <View style={styles.inputSection}>
+          {!hasApiKey && !generatedHtml && (
+            <Button
+              mode="contained"
+              onPress={handleTryDemo}
+              style={styles.demoButton}
+              icon="play-circle"
+            >
+              Try Demo
+            </Button>
+          )}
+
           <TextInput
             mode="outlined"
             label="What do you want to present?"
@@ -88,6 +163,17 @@ export default function CreateScreen() {
             multiline
             numberOfLines={4}
             style={styles.input}
+            disabled={loading}
+          />
+
+          <Text variant="labelLarge" style={styles.themeLabel}>
+            Theme
+          </Text>
+          <SegmentedButtons
+            value={selectedTheme}
+            onValueChange={setSelectedTheme}
+            buttons={themeOptions}
+            style={styles.themeSelector}
             disabled={loading}
           />
 
@@ -176,12 +262,28 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     color: '#666',
   },
+  banner: {
+    backgroundColor: '#e3f2fd',
+  },
+  demoBanner: {
+    backgroundColor: '#fff3e0',
+  },
   inputSection: {
     padding: 16,
   },
+  demoButton: {
+    marginBottom: 16,
+  },
   input: {
-    marginBottom: 8,
+    marginBottom: 16,
     backgroundColor: '#fff',
+  },
+  themeLabel: {
+    marginBottom: 8,
+    color: '#666',
+  },
+  themeSelector: {
+    marginBottom: 16,
   },
   errorText: {
     color: '#d32f2f',

@@ -1,150 +1,127 @@
+import Anthropic from '@anthropic-ai/sdk';
+import { createSlideHTML } from '../html/slideTemplate';
+import { getSettings } from '../db/queries';
+import { findBestTemplate } from './demoTemplates';
+
 interface GenerateSlidesResult {
   html: string;
   slideCount: number;
+  isDemo?: boolean;
 }
 
-export async function generateSlides(prompt: string): Promise<GenerateSlidesResult> {
+const SYSTEM_PROMPT = `You are an expert presentation designer. Generate slide content as an array of HTML strings based on the user's prompt.
+
+Rules:
+1. Return ONLY a valid JSON array of HTML strings, nothing else
+2. Each array element is the content for ONE slide
+3. Use semantic HTML: <h1> for titles, <h2> for subtitles, <h3> for section headers, <p> for body text, <ul>/<li> for lists
+4. Keep content concise - slides should be scannable, not text-heavy
+5. Use <strong> for emphasis and key terms
+6. Aim for 3-7 slides depending on topic complexity
+7. First slide should be a title slide with main topic
+8. Last slide should be a conclusion or call-to-action
+9. Middle slides should cover key points with clear hierarchy
+
+Example output format:
+[
+  "<h1>Main Title</h1><p>Subtitle or tagline</p>",
+  "<h2>Key Point 1</h2><ul><li>Supporting detail</li><li>Another detail</li></ul>",
+  "<h2>Conclusion</h2><p>Final thoughts</p>"
+]
+
+Do NOT include any markdown, explanations, or text outside the JSON array.`;
+
+export async function generateSlides(
+  prompt: string,
+  themeName: string = 'minimal'
+): Promise<GenerateSlidesResult> {
   if (!prompt.trim()) {
     throw new Error('Prompt cannot be empty');
   }
 
-  // Mock implementation - returns sample HTML slides
-  // In production, this would call Claude API
-  await new Promise(resolve => setTimeout(resolve, 2000));
+  const settings = await getSettings();
+  const apiKey = settings.apiKey;
 
-  const slides = [
-    {
-      title: 'Introduction',
-      content: `<h1>${prompt.slice(0, 50)}</h1><p>Generated from your prompt</p>`,
-    },
-    {
-      title: 'Key Points',
-      content: '<h2>Main Ideas</h2><ul><li>Point 1</li><li>Point 2</li><li>Point 3</li></ul>',
-    },
-    {
-      title: 'Conclusion',
-      content: '<h2>Summary</h2><p>Thank you for your attention</p>',
-    },
-  ];
+  if (!apiKey) {
+    const template = findBestTemplate(prompt);
+    const html = createSlideHTML(template.slides, themeName);
+    
+    return {
+      html,
+      slideCount: template.slides.length,
+      isDemo: true,
+    };
+  }
 
-  const slideHtmlArray = slides.map(slide => `
-    <div class="slide">
-      <div class="slide-content">
-        ${slide.content}
-      </div>
-    </div>
-  `);
+  try {
+    const anthropic = new Anthropic({
+      apiKey: apiKey,
+    });
 
-  const fullHtml = createSlideHTML(slideHtmlArray);
+    const message = await anthropic.messages.create({
+      model: 'claude-3-5-sonnet-20241022',
+      max_tokens: 4096,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+    });
 
-  return {
-    html: fullHtml,
-    slideCount: slides.length,
-  };
-}
+    const responseText = message.content[0].type === 'text' 
+      ? message.content[0].text 
+      : '';
 
-function createSlideHTML(slides: string[]): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
+    if (!responseText) {
+      throw new Error('Empty response from Claude API');
     }
-    
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      background: #000;
-      overflow: hidden;
-    }
-    
-    .slide {
-      display: none;
-      width: 100vw;
-      height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      align-items: center;
-      justify-content: center;
-      padding: 40px;
-    }
-    
-    .slide:first-child {
-      display: flex;
-    }
-    
-    .slide-content {
-      max-width: 900px;
-      width: 100%;
-      color: #fff;
-      text-align: center;
-    }
-    
-    .slide-content h1 {
-      font-size: 3rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-      line-height: 1.2;
-    }
-    
-    .slide-content h2 {
-      font-size: 2.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      line-height: 1.3;
-    }
-    
-    .slide-content p {
-      font-size: 1.5rem;
-      line-height: 1.6;
-      margin-bottom: 1rem;
-      opacity: 0.95;
-    }
-    
-    .slide-content ul {
-      list-style: none;
-      text-align: left;
-      display: inline-block;
-      font-size: 1.5rem;
-    }
-    
-    .slide-content li {
-      margin-bottom: 1rem;
-      padding-left: 2rem;
-      position: relative;
-    }
-    
-    .slide-content li:before {
-      content: '•';
-      position: absolute;
-      left: 0;
-      font-size: 2rem;
-      line-height: 1.5rem;
-    }
-    
-    @media (max-width: 768px) {
-      .slide-content h1 {
-        font-size: 2rem;
-      }
+
+    let slideContents: string[];
+    try {
+      slideContents = JSON.parse(responseText);
       
-      .slide-content h2 {
-        font-size: 1.75rem;
+      if (!Array.isArray(slideContents)) {
+        throw new Error('Response is not an array');
       }
-      
-      .slide-content p,
-      .slide-content ul {
-        font-size: 1.25rem;
+
+      if (slideContents.length === 0) {
+        throw new Error('No slides generated');
+      }
+
+      if (!slideContents.every(slide => typeof slide === 'string')) {
+        throw new Error('Invalid slide content format');
+      }
+    } catch (parseError) {
+      console.error('Failed to parse Claude response:', responseText);
+      throw new Error('Invalid response format from AI. Please try again.');
+    }
+
+    const html = createSlideHTML(slideContents, themeName);
+
+    return {
+      html,
+      slideCount: slideContents.length,
+      isDemo: false,
+    };
+  } catch (error) {
+    if (error instanceof Anthropic.APIError) {
+      if (error.status === 401) {
+        throw new Error('Invalid API key. Please check your Anthropic API key in Settings.');
+      } else if (error.status === 429) {
+        throw new Error('Rate limit exceeded. Please try again in a moment.');
+      } else if (error.status === 500 || error.status === 529) {
+        throw new Error('Anthropic API is temporarily unavailable. Please try again later.');
+      } else {
+        throw new Error(`API error: ${error.message}`);
       }
     }
-  </style>
-</head>
-<body>
-  ${slides.join('\n')}
-</body>
-</html>
-  `.trim();
+    
+    if (error instanceof Error) {
+      throw error;
+    }
+    
+    throw new Error('Failed to generate slides. Please try again.');
+  }
 }
