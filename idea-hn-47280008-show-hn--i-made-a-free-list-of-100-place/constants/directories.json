@@ -1,0 +1,32 @@
+[
+  {
+    "id": "1",
+    "name": "Product Hunt",
+    "url": "https://www.producthunt.com",
+    "category": "Product Hunt Alternatives",
+    "description": "The best new products in tech",
+    "drScore": 91,
+    "submissionDifficulty": "Medium",
+    "avgApprovalTime": "1-2 days",
+    "cost": "Free",
+    "requirements": "Product must be live, have screenshots, and a clear value proposition"
+  },
+  {
+    "id": "2",
+    "name": "Hacker News",
+    "url": "https://news.ycombinator.com",
+    "category": "Tech News",
+    "description": "Social news website focusing on computer science and entrepreneurship",
+    "drScore": 93,
+    "submissionDifficulty": "Easy",
+    "avgApprovalTime": "Instant",
+    "cost": "Free",
+    "requirements": "Submit as Show HN post with clear title"
+  },
+  {
+    "id": "3",
+    "name": "BetaList",
+    "url": "https://betalist.com",
+    "category": "Startup Directories",
+    "description": "Discover and get early access to tomorrow's startups",
+    "drScore": 78
