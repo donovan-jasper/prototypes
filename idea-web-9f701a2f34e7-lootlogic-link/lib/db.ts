@@ -23,12 +23,10 @@ export const initDB = () => {
     );
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS alert_rules (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        game_id INTEGER NOT NULL,
-        item_id INTEGER NOT NULL,
-        target_price REAL NOT NULL,
-        FOREIGN KEY (game_id) REFERENCES games (id),
-        FOREIGN KEY (item_id) REFERENCES items (id)
+        id TEXT PRIMARY KEY,
+        game TEXT NOT NULL,
+        item_name TEXT NOT NULL,
+        target_price REAL NOT NULL
       );`
     );
     tx.executeSql(
@@ -115,6 +113,53 @@ export const updateItemValue = (itemId, value) => {
       tx.executeSql(
         'UPDATE items SET value = ? WHERE id = ?',
         [value, itemId],
+        (_, result) => resolve(result),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const createAlertRule = (rule) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO alert_rules (id, game, item_name, target_price) VALUES (?, ?, ?, ?)',
+        [rule.id, rule.game, rule.itemName, rule.targetPrice],
+        (_, result) => resolve(result),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getAllAlertRules = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM alert_rules',
+        [],
+        (_, { rows }) => {
+          const rules = rows._array.map(row => ({
+            id: row.id,
+            game: row.game,
+            itemName: row.item_name,
+            targetPrice: row.target_price,
+          }));
+          resolve(rules);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const deleteAlertRule = (ruleId) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM alert_rules WHERE id = ?',
+        [ruleId],
         (_, result) => resolve(result),
         (_, error) => reject(error)
       );

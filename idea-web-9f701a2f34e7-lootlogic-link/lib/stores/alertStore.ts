@@ -1,4 +1,7 @@
 import { create } from 'zustand';
+import { createAlertRule, getAllAlertRules, deleteAlertRule } from '../db';
+import { scheduleAlertNotification } from '../utils/notifications';
+import { useInventoryStore } from './inventoryStore';
 
 interface AlertRule {
   id: string;
@@ -15,26 +18,77 @@ interface Alert {
 interface AlertStore {
   rules: AlertRule[];
   activeAlerts: Alert[];
-  createRule: (rule: AlertRule) => void;
-  checkRules: () => void;
+  createRule: (rule: AlertRule) => Promise<void>;
+  checkRules: () => Promise<void>;
   triggerAlert: (alert: Alert) => void;
-  loadRules: () => void;
+  loadRules: () => Promise<void>;
+  deleteRule: (ruleId: string) => Promise<void>;
 }
 
-const useAlertStore = create<AlertStore>((set) => ({
+const useAlertStore = create<AlertStore>((set, get) => ({
   rules: [],
   activeAlerts: [],
-  createRule: (rule) => set((state) => ({
-    rules: [...state.rules, rule],
-  })),
-  checkRules: () => {
-    // Logic to check alert rules and trigger notifications
+  
+  createRule: async (rule) => {
+    try {
+      await createAlertRule(rule);
+      set((state) => ({
+        rules: [...state.rules, rule],
+      }));
+    } catch (error) {
+      console.error('Failed to create alert rule:', error);
+    }
   },
+  
+  checkRules: async () => {
+    const { rules } = get();
+    const { items } = useInventoryStore.getState();
+    
+    for (const rule of rules) {
+      const matchingItems = items.filter(
+        item => item.game === rule.game && 
+                item.name.toLowerCase().includes(rule.itemName.toLowerCase())
+      );
+      
+      for (const item of matchingItems) {
+        if (item.value <= rule.targetPrice) {
+          await scheduleAlertNotification({
+            title: 'Price Alert!',
+            body: `${item.name} in ${item.game} is now $${item.value} (target: $${rule.targetPrice})`,
+            trigger: { seconds: 1 },
+          });
+          
+          get().triggerAlert({
+            id: Date.now().toString(),
+            message: `${item.name} reached target price`,
+          });
+        }
+      }
+    }
+  },
+  
   triggerAlert: (alert) => set((state) => ({
     activeAlerts: [...state.activeAlerts, alert],
   })),
-  loadRules: () => {
-    // Logic to load alert rules from database
+  
+  loadRules: async () => {
+    try {
+      const dbRules = await getAllAlertRules();
+      set({ rules: dbRules });
+    } catch (error) {
+      console.error('Failed to load alert rules:', error);
+    }
+  },
+  
+  deleteRule: async (ruleId) => {
+    try {
+      await deleteAlertRule(ruleId);
+      set((state) => ({
+        rules: state.rules.filter(rule => rule.id !== ruleId),
+      }));
+    } catch (error) {
+      console.error('Failed to delete alert rule:', error);
+    }
   },
 }));
 
