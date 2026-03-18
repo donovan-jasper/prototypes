@@ -28,9 +28,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl }) => {
 
   return (
     <View style={styles.container}>
-      {isLoading && <ActivityIndicator size="large" style={styles.loadingIndicator} />}
+      {isLoading && (
+        <View testID="loading-indicator" style={styles.loadingContainer}>
+          <ActivityIndicator size="large" />
+        </View>
+      )}
       {error && <Text style={styles.errorText}>{error}</Text>}
       <Video
+        testID="video-player"
         ref={videoRef}
         source={{ uri: streamUrl }}
         style={styles.video}
@@ -54,7 +59,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
-  loadingIndicator: {
+  loadingContainer: {
     position: 'absolute',
     zIndex: 1,
   },

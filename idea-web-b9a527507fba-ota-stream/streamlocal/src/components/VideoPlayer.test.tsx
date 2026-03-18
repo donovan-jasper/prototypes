@@ -14,4 +14,9 @@ describe('VideoPlayer', () => {
       expect(getByText('Failed to load stream. Please try again later.')).toBeTruthy();
     });
   });
+
+  it('renders video player with correct testID', () => {
+    const { getByTestId } = render(<VideoPlayer streamUrl="https://example.com/stream.m3u8" />);
+    expect(getByTestId('video-player')).toBeTruthy();
+  });
 });
