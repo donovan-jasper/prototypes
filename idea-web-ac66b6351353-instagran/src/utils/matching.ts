@@ -1,5 +1,4 @@
-export const getMatchingScore = (user1, user2) => {
+export const getMatchingScore = (user1: { hobbies: string[] }, user2: { hobbies: string[] }) => {
   const sharedInterests = user1.hobbies.filter(hobby => user2.hobbies.includes(hobby));
-  const totalInterests = new Set([...user1.hobbies, ...user2.hobbies]).size;
-  return Math.round((sharedInterests.length / totalInterests) * 100);
+  return Math.round((sharedInterests.length / user1.hobbies.length) * 100);
 };
