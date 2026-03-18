@@ -52,6 +52,8 @@ export const removePart = (engine: Matter.Engine, body: Matter.Body) => {
   Matter.World.remove(engine.world, body);
 };
 
+const FIXED_TIMESTEP = 16.666; // 60fps in milliseconds
+
 export const runSimulation = (engine: Matter.Engine, deltaTime: number) => {
-  Matter.Engine.update(engine, deltaTime);
+  Matter.Engine.update(engine, FIXED_TIMESTEP);
 };

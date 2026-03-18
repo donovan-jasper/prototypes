@@ -7,14 +7,22 @@ import { useStore } from '../lib/store';
 import { createEngine, addPart, removePart, runSimulation } from '../lib/physics';
 import { PARTS } from '../lib/parts';
 
+interface InitialPosition {
+  position: { x: number; y: number };
+  rotation: number;
+}
+
 const Canvas = React.forwardRef((props, ref) => {
   const { parts, isPlaying, selectedPart, addPart: addPartToStore, removePart: removePartFromStore, updatePart } = useStore();
   const engineRef = useRef<Matter.Engine | null>(null);
   const bodiesMapRef = useRef<Map<string, Matter.Body>>(new Map());
+  const initialPositionsRef = useRef<Map<string, InitialPosition>>(new Map());
   const lastTimeRef = useRef(0);
+  const accumulatedTimeRef = useRef(0);
   const [, forceUpdate] = useState({});
   const draggedPartRef = useRef<string | null>(null);
   const initialScaleRef = useRef<number>(1);
+  const wasPlayingRef = useRef(false);
 
   useEffect(() => {
     const engine = createEngine();
@@ -26,6 +34,12 @@ const Canvas = React.forwardRef((props, ref) => {
       body.angle = part.rotation;
       Matter.Body.scale(body, part.scale, part.scale);
       bodiesMapRef.current.set(part.id, body);
+      
+      // Store initial positions
+      initialPositionsRef.current.set(part.id, {
+        position: { x: part.position.x, y: part.position.y },
+        rotation: part.rotation,
+      });
     });
 
     return () => {
@@ -35,8 +49,24 @@ const Canvas = React.forwardRef((props, ref) => {
     };
   }, []);
 
+  // Store initial positions when play starts
+  useEffect(() => {
+    if (isPlaying && !wasPlayingRef.current) {
+      // Just started playing - store current positions as initial
+      parts.forEach((part) => {
+        initialPositionsRef.current.set(part.id, {
+          position: { x: part.position.x, y: part.position.y },
+          rotation: part.rotation,
+        });
+      });
+    }
+    wasPlayingRef.current = isPlaying;
+  }, [isPlaying, parts]);
+
   useEffect(() => {
     let animationFrameId: number;
+    const FIXED_TIMESTEP = 16.666;
+    
     const animate = (time: number) => {
       if (!lastTimeRef.current) {
         lastTimeRef.current = time;
@@ -45,25 +75,13 @@ const Canvas = React.forwardRef((props, ref) => {
       lastTimeRef.current = time;
 
       if (isPlaying && engineRef.current) {
-        runSimulation(engineRef.current, deltaTime);
+        accumulatedTimeRef.current += deltaTime;
         
-        // Sync physics bodies back to store
-        bodiesMapRef.current.forEach((body, partId) => {
-          const part = parts.find(p => p.id === partId);
-          if (part) {
-            const positionChanged = 
-              Math.abs(body.position.x - part.position.x) > 0.1 ||
-              Math.abs(body.position.y - part.position.y) > 0.1;
-            const rotationChanged = Math.abs(body.angle - part.rotation) > 0.01;
-            
-            if (positionChanged || rotationChanged) {
-              updatePart(partId, {
-                position: { x: body.position.x, y: body.position.y },
-                rotation: body.angle,
-              });
-            }
-          }
-        });
+        // Run simulation with fixed timestep, accumulating extra time
+        while (accumulatedTimeRef.current >= FIXED_TIMESTEP) {
+          runSimulation(engineRef.current, FIXED_TIMESTEP);
+          accumulatedTimeRef.current -= FIXED_TIMESTEP;
+        }
         
         forceUpdate({});
       }
@@ -78,7 +96,7 @@ const Canvas = React.forwardRef((props, ref) => {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isPlaying, parts]);
+  }, [isPlaying]);
 
   // Sync store changes to physics bodies
   useEffect(() => {
@@ -91,6 +109,12 @@ const Canvas = React.forwardRef((props, ref) => {
         body.angle = part.rotation;
         Matter.Body.scale(body, part.scale, part.scale);
         bodiesMapRef.current.set(part.id, body);
+        
+        // Store initial position for new parts
+        initialPositionsRef.current.set(part.id, {
+          position: { x: part.position.x, y: part.position.y },
+          rotation: part.rotation,
+        });
       }
     });
 
@@ -100,6 +124,7 @@ const Canvas = React.forwardRef((props, ref) => {
       if (!partIds.has(id)) {
         removePart(engineRef.current!, body);
         bodiesMapRef.current.delete(id);
+        initialPositionsRef.current.delete(id);
       }
     });
   }, [parts.length]);
@@ -132,6 +157,13 @@ const Canvas = React.forwardRef((props, ref) => {
 
       const body = addPart(engineRef.current, selectedPart, { x: event.x, y: event.y });
       bodiesMapRef.current.set(newPart.id, body);
+      
+      // Store initial position for new part
+      initialPositionsRef.current.set(newPart.id, {
+        position: { x: event.x, y: event.y },
+        rotation: 0,
+      });
+      
       addPartToStore(newPart);
     });
 
@@ -150,7 +182,10 @@ const Canvas = React.forwardRef((props, ref) => {
         Matter.Body.setPosition(body, { x: event.x, y: event.y });
         Matter.Body.setVelocity(body, { x: 0, y: 0 });
         Matter.Body.setAngularVelocity(body, 0);
+        
+        // Sync position back to store when manually dragging
         updatePart(draggedPartRef.current, { position: { x: event.x, y: event.y } });
+        
         forceUpdate({});
       }
     })
@@ -176,6 +211,7 @@ const Canvas = React.forwardRef((props, ref) => {
                 if (body && engineRef.current) {
                   removePart(engineRef.current, body);
                   bodiesMapRef.current.delete(partId);
+                  initialPositionsRef.current.delete(partId);
                   removePartFromStore(partId);
                 }
               },
@@ -219,6 +255,32 @@ const Canvas = React.forwardRef((props, ref) => {
     longPressGesture,
     Gesture.Simultaneous(tapGesture, panGesture, pinchGesture)
   );
+
+  // Expose reset function
+  React.useImperativeHandle(ref, () => ({
+    reset: () => {
+      if (!engineRef.current) return;
+      
+      // Reset all bodies to their initial positions
+      bodiesMapRef.current.forEach((body, partId) => {
+        const initial = initialPositionsRef.current.get(partId);
+        if (initial) {
+          Matter.Body.setPosition(body, initial.position);
+          Matter.Body.setAngle(body, initial.rotation);
+          Matter.Body.setVelocity(body, { x: 0, y: 0 });
+          Matter.Body.setAngularVelocity(body, 0);
+          
+          // Sync back to store
+          updatePart(partId, {
+            position: initial.position,
+            rotation: initial.rotation,
+          });
+        }
+      });
+      
+      forceUpdate({});
+    },
+  }));
 
   const renderBody = (body: Matter.Body, partId: string) => {
     const { position, vertices, circleRadius, label } = body;

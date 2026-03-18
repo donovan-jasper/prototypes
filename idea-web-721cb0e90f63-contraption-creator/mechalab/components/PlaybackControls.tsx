@@ -5,7 +5,7 @@ import { useStore } from '../lib/store';
 import { startRecording, stopRecording } from '../lib/video';
 
 const PlaybackControls = ({ canvasRef }) => {
-  const { isPlaying, togglePlay, clearCanvas } = useStore();
+  const { isPlaying, togglePlay } = useStore();
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
 
@@ -21,6 +21,12 @@ const PlaybackControls = ({ canvasRef }) => {
     }
   };
 
+  const handleReset = () => {
+    if (canvasRef.current && canvasRef.current.reset) {
+      canvasRef.current.reset();
+    }
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.button} onPress={togglePlay}>
@@ -30,7 +36,7 @@ const PlaybackControls = ({ canvasRef }) => {
           color="white"
         />
       </TouchableOpacity>
-      <TouchableOpacity style={styles.button} onPress={clearCanvas}>
+      <TouchableOpacity style={styles.button} onPress={handleReset}>
         <MaterialIcons name="replay" size={24} color="white" />
       </TouchableOpacity>
       <TouchableOpacity
