@@ -22,11 +22,11 @@ type InteractionType = 'call' | 'text' | 'video' | 'in-person' | 'other';
 export default function LogInteractionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const preselectedFriendId = params.friendId as string | undefined;
+  const prefilledFriendId = params.friendId as string | undefined;
 
   const [friends, setFriends] = useState<Friend[]>([]);
-  const [selectedFriendId, setSelectedFriendId] = useState<string | undefined>(preselectedFriendId);
-  const [interactionType, setInteractionType] = useState<InteractionType | undefined>();
+  const [selectedFriendId, setSelectedFriendId] = useState<string | undefined>(prefilledFriendId);
+  const [interactionType, setInteractionType] = useState<InteractionType>('call');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [notes, setNotes] = useState('');
   const [photoUri, setPhotoUri] = useState<string | undefined>();
@@ -68,11 +68,6 @@ export default function LogInteractionScreen() {
       return;
     }
 
-    if (!interactionType) {
-      Alert.alert('Type required', 'Please select an interaction type');
-      return;
-    }
-
     setSaving(true);
     try {
       await logInteraction({
@@ -94,21 +89,16 @@ export default function LogInteractionScreen() {
 
   const getInteractionIcon = (type: InteractionType) => {
     switch (type) {
-      case 'call': return '📞';
-      case 'text': return '💬';
-      case 'video': return '📹';
-      case 'in-person': return '🤝';
-      case 'other': return '✨';
-    }
-  };
-
-  const getInteractionLabel = (type: InteractionType) => {
-    switch (type) {
-      case 'call': return 'Call';
-      case 'text': return 'Text';
-      case 'video': return 'Video';
-      case 'in-person': return 'In-person';
-      case 'other': return 'Other';
+      case 'call':
+        return '📞';
+      case 'text':
+        return '💬';
+      case 'video':
+        return '📹';
+      case 'in-person':
+        return '🤝';
+      case 'other':
+        return '✨';
     }
   };
 
@@ -129,41 +119,43 @@ export default function LogInteractionScreen() {
     >
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         <View style={styles.section}>
-          <Text style={styles.label}>Friend *</Text>
+          <Text style={styles.label}>Friend</Text>
           <TouchableOpacity
             style={styles.friendSelector}
             onPress={() => setShowFriendPicker(!showFriendPicker)}
           >
-            <Text style={selectedFriend ? styles.friendSelectorText : styles.friendSelectorPlaceholder}>
+            <Text style={[styles.friendSelectorText, !selectedFriend && styles.placeholderText]}>
               {selectedFriend ? selectedFriend.name : 'Select a friend'}
             </Text>
-            <Text style={styles.friendSelectorArrow}>{showFriendPicker ? '▲' : '▼'}</Text>
+            <Text style={styles.dropdownArrow}>{showFriendPicker ? '▲' : '▼'}</Text>
           </TouchableOpacity>
-
+          
           {showFriendPicker && (
             <View style={styles.friendList}>
-              {friends.map((friend) => (
-                <TouchableOpacity
-                  key={friend.id}
-                  style={styles.friendItem}
-                  onPress={() => {
-                    setSelectedFriendId(friend.id);
-                    setShowFriendPicker(false);
-                  }}
-                >
-                  <Text style={styles.friendItemText}>{friend.name}</Text>
-                  {selectedFriendId === friend.id && (
-                    <Text style={styles.friendItemCheck}>✓</Text>
-                  )}
-                </TouchableOpacity>
-              ))}
+              <ScrollView style={styles.friendListScroll} nestedScrollEnabled>
+                {friends.map((friend) => (
+                  <TouchableOpacity
+                    key={friend.id}
+                    style={[
+                      styles.friendItem,
+                      selectedFriendId === friend.id && styles.friendItemSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedFriendId(friend.id);
+                      setShowFriendPicker(false);
+                    }}
+                  >
+                    <Text style={styles.friendItemText}>{friend.name}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.label}>Interaction Type *</Text>
-          <View style={styles.typeGrid}>
+          <Text style={styles.label}>Interaction Type</Text>
+          <View style={styles.typeButtons}>
             {(['call', 'text', 'video', 'in-person', 'other'] as InteractionType[]).map((type) => (
               <TouchableOpacity
                 key={type}
@@ -175,10 +167,10 @@ export default function LogInteractionScreen() {
               >
                 <Text style={styles.typeIcon}>{getInteractionIcon(type)}</Text>
                 <Text style={[
-                  styles.typeLabel,
-                  interactionType === type && styles.typeLabelSelected,
+                  styles.typeButtonText,
+                  interactionType === type && styles.typeButtonTextSelected,
                 ]}>
-                  {getInteractionLabel(type)}
+                  {type === 'in-person' ? 'In-person' : type.charAt(0).toUpperCase() + type.slice(1)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -281,7 +273,7 @@ const styles = StyleSheet.create({
   friendSelector: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
+    padding: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -292,11 +284,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#212121',
   },
-  friendSelectorPlaceholder: {
-    fontSize: 16,
+  placeholderText: {
     color: '#999',
   },
-  friendSelectorArrow: {
+  dropdownArrow: {
     fontSize: 12,
     color: '#757575',
   },
@@ -308,51 +299,50 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
     maxHeight: 200,
   },
+  friendListScroll: {
+    maxHeight: 200,
+  },
   friendItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+  },
+  friendItemSelected: {
+    backgroundColor: '#F0E6FF',
   },
   friendItemText: {
     fontSize: 16,
     color: '#212121',
   },
-  friendItemCheck: {
-    fontSize: 18,
-    color: '#6200EE',
-  },
-  typeGrid: {
+  typeButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    gap: 8,
   },
   typeButton: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
+    padding: 12,
+    borderWidth: 1,
     borderColor: '#E0E0E0',
-    width: '30%',
+    alignItems: 'center',
+    minWidth: 90,
   },
   typeButtonSelected: {
+    backgroundColor: '#6200EE',
     borderColor: '#6200EE',
-    backgroundColor: '#F3E5F5',
   },
   typeIcon: {
-    fontSize: 32,
-    marginBottom: 8,
+    fontSize: 24,
+    marginBottom: 4,
   },
-  typeLabel: {
-    fontSize: 14,
+  typeButtonText: {
+    fontSize: 12,
     color: '#757575',
+    fontWeight: '500',
   },
-  typeLabelSelected: {
-    color: '#6200EE',
-    fontWeight: '600',
+  typeButtonTextSelected: {
+    color: '#fff',
   },
   input: {
     backgroundColor: '#fff',
@@ -374,7 +364,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   removePhotoButton: {
     paddingHorizontal: 16,
@@ -398,8 +388,8 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   photoButtonText: {
-    fontSize: 16,
     color: '#6200EE',
+    fontSize: 16,
     fontWeight: '500',
   },
   actions: {
