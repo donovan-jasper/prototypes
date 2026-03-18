@@ -90,10 +90,26 @@ export const getPlants = async () => {
 export const updatePlant = async (id: string, data: any) => {
   const keys = Object.keys(data);
   const values = Object.values(data);
-  const setClause = keys.map(key => `${key} = ?`).join(', ');
+  
+  // Handle photoUris specially
+  const processedData = { ...data };
+  if ('photoUris' in data) {
+    if (typeof data.photoUris === 'string') {
+      // Already stringified, use as-is
+      processedData.photoUris = data.photoUris;
+    } else if (Array.isArray(data.photoUris)) {
+      // Array, stringify it
+      processedData.photoUris = JSON.stringify(data.photoUris);
+    }
+  }
+  
+  const processedKeys = Object.keys(processedData);
+  const processedValues = Object.values(processedData);
+  const setClause = processedKeys.map(key => `${key} = ?`).join(', ');
+  
   await db.runAsync(
     `UPDATE plants SET ${setClause} WHERE id = ?;`,
-    [...values, id]
+    [...processedValues, id]
   );
   
   // If lastWatered was updated, create a new reminder

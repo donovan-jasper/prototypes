@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, ScrollView, StyleSheet, Image, Alert } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { usePlants } from '../../hooks/usePlants';
 import PhotoTimeline from '../../components/PhotoTimeline';
@@ -15,6 +15,7 @@ export default function PlantDetailScreen() {
   const router = useRouter();
   const { plant, loadPlant, deletePlant } = usePlants();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [savingPhoto, setSavingPhoto] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -40,27 +41,44 @@ export default function PlantDetailScreen() {
       return;
     }
 
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
+    setSavingPhoto(true);
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      const photoUri = result.assets[0].uri;
-      const savedUri = await saveImage(photoUri, id as string);
-      
-      const updatedPhotoUris = [...(plant.photoUris || []), savedUri];
-      await updatePlant(id as string, { photoUris: JSON.stringify(updatedPhotoUris) });
-      
-      await loadPlant(id as string);
+      if (!result.canceled && result.assets[0]) {
+        const photoUri = result.assets[0].uri;
+        const savedUri = await saveImage(photoUri, id as string);
+        
+        // Parse current photoUris from database
+        const currentPhotoUris = Array.isArray(plant.photoUris) 
+          ? plant.photoUris 
+          : (typeof plant.photoUris === 'string' ? JSON.parse(plant.photoUris) : []);
+        
+        // Append new photo
+        const updatedPhotoUris = [...currentPhotoUris, savedUri];
+        
+        // Stringify before update
+        await updatePlant(id as string, { photoUris: JSON.stringify(updatedPhotoUris) });
+        
+        // Reload plant to show new photo
+        await loadPlant(id as string);
+      }
+    } catch (error) {
+      console.error('Error saving photo:', error);
+      Alert.alert('Error', 'Failed to save photo. Please try again.');
+    } finally {
+      setSavingPhoto(false);
     }
   };
 
   if (!plant) {
     return (
       <View style={styles.container}>
-        <Text>Loading...</Text>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
@@ -86,8 +104,10 @@ export default function PlantDetailScreen() {
           onPress={handleTakePhoto} 
           style={styles.photoButton}
           icon="camera"
+          loading={savingPhoto}
+          disabled={savingPhoto}
         >
-          Take Photo
+          {savingPhoto ? 'Saving Photo...' : 'Take Photo'}
         </Button>
         <PhotoTimeline photos={plant.photoUris} />
         <SymptomChecker />

@@ -25,8 +25,17 @@ export const usePlants = () => {
     setLoading(true);
     try {
       const plantsData = await getPlants();
-      const foundPlant = plantsData.find((p: any) => p.id === id);
-      setPlant(foundPlant);
+      const foundPlant = plantsData.find((p: any) => p.id.toString() === id.toString());
+      if (foundPlant) {
+        // Ensure photoUris is properly parsed
+        const parsedPlant = {
+          ...foundPlant,
+          photoUris: typeof foundPlant.photoUris === 'string' 
+            ? JSON.parse(foundPlant.photoUris) 
+            : foundPlant.photoUris
+        };
+        setPlant(parsedPlant);
+      }
     } catch (err) {
       setError(err);
     } finally {
