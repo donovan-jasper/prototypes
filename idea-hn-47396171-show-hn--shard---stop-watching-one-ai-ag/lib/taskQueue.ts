@@ -5,7 +5,6 @@ export class TaskQueue {
   private tasks: Map<string, Task> = new Map();
   private maxParallel: number;
   private aiProvider: AIProvider;
-  private processingQueue: boolean = false;
 
   constructor(maxParallel: number = 2) {
     this.maxParallel = maxParallel;
@@ -17,56 +16,48 @@ export class TaskQueue {
     this.processQueue();
   }
 
-  private async processQueue(): Promise<void> {
-    if (this.processingQueue) return;
-    this.processingQueue = true;
+  private processQueue(): void {
+    const running = Array.from(this.tasks.values()).filter(
+      t => t.status === TaskStatus.RUNNING
+    ).length;
 
-    try {
-      const running = Array.from(this.tasks.values()).filter(
-        t => t.status === TaskStatus.RUNNING
-      );
+    if (running >= this.maxParallel) return;
 
-      const slotsAvailable = this.maxParallel - running.length;
-      if (slotsAvailable <= 0) return;
+    const pending = Array.from(this.tasks.values())
+      .filter(t => t.status === TaskStatus.PENDING)
+      .sort((a, b) => a.createdAt - b.createdAt);
 
-      const pending = Array.from(this.tasks.values())
-        .filter(t => t.status === TaskStatus.PENDING)
-        .sort((a, b) => a.createdAt - b.createdAt);
+    const toStart = pending.slice(0, this.maxParallel - running);
 
-      const toStart = pending.slice(0, slotsAvailable);
-      if (toStart.length === 0) return;
-
-      await Promise.all(toStart.map(task => this.runTask(task)));
-    } finally {
-      this.processingQueue = false;
+    for (const task of toStart) {
+      this.runTask(task);
     }
   }
 
-  private async runTask(task: Task): Promise<void> {
+  private runTask(task: Task): void {
     task.status = TaskStatus.RUNNING;
     task.startedAt = Date.now();
     this.tasks.set(task.id, task);
 
-    try {
-      const result = await this.aiProvider.execute(
-        task.prompt,
-        (progress) => {
-          task.progress = progress;
-          this.tasks.set(task.id, task);
-        }
-      );
-
+    this.aiProvider.execute(
+      task.prompt,
+      (progress) => {
+        task.progress = progress;
+        this.tasks.set(task.id, task);
+      }
+    ).then(result => {
       task.status = TaskStatus.COMPLETED;
       task.result = result;
       task.completedAt = Date.now();
-    } catch (error) {
+      this.tasks.set(task.id, task);
+      this.processQueue();
+    }).catch(error => {
       task.status = TaskStatus.FAILED;
       task.error = error instanceof Error ? error.message : 'Unknown error';
       task.completedAt = Date.now();
-    } finally {
       this.tasks.set(task.id, task);
       this.processQueue();
-    }
+    });
   }
 
   cancelTask(id: string): void {
