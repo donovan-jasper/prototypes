@@ -46,6 +46,18 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="add-habit"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="add-event"
+        options={{
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

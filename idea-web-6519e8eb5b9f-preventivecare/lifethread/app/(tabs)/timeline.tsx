@@ -1,10 +1,12 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useTimeline } from '../../hooks/useTimeline';
 import TimelineEvent from '../../components/TimelineEvent';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TimelineScreen() {
+  const router = useRouter();
   const { events, loadTimeline } = useTimeline();
 
   useEffect(() => {
@@ -15,7 +17,10 @@ export default function TimelineScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Timeline</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => router.push('/add-event')}
+        >
           <Ionicons name="add" size={24} color="#673ab7" />
         </TouchableOpacity>
       </View>

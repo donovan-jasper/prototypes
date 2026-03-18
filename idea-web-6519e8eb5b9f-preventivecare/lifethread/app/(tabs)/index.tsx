@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useHabits } from '../../hooks/useHabits';
 import HabitCard from '../../components/HabitCard';
 import HealthScore from '../../components/HealthScore';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function TodayScreen() {
+  const router = useRouter();
   const { habits, loadHabits, toggleHabitCompletion } = useHabits();
   const [healthScore, setHealthScore] = useState(0);
 
@@ -24,7 +26,10 @@ export default function TodayScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Today</Text>
-        <TouchableOpacity style={styles.addButton}>
+        <TouchableOpacity 
+          style={styles.addButton}
+          onPress={() => router.push('/add-habit')}
+        >
           <Ionicons name="add" size={24} color="#673ab7" />
         </TouchableOpacity>
       </View>
