@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
 import { initDB } from '../lib/db';
 
 export default function AppLayout() {
@@ -9,43 +8,29 @@ export default function AppLayout() {
   }, []);
 
   return (
-    <Tabs>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Dashboard',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="grid" size={size} color={color} />
-          ),
-        }}
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="item/[id]" 
+        options={{ 
+          title: 'Item Details',
+          headerBackTitle: 'Back'
+        }} 
       />
-      <Tabs.Screen
-        name="alerts"
-        options={{
-          title: 'Alerts',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="notifications" size={size} color={color} />
-          ),
-        }}
+      <Stack.Screen 
+        name="game/[id]" 
+        options={{ 
+          title: 'Game Details',
+          headerBackTitle: 'Back'
+        }} 
       />
-      <Tabs.Screen
-        name="insights"
-        options={{
-          title: 'Insights',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="stats-chart" size={size} color={color} />
-          ),
-        }}
+      <Stack.Screen 
+        name="loadout/[id]" 
+        options={{ 
+          title: 'Loadout Editor',
+          headerBackTitle: 'Back'
+        }} 
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
-          ),
-        }}
-      />
-    </Tabs>
+    </Stack>
   );
 }
