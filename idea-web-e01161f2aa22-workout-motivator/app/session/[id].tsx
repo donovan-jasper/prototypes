@@ -1,8 +1,11 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSessionStore } from '../../lib/store';
 import SessionTimer from '../../components/SessionTimer';
+import { generatePrompt, selectPromptByIntensity, getRandomInterval } from '../../lib/prompts';
+import { speakPrompt, stopSpeaking } from '../../lib/audio';
+import { CoachId } from '../../constants/Prompts';
 
 const COACHES = {
   'drill-sergeant': { name: 'Drill Sergeant', emoji: '🎖️' },
@@ -15,11 +18,63 @@ const COACHES = {
 export default function SessionScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { taskName, coachId, isActive, stopSession, reset } = useSessionStore();
+  const { taskName, coachId, isActive, stopSession, reset, elapsedSeconds } = useSessionStore();
+  const [lastPrompt, setLastPrompt] = useState<string>('');
+  const [nextPromptIn, setNextPromptIn] = useState<number>(getRandomInterval());
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const lastPromptTimeRef = useRef<number>(0);
 
   const coach = COACHES[coachId as keyof typeof COACHES];
 
-  const handleEndSession = () => {
+  useEffect(() => {
+    if (!isActive) return;
+
+    const interval = setInterval(() => {
+      setNextPromptIn((prev) => {
+        if (prev <= 1) {
+          playMotivationalPrompt();
+          return getRandomInterval();
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isActive, coachId]);
+
+  const playMotivationalPrompt = async () => {
+    if (!coachId) return;
+
+    const secondsSinceLastPrompt = elapsedSeconds - lastPromptTimeRef.current;
+    const prompt = selectPromptByIntensity(coachId as CoachId, secondsSinceLastPrompt);
+    
+    setLastPrompt(prompt);
+    lastPromptTimeRef.current = elapsedSeconds;
+
+    // Fade in animation
+    Animated.sequence([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.delay(3000),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    try {
+      await speakPrompt(prompt, coachId);
+    } catch (error) {
+      console.error('Error speaking prompt:', error);
+    }
+  };
+
+  const handleEndSession = async () => {
+    await stopSpeaking();
     stopSession();
     reset();
     router.push('/');
@@ -46,6 +101,20 @@ export default function SessionScreen() {
       </View>
 
       <SessionTimer />
+
+      {lastPrompt && (
+        <Animated.View style={[styles.promptContainer, { opacity: fadeAnim }]}>
+          <Text style={styles.promptLabel}>💬 Coach says:</Text>
+          <Text style={styles.promptText}>{lastPrompt}</Text>
+        </Animated.View>
+      )}
+
+      <View style={styles.nextPromptContainer}>
+        <Text style={styles.nextPromptLabel}>Next motivation in:</Text>
+        <Text style={styles.nextPromptTime}>
+          {Math.floor(nextPromptIn / 60)}:{(nextPromptIn % 60).toString().padStart(2, '0')}
+        </Text>
+      </View>
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.endButton} onPress={handleEndSession}>
@@ -95,6 +164,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     textAlign: 'center',
+  },
+  promptContainer: {
+    backgroundColor: '#007AFF',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+  promptLabel: {
+    fontSize: 14,
+    color: '#fff',
+    marginBottom: 8,
+    opacity: 0.9,
+  },
+  promptText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  nextPromptContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  nextPromptLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  nextPromptTime: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#007AFF',
   },
   buttonContainer: {
     marginTop: 'auto',
