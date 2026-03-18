@@ -5,9 +5,19 @@ interface MotionData {
   timestamp: number;
 }
 
+interface StillnessState {
+  isStill: boolean;
+  confidence: number;
+  dataPoints: number;
+  calibrating: boolean;
+  secondsCollected: number;
+  secondsNeeded: number;
+}
+
 class MotionTracker {
   private buffer: MotionData[] = [];
   private readonly BUFFER_SIZE = 1200; // 120 seconds at 10 samples/second
+  private readonly REQUIRED_SECONDS = 120;
   private readonly SAMPLE_RATE = 100; // milliseconds
   private subscription: any = null;
   private isTracking = false;
@@ -44,12 +54,34 @@ class MotionTracker {
     this.buffer = [];
   }
 
-  getCurrentStillnessState(): { isStill: boolean; confidence: number; dataPoints: number } {
+  getCurrentStillnessState(): StillnessState {
+    const secondsCollected = this.buffer.length / 10; // 10 samples per second
+    const calibrating = this.buffer.length < this.BUFFER_SIZE;
+
     if (this.buffer.length === 0) {
-      return { isStill: false, confidence: 0, dataPoints: 0 };
+      return { 
+        isStill: false, 
+        confidence: 0, 
+        dataPoints: 0,
+        calibrating: true,
+        secondsCollected: 0,
+        secondsNeeded: this.REQUIRED_SECONDS
+      };
     }
 
-    // Calculate average magnitude over the buffer
+    // If we don't have enough data yet, return calibrating state
+    if (calibrating) {
+      return {
+        isStill: false,
+        confidence: 0,
+        dataPoints: this.buffer.length,
+        calibrating: true,
+        secondsCollected: Math.floor(secondsCollected),
+        secondsNeeded: this.REQUIRED_SECONDS
+      };
+    }
+
+    // Calculate average magnitude over the full buffer
     const avgMagnitude = this.buffer.reduce((sum, data) => sum + data.magnitude, 0) / this.buffer.length;
 
     // Threshold for stillness
@@ -64,7 +96,10 @@ class MotionTracker {
     return {
       isStill,
       confidence,
-      dataPoints: this.buffer.length
+      dataPoints: this.buffer.length,
+      calibrating: false,
+      secondsCollected: Math.floor(secondsCollected),
+      secondsNeeded: this.REQUIRED_SECONDS
     };
   }
 

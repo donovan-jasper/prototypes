@@ -9,7 +9,13 @@ import { classifySleepState } from '@/lib/ml/sleepClassifier';
 const MonitorScreen = () => {
   const [sleepState, setSleepState] = useState('awake');
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [bufferStatus, setBufferStatus] = useState({ percentFull: 0, dataPoints: 0 });
+  const [stillnessState, setStillnessState] = useState({
+    calibrating: true,
+    secondsCollected: 0,
+    secondsNeeded: 120,
+    isStill: false,
+    confidence: 0
+  });
   const { setSleepDetected } = useAppStore();
 
   useEffect(() => {
@@ -18,23 +24,26 @@ const MonitorScreen = () => {
 
       const interval = setInterval(async () => {
         const motionState = motionTracker.getCurrentStillnessState();
-        const sound = await analyzeSound();
-        const light = await measureLight();
+        setStillnessState(motionState);
 
-        const state = classifySleepState({ 
-          motion: motionState.isStill ? 0.01 : 0.5, 
-          sound, 
-          light 
-        });
-        
-        setSleepState(state);
-        setBufferStatus({
-          percentFull: motionTracker.getBufferStatus().percentFull,
-          dataPoints: motionState.dataPoints
-        });
+        // Only classify sleep state if we have enough data
+        if (!motionState.calibrating) {
+          const sound = await analyzeSound();
+          const light = await measureLight();
 
-        if (state === 'asleep') {
-          setSleepDetected(true);
+          const state = classifySleepState({ 
+            motion: motionState.isStill ? 0.01 : 0.5, 
+            sound, 
+            light 
+          });
+          
+          setSleepState(state);
+
+          if (state === 'asleep') {
+            setSleepDetected(true);
+          }
+        } else {
+          setSleepState('calibrating');
         }
       }, 10000);
 
@@ -47,23 +56,70 @@ const MonitorScreen = () => {
 
   const toggleMonitoring = () => {
     setIsMonitoring(!isMonitoring);
+    if (isMonitoring) {
+      setSleepState('awake');
+      setStillnessState({
+        calibrating: true,
+        secondsCollected: 0,
+        secondsNeeded: 120,
+        isStill: false,
+        confidence: 0
+      });
+    }
+  };
+
+  const getStatusColor = () => {
+    if (sleepState === 'calibrating') return '#9E9E9E';
+    if (sleepState === 'asleep') return '#F44336';
+    if (sleepState === 'drowsy') return '#FFC107';
+    return '#4CAF50';
+  };
+
+  const getStatusText = () => {
+    if (sleepState === 'calibrating') return 'CALIBRATING';
+    return sleepState.toUpperCase();
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Current Status</Text>
       
-      <View style={[styles.statusIndicator, styles[sleepState]]}>
-        <Text style={styles.statusText}>{sleepState.toUpperCase()}</Text>
+      <View style={[styles.statusIndicator, { backgroundColor: getStatusColor() }]}>
+        <Text style={styles.statusText}>{getStatusText()}</Text>
       </View>
 
       <View style={styles.infoContainer}>
-        <Text style={styles.infoText}>
-          Buffer: {bufferStatus.percentFull.toFixed(1)}% full
-        </Text>
-        <Text style={styles.infoText}>
-          Data points: {bufferStatus.dataPoints}
-        </Text>
+        {stillnessState.calibrating ? (
+          <>
+            <Text style={styles.calibratingTitle}>Calibrating...</Text>
+            <Text style={styles.calibratingText}>
+              Collecting motion data: {stillnessState.secondsCollected}/{stillnessState.secondsNeeded} seconds
+            </Text>
+            <View style={styles.progressBar}>
+              <View 
+                style={[
+                  styles.progressFill, 
+                  { width: `${(stillnessState.secondsCollected / stillnessState.secondsNeeded) * 100}%` }
+                ]} 
+              />
+            </View>
+            <Text style={styles.calibratingSubtext}>
+              Keep your device still to establish baseline motion patterns
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.infoText}>
+              Motion: {stillnessState.isStill ? 'Still' : 'Active'}
+            </Text>
+            <Text style={styles.infoText}>
+              Confidence: {(stillnessState.confidence * 100).toFixed(1)}%
+            </Text>
+            <Text style={styles.infoText}>
+              Data points: {stillnessState.secondsCollected}s collected
+            </Text>
+          </>
+        )}
         <Text style={styles.infoText}>
           Status: {isMonitoring ? 'Monitoring' : 'Stopped'}
         </Text>
@@ -108,15 +164,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  awake: {
-    backgroundColor: '#4CAF50',
-  },
-  drowsy: {
-    backgroundColor: '#FFC107',
-  },
-  asleep: {
-    backgroundColor: '#F44336',
-  },
   statusText: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -138,6 +185,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     color: '#666',
+  },
+  calibratingTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  calibratingText: {
+    fontSize: 16,
+    marginBottom: 12,
+    color: '#666',
+  },
+  calibratingSubtext: {
+    fontSize: 14,
+    marginTop: 8,
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2196F3',
+    borderRadius: 4,
   },
   button: {
     paddingVertical: 15,
