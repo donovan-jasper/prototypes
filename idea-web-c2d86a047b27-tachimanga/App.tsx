@@ -4,6 +4,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './app/screens/HomeScreen';
 import ContentDiscoveryScreen from './app/screens/ContentDiscoveryScreen';
+import CommunityScreen from './app/screens/CommunityScreen';
+import ThreadScreen from './app/screens/ThreadScreen';
 import Reader from './app/components/Reader';
 
 const Tab = createBottomTabNavigator();
@@ -26,12 +28,22 @@ const DiscoverStack = () => {
   );
 };
 
+const CommunityStack = () => {
+  return (
+    <Stack.Navigator>
+      <Stack.Screen name="Community" component={CommunityScreen} options={{ title: 'Community' }} />
+      <Stack.Screen name="Thread" component={ThreadScreen} options={{ title: 'Discussion' }} />
+    </Stack.Navigator>
+  );
+};
+
 const App = () => {
   return (
     <NavigationContainer>
       <Tab.Navigator>
         <Tab.Screen name="Library" component={LibraryStack} options={{ headerShown: false }} />
         <Tab.Screen name="Discover" component={DiscoverStack} options={{ headerShown: false }} />
+        <Tab.Screen name="Community" component={CommunityStack} options={{ headerShown: false }} />
       </Tab.Navigator>
     </NavigationContainer>
   );
