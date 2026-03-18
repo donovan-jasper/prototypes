@@ -17,9 +17,6 @@ export default function VideoPlayer({ streamUrl }: Props) {
 
   return (
     <View style={styles.container}>
-      <View style={styles.banner}>
-        <Text style={styles.bannerText}>Demo Mode - Using test stream</Text>
-      </View>
       <Video
         style={styles.video}
         source={{ uri: streamUrl }}
@@ -48,21 +45,5 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'white',
     fontSize: 16,
-  },
-  banner: {
-    position: 'absolute',
-    top: 100,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(255, 165, 0, 0.9)',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    zIndex: 10,
-    alignItems: 'center',
-  },
-  bannerText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

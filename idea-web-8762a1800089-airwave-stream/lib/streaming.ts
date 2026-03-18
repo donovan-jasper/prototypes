@@ -1,19 +1,35 @@
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Demo mode: Always return the test stream URL
-const TEST_STREAM_URL = 'https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8';
-
-export const buildStreamUrl = (channelId: string, isLocal: boolean): string => {
-  // For demo purposes, always return the test stream
-  return TEST_STREAM_URL;
+export const buildStreamUrl = async (channelNumber: string, isLocal: boolean): Promise<string> => {
+  if (isLocal) {
+    // Get tuner IP from stored config
+    const tunerConfig = await AsyncStorage.getItem('tunerConfig');
+    let tunerIp = '192.168.1.100'; // Default fallback
+    
+    if (tunerConfig) {
+      try {
+        const config = JSON.parse(tunerConfig);
+        tunerIp = config.ip || tunerIp;
+      } catch (error) {
+        console.error('Error parsing tuner config:', error);
+      }
+    }
+    
+    // Build HLS URL using channel number (e.g., '7.1', '2.1')
+    return `http://${tunerIp}:5004/auto/v${channelNumber}`;
+  } else {
+    // For remote streaming, use the backend proxy
+    const userId = 'demo-user'; // In a real app, this would come from auth
+    return `https://api.tunelocal.app/stream/${userId}/${channelNumber}`;
+  }
 };
 
 export const isOnHomeNetwork = async (): Promise<boolean> => {
   try {
     const networkState = await Network.getNetworkStateAsync();
     
-    if (!networkState.isInternetEnabled || !networkState.isConnected) {
+    if (!networkState.isInternetReachable || !networkState.isConnected) {
       return false;
     }
     
