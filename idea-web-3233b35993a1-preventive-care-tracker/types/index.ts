@@ -17,7 +17,11 @@ export interface FamilyMember {
 
 export interface Quest {
   id: string;
-  type: string;
+  title: string;
+  description: string;
+  type: 'checkups' | 'streak';
   target: number;
+  progress: number;
   completed: boolean;
+  points: number;
 }
