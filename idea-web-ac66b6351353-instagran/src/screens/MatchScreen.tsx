@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, StyleSheet } from 'react-native
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { getMatchingScore } from '../utils/matching';
+import { useUser } from '../context/UserContext';
 
 type MatchScreenNavigationProp = StackNavigationProp<RootStackParamList, 'MatchScreen'>;
 
@@ -11,8 +12,8 @@ type Props = {
 };
 
 const MatchScreen = ({ navigation }: Props) => {
+  const { currentUser } = useUser();
   const [users, setUsers] = useState<Array<{ id: string; name: string; hobbies: string[] }>>([]);
-  const currentUserHobbies = ['hiking', 'reading'];
 
   useEffect(() => {
     const mockUsers = [
@@ -28,6 +29,20 @@ const MatchScreen = ({ navigation }: Props) => {
     navigation.navigate('EventScreen', { user });
   };
 
+  if (!currentUser) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.emptyText}>Please create your profile first</Text>
+        <TouchableOpacity 
+          style={styles.button}
+          onPress={() => navigation.navigate('ProfileScreen')}
+        >
+          <Text style={styles.buttonText}>Go to Profile</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Potential Matches</Text>
@@ -35,7 +50,7 @@ const MatchScreen = ({ navigation }: Props) => {
         data={users}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => {
-          const score = getMatchingScore({ hobbies: currentUserHobbies }, item);
+          const score = getMatchingScore({ hobbies: currentUser.hobbies }, item);
           return (
             <View style={styles.userCard}>
               <View style={styles.userInfo}>
@@ -68,6 +83,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 50,
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 40,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   userCard: {
     backgroundColor: '#fff',

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { useUser } from '../context/UserContext';
 
 type ProfileScreenNavigationProp = StackNavigationProp<RootStackParamList, 'ProfileScreen'>;
 
@@ -10,11 +11,21 @@ type Props = {
 };
 
 const ProfileScreen = ({ navigation }: Props) => {
+  const { currentUser, saveUserProfile } = useUser();
   const [name, setName] = useState('');
   const [hobbies, setHobbies] = useState('');
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (currentUser) {
+      setName(currentUser.name);
+      setHobbies(currentUser.hobbies.join(', '));
+    }
+  }, [currentUser]);
+
+  const handleSave = async () => {
     if (name.trim() && hobbies.trim()) {
+      const hobbiesArray = hobbies.split(',').map(h => h.trim()).filter(h => h.length > 0);
+      await saveUserProfile({ name: name.trim(), hobbies: hobbiesArray });
       navigation.navigate('MatchScreen');
     }
   };
