@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,44 +8,11 @@ import {
   Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-
-interface Product {
-  id: string;
-  title: string;
-  description: string;
-  price: number;
-  quantity: number;
-  imageUri?: string;
-  platforms: string[];
-}
+import { useProductStore } from '../../store/products';
+import { Product } from '../../types/product';
 
 export default function Dashboard() {
-  const [products, setProducts] = useState<Product[]>([
-    {
-      id: '1',
-      title: 'Vintage Leather Jacket',
-      description: 'Classic brown leather jacket in excellent condition',
-      price: 89.99,
-      quantity: 1,
-      platforms: ['eBay', 'Shopify'],
-    },
-    {
-      id: '2',
-      title: 'Handmade Ceramic Mug Set',
-      description: 'Set of 4 artisan coffee mugs',
-      price: 45.00,
-      quantity: 3,
-      platforms: ['Etsy', 'Amazon'],
-    },
-    {
-      id: '3',
-      title: 'Wireless Bluetooth Headphones',
-      description: 'Noise-cancelling over-ear headphones',
-      price: 129.99,
-      quantity: 5,
-      platforms: ['Amazon', 'eBay'],
-    },
-  ]);
+  const products = useProductStore((state) => state.products);
 
   const renderProduct = ({ item }: { item: Product }) => (
     <TouchableOpacity style={styles.productCard}>
