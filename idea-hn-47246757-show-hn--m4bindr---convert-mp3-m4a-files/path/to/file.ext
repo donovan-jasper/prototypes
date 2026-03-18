@@ -1,0 +1,121 @@
+import { FFmpegKit, FFmpegSession, ReturnCode } from 'ffmpeg-kit-react-native';
+
+export const mergeAudioFiles = async (filePaths: string[]): Promise<string> => {
+  if (filePaths.length === 0) {
+    throw new Error('No files provided for merging');
+  }
+
+  if (filePaths.length === 1) {
+    return filePaths[0];
+  }
+
+  // Create a temporary file path for the merged output
+  const outputPath = `${FileSystem.documentDirectory}merged_${Date.now()}.m4a`;
+  
+  // Build the FFmpeg command to concatenate audio files
+  const inputs = filePaths.map(path => `-i "${path}"`).join(' ');
+  const streamCount = filePaths.length;
+  const concatFilter = Array.from({ length: streamCount }, (_, i) => `[${i}:a]`).join('') + `concat=n=${streamCount}:v=0:a=1[a]`;
+  
+  const command = `-y ${inputs} -filter_complex "${concatFilter}" -map "[a]" "${outputPath}"`;
+
+  return new Promise((resolve, reject) => {
+    FFmpegKit.execute(command)
+      .then(session => {
+        session.getReturnCode().then(returnCode => {
+          if (ReturnCode.isSuccess(returnCode)) {
+            resolve(outputPath);
+          } else {
+            FFmpegKit.getLogLevel().then(logLevel => {
+              console.error(`FFmpeg failed with return code: ${returnCode}, log level: ${logLevel}`);
+              session.getFailStackTrace().then(trace => {
+                console.error(`FFmpeg session fail trace: ${trace}`);
+                reject(new Error(`FFmpeg failed with return code: ${returnCode}`));
+              });
+            });
+          }
+        });
+      })
+      .catch(error => {
+        console.error('FFmpeg execution error:', error);
+        reject(error);
+      });
+  });
+};
+
+export const embedChapters = async (audioPath: string, chapters: any[]): Promise<string> => {
+  if (chapters.length === 0) {
+    return audioPath;
+  }
+
+  // Create a temporary file path for the output with embedded chapters
+  const outputPath = `${FileSystem.documentDirectory}chaptered_${Date.now()}.m4b`;
+  
+  // Build the FFmpeg command to embed chapters
+  let metadataArgs = '';
+  chapters.forEach((chapter, index) => {
+    const startTime = chapter.startTime / 1000; // Convert ms to seconds
+    const endTime = chapter.endTime / 1000; // Convert ms to seconds
+    
+    metadataArgs += `-metadata:s:0:g:${index} title="${chapter.title}" `;
+    metadataArgs += `-metadata:s:0:g:${index} start_time=${startTime.toFixed(3)} `;
+    metadataArgs += `-metadata:s:0:g:${index} end_time=${endTime.toFixed(3)} `;
+  });
+
+  const command = `-y -i "${audioPath}" -c copy ${metadataArgs} -movflags +faststart "${outputPath}"`;
+
+  return new Promise((resolve, reject) => {
+    FFmpegKit.execute(command)
+      .then(session => {
+        session.getReturnCode().then(returnCode => {
+          if (ReturnCode.isSuccess(returnCode)) {
+            resolve(outputPath);
+          } else {
+            FFmpegKit.getLogLevel().then(logLevel => {
+              console.error(`FFmpeg failed with return code: ${returnCode}, log level: ${logLevel}`);
+              session.getFailStackTrace().then(trace => {
+                console.error(`FFmpeg session fail trace: ${trace}`);
+                reject(new Error(`FFmpeg failed with return code: ${returnCode}`));
+              });
+            });
+          }
+        });
+      })
+      .catch(error => {
+        console.error('FFmpeg execution error:', error);
+        reject(error);
+      });
+  });
+};
+
+export const extractAudioDuration = async (fileUri: string): Promise<number> => {
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: fileUri },
+      { shouldPlay: false }
+    );
+    
+    const status = await sound.getStatusAsync();
+    await sound.unloadAsync();
+    
+    if (status.isLoaded && status.durationMillis) {
+      return status.durationMillis;
+    }
+    
+    return 0;
+  } catch (error) {
+    console.error('Error extracting audio duration:', error);
+    return 0;
+  }
+};
+
+export const extractMultipleFileDurations = async (fileUris: string[]): Promise<number[]> => {
+  const durations = await Promise.all(
+    fileUris.map(uri => extractAudioDuration(uri))
+  );
+  return durations;
+};
+
+export const calculateTotalDuration = (durations: number[]): number => {
+  return durations.reduce((total, duration) => total + duration, 0);
+};
