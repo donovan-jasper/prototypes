@@ -4,7 +4,7 @@ import * as Location from 'expo-location';
 import { generateMockEvents } from '../utils/mockEventGenerator';
 
 const HomeScreen = ({ navigation }) => {
-  const [location, setLocation] = useState(null);
+  const [location, setLocation] = useState(null); // Stores the user's current location object
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -15,32 +15,43 @@ const HomeScreen = ({ navigation }) => {
       if (status !== 'granted') {
         console.error('Permission to access location was denied');
         setLoading(false);
+        // Optionally, set a default location or show an error state
+        // For now, if permission is denied, events won't load based on user location.
         return;
       }
 
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
+      let currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation);
       setLoading(false);
     })();
   }, []);
 
   useEffect(() => {
+    // Only load events once location is available
     if (location) {
-      loadEvents();
+      loadEvents(location.coords.latitude, location.coords.longitude);
     }
-  }, [location]);
+  }, [location]); // Depend on location state
 
-  const loadEvents = () => {
-    const mockEvents = generateMockEvents();
+  // Modified to accept user's latitude and longitude
+  const loadEvents = (userLat, userLon) => {
+    // Pass user's coordinates to the mock event generator
+    const mockEvents = generateMockEvents(userLat, userLon);
     setEvents(mockEvents);
   };
 
   const handleRefresh = () => {
-    setRefreshing(true);
-    setTimeout(() => {
-      loadEvents();
-      setRefreshing(false);
-    }, 500);
+    if (location) { // Ensure location is available before refreshing
+      setRefreshing(true);
+      // Simulate network request or data fetching delay
+      setTimeout(() => {
+        loadEvents(location.coords.latitude, location.coords.longitude);
+        setRefreshing(false);
+      }, 500);
+    } else {
+      console.warn("Cannot refresh events: user location not available.");
+      setRefreshing(false); // Ensure refreshing state is reset even if location is missing
+    }
   };
 
   const renderItem = ({ item }) => (
@@ -77,10 +88,10 @@ const HomeScreen = ({ navigation }) => {
     <View style={styles.container}>
       <View style={styles.headerContainer}>
         <Text style={styles.header}>Nearby Activities</Text>
-        <TouchableOpacity 
-          style={styles.refreshButton} 
+        <TouchableOpacity
+          style={styles.refreshButton}
           onPress={handleRefresh}
-          disabled={refreshing}
+          disabled={refreshing || !location} // Disable refresh if loading or no location
         >
           <Text style={styles.refreshButtonText}>
             {refreshing ? '↻' : '🔄'} Refresh
@@ -98,6 +109,8 @@ const HomeScreen = ({ navigation }) => {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshing={refreshing} // Enable pull-to-refresh indicator
+          onRefresh={handleRefresh} // Handle pull-to-refresh action
         />
       )}
     </View>
