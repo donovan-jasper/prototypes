@@ -1,14 +1,17 @@
 import { View, Text, ScrollView, RefreshControl } from 'react-native';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PromptInput from '../../components/PromptInput';
 import GenerationCard from '../../components/GenerationCard';
 import { useAppStore } from '../../store/app-store';
-import { getGenerations } from '../../lib/database';
 
 export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const generations = useAppStore(state => state.generations);
   const loadGenerations = useAppStore(state => state.loadGenerations);
+
+  useEffect(() => {
+    loadGenerations();
+  }, []);
 
   const onRefresh = async () => {
     setRefreshing(true);
