@@ -1,16 +1,33 @@
 import React from 'react';
-import { View, Text, ScrollView } from 'react-native';
-import SyntaxHighlighter from 'react-native-syntax-highlighter';
-import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { ScrollView, Text, StyleSheet } from 'react-native';
 
-const CodeViewer = ({ code }) => {
+interface CodeViewerProps {
+  code: string;
+  language?: string;
+}
+
+const CodeViewer: React.FC<CodeViewerProps> = ({ code }) => {
   return (
-    <ScrollView style={{ flex: 1 }}>
-      <SyntaxHighlighter language="java" style={docco}>
-        {code}
-      </SyntaxHighlighter>
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <Text style={styles.code}>{code}</Text>
     </ScrollView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  content: {
+    padding: 16,
+  },
+  code: {
+    fontFamily: 'Courier',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#333',
+  },
+});
 
 export default CodeViewer;
