@@ -1,4 +1,4 @@
-import create from 'zustand';
+import { create } from 'zustand';
 import { openDatabase } from '../utils/database';
 
 const db = openDatabase();
@@ -20,10 +20,12 @@ interface WatchlistStore {
 export const useWatchlistStore = create<WatchlistStore>((set, get) => ({
   stocks: [],
   addStock: (symbol) => {
-    if (get().stocks.length >= 5 && !get().isPremium) {
-      console.error('Free tier limit reached');
+    const currentStocks = get().stocks;
+    
+    if (currentStocks.some(stock => stock.symbol === symbol)) {
       return;
     }
+    
     set((state) => ({
       stocks: [...state.stocks, { symbol, price: 0, change: 0 }],
     }));
