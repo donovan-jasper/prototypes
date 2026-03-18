@@ -6,33 +6,19 @@ export const initDB = () => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'CREATE TABLE IF NOT EXISTS items (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, archived BOOLEAN, muted BOOLEAN, pinned BOOLEAN, deleted BOOLEAN);',
+        `CREATE TABLE IF NOT EXISTS notifications (
+          id TEXT PRIMARY KEY, 
+          title TEXT, 
+          body TEXT, 
+          app TEXT, 
+          timestamp INTEGER,
+          archived BOOLEAN, 
+          muted BOOLEAN, 
+          pinned BOOLEAN, 
+          deleted BOOLEAN
+        );`,
         [],
-        () => {
-          tx.executeSql(
-            'SELECT COUNT(*) as count FROM items;',
-            [],
-            (_, { rows }) => {
-              if (rows._array[0].count === 0) {
-                tx.executeSql(
-                  'INSERT INTO items (name, archived, muted, pinned, deleted) VALUES (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?), (?, ?, ?, ?, ?);',
-                  [
-                    'Message 1', 0, 0, 0, 0,
-                    'Notification 1', 0, 0, 0, 0,
-                    'App 1', 0, 0, 0, 0,
-                    'Message 2', 0, 0, 0, 0,
-                    'Notification 2', 0, 0, 0, 0
-                  ],
-                  () => resolve(),
-                  (_, error) => reject(error)
-                );
-              } else {
-                resolve();
-              }
-            },
-            (_, error) => reject(error)
-          );
-        },
+        () => resolve(),
         (_, error) => reject(error)
       );
     });
@@ -43,7 +29,7 @@ export const getItems = () => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'SELECT * FROM items;',
+        'SELECT * FROM notifications;',
         [],
         (_, { rows: { _array } }) => {
           const items = _array.map(item => ({
@@ -65,8 +51,41 @@ export const updateItem = (item) => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'UPDATE items SET archived = ?, muted = ?, pinned = ?, deleted = ? WHERE id = ?;',
+        'UPDATE notifications SET archived = ?, muted = ?, pinned = ?, deleted = ? WHERE id = ?;',
         [item.archived ? 1 : 0, item.muted ? 1 : 0, item.pinned ? 1 : 0, item.deleted ? 1 : 0, item.id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const insertNotification = (notification) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT OR REPLACE INTO notifications (id, title, body, app, timestamp, archived, muted, pinned, deleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);',
+        [
+          notification.id,
+          notification.title,
+          notification.body,
+          notification.app,
+          notification.timestamp,
+          0, 0, 0, 0
+        ],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const deleteNotification = (id) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM notifications WHERE id = ?;',
+        [id],
         () => resolve(),
         (_, error) => reject(error)
       );
