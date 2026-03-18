@@ -4,27 +4,53 @@ import { Entry, Category } from '../types';
 const db = SQLite.openDatabase('trackflow.db');
 
 export const initDatabase = () => {
-  db.transaction((tx) => {
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        icon TEXT,
-        color TEXT
-      );`
-    );
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS entries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        categoryId INTEGER NOT NULL,
-        timestamp INTEGER NOT NULL,
-        note TEXT,
-        photoUri TEXT,
-        weather TEXT,
-        temperature REAL,
-        location TEXT,
-        FOREIGN KEY (categoryId) REFERENCES categories (id)
-      );`
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            icon TEXT,
+            color TEXT
+          );`
+        );
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            categoryId INTEGER NOT NULL,
+            timestamp INTEGER NOT NULL,
+            note TEXT,
+            photoUri TEXT,
+            weather TEXT,
+            temperature REAL,
+            location TEXT,
+            FOREIGN KEY (categoryId) REFERENCES categories (id)
+          );`
+        );
+        
+        // Check if default category exists
+        tx.executeSql(
+          `SELECT COUNT(*) as count FROM categories;`,
+          [],
+          (_, result) => {
+            const count = result.rows.item(0).count;
+            if (count === 0) {
+              // Add default Fitness category
+              tx.executeSql(
+                `INSERT INTO categories (name, icon, color) VALUES (?, ?, ?);`,
+                ['Fitness', '💪', '#007AFF']
+              );
+            }
+          }
+        );
+      },
+      (error) => {
+        reject(error);
+      },
+      () => {
+        resolve();
+      }
     );
   });
 };
