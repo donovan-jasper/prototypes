@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
 import { addSubscription } from '../services/SubscriptionService';
 
 const AddSubscriptionScreen = ({ navigation }) => {
@@ -8,13 +8,26 @@ const AddSubscriptionScreen = ({ navigation }) => {
   const [category, setCategory] = useState('email');
   const [cost, setCost] = useState('');
   const [unsubscribeUrl, setUnsubscribeUrl] = useState('');
+  const [billingCycle, setBillingCycle] = useState('monthly');
+  const [renewalDate, setRenewalDate] = useState('');
 
   const categories = ['email', 'social', 'newsletter'];
+  const billingCycles = ['monthly', 'yearly'];
 
   const handleSubmit = async () => {
     if (!name.trim()) {
       Alert.alert('Error', 'Please enter a subscription name');
       return;
+    }
+
+    let parsedRenewalDate = null;
+    if (renewalDate.trim()) {
+      const date = new Date(renewalDate.trim());
+      if (isNaN(date.getTime())) {
+        Alert.alert('Error', 'Invalid renewal date format. Use YYYY-MM-DD');
+        return;
+      }
+      parsedRenewalDate = date.toISOString();
     }
 
     const subscription = {
@@ -23,6 +36,8 @@ const AddSubscriptionScreen = ({ navigation }) => {
       category,
       cost: cost ? parseFloat(cost) : 0,
       unsubscribe_url: unsubscribeUrl.trim(),
+      billing_cycle: cost && parseFloat(cost) > 0 ? billingCycle : null,
+      renewal_date: parsedRenewalDate,
     };
 
     await addSubscription(subscription);
@@ -84,6 +99,44 @@ const AddSubscriptionScreen = ({ navigation }) => {
           placeholderTextColor="#999"
           keyboardType="decimal-pad"
         />
+
+        {cost && parseFloat(cost) > 0 && (
+          <>
+            <Text style={styles.label}>Billing Cycle</Text>
+            <View style={styles.categoryContainer}>
+              {billingCycles.map((cycle) => (
+                <TouchableOpacity
+                  key={cycle}
+                  style={[
+                    styles.categoryButton,
+                    billingCycle === cycle && styles.categoryButtonActive,
+                  ]}
+                  onPress={() => setBillingCycle(cycle)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      billingCycle === cycle && styles.categoryTextActive,
+                    ]}
+                  >
+                    {cycle.charAt(0).toUpperCase() + cycle.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Next Renewal Date</Text>
+            <Text style={styles.hint}>Format: YYYY-MM-DD (e.g., 2026-04-15)</Text>
+            <TextInput
+              style={styles.input}
+              value={renewalDate}
+              onChangeText={setRenewalDate}
+              placeholder="2026-04-15"
+              placeholderTextColor="#999"
+              autoCapitalize="none"
+            />
+          </>
+        )}
 
         <Text style={styles.label}>Unsubscribe URL (Optional)</Text>
         <Text style={styles.hint}>Paste the unsubscribe link from your email</Text>

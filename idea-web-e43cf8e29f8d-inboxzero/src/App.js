@@ -6,6 +6,7 @@ import HomeScreen from './screens/HomeScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import AddSubscriptionScreen from './screens/AddSubscriptionScreen';
 import { initDatabase, seedDatabase } from './services/SubscriptionService';
+import { requestPermissions, checkUpcomingRenewals } from './services/NotificationService';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -29,11 +30,13 @@ const HomeStack = () => {
 
 const App = () => {
   useEffect(() => {
-    const setupDatabase = async () => {
+    const setupApp = async () => {
       await initDatabase();
       await seedDatabase();
+      await requestPermissions();
+      await checkUpcomingRenewals();
     };
-    setupDatabase();
+    setupApp();
   }, []);
 
   return (
