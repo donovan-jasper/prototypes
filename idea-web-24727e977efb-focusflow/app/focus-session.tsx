@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, AppState, AppStateStatus } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useStore } from '../store/useStore';
 import { endFocusSession } from '../lib/focus-engine';
-import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, setupNotificationHandler } from '../lib/app-blocker';
+import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, setupNotificationHandler, isAppBlocked } from '../lib/app-blocker';
 
 export default function FocusSessionScreen() {
   const router = useRouter();
@@ -11,12 +12,36 @@ export default function FocusSessionScreen() {
   const { activeSession, setActiveSession, clearActiveSession } = useStore();
   
   const [timeRemaining, setTimeRemaining] = useState(0);
+  const [showBlockingOverlay, setShowBlockingOverlay] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
     setupNotificationHandler();
     requestNotificationPermissions();
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
+
+  const handleAppStateChange = (nextAppState: AppStateStatus) => {
+    if (
+      appStateRef.current.match(/inactive|background/) &&
+      nextAppState === 'active' &&
+      activeSession
+    ) {
+      setShowBlockingOverlay(true);
+      
+      setTimeout(() => {
+        setShowBlockingOverlay(false);
+      }, 2000);
+    }
+
+    appStateRef.current = nextAppState;
+  };
 
   useEffect(() => {
     if (!activeSession && params.duration) {
@@ -140,64 +165,90 @@ export default function FocusSessionScreen() {
   const blockedAppNames = getBlockedAppNames();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>Focus Session</Text>
-        <Text style={styles.durationText}>{activeSession.duration} minutes</Text>
-      </View>
+    <>
+      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.headerText}>Focus Session</Text>
+          <Text style={styles.durationText}>{activeSession.duration} minutes</Text>
+        </View>
 
-      <View style={styles.timerContainer}>
-        <View style={styles.progressRing}>
-          <View style={[styles.progressFill, { height: `${getProgress()}%` }]} />
+        <View style={styles.timerContainer}>
+          <View style={styles.progressRing}>
+            <View style={[styles.progressFill, { height: `${getProgress()}%` }]} />
+          </View>
+          <View style={styles.timerContent}>
+            <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
+            <Text style={styles.timerLabel}>remaining</Text>
+          </View>
         </View>
-        <View style={styles.timerContent}>
-          <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
-          <Text style={styles.timerLabel}>remaining</Text>
-        </View>
-      </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{Math.floor(getProgress())}%</Text>
-          <Text style={styles.statLabel}>Complete</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{Math.floor(getProgress())}%</Text>
+            <Text style={styles.statLabel}>Complete</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {Math.floor((activeSession.duration * 60 - timeRemaining) / 60)}
+            </Text>
+            <Text style={styles.statLabel}>Minutes Focused</Text>
+          </View>
         </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {Math.floor((activeSession.duration * 60 - timeRemaining) / 60)}
+
+        {blockedAppNames.length > 0 && (
+          <View style={styles.blockedAppsSection}>
+            <Text style={styles.blockedAppsTitle}>Blocked Apps</Text>
+            <View style={styles.blockedAppsList}>
+              {blockedAppNames.map((appName, index) => (
+                <View key={index} style={styles.blockedAppChip}>
+                  <Text style={styles.blockedAppText}>{appName}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={styles.blockingInfoBox}>
+              <Text style={styles.blockingInfoTitle}>📱 How blocking works:</Text>
+              <Text style={styles.blockingInfoText}>
+                <Text style={styles.bold}>iOS:</Text> You'll see this overlay when returning to ZenBlock. For full blocking, manually restrict apps in Screen Time settings.
+              </Text>
+              <Text style={styles.blockingInfoText}>
+                <Text style={styles.bold}>Android:</Text> Enable accessibility service in Settings → Accessibility → ZenBlock for automatic app blocking.
+              </Text>
+            </View>
+          </View>
+        )}
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.endButton}
+            onPress={handleEndEarly}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.endButtonText}>End Early</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.tipContainer}>
+          <Text style={styles.tipText}>
+            Stay present. Breathe. You've got this.
           </Text>
-          <Text style={styles.statLabel}>Minutes Focused</Text>
         </View>
-      </View>
+      </ScrollView>
 
-      {blockedAppNames.length > 0 && (
-        <View style={styles.blockedAppsSection}>
-          <Text style={styles.blockedAppsTitle}>Blocked Apps</Text>
-          <View style={styles.blockedAppsList}>
-            {blockedAppNames.map((appName, index) => (
-              <View key={index} style={styles.blockedAppChip}>
-                <Text style={styles.blockedAppText}>{appName}</Text>
-              </View>
-            ))}
+      {showBlockingOverlay && (
+        <View style={styles.blockingOverlay}>
+          <View style={styles.blockingOverlayContent}>
+            <Text style={styles.blockingOverlayEmoji}>🧘</Text>
+            <Text style={styles.blockingOverlayTitle}>Stay Focused</Text>
+            <Text style={styles.blockingOverlayText}>
+              You're in a focus session
+            </Text>
+            <Text style={styles.blockingOverlayTime}>
+              {formatTime(timeRemaining)} remaining
+            </Text>
           </View>
         </View>
       )}
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.endButton}
-          onPress={handleEndEarly}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.endButtonText}>End Early</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.tipContainer}>
-        <Text style={styles.tipText}>
-          Stay present. Breathe. You've got this.
-        </Text>
-      </View>
-    </ScrollView>
+    </>
   );
 }
 
@@ -299,6 +350,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+    marginBottom: 16,
   },
   blockedAppChip: {
     backgroundColor: '#f0f0ff',
@@ -312,6 +364,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6366f1',
     fontWeight: '500',
+  },
+  blockingInfoBox: {
+    backgroundColor: '#f9fafb',
+    borderRadius: 8,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: '#6366f1',
+  },
+  blockingInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 8,
+  },
+  blockingInfoText: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
+    marginBottom: 6,
+  },
+  bold: {
+    fontWeight: '600',
+    color: '#1a1a1a',
   },
   actions: {
     paddingHorizontal: 20,
@@ -360,5 +435,42 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  blockingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(99, 102, 241, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  blockingOverlayContent: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  blockingOverlayEmoji: {
+    fontSize: 80,
+    marginBottom: 20,
+  },
+  blockingOverlayTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 12,
+  },
+  blockingOverlayText: {
+    fontSize: 18,
+    color: '#fff',
+    opacity: 0.9,
+    marginBottom: 24,
+  },
+  blockingOverlayTime: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
   },
 });
