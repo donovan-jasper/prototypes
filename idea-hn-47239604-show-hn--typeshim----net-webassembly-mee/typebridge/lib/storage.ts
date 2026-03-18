@@ -25,8 +25,6 @@ export const saveProject = async (project) => {
 
 export const loadProject = async (id: string) => {
   try {
-    // In a real implementation, we'd fetch from the database
-    // For now, we'll simulate by getting all projects and finding the matching one
     const projects = await getDbProjects();
     return projects.find(p => p.id === id) || null;
   } catch (error) {
@@ -50,16 +48,12 @@ export const exportProjectFiles = async (project) => {
     const exportDir = `${FileSystem.documentDirectory}exports/${project.id}`;
     await FileSystem.makeDirectoryAsync(exportDir, { intermediates: true });
 
-    // Write the project code to a file
     const codeFile = `${exportDir}/code.ts`;
     await FileSystem.writeAsStringAsync(codeFile, project.code);
 
-    // If we have WASM bytes, write them too
-    if (project.wasmBytes) {
-      const wasmFile = `${exportDir}/app.wasm`;
-      await FileSystem.writeAsStringAsync(wasmFile, String.fromCharCode(...project.wasmBytes), {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
+    if (project.compiledJs) {
+      const jsFile = `${exportDir}/app.js`;
+      await FileSystem.writeAsStringAsync(jsFile, project.compiledJs);
     }
 
     return { success: true, path: exportDir };

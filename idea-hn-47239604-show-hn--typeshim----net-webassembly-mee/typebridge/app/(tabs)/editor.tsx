@@ -8,7 +8,7 @@ import CodeEditor from '../../components/CodeEditor';
 const EditorScreen = () => {
   const { projectId } = useLocalSearchParams();
   const router = useRouter();
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState('// Write your TypeScript code here\nfunction greet(name: string): string {\n  return `Hello, ${name}!`;\n}\n\nconsole.log(greet("World"));');
   const [project, setProject] = useState(null);
   const [isCompiling, setIsCompiling] = useState(false);
 
@@ -16,8 +16,23 @@ const EditorScreen = () => {
     const loadProjectData = async () => {
       if (projectId) {
         const loadedProject = await loadProject(projectId);
-        setProject(loadedProject);
-        setCode(loadedProject.code);
+        if (loadedProject) {
+          setProject(loadedProject);
+          setCode(loadedProject.code);
+        }
+      } else {
+        // Create new project
+        const newProject = {
+          id: Date.now().toString(),
+          name: 'Untitled Project',
+          code: code,
+          compiledJs: null,
+          wasmBytes: null,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await saveProject(newProject);
+        setProject(newProject);
       }
     };
     loadProjectData();
@@ -45,10 +60,16 @@ const EditorScreen = () => {
     try {
       const result = await compileTypeScriptToWasm(code);
       if (result.success) {
-        const updatedProject = { ...project, code, wasmBytes: result.wasmBytes, updatedAt: Date.now() };
+        const updatedProject = { 
+          ...project, 
+          code, 
+          compiledJs: result.compiledJs,
+          wasmBytes: result.wasmBytes, 
+          updatedAt: Date.now() 
+        };
         await saveProject(updatedProject);
         setProject(updatedProject);
-        Alert.alert('Success', 'Code compiled successfully!');
+        Alert.alert('Success', 'Code compiled successfully! Tap Preview to run it.');
       } else {
         Alert.alert('Compilation Error', result.error);
       }
@@ -67,7 +88,7 @@ const EditorScreen = () => {
 
   const handleExport = () => {
     if (project) {
-      router.push({ pathname: '/export', params: { projectId: project.id } });
+      Alert.alert('Export', 'Export feature coming soon!');
     }
   };
 

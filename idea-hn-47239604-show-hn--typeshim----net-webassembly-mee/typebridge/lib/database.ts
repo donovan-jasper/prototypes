@@ -11,6 +11,7 @@ export const initDatabase = async () => {
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
             code TEXT NOT NULL,
+            compiledJs TEXT,
             wasmBytes BLOB,
             createdAt INTEGER NOT NULL,
             updatedAt INTEGER NOT NULL
@@ -46,8 +47,8 @@ export const createProject = async (project) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'INSERT INTO projects (id, name, code, wasmBytes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?);',
-          [project.id, project.name, project.code, project.wasmBytes, project.createdAt, project.updatedAt],
+          'INSERT INTO projects (id, name, code, compiledJs, wasmBytes, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?);',
+          [project.id, project.name, project.code, project.compiledJs || null, project.wasmBytes, project.createdAt, project.updatedAt],
           (_, result) => resolve(result),
           (_, error) => reject(error)
         );
@@ -62,8 +63,8 @@ export const updateProject = async (project) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'UPDATE projects SET name = ?, code = ?, wasmBytes = ?, updatedAt = ? WHERE id = ?;',
-          [project.name, project.code, project.wasmBytes, project.updatedAt, project.id],
+          'UPDATE projects SET name = ?, code = ?, compiledJs = ?, wasmBytes = ?, updatedAt = ? WHERE id = ?;',
+          [project.name, project.code, project.compiledJs || null, project.wasmBytes, project.updatedAt, project.id],
           (_, result) => resolve(result),
           (_, error) => reject(error)
         );
