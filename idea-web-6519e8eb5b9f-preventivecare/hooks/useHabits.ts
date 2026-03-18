@@ -1,16 +1,21 @@
 import { useState } from 'react';
-import { addHabit, getHabits, logHabitCompletion, calculateStreak, getHabitLogsForToday } from '../lib/habits';
+import { addHabit, getHabits, logHabitCompletion, calculateStreak, getHabitLogsForToday, getHabitLogs } from '../lib/habits';
 
 export const useHabits = () => {
   const [habits, setHabits] = useState([]);
 
   const loadHabits = async () => {
     const loadedHabits = await getHabits();
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - 30);
+    
     const habitsWithStreaksAndCompletion = await Promise.all(
       loadedHabits.map(async habit => {
         const streak = await calculateStreak(habit.id);
         const completedToday = await getHabitLogsForToday(habit.id);
-        return { ...habit, streak, completedToday };
+        const logs = await getHabitLogs(habit.id, startDate, endDate);
+        return { ...habit, streak, completedToday, logs };
       })
     );
     setHabits(habitsWithStreaksAndCompletion);
