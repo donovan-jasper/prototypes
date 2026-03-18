@@ -1,0 +1,90 @@
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { useSession } from '../context/SessionContext';
+
+export default function OutputScreen() {
+  const { outputs } = useSession();
+
+  const renderOutput = ({ item }: { item: any }) => (
+    <View style={styles.outputItem}>
+      <Text style={styles.timestamp}>
+        {new Date(item.timestamp).toLocaleTimeString()}
+      </Text>
+      <ScrollView horizontal>
+        <Text style={styles.outputText}>{item.output}</Text>
+      </ScrollView>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Output</Text>
+      </View>
+      
+      {outputs.length === 0 ? (
+        <View style={styles.placeholderContainer}>
+          <Text style={styles.placeholder}>Run code to see output here...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={outputs}
+          renderItem={renderOutput}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.outputList}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0f172a',
+  },
+  header: {
+    padding: 16,
+    backgroundColor: '#1e293b',
+    borderBottomWidth: 1,
+    borderBottomColor: '#334155',
+  },
+  headerText: {
+    color: '#e2e8f0',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  placeholderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  placeholder: {
+    color: '#94a3b8',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  outputList: {
+    padding: 16,
+  },
+  outputItem: {
+    backgroundColor: '#1e293b',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  timestamp: {
+    color: '#94a3b8',
+    fontSize: 12,
+    marginBottom: 8,
+  },
+  outputText: {
+    color: '#e2e8f0',
+    fontSize: 14,
+    fontFamily: 'monospace',
+    lineHeight: 20,
+  },
+});
