@@ -1,37 +1,27 @@
-import { Tabs } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { Stack } from 'expo-router';
+import { useEffect } from 'react';
+import { initDB } from '../lib/db';
+import { requestNotificationPermissions } from '../lib/notifications';
+import { requestLocationPermissions } from '../lib/location';
 
-export default function TabLayout() {
+export default function RootLayout() {
+  useEffect(() => {
+    initDB();
+    requestNotificationPermissions();
+    requestLocationPermissions();
+  }, []);
+
   return (
-    <Tabs>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Today',
-          tabBarIcon: ({ color }) => <Ionicons name="home" size={24} color={color} />,
-        }}
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen 
+        name="add-memory" 
+        options={{ 
+          presentation: 'modal',
+          title: 'Add Reminder'
+        }} 
       />
-      <Tabs.Screen
-        name="memories"
-        options={{
-          title: 'Memories',
-          tabBarIcon: ({ color }) => <Ionicons name="list" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="shared"
-        options={{
-          title: 'Shared',
-          tabBarIcon: ({ color }) => <Ionicons name="people" size={24} color={color} />,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color }) => <Ionicons name="settings" size={24} color={color} />,
-        }}
-      />
-    </Tabs>
+      <Stack.Screen name="space/[id]" options={{ title: 'Space Details' }} />
+    </Stack>
   );
 }
