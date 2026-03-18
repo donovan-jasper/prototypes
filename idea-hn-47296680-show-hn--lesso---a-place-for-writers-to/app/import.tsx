@@ -9,74 +9,31 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { extractContentFromURL, convertFileToText, splitContentIntoLessons } from '../lib/import';
 import { useCourseStore } from '../store/courseStore';
 
-type TabType = 'url' | 'file' | 'ai';
+type Tab = 'url' | 'file' | 'lessons';
 
-interface ExtractedContent {
+interface ExtractedLesson {
   title: string;
-  body: string;
-  sections: string[];
+  content: string;
 }
 
 export default function ImportScreen() {
-  const [activeTab, setActiveTab] = useState<TabType>('url');
+  const [activeTab, setActiveTab] = useState<Tab>('url');
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
-  const [extractedContent, setExtractedContent] = useState<ExtractedContent | null>(null);
+  const [extractedTitle, setExtractedTitle] = useState('');
+  const [extractedBody, setExtractedBody] = useState('');
+  const [lessons, setLessons] = useState<ExtractedLesson[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+
   const createCourse = useCourseStore((state) => state.createCourse);
   const addLesson = useCourseStore((state) => state.addLesson);
 
-  const extractContentFromURL = async (urlString: string): Promise<ExtractedContent> => {
-    const response = await fetch(urlString);
-    const html = await response.text();
-
-    // Extract title from <h1> or <title>
-    let title = '';
-    const h1Match = html.match(/<h1[^>]*>(.*?)<\/h1>/i);
-    if (h1Match) {
-      title = h1Match[1].replace(/<[^>]*>/g, '').trim();
-    } else {
-      const titleMatch = html.match(/<title[^>]*>(.*?)<\/title>/i);
-      if (titleMatch) {
-        title = titleMatch[1].replace(/<[^>]*>/g, '').trim();
-      }
-    }
-
-    // Extract body from <article> or all <p> tags
-    let body = '';
-    const articleMatch = html.match(/<article[^>]*>(.*?)<\/article>/is);
-    if (articleMatch) {
-      body = articleMatch[1];
-    } else {
-      const pMatches = html.match(/<p[^>]*>.*?<\/p>/gi);
-      if (pMatches) {
-        body = pMatches.join('\n\n');
-      }
-    }
-
-    // Clean HTML tags
-    body = body.replace(/<[^>]*>/g, '').trim();
-    body = body.replace(/&nbsp;/g, ' ');
-    body = body.replace(/&amp;/g, '&');
-    body = body.replace(/&lt;/g, '<');
-    body = body.replace(/&gt;/g, '>');
-    body = body.replace(/&quot;/g, '"');
-
-    // Split into sections by paragraphs
-    const sections = body
-      .split(/\n\n+/)
-      .filter((s) => s.trim().length > 50)
-      .slice(0, 10);
-
-    return { title, body, sections };
-  };
-
-  const handleURLImport = async () => {
+  const handleFetchContent = async () => {
     if (!url.trim()) {
       Alert.alert('Error', 'Please enter a URL');
       return;
@@ -84,209 +41,100 @@ export default function ImportScreen() {
 
     setLoading(true);
     try {
-      const content = await extractContentFromURL(url);
-      if (!content.title || !content.body) {
-        throw new Error('Could not extract content from URL');
-      }
-      setExtractedContent(content);
+      const result = await extractContentFromURL(url);
+      setExtractedTitle(result.title);
+      setExtractedBody(result.body);
+      setShowPreview(true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to extract content from URL. Please check the URL and try again.');
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to fetch content');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFileImport = async () => {
+  const handleFileUpload = async () => {
     setLoading(true);
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['text/plain', 'text/markdown'],
-        copyToCacheDirectory: true,
-      });
-
-      if (result.canceled) {
-        setLoading(false);
-        return;
-      }
-
-      const file = result.assets[0];
-      const content = await FileSystem.readAsStringAsync(file.uri);
-
-      // Extract title from filename
-      const title = file.name.replace(/\.(txt|md)$/i, '');
-
-      // Split into sections by double newlines or markdown headers
-      const sections = content
-        .split(/\n\n+|^#{1,3}\s+/m)
-        .filter((s) => s.trim().length > 50)
-        .slice(0, 10);
-
-      setExtractedContent({
-        title,
-        body: content,
-        sections,
-      });
+      const result = await convertFileToText();
+      setExtractedTitle(result.title);
+      setExtractedBody(result.content);
+      setShowPreview(true);
+      setActiveTab('url'); // Switch to preview tab
     } catch (error) {
-      Alert.alert('Error', 'Failed to read file. Please try again.');
+      if (error instanceof Error && error.message !== 'File selection cancelled') {
+        Alert.alert('Error', error.message);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCreateFromContent = () => {
+    const extractedLessons = splitContentIntoLessons(extractedBody);
+    setLessons(extractedLessons);
+    setActiveTab('lessons');
+  };
+
+  const handleLessonTitleChange = (index: number, newTitle: string) => {
+    const updatedLessons = [...lessons];
+    updatedLessons[index].title = newTitle;
+    setLessons(updatedLessons);
   };
 
   const handleCreateCourse = () => {
-    if (!extractedContent) return;
+    if (lessons.length === 0) {
+      Alert.alert('Error', 'No lessons to create');
+      return;
+    }
 
     createCourse({
-      title: extractedContent.title,
-      description: extractedContent.body.substring(0, 200) + '...',
+      title: extractedTitle,
+      description: `Imported course with ${lessons.length} lessons`,
       published: false,
     });
 
     const courses = useCourseStore.getState().courses;
     const newCourse = courses[courses.length - 1];
 
-    // Create lessons from sections
-    extractedContent.sections.forEach((section, index) => {
+    lessons.forEach((lesson, index) => {
       addLesson(newCourse.id, {
-        title: `Lesson ${index + 1}`,
-        content: section,
+        title: lesson.title,
+        content: lesson.content,
         order: index,
       });
     });
 
-    Alert.alert(
-      'Success',
-      `Created course with ${extractedContent.sections.length} lessons`,
-      [
-        {
-          text: 'View Course',
-          onPress: () => router.push(`/course/${newCourse.id}`),
-        },
-      ]
-    );
+    Alert.alert('Success', 'Course created successfully', [
+      {
+        text: 'OK',
+        onPress: () => router.push(`/course/${newCourse.id}`),
+      },
+    ]);
   };
 
-  const renderURLTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.instructions}>
-        Paste a URL to extract article content and create lessons
-      </Text>
-      <TextInput
-        style={styles.urlInput}
-        placeholder="https://example.com/article"
-        placeholderTextColor="#C7C7CC"
-        value={url}
-        onChangeText={setUrl}
-        autoCapitalize="none"
-        autoCorrect={false}
-        keyboardType="url"
-      />
-      <TouchableOpacity
-        style={styles.importButton}
-        onPress={handleURLImport}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <>
-            <Ionicons name="download-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.importButtonText}>Extract Content</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderFileTab = () => (
-    <View style={styles.tabContent}>
-      <Text style={styles.instructions}>
-        Upload a .txt or .md file to create lessons from its content
-      </Text>
-      <TouchableOpacity
-        style={styles.fileButton}
-        onPress={handleFileImport}
-        disabled={loading}
-        activeOpacity={0.8}
-      >
-        {loading ? (
-          <ActivityIndicator color="#007AFF" />
-        ) : (
-          <>
-            <Ionicons name="document-outline" size={48} color="#007AFF" />
-            <Text style={styles.fileButtonText}>Choose File</Text>
-            <Text style={styles.fileButtonSubtext}>Supports .txt and .md files</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderAITab = () => (
-    <View style={styles.tabContent}>
-      <View style={styles.comingSoon}>
-        <Ionicons name="sparkles-outline" size={64} color="#C7C7CC" />
-        <Text style={styles.comingSoonTitle}>AI Generation</Text>
-        <Text style={styles.comingSoonText}>
-          Coming soon: Generate course content from a topic or description using AI
-        </Text>
-      </View>
-    </View>
-  );
-
-  const renderPreview = () => {
-    if (!extractedContent) return null;
-
-    return (
-      <View style={styles.preview}>
-        <View style={styles.previewHeader}>
-          <Ionicons name="eye-outline" size={24} color="#007AFF" />
-          <Text style={styles.previewTitle}>Preview</Text>
-        </View>
-
-        <View style={styles.previewContent}>
-          <Text style={styles.previewCourseTitle}>{extractedContent.title}</Text>
-          <Text style={styles.previewDescription} numberOfLines={3}>
-            {extractedContent.body.substring(0, 200)}...
-          </Text>
-
-          <View style={styles.lessonSuggestions}>
-            <Text style={styles.suggestionsTitle}>
-              Suggested Lessons ({extractedContent.sections.length})
-            </Text>
-            {extractedContent.sections.slice(0, 5).map((section, index) => (
-              <View key={index} style={styles.lessonPreview}>
-                <View style={styles.lessonNumber}>
-                  <Text style={styles.lessonNumberText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.lessonPreviewText} numberOfLines={2}>
-                  {section.substring(0, 100)}...
-                </Text>
-              </View>
-            ))}
-            {extractedContent.sections.length > 5 && (
-              <Text style={styles.moreText}>
-                +{extractedContent.sections.length - 5} more lessons
-              </Text>
-            )}
-          </View>
-
-          <TouchableOpacity
-            style={styles.createCourseButton}
-            onPress={handleCreateCourse}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add-circle-outline" size={24} color="#FFFFFF" />
-            <Text style={styles.createCourseButtonText}>Create Course from Import</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    );
+  const handleReset = () => {
+    setUrl('');
+    setExtractedTitle('');
+    setExtractedBody('');
+    setLessons([]);
+    setShowPreview(false);
+    setActiveTab('url');
   };
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={24} color="#007AFF" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Import Content</Text>
+        <View style={styles.backButton} />
+      </View>
+
       <View style={styles.tabs}>
         <TouchableOpacity
           style={[styles.tab, activeTab === 'url' && styles.activeTab]}
@@ -299,7 +147,7 @@ export default function ImportScreen() {
             color={activeTab === 'url' ? '#007AFF' : '#8E8E93'}
           />
           <Text style={[styles.tabText, activeTab === 'url' && styles.activeTabText]}>
-            URL
+            URL Import
           </Text>
         </TouchableOpacity>
 
@@ -314,31 +162,160 @@ export default function ImportScreen() {
             color={activeTab === 'file' ? '#007AFF' : '#8E8E93'}
           />
           <Text style={[styles.tabText, activeTab === 'file' && styles.activeTabText]}>
-            File
+            File Upload
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.tab, activeTab === 'ai' && styles.activeTab]}
-          onPress={() => setActiveTab('ai')}
+          style={[styles.tab, activeTab === 'lessons' && styles.activeTab]}
+          onPress={() => lessons.length > 0 && setActiveTab('lessons')}
           activeOpacity={0.7}
+          disabled={lessons.length === 0}
         >
           <Ionicons
-            name="sparkles-outline"
+            name="list-outline"
             size={20}
-            color={activeTab === 'ai' ? '#007AFF' : '#8E8E93'}
+            color={activeTab === 'lessons' ? '#007AFF' : '#8E8E93'}
           />
-          <Text style={[styles.tabText, activeTab === 'ai' && styles.activeTabText]}>
-            AI Generate
+          <Text style={[styles.tabText, activeTab === 'lessons' && styles.activeTabText]}>
+            Lessons ({lessons.length})
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {activeTab === 'url' && renderURLTab()}
-        {activeTab === 'file' && renderFileTab()}
-        {activeTab === 'ai' && renderAITab()}
-        {renderPreview()}
+      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+        {activeTab === 'url' && (
+          <View style={styles.tabContent}>
+            {!showPreview ? (
+              <>
+                <Text style={styles.sectionTitle}>Import from URL</Text>
+                <Text style={styles.sectionDescription}>
+                  Paste a Substack, Medium, or blog post URL to extract content
+                </Text>
+
+                <View style={styles.inputContainer}>
+                  <TextInput
+                    style={styles.urlInput}
+                    placeholder="https://example.substack.com/p/article"
+                    placeholderTextColor="#C7C7CC"
+                    value={url}
+                    onChangeText={setUrl}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.primaryButton, loading && styles.disabledButton]}
+                  onPress={handleFetchContent}
+                  disabled={loading}
+                  activeOpacity={0.8}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Ionicons name="download-outline" size={20} color="#FFFFFF" />
+                      <Text style={styles.primaryButtonText}>Fetch Content</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <View style={styles.previewHeader}>
+                  <Text style={styles.sectionTitle}>Content Preview</Text>
+                  <TouchableOpacity onPress={handleReset} activeOpacity={0.7}>
+                    <Ionicons name="close-circle-outline" size={24} color="#8E8E93" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.previewCard}>
+                  <Text style={styles.previewTitle}>{extractedTitle}</Text>
+                  <ScrollView style={styles.previewBodyScroll} nestedScrollEnabled>
+                    <Text style={styles.previewBody}>{extractedBody}</Text>
+                  </ScrollView>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.primaryButton}
+                  onPress={handleCreateFromContent}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="create-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Create Course from This</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+        )}
+
+        {activeTab === 'file' && (
+          <View style={styles.tabContent}>
+            <Text style={styles.sectionTitle}>Upload File</Text>
+            <Text style={styles.sectionDescription}>
+              Upload a PDF, TXT, or DOCX file to extract content
+            </Text>
+
+            <View style={styles.uploadArea}>
+              <Ionicons name="cloud-upload-outline" size={64} color="#C7C7CC" />
+              <Text style={styles.uploadText}>Choose a file to upload</Text>
+              <Text style={styles.uploadSubtext}>PDF, TXT, or DOCX files supported</Text>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.disabledButton]}
+              onPress={handleFileUpload}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <>
+                  <Ionicons name="folder-open-outline" size={20} color="#FFFFFF" />
+                  <Text style={styles.primaryButtonText}>Choose File</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {activeTab === 'lessons' && (
+          <View style={styles.tabContent}>
+            <Text style={styles.sectionTitle}>Edit Lessons</Text>
+            <Text style={styles.sectionDescription}>
+              Review and edit lesson titles before creating your course
+            </Text>
+
+            <View style={styles.lessonsList}>
+              {lessons.map((lesson, index) => (
+                <View key={index} style={styles.lessonItem}>
+                  <View style={styles.lessonNumber}>
+                    <Text style={styles.lessonNumberText}>{index + 1}</Text>
+                  </View>
+                  <TextInput
+                    style={styles.lessonTitleInput}
+                    value={lesson.title}
+                    onChangeText={(text) => handleLessonTitleChange(index, text)}
+                    placeholder="Lesson title"
+                    placeholderTextColor="#C7C7CC"
+                  />
+                </View>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={handleCreateCourse}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.primaryButtonText}>Create Course</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -348,6 +325,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000000',
   },
   tabs: {
     flexDirection: 'row',
@@ -360,7 +356,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 16,
+    paddingVertical: 12,
     gap: 6,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
@@ -377,170 +373,131 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     fontWeight: '600',
   },
-  scrollView: {
+  content: {
     flex: 1,
   },
   scrollContent: {
     padding: 16,
   },
   tabContent: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
+    gap: 16,
   },
-  instructions: {
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  sectionDescription: {
     fontSize: 14,
     color: '#8E8E93',
-    marginBottom: 16,
     lineHeight: 20,
   },
+  inputContainer: {
+    marginTop: 8,
+  },
   urlInput: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    padding: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
     fontSize: 16,
     color: '#000000',
-    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
-  importButton: {
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 14,
+    paddingVertical: 16,
+    borderRadius: 12,
     gap: 8,
   },
-  importButtonText: {
+  disabledButton: {
+    opacity: 0.6,
+  },
+  primaryButtonText: {
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  fileButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    gap: 12,
-  },
-  fileButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  fileButtonSubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-  },
-  comingSoon: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  comingSoonTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  comingSoonText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  preview: {
+  uploadArea: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E5E5EA',
+    borderStyle: 'dashed',
+    padding: 48,
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+    marginTop: 8,
+  },
+  uploadSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   previewHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    gap: 8,
+  },
+  previewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    maxHeight: 400,
   },
   previewTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  previewContent: {
-    padding: 16,
-  },
-  previewCourseTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 8,
-  },
-  previewDescription: {
-    fontSize: 14,
-    color: '#8E8E93',
-    lineHeight: 20,
-    marginBottom: 20,
-  },
-  lessonSuggestions: {
-    marginBottom: 20,
-  },
-  suggestionsTitle: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: '#000000',
     marginBottom: 12,
   },
-  lessonPreview: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    padding: 12,
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    marginBottom: 8,
+  previewBodyScroll: {
+    maxHeight: 300,
+  },
+  previewBody: {
+    fontSize: 14,
+    color: '#3C3C43',
+    lineHeight: 20,
+  },
+  lessonsList: {
     gap: 12,
   },
+  lessonItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+  },
   lessonNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   lessonNumberText: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  lessonPreviewText: {
+  lessonTitleInput: {
     flex: 1,
-    fontSize: 14,
-    color: '#000000',
-    lineHeight: 20,
-  },
-  moreText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 8,
-  },
-  createCourseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#34C759',
-    borderRadius: 12,
-    padding: 16,
-    gap: 8,
-  },
-  createCourseButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#000000',
+    padding: 0,
   },
 });

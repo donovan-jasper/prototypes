@@ -50,6 +50,10 @@ export default function DashboardScreen() {
     router.push('/create');
   };
 
+  const handleImportContent = () => {
+    router.push('/import');
+  };
+
   return (
     <View style={styles.container}>
       {courses.length === 0 ? (
@@ -57,19 +61,39 @@ export default function DashboardScreen() {
           <Ionicons name="book-outline" size={64} color="#C7C7CC" />
           <Text style={styles.emptyTitle}>No courses yet</Text>
           <Text style={styles.emptyDescription}>
-            Create your first course to get started
+            Create your first course or import existing content
           </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleCreateCourse}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="add" size={24} color="#FFFFFF" />
-            <Text style={styles.createButtonText}>Create Course</Text>
-          </TouchableOpacity>
+          <View style={styles.emptyActions}>
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleCreateCourse}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+              <Text style={styles.createButtonText}>Create Course</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.importButton}
+              onPress={handleImportContent}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="download-outline" size={24} color="#007AFF" />
+              <Text style={styles.importButtonText}>Import Content</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.importHeaderButton}
+              onPress={handleImportContent}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="download-outline" size={20} color="#007AFF" />
+              <Text style={styles.importHeaderButtonText}>Import Content</Text>
+            </TouchableOpacity>
+          </View>
           <FlatList
             data={courses}
             keyExtractor={(item) => item.id}
@@ -95,8 +119,31 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
+  headerActions: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  importHeaderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  importHeaderButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   listContent: {
     padding: 16,
+    paddingTop: 8,
     paddingBottom: 80,
   },
   card: {
@@ -172,9 +219,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 24,
   },
+  emptyActions: {
+    gap: 12,
+    width: '100%',
+  },
   createButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#007AFF',
     paddingHorizontal: 24,
     paddingVertical: 12,
@@ -185,6 +237,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  importButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
   },
   fab: {
     position: 'absolute',
