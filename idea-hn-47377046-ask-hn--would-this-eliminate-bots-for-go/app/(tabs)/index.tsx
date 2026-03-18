@@ -1,27 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Modal } from 'react-native';
 import VerificationButton from '@/components/VerificationButton';
 import TrustScoreGauge from '@/components/TrustScoreGauge';
+import QRCodeGenerator from '@/components/QRCodeGenerator';
 import { authenticateUser, isBiometricAvailable } from '@/lib/biometrics';
 import { getRecentEntropy } from '@/lib/sensors';
 import { generateVerificationToken } from '@/lib/crypto';
-import { calculateTrustScore } from '@/lib/trustScore';
-import { initDatabase, saveVerification, getVerificationCount } from '@/lib/database';
+import { calculateTrustScore, calculatePassiveTrustScore } from '@/lib/trustScore';
+import { initDatabase, saveVerification, getVerificationCount, updateDeviceReputation, getDeviceReputation } from '@/lib/database';
 import { useLiveness } from '@/components/LivenessMonitor';
 
 export default function HomeScreen() {
   const [trustScore, setTrustScore] = useState(0);
   const [verificationCount, setVerificationCount] = useState(0);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [currentToken, setCurrentToken] = useState('');
+  const [tokenExpiry, setTokenExpiry] = useState(0);
+  const [isPassiveMode, setIsPassiveMode] = useState(true);
+  const [deviceReputation, setDeviceReputation] = useState(0.5);
   const { isMonitoring, currentEntropy } = useLiveness();
 
   useEffect(() => {
     initDatabase();
     loadVerificationCount();
+    loadDeviceReputation();
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      if (isPassiveMode) {
+        const entropy = getRecentEntropy();
+        const reputation = await getDeviceReputation();
+        
+        const passiveScore = calculatePassiveTrustScore(
+          entropy,
+          reputation,
+          verificationCount
+        );
+        
+        setTrustScore(passiveScore);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isPassiveMode, verificationCount]);
 
   const loadVerificationCount = async () => {
     const count = await getVerificationCount();
     setVerificationCount(count);
+  };
+
+  const loadDeviceReputation = async () => {
+    const reputation = await getDeviceReputation();
+    setDeviceReputation(reputation);
   };
 
   const handleVerify = async () => {
@@ -29,27 +60,34 @@ export default function HomeScreen() {
       const biometricAvailable = await isBiometricAvailable();
       if (!biometricAvailable) {
         Alert.alert('Error', 'Biometric authentication not available');
+        await updateDeviceReputation(false);
+        await loadDeviceReputation();
         return;
       }
 
       const authResult = await authenticateUser();
       if (!authResult.success) {
         Alert.alert('Error', 'Authentication failed');
+        await updateDeviceReputation(false);
+        await loadDeviceReputation();
         return;
       }
 
       const entropy = getRecentEntropy();
+      const reputation = await getDeviceReputation();
 
       const score = calculateTrustScore({
         biometricSuccess: true,
         movementEntropy: entropy,
-        deviceReputation: 0.8,
+        deviceReputation: reputation,
         verificationHistory: verificationCount,
       });
 
       setTrustScore(score);
+      setIsPassiveMode(false);
 
       const token = await generateVerificationToken('user123', score);
+      const expiry = Date.now() + (24 * 60 * 60 * 1000);
 
       await saveVerification({
         timestamp: Date.now(),
@@ -58,11 +96,17 @@ export default function HomeScreen() {
         token,
       });
 
+      await updateDeviceReputation(true);
       await loadVerificationCount();
+      await loadDeviceReputation();
 
-      Alert.alert('Success', `Verified! Trust Score: ${score}`);
+      setCurrentToken(token);
+      setTokenExpiry(expiry);
+      setShowQRModal(true);
     } catch (error) {
       Alert.alert('Error', String(error));
+      await updateDeviceReputation(false);
+      await loadDeviceReputation();
     }
   };
 
@@ -78,13 +122,33 @@ export default function HomeScreen() {
         </Text>
       </View>
       
-      <TrustScoreGauge score={trustScore} />
+      <TrustScoreGauge score={trustScore} isPassive={isPassiveMode} />
+      
+      <View style={styles.reputationContainer}>
+        <Text style={styles.reputationLabel}>Device Reputation</Text>
+        <Text style={styles.reputationValue}>{Math.round(deviceReputation * 100)}%</Text>
+      </View>
       
       <VerificationButton onVerify={handleVerify} />
       
       <Text style={styles.count}>
         {verificationCount} verification{verificationCount !== 1 ? 's' : ''} completed
       </Text>
+
+      <Modal
+        visible={showQRModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowQRModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <QRCodeGenerator
+            token={currentToken}
+            expiryTime={tokenExpiry}
+            onClose={() => setShowQRModal(false)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -130,9 +194,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
   },
+  reputationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  reputationLabel: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  reputationValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
   count: {
     marginTop: 20,
     fontSize: 14,
     color: '#8E8E93',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
