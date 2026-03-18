@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, FlatList } from 'react-native';
 import FocusMode from '../../components/FocusMode';
-import { useAppStore } from '../../store/useAppStore';
+import useAppStore from '../../store/useAppStore';
 
 const ModesScreen = () => {
   const { focusModes, activateFocusMode } = useAppStore();
