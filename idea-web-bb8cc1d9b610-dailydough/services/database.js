@@ -28,6 +28,15 @@ export async function initDatabase() {
       category TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    
+    CREATE TABLE IF NOT EXISTS category_corrections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      description_pattern TEXT NOT NULL,
+      user_chosen_category TEXT NOT NULL,
+      frequency INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 }
 

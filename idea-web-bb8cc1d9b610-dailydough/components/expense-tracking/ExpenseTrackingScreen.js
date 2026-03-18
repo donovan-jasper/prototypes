@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, FlatList, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { getDatabase } from '../../services/database';
-import { categorizeExpense, getCategories } from '../../services/expenseCategorizer';
+import { categorizeExpense, getCategories, recordCategoryCorrection } from '../../services/expenseCategorizer';
 
 export default function ExpenseTrackingScreen() {
   const [expenses, setExpenses] = useState([]);
@@ -9,6 +9,8 @@ export default function ExpenseTrackingScreen() {
   const [category, setCategory] = useState('');
   const [description, setDescription] = useState('');
   const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [categorizationResult, setCategorizationResult] = useState(null);
+  const [originalSuggestedCategory, setOriginalSuggestedCategory] = useState('');
 
   const categories = getCategories();
 
@@ -17,10 +19,19 @@ export default function ExpenseTrackingScreen() {
   }, []);
 
   useEffect(() => {
-    if (description.trim()) {
-      const suggestedCategory = categorizeExpense(description);
-      setCategory(suggestedCategory);
+    async function suggestCategory() {
+      if (description.trim()) {
+        const result = await categorizeExpense(description);
+        setCategory(result.category);
+        setCategorizationResult(result);
+        setOriginalSuggestedCategory(result.category);
+      } else {
+        setCategory('');
+        setCategorizationResult(null);
+        setOriginalSuggestedCategory('');
+      }
     }
+    suggestCategory();
   }, [description]);
 
   async function loadExpenses() {
@@ -32,6 +43,11 @@ export default function ExpenseTrackingScreen() {
   async function addExpense() {
     if (!amount || !category) return;
     
+    // Record correction if user changed the suggested category
+    if (originalSuggestedCategory && category !== originalSuggestedCategory && description.trim()) {
+      await recordCategoryCorrection(description, category);
+    }
+    
     const db = getDatabase();
     await db.runAsync(
       'INSERT INTO expenses (amount, category, description, date) VALUES (?, ?, ?, ?)',
@@ -41,12 +57,20 @@ export default function ExpenseTrackingScreen() {
     setAmount('');
     setCategory('');
     setDescription('');
+    setCategorizationResult(null);
+    setOriginalSuggestedCategory('');
     loadExpenses();
   }
 
   function selectCategory(selectedCategory) {
     setCategory(selectedCategory);
     setShowCategoryPicker(false);
+  }
+
+  function getConfidenceText(confidence) {
+    if (confidence >= 0.8) return 'High confidence';
+    if (confidence >= 0.6) return 'Medium confidence';
+    return 'Low confidence';
   }
 
   return (
@@ -73,10 +97,18 @@ export default function ExpenseTrackingScreen() {
           {category || 'Select Category'}
         </Text>
       </TouchableOpacity>
-      {category && (
-        <Text style={styles.autoSuggestText}>
-          Auto-suggested from description (tap to change)
-        </Text>
+      {categorizationResult && (
+        <View style={styles.suggestionContainer}>
+          {categorizationResult.source === 'learned' ? (
+            <Text style={styles.learnedText}>
+              🧠 Learning from your choices • {getConfidenceText(categorizationResult.confidence)}
+            </Text>
+          ) : (
+            <Text style={styles.autoSuggestText}>
+              Auto-suggested from description • {getConfidenceText(categorizationResult.confidence)}
+            </Text>
+          )}
+        </View>
       )}
       <Button title="Add Expense" onPress={addExpense} />
       
@@ -142,11 +174,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333'
   },
+  suggestionContainer: {
+    marginBottom: 10
+  },
   autoSuggestText: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 10,
     fontStyle: 'italic'
+  },
+  learnedText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '500'
   },
   item: { backgroundColor: 'white', padding: 15, marginBottom: 10, borderRadius: 5 },
   itemAmount: { fontSize: 18, fontWeight: 'bold' },

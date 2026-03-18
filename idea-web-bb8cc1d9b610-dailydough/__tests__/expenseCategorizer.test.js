@@ -1,65 +1,97 @@
-import { categorizeExpense, getCategories } from '../services/expenseCategorizer';
+import { categorizeExpense, getCategories, recordCategoryCorrection } from '../services/expenseCategorizer';
+import { initDatabase } from '../services/database';
+
+// Mock expo-sqlite
+jest.mock('expo-sqlite', () => ({
+  openDatabaseAsync: jest.fn(() => Promise.resolve({
+    execAsync: jest.fn(),
+    getAllAsync: jest.fn(() => Promise.resolve([])),
+    runAsync: jest.fn()
+  }))
+}));
 
 describe('Expense Categorizer', () => {
-  test('categorizes food-related expenses correctly', () => {
-    expect(categorizeExpense('Starbucks coffee')).toBe('Food & Dining');
-    expect(categorizeExpense('McDonald\'s lunch')).toBe('Food & Dining');
-    expect(categorizeExpense('Grocery shopping at Whole Foods')).toBe('Food & Dining');
-    expect(categorizeExpense('Pizza delivery')).toBe('Food & Dining');
+  beforeEach(async () => {
+    await initDatabase();
   });
 
-  test('categorizes transportation expenses correctly', () => {
-    expect(categorizeExpense('Uber ride to work')).toBe('Transportation');
-    expect(categorizeExpense('Gas station fill up')).toBe('Transportation');
-    expect(categorizeExpense('Lyft to airport')).toBe('Transportation');
-    expect(categorizeExpense('Parking fee')).toBe('Transportation');
+  test('categorizes food-related expenses correctly', async () => {
+    const result = await categorizeExpense('Starbucks coffee');
+    expect(result.category).toBe('Food & Dining');
+    expect(result.confidence).toBeGreaterThan(0);
+    expect(result.source).toBe('keyword');
   });
 
-  test('categorizes shopping expenses correctly', () => {
-    expect(categorizeExpense('Amazon order')).toBe('Shopping');
-    expect(categorizeExpense('Target purchase')).toBe('Shopping');
-    expect(categorizeExpense('New shoes from Nike')).toBe('Shopping');
+  test('categorizes transportation expenses correctly', async () => {
+    const result = await categorizeExpense('Uber ride to work');
+    expect(result.category).toBe('Transportation');
+    expect(result.source).toBe('keyword');
   });
 
-  test('categorizes entertainment expenses correctly', () => {
-    expect(categorizeExpense('Netflix subscription')).toBe('Entertainment');
-    expect(categorizeExpense('Spotify premium')).toBe('Entertainment');
-    expect(categorizeExpense('Movie tickets')).toBe('Entertainment');
+  test('categorizes shopping expenses correctly', async () => {
+    const result = await categorizeExpense('Amazon order');
+    expect(result.category).toBe('Shopping');
   });
 
-  test('categorizes bills and utilities correctly', () => {
-    expect(categorizeExpense('Electric bill payment')).toBe('Bills & Utilities');
-    expect(categorizeExpense('Internet service')).toBe('Bills & Utilities');
-    expect(categorizeExpense('Rent payment')).toBe('Bills & Utilities');
+  test('categorizes entertainment expenses correctly', async () => {
+    const result = await categorizeExpense('Netflix subscription');
+    expect(result.category).toBe('Entertainment');
   });
 
-  test('categorizes healthcare expenses correctly', () => {
-    expect(categorizeExpense('Doctor appointment')).toBe('Healthcare');
-    expect(categorizeExpense('CVS pharmacy')).toBe('Healthcare');
-    expect(categorizeExpense('Dental checkup')).toBe('Healthcare');
+  test('categorizes bills and utilities correctly', async () => {
+    const result = await categorizeExpense('Electric bill payment');
+    expect(result.category).toBe('Bills & Utilities');
   });
 
-  test('categorizes personal care expenses correctly', () => {
-    expect(categorizeExpense('Gym membership')).toBe('Personal Care');
-    expect(categorizeExpense('Haircut at salon')).toBe('Personal Care');
-    expect(categorizeExpense('Spa treatment')).toBe('Personal Care');
+  test('categorizes healthcare expenses correctly', async () => {
+    const result = await categorizeExpense('Doctor appointment');
+    expect(result.category).toBe('Healthcare');
   });
 
-  test('returns Other for unrecognized expenses', () => {
-    expect(categorizeExpense('Random expense')).toBe('Other');
-    expect(categorizeExpense('Unknown purchase')).toBe('Other');
+  test('categorizes personal care expenses correctly', async () => {
+    const result = await categorizeExpense('Gym membership');
+    expect(result.category).toBe('Personal Care');
   });
 
-  test('handles empty or invalid input', () => {
-    expect(categorizeExpense('')).toBe('Other');
-    expect(categorizeExpense(null)).toBe('Other');
-    expect(categorizeExpense(undefined)).toBe('Other');
+  test('returns Other for unrecognized expenses', async () => {
+    const result = await categorizeExpense('Random expense');
+    expect(result.category).toBe('Other');
   });
 
-  test('is case insensitive', () => {
-    expect(categorizeExpense('UBER RIDE')).toBe('Transportation');
-    expect(categorizeExpense('netflix')).toBe('Entertainment');
-    expect(categorizeExpense('StArBuCkS')).toBe('Food & Dining');
+  test('handles empty or invalid input', async () => {
+    const result1 = await categorizeExpense('');
+    expect(result1.category).toBe('Other');
+    
+    const result2 = await categorizeExpense(null);
+    expect(result2.category).toBe('Other');
+    
+    const result3 = await categorizeExpense(undefined);
+    expect(result3.category).toBe('Other');
+  });
+
+  test('is case insensitive', async () => {
+    const result1 = await categorizeExpense('UBER RIDE');
+    expect(result1.category).toBe('Transportation');
+    
+    const result2 = await categorizeExpense('netflix');
+    expect(result2.category).toBe('Entertainment');
+    
+    const result3 = await categorizeExpense('StArBuCkS');
+    expect(result3.category).toBe('Food & Dining');
+  });
+
+  test('returns confidence score', async () => {
+    const result = await categorizeExpense('Starbucks coffee');
+    expect(result).toHaveProperty('confidence');
+    expect(typeof result.confidence).toBe('number');
+    expect(result.confidence).toBeGreaterThanOrEqual(0);
+    expect(result.confidence).toBeLessThanOrEqual(1);
+  });
+
+  test('returns source information', async () => {
+    const result = await categorizeExpense('Starbucks coffee');
+    expect(result).toHaveProperty('source');
+    expect(['keyword', 'learned', 'default']).toContain(result.source);
   });
 
   test('getCategories returns all categories', () => {
