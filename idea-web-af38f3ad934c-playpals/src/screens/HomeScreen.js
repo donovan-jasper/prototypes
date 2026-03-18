@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import * as Location from 'expo-location';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateMockEvents } from '../utils/mockEventGenerator';
 
 const HomeScreen = ({ navigation }) => {
-  const [location, setLocation] = useState(null); // Stores the user's current location object
+  const [location, setLocation] = useState(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -15,8 +16,6 @@ const HomeScreen = ({ navigation }) => {
       if (status !== 'granted') {
         console.error('Permission to access location was denied');
         setLoading(false);
-        // Optionally, set a default location or show an error state
-        // For now, if permission is denied, events won't load based on user location.
         return;
       }
 
@@ -27,30 +26,72 @@ const HomeScreen = ({ navigation }) => {
   }, []);
 
   useEffect(() => {
-    // Only load events once location is available
     if (location) {
       loadEvents(location.coords.latitude, location.coords.longitude);
     }
-  }, [location]); // Depend on location state
+  }, [location]);
 
-  // Modified to accept user's latitude and longitude
-  const loadEvents = (userLat, userLon) => {
-    // Pass user's coordinates to the mock event generator
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (location) {
+        loadEvents(location.coords.latitude, location.coords.longitude);
+      }
+    });
+
+    return unsubscribe;
+  }, [navigation, location]);
+
+  const loadEvents = async (userLat, userLon) => {
     const mockEvents = generateMockEvents(userLat, userLon);
-    setEvents(mockEvents);
+    
+    try {
+      const storedEvents = await AsyncStorage.getItem('userEvents');
+      const userEvents = storedEvents ? JSON.parse(storedEvents) : [];
+      
+      const userEventsWithDistance = userEvents.map(event => {
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          event.latitude,
+          event.longitude
+        );
+        return { ...event, distance };
+      });
+      
+      const allEvents = [...userEventsWithDistance, ...mockEvents];
+      allEvents.sort((a, b) => a.distance - b.distance);
+      
+      setEvents(allEvents);
+    } catch (error) {
+      console.error('Error loading user events:', error);
+      setEvents(mockEvents);
+    }
   };
 
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 3958.8;
+    const dLat = toRadians(lat2 - lat1);
+    const dLon = toRadians(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(toRadians(lat1)) * Math.cos(toRadians(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return parseFloat((R * c).toFixed(1));
+  };
+
+  const toRadians = (degrees) => degrees * (Math.PI / 180);
+
   const handleRefresh = () => {
-    if (location) { // Ensure location is available before refreshing
+    if (location) {
       setRefreshing(true);
-      // Simulate network request or data fetching delay
       setTimeout(() => {
         loadEvents(location.coords.latitude, location.coords.longitude);
         setRefreshing(false);
       }, 500);
     } else {
       console.warn("Cannot refresh events: user location not available.");
-      setRefreshing(false); // Ensure refreshing state is reset even if location is missing
+      setRefreshing(false);
     }
   };
 
@@ -71,6 +112,11 @@ const HomeScreen = ({ navigation }) => {
             👥 {item.currentParticipants}/{item.maxCapacity}
           </Text>
         </View>
+        {item.createdBy === 'user' && (
+          <View style={styles.userBadge}>
+            <Text style={styles.userBadgeText}>Your Activity</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -91,7 +137,7 @@ const HomeScreen = ({ navigation }) => {
         <TouchableOpacity
           style={styles.refreshButton}
           onPress={handleRefresh}
-          disabled={refreshing || !location} // Disable refresh if loading or no location
+          disabled={refreshing || !location}
         >
           <Text style={styles.refreshButtonText}>
             {refreshing ? '↻' : '🔄'} Refresh
@@ -109,10 +155,16 @@ const HomeScreen = ({ navigation }) => {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
-          refreshing={refreshing} // Enable pull-to-refresh indicator
-          onRefresh={handleRefresh} // Handle pull-to-refresh action
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
         />
       )}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate('CreateEvent')}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -161,6 +213,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: 16,
+    paddingBottom: 80,
   },
   eventItem: {
     backgroundColor: '#FFFFFF',
@@ -215,6 +268,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  userBadge: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  userBadgeText: {
+    fontSize: 12,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
@@ -224,6 +290,27 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#666',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabText: {
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: '300',
   },
 });
 
