@@ -63,7 +63,7 @@ export const useDecompilation = () => {
     return { ...decompilation, id };
   };
 
-  const getDecompilation = async (id) => {
+  const getDecompilationById = async (id) => {
     const decompilation = await getDecompilation(id);
     return decompilation;
   };
@@ -83,15 +83,24 @@ export const useDecompilation = () => {
   };
 
   const getPreviousVersion = async (decompilation) => {
-    // Implement logic to find previous version of the same app
-    // Could be based on file name pattern, package name, etc.
+    // Find previous version by matching file name pattern
+    const similar = allDecompilations.filter(d => 
+      d.fileName.includes(decompilation.fileName.split('.')[0]) &&
+      d.timestamp < decompilation.timestamp
+    );
+    
+    if (similar.length > 0) {
+      return similar[0];
+    }
+    
+    return null;
   };
 
   return {
     recentDecompilations,
     allDecompilations,
     uploadFile,
-    getDecompilation,
+    getDecompilation: getDecompilationById,
     getComparison,
   };
 };
