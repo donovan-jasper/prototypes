@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { fetchChannels } from '../services/channelService';
 import { initDatabase, getChannels, insertChannels, getFavorites, addFavorite as dbAddFavorite, removeFavorite as dbRemoveFavorite, getAlerts, addAlert as dbAddAlert, removeAlert as dbRemoveAlert } from '../services/database';
+import { DEFAULT_CHANNELS } from '../utils/constants';
 
 interface AppContextType {
   channels: any[];
@@ -40,8 +41,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       insertChannels(fetchedChannels);
       setChannels(fetchedChannels);
     } catch (error) {
-      console.error('Error loading channels:', error);
-      getChannels(setChannels);
+      console.error('Error loading channels, using defaults:', error);
+      insertChannels(DEFAULT_CHANNELS);
+      setChannels(DEFAULT_CHANNELS);
     }
   };
 
