@@ -1,48 +1,94 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet } from 'react-native';
-import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
+import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { RootTabParamList } from '../types/navigation';
+
+type ChallengeScreenRouteProp = RouteProp<RootTabParamList, 'Challenge'>;
+type ChallengeScreenNavigationProp = BottomTabNavigationProp<RootTabParamList, 'Challenge'>;
 
 const ChallengeScreen: React.FC = () => {
+  const route = useRoute<ChallengeScreenRouteProp>();
+  const navigation = useNavigation<ChallengeScreenNavigationProp>();
   const [text, setText] = useState('');
   const [feedback, setFeedback] = useState('');
-  const [model, setModel] = useState<any>(null);
+  const [score, setScore] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
 
-  useEffect(() => {
-    const loadModel = async () => {
-      await tf.ready();
-      const loadedModel = await tf.loadLayersModel('path/to/your/model.json');
-      setModel(loadedModel);
-    };
-    loadModel();
-  }, []);
+  const challengeData = route.params || {
+    id: '1',
+    title: 'Typing Challenge',
+    description: 'Improve your typing speed and accuracy',
+  };
 
-  const handleSubmit = async () => {
-    if (!model) return;
+  const handleSubmit = () => {
+    const wordCount = text.trim().split(/\s+/).length;
+    const calculatedScore = Math.min(wordCount * 10, 100);
+    setScore(calculatedScore);
+    setFeedback(`Great job! You typed ${wordCount} words. Score: ${calculatedScore}/100`);
+    setIsCompleted(true);
+  };
 
-    // Preprocess the input text
-    const inputTensor = tf.tensor2d([text.split('').map(c => c.charCodeAt(0))]);
+  const handleReset = () => {
+    setText('');
+    setFeedback('');
+    setScore(0);
+    setIsCompleted(false);
+  };
 
-    // Get the model's prediction
-    const prediction = model.predict(inputTensor) as tf.Tensor;
-
-    // Convert the prediction to a readable format
-    const feedbackText = prediction.dataSync().join(', ');
-    setFeedback(feedbackText);
+  const handleBackToHome = () => {
+    navigation.navigate('Home');
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Typing Challenge</Text>
-      <TextInput
-        style={styles.input}
-        onChangeText={setText}
-        value={text}
-        placeholder="Type here..."
-        multiline
-      />
-      <Button title="Submit" onPress={handleSubmit} />
-      <Text style={styles.feedback}>{feedback}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBackToHome} style={styles.backButton}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>{challengeData.title}</Text>
+        <Text style={styles.description}>{challengeData.description}</Text>
+      </View>
+
+      <View style={styles.content}>
+        <Text style={styles.instruction}>Type as much as you can in the box below:</Text>
+        <TextInput
+          style={styles.input}
+          onChangeText={setText}
+          value={text}
+          placeholder="Start typing here..."
+          multiline
+          editable={!isCompleted}
+        />
+
+        {!isCompleted ? (
+          <TouchableOpacity 
+            style={[styles.button, styles.submitButton]} 
+            onPress={handleSubmit}
+            disabled={text.trim().length === 0}
+          >
+            <Text style={styles.buttonText}>Submit</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.resultContainer}>
+            <Text style={styles.feedback}>{feedback}</Text>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity 
+                style={[styles.button, styles.resetButton]} 
+                onPress={handleReset}
+              >
+                <Text style={styles.buttonText}>Try Again</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.button, styles.homeButton]} 
+                onPress={handleBackToHome}
+              >
+                <Text style={styles.buttonText}>Back to Home</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -50,24 +96,91 @@ const ChallengeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   header: {
-    fontSize: 24,
+    paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  backButton: {
+    marginBottom: 12,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+  },
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 8,
+    color: '#000',
+  },
+  description: {
+    fontSize: 16,
+    color: '#666',
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  instruction: {
+    fontSize: 16,
+    marginBottom: 12,
+    color: '#333',
   },
   input: {
-    height: 100,
-    borderColor: 'gray',
+    height: 200,
+    borderColor: '#ddd',
     borderWidth: 1,
+    borderRadius: 8,
     marginBottom: 16,
-    padding: 8,
+    padding: 12,
+    backgroundColor: '#fff',
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  button: {
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  submitButton: {
+    backgroundColor: '#007AFF',
+  },
+  resetButton: {
+    backgroundColor: '#FF9500',
+    flex: 1,
+    marginRight: 8,
+  },
+  homeButton: {
+    backgroundColor: '#34C759',
+    flex: 1,
+    marginLeft: 8,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  resultContainer: {
+    marginTop: 16,
   },
   feedback: {
-    marginTop: 16,
-    fontSize: 16,
+    fontSize: 18,
+    color: '#34C759',
+    fontWeight: '600',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  buttonRow: {
+    flexDirection: 'row',
   },
 });
 
