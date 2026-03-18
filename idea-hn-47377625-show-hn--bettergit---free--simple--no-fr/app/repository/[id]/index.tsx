@@ -1,7 +1,16 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRepositoryStore } from '@/stores/useRepositoryStore';
+import { CloneService } from '@/services/git/CloneService';
+import { GitService } from '@/services/git/GitService';
+import { useState, useEffect } from 'react';
+
+interface FileItem {
+  name: string;
+  type: 'file' | 'directory';
+  path: string;
+}
 
 export default function RepositoryDetailScreen() {
   const { id } = useLocalSearchParams();
@@ -9,6 +18,79 @@ export default function RepositoryDetailScreen() {
   const repository = useRepositoryStore((state) =>
     state.repositories.find((r) => r.id === id)
   );
+  const updateRepository = useRepositoryStore((state) => state.updateRepository);
+  const setCloneProgress = useRepositoryStore((state) => state.setCloneProgress);
+  const setCloned = useRepositoryStore((state) => state.setCloned);
+
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCloning, setIsCloning] = useState(false);
+
+  useEffect(() => {
+    if (repository?.isCloned) {
+      loadFiles();
+    }
+  }, [repository?.isCloned]);
+
+  const loadFiles = async () => {
+    if (!repository) return;
+
+    setIsLoading(true);
+    try {
+      const fileNames = await GitService.listFiles(repository.id);
+      const fileItems: FileItem[] = await Promise.all(
+        fileNames.map(async (name) => {
+          const info = await GitService.getFileInfo(repository.id, name);
+          return {
+            name,
+            type: info.isDirectory ? 'directory' : 'file',
+            path: name,
+          };
+        })
+      );
+      setFiles(fileItems);
+    } catch (error) {
+      console.error('Error loading files:', error);
+      Alert.alert('Error', 'Failed to load repository files');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClone = async () => {
+    if (!repository) return;
+
+    setIsCloning(true);
+    try {
+      await CloneService.cloneRepository({
+        url: repository.url,
+        repoId: repository.id,
+        onProgress: (progress) => {
+          const percent = progress.total > 0 
+            ? Math.round((progress.loaded / progress.total) * 100)
+            : 0;
+          setCloneProgress(repository.id, percent);
+        },
+      });
+      setCloned(repository.id, true);
+      await loadFiles();
+    } catch (error) {
+      console.error('Clone error:', error);
+      Alert.alert('Clone Failed', 'Failed to clone repository. Please try again.');
+    } finally {
+      setIsCloning(false);
+    }
+  };
+
+  const handleFilePress = async (file: FileItem) => {
+    if (file.type === 'directory') {
+      // TODO: Navigate to subdirectory
+      Alert.alert('Directory', `Opening ${file.name} - subdirectory navigation coming soon`);
+    } else {
+      // TODO: Navigate to file viewer
+      Alert.alert('File', `Opening ${file.name} - file viewer coming soon`);
+    }
+  };
 
   if (!repository) {
     return (
@@ -17,14 +99,6 @@ export default function RepositoryDetailScreen() {
       </View>
     );
   }
-
-  const mockFiles = [
-    { id: '1', name: 'src', type: 'folder', children: 3 },
-    { id: '2', name: 'components', type: 'folder', children: 8 },
-    { id: '3', name: 'README.md', type: 'file', size: '2.4 KB' },
-    { id: '4', name: 'package.json', type: 'file', size: '1.2 KB' },
-    { id: '5', name: 'tsconfig.json', type: 'file', size: '856 B' },
-  ];
 
   return (
     <View style={styles.container}>
@@ -60,35 +134,67 @@ export default function RepositoryDetailScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Files</Text>
-          {mockFiles.map((file) => (
-            <TouchableOpacity
-              key={file.id}
-              style={styles.fileItem}
-              activeOpacity={0.7}
-            >
-              <MaterialCommunityIcons
-                name={file.type === 'folder' ? 'folder' : 'file-document-outline'}
-                size={24}
-                color={file.type === 'folder' ? '#FFA726' : '#757575'}
-              />
-              <View style={styles.fileInfo}>
-                <Text style={styles.fileName}>{file.name}</Text>
-                <Text style={styles.fileDetail}>
-                  {file.type === 'folder'
-                    ? `${file.children} items`
-                    : file.size}
-                </Text>
+        {!repository.isCloned && !isCloning && (
+          <TouchableOpacity
+            style={styles.cloneButton}
+            onPress={handleClone}
+            activeOpacity={0.8}
+          >
+            <MaterialCommunityIcons name="download" size={20} color="#fff" />
+            <Text style={styles.cloneButtonText}>Clone Repository</Text>
+          </TouchableOpacity>
+        )}
+
+        {isCloning && (
+          <View style={styles.cloningCard}>
+            <ActivityIndicator size="large" color="#2196F3" />
+            <Text style={styles.cloningText}>Cloning repository...</Text>
+            {repository.cloneProgress !== undefined && (
+              <Text style={styles.progressText}>{repository.cloneProgress}%</Text>
+            )}
+          </View>
+        )}
+
+        {repository.isCloned && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Files</Text>
+            {isLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#2196F3" />
               </View>
-              <MaterialCommunityIcons
-                name="chevron-right"
-                size={24}
-                color="#bdbdbd"
-              />
-            </TouchableOpacity>
-          ))}
-        </View>
+            ) : files.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No files found</Text>
+              </View>
+            ) : (
+              files.map((file) => (
+                <TouchableOpacity
+                  key={file.path}
+                  style={styles.fileItem}
+                  onPress={() => handleFilePress(file)}
+                  activeOpacity={0.7}
+                >
+                  <MaterialCommunityIcons
+                    name={file.type === 'directory' ? 'folder' : 'file-document-outline'}
+                    size={24}
+                    color={file.type === 'directory' ? '#FFA726' : '#757575'}
+                  />
+                  <View style={styles.fileInfo}>
+                    <Text style={styles.fileName}>{file.name}</Text>
+                    <Text style={styles.fileDetail}>
+                      {file.type === 'directory' ? 'Folder' : 'File'}
+                    </Text>
+                  </View>
+                  <MaterialCommunityIcons
+                    name="chevron-right"
+                    size={24}
+                    color="#bdbdbd"
+                  />
+                </TouchableOpacity>
+              ))
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -146,6 +252,41 @@ const styles = StyleSheet.create({
     color: '#757575',
     marginLeft: 6,
   },
+  cloneButton: {
+    backgroundColor: '#2196F3',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+  },
+  cloneButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  cloningCard: {
+    backgroundColor: '#fff',
+    padding: 24,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  cloningText: {
+    fontSize: 16,
+    color: '#212121',
+    marginTop: 16,
+    fontWeight: '500',
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#757575',
+    marginTop: 8,
+  },
   section: {
     backgroundColor: '#fff',
     marginBottom: 16,
@@ -156,6 +297,18 @@ const styles = StyleSheet.create({
     color: '#212121',
     padding: 16,
     paddingBottom: 8,
+  },
+  loadingContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9e9e9e',
   },
   fileItem: {
     flexDirection: 'row',

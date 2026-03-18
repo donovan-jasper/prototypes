@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-interface Repository {
+export interface Repository {
   id: string;
   name: string;
   description: string;
@@ -8,13 +8,19 @@ interface Repository {
   forks: number;
   language: string;
   languageColor: string;
+  url: string;
+  isCloned: boolean;
+  cloneProgress?: number;
 }
 
 interface RepositoryStore {
   repositories: Repository[];
+  updateRepository: (id: string, updates: Partial<Repository>) => void;
+  setCloneProgress: (id: string, progress: number) => void;
+  setCloned: (id: string, isCloned: boolean) => void;
 }
 
-export const useRepositoryStore = create<RepositoryStore>(() => ({
+export const useRepositoryStore = create<RepositoryStore>((set) => ({
   repositories: [
     {
       id: '1',
@@ -24,6 +30,8 @@ export const useRepositoryStore = create<RepositoryStore>(() => ({
       forks: 8,
       language: 'TypeScript',
       languageColor: '#3178c6',
+      url: 'https://github.com/vercel/next.js',
+      isCloned: false,
     },
     {
       id: '2',
@@ -33,6 +41,8 @@ export const useRepositoryStore = create<RepositoryStore>(() => ({
       forks: 23,
       language: 'Python',
       languageColor: '#3572A5',
+      url: 'https://github.com/pallets/flask',
+      isCloned: false,
     },
     {
       id: '3',
@@ -42,6 +52,8 @@ export const useRepositoryStore = create<RepositoryStore>(() => ({
       forks: 12,
       language: 'JavaScript',
       languageColor: '#f1e05a',
+      url: 'https://github.com/facebook/react',
+      isCloned: false,
     },
     {
       id: '4',
@@ -51,6 +63,8 @@ export const useRepositoryStore = create<RepositoryStore>(() => ({
       forks: 45,
       language: 'TypeScript',
       languageColor: '#3178c6',
+      url: 'https://github.com/expo/expo',
+      isCloned: false,
     },
     {
       id: '5',
@@ -60,6 +74,26 @@ export const useRepositoryStore = create<RepositoryStore>(() => ({
       forks: 34,
       language: 'Markdown',
       languageColor: '#083fa1',
+      url: 'https://github.com/facebook/docusaurus',
+      isCloned: false,
     },
   ],
+  updateRepository: (id, updates) =>
+    set((state) => ({
+      repositories: state.repositories.map((repo) =>
+        repo.id === id ? { ...repo, ...updates } : repo
+      ),
+    })),
+  setCloneProgress: (id, progress) =>
+    set((state) => ({
+      repositories: state.repositories.map((repo) =>
+        repo.id === id ? { ...repo, cloneProgress: progress } : repo
+      ),
+    })),
+  setCloned: (id, isCloned) =>
+    set((state) => ({
+      repositories: state.repositories.map((repo) =>
+        repo.id === id ? { ...repo, isCloned, cloneProgress: undefined } : repo
+      ),
+    })),
 }));
