@@ -48,6 +48,58 @@ export const initDB = () => {
   });
 };
 
+export const seedMockMessages = () => {
+  getPlatforms((platforms) => {
+    if (platforms.length === 0) return;
+    
+    getMessages((existingMessages) => {
+      if (existingMessages.length > 0) return;
+      
+      const mockMessages = [
+        {
+          platformId: platforms[0].id,
+          buyerName: 'Sarah Johnson',
+          content: 'Hi! Is this item still available? I\'m very interested!',
+          read: 0,
+          receivedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          platformId: platforms[0].id,
+          buyerName: 'Mike Chen',
+          content: 'Can you ship to Canada? How much would that cost?',
+          read: 0,
+          receivedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          platformId: platforms.length > 1 ? platforms[1].id : platforms[0].id,
+          buyerName: 'Emma Davis',
+          content: 'I bought this yesterday. When will it ship?',
+          read: 1,
+          receivedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        },
+        {
+          platformId: platforms[0].id,
+          buyerName: 'Alex Rodriguez',
+          content: 'Do you have this in a different color?',
+          read: 0,
+          receivedAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        },
+        {
+          platformId: platforms.length > 1 ? platforms[1].id : platforms[0].id,
+          buyerName: 'Lisa Wang',
+          content: 'Great product! Would you consider a bundle discount if I buy 3?',
+          read: 1,
+          receivedAt: new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString(),
+        },
+      ];
+      
+      mockMessages.forEach((msg) => {
+        addMessage(msg, () => {});
+      });
+    });
+  });
+};
+
 export const addProduct = (product, callback) => {
   db.transaction((tx) => {
     tx.executeSql(
@@ -172,7 +224,7 @@ export const markMessageAsRead = (id, callback) => {
 export const getMessages = (callback) => {
   db.transaction((tx) => {
     tx.executeSql(
-      'SELECT * FROM messages;',
+      'SELECT * FROM messages ORDER BY received_at DESC;',
       [],
       (_, { rows: { _array } }) => callback(_array),
       (_, error) => console.log(error)

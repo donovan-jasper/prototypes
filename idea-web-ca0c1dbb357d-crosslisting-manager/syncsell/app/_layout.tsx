@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { Provider as PaperProvider } from 'react-native-paper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { initDB } from '../lib/db';
+import { initDB, seedMockMessages } from '../lib/db';
 
 export default function RootLayout() {
   const [isReady, setIsReady] = useState(false);
@@ -13,10 +13,12 @@ export default function RootLayout() {
   useEffect(() => {
     async function prepare() {
       try {
-        // Initialize database
         initDB();
+        
+        setTimeout(() => {
+          seedMockMessages();
+        }, 500);
 
-        // Check onboarding status
         const onboardingComplete = await AsyncStorage.getItem('hasCompletedOnboarding');
         setHasCompletedOnboarding(onboardingComplete === 'true');
       } catch (error) {
@@ -51,6 +53,14 @@ export default function RootLayout() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="product" />
+        <Stack.Screen 
+          name="message/[id]" 
+          options={{ 
+            headerShown: true,
+            title: 'Message',
+            presentation: 'card'
+          }} 
+        />
       </Stack>
     </PaperProvider>
   );
