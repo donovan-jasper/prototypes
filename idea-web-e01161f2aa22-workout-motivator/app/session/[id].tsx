@@ -1,11 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSessionStore } from '../../lib/store';
 import SessionTimer from '../../components/SessionTimer';
 import { generatePrompt, selectPromptByIntensity, getRandomInterval } from '../../lib/prompts';
 import { speakPrompt, stopSpeaking } from '../../lib/audio';
 import { CoachId } from '../../constants/Prompts';
+import { saveSession, calculateXP } from '../../lib/database';
 
 const COACHES = {
   'drill-sergeant': { name: 'Drill Sergeant', emoji: '🎖️' },
@@ -51,7 +52,6 @@ export default function SessionScreen() {
     setLastPrompt(prompt);
     lastPromptTimeRef.current = elapsedSeconds;
 
-    // Fade in animation
     Animated.sequence([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -76,8 +76,36 @@ export default function SessionScreen() {
   const handleEndSession = async () => {
     await stopSpeaking();
     stopSession();
-    reset();
-    router.push('/');
+
+    const xpEarned = calculateXP(elapsedSeconds);
+    
+    try {
+      await saveSession({
+        taskName,
+        coachId,
+        duration: elapsedSeconds,
+        completedAt: Date.now(),
+        xpEarned,
+      });
+
+      Alert.alert(
+        'Session Complete! 🎉',
+        `Great work! You earned ${xpEarned} XP for ${Math.floor(elapsedSeconds / 60)} minutes of focused work.`,
+        [
+          {
+            text: 'OK',
+            onPress: () => {
+              reset();
+              router.push('/');
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error saving session:', error);
+      reset();
+      router.push('/');
+    }
   };
 
   if (!taskName || !coach) {

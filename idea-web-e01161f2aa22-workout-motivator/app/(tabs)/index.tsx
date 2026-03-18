@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSessionStore } from '../../lib/store';
+import { getUserStats, UserStats } from '../../lib/database';
+import StreakCalendar from '../../components/StreakCalendar';
 
 const COACHES = [
   { id: 'drill-sergeant', name: 'Drill Sergeant', emoji: '🎖️', description: 'No excuses, soldier!' },
@@ -14,8 +16,18 @@ const COACHES = [
 export default function HomeScreen() {
   const [taskName, setTaskName] = useState('');
   const [selectedCoach, setSelectedCoach] = useState(COACHES[0].id);
+  const [stats, setStats] = useState<UserStats>({ totalXP: 0, streakFreezeTokens: 1, currentStreak: 0 });
   const router = useRouter();
   const startSession = useSessionStore((state) => state.startSession);
+
+  useEffect(() => {
+    loadStats();
+  }, []);
+
+  const loadStats = async () => {
+    const userStats = await getUserStats();
+    setStats(userStats);
+  };
 
   const handleStartSession = () => {
     if (!taskName.trim()) {
@@ -32,6 +44,28 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>MotiveMate</Text>
         <Text style={styles.subtitle}>Your personal hype coach</Text>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <Text style={styles.statEmoji}>🔥</Text>
+          <Text style={styles.statValue}>{stats.currentStreak}</Text>
+          <Text style={styles.statLabel}>Day Streak</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statEmoji}>⭐</Text>
+          <Text style={styles.statValue}>{stats.totalXP}</Text>
+          <Text style={styles.statLabel}>Total XP</Text>
+        </View>
+        <View style={styles.statBox}>
+          <Text style={styles.statEmoji}>🧊</Text>
+          <Text style={styles.statValue}>{stats.streakFreezeTokens}</Text>
+          <Text style={styles.statLabel}>Freeze Tokens</Text>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <StreakCalendar />
       </View>
 
       <View style={styles.section}>
@@ -87,7 +121,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     marginTop: 40,
-    marginBottom: 30,
+    marginBottom: 20,
   },
   title: {
     fontSize: 36,
@@ -99,8 +133,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    gap: 10,
+  },
+  statBox: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  statEmoji: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+  },
   section: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   label: {
     fontSize: 18,
