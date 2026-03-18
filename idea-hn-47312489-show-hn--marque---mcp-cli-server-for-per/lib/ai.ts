@@ -1,11 +1,14 @@
 import OpenAI from 'openai';
+import { convertImageToBase64 } from './imageAnalysis';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const analyzeImage = async (base64Data: string) => {
+export const analyzeImage = async (imageUri: string) => {
   try {
+    const base64Data = await convertImageToBase64(imageUri);
+    
     const response = await openai.chat.completions.create({
       model: "gpt-4-vision-preview",
       messages: [

@@ -2,10 +2,20 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { analyzeImage } from './ai';
 
-export const extractColors = async (imageUri: string) => {
+export const analyzeImageFromUri = async (imageUri: string) => {
   try {
     const base64Data = await convertImageToBase64(imageUri);
-    const analysis = await analyzeImage(base64Data);
+    const analysis = await analyzeImage(imageUri);
+    return analysis;
+  } catch (error) {
+    console.error('Error analyzing image:', error);
+    throw error;
+  }
+};
+
+export const extractColors = async (imageUri: string) => {
+  try {
+    const analysis = await analyzeImageFromUri(imageUri);
     return analysis.colors || [];
   } catch (error) {
     console.error('Error extracting colors:', error);
@@ -15,8 +25,7 @@ export const extractColors = async (imageUri: string) => {
 
 export const analyzeTypography = async (imageUri: string) => {
   try {
-    const base64Data = await convertImageToBase64(imageUri);
-    const analysis = await analyzeImage(base64Data);
+    const analysis = await analyzeImageFromUri(imageUri);
     return analysis.typography || { base: 16, ratio: 1.25 };
   } catch (error) {
     console.error('Error analyzing typography:', error);
