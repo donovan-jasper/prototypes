@@ -7,8 +7,9 @@ import {
   Image,
   ScrollView,
   TextInput,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
@@ -26,64 +27,68 @@ const CATEGORIES: { label: string; value: Category }[] = [
   { label: 'Accessory', value: 'accessory' },
 ];
 
-const AVAILABLE_TAGS = [
-  'casual',
-  'formal',
-  'work',
-  'athletic',
-  'everyday',
-  'special',
-  'summer',
-  'winter',
-  'spring',
-  'fall',
+const COMMON_TAGS = [
+  'casual', 'formal', 'work', 'athletic', 'evening', 'summer', 'winter', 'everyday'
 ];
 
 export default function AddItemScreen() {
   const router = useRouter();
-  const addItem = useWardrobeStore(state => state.addItem);
+  const { addItem } = useWardrobeStore();
 
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [category, setCategory] = useState<Category>('top');
   const [colors, setColors] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [purchasePrice, setPurchasePrice] = useState('');
+  const [loading, setLoading] = useState(false);
   const [classifying, setClassifying] = useState(false);
-  const [saving, setSaving] = useState(false);
 
   const requestPermissions = async () => {
-    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-    const { status: mediaStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-    if (cameraStatus !== 'granted' || mediaStatus !== 'granted') {
-      Alert.alert(
-        'Permissions Required',
-        'StyleSync needs camera and photo library access to digitize your wardrobe.',
-        [{ text: 'OK' }]
-      );
-      return false;
+    if (Platform.OS !== 'web') {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Camera access is needed to capture photos of your clothing items.',
+          [{ text: 'OK' }]
+        );
+        return false;
+      }
     }
     return true;
   };
 
-  const handlePickImage = async (useCamera: boolean) => {
+  const handleTakePhoto = async () => {
     const hasPermission = await requestPermissions();
     if (!hasPermission) return;
 
     try {
-      const result = useCamera
-        ? await ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          })
-        : await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.8,
-          });
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const uri = result.assets[0].uri;
+        setImageUri(uri);
+        await classifyImage(uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to capture photo. Please try again.');
+      console.error('Camera error:', error);
+    }
+  };
+
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
@@ -99,81 +104,79 @@ export default function AddItemScreen() {
   const classifyImage = async (uri: string) => {
     setClassifying(true);
     try {
-      const classification = await classifyItem(uri);
-      setCategory(classification.category);
-      setColors(classification.colors);
-      setTags(classification.tags);
+      const result = await classifyItem(uri);
+      setCategory(result.category);
+      setColors(result.colors);
+      setTags(result.tags);
     } catch (error) {
-      Alert.alert('Classification Failed', 'Could not auto-classify item. Please set details manually.');
       console.error('Classification error:', error);
+      Alert.alert('Classification Failed', 'Could not auto-detect item details. Please set them manually.');
     } finally {
       setClassifying(false);
     }
   };
 
   const toggleTag = (tag: string) => {
-    setTags(prev =>
-      prev.includes(tag)
-        ? prev.filter(t => t !== tag)
-        : [...prev, tag]
-    );
+    if (tags.includes(tag)) {
+      setTags(tags.filter(t => t !== tag));
+    } else {
+      setTags([...tags, tag]);
+    }
   };
 
   const handleSave = async () => {
     if (!imageUri) {
-      Alert.alert('No Image', 'Please capture or select an image first.');
+      Alert.alert('Missing Image', 'Please capture or select an image first.');
       return;
     }
 
     if (tags.length === 0) {
-      Alert.alert('No Tags', 'Please select at least one tag for this item.');
+      Alert.alert('Missing Tags', 'Please select at least one tag.');
       return;
     }
 
-    setSaving(true);
+    setLoading(true);
     try {
+      const price = purchasePrice ? parseFloat(purchasePrice) : undefined;
+      
       await addItem({
         imageUri,
         category,
         colors,
         tags,
-        purchasePrice: purchasePrice ? parseFloat(purchasePrice) : undefined,
+        purchasePrice: price,
         addedDate: new Date().toISOString(),
       });
 
       router.back();
     } catch (error) {
-      Alert.alert('Error', 'Failed to save item. Please try again.');
       console.error('Save error:', error);
+      Alert.alert('Error', 'Failed to save item. Please try again.');
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {!imageUri ? (
-        <View style={styles.pickerContainer}>
-          <Text style={styles.pickerTitle}>Add a clothing item</Text>
-          <Text style={styles.pickerSubtitle}>
-            Take a photo or choose from your gallery
-          </Text>
+        <View style={styles.captureSection}>
+          <View style={styles.placeholder}>
+            <Ionicons name="camera-outline" size={64} color="#9ca3af" />
+            <Text style={styles.placeholderText}>Capture or select a photo</Text>
+          </View>
 
-          <TouchableOpacity
-            style={styles.pickerButton}
-            onPress={() => handlePickImage(true)}
-          >
-            <Ionicons name="camera" size={24} color="#007AFF" />
-            <Text style={styles.pickerButtonText}>Take Photo</Text>
-          </TouchableOpacity>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity style={styles.captureButton} onPress={handleTakePhoto}>
+              <Ionicons name="camera" size={24} color="#fff" />
+              <Text style={styles.captureButtonText}>Take Photo</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.pickerButton, styles.pickerButtonSecondary]}
-            onPress={() => handlePickImage(false)}
-          >
-            <Ionicons name="images" size={24} color="#007AFF" />
-            <Text style={styles.pickerButtonText}>Choose from Gallery</Text>
-          </TouchableOpacity>
+            <TouchableOpacity style={styles.captureButton} onPress={handlePickImage}>
+              <Ionicons name="images" size={24} color="#fff" />
+              <Text style={styles.captureButtonText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       ) : (
         <>
@@ -183,19 +186,18 @@ export default function AddItemScreen() {
               style={styles.changeImageButton}
               onPress={() => setImageUri(null)}
             >
-              <Ionicons name="camera" size={20} color="#fff" />
-              <Text style={styles.changeImageText}>Change Photo</Text>
+              <Ionicons name="close-circle" size={32} color="#fff" />
             </TouchableOpacity>
           </View>
 
           {classifying && (
             <View style={styles.classifyingBanner}>
               <ActivityIndicator size="small" color="#007AFF" />
-              <Text style={styles.classifyingText}>Analyzing item...</Text>
+              <Text style={styles.classifyingText}>Analyzing image...</Text>
             </View>
           )}
 
-          <View style={styles.form}>
+          <View style={styles.formSection}>
             <Text style={styles.label}>Category</Text>
             <ScrollView
               horizontal
@@ -210,6 +212,7 @@ export default function AddItemScreen() {
                     category === cat.value && styles.categoryChipActive,
                   ]}
                   onPress={() => setCategory(cat.value)}
+                  disabled={classifying}
                 >
                   <Text
                     style={[
@@ -222,8 +225,10 @@ export default function AddItemScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          </View>
 
-            <Text style={styles.label}>Detected Colors</Text>
+          <View style={styles.formSection}>
+            <Text style={styles.label}>Colors</Text>
             <View style={styles.colorPalette}>
               {colors.map((color, idx) => (
                 <View
@@ -231,11 +236,16 @@ export default function AddItemScreen() {
                   style={[styles.colorSwatch, { backgroundColor: color }]}
                 />
               ))}
+              {colors.length === 0 && (
+                <Text style={styles.emptyText}>No colors detected</Text>
+              )}
             </View>
+          </View>
 
+          <View style={styles.formSection}>
             <Text style={styles.label}>Tags</Text>
             <View style={styles.tagsContainer}>
-              {AVAILABLE_TAGS.map(tag => (
+              {COMMON_TAGS.map(tag => (
                 <TouchableOpacity
                   key={tag}
                   style={[
@@ -243,6 +253,7 @@ export default function AddItemScreen() {
                     tags.includes(tag) && styles.tagChipActive,
                   ]}
                   onPress={() => toggleTag(tag)}
+                  disabled={classifying}
                 >
                   <Text
                     style={[
@@ -255,31 +266,30 @@ export default function AddItemScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          </View>
 
+          <View style={styles.formSection}>
             <Text style={styles.label}>Purchase Price (Optional)</Text>
             <TextInput
               style={styles.input}
-              placeholder="$0.00"
+              placeholder="0.00"
               keyboardType="decimal-pad"
               value={purchasePrice}
               onChangeText={setPurchasePrice}
             />
-
-            <TouchableOpacity
-              style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-              onPress={handleSave}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="checkmark" size={20} color="#fff" />
-                  <Text style={styles.saveButtonText}>Save Item</Text>
-                </>
-              )}
-            </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={[styles.saveButton, loading && styles.saveButtonDisabled]}
+            onPress={handleSave}
+            disabled={loading || classifying}
+          >
+            {loading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Item</Text>
+            )}
+          </TouchableOpacity>
         </>
       )}
     </ScrollView>
@@ -292,80 +302,67 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   content: {
-    paddingBottom: 40,
+    padding: 20,
   },
-  pickerContainer: {
+  captureSection: {
     flex: 1,
+    minHeight: 500,
+    justifyContent: 'center',
+  },
+  placeholder: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 60,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 60,
+    marginBottom: 24,
   },
-  pickerTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  pickerSubtitle: {
+  placeholderText: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 40,
+    color: '#6b7280',
+    marginTop: 16,
   },
-  pickerButton: {
+  buttonRow: {
+    gap: 12,
+  },
+  captureButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#f0f9ff',
-    paddingHorizontal: 24,
+    backgroundColor: '#007AFF',
     paddingVertical: 16,
-    borderRadius: 12,
-    width: '100%',
-    marginBottom: 12,
-    gap: 12,
+    borderRadius: 10,
+    gap: 8,
   },
-  pickerButtonSecondary: {
-    backgroundColor: '#f3f4f6',
-  },
-  pickerButtonText: {
+  captureButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
   },
   imagePreview: {
     position: 'relative',
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#f3f4f6',
+    marginBottom: 24,
   },
   previewImage: {
     width: '100%',
-    height: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
   },
   changeImageButton: {
     position: 'absolute',
-    bottom: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 8,
-  },
-  changeImageText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 16,
   },
   classifyingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#f0f9ff',
-    paddingVertical: 12,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
     gap: 8,
   },
   classifyingText: {
@@ -373,18 +370,17 @@ const styles = StyleSheet.create({
     color: '#0369a1',
     fontWeight: '500',
   },
-  form: {
-    padding: 20,
+  formSection: {
+    marginBottom: 24,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     color: '#1a1a1a',
     marginBottom: 12,
-    marginTop: 20,
   },
   categoryScroll: {
-    marginBottom: 8,
+    flexGrow: 0,
   },
   categoryChip: {
     paddingHorizontal: 16,
@@ -407,6 +403,7 @@ const styles = StyleSheet.create({
   colorPalette: {
     flexDirection: 'row',
     gap: 12,
+    alignItems: 'center',
   },
   colorSwatch: {
     width: 48,
@@ -414,6 +411,11 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 2,
     borderColor: '#e5e7eb',
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -441,7 +443,6 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   input: {
-    backgroundColor: '#f9fafb',
     borderWidth: 1,
     borderColor: '#e5e7eb',
     borderRadius: 8,
@@ -451,14 +452,12 @@ const styles = StyleSheet.create({
     color: '#1a1a1a',
   },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#007AFF',
     paddingVertical: 16,
     borderRadius: 10,
-    marginTop: 32,
-    gap: 8,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 40,
   },
   saveButtonDisabled: {
     opacity: 0.6,
