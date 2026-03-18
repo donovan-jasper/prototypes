@@ -16,13 +16,20 @@
     },
     "assetBundlePatterns": ["**/*"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "DataPal needs microphone access for voice-to-text database creation and queries.",
+        "NSSpeechRecognitionUsageDescription": "DataPal uses speech recognition to convert your voice commands into database operations."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -34,7 +41,13 @@
           "iosDatabaseLocation": "Library/Preferences"
         }
       ],
-      "expo-speech"
+      "expo-speech",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow DataPal to access your microphone for voice commands."
+        }
+      ]
     ]
   }
 }
