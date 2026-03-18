@@ -13,26 +13,26 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
   const getColor = () => {
     switch (status) {
       case 'compatible':
-        return 'green';
+        return '#4caf50';
       case 'warning':
-        return 'yellow';
+        return '#ff9800';
       case 'incompatible':
-        return 'red';
+        return '#f44336';
       default:
-        return 'black';
+        return '#000000';
     }
   };
 
   return (
     <View style={styles.container}>
-      <Svg height="100%" width="100%">
+      <Svg height="40" width="100%">
         <Line
           x1="50%"
-          y1="0%"
+          y1="0"
           x2="50%"
-          y2="100%"
+          y2="40"
           stroke={getColor()}
-          strokeWidth="2"
+          strokeWidth="3"
         />
       </Svg>
     </View>
@@ -41,11 +41,7 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
