@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { downloadContent } from '../utils/offlineLibrary';
+import { downloadContent, autoDownloadNextChapters } from '../utils/offlineLibrary';
 
 interface ContentItem {
   id: string;
@@ -70,13 +70,22 @@ const ContentDiscoveryScreen = () => {
   const handleDownload = async (item: ContentItem) => {
     setDownloading(item.id);
     try {
-      await downloadContent({
+      const result = await downloadContent({
         title: item.title,
         text: item.text
       });
+
+      // Trigger auto-download of next chapters if enabled
+      const autoDownloaded = await autoDownloadNextChapters(result.localPath as number);
+      
+      let message = `"${item.title}" has been added to your library!`;
+      if (autoDownloaded.length > 0) {
+        message += `\n\n${autoDownloaded.length} additional chapter${autoDownloaded.length > 1 ? 's' : ''} auto-downloaded.`;
+      }
+
       Alert.alert(
         'Download Complete',
-        `"${item.title}" has been added to your library!`,
+        message,
         [
           {
             text: 'Go to Library',
