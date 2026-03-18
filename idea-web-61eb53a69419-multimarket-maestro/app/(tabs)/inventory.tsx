@@ -4,6 +4,7 @@ import { Text, FAB, Snackbar } from 'react-native-paper';
 import { useAppStore } from '../../store/app-store';
 import InventoryCard from '../../components/InventoryCard';
 import { Listing } from '../../types';
+import { router } from 'expo-router';
 
 export default function InventoryScreen() {
   const { listings, isSyncing, triggerSync, deleteListing } = useAppStore();
@@ -51,10 +52,7 @@ export default function InventoryScreen() {
       <FAB
         icon="plus"
         style={styles.fab}
-        onPress={() => {
-          setSnackbarMessage('Create listing screen coming soon');
-          setSnackbarVisible(true);
-        }}
+        onPress={() => router.push('/create')}
       />
       <Snackbar
         visible={snackbarVisible}
