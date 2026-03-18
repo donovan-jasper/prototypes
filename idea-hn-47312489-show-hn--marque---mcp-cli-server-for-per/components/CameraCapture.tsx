@@ -1,21 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image } from 'react-native';
-import { Camera } from 'expo-camera';
+import React, { useState, useRef } from 'react';
+import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
 const CameraCapture = ({ onCapture }) => {
-  const [hasPermission, setHasPermission] = useState(null);
-  const [type, setType] = useState(Camera.Constants.Type.back);
+  const [permission, requestPermission] = useCameraPermissions();
+  const [facing, setFacing] = useState<CameraType>('back');
   const [image, setImage] = useState(null);
   const cameraRef = useRef(null);
-
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
 
   const takePicture = async () => {
     if (cameraRef.current) {
@@ -39,67 +32,135 @@ const CameraCapture = ({ onCapture }) => {
     }
   };
 
-  if (hasPermission === null) {
+  const toggleCameraFacing = () => {
+    setFacing(current => (current === 'back' ? 'front' : 'back'));
+  };
+
+  if (!permission) {
     return <View />;
   }
 
-  if (hasPermission === false) {
+  if (!permission.granted) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <Text>No access to camera</Text>
+      <View style={styles.container}>
+        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
+          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View className="flex-1">
+    <View style={styles.container}>
       {image ? (
-        <View className="flex-1">
-          <Image source={{ uri: image }} className="flex-1" />
+        <View style={styles.container}>
+          <Image source={{ uri: image }} style={styles.image} />
           <TouchableOpacity
             onPress={() => setImage(null)}
-            className="absolute bottom-4 right-4 bg-white p-2 rounded-full"
+            style={styles.retakeButton}
           >
             <Ionicons name="camera" size={24} color="black" />
           </TouchableOpacity>
         </View>
       ) : (
-        <Camera
+        <CameraView
           ref={cameraRef}
-          type={type}
-          className="flex-1"
-          ratio="16:9"
+          style={styles.camera}
+          facing={facing}
         >
-          <View className="flex-1 bg-transparent flex-row">
+          <View style={styles.buttonContainer}>
             <TouchableOpacity
-              onPress={() => {
-                setType(
-                  type === Camera.Constants.Type.back
-                    ? Camera.Constants.Type.front
-                    : Camera.Constants.Type.back
-                );
-              }}
-              className="absolute bottom-4 left-4 bg-white p-2 rounded-full"
+              onPress={toggleCameraFacing}
+              style={styles.flipButton}
             >
               <Ionicons name="camera-reverse" size={24} color="black" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={takePicture}
-              className="absolute bottom-4 self-center bg-white p-4 rounded-full"
+              style={styles.captureButton}
             >
               <Ionicons name="camera" size={32} color="black" />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={pickImage}
-              className="absolute bottom-4 right-4 bg-white p-2 rounded-full"
+              style={styles.galleryButton}
             >
               <Ionicons name="image" size={24} color="black" />
             </TouchableOpacity>
           </View>
-        </Camera>
+        </CameraView>
       )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  message: {
+    textAlign: 'center',
+    paddingBottom: 10,
+  },
+  permissionButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  permissionButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  camera: {
+    flex: 1,
+    width: '100%',
+  },
+  buttonContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    backgroundColor: 'transparent',
+    margin: 64,
+  },
+  flipButton: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    backgroundColor: 'white',
+    padding: 8,
+    borderRadius: 50,
+  },
+  captureButton: {
+    position: 'absolute',
+    bottom: 0,
+    alignSelf: 'center',
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 50,
+  },
+  galleryButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: 'white',
+    padding: 8,
+    borderRadius: 50,
+  },
+  image: {
+    flex: 1,
+    width: '100%',
+  },
+  retakeButton: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    backgroundColor: 'white',
+    padding: 8,
+    borderRadius: 50,
+  },
+});
 
 export default CameraCapture;
