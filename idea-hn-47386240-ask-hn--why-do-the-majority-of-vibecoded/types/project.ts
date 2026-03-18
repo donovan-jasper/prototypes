@@ -12,14 +12,14 @@ export interface Screen {
   projectId: string;
   name: string;
   order: number;
-  layout: string; // JSON string
+  layout: object; // Changed from string to object
 }
 
 export interface Component {
   id: string;
   screenId: string;
   type: string;
-  props: string; // JSON string
-  position: string; // JSON string
+  props: object; // Changed from string to object
+  position: object; // Changed from string to object
   order: number;
 }

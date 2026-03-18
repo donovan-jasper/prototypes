@@ -34,36 +34,42 @@ export default function ProjectsScreen() {
     );
   };
 
+  const handlePressProject = (projectId: string) => {
+    router.push(`/project/${projectId}`);
+  };
+
   const renderProject = ({ item }: { item: Project }) => (
-    <Card style={styles.card}>
-      <Card.Content>
-        <View style={styles.cardHeader}>
-          <View style={styles.cardInfo}>
-            <Text variant="titleMedium" style={styles.projectName}>
-              {item.name}
-            </Text>
-            {item.appType && (
-              <Text variant="bodySmall" style={styles.appType}>
-                {item.appType}
+    <TouchableOpacity onPress={() => handlePressProject(item.id)} style={styles.cardWrapper}>
+      <Card style={styles.card}>
+        <Card.Content>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardInfo}>
+              <Text variant="titleMedium" style={styles.projectName}>
+                {item.name}
               </Text>
-            )}
+              {item.appType && (
+                <Text variant="bodySmall" style={styles.appType}>
+                  {item.appType}
+                </Text>
+              )}
+            </View>
+            <IconButton
+              icon="delete"
+              size={20}
+              onPress={() => handleDelete(item)}
+            />
           </View>
-          <IconButton
-            icon="delete"
-            size={20}
-            onPress={() => handleDelete(item)}
-          />
-        </View>
-        {item.description && (
-          <Text variant="bodyMedium" style={styles.description} numberOfLines={2}>
-            {item.description}
+          {item.description && (
+            <Text variant="bodyMedium" style={styles.description} numberOfLines={2}>
+              {item.description}
+            </Text>
+          )}
+          <Text variant="bodySmall" style={styles.date}>
+            Updated {new Date(item.updatedAt).toLocaleDateString()}
           </Text>
-        )}
-        <Text variant="bodySmall" style={styles.date}>
-          Updated {new Date(item.updatedAt).toLocaleDateString()}
-        </Text>
-      </Card.Content>
-    </Card>
+        </Card.Content>
+      </Card>
+    </TouchableOpacity>
   );
 
   if (loading && projects.length === 0) {
@@ -134,10 +140,13 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 8,
   },
-  card: {
+  cardWrapper: { // Added wrapper for TouchableOpacity to apply flex styling
     flex: 1,
     margin: 8,
-    maxWidth: '46%',
+    maxWidth: '46%', // Adjust to account for margin
+  },
+  card: {
+    flex: 1, // Make card fill the wrapper
   },
   cardHeader: {
     flexDirection: 'row',

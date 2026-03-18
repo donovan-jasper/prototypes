@@ -12,6 +12,7 @@ export default function RootLayout() {
     <PaperProvider>
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="project" options={{ headerShown: false }} /> {/* Add this line */}
       </Stack>
     </PaperProvider>
   );

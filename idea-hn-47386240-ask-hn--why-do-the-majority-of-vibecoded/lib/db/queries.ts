@@ -80,11 +80,12 @@ export async function createScreen(data: Omit<Screen, 'id'>): Promise<Screen> {
   const screen: Screen = {
     id,
     ...data,
+    layout: data.layout || {}, // Ensure it's an object
   };
 
   await db.runAsync(
     'INSERT INTO screens (id, projectId, name, "order", layout) VALUES (?, ?, ?, ?, ?)',
-    [screen.id, screen.projectId, screen.name, screen.order, screen.layout || '{}']
+    [screen.id, screen.projectId, screen.name, screen.order, JSON.stringify(screen.layout)] // Stringify layout
   );
 
   return screen;
@@ -92,11 +93,14 @@ export async function createScreen(data: Omit<Screen, 'id'>): Promise<Screen> {
 
 export async function getScreensByProject(projectId: string): Promise<Screen[]> {
   const db = await getDatabase();
-  const results = await db.getAllAsync<Screen>(
+  const results = await db.getAllAsync<{ id: string; projectId: string; name: string; order: number; layout: string }>( // Query returns string
     'SELECT * FROM screens WHERE projectId = ? ORDER BY "order"',
     [projectId]
   );
-  return results;
+  return results.map(row => ({
+    ...row,
+    layout: JSON.parse(row.layout || '{}'), // Parse layout back to object
+  }));
 }
 
 export async function createComponent(data: Omit<Component, 'id'>): Promise<Component> {
@@ -106,11 +110,20 @@ export async function createComponent(data: Omit<Component, 'id'>): Promise<Comp
   const component: Component = {
     id,
     ...data,
+    props: data.props || {},
+    position: data.position || {},
   };
 
   await db.runAsync(
     'INSERT INTO components (id, screenId, type, props, position, "order") VALUES (?, ?, ?, ?, ?, ?)',
-    [component.id, component.screenId, component.type, component.props || '{}', component.position || '{}', component.order]
+    [
+      component.id,
+      component.screenId,
+      component.type,
+      JSON.stringify(component.props), // Stringify props
+      JSON.stringify(component.position), // Stringify position
+      component.order
+    ]
   );
 
   return component;
@@ -118,9 +131,13 @@ export async function createComponent(data: Omit<Component, 'id'>): Promise<Comp
 
 export async function getComponentsByScreen(screenId: string): Promise<Component[]> {
   const db = await getDatabase();
-  const results = await db.getAllAsync<Component>(
+  const results = await db.getAllAsync<{ id: string; screenId: string; type: string; props: string; position: string; order: number }>( // Query returns string
     'SELECT * FROM components WHERE screenId = ? ORDER BY "order"',
     [screenId]
   );
-  return results;
+  return results.map(row => ({
+    ...row,
+    props: JSON.parse(row.props || '{}'), // Parse props
+    position: JSON.parse(row.position || '{}'), // Parse position
+  }));
 }
