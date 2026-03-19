@@ -9,13 +9,29 @@ class Terminal {
   initialize(socket, sessionId) {
     this.socket = socket;
     this.currentSessionId = sessionId;
+    this.clear(); // Clear terminal when switching sessions or initializing
 
     this.socket.on('terminal-output', (data) => {
       this.appendOutput(data, 'output');
     });
 
     this.socket.on('agent-response', (data) => {
+      // Agent responses are streamed chunks, append directly.
+      // A newline will be sent by the server after the full response.
       this.appendOutput(data, 'agent');
+    });
+
+    // New listener for historical messages
+    this.socket.on('historical-messages', (messages) => {
+      this.clear(); // Clear before displaying history
+      messages.forEach(msg => {
+        if (msg.role === 'user') {
+          this.appendOutput(`> ${msg.content}\n`, 'user');
+        } else if (msg.role === 'assistant') {
+          this.appendOutput(`${msg.content}\n`, 'agent'); // Add newline for full historical messages
+        }
+        // Other roles (e.g., 'system') are not explicitly handled for display in this UI
+      });
     });
 
     this.terminalInput.addEventListener('keypress', (e) => {
@@ -34,12 +50,12 @@ class Terminal {
   }
 
   sendMessage(text) {
-    this.appendOutput(`> ${text}\n`, 'user');
+    this.appendOutput(`> ${text}\n`, 'user'); // User input always gets a newline
     this.socket.emit('send-message', { sessionId: this.currentSessionId, text });
   }
 
   executeCommand(cmd) {
-    this.appendOutput(`$ ${cmd}\n`, 'command');
+    this.appendOutput(`$ ${cmd}\n`, 'command'); // Command always gets a newline
     this.socket.emit('execute-command', { sessionId: this.currentSessionId, command: cmd });
   }
 

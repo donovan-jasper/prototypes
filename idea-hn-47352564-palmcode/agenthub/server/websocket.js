@@ -9,8 +9,21 @@ module.exports = (io) => {
   io.on('connection', (socket) => {
     let terminal;
     let watcher;
+    let currentSessionId = null; // Track current session for cleanup
 
     socket.on('join-session', (sessionId) => {
+      // Clean up previous session's terminal and watcher if switching sessions
+      if (terminal) {
+        terminal.kill();
+        terminal = null;
+      }
+      if (watcher) {
+        watcher.close();
+        watcher = null;
+      }
+
+      currentSessionId = sessionId; // Update current session ID
+
       const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId);
 
       if (!session) {
@@ -31,15 +44,23 @@ module.exports = (io) => {
       });
 
       watcher = chokidar.watch(session.workspace_path, {
-        ignored: /(^|[\/\\])\../,
+        ignored: /(^|[\/\\])\../, // ignore dotfiles
         persistent: true,
+        ignoreInitial: true, // Don't emit 'add' events for files that already exist
       });
 
       watcher.on('all', (event, path) => {
-        socket.emit('file-change', { event, path: path.replace(session.workspace_path, '') });
+        // Only emit if the event is for the current session
+        if (currentSessionId === sessionId) {
+          socket.emit('file-change', { event, path: path.replace(session.workspace_path, '') });
+        }
       });
 
       socket.emit('session-joined', session);
+
+      // Load and send historical messages
+      const historicalMessages = db.prepare('SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp').all(sessionId);
+      socket.emit('historical-messages', historicalMessages);
     });
 
     socket.on('send-message', async (data) => {
@@ -51,17 +72,18 @@ module.exports = (io) => {
         return;
       }
 
+      // Save user message to database
       db.prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)').run(sessionId, 'user', text);
 
-      const conversationHistory = db.prepare('SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp').all(sessionId)
-        .map(msg => `${msg.role}: ${msg.content}`).join('\n');
+      // Retrieve conversation history as an array of objects
+      const conversationHistory = db.prepare('SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp').all(sessionId);
 
       let agent;
       switch (session.agent_type) {
         case 'claude':
           agent = claude;
           break;
-        case 'codex':
+        case 'codex': // Assuming 'codex' maps to openai
           agent = openai;
           break;
         case 'gemini':
@@ -72,15 +94,23 @@ module.exports = (io) => {
           return;
       }
 
+      let fullAgentResponse = '';
       try {
+        // Pass the conversation history array directly to the agent's sendMessage
         for await (const chunk of agent.sendMessage(text, conversationHistory)) {
-          socket.emit('agent-response', chunk);
+          if (chunk) { // Ensure chunk is not null/undefined
+            fullAgentResponse += chunk;
+            socket.emit('agent-response', chunk);
+          }
         }
+        // Emit a newline after the full streamed response for better terminal display
+        socket.emit('agent-response', '\n');
 
-        const response = db.prepare('SELECT content FROM messages WHERE session_id = ? ORDER BY timestamp DESC LIMIT 1').get(sessionId).content;
-        db.prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)').run(sessionId, 'assistant', response);
+        // Save the complete agent response to the database
+        db.prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)').run(sessionId, 'assistant', fullAgentResponse);
       } catch (error) {
-        socket.emit('error', error.message);
+        console.error(`Error during agent response for session ${sessionId}:`, error);
+        socket.emit('error', `Agent error: ${error.message}`);
       }
     });
 
@@ -93,9 +123,12 @@ module.exports = (io) => {
         return;
       }
 
-      terminal.write(`${command}\r`);
-
-      db.prepare('INSERT INTO terminal_history (session_id, command) VALUES (?, ?)').run(sessionId, command);
+      if (terminal && currentSessionId === sessionId) { // Ensure command is for the active terminal
+        terminal.write(`${command}\r`);
+        db.prepare('INSERT INTO terminal_history (session_id, command) VALUES (?, ?)').run(sessionId, command);
+      } else {
+        socket.emit('error', 'Terminal not active for this session.');
+      }
     });
 
     socket.on('disconnect', () => {
@@ -105,6 +138,7 @@ module.exports = (io) => {
       if (watcher) {
         watcher.close();
       }
+      currentSessionId = null; // Clear current session on disconnect
     });
   });
 };
