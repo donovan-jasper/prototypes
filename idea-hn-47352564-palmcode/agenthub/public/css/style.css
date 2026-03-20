@@ -112,13 +112,28 @@ header h1 {
   padding: 1rem;
 }
 
-.terminal-output {
+.terminal-output { /* This ID refers to the container, but also used as a class for raw output */
   flex: 1;
   overflow-y: auto;
   font-family: 'Courier New', Courier, monospace;
   white-space: pre-wrap;
   margin-bottom: 1rem;
+  color: var(--text-color); /* Default color for raw terminal output */
 }
+
+/* Specific styles for different output types */
+.terminal-user {
+  color: #8be9fd; /* Light blue for user input */
+}
+
+.terminal-agent {
+  color: #f1fa8c; /* Yellow for agent responses */
+}
+
+.terminal-command {
+  color: #50fa7b; /* Green for executed commands */
+}
+
 
 .terminal-input {
   display: flex;

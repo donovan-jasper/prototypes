@@ -9,9 +9,29 @@ module.exports = (io) => {
   io.on('connection', (socket) => {
     let terminal;
     let watcher;
-    let currentSessionId = null; // Track current session for cleanup
+    let currentSessionId = null;
+    let currentCommandHistoryId = null; // New state: ID of the terminal_history entry for the current command
+    let outputBuffer = ''; // New state: Buffer for accumulating terminal output
+    let outputTimeout = null; // New state: Debounce timeout for saving output
+    const DEBOUNCE_TIME = 200; // Time in ms to wait before saving buffered output
+
+    // Helper function to save accumulated terminal output to the database
+    const saveTerminalOutput = () => {
+      if (outputTimeout) {
+        clearTimeout(outputTimeout);
+        outputTimeout = null;
+      }
+      if (currentCommandHistoryId && outputBuffer.length > 0) {
+        // Append to existing output, or set if null. COALESCE handles initial NULL values.
+        db.prepare('UPDATE terminal_history SET output = COALESCE(output, "") || ? WHERE id = ?').run(outputBuffer, currentCommandHistoryId);
+        outputBuffer = ''; // Clear buffer after saving
+      }
+    };
 
     socket.on('join-session', (sessionId) => {
+      // Before switching, save any pending output from the previous session's command
+      saveTerminalOutput();
+
       // Clean up previous session's terminal and watcher if switching sessions
       if (terminal) {
         terminal.kill();
@@ -23,6 +43,8 @@ module.exports = (io) => {
       }
 
       currentSessionId = sessionId; // Update current session ID
+      currentCommandHistoryId = null; // Reset command history ID for new session
+      outputBuffer = ''; // Reset output buffer for new session
 
       const session = db.prepare('SELECT * FROM sessions WHERE id = ?').get(sessionId);
 
@@ -40,7 +62,18 @@ module.exports = (io) => {
       });
 
       terminal.onData((data) => {
-        socket.emit('terminal-output', data);
+        socket.emit('terminal-output', data); // Emit in real-time
+
+        // If a command is active, buffer its output and debounce saving
+        if (currentCommandHistoryId) {
+          outputBuffer += data;
+          if (outputTimeout) {
+            clearTimeout(outputTimeout);
+          }
+          outputTimeout = setTimeout(() => {
+            saveTerminalOutput();
+          }, DEBOUNCE_TIME);
+        }
       });
 
       watcher = chokidar.watch(session.workspace_path, {
@@ -58,9 +91,15 @@ module.exports = (io) => {
 
       socket.emit('session-joined', session);
 
-      // Load and send historical messages
-      const historicalMessages = db.prepare('SELECT role, content FROM messages WHERE session_id = ? ORDER BY timestamp').all(sessionId);
-      socket.emit('historical-messages', historicalMessages);
+      // Fetch and send combined historical data (messages and terminal history)
+      const fullHistory = db.prepare(`
+        SELECT id, session_id, role, content, timestamp, 'message' as type, NULL as command, NULL as output FROM messages WHERE session_id = ?
+        UNION ALL
+        SELECT id, session_id, NULL as role, NULL as content, timestamp, 'terminal' as type, command, output FROM terminal_history WHERE session_id = ?
+        ORDER BY timestamp;
+      `).all(sessionId, sessionId); // Pass sessionId twice for the UNION ALL
+
+      socket.emit('full-session-history', fullHistory);
     });
 
     socket.on('send-message', async (data) => {
@@ -71,6 +110,10 @@ module.exports = (io) => {
         socket.emit('error', 'Session not found');
         return;
       }
+
+      // Save any pending terminal output before processing a new chat message
+      saveTerminalOutput();
+      currentCommandHistoryId = null; // No command is active during chat
 
       // Save user message to database
       db.prepare('INSERT INTO messages (session_id, role, content) VALUES (?, ?, ?)').run(sessionId, 'user', text);
@@ -123,15 +166,26 @@ module.exports = (io) => {
         return;
       }
 
+      // Finalize and save any pending output from the previous command
+      saveTerminalOutput();
+
       if (terminal && currentSessionId === sessionId) { // Ensure command is for the active terminal
+        // Insert the new command into terminal_history and get its ID
+        const insertStmt = db.prepare('INSERT INTO terminal_history (session_id, command) VALUES (?, ?)');
+        const info = insertStmt.run(sessionId, command);
+        currentCommandHistoryId = info.lastInsertRowid; // Store the ID for subsequent output
+        outputBuffer = ''; // Reset buffer for the new command
+
         terminal.write(`${command}\r`);
-        db.prepare('INSERT INTO terminal_history (session_id, command) VALUES (?, ?)').run(sessionId, command);
       } else {
         socket.emit('error', 'Terminal not active for this session.');
       }
     });
 
     socket.on('disconnect', () => {
+      // On disconnect, ensure any pending output is saved
+      saveTerminalOutput();
+
       if (terminal) {
         terminal.kill();
       }
@@ -139,6 +193,8 @@ module.exports = (io) => {
         watcher.close();
       }
       currentSessionId = null; // Clear current session on disconnect
+      currentCommandHistoryId = null;
+      outputBuffer = '';
     });
   });
 };

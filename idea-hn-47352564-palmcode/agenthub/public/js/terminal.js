@@ -21,18 +21,39 @@ class Terminal {
       this.appendOutput(data, 'agent');
     });
 
-    // New listener for historical messages
-    this.socket.on('historical-messages', (messages) => {
-      this.clear(); // Clear before displaying history
-      messages.forEach(msg => {
-        if (msg.role === 'user') {
-          this.appendOutput(`> ${msg.content}\n`, 'user');
-        } else if (msg.role === 'assistant') {
-          this.appendOutput(`${msg.content}\n`, 'agent'); // Add newline for full historical messages
+    // REMOVED: historical-messages listener is replaced by full-session-history
+    // this.socket.on('historical-messages', (messages) => {
+    //   this.clear(); // Clear before displaying history
+    //   messages.forEach(msg => {
+    //     if (msg.role === 'user') {
+    //       this.appendOutput(`> ${msg.content}\n`, 'user');
+    //     } else if (msg.role === 'assistant') {
+    //       this.appendOutput(`${msg.content}\n`, 'agent'); // Add newline for full historical messages
+    //     }
+    //     // Other roles (e.g., 'system') are not explicitly handled for display in this UI
+    //   });
+    // });
+
+    // NEW: Listener for combined full session history
+    this.socket.on('full-session-history', (history) => {
+      this.clear(); // Clear before displaying full history
+      history.forEach(entry => {
+        if (entry.type === 'message') {
+          if (entry.role === 'user') {
+            this.appendOutput(`> ${entry.content}\n`, 'user');
+          } else if (entry.role === 'assistant') {
+            this.appendOutput(`${entry.content}\n`, 'agent');
+          }
+        } else if (entry.type === 'terminal') {
+          this.appendOutput(`$ ${entry.command}\n`, 'command');
+          if (entry.output) {
+            this.appendOutput(entry.output, 'output');
+          }
         }
-        // Other roles (e.g., 'system') are not explicitly handled for display in this UI
       });
+      this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight; // Scroll to bottom after rendering history
     });
+
 
     this.terminalInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
