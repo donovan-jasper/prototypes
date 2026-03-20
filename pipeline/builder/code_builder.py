@@ -60,22 +60,44 @@ async def fix_with_unstuck(client: httpx.AsyncClient, spec: str, code: str, erro
 
 
 def parse_code_blocks(response: str) -> dict[str, str]:
-    """Extract file_path -> contents from fenced code blocks."""
+    """Extract file_path -> contents from fenced code blocks.
+
+    Handles multiple header formats:
+      ```path/to/file.js      (path in header)
+      ```javascript            (language only — fall back to first comment line)
+    """
+    import re
+
     files = {}
     parts = response.split("```")
     for i in range(1, len(parts), 2):
         block = parts[i]
-        first_line_end = block.index("\n")
+        try:
+            first_line_end = block.index("\n")
+        except ValueError:
+            continue
         header = block[:first_line_end].strip()
         content = block[first_line_end + 1:]
-        # Header should be a file path (contains / or .)
+
+        path = None
         if "/" in header or "." in header:
-            # Strip language hint if present (e.g., "python src/app.py" -> "src/app.py")
+            # Header contains a path directly
             path = header.split()[-1] if " " in header else header
             # Strip "lang:" prefix (e.g., "json:package.json" -> "package.json")
             if ":" in path and not path.startswith("/"):
                 after_colon = path.split(":", 1)[1]
                 if "." in after_colon:
                     path = after_colon
+        else:
+            # Header is a language tag — look for file path in first comment line
+            # Matches: "// src/file.js", "# file.py", "/* file.css */", "<!-- file.html -->"
+            first_content_line = content.split("\n")[0].strip()
+            m = re.match(r'^(?://|#|/\*|<!--)\s*([\w./-]+\.[\w]+)', first_content_line)
+            if m:
+                path = m.group(1)
+                # Strip the comment line from content
+                content = content[content.index("\n") + 1:]
+
+        if path:
             files[path] = content.rstrip("\n") + "\n"
     return files

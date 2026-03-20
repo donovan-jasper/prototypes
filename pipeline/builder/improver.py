@@ -71,22 +71,42 @@ Output the COMPLETE updated files (not diffs). Format each as:
 Only output files that changed or are new. No commentary outside code blocks."""
 
 
-def _read_project_files(project_dir: str) -> str:
-    """Read all text files in a project directory into a listing."""
+def _read_project_files(project_dir: str, only_files: list[str] | None = None, max_total_chars: int = 40000) -> str:
+    """Read text files in a project directory into a listing.
+
+    If only_files is given, only those paths (relative to project_dir) are included.
+    Stops adding files once max_total_chars is reached.
+    """
     parts = []
-    for root, _, fnames in os.walk(project_dir):
-        for fname in fnames:
-            if fname.startswith(".") or "__pycache__" in root or "node_modules" in root:
-                continue
-            fpath = os.path.join(root, fname)
-            rel = os.path.relpath(fpath, project_dir)
-            try:
-                with open(fpath) as f:
-                    content = f.read()
-                if len(content) < 10000:
-                    parts.append(f"### {rel}\n```\n{content}\n```")
-            except (UnicodeDecodeError, PermissionError):
-                continue
+    total = 0
+
+    if only_files:
+        candidates = [(os.path.join(project_dir, p), p) for p in only_files]
+    else:
+        candidates = []
+        for root, _, fnames in os.walk(project_dir):
+            for fname in sorted(fnames):
+                if fname.startswith(".") or "__pycache__" in root or "node_modules" in root:
+                    continue
+                fpath = os.path.join(root, fname)
+                rel = os.path.relpath(fpath, project_dir)
+                candidates.append((fpath, rel))
+
+    for fpath, rel in candidates:
+        try:
+            with open(fpath) as f:
+                content = f.read()
+        except (UnicodeDecodeError, PermissionError, FileNotFoundError):
+            continue
+        if len(content) >= 5000:
+            content = content[:5000] + "\n... (truncated)"
+
+        entry = f"### {rel}\n```\n{content}\n```"
+        if total + len(entry) > max_total_chars:
+            parts.append("### (truncated — remaining files omitted to stay within context)")
+            break
+        parts.append(entry)
+        total += len(entry)
     return "\n\n".join(parts)
 
 
@@ -117,7 +137,7 @@ async def improve_prototype(idea: dict) -> bool:
         with open(spec_path) as f:
             spec = f.read()
 
-    file_listing = _read_project_files(project_dir)
+    file_listing = _read_project_files(project_dir, max_total_chars=20000)
     if not file_listing:
         print(f"  Empty project dir: {project_dir}, skipping permanently")
         db.record_improvement(idea["id"])
@@ -147,10 +167,12 @@ async def improve_prototype(idea: dict) -> bool:
 
         # Step 2: Implement — coder does the work
         print("  [coder] Implementing...")
+        files_to_change = assessment.get("files_to_change", [])
+        impl_listing = _read_project_files(project_dir, only_files=files_to_change) if files_to_change else file_listing
         impl_response = await llm_call(
             client, CODER_MODEL,
             [{"role": "user", "content": IMPLEMENT_PROMPT.format(
-                improvement=improvement, spec=spec, file_listing=file_listing
+                improvement=improvement, spec=spec, file_listing=impl_listing
             )}],
             temperature=0.2,
         )
