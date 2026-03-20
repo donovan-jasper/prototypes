@@ -44,4 +44,40 @@ describe('ApplicationBuilder', () => {
     
     await waitFor(() => expect(getByText('Test Application')).toBeTruthy());
   });
+
+  it('adds field to application', () => {
+    const { getByPlaceholderText, getByText } = render(
+      <NavigationContainer>
+        <ApplicationBuilder />
+      </NavigationContainer>
+    );
+    const fieldNameInput = getByPlaceholderText('Field Name');
+    const fieldTypeInput = getByPlaceholderText('Field Type (e.g. String, Number, Boolean)');
+    const addFieldButton = getByText('Add Field');
+    
+    fireEvent.changeText(fieldNameInput, 'Test Field');
+    fireEvent.changeText(fieldTypeInput, 'String');
+    fireEvent.press(addFieldButton);
+    
+    expect(getByText('Test Field')).toBeTruthy();
+  });
+
+  it('removes field from application', () => {
+    const { getByPlaceholderText, getByText, getAllByType } = render(
+      <NavigationContainer>
+        <ApplicationBuilder />
+      </NavigationContainer>
+    );
+    const fieldNameInput = getByPlaceholderText('Field Name');
+    const fieldTypeInput = getByPlaceholderText('Field Type (e.g. String, Number, Boolean)');
+    const addFieldButton = getByText('Add Field');
+    const removeFieldButton = getAllByType(Button)[1];
+    
+    fireEvent.changeText(fieldNameInput, 'Test Field');
+    fireEvent.changeText(fieldTypeInput, 'String');
+    fireEvent.press(addFieldButton);
+    fireEvent.press(removeFieldButton);
+    
+    expect(getByText('Test Field')).toBeFalsy();
+  });
 });
