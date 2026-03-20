@@ -54,6 +54,8 @@ function CallScreen() {
     let statusMessage = '';
     let statusColor = '#333';
     const callerInfo = callData.callerId || 'Unknown';
+    const canAnswerOrScreen = callData.status === 'ringing' && !callData.isScreening;
+    const canEnd = callData.status === 'offhook';
 
     switch (callData.status) {
       case 'ringing':
@@ -72,6 +74,10 @@ function CallScreen() {
         statusMessage = `Call with ${callerInfo} on hold.`;
         statusColor = '#FF9800'; // Orange
         break;
+      case 'screening':
+        statusMessage = `AI Screening call from ${callerInfo}...`;
+        statusColor = '#673AB7'; // Deep Purple
+        break;
       default:
         statusMessage = `Call state: ${callData.status} with ${callerInfo}`;
         statusColor = '#2196F3'; // Blue
@@ -83,26 +89,29 @@ function CallScreen() {
         {callData.status === 'offhook' && callData.duration > 0 && (
           <Text style={styles.durationText}>Duration: {callData.duration}s</Text>
         )}
+        {callData.status === 'screening' && (
+          <ActivityIndicator size="small" color={statusColor} style={styles.screeningIndicator} />
+        )}
 
-        {callData.status === 'ringing' && (
+        {canAnswerOrScreen && (
           <View style={styles.buttonRow}>
-            <Button title="Screen Call" onPress={handleScreenCall} color="#673AB7" />
-            <Button title="Answer Call" onPress={handleAnswerCall} color="#4CAF50" />
+            <Button title="Screen Call" onPress={handleScreenCall} color="#673AB7" disabled={callData.isScreening} />
+            <Button title="Answer Call" onPress={handleAnswerCall} color="#4CAF50" disabled={callData.isScreening} />
           </View>
         )}
-        {callData.status === 'offhook' && (
+        {canEnd && (
           <Button title="End Call" onPress={handleEndCall} color="#F44336" />
         )}
 
-        {(callData.status === 'offhook' || callData.transcript) && (
+        {(callData.status === 'offhook' || callData.status === 'screening' || callData.transcript) && (
           <>
             <Text style={styles.transcriptLabel}>Transcript:</Text>
             <ScrollView style={styles.transcriptScroll}>
-              <Text style={styles.transcriptText}>{callData.transcript || 'Waiting for audio...'}</Text>
+              <Text style={styles.transcriptText}>{callData.transcript || 'Waiting for AI audio...'}</Text>
             </ScrollView>
           </>
         )}
-        {(callData.status === 'offhook' || callData.summary) && (
+        {(callData.status === 'offhook' || callData.status === 'screening' || callData.summary) && (
           <>
             <Text style={styles.summaryLabel}>Summary:</Text>
             <Text style={styles.summaryText}>{callData.summary || 'Generating summary...'}</Text>
@@ -134,9 +143,14 @@ function CallScreen() {
         <Text style={styles.sectionTitle}>Past Calls</Text>
         {pastCalls.map((call, index) => (
           <View key={call.id || index} style={styles.pastCallItem}>
-            <Text style={styles.pastCallHeader}>Caller: {call.caller_id} - {new Date(call.call_time).toLocaleString()}</Text>
-            <Text style={styles.pastCallSummary}>Summary: {call.summary}</Text>
-            <Text style={styles.pastCallTranscript}>Transcript: {call.transcript.substring(0, 100)}...</Text>
+            <Text style={styles.pastCallHeader}>Caller: {call.caller_id || 'Unknown'}</Text>
+            <Text style={styles.pastCallTime}>Time: {new Date(call.call_time).toLocaleString()}</Text>
+            {call.duration !== undefined && <Text style={styles.pastCallDetail}>Duration: {call.duration}s</Text>}
+            {call.type && <Text style={styles.pastCallDetail}>Type: {call.type}</Text>}
+            {call.summary && <Text style={styles.pastCallDetail}>Summary: {call.summary}</Text>}
+            {call.transcript && (
+              <Text style={styles.pastCallDetail} numberOfLines={2}>Transcript: {call.transcript}</Text>
+            )}
           </View>
         ))}
       </ScrollView>
@@ -145,7 +159,7 @@ function CallScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>CallGuard Live Screening</Text>
+      <Text style={styles.title}>CallGuard</Text>
       {renderCallStatus()}
       <View style={styles.separator} />
       {renderPastCalls()}
@@ -158,13 +172,14 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#f0f2f5',
+    paddingTop: 50,
   },
-  header: {
-    fontSize: 26,
+  title: {
+    fontSize: 28,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#333',
     textAlign: 'center',
+    color: '#333',
   },
   callStatusContainer: {
     backgroundColor: '#fff',
@@ -180,18 +195,22 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 10,
   },
   durationText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
+    color: '#555',
     marginBottom: 10,
+  },
+  screeningIndicator: {
+    marginVertical: 10,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginTop: 10,
     marginBottom: 10,
   },
   transcriptLabel: {
@@ -199,39 +218,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 15,
     marginBottom: 5,
-    color: '#555',
+    color: '#333',
   },
   transcriptScroll: {
-    maxHeight: 100,
-    backgroundColor: '#f9f9f9',
+    maxHeight: 150,
+    backgroundColor: '#eef',
     borderRadius: 5,
     padding: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
+    marginBottom: 10,
   },
   transcriptText: {
     fontSize: 14,
-    color: '#444',
     lineHeight: 20,
+    color: '#555',
   },
   summaryLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 15,
+    marginTop: 10,
     marginBottom: 5,
-    color: '#555',
+    color: '#333',
   },
   summaryText: {
     fontSize: 14,
-    color: '#444',
     lineHeight: 20,
+    color: '#555',
+    backgroundColor: '#eef',
+    borderRadius: 5,
+    padding: 10,
   },
   limitationText: {
     fontSize: 12,
     color: '#888',
+    textAlign: 'center',
     marginTop: 10,
     fontStyle: 'italic',
-    textAlign: 'center',
   },
   separator: {
     height: 1,
@@ -245,15 +266,6 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
-  loadingIndicator: {
-    marginVertical: 20,
-  },
-  noPastCallsText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
-  },
   pastCallsScroll: {
     flex: 1,
   },
@@ -264,24 +276,34 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 2,
   },
   pastCallHeader: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
     color: '#333',
-  },
-  pastCallSummary: {
-    fontSize: 14,
-    color: '#555',
     marginBottom: 5,
   },
-  pastCallTranscript: {
+  pastCallTime: {
     fontSize: 12,
     color: '#777',
+    marginBottom: 5,
+  },
+  pastCallDetail: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 3,
+  },
+  noPastCallsText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#777',
+    marginTop: 20,
+  },
+  loadingIndicator: {
+    marginTop: 20,
   },
 });
 

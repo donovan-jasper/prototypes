@@ -1,4 +1,5 @@
 import { NativeModules, NativeEventEmitter, Platform, Alert } from 'react-native';
+import storage from './storage'; // Import storage to save screened calls
 
 const { CallGuardModule } = NativeModules;
 
@@ -7,13 +8,14 @@ const callEventEmitter = new NativeEventEmitter(CallGuardModule);
 
 // Internal state for the current call
 let currentCallState = {
-  status: 'idle', // 'idle', 'ringing', 'offhook', 'dialing', 'onhold', 'unknown'
+  status: 'idle', // 'idle', 'ringing', 'offhook', 'dialing', 'onhold', 'unknown', 'screening'
   callerId: null,
   uuid: null,
   startTime: null,
   duration: 0,
   transcript: '',
   summary: '',
+  isScreening: false, // New flag for AI screening process
 };
 
 // List of registered listeners
@@ -54,7 +56,13 @@ const handleNativeCallEvent = (event) => {
   let newStatus = state;
   let newCallerId = callerId === null ? 'Unknown' : callerId; // Handle null callerId from iOS
 
-  // Update callerId if it's an incoming call and we have it
+  // If we are currently screening, do not let native events override the screening status
+  // unless the native event indicates the call has truly ended (idle).
+  if (currentCallState.isScreening && newStatus !== 'idle') {
+    console.log('Ignoring native event during AI screening:', event);
+    return;
+  }
+
   if (newStatus === 'ringing' && newCallerId) {
     updateCallState({
       status: newStatus,
@@ -62,6 +70,7 @@ const handleNativeCallEvent = (event) => {
       uuid: uuid,
       transcript: '',
       summary: '',
+      isScreening: false, // Ensure screening is off for a new incoming call
     });
   } else if (newStatus === 'offhook') {
     // If a call goes offhook, use the existing callerId if available, otherwise the new one
@@ -69,13 +78,32 @@ const handleNativeCallEvent = (event) => {
       status: newStatus,
       callerId: currentCallState.callerId || newCallerId,
       uuid: uuid,
+      isScreening: false,
     });
     startDurationTimer();
   } else if (newStatus === 'idle') {
+    // If a call ends, save it if it was offhook or screened
+    if (currentCallState.status === 'offhook' || currentCallState.status === 'screening') {
+      // Save the call data before resetting
+      const callToSave = {
+        id: currentCallState.uuid || Date.now().toString(), // Use UUID or timestamp as ID
+        caller_id: currentCallState.callerId,
+        call_time: currentCallState.startTime ? new Date(currentCallState.startTime).toISOString() : new Date().toISOString(),
+        duration: currentCallState.duration,
+        summary: currentCallState.summary || (currentCallState.status === 'offhook' ? 'Call completed.' : 'Screened call completed.'),
+        transcript: currentCallState.transcript || (currentCallState.status === 'offhook' ? 'No transcript available for live call.' : 'No transcript generated.'),
+        type: currentCallState.status === 'screening' ? 'screened' : 'answered',
+      };
+      storage.saveCallData(callToSave).catch(e => console.error('Failed to save call data:', e));
+    }
+
     updateCallState({
       status: newStatus,
       uuid: null,
-      // Keep callerId for a moment to show "Call ended with X"
+      callerId: null, // Reset callerId after call ends
+      transcript: '',
+      summary: '',
+      isScreening: false,
     });
     stopDurationTimer();
   } else {
@@ -84,11 +112,20 @@ const handleNativeCallEvent = (event) => {
       status: newStatus,
       callerId: currentCallState.callerId || newCallerId,
       uuid: uuid,
+      isScreening: false,
     });
   }
 };
 
 const callHandler = {
+  /**
+   * Returns the current state of the call.
+   * @returns {object} The current call state.
+   */
+  getCurrentCallState() {
+    return currentCallState;
+  },
+
   /**
    * Initializes the native call monitoring.
    */
@@ -139,7 +176,7 @@ const callHandler = {
     }
     stopDurationTimer();
     listeners.clear();
-    updateCallState({ status: 'idle', callerId: null, uuid: null, transcript: '', summary: '' });
+    updateCallState({ status: 'idle', callerId: null, uuid: null, transcript: '', summary: '', isScreening: false });
   },
 
   /**
@@ -161,66 +198,88 @@ const callHandler = {
   },
 
   /**
-   * Attempts to answer the current incoming call.
-   * Note: This is highly restricted on both iOS and Android for third-party apps.
+   * Simulates answering an incoming call.
+   * In a real app, this would interact with native call APIs.
    */
   async answerCall() {
-    if (!CallGuardModule) return;
-    if (currentCallState.status !== 'ringing') {
-      Alert.alert('Info', 'No incoming call to answer.');
-      return;
-    }
-    try {
-      await CallGuardModule.answerCall();
-      Alert.alert('Success', 'Attempted to answer call (may not work for cellular calls).');
-    } catch (error) {
-      Alert.alert('Action Restricted', `Cannot answer cellular calls programmatically on ${Platform.OS}. ${error.message}`);
-      console.error('Failed to answer call:', error);
+    if (currentCallState.status === 'ringing') {
+      console.log('Simulating answering call...');
+      // In a real app, you'd call a native module method here
+      // await CallGuardModule.answerCall(currentCallState.uuid);
+      updateCallState({ status: 'offhook', isScreening: false });
+      startDurationTimer();
+    } else {
+      console.warn('Cannot answer call: Not in ringing state.');
     }
   },
 
   /**
-   * Attempts to end the current ongoing call.
-   * Note: This is highly restricted on both iOS and Android for third-party apps.
+   * Simulates ending an active call.
+   * In a real app, this would interact with native call APIs.
    */
   async endCall() {
-    if (!CallGuardModule) return;
-    if (currentCallState.status !== 'offhook') {
-      Alert.alert('Info', 'No active call to end.');
-      return;
-    }
-    try {
-      await CallGuardModule.endCall();
-      Alert.alert('Success', 'Attempted to end call (may not work for cellular calls).');
-    } catch (error) {
-      Alert.alert('Action Restricted', `Cannot end cellular calls programmatically on ${Platform.OS}. ${error.message}`);
-      console.error('Failed to end call:', error);
+    if (currentCallState.status === 'offhook' || currentCallState.status === 'dialing' || currentCallState.status === 'onhold') {
+      console.log('Simulating ending call...');
+      // In a real app, you'd call a native module method here
+      // await CallGuardModule.endCall(currentCallState.uuid);
+      // The handleNativeCallEvent for 'idle' will take care of saving and resetting
+      handleNativeCallEvent({ state: 'idle', uuid: currentCallState.uuid, callerId: currentCallState.callerId });
+    } else {
+      console.warn('Cannot end call: No active call to end.');
     }
   },
 
   /**
-   * Placeholder for screening an incoming call.
-   * In a real scenario, this would involve AI processing.
+   * Simulates AI screening an incoming call.
+   * Progressively updates transcript and then provides a summary.
    */
   async screenCall() {
-    if (currentCallState.status !== 'ringing') {
-      Alert.alert('Info', 'No incoming call to screen.');
+    if (currentCallState.status !== 'ringing' || currentCallState.isScreening) {
+      console.warn('Cannot screen call: Not in ringing state or already screening.');
+      Alert.alert('Screening Error', 'Cannot screen call unless it is ringing and not already being screened.');
       return;
     }
-    Alert.alert('Screening Call', `AI is screening the call from ${currentCallState.callerId || 'Unknown'}...`);
-    console.log(`AI screening call from ${currentCallState.callerId || 'Unknown'}`);
-    // Simulate AI screening process
-    updateCallState({ transcript: 'AI: Hello, this is CallGuard. Who is calling?', summary: 'AI initiated screening.' });
-    // In a real app, this would involve complex native integration for audio routing
-    // and AI processing, which is beyond the scope of basic call detection.
-  },
 
-  /**
-   * Returns the current call state.
-   * @returns {object} The current call state.
-   */
-  getCurrentCallState() {
-    return currentCallState;
+    const callerId = currentCallState.callerId || 'Unknown Caller';
+    console.log(`Simulating AI screening for call from ${callerId}...`);
+
+    updateCallState({
+      status: 'screening',
+      transcript: 'AI Assistant is connecting...',
+      summary: 'Generating summary...',
+      isScreening: true,
+    });
+
+    const transcriptSnippets = [
+      "Hello, this is CallGuard's AI assistant. Who is calling, please?",
+      "I'm screening this call for the recipient. Could you state the purpose of your call?",
+      "Okay, I understand. So, you're calling about the appointment on Tuesday?",
+      "The recipient is currently unavailable. I can take a message or forward your request.",
+      "Thank you for that information. I will relay it to the recipient.",
+      "Is there anything else I can assist you with regarding this matter?",
+      "Alright, I have all the necessary details. The call is now concluded.",
+    ];
+
+    let currentTranscript = '';
+    for (let i = 0; i < transcriptSnippets.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second per snippet
+      currentTranscript += (i > 0 ? '\n' : '') + transcriptSnippets[i];
+      updateCallState({ transcript: currentTranscript });
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 2000)); // Give a moment before summary
+
+    const finalSummary = `Incoming call from ${callerId}. Caller confirmed the meeting details and left a message about a slight delay. AI assistant successfully screened the call and gathered information.`;
+
+    updateCallState({
+      summary: finalSummary,
+      transcript: currentTranscript, // Ensure final transcript is set
+      isScreening: false, // Screening process is complete
+    });
+
+    // After screening, the call is effectively handled by AI and ends.
+    // Trigger the idle state to save the call and reset.
+    handleNativeCallEvent({ state: 'idle', uuid: currentCallState.uuid, callerId: currentCallState.callerId });
   },
 };
 
