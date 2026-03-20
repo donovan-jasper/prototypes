@@ -1,0 +1,43 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.callguard">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" /> <!-- Required for PhoneStateListener -->
+    <!-- For CallScreeningService (Android 9+), more permissions would be needed: -->
+    <!-- <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" /> -->
+    <!-- <uses-permission android:name="android.permission.BIND_SCREENING_SERVICE" /> -->
+    <!-- <uses-permission android:name="android.permission.ANSWER_PHONE_CALLS" /> -->
+    <!-- <uses-permission android:name="android.permission.CALL_PHONE" /> -->
+    <!-- <uses-permission android:name="android.permission.READ_CALL_LOG" /> -->
+
+    <application
+      android:name=".MainApplication"
+      android:label="@string/app_name"
+      android:icon="@mipmap/ic_launcher"
+      android:roundIcon="@mipmap/ic_launcher_round"
+      android:allowBackup="false"
+      android:theme="@style/AppTheme">
+      <activity
+        android:name=".MainActivity"
+        android:label="@string/app_name"
+        android:configChanges="keyboard|keyboardHidden|orientation|screenSize|uiMode"
+        android:launchMode="singleTask"
+        android:windowSoftInputMode="adjustResize"
+        android:exported="true">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent-filter>
+      </activity>
+      <activity android:name="com.facebook.react.devsupport.DevSettingsActivity" android:exported="false" />
+
+      <!-- If using CallScreeningService, you'd declare it here -->
+      <!-- <service android:name=".CallGuardScreeningService"
+                 android:permission="android.permission.BIND_SCREENING_SERVICE"
+                 android:exported="true">
+          <intent-filter>
+              <action android:name="android.telecom.CallScreeningService" />
+          </intent-filter>
+      </service> -->
+    </application>
+</manifest>
