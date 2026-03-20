@@ -1,53 +1,22 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert } from 'react-native';
-import AIService from '../services/AIService';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, FlatList } from 'react-native';
+import DatabaseService from '../services/DatabaseService';
 
 const ApplicationBuilder = ({ navigation }) => {
   const [appName, setAppName] = useState('');
-  const [schema, setSchema] = useState({ type: 'object', properties: {} });
-  const [propertyName, setPropertyName] = useState('');
-  const [propertyType, setPropertyType] = useState('string');
-  const aiService = new AIService();
+  const [applications, setApplications] = useState([]);
+  const [newApplicationName, setNewApplicationName] = useState('');
+  const databaseService = new DatabaseService();
 
-  const addProperty = () => {
-    if (!propertyName.trim()) {
-      Alert.alert('Error', 'Please enter a property name');
+  const createApplication = () => {
+    if (!newApplicationName.trim()) {
+      Alert.alert('Error', 'Please enter an application name');
       return;
     }
     
-    const updatedSchema = {
-      ...schema,
-      properties: {
-        ...schema.properties,
-        [propertyName]: { type: propertyType }
-      }
-    };
-    
-    setSchema(updatedSchema);
-    setPropertyName('');
-  };
-
-  const generateAISuggestions = async () => {
-    try {
-      const result = await aiService.generateSchemaSuggestion(schema);
-      if (result.success) {
-        Alert.alert('AI Suggestions', `Received ${result.suggestions.length} suggestions`);
-        // Apply suggestions to schema if needed
-        let updatedSchema = { ...schema };
-        result.suggestions.forEach(suggestion => {
-          if (suggestion.type === 'add_property') {
-            updatedSchema.properties[suggestion.property] = { 
-              type: suggestion.dataType 
-            };
-          }
-        });
-        setSchema(updatedSchema);
-      } else {
-        Alert.alert('Error', result.error);
-      }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to get AI suggestions');
-    }
+    const updatedApplications = [...applications, { name: newApplicationName }];
+    setApplications(updatedApplications);
+    setNewApplicationName('');
   };
 
   const saveApplication = () => {
@@ -56,9 +25,18 @@ const ApplicationBuilder = ({ navigation }) => {
       return;
     }
     
-    // In a real app, you would save this to the database
-    Alert.alert('Success', `Application "${appName}" saved with schema!`);
-    navigation.navigate('Home');
+    const applicationStructure = {
+      name: appName,
+    };
+    
+    databaseService.insertApplication(appName, applicationStructure)
+      .then(() => {
+        Alert.alert('Success', `Application "${appName}" saved!`);
+        navigation.navigate('Home');
+      })
+      .catch(error => {
+        Alert.alert('Error', 'Failed to save application');
+      });
   };
 
   return (
@@ -72,30 +50,26 @@ const ApplicationBuilder = ({ navigation }) => {
         onChangeText={setAppName}
       />
       
-      <View style={styles.schemaSection}>
-        <Text style={styles.sectionTitle}>Current Schema</Text>
-        <Text style={styles.schemaPreview}>{JSON.stringify(schema, null, 2)}</Text>
-      </View>
+      <Button title="Create Application" onPress={saveApplication} />
       
-      <View style={styles.addPropertySection}>
-        <Text style={styles.sectionTitle}>Add Property</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Property Name"
-          value={propertyName}
-          onChangeText={setPropertyName}
-        />
-        <View style={styles.row}>
-          <Text style={styles.label}>Type:</Text>
-          <Button title="String" onPress={() => setPropertyType('string')} />
-          <Button title="Number" onPress={() => setPropertyType('number')} />
-          <Button title="Boolean" onPress={() => setPropertyType('boolean')} />
-        </View>
-        <Button title="Add Property" onPress={addProperty} />
-      </View>
+      <Text style={styles.sectionTitle}>Created Applications:</Text>
       
-      <Button title="Get AI Suggestions" onPress={generateAISuggestions} />
-      <Button title="Save Application" onPress={saveApplication} />
+      <FlatList
+        data={applications}
+        renderItem={({ item }) => (
+          <Text style={styles.application}>{item.name}</Text>
+        )}
+        keyExtractor={(item, index) => index.toString()}
+      />
+      
+      <TextInput
+        style={styles.input}
+        placeholder="New Application Name"
+        value={newApplicationName}
+        onChangeText={setNewApplicationName}
+      />
+      
+      <Button title="Add Application" onPress={createApplication} />
     </ScrollView>
   );
 };
@@ -120,32 +94,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: 'white',
   },
-  schemaSection: {
-    marginBottom: 20,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  schemaPreview: {
-    fontFamily: 'monospace',
-    padding: 10,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-  },
-  addPropertySection: {
-    marginBottom: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  label: {
-    marginRight: 10,
+  application: {
+    fontSize: 16,
+    marginBottom: 5,
   },
 });
 
