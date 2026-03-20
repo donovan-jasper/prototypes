@@ -63,41 +63,60 @@ def parse_code_blocks(response: str) -> dict[str, str]:
     """Extract file_path -> contents from fenced code blocks.
 
     Handles multiple header formats:
-      ```path/to/file.js      (path in header)
-      ```javascript            (language only — fall back to first comment line)
+      ```path/to/file.js        (path in header)
+      ### path/to/file.js\n```  (markdown heading before block)
+      ```javascript              (language only — fall back to first comment line)
     """
     import re
 
     files = {}
-    parts = response.split("```")
-    for i in range(1, len(parts), 2):
-        block = parts[i]
-        try:
-            first_line_end = block.index("\n")
-        except ValueError:
-            continue
-        header = block[:first_line_end].strip()
-        content = block[first_line_end + 1:]
-
-        path = None
-        if "/" in header or "." in header:
-            # Header contains a path directly
-            path = header.split()[-1] if " " in header else header
-            # Strip "lang:" prefix (e.g., "json:package.json" -> "package.json")
-            if ":" in path and not path.startswith("/"):
-                after_colon = path.split(":", 1)[1]
-                if "." in after_colon:
-                    path = after_colon
-        else:
-            # Header is a language tag — look for file path in first comment line
-            # Matches: "// src/file.js", "# file.py", "/* file.css */", "<!-- file.html -->"
-            first_content_line = content.split("\n")[0].strip()
-            m = re.match(r'^(?://|#|/\*|<!--)\s*([\w./-]+\.[\w]+)', first_content_line)
+    # Pre-split lines to enable markdown-heading lookahead
+    lines = response.split("\n")
+    # Rebuild text but track which fenced blocks are preceded by a heading
+    heading_for_block: dict[int, str] = {}  # char offset of ``` -> heading path
+    char_pos = 0
+    for idx, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith("```") and idx > 0:
+            prev = lines[idx - 1].strip()
+            m = re.match(r'^#{1,4}\s+([\w./-]+\.[\w]+)', prev)
             if m:
-                path = m.group(1)
-                # Strip the comment line from content
-                content = content[content.index("\n") + 1:]
+                heading_for_block[char_pos] = m.group(1)
+        char_pos += len(line) + 1  # +1 for the \n
 
-        if path:
-            files[path] = content.rstrip("\n") + "\n"
+    parts = response.split("```")
+    char_offset = 0
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # inside a fenced block
+            fence_start = char_offset - 3  # position of the opening ```
+            try:
+                first_line_end = part.index("\n")
+            except ValueError:
+                char_offset += len(part) + 3
+                continue
+            header = part[:first_line_end].strip()
+            content = part[first_line_end + 1:]
+
+            path = None
+            if "/" in header or "." in header:
+                # Path is in the fence header
+                path = header.split()[-1] if " " in header else header
+                if ":" in path and not path.startswith("/"):
+                    after_colon = path.split(":", 1)[1]
+                    if "." in after_colon:
+                        path = after_colon
+            elif fence_start in heading_for_block:
+                # Markdown heading on the line before this block
+                path = heading_for_block[fence_start]
+            else:
+                # Language-only header — look for path in first comment line
+                first_content_line = content.split("\n")[0].strip()
+                m = re.match(r'^(?://|#|/\*|<!--)\s*([\w./-]+\.[\w]+)', first_content_line)
+                if m:
+                    path = m.group(1)
+                    content = content[content.index("\n") + 1:]
+
+            if path:
+                files[path] = content.rstrip("\n") + "\n"
+        char_offset += len(part) + 3  # +3 for the ``` delimiter
     return files
