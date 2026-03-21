@@ -1,40 +1,94 @@
 import React from 'react';
-import { View, Text } from 'react-native';
-import Svg, { Circle, Line } from 'react-native-svg';
+import { View, Text, StyleSheet } from 'react-native';
+import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 
-const TaskChain = ({ tasks }) => {
+const TaskChain = ({ tasks, chainName }) => {
+  if (!tasks || tasks.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noTasksText}>No tasks in this chain yet.</Text>
+      </View>
+    );
+  }
+
+  const circleRadius = 20;
+  const horizontalSpacing = 80; // Space between circle centers
+  const startX = 50;
+  const startY = 100;
+  const svgWidth = startX + (tasks.length - 1) * horizontalSpacing + circleRadius + 20;
+  const svgHeight = 200;
+
   return (
-    <View>
-      <Text>Task Chain</Text>
-      <Svg height="200" width="300">
-        {tasks.map((task, index) => (
-          <React.Fragment key={index}>
-            <Circle
-              cx={50 + index * 50}
-              cy="100"
-              r="20"
-              stroke="black"
-              strokeWidth="2"
-              fill="white"
-            />
-            <Text x={50 + index * 50} y="100" textAnchor="middle" fill="black">
-              {task}
-            </Text>
-            {index < tasks.length - 1 && (
-              <Line
-                x1={70 + index * 50}
-                y1="100"
-                x2={30 + (index + 1) * 50}
-                y2="100"
-                stroke="black"
+    <View style={styles.container}>
+      {chainName && <Text style={styles.chainName}>{chainName}</Text>}
+      <Svg height={svgHeight} width={Math.max(300, svgWidth)}>
+        {tasks.map((task, index) => {
+          const cx = startX + index * horizontalSpacing;
+          const cy = startY;
+
+          return (
+            <React.Fragment key={index}>
+              {/* Circle for the task */}
+              <Circle
+                cx={cx}
+                cy={cy}
+                r={circleRadius}
+                stroke="#3498db"
                 strokeWidth="2"
+                fill="#ecf0f1"
               />
-            )}
-          </React.Fragment>
-        ))}
+              {/* Text for the task name */}
+              <SvgText
+                x={cx}
+                y={cy + 5} // Adjust y to vertically center text
+                textAnchor="middle"
+                fill="#2c3e50"
+                fontSize="12"
+                fontWeight="bold"
+              >
+                {task}
+              </SvgText>
+
+              {/* Line connecting to the next task */}
+              {index < tasks.length - 1 && (
+                <Line
+                  x1={cx + circleRadius}
+                  y1={cy}
+                  x2={cx + horizontalSpacing - circleRadius}
+                  y2={cy}
+                  stroke="#3498db"
+                  strokeWidth="2"
+                />
+              )}
+            </React.Fragment>
+          );
+        })}
       </Svg>
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    marginVertical: 10,
+    padding: 10,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  chainName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#2c3e50',
+    textAlign: 'center',
+  },
+  noTasksText: {
+    textAlign: 'center',
+    color: '#7f8c8d',
+    fontStyle: 'italic',
+  },
+});
 
 export default TaskChain;
