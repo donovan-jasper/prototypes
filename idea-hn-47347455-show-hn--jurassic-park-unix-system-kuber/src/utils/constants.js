@@ -1,2 +1,1 @@
-export const THEME_RETRO = 'retro';
-export const THEME_MODERN = 'modern';
+export const WEBSOCKET_ENDPOINT = 'ws://localhost:8080';

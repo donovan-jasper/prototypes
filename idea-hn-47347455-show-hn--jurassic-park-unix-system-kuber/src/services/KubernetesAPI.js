@@ -1,53 +1,63 @@
 class KubernetesAPI {
   constructor() {
-    // Initial mock values for metrics
+    this.ws = null;
     this.currentCpu = 50;
     this.currentMemory = 60;
     this.currentDisk = 70;
+    this.callback = null;
   }
 
   /**
-   * Generates a mock metric value that fluctuates slightly around its current value.
-   * Clamps the value between 0 and 100.
-   * @param {number} currentValue The current metric value.
-   * @returns {number} The new, slightly adjusted metric value.
-   */
-  _generateMockMetric(currentValue) {
-    const change = Math.floor(Math.random() * 11) - 5; // Generates a random integer between -5 and +5
-    let newValue = currentValue + change;
-    return Math.max(0, Math.min(100, newValue)); // Clamp between 0 and 100
-  }
-
-  /**
-   * Subscribes to real-time system metrics.
-   * Emits mock CPU, Memory, and Disk data at regular intervals.
+   * Establishes a WebSocket connection to the specified endpoint.
+   * @param {string} endpoint The WebSocket endpoint URL.
    * @param {(metrics: { cpu: number, memory: number, disk: number }) => void} callback
    *   The function to call with new metric data.
-   * @returns {() => void} A function to unsubscribe (clear the interval).
+   * @returns {() => void} A function to unsubscribe (close the WebSocket connection).
    */
-  subscribeToMetrics(callback) {
-    // Immediately call the callback with initial values
-    callback({
-      cpu: this.currentCpu,
-      memory: this.currentMemory,
-      disk: this.currentDisk,
-    });
+  subscribeToMetrics(endpoint, callback) {
+    this.callback = callback;
 
-    const intervalId = setInterval(() => {
-      this.currentCpu = this._generateMockMetric(this.currentCpu);
-      this.currentMemory = this._generateMockMetric(this.currentMemory);
-      this.currentDisk = this._generateMockMetric(this.currentDisk);
+    this.ws = new WebSocket(endpoint);
 
+    this.ws.onmessage = (event) => {
+      try {
+        const metrics = JSON.parse(event.data);
+        this.currentCpu = metrics.cpu;
+        this.currentMemory = metrics.memory;
+        this.currentDisk = metrics.disk;
+
+        callback({
+          cpu: this.currentCpu,
+          memory: this.currentMemory,
+          disk: this.currentDisk,
+        });
+      } catch (error) {
+        console.log('Error parsing WebSocket message:', error);
+      }
+    };
+
+    this.ws.onopen = () => {
       callback({
         cpu: this.currentCpu,
         memory: this.currentMemory,
         disk: this.currentDisk,
       });
-    }, 1000); // Update every 1 second
+    };
 
-    // Return a cleanup function to stop the interval
+    this.ws.onerror = (event) => {
+      console.log('Error occurred while connecting to WebSocket:', event);
+    };
+
+    this.ws.onclose = () => {
+      console.log('WebSocket connection closed');
+    };
+
+    // Return a cleanup function to stop the WebSocket connection
     return () => {
-      clearInterval(intervalId);
+      if (this.ws) {
+        this.ws.close();
+        this.ws = null;
+      }
     };
   }
 }
