@@ -1,71 +1,127 @@
-import { parseScriptWithAI } from './aiService';
+import { Alert } from 'react-native';
 
-export const processScriptToVideo = async (script) => {
+/**
+ * Mocks an AI service call to process a script and generate video scene parameters.
+ * In a real application, this would involve API calls to an AI model.
+ *
+ * @param {string} script - The input script text.
+ * @returns {Promise<{scenes: Array<Object>}>} - A promise that resolves with an object containing an array of scene parameters.
+ */
+const processScriptToVideo = async (script) => {
+  // Simulate AI processing delay
+  await new Promise(resolve => setTimeout(resolve, 1500));
+
   if (!script || script.trim() === '') {
-    return { scenes: [] };
-  }
-
-  try {
-    // Parse the script using AI service
-    const parsedScenes = await parseScriptWithAI(script);
-    
-    // Process each scene to add default values and structure
-    const processedScenes = parsedScenes.map((scene, index) => ({
-      id: `scene_${index + 1}`,
-      description: scene.description || '',
-      duration: scene.duration || 5000, // Default 5 seconds
-      background: scene.background || 'neutral',
-      characters: scene.characters || [],
-      visualElements: scene.visualElements || [],
-      position: scene.position || 'center',
-      transition: scene.transition || 'fade'
-    }));
-
-    return {
-      scenes: processedScenes,
-      totalDuration: processedScenes.reduce((sum, scene) => sum + scene.duration, 0),
-      sceneCount: processedScenes.length
-    };
-  } catch (error) {
-    console.error('Error processing script to video:', error);
-    // Return fallback structure in case of error
+    // Return a default empty scene if the script is empty
     return {
       scenes: [{
-        id: 'scene_1',
-        description: script.substring(0, 100) + (script.length > 100 ? '...' : ''),
-        duration: 5000,
-        background: 'neutral',
+        description: "Please enter a script to generate scenes.",
+        duration: 5,
+        background: "default",
         characters: [],
         visualElements: [],
-        position: 'center',
-        transition: 'fade'
-      }],
-      totalDuration: 5000,
-      sceneCount: 1
+        position: {},
+        transition: "fade"
+      }]
     };
   }
-};
 
-export const splitScriptIntoScenes = (script) => {
-  // Split script by scene markers like "Scene 1:", "SCENE 1:", "Scene 2:", etc.
-  const sceneRegex = /(?:^|\n)(?:Scene|SCENE)\s+(\d+):?\s*(.*?)(?=\n(?:Scene|SCENE)\s+\d+:|$)/gi;
-  const matches = [];
-  let match;
+  // Basic parsing to create scenes based on lines or simple markers
+  const lines = script.split('\n').filter(line => line.trim() !== '');
+  const scenes = [];
 
-  while ((match = sceneRegex.exec(script)) !== null) {
-    matches.push({
-      number: parseInt(match[1]),
-      content: match[2].trim()
+  let sceneCounter = 0;
+  for (const line of lines) {
+    sceneCounter++;
+    // Simple heuristic to generate scene data
+    let description = line;
+    // Duration based on line length, clamped between 3 and 10 seconds
+    let duration = Math.max(3, Math.min(10, Math.floor(line.length / 10)));
+    let background = 'default';
+    let characters = [];
+    let visualElements = [];
+    let position = {};
+    let transition = 'fade'; // Default transition
+
+    // Simple keyword-based detection for background, characters, and elements
+    if (line.toLowerCase().includes('forest')) {
+      background = 'forest';
+      visualElements.push('trees');
+      visualElements.push('stream');
+    } else if (line.toLowerCase().includes('beach')) {
+      background = 'beach';
+      visualElements.push('ocean');
+      visualElements.push('sand');
+    } else if (line.toLowerCase().includes('city')) {
+      background = 'city';
+      visualElements.push('buildings');
+      visualElements.push('cars');
+    } else if (line.toLowerCase().includes('space')) {
+      background = 'space';
+      visualElements.push('stars');
+      visualElements.push('planets');
+    } else if (line.toLowerCase().includes('house') || line.toLowerCase().includes('room')) {
+      background = 'house';
+      visualElements.push('furniture');
+    } else if (line.toLowerCase().includes('mountain')) {
+      background = 'mountain';
+      visualElements.push('peaks');
+      visualElements.push('snow');
+    } else if (line.toLowerCase().includes('desert')) {
+      background = 'desert';
+      visualElements.push('sand dunes');
+      visualElements.push('cactus');
+    }
+
+    if (line.toLowerCase().includes('cat')) {
+      characters.push('cat');
+      position.cat = 'bottom-left';
+    }
+    if (line.toLowerCase().includes('dog')) {
+      characters.push('dog');
+      position.dog = 'bottom-right';
+    }
+    if (line.toLowerCase().includes('person') || line.toLowerCase().includes('man') || line.toLowerCase().includes('woman') || line.toLowerCase().includes('child')) {
+      characters.push('person');
+      position.person = 'center';
+    }
+    if (line.toLowerCase().includes('bird')) {
+      characters.push('bird');
+      position.bird = 'top-center';
+    }
+    if (line.toLowerCase().includes('robot')) {
+      characters.push('robot');
+      position.robot = 'bottom-center';
+    }
+
+    // Alternate transition types for demonstration
+    transition = sceneCounter % 2 === 0 ? 'slide' : 'fade';
+
+    scenes.push({
+      description,
+      duration,
+      background,
+      characters,
+      visualElements,
+      position,
+      transition
     });
   }
 
-  // If no scene markers found, treat entire script as one scene
-  if (matches.length === 0) {
-    return [{
-      number: 1,
-      content: script.trim()
-    }];
+  // If no scenes were generated from the script, provide a default
+  if (scenes.length === 0) {
+    scenes.push({
+      description: "Could not interpret script, showing a default scene.",
+      duration: 5,
+      background: "default",
+      characters: [],
+      visualElements: [],
+      position: {},
+      transition: "fade"
+    });
   }
 
-  return matches;
+  return { scenes };
 };
+
+export { processScriptToVideo };
