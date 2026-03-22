@@ -20,6 +20,7 @@ const CHARACTER_ICONS = {
   person: 'ios-person',
   bird: 'ios-leaf', // Using leaf as a placeholder for bird
   robot: 'ios-hardware-chip',
+  // Add more as needed
 };
 
 const VISUAL_ELEMENT_ICONS = {
@@ -36,6 +37,7 @@ const VISUAL_ELEMENT_ICONS = {
   snow: 'ios-snow',
   'sand dunes': 'ios-apps', // Placeholder
   cactus: 'ios-flower',
+  // Add more as needed
 };
 
 // Helper to get position styles
@@ -144,67 +146,75 @@ const VideoPreview = ({ scenes }) => {
     setIsPlaying(!isPlaying);
   };
 
-  const handlePrevScene = () => {
-    setIsPlaying(false); // Pause when manually navigating
-    setCurrentSceneIndex((prevIndex) => Math.max(0, prevIndex - 1));
+  const handleNextScene = () => {
+    if (currentSceneIndex < scenes.length - 1) {
+      setCurrentSceneIndex(prev => prev + 1);
+      setIsPlaying(false); // Pause when manually navigating
+    }
   };
 
-  const handleNextScene = () => {
-    setIsPlaying(false); // Pause when manually navigating
-    setCurrentSceneIndex((prevIndex) => Math.min(scenes.length - 1, prevIndex + 1));
+  const handlePrevScene = () => {
+    if (currentSceneIndex > 0) {
+      setCurrentSceneIndex(prev => prev - 1);
+      setIsPlaying(false); // Pause when manually navigating
+    }
   };
 
   return (
     <View style={styles.container}>
       <Animated.View
         style={[
-          styles.sceneContainer,
-          { backgroundColor: BACKGROUND_COLORS[currentScene.background] || BACKGROUND_COLORS.default },
+          styles.sceneView,
+          { backgroundColor: BACKGROUND_COLORS[currentScene.backgroundColor] || BACKGROUND_COLORS.default },
           { opacity: fadeAnim },
         ]}
       >
         <Text style={styles.sceneDescription}>{currentScene.description}</Text>
 
-        {currentScene.characters.map((char, index) => (
-          <View
-            key={`char-${index}`}
-            style={[styles.characterElementContainer, getPositionStyles(currentScene.position[char] || 'center')]}
-          >
-            <Ionicons name={CHARACTER_ICONS[char] || 'ios-person'} size={40} color="white" />
-            <Text style={styles.characterElementText}>{char}</Text>
-          </View>
-        ))}
+        {currentScene.characters && currentScene.characters.map((char, index) => {
+          const iconName = CHARACTER_ICONS[char.name.toLowerCase()] || 'ios-help-circle';
+          const positionStyles = getPositionStyles(char.position);
+          return (
+            <Ionicons
+              key={`char-${index}`}
+              name={iconName}
+              size={60}
+              color="white"
+              style={[styles.icon, positionStyles]}
+            />
+          );
+        })}
 
-        {currentScene.visualElements.map((elem, index) => (
-          <View
-            key={`elem-${index}`}
-            style={[styles.characterElementContainer, getPositionStyles(currentScene.position[elem] || 'center')]}
-          >
-            <Ionicons name={VISUAL_ELEMENT_ICONS[elem] || 'ios-cube'} size={40} color="white" />
-            <Text style={styles.characterElementText}>{elem}</Text>
-          </View>
-        ))}
+        {currentScene.visualElements && currentScene.visualElements.map((element, index) => {
+          const iconName = VISUAL_ELEMENT_ICONS[element.name.toLowerCase()] || 'ios-help-circle-outline';
+          const positionStyles = getPositionStyles(element.position);
+          return (
+            <Ionicons
+              key={`element-${index}`}
+              name={iconName}
+              size={60}
+              color="white"
+              style={[styles.icon, positionStyles]}
+            />
+          );
+        })}
 
-        <View style={styles.durationInfo}>
-          <Text style={styles.durationText}>
-            Scene {currentSceneIndex + 1}/{scenes.length} - {currentScene.duration}s
-          </Text>
-        </View>
-
-        <View style={styles.progressBarBackground}>
-          <Animated.View style={[styles.progressBarFill, { width: progressBarWidth }]} />
+        {/* Progress Bar */}
+        <View style={styles.progressBarContainer}>
+          <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
         </View>
       </Animated.View>
 
+      {/* Controls */}
       <View style={styles.controls}>
-        <TouchableOpacity onPress={handlePrevScene} disabled={currentSceneIndex === 0} style={styles.controlButton}>
-          <Ionicons name="ios-play-back" size={30} color={currentSceneIndex === 0 ? '#aaa' : 'white'} />
+        <TouchableOpacity onPress={handlePrevScene} style={styles.controlButton}>
+          <Ionicons name="ios-play-back" size={32} color="white" />
         </TouchableOpacity>
         <TouchableOpacity onPress={handlePlayPause} style={styles.controlButton}>
-          <Ionicons name={isPlaying ? 'ios-pause' : 'ios-play'} size={40} color="white" />
+          <Ionicons name={isPlaying ? 'ios-pause' : 'ios-play'} size={48} color="white" />
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleNextScene} disabled={currentSceneIndex === scenes.length - 1} style={styles.controlButton}>
-          <Ionicons name="ios-play-forward" size={30} color={currentSceneIndex === scenes.length - 1 ? '#aaa' : 'white'} />
+        <TouchableOpacity onPress={handleNextScene} style={styles.controlButton}>
+          <Ionicons name="ios-play-forward" size={32} color="white" />
         </TouchableOpacity>
       </View>
     </View>
@@ -217,24 +227,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#333',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
   },
-  noScenesText: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-  },
-  sceneContainer: {
-    width: '100%',
+  sceneView: {
+    width: '90%',
     aspectRatio: 16 / 9, // Common video aspect ratio
     borderRadius: 10,
     overflow: 'hidden',
+    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
     marginBottom: 20,
-    borderWidth: 2,
-    borderColor: '#555',
+    elevation: 5, // Android shadow
+    shadowColor: '#000', // iOS shadow
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   sceneDescription: {
     position: 'absolute',
@@ -245,64 +252,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
+    zIndex: 10, // Ensure description is above icons if they overlap
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10,
+    textShadowRadius: 10
   },
-  characterElementContainer: {
+  icon: {
     position: 'absolute',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 5,
-    borderRadius: 5,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    zIndex: 5, // Icons below description
   },
-  characterElementText: {
-    color: 'white',
-    fontSize: 12,
-    marginTop: 2,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 5,
-  },
-  durationInfo: {
-    position: 'absolute',
-    bottom: 40,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  durationText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-  },
-  progressBarBackground: {
+  progressBarContainer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    height: 8,
+    height: 5,
     backgroundColor: 'rgba(255,255,255,0.3)',
   },
-  progressBarFill: {
+  progressBar: {
     height: '100%',
-    backgroundColor: '#00BFFF', // Deep Sky Blue
+    backgroundColor: '#007AFF', // Expo blue
   },
   controls: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-around',
-    width: '100%',
-    marginTop: 20,
+    width: '80%',
   },
   controlButton: {
     padding: 10,
-    borderRadius: 50,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  noScenesText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
   },
 });
 
