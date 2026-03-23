@@ -10,7 +10,8 @@ db.serialize(() => {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT UNIQUE,
       note TEXT,
-      encrypted_note TEXT
+      encrypted_note TEXT,
+      salt TEXT
     )
   `);
 });
