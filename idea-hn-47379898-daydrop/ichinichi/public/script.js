@@ -21,7 +21,7 @@ function loadCurrentNote() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('note-date').textContent = today;
 
-  db.get('SELECT * FROM notes WHERE date = ?', [today], (err, row) => {
+  db.get('SELECT encrypted_note, salt FROM notes WHERE date = ?', [today], (err, row) => {
     if (err) {
       console.error(err);
       return;
@@ -47,8 +47,8 @@ document.getElementById('save-note').addEventListener('click', () => {
     const { encrypted, salt } = encryptNote(noteText, password);
 
     db.run(
-      'INSERT INTO notes (date, note, encrypted_note, salt) VALUES (?, ?, ?, ?)',
-      [today, noteText, encrypted, salt],
+      'INSERT INTO notes (date, encrypted_note, salt) VALUES (?, ?, ?)',
+      [today, encrypted, salt],
       (err) => {
         if (err) {
           console.error(err);
@@ -84,7 +84,7 @@ function loadCalendar() {
 
     const date = new Date(today.getFullYear(), today.getMonth(), i).toISOString().split('T')[0];
 
-    db.get('SELECT * FROM notes WHERE date = ?', [date], (err, row) => {
+    db.get('SELECT encrypted_note, salt FROM notes WHERE date = ?', [date], (err, row) => {
       if (err) {
         console.error(err);
         return;

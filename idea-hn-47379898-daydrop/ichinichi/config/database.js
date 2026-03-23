@@ -9,7 +9,6 @@ db.serialize(() => {
     CREATE TABLE IF NOT EXISTS notes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       date TEXT UNIQUE,
-      note TEXT,
       encrypted_note TEXT,
       salt TEXT
     )
