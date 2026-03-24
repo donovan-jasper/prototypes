@@ -47,7 +47,13 @@ function createTerminal(sessionId) {
             background: '#1e1e1e',
             foreground: '#d4d4d4',
             cursor: '#ffffff'
-        }
+        },
+        allowTransparency: true,
+        drawBoldTextInBrightColors: false,
+        letterSpacing: 0,
+        lineHeight: 1.2,
+        scrollback: 10000,
+        tabStopWidth: 8
     });
     
     term.open(termElement);
@@ -100,3 +106,8 @@ function attachToSession(sessionId) {
 }
 
 initializeSocket();
+
+// Export functions for other modules to use
+window.createNewSession = createNewSession;
+window.attachToSession = attachToSession;
+window.resizeTerminal = resizeTerminal;
