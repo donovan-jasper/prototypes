@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LocalForge</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header>
+    <nav>
+      <ul>
+        <li><a href="#" data-tool="media">Media</a></li>
+        <li><a href="#" data-tool="image">Image</a></li>
+        <li><a href="#" data-tool="pdf">PDF</a></li>
+        <li><a href="#" data-tool="document">Document</a></li>
+        <li><a href="#" data-tool="archive">Archive</a></li>
+      </ul>
+    </nav>
+  </header>
+  <main>
+    <div id="conversion-options"></div>
+    <button id="convertButton">Convert</button>
+    <a id="downloadButton" style="display: none;">Download</a>
+    <div id="progress" style="width: 0%;"></div>
+    <div id="error"></div>
+    <div id="success"></div>
+  </main>
+  <script src="js/app.js"></script>
+</body>
+</html>

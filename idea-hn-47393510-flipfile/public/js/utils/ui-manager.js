@@ -37,7 +37,7 @@ class UIManager {
   }
 
   updateToolOptions(toolType) {
-    const conversionOptionsElement = document.getElementById('conversionOptions');
+    const conversionOptionsElement = document.getElementById('conversion-options');
     conversionOptionsElement.innerHTML = '';
     if (toolType === 'media') {
       const label = document.createElement('label');
@@ -50,6 +50,95 @@ class UIManager {
         { value: 'mp3', text: 'MP3' },
         { value: 'wav', text: 'WAV' },
         { value: 'ogg', text: 'OGG' },
+      ];
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.text;
+        select.appendChild(optionElement);
+      });
+      conversionOptionsElement.appendChild(label);
+      conversionOptionsElement.appendChild(select);
+      const convertButton = document.createElement('button');
+      convertButton.id = 'convertButton';
+      convertButton.textContent = 'Convert';
+      conversionOptionsElement.appendChild(convertButton);
+    } else if (toolType === 'image') {
+      const label = document.createElement('label');
+      label.textContent = 'Target Format:';
+      const select = document.createElement('select');
+      select.id = 'targetFormat';
+      const options = [
+        { value: 'png', text: 'PNG' },
+        { value: 'jpg', text: 'JPG' },
+        { value: 'webp', text: 'WebP' },
+        { value: 'gif', text: 'GIF' },
+        { value: 'bmp', text: 'BMP' },
+      ];
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.text;
+        select.appendChild(optionElement);
+      });
+      conversionOptionsElement.appendChild(label);
+      conversionOptionsElement.appendChild(select);
+      const convertButton = document.createElement('button');
+      convertButton.id = 'convertButton';
+      convertButton.textContent = 'Convert';
+      conversionOptionsElement.appendChild(convertButton);
+    } else if (toolType === 'pdf') {
+      const label = document.createElement('label');
+      label.textContent = 'Target Format:';
+      const select = document.createElement('select');
+      select.id = 'targetFormat';
+      const options = [
+        { value: 'pdf', text: 'PDF' },
+        { value: 'image', text: 'Image' },
+      ];
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.text;
+        select.appendChild(optionElement);
+      });
+      conversionOptionsElement.appendChild(label);
+      conversionOptionsElement.appendChild(select);
+      const convertButton = document.createElement('button');
+      convertButton.id = 'convertButton';
+      convertButton.textContent = 'Convert';
+      conversionOptionsElement.appendChild(convertButton);
+    } else if (toolType === 'document') {
+      const label = document.createElement('label');
+      label.textContent = 'Target Format:';
+      const select = document.createElement('select');
+      select.id = 'targetFormat';
+      const options = [
+        { value: 'txt', text: 'TXT' },
+        { value: 'md', text: 'Markdown' },
+        { value: 'html', text: 'HTML' },
+        { value: 'csv', text: 'CSV' },
+        { value: 'json', text: 'JSON' },
+      ];
+      options.forEach((option) => {
+        const optionElement = document.createElement('option');
+        optionElement.value = option.value;
+        optionElement.textContent = option.text;
+        select.appendChild(optionElement);
+      });
+      conversionOptionsElement.appendChild(label);
+      conversionOptionsElement.appendChild(select);
+      const convertButton = document.createElement('button');
+      convertButton.id = 'convertButton';
+      convertButton.textContent = 'Convert';
+      conversionOptionsElement.appendChild(convertButton);
+    } else if (toolType === 'archive') {
+      const label = document.createElement('label');
+      label.textContent = 'Target Format:';
+      const select = document.createElement('select');
+      select.id = 'targetFormat';
+      const options = [
+        { value: 'zip', text: 'ZIP' },
       ];
       options.forEach((option) => {
         const optionElement = document.createElement('option');

@@ -60,6 +60,38 @@ class FileHandler {
       }).catch((error) => {
         this.uiManager.showError(error);
       });
+    } else if (toolType === 'image') {
+      const targetFormat = this.uiManager.getMediaConversionOptions();
+      ImageConverter.convert(files[0], targetFormat, this.uiManager, this).then((blob, filename) => {
+        this.uiManager.enableDownload(blob, filename);
+        this.uiManager.showSuccess('Conversion complete!');
+      }).catch((error) => {
+        this.uiManager.showError(error);
+      });
+    } else if (toolType === 'pdf') {
+      const targetFormat = this.uiManager.getMediaConversionOptions();
+      PDFConverter.convert(files[0], targetFormat, this.uiManager, this).then((blob, filename) => {
+        this.uiManager.enableDownload(blob, filename);
+        this.uiManager.showSuccess('Conversion complete!');
+      }).catch((error) => {
+        this.uiManager.showError(error);
+      });
+    } else if (toolType === 'document') {
+      const targetFormat = this.uiManager.getMediaConversionOptions();
+      DocumentConverter.convert(files[0], targetFormat, this.uiManager, this).then((blob, filename) => {
+        this.uiManager.enableDownload(blob, filename);
+        this.uiManager.showSuccess('Conversion complete!');
+      }).catch((error) => {
+        this.uiManager.showError(error);
+      });
+    } else if (toolType === 'archive') {
+      const targetFormat = this.uiManager.getMediaConversionOptions();
+      ArchiveConverter.convert(files[0], targetFormat, this.uiManager, this).then((blob, filename) => {
+        this.uiManager.enableDownload(blob, filename);
+        this.uiManager.showSuccess('Conversion complete!');
+      }).catch((error) => {
+        this.uiManager.showError(error);
+      });
     }
   }
 }
