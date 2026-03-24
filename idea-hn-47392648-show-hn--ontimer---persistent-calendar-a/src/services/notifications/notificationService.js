@@ -1,6 +1,6 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
-import { getEventById } from '../data/eventRepository';
+import { getEventById, updateEventStatus } from '../data/eventRepository'; // Import updateEventStatus
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -72,6 +72,26 @@ export const schedulePersistentAlert = async (event) => {
 };
 
 /**
+ * Helper function to generate alert body based on time before event
+ * @param {Object} event - The event object
+ * @param {number} secondsBefore - Seconds before the event the alert is triggered
+ * @returns {string} The alert body text
+ */
+const getAlertBody = (event, secondsBefore) => {
+  if (secondsBefore === 0) {
+    return `${event.title} is happening now!`;
+  } else if (secondsBefore < 60) {
+    return `${event.title} starts in less than a minute!`;
+  } else if (secondsBefore < 3600) {
+    const minutes = Math.ceil(secondsBefore / 60);
+    return `${event.title} starts in ${minutes} minute${minutes > 1 ? 's' : ''}.`;
+  } else {
+    const hours = Math.ceil(secondsBefore / 3600);
+    return `${event.title} starts in ${hours} hour${hours > 1 ? 's' : ''}.`;
+  }
+};
+
+/**
  * Schedules a full-screen alert for critical events
  * @param {Object} event - The event object
  */
@@ -112,7 +132,8 @@ export const scheduleFullScreenAlert = async (event) => {
 };
 
 /**
- * Dismisses all scheduled notifications for a specific event
+ * Dismisses all scheduled notifications associated with a specific event.
+ * This function is intended to cancel all future escalations for an event.
  * @param {string} eventId - The ID of the event
  */
 export const dismissAlert = async (eventId) => {
@@ -129,110 +150,38 @@ export const dismissAlert = async (eventId) => {
     for (const notification of eventNotifications) {
       await Notifications.cancelScheduledNotificationAsync(notification.identifier);
     }
+    console.log(`Dismissed all scheduled notifications for event: ${eventId}`);
   } catch (error) {
-    console.error('Error dismissing alert:', error);
+    console.error('Error dismissing scheduled alerts:', error);
     throw error;
   }
 };
 
 /**
- * Acknowledges an alert by dismissing the notification and updating event status
- * @param {string} notificationId - The ID of the notification
+ * Acknowledges an alert by dismissing the specific notification that triggered the action,
+ * canceling all further scheduled notifications for the event, and updating the event's status.
+ * @param {string} notificationId - The ID of the specific notification that triggered the action (e.g., the full-screen alert)
  * @param {string} eventId - The ID of the event
  */
 export const acknowledgeAlert = async (notificationId, eventId) => {
   try {
-    // Dismiss the notification
-    await Notifications.dismissNotificationAsync(notificationId);
-    
-    // Update event status in database to mark as acknowledged
-    const event = await getEventById(eventId);
-    if (event) {
-      const updatedEvent = {
-        ...event,
-        acknowledged: true,
-        acknowledgedAt: new Date().toISOString(),
-      };
-      // Note: We assume there's an updateEvent function in eventRepository
-      // This might need to be added to the repository
+    // 1. Dismiss the specific notification that triggered the action
+    if (notificationId) {
+      await Notifications.dismissNotificationAsync(notificationId);
+      console.log(`Dismissed specific notification: ${notificationId}`);
     }
+
+    // 2. Cancel all scheduled notifications associated with this event
+    // This stops all further escalations for that event.
+    await dismissAlert(eventId);
+    console.log(`Cancelled all scheduled notifications for event: ${eventId}`);
+
+    // 3. Update the event's status in the local database
+    await updateEventStatus(eventId, { isAcknowledged: true });
+    console.log(`Event ${eventId} marked as acknowledged.`);
+
   } catch (error) {
     console.error('Error acknowledging alert:', error);
     throw error;
-  }
-};
-
-/**
- * Gets the appropriate alert body based on time remaining
- * @param {Object} event - The event object
- * @param {number} secondsBefore - Seconds before the event
- * @returns {string} The alert body text
- */
-const getAlertBody = (event, secondsBefore) => {
-  if (secondsBefore === 0) {
-    return `${event.title} starts now!`;
-  } else if (secondsBefore < 60) {
-    return `${event.title} starts in ${secondsBefore} seconds!`;
-  } else if (secondsBefore < 3600) {
-    const minutes = Math.floor(secondsBefore / 60);
-    return `${event.title} starts in ${minutes} minute${minutes !== 1 ? 's' : ''}!`;
-  } else {
-    const hours = Math.floor(secondsBefore / 3600);
-    return `${event.title} starts in ${hours} hour${hours !== 1 ? 's' : ''}!`;
-  }
-};
-
-/**
- * Sets up notification listeners for foreground/background handling
- * @param {Function} onFullScreenAlert - Callback when a full-screen alert should be shown
- */
-export const setupNotificationListeners = (onFullScreenAlert) => {
-  // Handle notification received while app is in foreground
-  const foregroundSubscription = Notifications.addNotificationReceivedListener(notification => {
-    console.log('Notification received in foreground:', notification);
-    
-    // Check if this is a critical event that requires full-screen alert
-    const eventType = notification.request.content.data?.notificationType;
-    const eventId = notification.request.content.data?.eventId;
-    
-    if (eventType === 'fullscreen-alert' && onFullScreenAlert) {
-      onFullScreenAlert(eventId);
-    }
-  });
-
-  // Handle notification response (when user interacts with notification)
-  const responseSubscription = Notifications.addNotificationResponseReceivedListener(response => {
-    console.log('Notification response received:', response);
-    
-    const notification = response.notification;
-    const eventType = notification.request.content.data?.notificationType;
-    const eventId = notification.request.content.data?.eventId;
-    
-    // Acknowledge the alert when user responds
-    if (eventId) {
-      acknowledgeAlert(notification.request.identifier, eventId);
-    }
-    
-    // If it's a full-screen alert, ensure the full-screen component is shown
-    if (eventType === 'fullscreen-alert' && onFullScreenAlert) {
-      onFullScreenAlert(eventId);
-    }
-  });
-
-  // Return cleanup function
-  return () => {
-    foregroundSubscription.remove();
-    responseSubscription.remove();
-  };
-};
-
-/**
- * Cancels all scheduled notifications
- */
-export const cancelAllNotifications = async () => {
-  try {
-    await Notifications.cancelAllScheduledNotificationsAsync();
-  } catch (error) {
-    console.error('Error canceling all notifications:', error);
   }
 };
