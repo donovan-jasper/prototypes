@@ -39,7 +39,7 @@ io.on('connection', (socket) => {
     const sessionId = terminalManager.createSession(cols, rows);
     
     const session = terminalManager.getSession(sessionId);
-    session.term.onData(output => {
+    session.term.on('data', output => {
       socket.emit('output', { sessionId, output });
     });
     
@@ -54,7 +54,7 @@ io.on('connection', (socket) => {
       // Cancel cleanup since user is reconnecting
       terminalManager.cancelCleanup(sessionId);
       
-      session.term.onData(output => {
+      session.term.on('data', output => {
         socket.emit('output', { sessionId, output });
       });
       
@@ -77,7 +77,9 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('Client disconnected');
     // Mark all sessions for cleanup when client disconnects
-    // In a real implementation, you might want to track which sessions belong to this client
+    for (let sessionId of terminalManager.sessions.keys()) {
+      terminalManager.markForCleanup(sessionId);
+    }
   });
 });
 
