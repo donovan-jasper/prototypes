@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "FlowZone",
+    "slug": "flowzone",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./icon.png",
+    "splash": {
+      "image": "./splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "bundleIdentifier": "com.flowzone.app",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "YOUR_CLIENT_ID"
+        }
+      }
+    },
+    "android": {
+      "package": "com.flowzone.app",
+      "config": {
+        "googleSignIn": {
+          "reservedClientId": "YOUR_CLIENT_ID"
+        }
+      }
+    }
+  }
+}
