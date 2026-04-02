@@ -16,7 +16,9 @@ export const initializeDatabase = () => {
         location TEXT,
         is_critical INTEGER DEFAULT 0,
         alert_settings TEXT,
-        acknowledged_at TEXT,
+        acknowledgment_status TEXT DEFAULT 'pending',
+        snooze_until TEXT, 
+        last_modified TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
       );`,
       [],
