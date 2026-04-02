@@ -126,72 +126,147 @@ function createKeyboardHTML() {
         
         keyboardContainer.appendChild(rowDiv);
     });
+
+    // Add toggle button for native keyboard
+    const toggleButton = document.createElement('button');
+    toggleButton.id = 'toggle-native-keyboard';
+    toggleButton.className = 'key-btn key-toggle';
+    toggleButton.textContent = virtualKeyboardVisible ? 'Hide KB' : 'Show KB';
+    
+    toggleButton.addEventListener('touchstart', () => {
+        toggleButton.classList.add('pressed');
+    });
+    
+    toggleButton.addEventListener('touchend', () => {
+        setTimeout(() => {
+            toggleButton.classList.remove('pressed');
+        }, 100);
+    });
+    
+    toggleButton.addEventListener('mousedown', () => {
+        toggleButton.classList.add('pressed');
+    });
+    
+    toggleButton.addEventListener('mouseup', () => {
+        setTimeout(() => {
+            toggleButton.classList.remove('pressed');
+        }, 100);
+    });
+    
+    toggleButton.addEventListener('click', toggleNativeKeyboard);
+    
+    keyboardContainer.appendChild(toggleButton);
 }
 
 /**
- * Sets up event listeners for the virtual keyboard.
+ * Sets up event listeners for all keyboard buttons.
  */
 function setupKeyboardEventListeners() {
     const keyboardContainer = document.getElementById('virtual-keyboard');
+    const buttons = keyboardContainer.querySelectorAll('.key-btn');
     
-    // Add click/touch event listener to the entire keyboard container
-    keyboardContainer.addEventListener('click', handleKeyPress);
-    
-    // Add keyboard visibility toggle button
-    const toggleBtn = document.createElement('button');
-    toggleBtn.id = 'keyboard-toggle';
-    toggleBtn.textContent = virtualKeyboardVisible ? 'Hide Keyboard' : 'Show Keyboard';
-    toggleBtn.className = 'keyboard-toggle-btn';
-    toggleBtn.addEventListener('click', toggleKeyboardVisibility);
-    
-    // Insert after the keyboard container
-    keyboardContainer.parentNode.insertBefore(toggleBtn, keyboardContainer.nextSibling);
+    buttons.forEach(button => {
+        button.addEventListener('click', handleKeyPress);
+    });
 }
 
 /**
- * Handles key press events from the virtual keyboard.
- * @param {Event} event The click/touch event
+ * Handles key press events and sends appropriate data to the terminal.
+ * @param {Event} event The click event from the key button.
  */
 function handleKeyPress(event) {
-    if (!terminalInstance || !event.target.classList.contains('key-btn')) {
-        return;
-    }
+    const button = event.target;
+    const code = button.dataset.code;
+    const type = button.dataset.type;
     
-    const keyType = event.target.dataset.type;
-    const keyCode = event.target.dataset.code;
-    
-    // Toggle modifier keys
-    if (keyType === 'modifier') {
-        toggleModifier(keyCode);
+    // Handle modifier keys
+    if (type === 'modifier') {
+        toggleModifier(code);
         updateModifierVisuals();
         return;
     }
     
-    // Send the appropriate character sequence based on current modifier state
-    let output = keyCode;
+    // Handle regular keys with modifiers
+    let outputCode = code;
     
-    // Handle special cases where we need to modify the output based on modifiers
-    if (keyType === 'char' || keyType === 'arrow' || keyType === 'special') {
-        output = getModifiedOutput(keyCode, keyType);
+    // Apply modifiers based on current state
+    if (modifierStates.ctrl && !isModifierCode(code)) {
+        // For letter keys, apply Ctrl mapping
+        if (code.length === 1 && code >= 'a' && code <= 'z') {
+            // Ctrl + letter mapping
+            const charCode = code.charCodeAt(0);
+            if (charCode >= 97 && charCode <= 122) { // a-z
+                outputCode = String.fromCharCode(charCode - 96); // Ctrl codes
+            }
+        } else if (code === 'MOD_CTRL') {
+            outputCode = '';
+        }
+    }
+    
+    // Special handling for some keys with modifiers
+    if (modifierStates.ctrl) {
+        switch (code) {
+            case 'c':
+            case 'C':
+                outputCode = '\x03'; // Ctrl+C
+                break;
+            case 'd':
+            case 'D':
+                outputCode = '\x04'; // Ctrl+D
+                break;
+            case 'z':
+            case 'Z':
+                outputCode = '\x1a'; // Ctrl+Z
+                break;
+            case 'l':
+            case 'L':
+                outputCode = '\x0c'; // Ctrl+L
+                break;
+            case 'a':
+            case 'A':
+                outputCode = '\x01'; // Ctrl+A
+                break;
+            case 'e':
+            case 'E':
+                outputCode = '\x05'; // Ctrl+E
+                break;
+            case 'u':
+            case 'U':
+                outputCode = '\x15'; // Ctrl+U
+                break;
+            case 'k':
+            case 'K':
+                outputCode = '\x0b'; // Ctrl+K
+                break;
+            case 'w':
+            case 'W':
+                outputCode = '\x17'; // Ctrl+W
+                break;
+            case 'r':
+            case 'R':
+                outputCode = '\x12'; // Ctrl+R
+                break;
+        }
     }
     
     // Send the output to the terminal
-    if (terminalInstance && output) {
-        terminalInstance.write(output);
+    if (terminalInstance && outputCode) {
+        terminalInstance.write(outputCode);
     }
     
-    // Reset modifiers after sending the character (except for persistent ones like Ctrl)
-    if (keyType !== 'modifier') {
-        resetNonPersistentModifiers();
+    // Reset modifiers after sending (for single-use modifiers like Ctrl+C)
+    if (modifierStates.ctrl && type !== 'modifier') {
+        resetModifiers();
+        updateModifierVisuals();
     }
 }
 
 /**
  * Toggles the state of a modifier key.
- * @param {string} modifierCode The code of the modifier to toggle
+ * @param {string} code The modifier code to toggle.
  */
-function toggleModifier(modifierCode) {
-    switch (modifierCode) {
+function toggleModifier(code) {
+    switch (code) {
         case 'MOD_CTRL':
             modifierStates.ctrl = !modifierStates.ctrl;
             break;
@@ -205,131 +280,63 @@ function toggleModifier(modifierCode) {
 }
 
 /**
+ * Checks if the given code represents a modifier.
+ * @param {string} code The code to check.
+ * @returns {boolean} True if the code is a modifier, false otherwise.
+ */
+function isModifierCode(code) {
+    return code === 'MOD_CTRL' || code === 'MOD_ALT' || code === 'MOD_SHIFT';
+}
+
+/**
+ * Resets all modifier states.
+ */
+function resetModifiers() {
+    modifierStates.ctrl = false;
+    modifierStates.alt = false;
+    modifierStates.shift = false;
+}
+
+/**
  * Updates the visual appearance of modifier keys based on their state.
  */
 function updateModifierVisuals() {
-    const keys = document.querySelectorAll('.key-modifier');
-    
-    keys.forEach(key => {
-        const code = key.dataset.code;
-        let isActive = false;
-        
-        switch (code) {
-            case 'MOD_CTRL':
-                isActive = modifierStates.ctrl;
-                break;
-            case 'MOD_ALT':
-                isActive = modifierStates.alt;
-                break;
-            case 'MOD_SHIFT':
-                isActive = modifierStates.shift;
-                break;
-        }
-        
-        if (isActive) {
-            key.classList.add('active');
-        } else {
-            key.classList.remove('active');
+    const buttons = document.querySelectorAll('.key-btn');
+    buttons.forEach(button => {
+        const code = button.dataset.code;
+        if (code === 'MOD_CTRL') {
+            button.classList.toggle('active', modifierStates.ctrl);
+        } else if (code === 'MOD_ALT') {
+            button.classList.toggle('active', modifierStates.alt);
+        } else if (code === 'MOD_SHIFT') {
+            button.classList.toggle('active', modifierStates.shift);
         }
     });
 }
 
 /**
- * Gets the modified output based on current modifier states.
- * @param {string} keyCode The base key code
- * @param {string} keyType The type of key
- * @returns {string} The modified output string
+ * Toggles visibility of the native keyboard.
  */
-function getModifiedOutput(keyCode, keyType) {
-    // If no modifiers are active, return the original code
-    if (!modifierStates.ctrl && !modifierStates.alt && !modifierStates.shift) {
-        return keyCode;
-    }
-    
-    // Handle special cases for modifier combinations
-    if (modifierStates.ctrl) {
-        // Handle Ctrl combinations
-        if (keyType === 'char') {
-            const char = keyCode.toLowerCase();
-            // Convert to control character (A=1, B=2, ..., Z=26)
-            if (char >= 'a' && char <= 'z') {
-                return String.fromCharCode(char.charCodeAt(0) - 'a'.charCodeAt(0) + 1);
-            }
-            // Special cases for other characters
-            switch (char) {
-                case '@': return '\x00'; // Ctrl+Space
-                case '[': return '\x1b'; // Ctrl+[
-                case '\\': return '\x1c'; // Ctrl+\
-                case ']': return '\x1d'; // Ctrl+]
-                case '^': return '\x1e'; // Ctrl+^
-                case '_': return '\x1f'; // Ctrl+_
-            }
-        }
-        
-        // For arrow keys with Ctrl, send extended escape sequences
-        if (keyType === 'arrow') {
-            // Add modifier number to arrow key sequence (5 for Ctrl)
-            return keyCode.replace(/\[(\w)/, '[1;5$1');
-        }
-    }
-    
-    if (modifierStates.alt) {
-        // Alt sends ESC followed by the character
-        if (keyType === 'char') {
-            return '\x1b' + keyCode;
-        }
-        
-        // For arrow keys with Alt, send extended escape sequences
-        if (keyType === 'arrow') {
-            // Add modifier number to arrow key sequence (3 for Alt)
-            return keyCode.replace(/\[(\w)/, '[1;3$1');
-        }
-    }
-    
-    if (modifierStates.shift) {
-        // Shift might modify some keys differently
-        if (keyType === 'arrow') {
-            // Add modifier number to arrow key sequence (2 for Shift)
-            return keyCode.replace(/\[(\w)/, '[1;2$1');
-        }
-    }
-    
-    // For complex modifier combinations, return the original
-    return keyCode;
-}
-
-/**
- * Resets non-persistent modifiers after a key press.
- */
-function resetNonPersistentModifiers() {
-    // In this implementation, modifiers are toggled rather than momentary,
-    // so we don't reset them automatically. They stay active until toggled off.
-}
-
-/**
- * Toggles the visibility of the virtual keyboard.
- */
-function toggleKeyboardVisibility() {
+function toggleNativeKeyboard() {
     virtualKeyboardVisible = !virtualKeyboardVisible;
     updateKeyboardVisibility();
     
     // Update toggle button text
-    const toggleBtn = document.getElementById('keyboard-toggle');
-    if (toggleBtn) {
-        toggleBtn.textContent = virtualKeyboardVisible ? 'Hide Keyboard' : 'Show Keyboard';
+    const toggleButton = document.getElementById('toggle-native-keyboard');
+    if (toggleButton) {
+        toggleButton.textContent = virtualKeyboardVisible ? 'Hide KB' : 'Show KB';
     }
 }
 
 /**
- * Updates the visibility of the virtual keyboard based on the current state.
+ * Updates the visibility of the virtual keyboard.
  */
 function updateKeyboardVisibility() {
     const keyboardContainer = document.getElementById('virtual-keyboard');
     if (keyboardContainer) {
-        keyboardContainer.style.display = virtualKeyboardVisible ? 'block' : 'none';
+        keyboardContainer.style.display = virtualKeyboardVisible ? 'flex' : 'none';
     }
 }
 
-// Export functions for use in other modules
+// Export functions for external use
 window.initKeyboard = initKeyboard;
-window.toggleKeyboardVisibility = toggleKeyboardVisibility;
