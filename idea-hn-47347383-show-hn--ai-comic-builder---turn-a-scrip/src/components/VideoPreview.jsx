@@ -1,18 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, ImageBackground, Image } from 'react-native';
-// Removed Ionicons import as we are now using Image components
 
-// --- Helper to get position styles for Image components ---
 const getPositionStyles = (positionKey) => {
-  const baseSize = 120; // Base size for character image
-  const offset = -baseSize / 2; // To center the image if using transform
+  const baseSize = 120; 
+  const offset = -baseSize / 2; 
 
-  // Using absolute positioning for characters
   const styles = {
     position: 'absolute',
     width: baseSize,
     height: baseSize,
-    // Default to bottom-center if positionKey is not recognized
     bottom: 20,
     left: '50%',
     transform: [{ translateX: offset }],
@@ -28,23 +24,22 @@ const getPositionStyles = (positionKey) => {
     case 'bottom-left': return { ...styles, bottom: 20, left: 20, transform: [] };
     case 'bottom-center': return { ...styles, bottom: 20, left: '50%', transform: [{ translateX: offset }] };
     case 'bottom-right': return { ...styles, bottom: 20, right: 20, left: 'auto', transform: [] };
-    default: return styles; // Default to bottom-center
+    default: return styles; 
   }
 };
 
 const VideoPreview = ({ scenes }) => {
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
-  const fadeAnim = useRef(new Animated.Value(1)).current; // For scene fade in/out
-  const progressBarAnim = useRef(new Animated.Value(0)).current; // For scene duration progress
+  const fadeAnim = useRef(new Animated.Value(1)).current; 
+  const progressBarAnim = useRef(new Animated.Value(0)).current; 
 
   const currentScene = scenes[currentSceneIndex];
 
   useEffect(() => {
     if (!currentScene || !isPlaying) {
-      // If no scenes or not playing, reset progress bar and stop animations
       progressBarAnim.setValue(0);
-      fadeAnim.setValue(1); // Ensure current scene is visible if not playing
+      fadeAnim.setValue(1); 
       return;
     }
 
@@ -52,38 +47,33 @@ const VideoPreview = ({ scenes }) => {
     let progressAnimation;
 
     const startScene = () => {
-      // Reset progress bar and fade in
       progressBarAnim.setValue(0);
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 500, // Fade in duration
+        duration: 500, 
         useNativeDriver: true,
       }).start(() => {
-        // Start progress bar animation after fade in
         progressAnimation = Animated.timing(progressBarAnim, {
           toValue: 1,
           duration: currentScene.duration * 1000,
           easing: Easing.linear,
-          useNativeDriver: false, // width animation cannot use native driver
+          useNativeDriver: false, 
         });
         progressAnimation.start();
 
-        // Set timeout for next scene
         sceneTimeout = setTimeout(() => {
           if (currentSceneIndex < scenes.length - 1) {
-            // Fade out current scene before changing
             Animated.timing(fadeAnim, {
               toValue: 0,
-              duration: 500, // Fade out duration
+              duration: 500, 
               useNativeDriver: true,
             }).start(() => {
               setCurrentSceneIndex((prevIndex) => prevIndex + 1);
             });
           } else {
-            // End of scenes, stop playing
             setIsPlaying(false);
-            setCurrentSceneIndex(0); // Loop back to start or stay on last scene
-            Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start(); // Fade in last scene
+            setCurrentSceneIndex(0); 
+            Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }).start(); 
           }
         }, currentScene.duration * 1000);
       });
@@ -98,7 +88,7 @@ const VideoPreview = ({ scenes }) => {
       }
       fadeAnim.stop();
     };
-  }, [currentSceneIndex, scenes, isPlaying, currentScene]); // Depend on currentScene to re-run when its properties change
+  }, [currentSceneIndex, scenes, isPlaying, currentScene]); 
 
   if (!currentScene) {
     return (
@@ -115,7 +105,6 @@ const VideoPreview = ({ scenes }) => {
 
   const handlePlayPause = () => {
     if (!isPlaying && currentSceneIndex === scenes.length - 1) {
-      // If at the end and pressing play, restart from beginning
       setCurrentSceneIndex(0);
       setIsPlaying(true);
     } else {
@@ -123,48 +112,40 @@ const VideoPreview = ({ scenes }) => {
     }
   };
 
+  const getBackgroundStyle = () => {
+    switch (currentScene.background) {
+      case 'forest':
+        return { backgroundColor: 'green' };
+      case 'beach':
+        return { backgroundColor: 'blue' };
+      case 'city':
+        return { backgroundColor: 'gray' };
+      default:
+        return { backgroundColor: 'white' };
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Animated.View style={[styles.sceneWrapper, { opacity: fadeAnim }]}>
-        <ImageBackground
-          source={{ uri: currentScene.backgroundImageUrl }}
-          style={styles.imageBackground}
-          resizeMode="cover" // Ensure the background image covers the area
-        >
-          {/* Scene description text overlay */}
-          <View style={styles.descriptionOverlay}>
-            <Text style={styles.descriptionText}>{currentScene.description}</Text>
-          </View>
-
-          {/* Render characters */}
-          {currentScene.characters && currentScene.characters.map((char, charIndex) => (
-            <Image
-              key={charIndex}
-              source={{ uri: char.imageUrl }}
-              style={getPositionStyles(char.position)}
-              resizeMode="contain" // Ensure character images fit within their bounds
-            />
+        <ImageBackground source={require('../assets/backgrounds/forest.jpg')} style={[styles.background, getBackgroundStyle()]}>
+          {currentScene.characters.map((character, index) => (
+            <Image key={index} source={require('../assets/characters/person.png')} style={[styles.character, getPositionStyles(character.position)]} />
           ))}
-
-          {/* Visual elements are not rendered in this task, but data exists */}
-          {/* If you wanted to render visual elements, you'd add similar Image components here */}
+          <Text style={styles.sceneDescription}>{currentScene.description}</Text>
+          <Text style={styles.sceneDuration}>{currentScene.duration} seconds</Text>
         </ImageBackground>
       </Animated.View>
-
-      {/* Progress Bar */}
       <View style={styles.progressBarContainer}>
-        <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
+        <View style={[styles.progressBar, { width: progressBarWidth }]} />
       </View>
-
-      {/* Play/Pause Button */}
-      <TouchableOpacity onPress={handlePlayPause} style={styles.playPauseButton}>
-        <Text style={styles.playPauseText}>{isPlaying ? 'Pause' : 'Play'}</Text>
+      <TouchableOpacity style={styles.playButton} onPress={handlePlayPause}>
+        {isPlaying ? (
+          <Text style={styles.playButtonText}>Pause</Text>
+        ) : (
+          <Text style={styles.playButtonText}>Play</Text>
+        )}
       </TouchableOpacity>
-
-      {/* Scene Index and Total */}
-      <Text style={styles.sceneCounter}>
-        Scene {currentSceneIndex + 1} / {scenes.length}
-      </Text>
     </View>
   );
 };
@@ -172,66 +153,59 @@ const VideoPreview = ({ scenes }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000', // Black background for the whole preview area
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   sceneWrapper: {
-    flex: 1,
-  },
-  imageBackground: {
-    flex: 1,
-    justifyContent: 'flex-end', // Align description to bottom
-    alignItems: 'center',
-    position: 'relative', // For absolute positioning of characters
-  },
-  descriptionOverlay: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
     width: '100%',
-    alignItems: 'center',
+    height: '80%',
+  },
+  background: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  character: {
+    resizeMode: 'contain',
+  },
+  sceneDescription: {
     position: 'absolute',
-    bottom: 0,
-  },
-  descriptionText: {
-    color: 'white',
+    top: 20,
+    left: 20,
     fontSize: 18,
-    textAlign: 'center',
-  },
-  // characterImage styles are handled by getPositionStyles, no need for a base style here
-  // visualElementIcon: { // Removed as visual elements are not rendered with Ionicons
-  //   position: 'absolute',
-  // },
-  noScenesText: {
     color: 'white',
-    textAlign: 'center',
-    marginTop: 50,
+  },
+  sceneDuration: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
     fontSize: 18,
+    color: 'white',
   },
   progressBarContainer: {
-    height: 5,
-    backgroundColor: '#333',
     width: '100%',
+    height: 20,
+    backgroundColor: 'gray',
   },
   progressBar: {
-    height: '100%',
-    backgroundColor: '#007AFF', // Blue progress bar
+    height: 20,
+    backgroundColor: 'blue',
   },
-  playPauseButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    alignSelf: 'center',
-    marginVertical: 10,
+  playButton: {
+    width: 100,
+    height: 50,
+    backgroundColor: 'blue',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 10,
   },
-  playPauseText: {
+  playButtonText: {
+    fontSize: 18,
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
-  sceneCounter: {
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 10,
+  noScenesText: {
+    fontSize: 18,
+    color: 'gray',
   },
 });
 
