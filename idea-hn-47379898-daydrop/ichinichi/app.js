@@ -7,6 +7,18 @@ const port = 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Middleware to check if date is in the past
+const checkImmutability = (req, res, next) => {
+  const { date } = req.params;
+  const today = new Date().toISOString().split('T')[0];
+  
+  if (date < today) {
+    return res.status(403).json({ error: 'Past entries are immutable' });
+  }
+  
+  next();
+};
+
 // Get note for a specific date
 app.get('/api/notes/:date', (req, res) => {
   const { date } = req.params;
@@ -37,6 +49,12 @@ app.post('/api/notes', (req, res) => {
     return res.status(400).json({ error: 'Missing required fields' });
   }
   
+  // Validate that the date is today
+  const today = new Date().toISOString().split('T')[0];
+  if (date !== today) {
+    return res.status(403).json({ error: 'Can only create notes for today' });
+  }
+  
   // Check if note already exists for this date
   db.get('SELECT id FROM notes WHERE date = ?', [date], (err, row) => {
     if (err) {
@@ -64,6 +82,53 @@ app.post('/api/notes', (req, res) => {
         });
       }
     );
+  });
+});
+
+// Update a note (only for today's date)
+app.put('/api/notes/:date', checkImmutability, (req, res) => {
+  const { date } = req.params;
+  const { encrypted_note, salt } = req.body;
+  
+  if (!encrypted_note || !salt) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+  
+  db.run(
+    'UPDATE notes SET encrypted_note = ?, salt = ? WHERE date = ?',
+    [encrypted_note, salt, date],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Failed to update note' });
+      }
+      
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Note not found' });
+      }
+      
+      res.json({
+        date,
+        encrypted_note,
+        salt
+      });
+    }
+  );
+});
+
+// Delete a note (only for today's date)
+app.delete('/api/notes/:date', checkImmutability, (req, res) => {
+  const { date } = req.params;
+  
+  db.run('DELETE FROM notes WHERE date = ?', [date], function(err) {
+    if (err) {
+      return res.status(500).json({ error: 'Failed to delete note' });
+    }
+    
+    if (this.changes === 0) {
+      return res.status(404).json({ error: 'Note not found' });
+    }
+    
+    res.json({ message: 'Note deleted successfully' });
   });
 });
 
