@@ -7,18 +7,21 @@ export const initializeDatabase = () => {
     tx.executeSql(
       `CREATE TABLE IF NOT EXISTS events (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        external_id TEXT,
+        calendar_id TEXT,
         title TEXT NOT NULL,
         description TEXT,
         start_date TEXT NOT NULL,
         end_date TEXT NOT NULL,
-        calendar_id TEXT,
-        external_id TEXT,
-        is_critical BOOLEAN DEFAULT 0,
-        alert_settings TEXT,
         location TEXT,
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );`
+        is_critical INTEGER DEFAULT 0,
+        alert_settings TEXT,
+        acknowledged_at TEXT,
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP
+      );`,
+      [],
+      () => console.log('Events table created successfully'),
+      (_, error) => console.error('Error creating events table:', error)
     );
 
     tx.executeSql(
@@ -28,7 +31,10 @@ export const initializeDatabase = () => {
         value TEXT NOT NULL,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-      );`
+      );`,
+      [],
+      () => console.log('Settings table created successfully'),
+      (_, error) => console.error('Error creating settings table:', error)
     );
   });
 };

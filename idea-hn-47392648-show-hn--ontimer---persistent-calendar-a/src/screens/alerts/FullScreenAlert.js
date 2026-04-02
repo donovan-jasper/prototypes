@@ -11,15 +11,17 @@ import {
   StatusBar,
 } from 'react-native';
 import { getEventById } from '../../services/data/eventRepository';
-import { acknowledgeAlert } from '../../services/notifications/notificationService'; // Only acknowledgeAlert is needed now
+import { acknowledgeAlert, snoozeAlert } from '../../services/notifications/notificationService'; // Import snoozeAlert
 
 const { width, height } = Dimensions.get('window');
 
-export default function FullScreenAlert({ visible, eventId, notificationId, onClose }) { // Added notificationId prop
+export default function FullScreenAlert({ visible, eventId, notificationId, onClose }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const [eventDetails, setEventDetails] = useState(null);
-  
+  const [showSnoozeOptions, setShowSnoozeOptions] = useState(false); // State for snooze options visibility
+  const vibrateIntervalRef = useRef(null); // Ref to store interval ID
+
   useEffect(() => {
     if (visible && eventId) {
       // Fetch event details
@@ -44,17 +46,31 @@ export default function FullScreenAlert({ visible, eventId, notificationId, onCl
       Vibration.vibrate([100, 200, 100, 200, 100]);
       
       // Set up repeating vibration
-      const vibrateInterval = setInterval(() => {
+      vibrateIntervalRef.current = setInterval(() => {
         Vibration.vibrate([100, 200, 100]);
       }, 3000);
       
-      // Clear interval when component unmounts
+      // Clear interval when component unmounts or becomes invisible
       return () => {
-        clearInterval(vibrateInterval);
+        if (vibrateIntervalRef.current) {
+          clearInterval(vibrateIntervalRef.current);
+        }
         Vibration.cancel();
+        // Reset animations and snooze options when alert is dismissed
+        fadeAnim.setValue(0);
+        scaleAnim.setValue(0.8);
+        setShowSnoozeOptions(false);
       };
+    } else if (!visible) {
+      // Ensure vibrations are stopped if visibility changes to false
+      if (vibrateIntervalRef.current) {
+        clearInterval(vibrateIntervalRef.current);
+        vibrateIntervalRef.current = null;
+      }
+      Vibration.cancel();
+      setShowSnoozeOptions(false); // Ensure snooze options are hidden when alert is not visible
     }
-  }, [visible, eventId]);
+  }, [visible, eventId, fadeAnim, scaleAnim]);
 
   const loadEventDetails = async () => {
     try {
@@ -62,19 +78,44 @@ export default function FullScreenAlert({ visible, eventId, notificationId, onCl
       setEventDetails(event);
     } catch (error) {
       console.error('Error loading event details:', error);
+      setEventDetails({ title: 'Unknown Event' }); // Fallback
     }
   };
 
   const handleAcknowledge = async () => {
-    if (eventId) {
+    if (eventId && notificationId) { // Ensure both eventId and notificationId are present
       try {
         // Call acknowledgeAlert, passing both notificationId and eventId
         await acknowledgeAlert(notificationId, eventId); 
-        onClose();
-      } catch (error) {
+        onClose(); // Close the full-screen alert UI
+      } catch (error)
+ {
         console.error('Error acknowledging alert:', error);
+        // Optionally, show an error message to the user
+        onClose(); // Still attempt to close the UI even if acknowledgment fails
       }
+    } else {
+      console.warn('Cannot acknowledge alert: Missing eventId or notificationId.');
+      onClose(); // Close the UI even if data is missing
     }
+  };
+
+  const handleSnooze = async (durationInMinutes) => {
+    if (eventId && notificationId) {
+      try {
+        // Call snoozeAlert, passing notificationId, eventId, and duration in seconds
+        await snoozeAlert(notificationId, eventId, durationInMinutes * 60); // Convert minutes to seconds
+        onClose(); // Close the full-screen alert UI
+      } catch (error) {
+        console.error('Error snoozing alert:', error);
+        // Optionally, show an error message to the user
+        onClose(); // Still attempt to close the UI even if snoozing fails
+      }
+    } else {
+      console.warn('Cannot snooze alert: Missing eventId or notificationId.');
+      onClose();
+    }
+    setShowSnoozeOptions(false); // Hide snooze options after selection
   };
 
   if (!visible) {
@@ -86,7 +127,7 @@ export default function FullScreenAlert({ visible, eventId, notificationId, onCl
       animationType="none"
       transparent={true}
       visible={visible}
-      onRequestClose={handleAcknowledge}
+      onRequestClose={handleAcknowledge} // Android back button will trigger acknowledge
       statusBarTranslucent={true}
     >
       <StatusBar backgroundColor="#ff0000" barStyle="light-content" />
@@ -114,7 +155,7 @@ export default function FullScreenAlert({ visible, eventId, notificationId, onCl
             </Text>
             
             <Text style={styles.instruction}>
-              You must acknowledge this alert to continue.
+              You must acknowledge or snooze this alert.
             </Text>
           </View>
           
@@ -123,8 +164,38 @@ export default function FullScreenAlert({ visible, eventId, notificationId, onCl
               style={[styles.actionButton, styles.acknowledgeButton]}
               onPress={handleAcknowledge}
             >
-              <Text style={styles.actionButtonText}>I'M READY</Text>
+              <Text style={styles.actionButtonText}>ACKNOWLEDGE</Text>
             </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.snoozeButton]}
+              onPress={() => setShowSnoozeOptions(!showSnoozeOptions)}
+            >
+              <Text style={styles.actionButtonText}>SNOOZE</Text>
+            </TouchableOpacity>
+
+            {showSnoozeOptions && (
+              <View style={styles.snoozeOptionsContainer}>
+                <TouchableOpacity 
+                  style={styles.snoozeOptionButton}
+                  onPress={() => handleSnooze(5)}
+                >
+                  <Text style={styles.snoozeOptionText}>5 MIN</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.snoozeOptionButton}
+                  onPress={() => handleSnooze(10)}
+                >
+                  <Text style={styles.snoozeOptionText}>10 MIN</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.snoozeOptionButton}
+                  onPress={() => handleSnooze(15)}
+                >
+                  <Text style={styles.snoozeOptionText}>15 MIN</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
         </View>
       </Animated.View>
@@ -143,69 +214,101 @@ const styles = StyleSheet.create({
   alertContainer: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 16,
+    backgroundColor: '#222',
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 20,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 12,
-    },
-    shadowOpacity: 0.58,
-    shadowRadius: 16.0,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.5,
+    shadowRadius: 20,
+    elevation: 15,
+    borderWidth: 2,
+    borderColor: '#ff0000',
   },
   header: {
     backgroundColor: '#ff0000',
-    paddingVertical: 20,
+    paddingVertical: 15,
     alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#cc0000',
   },
   alertTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
-    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
   },
   content: {
-    padding: 30,
+    padding: 25,
     alignItems: 'center',
   },
   eventTitle: {
-    fontSize: 20,
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#fff',
     textAlign: 'center',
+    marginBottom: 15,
+    lineHeight: 40,
   },
   message: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    color: '#ccc',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   instruction: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 16,
+    color: '#aaa',
     textAlign: 'center',
-    marginBottom: 30,
+    fontStyle: 'italic',
   },
   actions: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
     padding: 20,
-  },
-  actionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    minWidth: 120,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+    flexDirection: 'column', // Changed to column to stack buttons
     alignItems: 'center',
   },
+  actionButton: {
+    width: '80%', // Make buttons wider
+    paddingVertical: 15,
+    borderRadius: 10,
+    marginBottom: 10, // Add margin between buttons
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   acknowledgeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#4CAF50', // Green for acknowledge
+  },
+  snoozeButton: {
+    backgroundColor: '#FFC107', // Amber for snooze
   },
   actionButtonText: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  snoozeOptionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 10,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  snoozeOptionButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    backgroundColor: '#555',
+    marginHorizontal: 5,
+  },
+  snoozeOptionText: {
+    color: '#fff',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
