@@ -1,38 +1,50 @@
-class UIManager {
-  constructor() {
-    this.progressElement = document.getElementById('progress');
-    this.errorElement = document.getElementById('error');
-    this.successElement = document.getElementById('success');
-    this.downloadButton = document.getElementById('download-button');
-  }
-
+export class UIManager {
   showProgress(percentage, message) {
-    this.progressElement.style.display = 'block';
-    this.progressElement.innerHTML = `${message} (${percentage}%)`;
+    const progressBar = document.getElementById('progress');
+    progressBar.style.width = `${percentage}%`;
+    
+    if (message) {
+      console.log(message);
+    }
   }
 
   showError(message) {
-    this.errorElement.style.display = 'block';
-    this.errorElement.innerHTML = message;
+    const errorDiv = document.getElementById('error');
+    errorDiv.textContent = message;
+    errorDiv.classList.add('visible');
+    
+    setTimeout(() => {
+      errorDiv.classList.remove('visible');
+    }, 5000);
   }
 
   showSuccess(message) {
-    this.successElement.style.display = 'block';
-    this.successElement.innerHTML = message;
+    const successDiv = document.getElementById('success');
+    successDiv.textContent = message;
+    successDiv.classList.add('visible');
+    
+    setTimeout(() => {
+      successDiv.classList.remove('visible');
+    }, 5000);
+  }
+
+  updateToolOptions(toolType) {
+    const optionsDiv = document.getElementById('conversion-options');
+    optionsDiv.style.display = 'block';
   }
 
   enableDownload(blob, filename) {
-    this.downloadButton.style.display = 'block';
-    this.downloadButton.href = URL.createObjectURL(blob);
-    this.downloadButton.download = filename;
+    const downloadButton = document.getElementById('downloadButton');
+    downloadButton.style.display = 'block';
+    downloadButton.href = URL.createObjectURL(blob);
+    downloadButton.download = filename;
+    downloadButton.textContent = `Download ${filename}`;
   }
 
   resetUI() {
-    this.progressElement.style.display = 'none';
-    this.errorElement.style.display = 'none';
-    this.successElement.style.display = 'none';
-    this.downloadButton.style.display = 'none';
+    document.getElementById('progress').style.width = '0%';
+    document.getElementById('downloadButton').style.display = 'none';
+    document.getElementById('error').classList.remove('visible');
+    document.getElementById('success').classList.remove('visible');
   }
 }
-
-export { UIManager };

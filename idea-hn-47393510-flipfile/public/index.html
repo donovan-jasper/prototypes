@@ -19,13 +19,26 @@
     </nav>
   </header>
   <main>
-    <div id="conversion-options"></div>
+    <div id="dropZone" class="drop-zone">
+      <p>Drag & drop files here or click to browse</p>
+      <input type="file" id="fileInput" multiple style="display: none;">
+    </div>
+    <div id="fileList" class="file-list"></div>
+    <div id="conversion-options">
+      <div class="format-selector-container">
+        <label for="formatSelector">Target Format:</label>
+        <select id="formatSelector">
+          <option value="">Select format...</option>
+        </select>
+      </div>
+      <div id="qualityOptions" class="quality-options"></div>
+    </div>
     <button id="convertButton">Convert</button>
     <a id="downloadButton" style="display: none;">Download</a>
     <div id="progress" style="width: 0%;"></div>
     <div id="error"></div>
     <div id="success"></div>
   </main>
-  <script src="js/app.js"></script>
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>
