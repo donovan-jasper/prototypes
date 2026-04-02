@@ -1,59 +1,34 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // Using Expo vector icons for characters/elements
+import { View, Text, StyleSheet, Animated, Easing, TouchableOpacity, ImageBackground, Image } from 'react-native';
+// Removed Ionicons import as we are now using Image components
 
-// --- Constants for styling and mapping ---
-const BACKGROUND_COLORS = {
-  forest: '#228B22', // Forest Green
-  beach: '#ADD8E6',  // Light Blue
-  city: '#696969',   // Dim Gray
-  space: '#191970',  // Midnight Blue
-  house: '#A0522D',  // Sienna
-  mountain: '#708090', // Slate Gray
-  desert: '#F4A460', // Sandy Brown
-  default: '#D3D3D3', // Light Gray
-};
-
-const CHARACTER_ICONS = {
-  cat: 'ios-paw',
-  dog: 'ios-happy',
-  person: 'ios-person',
-  bird: 'ios-leaf', // Using leaf as a placeholder for bird
-  robot: 'ios-hardware-chip',
-  // Add more as needed
-};
-
-const VISUAL_ELEMENT_ICONS = {
-  trees: 'ios-tree',
-  stream: 'ios-water',
-  ocean: 'ios-boat',
-  sand: 'ios-sunny',
-  buildings: 'ios-business',
-  cars: 'ios-car',
-  stars: 'ios-star',
-  planets: 'ios-planet',
-  furniture: 'ios-cube',
-  peaks: 'ios-triangle',
-  snow: 'ios-snow',
-  'sand dunes': 'ios-apps', // Placeholder
-  cactus: 'ios-flower',
-  // Add more as needed
-};
-
-// Helper to get position styles
+// --- Helper to get position styles for Image components ---
 const getPositionStyles = (positionKey) => {
-  const baseSize = 60; // Base size for character/element icons
-  const offset = -baseSize / 2; // To center the icon if using transform
+  const baseSize = 120; // Base size for character image
+  const offset = -baseSize / 2; // To center the image if using transform
+
+  // Using absolute positioning for characters
+  const styles = {
+    position: 'absolute',
+    width: baseSize,
+    height: baseSize,
+    // Default to bottom-center if positionKey is not recognized
+    bottom: 20,
+    left: '50%',
+    transform: [{ translateX: offset }],
+  };
 
   switch (positionKey) {
-    case 'top-left': return { top: 20, left: 20 };
-    case 'top-center': return { top: 20, left: '50%', transform: [{ translateX: offset }] };
-    case 'top-right': return { top: 20, right: 20 };
-    case 'center': return { top: '50%', left: '50%', transform: [{ translateX: offset }, { translateY: offset }] };
-    case 'bottom-left': return { bottom: 20, left: 20 };
-    case 'bottom-center': return { bottom: 20, left: '50%', transform: [{ translateX: offset }] };
-    case 'bottom-right': return { bottom: 20, right: 20 };
-    default: return { top: 'auto', left: 'auto' }; // Default or no specific position
+    case 'top-left': return { ...styles, top: 20, left: 20, bottom: 'auto', transform: [] };
+    case 'top-center': return { ...styles, top: 20, left: '50%', bottom: 'auto', transform: [{ translateX: offset }] };
+    case 'top-right': return { ...styles, top: 20, right: 20, left: 'auto', bottom: 'auto', transform: [] };
+    case 'center-left': return { ...styles, top: '50%', left: 20, bottom: 'auto', transform: [{ translateY: offset }] };
+    case 'center': return { ...styles, top: '50%', left: '50%', bottom: 'auto', transform: [{ translateX: offset }, { translateY: offset }] };
+    case 'center-right': return { ...styles, top: '50%', right: 20, left: 'auto', bottom: 'auto', transform: [{ translateY: offset }] };
+    case 'bottom-left': return { ...styles, bottom: 20, left: 20, transform: [] };
+    case 'bottom-center': return { ...styles, bottom: 20, left: '50%', transform: [{ translateX: offset }] };
+    case 'bottom-right': return { ...styles, bottom: 20, right: 20, left: 'auto', transform: [] };
+    default: return styles; // Default to bottom-center
   }
 };
 
@@ -142,81 +117,54 @@ const VideoPreview = ({ scenes }) => {
     if (!isPlaying && currentSceneIndex === scenes.length - 1) {
       // If at the end and pressing play, restart from beginning
       setCurrentSceneIndex(0);
-    }
-    setIsPlaying(!isPlaying);
-  };
-
-  const handleNextScene = () => {
-    if (currentSceneIndex < scenes.length - 1) {
-      setCurrentSceneIndex(prev => prev + 1);
-      setIsPlaying(false); // Pause when manually navigating
-    }
-  };
-
-  const handlePrevScene = () => {
-    if (currentSceneIndex > 0) {
-      setCurrentSceneIndex(prev => prev - 1);
-      setIsPlaying(false); // Pause when manually navigating
+      setIsPlaying(true);
+    } else {
+      setIsPlaying(!isPlaying);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Animated.View
-        style={[
-          styles.sceneView,
-          { backgroundColor: BACKGROUND_COLORS[currentScene.backgroundColor] || BACKGROUND_COLORS.default },
-          { opacity: fadeAnim },
-        ]}
-      >
-        <Text style={styles.sceneDescription}>{currentScene.description}</Text>
+      <Animated.View style={[styles.sceneWrapper, { opacity: fadeAnim }]}>
+        <ImageBackground
+          source={{ uri: currentScene.backgroundImageUrl }}
+          style={styles.imageBackground}
+          resizeMode="cover" // Ensure the background image covers the area
+        >
+          {/* Scene description text overlay */}
+          <View style={styles.descriptionOverlay}>
+            <Text style={styles.descriptionText}>{currentScene.description}</Text>
+          </View>
 
-        {currentScene.characters && currentScene.characters.map((char, index) => {
-          const iconName = CHARACTER_ICONS[char.name.toLowerCase()] || 'ios-help-circle';
-          const positionStyles = getPositionStyles(char.position);
-          return (
-            <Ionicons
-              key={`char-${index}`}
-              name={iconName}
-              size={60}
-              color="white"
-              style={[styles.icon, positionStyles]}
+          {/* Render characters */}
+          {currentScene.characters && currentScene.characters.map((char, charIndex) => (
+            <Image
+              key={charIndex}
+              source={{ uri: char.imageUrl }}
+              style={getPositionStyles(char.position)}
+              resizeMode="contain" // Ensure character images fit within their bounds
             />
-          );
-        })}
+          ))}
 
-        {currentScene.visualElements && currentScene.visualElements.map((element, index) => {
-          const iconName = VISUAL_ELEMENT_ICONS[element.name.toLowerCase()] || 'ios-help-circle-outline';
-          const positionStyles = getPositionStyles(element.position);
-          return (
-            <Ionicons
-              key={`element-${index}`}
-              name={iconName}
-              size={60}
-              color="white"
-              style={[styles.icon, positionStyles]}
-            />
-          );
-        })}
-
-        {/* Progress Bar */}
-        <View style={styles.progressBarContainer}>
-          <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
-        </View>
+          {/* Visual elements are not rendered in this task, but data exists */}
+          {/* If you wanted to render visual elements, you'd add similar Image components here */}
+        </ImageBackground>
       </Animated.View>
 
-      {/* Controls */}
-      <View style={styles.controls}>
-        <TouchableOpacity onPress={handlePrevScene} style={styles.controlButton}>
-          <Ionicons name="ios-play-back" size={32} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handlePlayPause} style={styles.controlButton}>
-          <Ionicons name={isPlaying ? 'ios-pause' : 'ios-play'} size={48} color="white" />
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleNextScene} style={styles.controlButton}>
-          <Ionicons name="ios-play-forward" size={32} color="white" />
-        </TouchableOpacity>
+      {/* Progress Bar */}
+      <View style={styles.progressBarContainer}>
+        <Animated.View style={[styles.progressBar, { width: progressBarWidth }]} />
       </View>
+
+      {/* Play/Pause Button */}
+      <TouchableOpacity onPress={handlePlayPause} style={styles.playPauseButton}>
+        <Text style={styles.playPauseText}>{isPlaying ? 'Pause' : 'Play'}</Text>
+      </TouchableOpacity>
+
+      {/* Scene Index and Total */}
+      <Text style={styles.sceneCounter}>
+        Scene {currentSceneIndex + 1} / {scenes.length}
+      </Text>
     </View>
   );
 };
@@ -224,68 +172,66 @@ const VideoPreview = ({ scenes }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#333',
+    backgroundColor: '#000', // Black background for the whole preview area
+  },
+  sceneWrapper: {
+    flex: 1,
+  },
+  imageBackground: {
+    flex: 1,
+    justifyContent: 'flex-end', // Align description to bottom
     alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative', // For absolute positioning of characters
   },
-  sceneView: {
-    width: '90%',
-    aspectRatio: 16 / 9, // Common video aspect ratio
-    borderRadius: 10,
-    overflow: 'hidden',
-    position: 'relative',
-    justifyContent: 'center',
+  descriptionOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+    width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
-    elevation: 5, // Android shadow
-    shadowColor: '#000', // iOS shadow
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  sceneDescription: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    zIndex: 10, // Ensure description is above icons if they overlap
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
-    textShadowOffset: { width: -1, height: 1 },
-    textShadowRadius: 10
-  },
-  icon: {
-    position: 'absolute',
-    zIndex: 5, // Icons below description
-  },
-  progressBarContainer: {
     position: 'absolute',
     bottom: 0,
-    left: 0,
-    right: 0,
+  },
+  descriptionText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+  },
+  // characterImage styles are handled by getPositionStyles, no need for a base style here
+  // visualElementIcon: { // Removed as visual elements are not rendered with Ionicons
+  //   position: 'absolute',
+  // },
+  noScenesText: {
+    color: 'white',
+    textAlign: 'center',
+    marginTop: 50,
+    fontSize: 18,
+  },
+  progressBarContainer: {
     height: 5,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: '#333',
+    width: '100%',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#007AFF', // Expo blue
+    backgroundColor: '#007AFF', // Blue progress bar
   },
-  controls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    width: '80%',
+  playPauseButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    alignSelf: 'center',
+    marginVertical: 10,
   },
-  controlButton: {
-    padding: 10,
-  },
-  noScenesText: {
+  playPauseText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  sceneCounter: {
+    color: 'white',
     textAlign: 'center',
+    marginBottom: 10,
   },
 });
 

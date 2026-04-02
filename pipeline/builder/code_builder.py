@@ -2,26 +2,31 @@ import asyncio
 import httpx
 from idea_scout.config import OMNIROUTE_BASE, CODER_MODEL, UNSTUCK_MODEL
 
-MAX_429_RETRIES = 4
-RETRY_DELAYS = [30, 60, 90, 120]
+MAX_RETRIES = 3
+RETRY_DELAYS = [30, 60, 120]
 
 
 async def llm_call(client: httpx.AsyncClient, model: str, messages: list[dict], temperature: float = 0.3) -> str:
-    """Make an LLM call with retry on 429. ReadTimeout/disconnect propagate immediately
-    so the daemon can restart OmniRoute quickly."""
-    for attempt in range(MAX_429_RETRIES):
+    """Make an LLM call with retry on transient errors only.
+
+    503 (transient) — retry with backoff.
+    429/406 (all providers exhausted) — propagate immediately to daemon for backoff.
+    ReadTimeout/disconnect — propagate immediately so daemon can restart OmniRoute.
+    """
+    for attempt in range(MAX_RETRIES):
         try:
             resp = await client.post(
                 f"{OMNIROUTE_BASE}/chat/completions",
                 json={"model": model, "messages": messages, "temperature": temperature},
-                timeout=60,
+                timeout=120,
             )
             resp.raise_for_status()
             return resp.json()["choices"][0]["message"]["content"]
         except httpx.HTTPStatusError as e:
-            if e.response.status_code in (429, 503) and attempt < MAX_429_RETRIES - 1:
+            # Only retry 503 (transient) — 429/406 mean all providers are down
+            if e.response.status_code == 503 and attempt < MAX_RETRIES - 1:
                 delay = RETRY_DELAYS[attempt]
-                print(f"    [llm] {e.response.status_code}, waiting {delay}s (attempt {attempt + 1}/{MAX_429_RETRIES})")
+                print(f"    [llm] 503, waiting {delay}s (attempt {attempt + 1}/{MAX_RETRIES})")
                 await asyncio.sleep(delay)
                 continue
             raise
