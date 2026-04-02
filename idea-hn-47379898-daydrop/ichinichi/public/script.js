@@ -20,31 +20,65 @@ function generateSalt() {
   return CryptoJS.lib.WordArray.random(128/8).toString();
 }
 
-// LocalStorage functions
-function saveNoteToLocalStorage(date, encryptedNote, salt) {
-  const noteData = {
-    encrypted_note: encryptedNote,
-    salt: salt,
-    date: date
-  };
-  localStorage.setItem(`note_${date}`, JSON.stringify(noteData));
-}
-
-function getNoteFromLocalStorage(date) {
-  const noteData = localStorage.getItem(`note_${date}`);
-  return noteData ? JSON.parse(noteData) : null;
-}
-
-function getAllNotesFromLocalStorage() {
-  const notes = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key.startsWith('note_')) {
-      const noteData = JSON.parse(localStorage.getItem(key));
-      notes.push(noteData);
-    }
+// API functions
+async function saveNoteToAPI(date, encryptedNote, salt) {
+  const response = await fetch('/api/notes', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      date: date,
+      encrypted_note: encryptedNote,
+      salt: salt
+    })
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to save note');
   }
-  return notes.sort((a, b) => b.date.localeCompare(a.date));
+  
+  return await response.json();
+}
+
+async function getNoteFromAPI(date) {
+  const response = await fetch(`/api/notes/${date}`);
+  
+  if (response.status === 404) {
+    return null;
+  }
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch note');
+  }
+  
+  return await response.json();
+}
+
+async function getAllNotesFromAPI() {
+  const response = await fetch('/api/notes');
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to fetch notes');
+  }
+  
+  return await response.json();
+}
+
+async function deleteNoteFromAPI(date) {
+  const response = await fetch(`/api/notes/${date}`, {
+    method: 'DELETE'
+  });
+  
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.error || 'Failed to delete note');
+  }
+  
+  return await response.json();
 }
 
 function showPasswordPrompt() {
@@ -62,27 +96,32 @@ function showMainContent() {
   loadCalendar();
 }
 
-function attemptAutoLogin() {
+async function attemptAutoLogin() {
   const storedPassword = sessionStorage.getItem('ichinichi_password');
 
   if (storedPassword) {
     password = storedPassword;
 
-    const notes = getAllNotesFromLocalStorage();
+    try {
+      const notes = await getAllNotesFromAPI();
 
-    if (notes.length > 0) {
-      try {
-        decryptNote(notes[0].encrypted_note, password, notes[0].salt);
-        console.log("Stored password successfully decrypted a note. Auto-logging in.");
+      if (notes.length > 0) {
+        try {
+          decryptNote(notes[0].encrypted_note, password, notes[0].salt);
+          console.log("Stored password successfully decrypted a note. Auto-logging in.");
+          showMainContent();
+        } catch (decryptionError) {
+          console.warn("Decryption failed with stored password, showing password prompt:", decryptionError);
+          sessionStorage.removeItem('ichinichi_password');
+          showPasswordPrompt();
+        }
+      } else {
+        console.log("No notes found, proceeding with stored password without explicit validation.");
         showMainContent();
-      } catch (decryptionError) {
-        console.warn("Decryption failed with stored password, showing password prompt:", decryptionError);
-        sessionStorage.removeItem('ichinichi_password');
-        showPasswordPrompt();
       }
-    } else {
-      console.log("No notes found, proceeding with stored password without explicit validation.");
-      showMainContent();
+    } catch (error) {
+      console.error("Error fetching notes:", error);
+      showPasswordPrompt();
     }
   } else {
     showPasswordPrompt();
@@ -132,87 +171,80 @@ function updateUIForDateState(dateString, hasNote, noteContent = '') {
   }
 }
 
-function loadCurrentNote() {
+async function loadCurrentNote() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('note-date').textContent = today;
 
-  const note = getNoteFromLocalStorage(today);
-  
-  if (note) {
-    try {
-      const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
-      document.getElementById('note-text').value = decryptedNote;
-      updateUIForDateState(today, true, decryptedNote);
-    } catch (error) {
-      console.error('Error decrypting note:', error);
+  try {
+    const note = await getNoteFromAPI(today);
+    
+    if (note) {
+      try {
+        const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
+        document.getElementById('note-text').value = decryptedNote;
+        updateUIForDateState(today, true, decryptedNote);
+      } catch (error) {
+        console.error('Error decrypting note:', error);
+        document.getElementById('note-text').value = '';
+        updateUIForDateState(today, false);
+      }
+    } else {
       document.getElementById('note-text').value = '';
       updateUIForDateState(today, false);
     }
-  } else {
+  } catch (error) {
+    console.error('Error loading note:', error);
     document.getElementById('note-text').value = '';
     updateUIForDateState(today, false);
-  }
-}
-
-function loadNoteForDate(dateString) {
-  document.getElementById('note-date').textContent = dateString;
-
-  const note = getNoteFromLocalStorage(dateString);
-  
-  if (note) {
-    try {
-      const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
-      document.getElementById('note-text').value = decryptedNote;
-      updateUIForDateState(dateString, true, decryptedNote);
-    } catch (error) {
-      console.error('Error decrypting note:', error);
-      document.getElementById('note-text').value = '';
-      updateUIForDateState(dateString, false);
-    }
-  } else {
-    document.getElementById('note-text').value = '';
-    updateUIForDateState(dateString, false);
   }
 }
 
 document.getElementById('save-note').addEventListener('click', async () => {
   const noteText = document.getElementById('note-text').value;
   const today = new Date().toISOString().split('T')[0];
-  
+
   if (!noteText.trim()) {
-    alert('Please enter some text for your note');
+    alert('Please enter a note');
     return;
   }
 
-  const existingNote = getNoteFromLocalStorage(today);
-  if (existingNote) {
-    alert('A note already exists for today');
-    return;
+  try {
+    const salt = generateSalt();
+    const encryptedNote = encryptNote(noteText, password, salt);
+    
+    await saveNoteToAPI(today, encryptedNote, salt);
+    
+    updateUIForDateState(today, true, noteText);
+    loadCalendar();
+    alert('Note saved successfully!');
+  } catch (error) {
+    console.error('Error saving note:', error);
+    alert('Error saving note: ' + error.message);
   }
-
-  const salt = generateSalt();
-  const encryptedNote = encryptNote(noteText, password, salt);
-  
-  saveNoteToLocalStorage(today, encryptedNote, salt);
-  
-  updateUIForDateState(today, true, noteText);
-  loadCalendar();
-  alert('Note saved successfully!');
 });
 
-function loadCalendar() {
+async function loadCalendar() {
+  try {
+    notesCache = await getAllNotesFromAPI();
+    renderCalendar();
+  } catch (error) {
+    console.error('Error loading calendar:', error);
+  }
+}
+
+function renderCalendar() {
   const calendarGrid = document.getElementById('calendar-grid');
   const monthYear = document.getElementById('month-year');
-  
+
   const firstDay = new Date(currentYear, currentMonth, 1);
   const lastDay = new Date(currentYear, currentMonth + 1, 0);
   const daysInMonth = lastDay.getDate();
   const startingDayOfWeek = firstDay.getDay();
-  
+
   monthYear.textContent = firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  
+
   calendarGrid.innerHTML = '';
-  
+
   const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   dayHeaders.forEach(day => {
     const dayHeader = document.createElement('div');
@@ -220,39 +252,61 @@ function loadCalendar() {
     dayHeader.textContent = day;
     calendarGrid.appendChild(dayHeader);
   });
-  
-  const notes = getAllNotesFromLocalStorage();
-  notesCache = notes;
-  
-  const noteDates = new Set(notes.map(note => note.date));
-  
+
   for (let i = 0; i < startingDayOfWeek; i++) {
     const emptyDay = document.createElement('div');
     emptyDay.className = 'calendar-day empty';
     calendarGrid.appendChild(emptyDay);
   }
-  
-  const today = new Date().toISOString().split('T')[0];
-  
+
   for (let day = 1; day <= daysInMonth; day++) {
-    const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const dayElement = document.createElement('div');
     dayElement.className = 'calendar-day';
     dayElement.textContent = day;
-    
+
+    const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const hasNote = notesCache.some(note => note.date === dateString);
+
+    if (hasNote) {
+      dayElement.classList.add('has-note');
+    }
+
+    const today = new Date().toISOString().split('T')[0];
     if (dateString === today) {
       dayElement.classList.add('today');
     }
-    
-    if (noteDates.has(dateString)) {
-      dayElement.classList.add('has-note');
-    }
-    
-    dayElement.addEventListener('click', () => {
-      loadNoteForDate(dateString);
-    });
-    
+
+    dayElement.addEventListener('click', () => loadNoteForDate(dateString));
+
     calendarGrid.appendChild(dayElement);
+  }
+}
+
+async function loadNoteForDate(dateString) {
+  document.getElementById('note-date').textContent = dateString;
+
+  try {
+    const note = await getNoteFromAPI(dateString);
+    
+    if (note) {
+      try {
+        const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
+        document.getElementById('note-text').value = decryptedNote;
+        updateUIForDateState(dateString, true, decryptedNote);
+      } catch (error) {
+        console.error('Error decrypting note:', error);
+        document.getElementById('note-text').value = '';
+        updateUIForDateState(dateString, false);
+        alert('Error decrypting note. Please check your password.');
+      }
+    } else {
+      document.getElementById('note-text').value = '';
+      updateUIForDateState(dateString, false);
+    }
+  } catch (error) {
+    console.error('Error loading note:', error);
+    document.getElementById('note-text').value = '';
+    updateUIForDateState(dateString, false);
   }
 }
 
@@ -262,7 +316,7 @@ document.getElementById('prev-month').addEventListener('click', () => {
     currentMonth = 11;
     currentYear--;
   }
-  loadCalendar();
+  renderCalendar();
 });
 
 document.getElementById('next-month').addEventListener('click', () => {
@@ -271,5 +325,5 @@ document.getElementById('next-month').addEventListener('click', () => {
     currentMonth = 0;
     currentYear++;
   }
-  loadCalendar();
+  renderCalendar();
 });
