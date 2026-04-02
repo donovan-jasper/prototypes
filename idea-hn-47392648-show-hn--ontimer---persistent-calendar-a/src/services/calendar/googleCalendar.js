@@ -159,3 +159,22 @@ export const getGoogleCalendarList = async (calendarId) => {
       `${GOOGLE_CALENDAR_API_BASE}/users/me/calendarList`,
       {
         headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error?.message || 'Failed to fetch calendar list');
+    }
+
+    const data = await response.json();
+    
+    return data.items;
+  } catch (error) {
+    console.error('Error fetching Google Calendar list:', error);
+    throw error;
+  }
+};
