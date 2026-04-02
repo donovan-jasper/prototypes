@@ -1,4 +1,5 @@
 import ImageConverter from './converters/image-converter.js';
+import PDFConverter from './converters/pdf-converter.js';
 import MediaConverter from './converters/media-converter.js';
 import ArchiveConverter from './converters/archive-converter.js';
 import { UIManager } from './utils/ui-manager.js';
@@ -9,6 +10,7 @@ class App {
     this.uiManager = new UIManager();
     this.fileHandler = new FileHandler();
     this.imageConverter = new ImageConverter();
+    this.pdfConverter = new PDFConverter();
     this.mediaConverter = new MediaConverter();
     this.archiveConverter = new ArchiveConverter();
     this.selectedFiles = [];
@@ -131,6 +133,25 @@ class App {
       });
       
       qualityOptions.classList.add('visible');
+    } else if (this.currentTool === 'pdf' && format === 'split') {
+      qualityOptions.innerHTML = `
+        <div class="option-group">
+          <label for="pageRanges">Page Ranges (e.g., 1-3,5,7-9)</label>
+          <input type="text" id="pageRanges" placeholder="1-3,5,7-9">
+        </div>
+      `;
+      qualityOptions.classList.add('visible');
+    } else if (this.currentTool === 'pdf' && format === 'to-images') {
+      qualityOptions.innerHTML = `
+        <div class="option-group">
+          <label for="imageFormat">Image Format</label>
+          <select id="imageFormat">
+            <option value="png">PNG</option>
+            <option value="jpeg">JPEG</option>
+          </select>
+        </div>
+      `;
+      qualityOptions.classList.add('visible');
     } else {
       qualityOptions.classList.remove('visible');
     }
@@ -145,78 +166,150 @@ class App {
     const fileList = document.getElementById('fileList');
     
     if (this.selectedFiles.length === 0) {
-      fileList.classList.remove('has-files');
-      fileList.innerHTML = '';
+      fileList.innerHTML = '<p class="no-files">No files selected</p>';
       return;
     }
     
-    fileList.classList.add('has-files');
-    fileList.innerHTML = '<h3>Selected Files:</h3>';
-    
-    this.selectedFiles.forEach((file, index) => {
-      const fileItem = document.createElement('div');
-      fileItem.className = 'file-item';
-      fileItem.innerHTML = `
-        <div class="file-info">
-          <div class="file-name">${file.name}</div>
-          <div class="file-size">${this.fileHandler.formatFileSize(file.size)}</div>
-        </div>
-        <button class="file-remove" data-index="${index}">×</button>
-      `;
-      
-      fileItem.querySelector('.file-remove').addEventListener('click', () => {
-        this.removeFile(index);
-      });
-      
-      fileList.appendChild(fileItem);
-    });
+    fileList.innerHTML = '<ul class="file-items">' + 
+      this.selectedFiles.map(file => `
+        <li class="file-item">
+          <span class="file-name">${file.name}</span>
+          <span class="file-size">${this.formatFileSize(file.size)}</span>
+        </li>
+      `).join('') +
+      '</ul>';
   }
 
-  removeFile(index) {
-    this.selectedFiles.splice(index, 1);
-    this.displayFileList();
+  formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   }
 
   async handleConvert() {
+    const format = document.getElementById('formatSelector').value;
+    
+    if (!format) {
+      this.uiManager.showError('Please select a format');
+      return;
+    }
+    
     if (this.selectedFiles.length === 0) {
       this.uiManager.showError('Please select files to convert');
       return;
     }
     
-    const formatSelector = document.getElementById('formatSelector');
-    const targetFormat = formatSelector.value;
-    
-    if (!targetFormat) {
-      this.uiManager.showError('Please select a target format');
-      return;
-    }
-    
-    const file = this.selectedFiles[0];
-    
     try {
+      this.uiManager.showProgress(0, 'Starting conversion...');
+      
       let result;
       
-      if (this.currentTool === 'image') {
-        const quality = document.getElementById('qualitySlider')?.value || 0.8;
-        result = await this.imageConverter.convert(file, targetFormat, parseFloat(quality), this.uiManager, this.fileHandler);
-      } else if (this.currentTool === 'media') {
-        const options = {};
-        const bitrateSlider = document.getElementById('bitrateSlider');
-        if (bitrateSlider) {
-          options.bitrate = bitrateSlider.value;
-        }
-        result = await this.mediaConverter.convert(file, targetFormat, options, this.uiManager, this.fileHandler);
-      } else if (this.currentTool === 'archive') {
-        result = await this.archiveConverter.createZip(this.selectedFiles, this.uiManager);
+      switch (this.currentTool) {
+        case 'image':
+          result = await this.convertImage(format);
+          break;
+        case 'media':
+          result = await this.convertMedia(format);
+          break;
+        case 'pdf':
+          result = await this.convertPDF(format);
+          break;
+        case 'archive':
+          result = await this.convertArchive(format);
+          break;
+        default:
+          throw new Error('Unsupported tool');
       }
       
-      if (result) {
-        this.uiManager.enableDownload(result.blob, result.filename);
-        this.uiManager.showSuccess('Conversion completed successfully!');
+      this.uiManager.showProgress(100, 'Conversion complete!');
+      
+      if (Array.isArray(result)) {
+        result.forEach(({ blob, filename }) => {
+          this.downloadFile(blob, filename);
+        });
+      } else {
+        this.downloadFile(result.blob, result.filename);
       }
+      
+      this.uiManager.showSuccess('Conversion completed successfully!');
     } catch (error) {
-      this.uiManager.showError(`Conversion failed: ${error.message}`);
+      console.error('Conversion error:', error);
+      this.uiManager.showError(error.message);
     }
+  }
+
+  async convertImage(format) {
+    const file = this.selectedFiles[0];
+    const quality = document.getElementById('qualitySlider')?.value || 0.8;
+    
+    const blob = await this.imageConverter.convert(file, format, parseFloat(quality));
+    const filename = file.name.replace(/\.[^.]+$/, `.${format}`);
+    
+    return { blob, filename };
+  }
+
+  async convertMedia(format) {
+    const file = this.selectedFiles[0];
+    const bitrate = document.getElementById('bitrateSlider')?.value || 192;
+    
+    const blob = await this.mediaConverter.convert(file, format, { bitrate });
+    const filename = file.name.replace(/\.[^.]+$/, `.${format}`);
+    
+    return { blob, filename };
+  }
+
+  async convertPDF(format) {
+    const file = this.selectedFiles[0];
+    
+    switch (format) {
+      case 'merge':
+        if (this.selectedFiles.length < 2) {
+          throw new Error('Please select at least 2 PDF files to merge');
+        }
+        const mergedBlob = await this.pdfConverter.mergePDFs(this.selectedFiles);
+        return { blob: mergedBlob, filename: 'merged.pdf' };
+        
+      case 'split':
+        const pageRanges = document.getElementById('pageRanges')?.value;
+        if (!pageRanges) {
+          throw new Error('Please enter page ranges');
+        }
+        const splitBlob = await this.pdfConverter.splitPDF(file, pageRanges);
+        return { blob: splitBlob, filename: file.name.replace('.pdf', '_split.pdf') };
+        
+      case 'compress':
+        const compressedBlob = await this.pdfConverter.compressPDF(file);
+        return { blob: compressedBlob, filename: file.name.replace('.pdf', '_compressed.pdf') };
+        
+      case 'to-images':
+        const imageFormat = document.getElementById('imageFormat')?.value || 'png';
+        const images = await this.pdfConverter.pdfToImages(file, imageFormat);
+        return images;
+        
+      default:
+        throw new Error('Unsupported PDF operation');
+    }
+  }
+
+  async convertArchive(format) {
+    if (format === 'zip') {
+      const blob = await this.archiveConverter.createZip(this.selectedFiles);
+      return { blob, filename: 'archive.zip' };
+    }
+    throw new Error('Unsupported archive format');
+  }
+
+  downloadFile(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   }
 }
 

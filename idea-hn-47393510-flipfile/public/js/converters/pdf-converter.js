@@ -72,20 +72,10 @@ export default class PDFConverter {
     return Array.from(pages).sort((a, b) => a - b);
   }
 
-  async compressPDF(file, quality = 0.7) {
+  async compressPDF(file) {
     try {
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await PDFDocument.load(arrayBuffer);
-      
-      const pages = pdf.getPages();
-      for (const page of pages) {
-        const { width, height } = page.getSize();
-        
-        const scaleFactor = Math.sqrt(quality);
-        if (scaleFactor < 1) {
-          page.scale(scaleFactor, scaleFactor);
-        }
-      }
       
       const pdfBytes = await pdf.save({
         useObjectStreams: true,
@@ -107,18 +97,13 @@ export default class PDFConverter {
       
       const images = [];
       
+      const pdfDataUrl = URL.createObjectURL(new Blob([arrayBuffer], { type: 'application/pdf' }));
+      
       for (let i = 0; i < pageCount; i++) {
-        const singlePagePdf = await PDFDocument.create();
-        const [copiedPage] = await singlePagePdf.copyPages(pdf, [i]);
-        singlePagePdf.addPage(copiedPage);
-        
-        const pdfBytes = await singlePagePdf.save();
-        const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-        
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        const page = copiedPage;
+        const page = pdf.getPage(i);
         const { width, height } = page.getSize();
         
         const scale = 2;
@@ -139,6 +124,8 @@ export default class PDFConverter {
           filename: `page_${i + 1}.${format}`
         });
       }
+      
+      URL.revokeObjectURL(pdfDataUrl);
       
       return images;
     } catch (error) {
