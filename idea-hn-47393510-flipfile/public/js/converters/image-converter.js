@@ -8,23 +8,12 @@ class ImageConverter {
       
       uiManager.showProgress(50, 'Processing image...');
       
-      // Create canvas and draw image
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      // Set canvas dimensions to match image
-      canvas.width = image.width;
-      canvas.height = image.height;
-      
-      // Draw image to canvas
-      ctx.drawImage(image, 0, 0);
+      const canvas = this.drawToCanvas(image, image.width, image.height);
       
       uiManager.showProgress(80, 'Exporting image...');
       
-      // Convert canvas to blob in target format
       const blob = await this.canvasToBlob(canvas, targetFormat, quality);
       
-      // Generate output filename
       const baseName = file.name.substring(0, file.name.lastIndexOf('.'));
       const filename = `${baseName}.${targetFormat}`;
       
@@ -45,12 +34,12 @@ class ImageConverter {
       const img = new Image();
       
       img.onload = () => {
-        URL.revokeObjectURL(url); // Clean up
+        URL.revokeObjectURL(url);
         resolve(img);
       };
       
       img.onerror = () => {
-        URL.revokeObjectURL(url); // Clean up
+        URL.revokeObjectURL(url);
         reject(new Error('Failed to load image'));
       };
       
@@ -62,7 +51,6 @@ class ImageConverter {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     
-    // Calculate new dimensions maintaining aspect ratio
     let width = image.width;
     let height = image.height;
     
@@ -85,12 +73,18 @@ class ImageConverter {
   }
 
   static canvasToBlob(canvas, format, quality) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const mimeType = `image/${format}`;
+      
       canvas.toBlob(
         (blob) => {
-          resolve(blob);
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('Failed to create blob'));
+          }
         },
-        `image/${format}`,
+        mimeType,
         quality
       );
     });
