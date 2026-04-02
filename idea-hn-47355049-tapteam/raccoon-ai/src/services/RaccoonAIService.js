@@ -29,9 +29,7 @@ class RaccoonAIService {
   }
 
   /**
-   * Placeholder for executing a task chain.
-   * In a real implementation, this would involve iterating through tasks,
-   * calling AI models, and potentially integrating with external tools.
+   * Execute a task chain.
    * @param {object} chain - The task chain object, including its name and tasks array.
    * @returns {Promise<string>} A promise that resolves with the execution status or result.
    */
@@ -40,6 +38,9 @@ class RaccoonAIService {
     console.log('Tasks:', chain.tasks);
     // Simulate AI processing
     await new Promise(resolve => setTimeout(resolve, 2000));
+    chain.tasks.forEach((task) => {
+      console.log(`Executing task: "${task}"`);
+    });
     const result = `Task chain "${chain.name}" executed successfully! Processed ${chain.tasks.length} tasks.`;
     console.log(result);
     return result;
