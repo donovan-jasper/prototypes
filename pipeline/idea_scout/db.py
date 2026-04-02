@@ -161,6 +161,17 @@ class IdeaDB:
         )
         self.conn.commit()
 
+    def mark_permanently_skipped(self, post_id: str):
+        """Set improvement_count high enough to never be picked again."""
+        self.conn.execute(
+            """UPDATE posts SET
+                improvement_count = 999,
+                last_improved_at = CURRENT_TIMESTAMP
+               WHERE id = ?""",
+            (post_id,),
+        )
+        self.conn.commit()
+
     def mark_prototype_started(self, post_id: str):
         self.conn.execute(
             "UPDATE posts SET prototype_started = 1 WHERE id = ?", (post_id,),
@@ -203,8 +214,13 @@ class IdeaDB:
         return [dict(r) for r in rows]
 
     def count_unbuilt_ideas(self, min_score: int = 7) -> int:
+        """Count ideas that are actually buildable (matching get_buildable_ideas filters)."""
         row = self.conn.execute(
-            "SELECT COUNT(*) FROM posts WHERE viability_score >= ? AND prototype_started = 0",
+            """SELECT COUNT(*) FROM posts
+               WHERE viability_score >= ?
+                 AND competition_score IS NOT NULL
+                 AND competition_score >= 4
+                 AND prototype_started = 0""",
             (min_score,),
         ).fetchone()
         return row[0]

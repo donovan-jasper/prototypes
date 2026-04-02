@@ -128,7 +128,7 @@ async def improve_prototype(idea: dict) -> bool:
     project_dir = _find_project_dir(idea)
     if not project_dir:
         print(f"  Cannot find project dir for {idea['id']}, skipping permanently")
-        db.record_improvement(idea["id"])  # bump count so daemon moves on
+        db.mark_permanently_skipped(idea["id"])
         return False
 
     spec_path = os.path.join(project_dir, "spec.md")
@@ -140,7 +140,7 @@ async def improve_prototype(idea: dict) -> bool:
     file_listing = _read_project_files(project_dir, max_total_chars=20000)
     if not file_listing:
         print(f"  Empty project dir: {project_dir}, skipping permanently")
-        db.record_improvement(idea["id"])
+        db.mark_permanently_skipped(idea["id"])
         return False
 
     async with httpx.AsyncClient(timeout=300) as client:
