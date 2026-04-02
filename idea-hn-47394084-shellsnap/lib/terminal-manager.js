@@ -8,18 +8,22 @@ class TerminalManager {
     this.dataListeners = new Map(); // Map<sessionId, Set<Function>> for PTY data events
   }
 
-  createSession(cols, rows) {
+  /**
+   * Creates a new PTY session.
+   * @param {number} cols The number of columns for the terminal.
+   * @param {number} rows The number of rows for the terminal.
+   * @param {string} shellPath The path to the shell executable (e.g., '/bin/zsh').
+   * @returns {string} The unique ID of the new session.
+   */
+  createSession(cols, rows, shellPath) {
     const sessionId = uuidv4();
     
-    // Use the shell specified in config, or default to /bin/zsh
-    const shell = process.env.SHELL || '/bin/zsh'; 
-
-    const term = pty.spawn(shell, [], {
+    const term = pty.spawn(shellPath, [], {
       name: 'xterm-color',
       cols: cols || 80,
       rows: rows || 24,
-      cwd: process.env.HOME,
-      env: process.env
+      cwd: process.env.HOME, // Start in the user's home directory
+      env: process.env // Inherit environment variables
     });
 
     this.sessions.set(sessionId, {
@@ -43,10 +47,21 @@ class TerminalManager {
       }
     });
 
-    console.log(`Created new terminal session: ${sessionId}`);
+    // Handle PTY exit event to clean up resources
+    term.on('exit', (code, signal) => {
+      console.log(`PTY session ${sessionId} exited with code ${code}, signal ${signal}. Cleaning up.`);
+      this.destroySession(sessionId); // Ensure full cleanup if PTY process terminates
+    });
+
+    console.log(`Created new terminal session: ${sessionId} with shell ${shellPath}`);
     return sessionId;
   }
 
+  /**
+   * Retrieves an existing PTY session. Updates its last activity timestamp.
+   * @param {string} id The session ID.
+   * @returns {{term: import('node-pty').IPty, createdAt: number, lastActivity: number}|undefined} The session object, or undefined if not found.
+   */
   getSession(id) {
     const session = this.sessions.get(id);
     if (session) {
@@ -55,6 +70,12 @@ class TerminalManager {
     return session;
   }
 
+  /**
+   * Resizes a PTY session.
+   * @param {string} id The session ID.
+   * @param {number} cols The new number of columns.
+   * @param {number} rows The new number of rows.
+   */
   resizeSession(id, cols, rows) {
     const session = this.getSession(id); // getSession updates lastActivity
     if (session) {
@@ -63,6 +84,11 @@ class TerminalManager {
     }
   }
 
+  /**
+   * Writes data to a PTY session's input.
+   * @param {string} id The session ID.
+   * @param {string} data The data to write.
+   */
   writeToSession(id, data) {
     const session = this.getSession(id); // getSession updates lastActivity
     if (session) {
@@ -73,7 +99,7 @@ class TerminalManager {
   /**
    * Destroys a terminal session, killing its PTY process and cleaning up all associated resources.
    * This method should only be called if the timer expires and no active listeners remain,
-   * as determined by the `markForCleanup` logic.
+   * or if the PTY process exits.
    * @param {string} id The session ID to destroy.
    */
   destroySession(id) {
@@ -89,7 +115,7 @@ class TerminalManager {
       }
       // Remove all data listeners for this session
       if (this.dataListeners.has(id)) {
-        this.dataListeners.delete(id);
+        this.dataListeners.delete(id); // Remove the entire Set of listeners
       }
       console.log(`Destroyed terminal session: ${id}`);
     }
@@ -108,7 +134,7 @@ class TerminalManager {
     }
     
     // Set a new timeout for 5 minutes
-    this.sessionTimeouts.set(id, setTimeout(() => {
+    const timeout = setTimeout(() => {
       const listeners = this.dataListeners.get(id);
       // Check if there are no active listeners for this session
       if (!listeners || listeners.size === 0) {
@@ -120,12 +146,14 @@ class TerminalManager {
         // The timeout is cleared, so it won't attempt to destroy again until markForCleanup is called again.
       }
       this.sessionTimeouts.delete(id); // Always delete the timeout reference after it fires
-    }, 5 * 60 * 1000)); // 5 minutes
+    }, 5 * 60 * 1000); // 5 minutes
+    
+    this.sessionTimeouts.set(id, timeout);
     console.log(`Session ${id} marked for cleanup in 5 minutes.`);
   }
 
   /**
-   * Cancels a pending cleanup for a session, typically when a client reconnects.
+   * Cancels a pending cleanup for a session, typically when a client reconnects or attaches.
    * @param {string} id The session ID for which to cancel cleanup.
    */
   cancelCleanup(id) {
@@ -137,33 +165,44 @@ class TerminalManager {
   }
 
   /**
-   * Registers a callback function to receive data events from a specific PTY session.
+   * Registers a callback function to receive data from a specific PTY session.
+   * If this is the first listener for the session, it cancels any pending cleanup.
    * @param {string} sessionId The ID of the session.
-   * @param {Function} callback The function to call when data is received.
+   * @param {Function} callback The callback function (data) => void.
    */
-  onData(sessionId, callback) {
-    const listeners = this.dataListeners.get(sessionId);
-    if (listeners) {
-      listeners.add(callback);
-      // Update last activity when a listener is added (client attaches)
-      const session = this.sessions.get(sessionId);
-      if (session) {
-        session.lastActivity = Date.now();
-      }
+  registerDataCallback(sessionId, callback) {
+    let listeners = this.dataListeners.get(sessionId);
+    if (!listeners) {
+      listeners = new Set();
+      this.dataListeners.set(sessionId, listeners);
+    }
+    
+    const wasEmpty = listeners.size === 0;
+    listeners.add(callback);
+    
+    if (wasEmpty) {
+      this.cancelCleanup(sessionId); // A client is now active, cancel cleanup
+      console.log(`Registered first listener for session ${sessionId}. Cleanup cancelled.`);
     } else {
-      console.warn(`Attempted to register data listener for non-existent session: ${sessionId}`);
+      console.log(`Registered additional listener for session ${sessionId}.`);
     }
   }
 
   /**
-   * Unregisters a callback function from receiving data events for a specific PTY session.
+   * Unregisters a callback function from a specific PTY session.
+   * If, after unregistering, there are no more listeners, it marks the session for cleanup.
    * @param {string} sessionId The ID of the session.
-   * @param {Function} callback The function to remove.
+   * @param {Function} callback The callback function to remove.
    */
-  offData(sessionId, callback) {
+  unregisterDataCallback(sessionId, callback) {
     const listeners = this.dataListeners.get(sessionId);
     if (listeners) {
       listeners.delete(callback);
+      console.log(`Unregistered listener for session ${sessionId}. Remaining listeners: ${listeners.size}`);
+      if (listeners.size === 0) {
+        this.markForCleanup(sessionId); // No more active listeners, mark for cleanup
+        console.log(`No more listeners for session ${sessionId}. Marked for cleanup.`);
+      }
     }
   }
 }
