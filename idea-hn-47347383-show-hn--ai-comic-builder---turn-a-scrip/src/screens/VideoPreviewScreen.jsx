@@ -9,7 +9,6 @@ const VideoPreviewScreen = () => {
   // Extract the 'script' parameter from navigation. If not found, default to an empty string.
   const { script } = route.params || {}; 
 
-  const [videoUri, setVideoUri] = useState(null);
   const [scenes, setScenes] = useState([]); // Store scenes for potential display or future use
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +27,6 @@ const VideoPreviewScreen = () => {
         // Call the video processor utility with the script
         const result = await processScriptToVideo(script);
         setScenes(result.scenes);
-        setVideoUri(result.videoUri);
       } catch (err) {
         console.error("Error processing script to video:", err);
         setError("Failed to generate video. Please check your script and try again.");
@@ -61,8 +59,8 @@ const VideoPreviewScreen = () => {
   return (
     <ScrollView contentContainerStyle={styles.scrollViewContent}>
       <View style={styles.videoPlayerWrapper}>
-        {/* Pass the generated videoUri to the VideoPreview component */}
-        <VideoPreview videoUri={videoUri} />
+        {/* Pass the generated scenes to the VideoPreview component */}
+        <VideoPreview scenes={scenes} />
       </View>
 
       {/* Optionally display the generated scenes below the video */}
