@@ -1,5 +1,10 @@
 let virtualKeyboardVisible = true;
 let terminalInstance = null;
+let modifierStates = {
+    ctrl: false,
+    alt: false,
+    shift: false
+};
 
 /**
  * Initializes the virtual keyboard and binds it to the terminal instance.
@@ -32,25 +37,50 @@ function createKeyboardHTML() {
             { label: 'TAB', code: '\t', type: 'special' },
             { label: 'CTRL', code: 'MOD_CTRL', type: 'modifier' },
             { label: 'ALT', code: 'MOD_ALT', type: 'modifier' },
+            { label: 'SHIFT', code: 'MOD_SHIFT', type: 'modifier' },
             { label: '←', code: '\x1b[D', type: 'arrow' },
             { label: '↑', code: '\x1b[A', type: 'arrow' },
             { label: '↓', code: '\x1b[B', type: 'arrow' },
             { label: '→', code: '\x1b[C', type: 'arrow' }
         ],
         [ // Row 2
+            { label: 'F1', code: '\x1bOP', type: 'function' },
+            { label: 'F2', code: '\x1bOQ', type: 'function' },
+            { label: 'F3', code: '\x1bOR', type: 'function' },
+            { label: 'F4', code: '\x1bOS', type: 'function' },
+            { label: 'F5', code: '\x1b[15~', type: 'function' },
+            { label: 'F6', code: '\x1b[17~', type: 'function' },
+            { label: 'F7', code: '\x1b[18~', type: 'function' },
+            { label: 'F8', code: '\x1b[19~', type: 'function' },
+            { label: 'F9', code: '\x1b[20~', type: 'function' },
+            { label: 'F10', code: '\x1b[21~', type: 'function' },
+            { label: 'F11', code: '\x1b[23~', type: 'function' },
+            { label: 'F12', code: '\x1b[24~', type: 'function' }
+        ],
+        [ // Row 3
             { label: 'Ctrl+C', code: '\x03', type: 'shortcut' },
             { label: 'Ctrl+D', code: '\x04', type: 'shortcut' },
             { label: 'Ctrl+Z', code: '\x1a', type: 'shortcut' },
-            { label: 'Ctrl+L', code: '\x0c', type: 'shortcut' }
+            { label: 'Ctrl+L', code: '\x0c', type: 'shortcut' },
+            { label: 'Ctrl+A', code: '\x01', type: 'shortcut' },
+            { label: 'Ctrl+E', code: '\x05', type: 'shortcut' },
+            { label: 'Ctrl+U', code: '\x15', type: 'shortcut' },
+            { label: 'Ctrl+K', code: '\x0b', type: 'shortcut' },
+            { label: 'Ctrl+W', code: '\x17', type: 'shortcut' },
+            { label: 'Ctrl+R', code: '\x12', type: 'shortcut' }
         ],
-        [ // Row 3
+        [ // Row 4
             { label: '|', code: '|', type: 'char' },
             { label: '&', code: '&', type: 'char' },
             { label: '>', code: '>', type: 'char' },
             { label: '<', code: '<', type: 'char' },
             { label: '~', code: '~', type: 'char' },
             { label: '`', code: '`', type: 'char' },
-            { label: '$', code: '$', type: 'char' }
+            { label: '$', code: '$', type: 'char' },
+            { label: '#', code: '#', type: 'char' },
+            { label: '%', code: '%', type: 'char' },
+            { label: '*', code: '*', type: 'char' },
+            { label: '@', code: '@', type: 'char' }
         ]
     ];
 
@@ -142,71 +172,133 @@ function setupKeyboardEventListeners() {
  * @param {Event} e The click event.
  */
 function handleKeyPress(e) {
-    if (!e.target.classList.contains('key-btn')) return;
-    
-    const keyCode = e.target.dataset.code;
+    if (!e.target.classList.contains('key-btn')) {
+        return;
+    }
+
     const keyType = e.target.dataset.type;
-    
-    // Handle modifier keys specially
+    let keyCode = e.target.dataset.code;
+
+    // Handle modifier keys
     if (keyType === 'modifier') {
-        // For now, just send the character representation
-        // In a more advanced implementation, we'd track modifier states
         if (keyCode === 'MOD_CTRL') {
-            // Visual feedback only for modifier keys
-            return;
+            modifierStates.ctrl = !modifierStates.ctrl;
+            e.target.classList.toggle('active', modifierStates.ctrl);
+        } else if (keyCode === 'MOD_ALT') {
+            modifierStates.alt = !modifierStates.alt;
+            e.target.classList.toggle('active', modifierStates.alt);
+        } else if (keyCode === 'MOD_SHIFT') {
+            modifierStates.shift = !modifierStates.shift;
+            e.target.classList.toggle('active', modifierStates.shift);
         }
-        if (keyCode === 'MOD_ALT') {
-            // Visual feedback only for modifier keys
-            return;
+        return;
+    }
+
+    // Handle special keys
+    if (keyType === 'special') {
+        terminalInstance.write(keyCode);
+        return;
+    }
+
+    // Handle arrow keys
+    if (keyType === 'arrow') {
+        terminalInstance.write(keyCode);
+        return;
+    }
+
+    // Handle function keys
+    if (keyType === 'function') {
+        terminalInstance.write(keyCode);
+        return;
+    }
+
+    // Handle shortcuts
+    if (keyType === 'shortcut') {
+        terminalInstance.write(keyCode);
+        return;
+    }
+
+    // Handle character keys
+    if (keyType === 'char') {
+        let charToSend = keyCode;
+        
+        // Apply modifiers to character if needed
+        if (modifierStates.ctrl) {
+            // Convert character to control code
+            if (charToSend >= 'a' && charToSend <= 'z') {
+                charToSend = String.fromCharCode(charToSend.charCodeAt(0) - 'a'.charCodeAt(0) + 1);
+            } else if (charToSend >= 'A' && charToSend <= 'Z') {
+                charToSend = String.fromCharCode(charToSend.charCodeAt(0) - 'A'.charCodeAt(0) + 1);
+            }
+        } else if (modifierStates.shift) {
+            // Apply shift transformation if needed
+            charToSend = charToSend.toUpperCase();
+        }
+        
+        terminalInstance.write(charToSend);
+        return;
+    }
+
+    // If we have a modifier pressed, apply it to the key
+    if (modifierStates.ctrl) {
+        // For regular characters, convert to control code
+        if (keyCode.length === 1 && keyCode >= 'a' && keyCode <= 'z') {
+            keyCode = String.fromCharCode(keyCode.charCodeAt(0) - 'a'.charCodeAt(0) + 1);
+        } else if (keyCode.length === 1 && keyCode >= 'A' && keyCode <= 'Z') {
+            keyCode = String.fromCharCode(keyCode.charCodeAt(0) - 'A'.charCodeAt(0) + 1);
         }
     }
-    
-    // Send the key code to the terminal
-    if (terminalInstance && keyCode) {
-        terminalInstance.write(keyCode);
+
+    // Write the final character to the terminal
+    terminalInstance.write(keyCode);
+
+    // Reset modifiers after sending the character
+    if (modifierStates.ctrl || modifierStates.alt || modifierStates.shift) {
+        resetModifiers();
     }
 }
 
 /**
- * Toggles the visibility of the native keyboard by focusing/unfocusing a hidden input.
+ * Resets all modifier keys to their unpressed state.
+ */
+function resetModifiers() {
+    modifierStates.ctrl = false;
+    modifierStates.alt = false;
+    modifierStates.shift = false;
+    
+    // Update UI to reflect reset state
+    const ctrlKey = document.querySelector('[data-code="MOD_CTRL"]');
+    const altKey = document.querySelector('[data-code="MOD_ALT"]');
+    const shiftKey = document.querySelector('[data-code="MOD_SHIFT"]');
+    
+    if (ctrlKey) ctrlKey.classList.remove('active');
+    if (altKey) altKey.classList.remove('active');
+    if (shiftKey) shiftKey.classList.remove('active');
+}
+
+/**
+ * Toggles visibility of the native keyboard.
  */
 function toggleNativeKeyboard() {
-    const hiddenInput = document.getElementById('hidden-input');
-    if (!hiddenInput) {
-        // Create a hidden input if it doesn't exist
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.id = 'hidden-input';
-        input.style.position = 'absolute';
-        input.style.opacity = '0';
-        input.style.height = '0';
-        input.style.width = '0';
-        input.style.pointerEvents = 'none';
-        document.body.appendChild(input);
-        toggleNativeKeyboard(); // Recursive call to focus the newly created input
-        return;
-    }
-    
-    if (document.activeElement === hiddenInput) {
-        hiddenInput.blur();
-        virtualKeyboardVisible = true;
-    } else {
-        hiddenInput.focus();
-        virtualKeyboardVisible = false;
-    }
-    
+    virtualKeyboardVisible = !virtualKeyboardVisible;
     updateKeyboardVisibility();
 }
 
 /**
- * Updates the toggle button text based on keyboard visibility state.
+ * Updates the visibility of the virtual keyboard.
  */
 function updateKeyboardVisibility() {
-    const toggleBtn = document.getElementById('toggle-native-kb');
-    if (toggleBtn) {
-        toggleBtn.textContent = virtualKeyboardVisible ? 'Hide KB' : 'Show KB';
+    const keyboardContainer = document.getElementById('virtual-keyboard');
+    if (virtualKeyboardVisible) {
+        keyboardContainer.style.display = 'block';
+        document.getElementById('toggle-native-kb').textContent = 'Hide KB';
+    } else {
+        keyboardContainer.style.display = 'none';
+        document.getElementById('toggle-native-kb').textContent = 'Show KB';
     }
 }
 
-// Export the init function for use in other modules
+// Export functions for external use
 window.initKeyboard = initKeyboard;
+window.handleKeyPress = handleKeyPress;
+window.toggleNativeKeyboard = toggleNativeKeyboard;
