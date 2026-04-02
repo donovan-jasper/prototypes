@@ -2,31 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
 import VideoPreview from '../components/VideoPreview';
 import { processScriptToVideo } from '../utils/videoProcessor';
+import { useRoute } from '@react-navigation/native';
 
 const VideoPreviewScreen = () => {
   const [scenes, setScenes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
-  // A default script for demonstration purposes
-  const defaultScript = `
-Scene 1: A majestic forest with tall trees and a sparkling stream. A curious squirrel peeks from behind a tree.
-Scene 2: A sunny beach, waves gently lapping the shore. A person walks along the sand, a dog running beside them.
-Scene 3: A bustling city street at night. Bright lights and tall buildings. A cat sits on a window ledge.
-Scene 4: Deep space, with countless stars and a distant nebula. A lone astronaut floats by.
-Scene 5: A cozy living room in a house. A family gathers around a fireplace. A robot serves tea.
-Scene 6: High up in the mountains, covered in fresh snow. A bird flies overhead.
-Scene 7: A vast desert with towering sand dunes. A lone cactus stands tall.
-`;
+  const route = useRoute();
 
   useEffect(() => {
     const fetchScenes = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        // In a real app, the script would come from navigation params or global state
-        // For this prototype, we use a default script.
-        const result = await processScriptToVideo(defaultScript);
+        const script = route.params.script;
+        const result = await processScriptToVideo(script);
         setScenes(result.scenes);
       } catch (err) {
         console.error("Failed to process script:", err);
@@ -37,7 +27,7 @@ Scene 7: A vast desert with towering sand dunes. A lone cactus stands tall.
     };
 
     fetchScenes();
-  }, []); // Empty dependency array means this runs once on mount
+  }, [route.params.script]); // Re-run when script changes
 
   return (
     <SafeAreaView style={styles.safeArea}>
