@@ -1,4 +1,7 @@
 let password = '';
+let currentMonth = new Date().getMonth();
+let currentYear = new Date().getFullYear();
+let notesCache = [];
 
 // Encryption functions using CryptoJS
 function encryptNote(note, password, salt) {
@@ -107,6 +110,38 @@ async function loadCurrentNote() {
   }
 }
 
+async function loadNoteForDate(dateString) {
+  const today = new Date().toISOString().split('T')[0];
+  const isPastDate = dateString < today;
+  
+  document.getElementById('note-date').textContent = dateString;
+
+  try {
+    const response = await fetch(`/api/notes/${dateString}`);
+    
+    if (response.ok) {
+      const note = await response.json();
+      const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
+      document.getElementById('note-text').value = decryptedNote;
+      document.getElementById('note-text').readOnly = true;
+      document.getElementById('save-note').disabled = true;
+    } else if (response.status === 404) {
+      document.getElementById('note-text').value = '';
+      if (dateString === today) {
+        document.getElementById('note-text').readOnly = false;
+        document.getElementById('save-note').disabled = false;
+      } else {
+        document.getElementById('note-text').readOnly = true;
+        document.getElementById('save-note').disabled = true;
+      }
+    } else {
+      console.error('Error loading note:', await response.text());
+    }
+  } catch (error) {
+    console.error('Error loading note:', error);
+  }
+}
+
 document.getElementById('save-note').addEventListener('click', async () => {
   const noteText = document.getElementById('note-text').value;
   const today = new Date().toISOString().split('T')[0];
@@ -152,32 +187,79 @@ document.getElementById('save-note').addEventListener('click', async () => {
 async function loadCalendar() {
   try {
     const response = await fetch('/api/notes');
-    const notes = await response.json();
-
-    const calendar = document.getElementById('calendar');
-    calendar.innerHTML = '';
-
-    notes.forEach(note => {
-      const noteElement = document.createElement('div');
-      noteElement.className = 'calendar-item';
-      noteElement.textContent = note.date;
-      noteElement.addEventListener('click', () => viewNote(note));
-      calendar.appendChild(noteElement);
-    });
+    notesCache = await response.json();
+    renderCalendar();
   } catch (error) {
     console.error('Error loading calendar:', error);
   }
 }
 
-function viewNote(note) {
-  try {
-    const decryptedNote = decryptNote(note.encrypted_note, password, note.salt);
-    document.getElementById('note-date').textContent = note.date;
-    document.getElementById('note-text').value = decryptedNote;
-    document.getElementById('note-text').readOnly = true;
-    document.getElementById('save-note').disabled = true;
-  } catch (error) {
-    console.error('Error decrypting note:', error);
-    alert('Error decrypting note. Wrong password?');
+function renderCalendar() {
+  const calendar = document.getElementById('calendar');
+  calendar.innerHTML = '';
+  
+  const monthYearDisplay = document.getElementById('calendar-month-year');
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                      'July', 'August', 'September', 'October', 'November', 'December'];
+  monthYearDisplay.textContent = `${monthNames[currentMonth]} ${currentYear}`;
+  
+  const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  dayHeaders.forEach(day => {
+    const header = document.createElement('div');
+    header.className = 'calendar-day-header';
+    header.textContent = day;
+    calendar.appendChild(header);
+  });
+  
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  
+  for (let i = 0; i < firstDay; i++) {
+    const emptyCell = document.createElement('div');
+    emptyCell.className = 'calendar-day empty';
+    calendar.appendChild(emptyCell);
+  }
+  
+  const today = new Date();
+  const todayString = today.toISOString().split('T')[0];
+  
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const dayCell = document.createElement('div');
+    dayCell.className = 'calendar-day';
+    dayCell.textContent = day;
+    
+    const hasNote = notesCache.some(note => note.date === dateString);
+    if (hasNote) {
+      dayCell.classList.add('has-note');
+    }
+    
+    if (dateString === todayString) {
+      dayCell.classList.add('today');
+    }
+    
+    dayCell.addEventListener('click', () => {
+      loadNoteForDate(dateString);
+    });
+    
+    calendar.appendChild(dayCell);
   }
 }
+
+document.getElementById('prev-month').addEventListener('click', () => {
+  currentMonth--;
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  }
+  renderCalendar();
+});
+
+document.getElementById('next-month').addEventListener('click', () => {
+  currentMonth++;
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  }
+  renderCalendar();
+});

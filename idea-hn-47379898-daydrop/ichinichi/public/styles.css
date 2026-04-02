@@ -29,6 +29,7 @@ h1, h2 {
   margin-bottom: 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
+  box-sizing: border-box;
 }
 
 .password-container button, .note-container button {
@@ -44,18 +45,56 @@ h1, h2 {
   background-color: #45a049;
 }
 
-.calendar-container {
+.calendar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendar-header button {
+  background-color: #4CAF50;
+  color: white;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.calendar-header button:hover {
+  background-color: #45a049;
+}
+
+.calendar-header h2 {
+  margin: 0;
+  flex-grow: 1;
+}
+
+#calendar {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 10px;
+  gap: 5px;
+}
+
+.calendar-day-header {
+  padding: 10px;
+  text-align: center;
+  font-weight: bold;
+  background-color: #f0f0f0;
+  border-radius: 5px;
 }
 
 .calendar-day {
-  padding: 10px;
+  padding: 15px 10px;
   border: 1px solid #ddd;
   border-radius: 5px;
   text-align: center;
   cursor: pointer;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .calendar-day:hover {
@@ -65,4 +104,19 @@ h1, h2 {
 .calendar-day.has-note {
   background-color: #4CAF50;
   color: white;
+  font-weight: bold;
+}
+
+.calendar-day.empty {
+  background-color: transparent;
+  border: none;
+  cursor: default;
+}
+
+.calendar-day.empty:hover {
+  background-color: transparent;
+}
+
+.calendar-day.today {
+  border: 2px solid #4CAF50;
 }
