@@ -32,6 +32,12 @@ h1, h2 {
   box-sizing: border-box;
 }
 
+.note-container textarea.locked {
+  background-color: #f9f9f9;
+  border: 2px solid #ccc;
+  cursor: not-allowed;
+}
+
 .password-container button, .note-container button {
   background-color: #4CAF50;
   color: white;
@@ -62,6 +68,11 @@ h1, h2 {
   border-radius: 5px;
   text-align: center;
   font-weight: bold;
+}
+
+#lock-icon {
+  font-size: 1.2em;
+  vertical-align: middle;
 }
 
 .calendar-header {

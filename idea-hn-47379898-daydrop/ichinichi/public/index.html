@@ -3,34 +3,39 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Ichinichi</title>
+  <title>Ichinichi - Daily Journal</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </head>
 <body>
   <div class="container">
     <h1>Ichinichi</h1>
+    
     <div class="password-container">
+      <h2>Enter Password</h2>
       <input type="password" id="password" placeholder="Enter your password">
       <button id="submit-password">Submit</button>
     </div>
+    
     <div class="note-container">
-      <h2 id="note-date"></h2>
+      <h2>Daily Note - <span id="current-date"></span> <span id="lock-icon" style="display: none;">🔒</span></h2>
       <div id="immutable-warning" class="immutable-warning" style="display: none;">
-        Past entries are immutable and cannot be edited
+        🔒 This entry is saved and cannot be edited
       </div>
-      <textarea id="note-text" placeholder="Write your note here..."></textarea>
+      <textarea id="note-text" rows="10" placeholder="Write your note for today..."></textarea>
       <button id="save-note">Save Note</button>
     </div>
+    
     <div class="calendar-container">
       <div class="calendar-header">
-        <button id="prev-month">&lt;</button>
-        <h2 id="calendar-month-year"></h2>
-        <button id="next-month">&gt;</button>
+        <button id="prev-month">←</button>
+        <h2 id="current-month-year"></h2>
+        <button id="next-month">→</button>
       </div>
       <div id="calendar"></div>
     </div>
   </div>
+  
   <script src="script.js"></script>
 </body>
 </html>
