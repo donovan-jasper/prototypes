@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 import subprocess
 import time
 import traceback
@@ -22,6 +23,18 @@ _state = {"llm_failures": 0, "consecutive_406": 0, "err_counts": {}, "notified_e
 MAX_LLM_FAILURES_BEFORE_RESTART = 2
 MAX_ERROR_NOTIFICATIONS = 2  # only notify this many times per error type per cycle
 
+
+
+MIN_DISK_GB = 2  # pause builds when disk drops below this
+
+
+def _check_disk_space() -> bool:
+    usage = shutil.disk_usage('/')
+    free_gb = usage.free / (1024 ** 3)
+    if free_gb < MIN_DISK_GB:
+        print(f'  [disk] Only {free_gb:.1f}GB free — pausing builds until space is freed')
+        return False
+    return True
 
 def _reset_error_state():
     """Reset error tracking after a successful cycle."""
@@ -145,6 +158,12 @@ async def run_loop():
             hours_since_scout = (time.time() - last_scout) / 3600
             backlog = db.count_unbuilt_ideas(min_score=7)
             unanalyzed = len(db.get_unanalyzed_posts(limit=1))
+
+            # Disk space gate — skip builds/improvements if disk is low
+            if not _check_disk_space():
+                await notify_daemon(f'Disk space critically low — pausing builds', tags='warning')
+                await asyncio.sleep(IDLE_SLEEP_MINUTES * 60)
+                continue
 
             # Priority 1: Build new prototypes (highest value)
             buildable = db.get_buildable_ideas(limit=1)
