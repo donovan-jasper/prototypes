@@ -18,8 +18,16 @@ from builder.orchestrator import build_next_prototype
 from builder.improver import improve_prototype
 
 SCOUT_TIMESTAMP_FILE = os.path.expanduser("~/prototypes/pipeline/.last_scout")
-_state = {"llm_failures": 0, "consecutive_406": 0}
+_state = {"llm_failures": 0, "consecutive_406": 0, "err_counts": {}, "notified_errors": set()}
 MAX_LLM_FAILURES_BEFORE_RESTART = 2
+MAX_ERROR_NOTIFICATIONS = 2  # only notify this many times per error type per cycle
+
+
+def _reset_error_state():
+    """Reset error tracking after a successful cycle."""
+    _state["llm_failures"] = 0
+    _state["consecutive_406"] = 0
+    _state["err_counts"] = {}
 
 
 def _restart_omniroute():
@@ -143,8 +151,7 @@ async def run_loop():
             if buildable:
                 print(f"\n=== BUILDING ===")
                 await build_next_prototype()
-                _state["llm_failures"] = 0
-                _state["consecutive_406"] = 0
+                _reset_error_state()
                 continue
 
             # Priority 2: Improve existing prototypes (make them shippable)
@@ -155,8 +162,7 @@ async def run_loop():
                 idea = improvable[0]
                 print(f"\n=== IMPROVING: {idea['title'][:50]} (round {idea.get('improvement_count', 0) + 1}) ===")
                 await improve_prototype(idea)
-                _state["llm_failures"] = 0
-                _state["consecutive_406"] = 0
+                _reset_error_state()
                 continue
 
             # Priority 3: Competition check for 7+ ideas (unlocks builds)
@@ -164,16 +170,14 @@ async def run_loop():
             if needs_comp:
                 print(f"\n=== COMPETITION CHECK (high priority) ===")
                 await competition_batch(db, limit=5)
-                _state["llm_failures"] = 0
-                _state["consecutive_406"] = 0
+                _reset_error_state()
                 continue
 
             # Priority 4: Analyze unscored ideas (small batches)
             if unanalyzed:
                 print(f"\n=== ANALYZING (backlog={backlog}, unscored={unanalyzed}) ===")
                 await analyze_batch(db, limit=10)
-                _state["llm_failures"] = 0
-                _state["consecutive_406"] = 0
+                _reset_error_state()
                 continue
 
             # Priority 5: Competition check for lower-scoring ideas
@@ -181,8 +185,7 @@ async def run_loop():
             if needs_comp_low:
                 print(f"\n=== COMPETITION CHECK ===")
                 await competition_batch(db, limit=5)
-                _state["llm_failures"] = 0
-                _state["consecutive_406"] = 0
+                _reset_error_state()
                 continue
 
             # Priority 6: Scout for NEW ideas — only if backlog is low
@@ -199,7 +202,21 @@ async def run_loop():
         except Exception as e:
             err_name = type(e).__name__
             err_str = str(e)
-            print(f"Daemon error: {err_name}: {e}\n{traceback.format_exc()[-500:]}")
+            # Classify error for dedup
+            if "406" in err_str:
+                err_key = "406"
+            elif "429" in err_str:
+                err_key = "429"
+            else:
+                err_key = err_name
+            _state["err_counts"][err_key] = _state["err_counts"].get(err_key, 0) + 1
+            count = _state["err_counts"][err_key]
+
+            # Only log first 2 of each error type, then suppress
+            if count <= MAX_ERROR_NOTIFICATIONS:
+                print(f"Daemon error: {err_name}: {e}\n{traceback.format_exc()[-500:]}")
+            elif count == MAX_ERROR_NOTIFICATIONS + 1:
+                print(f"  [muted] Suppressing further {err_key} errors until next success")
 
             # Track LLM failures and restart OmniRoute if stuck
             if err_name in ("ReadTimeout", "RemoteProtocolError", "ConnectError"):
@@ -208,22 +225,23 @@ async def run_loop():
                     _restart_omniroute()
                     _state["llm_failures"] = 0
                 await asyncio.sleep(30)
-            elif "429" in err_str:
-                # Rate limited — wait longer but reset failure count
+            elif err_key == "429":
                 _state["llm_failures"] = 0
                 _state["consecutive_406"] = 0
                 await asyncio.sleep(90)
-            elif "406" in err_str:
+            elif err_key == "406":
                 # All providers exhausted — exponential backoff
                 _state["llm_failures"] = 0
                 _state["consecutive_406"] = min(_state["consecutive_406"] + 1, 6)
                 wait = min(60 * (2 ** _state["consecutive_406"]), 1800)  # 2m, 4m, 8m, 16m, max 30m
-                print(f"  [backoff] All providers exhausted, waiting {wait // 60}m (streak: {_state['consecutive_406']})")
+                if count <= MAX_ERROR_NOTIFICATIONS:
+                    print(f"  [backoff] All providers exhausted, waiting {wait // 60}m (streak: {_state['consecutive_406']})")
                 await asyncio.sleep(wait)
             else:
                 _state["llm_failures"] = 0
                 _state["consecutive_406"] = 0
-                if "circuit" not in err_str.lower():
+                # Only send push notification for first 2 of each error type
+                if count <= MAX_ERROR_NOTIFICATIONS and "circuit" not in err_str.lower():
                     await notify_daemon(f"Error: {err_str[:200]}", tags="warning")
                 await asyncio.sleep(60)
 
