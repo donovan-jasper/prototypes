@@ -44,6 +44,38 @@ const SERVICE_NOTIFICATION_KEYWORDS = [
   'security', 'privacy', 'policy', 'change', 'announcement'
 ];
 
+const SPAM_DOMAINS = new Set([
+  'spamdomain.com', 'phishing.net', 'fake-service.org',
+  'dodgy-email.biz', 'scam-site.co', 'shady-deals.info'
+]);
+
+async function isKnownSpamDomain(domain: string): Promise<boolean> {
+  // In a real implementation, this would check against a database or API
+  return SPAM_DOMAINS.has(domain.toLowerCase());
+}
+
+function hasPromotionalHtmlStructure(html: string): boolean {
+  // Check for common promotional HTML patterns
+  const lowerHtml = html.toLowerCase();
+  return lowerHtml.includes('font-family') ||
+         lowerHtml.includes('background-color') ||
+         lowerHtml.includes('border-radius') ||
+         lowerHtml.includes('padding:') ||
+         lowerHtml.includes('margin:') ||
+         lowerHtml.includes('text-align:center') ||
+         lowerHtml.includes('width:100%') ||
+         lowerHtml.includes('table layout=fixed');
+}
+
+function containsSpamIndicators(email: Email): boolean {
+  const subject = email.subject.toLowerCase();
+  const body = email.body.toLowerCase();
+
+  return SPAM_INDICATORS.some(indicator =>
+    subject.includes(indicator) || body.includes(indicator)
+  );
+}
+
 export async function classifyEmail(email: Email): Promise<'important' | 'promotional' | 'spam' | 'subscription' | 'transactional' | 'newsletter' | 'service-notification'> {
   // Check for spam indicators first
   if (containsSpamIndicators(email)) {
@@ -69,17 +101,20 @@ export async function classifyEmail(email: Email): Promise<'important' | 'promot
   }
 
   // Check for transactional content
-  if (TRANSACTIONAL_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+  if (TRANSACTIONAL_KEYWORDS.some(keyword =>
+      subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
     return 'transactional';
   }
 
   // Check for newsletter content
-  if (NEWSLETTER_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+  if (NEWSLETTER_KEYWORDS.some(keyword =>
+      subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
     return 'newsletter';
   }
 
   // Check for service notification content
-  if (SERVICE_NOTIFICATION_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+  if (SERVICE_NOTIFICATION_KEYWORDS.some(keyword =>
+      subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
     return 'service-notification';
   }
 
@@ -150,10 +185,9 @@ export async function getAITags(email: Email): Promise<string[]> {
 
   // Check for marketing campaigns
   if (subjectLower.includes('campaign') ||
-      subjectLower.includes('promotion') ||
-      bodyLower.includes('special offer') ||
-      bodyLower.includes('limited time')) {
-    tags.push('marketing');
+      subjectLower.includes('promo') ||
+      subjectLower.includes('special offer')) {
+    tags.push('marketing-campaign');
   }
 
   // Check for service notifications
@@ -162,71 +196,23 @@ export async function getAITags(email: Email): Promise<string[]> {
     tags.push('service-notification');
   }
 
-  // Check for spam indicators
-  if (containsSpamIndicators(email)) {
-    tags.push('spam');
-  }
-
   // Check for transactional emails
   if (TRANSACTIONAL_KEYWORDS.some(keyword =>
       subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
     tags.push('transactional');
   }
 
-  // Check for subscription services
-  if (SUBSCRIPTION_SERVICE_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('subscription-service');
+  // Check for spam indicators
+  if (containsSpamIndicators(email)) {
+    tags.push('spam');
   }
 
-  // Check for email tracking indicators
-  if (email.headers['X-Open-Tracking'] || email.headers['X-Read-Receipt-To']) {
-    tags.push('tracking');
+  // Check for high-priority emails
+  if (email.headers['X-Priority'] === '1' ||
+      email.headers['Importance'] === 'high' ||
+      email.headers['Precedence'] === 'urgent') {
+    tags.push('high-priority');
   }
 
-  // Check for unsubscribe links
-  if (email.headers['List-Unsubscribe'] || email.body.includes('unsubscribe')) {
-    tags.push('unsubscribe-available');
-  }
-
-  return [...new Set(tags)]; // Remove duplicates
-}
-
-function containsSpamIndicators(email: Email): boolean {
-  const content = `${email.subject} ${email.body}`.toLowerCase();
-  return SPAM_INDICATORS.some(indicator => content.includes(indicator));
-}
-
-async function isKnownSpamDomain(domain: string): Promise<boolean> {
-  // In a real implementation, this would query a spam domain database
-  // For now, we'll use a simple list of known spam domains
-  const knownSpamDomains = [
-    'spamdomain.com', 'fakeemail.com', 'phishing.net',
-    'scam.org', 'malware.biz', 'spammy.net'
-  ];
-
-  return knownSpamDomains.includes(domain.toLowerCase());
-}
-
-function hasPromotionalHtmlStructure(html: string): boolean {
-  // Check for common promotional HTML patterns
-  const lowerHtml = html.toLowerCase();
-
-  // Check for multiple images with links
-  const imgCount = (lowerHtml.match(/<img/g) || []).length;
-  const linkCount = (lowerHtml.match(/<a href/g) || []).length;
-
-  // Check for call-to-action buttons
-  const hasCTA = lowerHtml.includes('click here') ||
-                 lowerHtml.includes('shop now') ||
-                 lowerHtml.includes('sign up') ||
-                 lowerHtml.includes('buy now');
-
-  // Check for discount or offer language
-  const hasDiscount = lowerHtml.includes('discount') ||
-                      lowerHtml.includes('offer') ||
-                      lowerHtml.includes('sale') ||
-                      lowerHtml.includes('promo');
-
-  return (imgCount > 3 && linkCount > 5) || hasCTA || hasDiscount;
+  return tags;
 }
