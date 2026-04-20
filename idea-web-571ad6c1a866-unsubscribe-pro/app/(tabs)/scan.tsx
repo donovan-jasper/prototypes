@@ -1,89 +1,120 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, ActivityIndicator } from 'react-native';
+import { Text, Searchbar, useTheme, Button, IconButton } from 'react-native-paper';
 import { useEmailStore } from '../../store/email-store';
 import EmailCard from '../../components/EmailCard';
-import { Sender } from '../../types';
-import { useNavigation } from '@react-navigation/native';
 
 const ScanScreen = () => {
-  const {
-    senders,
-    isLoading,
-    error,
-    loadSenders,
-    scanInbox,
-    unsubscribeFromSender
-  } = useEmailStore();
-  const navigation = useNavigation();
+  const theme = useTheme();
+  const { senders, loadSenders, isLoading, scanInbox } = useEmailStore();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'unsubscribe' | 'tracking'>('all');
 
   useEffect(() => {
     loadSenders();
   }, []);
 
-  const handleRefresh = async () => {
+  const onRefresh = async () => {
+    setRefreshing(true);
     await scanInbox();
     await loadSenders();
+    setRefreshing(false);
   };
 
-  const handleUnsubscribe = async (domain: string) => {
-    await unsubscribeFromSender(domain);
-    await loadSenders();
-  };
+  const filteredSenders = senders.filter(sender => {
+    const matchesSearch = sender.domain.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         sender.name.toLowerCase().includes(searchQuery.toLowerCase());
 
-  const renderItem = ({ item }: { item: Sender }) => (
-    <EmailCard
-      sender={item}
-      onUnsubscribe={() => handleUnsubscribe(item.domain)}
-      onPress={() => navigation.navigate('sender-details', { domain: item.domain })}
-    />
+    const matchesFilter =
+      (filter === 'all') ||
+      (filter === 'unsubscribe' && sender.tags.includes('unsubscribe-available')) ||
+      (filter === 'tracking' && sender.tags.includes('tracking'));
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const renderItem = ({ item }: { item: any }) => (
+    <EmailCard sender={item} />
   );
 
-  const renderEmptyState = () => (
+  const emptyComponent = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>No senders found in your inbox.</Text>
-      <Text style={styles.emptySubtext}>Pull down to refresh or connect your email account.</Text>
-      <TouchableOpacity style={styles.scanButton} onPress={scanInbox}>
-        <Text style={styles.scanButtonText}>Scan Inbox</Text>
-      </TouchableOpacity>
+      {isLoading ? (
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      ) : (
+        <>
+          <Text variant="titleMedium" style={styles.emptyTitle}>
+            No senders found
+          </Text>
+          <Text variant="bodyMedium" style={styles.emptySubtitle}>
+            {filter === 'all'
+              ? 'Your inbox is clean!'
+              : `No senders match your ${filter} filter`}
+          </Text>
+          <Button
+            mode="contained"
+            onPress={onRefresh}
+            style={styles.emptyButton}
+            contentStyle={styles.emptyButtonContent}
+          >
+            Scan Inbox
+          </Button>
+        </>
+      )}
     </View>
   );
 
-  if (isLoading && senders.length === 0) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={styles.loadingText}>Loading your email senders...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error: {error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
+      <View style={styles.searchContainer}>
+        <Searchbar
+          placeholder="Search senders"
+          onChangeText={setSearchQuery}
+          value={searchQuery}
+          style={styles.searchBar}
+          inputStyle={styles.searchInput}
+        />
+      </View>
+
+      <View style={styles.filterContainer}>
+        <Button
+          mode={filter === 'all' ? 'contained' : 'outlined'}
+          onPress={() => setFilter('all')}
+          style={styles.filterButton}
+        >
+          All
+        </Button>
+        <Button
+          mode={filter === 'unsubscribe' ? 'contained' : 'outlined'}
+          onPress={() => setFilter('unsubscribe')}
+          style={styles.filterButton}
+        >
+          Unsubscribe
+        </Button>
+        <Button
+          mode={filter === 'tracking' ? 'contained' : 'outlined'}
+          onPress={() => setFilter('tracking')}
+          style={styles.filterButton}
+        >
+          Tracking
+        </Button>
+      </View>
+
       <FlatList
-        data={senders}
+        data={filteredSenders}
         renderItem={renderItem}
-        keyExtractor={(item) => item.domain}
+        keyExtractor={item => item.id.toString()}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
-            onRefresh={handleRefresh}
-            colors={['#2196F3']}
-            tintColor="#2196F3"
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
           />
         }
-        ListEmptyComponent={renderEmptyState}
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={emptyComponent}
       />
     </View>
   );
@@ -94,73 +125,54 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  loadingContainer: {
+  searchContainer: {
+    padding: 15,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  searchBar: {
+    borderRadius: 20,
+    elevation: 0,
+  },
+  searchInput: {
+    fontSize: 16,
+  },
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: 10,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  filterButton: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#d32f2f',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
+    marginHorizontal: 5,
   },
   listContent: {
-    paddingVertical: 16,
+    padding: 15,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+    padding: 20,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#333',
-    textAlign: 'center',
-    marginBottom: 8,
+  emptyTitle: {
+    marginBottom: 10,
+    fontWeight: 'bold',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
+  emptySubtitle: {
+    color: 'gray',
     textAlign: 'center',
     marginBottom: 20,
   },
-  scanButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+  emptyButton: {
+    paddingVertical: 8,
   },
-  scanButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '500',
+  emptyButtonContent: {
+    height: 40,
   },
 });
 

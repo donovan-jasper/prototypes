@@ -1,83 +1,81 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
+import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { Text, useTheme } from 'react-native-paper';
+import Svg, { Circle, G, Text as SvgText } from 'react-native-svg';
 
 interface HealthScoreProps {
   score: number;
+  size?: number;
 }
 
-const HealthScore: React.FC<HealthScoreProps> = ({ score }) => {
+const HealthScore: React.FC<HealthScoreProps> = ({ score, size = 120 }) => {
+  const theme = useTheme();
   const animatedScore = useRef(new Animated.Value(0)).current;
-  const circleRef = useRef<Circle>(null);
-  const radius = 80;
+  const radius = size / 2 - 10;
+  const circumference = radius * 2 * Math.PI;
   const strokeWidth = 10;
-  const circumference = 2 * Math.PI * radius;
-  const progress = (score / 100) * circumference;
 
   useEffect(() => {
     Animated.timing(animatedScore, {
       toValue: score,
-      duration: 1500,
+      duration: 1000,
+      easing: Easing.out(Easing.quad),
       useNativeDriver: true,
     }).start();
   }, [score]);
 
-  const animatedProgress = animatedScore.interpolate({
+  const strokeDashoffset = animatedScore.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, progress],
+    outputRange: [circumference, 0],
   });
 
   const getColor = (score: number) => {
-    if (score >= 80) return '#4CAF50'; // Green
-    if (score >= 60) return '#FFC107'; // Yellow
+    if (score >= 80) return theme.colors.primary;
+    if (score >= 60) return '#FFC107'; // Amber
     if (score >= 40) return '#FF9800'; // Orange
     return '#F44336'; // Red
   };
 
+  const getMessage = (score: number) => {
+    if (score >= 80) return 'Excellent';
+    if (score >= 60) return 'Good';
+    if (score >= 40) return 'Fair';
+    return 'Needs work';
+  };
+
   return (
-    <View style={styles.container}>
-      <Svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
-        {/* Background circle */}
-        <Circle
-          cx={radius}
-          cy={radius}
-          r={radius - strokeWidth / 2}
-          stroke="#e0e0e0"
-          strokeWidth={strokeWidth}
-          fill="none"
-        />
-
-        {/* Progress circle */}
-        <Circle
-          ref={circleRef}
-          cx={radius}
-          cy={radius}
-          r={radius - strokeWidth / 2}
-          stroke={getColor(score)}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={circumference}
-          strokeLinecap="round"
-          fill="none"
-        />
-
-        {/* Animated progress */}
-        <AnimatedCircle
-          cx={radius}
-          cy={radius}
-          r={radius - strokeWidth / 2}
-          stroke={getColor(score)}
-          strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={animatedProgress}
-          strokeLinecap="round"
-          fill="none"
-        />
+    <View style={[styles.container, { width: size, height: size }]}>
+      <Svg width={size} height={size}>
+        <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
+          <Circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke="#eee"
+            strokeWidth={strokeWidth}
+            fill="none"
+          />
+          <AnimatedCircle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            stroke={getColor(score)}
+            strokeWidth={strokeWidth}
+            strokeDasharray={circumference}
+            strokeDashoffset={strokeDashoffset}
+            strokeLinecap="round"
+            fill="none"
+          />
+        </G>
       </Svg>
 
-      <View style={styles.scoreContainer}>
-        <Text style={styles.scoreValue}>{Math.round(score)}</Text>
-        <Text style={styles.scoreLabel}>Health Score</Text>
+      <View style={styles.textContainer}>
+        <Text variant="headlineSmall" style={styles.scoreText}>
+          {Math.round(score)}
+        </Text>
+        <Text variant="bodySmall" style={styles.messageText}>
+          {getMessage(score)}
+        </Text>
       </View>
     </View>
   );
@@ -89,22 +87,18 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 16,
   },
-  scoreContainer: {
+  textContainer: {
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scoreValue: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#333',
+  scoreText: {
+    fontWeight: 'bold',
   },
-  scoreLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+  messageText: {
+    color: 'gray',
+    marginTop: 2,
   },
 });
 
