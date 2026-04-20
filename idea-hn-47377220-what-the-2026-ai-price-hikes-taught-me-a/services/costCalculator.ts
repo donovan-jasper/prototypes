@@ -56,7 +56,7 @@ export async function getCostRecommendation(
 ): Promise<string> {
   try {
     const response = await axios.post(
-      OPENAI_API_URL,
+      'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-3.5-turbo',
         messages: [
@@ -77,7 +77,7 @@ export async function getCostRecommendation(
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'Authorization': `Bearer YOUR_OPENAI_API_KEY`
         }
       }
     );
@@ -95,7 +95,7 @@ export async function getCostProjection(
 ): Promise<{ projectedCost: number; savingsOpportunities: string[] }> {
   try {
     const response = await axios.post(
-      OPENAI_API_URL,
+      'https://api.openai.com/v1/chat/completions',
       {
         model: 'gpt-3.5-turbo',
         messages: [
@@ -118,7 +118,7 @@ export async function getCostProjection(
       {
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`
+          'Authorization': `Bearer YOUR_OPENAI_API_KEY`
         }
       }
     );
