@@ -1,86 +1,55 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import * as Notifications from 'expo-notifications';
 import { useDatabase } from '../hooks/useDatabase';
-import { TimingEngine } from '../services/timing-engine';
+import { useMoments } from '../hooks/useMoments';
+import { useStreak } from '../hooks/useStreak';
+import { NotificationService } from '../services/notifications';
 
 interface AppContextType {
-  hasNotificationPermission: boolean;
-  requestNotificationPermission: () => Promise<void>;
   userId: string;
-  isPremium: boolean;
-  settings: any;
-  timingEngine: TimingEngine | null;
-  togglePremium: () => void; // For testing purposes only
+  moments: any[];
+  streak: number;
+  loading: boolean;
+  error: Error | null;
+  completeMoment: (momentId: string, moodRating?: number) => Promise<void>;
+  refreshMoments: () => Promise<void>;
+  notificationService: NotificationService;
 }
 
-const AppContext = createContext<AppContextType>({
-  hasNotificationPermission: false,
-  requestNotificationPermission: async () => {},
-  userId: '',
-  isPremium: false,
-  settings: {},
-  timingEngine: null,
-  togglePremium: () => {},
-});
+const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
-  const [userId, setUserId] = useState('');
-  const [isPremium, setIsPremium] = useState(false);
-  const [settings, setSettings] = useState({});
-  const [timingEngine, setTimingEngine] = useState<TimingEngine | null>(null);
+  const [userId] = useState('user1'); // In a real app, this would come from auth
   const db = useDatabase();
+  const { moments, loading, error, completeMoment, refreshMoments } = useMoments(userId);
+  const { streak } = useStreak(userId);
+  const [notificationService] = useState(new NotificationService(userId));
 
+  // Initialize notifications on app start
   useEffect(() => {
-    const initializeApp = async () => {
-      // Check notification permissions
-      const { status } = await Notifications.getPermissionsAsync();
-      setHasNotificationPermission(status === 'granted');
+    const initializeNotifications = async () => {
+      const hasPermission = await notificationService.getNotificationPermissions();
+      if (!hasPermission) {
+        await notificationService.requestNotificationPermissions();
+      }
 
-      // Initialize user
-      const user = await db.getOrCreateUser();
-      setUserId(user.id);
-      setIsPremium(user.isPremium);
-
-      // Load settings
-      const userSettings = await db.getUserSettings(user.id);
-      setSettings(userSettings);
-
-      // Initialize timing engine
-      const engine = new TimingEngine(user.id);
-      setTimingEngine(engine);
+      // Schedule today's notifications
+      await notificationService.scheduleDailyNotifications();
     };
 
-    initializeApp();
-  }, [db]);
-
-  const requestNotificationPermission = async () => {
-    const { status } = await Notifications.requestPermissionsAsync();
-    setHasNotificationPermission(status === 'granted');
-  };
-
-  // For testing purposes only - in a real app this would be handled by a payment processor
-  const togglePremium = async () => {
-    const newPremiumStatus = !isPremium;
-    setIsPremium(newPremiumStatus);
-
-    // Update in database
-    await db.updateUser({
-      id: userId,
-      isPremium: newPremiumStatus
-    });
-  };
+    initializeNotifications();
+  }, [notificationService]);
 
   return (
     <AppContext.Provider
       value={{
-        hasNotificationPermission,
-        requestNotificationPermission,
         userId,
-        isPremium,
-        settings,
-        timingEngine,
-        togglePremium,
+        moments,
+        streak,
+        loading,
+        error,
+        completeMoment,
+        refreshMoments,
+        notificationService
       }}
     >
       {children}
@@ -88,4 +57,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-export const useAppContext = () => useContext(AppContext);
+export function useAppContext() {
+  const context = useContext(AppContext);
+  if (context === undefined) {
+    throw new Error('useAppContext must be used within an AppProvider');
+  }
+  return context;
+}

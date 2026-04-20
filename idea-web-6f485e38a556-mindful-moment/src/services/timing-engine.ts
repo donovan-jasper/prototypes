@@ -168,65 +168,40 @@ export class TimingEngine {
         cat => !categories.includes(cat)
       );
 
-      // Add 2-3 additional categories to create variety
-      for (let i = 0; i < Math.min(3, additionalCategories.length); i++) {
-        categories.push(additionalCategories[i]);
+      // Add 20% of additional categories to maintain diversity
+      const varietyCount = Math.max(1, Math.floor(categories.length * 0.2));
+      for (let i = 0; i < varietyCount && additionalCategories.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * additionalCategories.length);
+        categories.push(additionalCategories[randomIndex]);
+        additionalCategories.splice(randomIndex, 1);
       }
+    } else {
+      // If no preferences, use all categories
+      categories.push(...allCategories);
     }
 
-    return categories.length > 0 ? categories : allCategories;
+    return categories;
   }
 
   private calculatePriority(hour: number, activeTimes: string[]): number {
-    let priority = 0;
+    const activeHours = activeTimes.map(time => parseInt(time.split(':')[0]));
+    const isActiveTime = activeHours.includes(hour);
 
-    // Higher priority for active times
-    if (activeTimes.some(time => parseInt(time.split(':')[0]) === hour)) {
-      priority += 2;
-    }
-
-    // Higher priority for morning and evening
-    if (hour >= 7 && hour < 12) { // Morning
-      priority += 1;
-    } else if (hour >= 18 && hour < 22) { // Evening
-      priority += 1;
-    }
-
-    return priority;
+    // Priority is higher for active times and earlier in the day
+    return isActiveTime ? 100 - hour : 50 - hour;
   }
 
   private isInQuietHours(hour: number, quietHours: { start: number, end: number }): boolean {
     if (quietHours.start < quietHours.end) {
       return hour >= quietHours.start && hour < quietHours.end;
     } else {
+      // Handle overnight quiet hours (e.g., 22:00-08:00)
       return hour >= quietHours.start || hour < quietHours.end;
     }
   }
 
   private isIgnoredTime(hour: number, ignoredTimes: string[]): boolean {
-    return ignoredTimes.some(time => {
-      const ignoredHour = parseInt(time.split(':')[0]);
-      return Math.abs(ignoredHour - hour) <= 1; // Within 1 hour of ignored time
-    });
-  }
-
-  async scheduleMoments(moments: Moment[], windows: OptimalWindow[]): Promise<void> {
-    // Schedule moments in the database for delivery
-    await this.db.scheduleMoments(this.userId, moments, windows);
-  }
-
-  async adaptToUserBehavior(notificationId: string, wasIgnored: boolean): Promise<void> {
-    // Update user patterns based on notification interaction
-    const engagementData: EngagementData = {
-      notificationId,
-      wasIgnored,
-      timestamp: new Date()
-    };
-
-    await this.updateUserPatterns(engagementData);
-  }
-
-  async getDailySchedule(): Promise<{ moment: Moment, window: OptimalWindow }[]> {
-    return await this.db.getScheduledMoments(this.userId);
+    const ignoredHours = ignoredTimes.map(time => parseInt(time.split(':')[0]));
+    return ignoredHours.includes(hour);
   }
 }

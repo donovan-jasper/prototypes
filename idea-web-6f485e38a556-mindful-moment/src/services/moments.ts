@@ -51,4 +51,22 @@ export class MomentsService {
 
     return moments.slice(0, 3);
   }
+
+  async scheduleMomentsForToday(userId: string): Promise<void> {
+    // Get optimal windows from timing engine
+    const timingEngine = new TimingEngine(userId);
+    const userSettings = await this.db.getUserSettings(userId);
+    const optimalWindows = await timingEngine.calculateOptimalWindows(userSettings);
+
+    // Clear existing scheduled moments for today
+    await this.db.clearScheduledMomentsForToday(userId);
+
+    // Schedule moments in optimal windows
+    for (const window of optimalWindows) {
+      const moment = await this.getRandomMoment(window.category);
+      if (moment) {
+        await this.db.scheduleMomentForToday(userId, moment.id, window.start);
+      }
+    }
+  }
 }
