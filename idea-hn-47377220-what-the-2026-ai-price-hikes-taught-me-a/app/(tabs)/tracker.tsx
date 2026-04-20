@@ -1,63 +1,124 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { Text, Button, Divider, Card, Chip, ProgressBar, Dialog, Portal, RadioButton, TextInput } from 'react-native-paper';
+import React, { useState, useEffect, useCallback } from 'react';
+import { ScrollView, StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
+import { Text, Button, Divider, Card, Chip, ProgressBar, Dialog, Portal, TextInput, useTheme } from 'react-native-paper';
 import CostChart from '../../components/CostChart';
-import { getUsageHistory, getMonthlyTotal } from '../../services/database';
-import { UsageEntry, AIModel } from '../../types/models';
+import { getUsageHistory, getMonthlyTotal, logUsage, getSetting } from '../../services/database';
+import { UsageEntry, AIModel, TaskType } from '../../types/models';
 import { projectMonthlyCost, calculateSavings } from '../../services/costCalculator';
-import { getAllModels } from '../../services/modelService';
+import { getAllModels, getModelById } from '../../services/modelService';
+import { Picker } from '@react-native-picker/picker';
 
 export default function TrackerScreen() {
+  const theme = useTheme();
   const [usageHistory, setUsageHistory] = useState<UsageEntry[]>([]);
   const [monthlyTotal, setMonthlyTotal] = useState<number>(0);
   const [projectedCost, setProjectedCost] = useState<number | null>(null);
-  const [savingsOpportunities, setSavingsOpportunities] = useState<string[]>([]);
   const [budgetLimit, setBudgetLimit] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [models, setModels] = useState<AIModel[]>([]);
+
+  // State for manual usage logging form
+  const [formModelId, setFormModelId] = useState<string>('');
+  const [formTaskType, setFormTaskType] = useState<TaskType | ''>('');
+  const [formInputTokens, setFormInputTokens] = useState<string>('');
+  const [formOutputTokens, setFormOutputTokens] = useState<string>('');
+  const [formCost, setFormCost] = useState<string>('');
+  const [isLogging, setIsLogging] = useState(false);
+
+  // State for What-If scenario
   const [whatIfVisible, setWhatIfVisible] = useState(false);
   const [whatIfModel, setWhatIfModel] = useState<string>('');
   const [whatIfSavings, setWhatIfSavings] = useState<number>(0);
-  const [models, setModels] = useState<AIModel[]>([]);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const history = await getUsageHistory();
       const total = await getMonthlyTotal();
-      const allModels = getAllModels();
+      const allModels = await getAllModels();
 
       setUsageHistory(history);
       setMonthlyTotal(total);
       setModels(allModels);
 
-      // Prepare data for chart
-      const chartData = history.reduce((acc, entry) => {
+      // Prepare data for chart: group by date for daily totals
+      const dailyChartDataMap = history.reduce((acc, entry) => {
         const date = new Date(entry.timestamp).toISOString().split('T')[0];
-        const existing = acc.find(item => item.date === date);
-        if (existing) {
-          existing.cost += entry.cost;
-        } else {
-          acc.push({ date, cost: entry.cost });
-        }
+        acc.set(date, (acc.get(date) || 0) + entry.cost);
         return acc;
-      }, [] as Array<{ date: string; cost: number }>);
+      }, new Map<string, number>());
 
-      // Get AI projection
-      const { projectedCost, savingsOpportunities } = await projectMonthlyCost(chartData);
-      setProjectedCost(projectedCost);
-      setSavingsOpportunities(savingsOpportunities);
+      const chartData = Array.from(dailyChartDataMap.entries())
+        .map(([date, cost]) => ({ date, cost }))
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+      // Project monthly cost
+      const projected = projectMonthlyCost(chartData);
+      setProjectedCost(projected);
 
       // Load budget limit
       const limit = await getSetting('budget_limit');
       if (limit) setBudgetLimit(parseFloat(limit));
+
+      // Set initial form model if models are available and not already set
+      if (allModels.length > 0 && !formModelId) {
+        setFormModelId(allModels[0].id);
+      }
+      // Set initial form task type if not already set
+      if (!formTaskType) {
+        setFormTaskType(TaskType.TEXT_GENERATION); // Default task type
+      }
+
     } catch (error) {
       console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load cost data. Please try again.');
     } finally {
       setLoading(false);
+    }
+  }, [formModelId, formTaskType]); // Dependencies to avoid re-setting defaults if user has selected something
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleLogUsage = async () => {
+    if (!formModelId || !formTaskType || !formInputTokens || !formOutputTokens || !formCost) {
+      Alert.alert('Missing Information', 'Please fill in all fields.');
+      return;
+    }
+
+    const inputTokensNum = parseInt(formInputTokens, 10);
+    const outputTokensNum = parseInt(formOutputTokens, 10);
+    const costNum = parseFloat(formCost);
+
+    if (isNaN(inputTokensNum) || isNaN(outputTokensNum) || isNaN(costNum) || inputTokensNum < 0 || outputTokensNum < 0 || costNum < 0) {
+      Alert.alert('Invalid Input', 'Please enter valid positive numbers for tokens and cost.');
+      return;
+    }
+
+    setIsLogging(true);
+    try {
+      const newEntry: UsageEntry = {
+        modelId: formModelId,
+        taskType: formTaskType as TaskType, // Cast to TaskType
+        inputTokens: inputTokensNum,
+        outputTokens: outputTokensNum,
+        cost: costNum,
+        timestamp: Date.now(),
+      };
+      await logUsage(newEntry);
+      Alert.alert('Success', 'Usage logged successfully!');
+      // Clear form
+      setFormInputTokens('');
+      setFormOutputTokens('');
+      setFormCost('');
+      // Reload data to update totals and history
+      await loadData();
+    } catch (error) {
+      console.error('Error logging usage:', error);
+      Alert.alert('Error', 'Failed to log usage. Please try again.');
+    } finally {
+      setIsLogging(false);
     }
   };
 
@@ -68,9 +129,9 @@ export default function TrackerScreen() {
 
   const getBudgetStatusColor = () => {
     const progress = getBudgetProgress();
-    if (progress > 0.9) return '#f44336'; // Red
+    if (progress > 0.9) return theme.colors.error; // Red
     if (progress > 0.7) return '#ff9800'; // Orange
-    return '#4CAF50'; // Green
+    return theme.colors.primary; // Green
   };
 
   const calculateWhatIfSavings = () => {
@@ -79,10 +140,9 @@ export default function TrackerScreen() {
     const selectedModel = models.find(m => m.id === whatIfModel);
     if (!selectedModel) return 0;
 
-    // Calculate total savings if all future tasks used this model
-    // This is a simplified calculation - in a real app you'd need more context
+    // Calculate total savings if all *past* tasks used this model instead
     const totalSavings = usageHistory.reduce((sum, entry) => {
-      const currentModel = models.find(m => m.id === entry.modelId);
+      const currentModel = getModelById(entry.modelId); // Use getModelById to ensure we have the full model object
       if (currentModel) {
         const savings = calculateSavings(
           currentModel,
@@ -106,11 +166,23 @@ export default function TrackerScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
+        <ActivityIndicator size="large" color={theme.colors.primary} />
         <Text style={styles.loadingText}>Loading your cost data...</Text>
       </View>
     );
   }
+
+  // Prepare data for CostChart component (re-calculate if usageHistory changes)
+  const dailyChartDataMap = usageHistory.reduce((acc, entry) => {
+    const date = new Date(entry.timestamp).toISOString().split('T')[0];
+    acc.set(date, (acc.get(date) || 0) + entry.cost);
+    return acc;
+  }, new Map<string, number>());
+
+  const chartDataForComponent = Array.from(dailyChartDataMap.entries())
+    .map(([date, cost]) => ({ date, cost }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
 
   return (
     <ScrollView style={styles.container}>
@@ -123,6 +195,7 @@ export default function TrackerScreen() {
         </Text>
       </View>
 
+      {/* Monthly Total Display */}
       <Card style={styles.summaryCard}>
         <Card.Content>
           <View style={styles.summaryRow}>
@@ -143,132 +216,206 @@ export default function TrackerScreen() {
               </View>
             )}
           </View>
-
-          {budgetLimit && projectedCost && (
-            <View style={styles.budgetContainer}>
-              <Text variant="bodyMedium" style={styles.budgetLabel}>
+          {budgetLimit !== null && projectedCost !== null && (
+            <View style={styles.budgetProgressContainer}>
+              <Text variant="bodySmall" style={styles.budgetLabel}>
                 Budget: ${budgetLimit.toFixed(2)}
               </Text>
               <ProgressBar
                 progress={getBudgetProgress()}
                 color={getBudgetStatusColor()}
-                style={styles.budgetProgress}
+                style={styles.progressBar}
               />
-              <Text variant="bodySmall" style={styles.budgetStatus}>
-                {getBudgetProgress() > 0.9 ? 'Warning: Approaching limit' :
-                 getBudgetProgress() > 0.7 ? 'Caution: Near limit' : 'On track'}
-              </Text>
+              {getBudgetProgress() >= 1 && (
+                <Text style={{ color: theme.colors.error, marginTop: 4 }}>
+                  You are over your budget limit!
+                </Text>
+              )}
             </View>
           )}
         </Card.Content>
       </Card>
 
-      <Button
-        mode="outlined"
-        onPress={() => setWhatIfVisible(true)}
-        style={styles.whatIfButton}
-        icon="lightbulb-on"
-      >
-        What-If Scenario
-      </Button>
+      <Divider style={styles.divider} />
 
-      <CostChart data={usageHistory.map(entry => ({
-        date: new Date(entry.timestamp).toISOString(),
-        cost: entry.cost
-      }))} />
+      {/* Manual Usage Logging Form */}
+      <Card style={styles.formCard}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.formTitle}>Log New Usage</Text>
 
-      {savingsOpportunities.length > 0 && (
-        <View style={styles.savingsSection}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Savings Opportunities
-          </Text>
-          {savingsOpportunities.map((opportunity, index) => (
-            <Chip key={index} style={styles.savingsChip} icon="lightbulb-on">
-              {opportunity}
-            </Chip>
-          ))}
-        </View>
-      )}
+          <Text style={styles.pickerLabel}>Select Model:</Text>
+          <Picker
+            selectedValue={formModelId}
+            onValueChange={(itemValue) => setFormModelId(itemValue)}
+            style={styles.picker}
+            itemStyle={styles.pickerItem}
+          >
+            {models.length === 0 ? (
+              <Picker.Item label="No models available" value="" />
+            ) : (
+              models.map((model) => (
+                <Picker.Item key={model.id} label={model.name} value={model.id} />
+              ))
+            )}
+          </Picker>
+
+          <Text style={styles.pickerLabel}>Select Task Type:</Text>
+          <Picker
+            selectedValue={formTaskType}
+            onValueChange={(itemValue) => setFormTaskType(itemValue)}
+            style={styles.picker}
+            itemStyle={styles.pickerItem}
+          >
+            {Object.values(TaskType).map((type) => (
+              <Picker.Item key={type} label={type.replace(/_/g, ' ').toUpperCase()} value={type} />
+            ))}
+          </Picker>
+
+          <TextInput
+            label="Input Tokens"
+            value={formInputTokens}
+            onChangeText={setFormInputTokens}
+            keyboardType="numeric"
+            mode="outlined"
+            style={styles.input}
+          />
+          <TextInput
+            label="Output Tokens"
+            value={formOutputTokens}
+            onChangeText={setFormOutputTokens}
+            keyboardType="numeric"
+            mode="outlined"
+            style={styles.input}
+          />
+          <TextInput
+            label="Cost ($)"
+            value={formCost}
+            onChangeText={setFormCost}
+            keyboardType="numeric"
+            mode="outlined"
+            style={styles.input}
+          />
+
+          <Button
+            mode="contained"
+            onPress={handleLogUsage}
+            loading={isLogging}
+            disabled={isLogging || models.length === 0}
+            style={styles.logButton}
+            icon="plus-circle"
+          >
+            Log Usage
+          </Button>
+        </Card.Content>
+      </Card>
 
       <Divider style={styles.divider} />
 
-      <View style={styles.recentActivity}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Recent Activity
-        </Text>
-        {usageHistory.slice(0, 5).map((entry, index) => (
-          <Card key={index} style={styles.activityCard}>
-            <Card.Content>
-              <View style={styles.activityRow}>
-                <View>
-                  <Text variant="bodyMedium" style={styles.activityModel}>
-                    {entry.modelId}
+      {/* Cost Chart */}
+      <CostChart data={chartDataForComponent} />
+
+      <Divider style={styles.divider} />
+
+      {/* Recent Usage Entries */}
+      <View style={styles.recentUsageContainer}>
+        <Text variant="titleMedium" style={styles.recentUsageTitle}>Recent Usage</Text>
+        {usageHistory.length === 0 ? (
+          <Text style={styles.emptyStateText}>No recent usage entries. Log some AI tasks!</Text>
+        ) : (
+          usageHistory.map((entry, index) => {
+            const model = getModelById(entry.modelId);
+            return (
+              <Card key={entry.id || index} style={styles.usageEntryCard}>
+                <Card.Content>
+                  <View style={styles.usageEntryHeader}>
+                    <Text variant="titleSmall" style={styles.usageModelName}>
+                      {model?.name || entry.modelId}
+                    </Text>
+                    <Chip style={styles.costChip} textStyle={{ color: theme.colors.onPrimaryContainer }}>
+                      ${entry.cost.toFixed(4)}
+                    </Chip>
+                  </View>
+                  <Text variant="bodySmall" style={styles.usageDetails}>
+                    Task: {entry.taskType.replace(/_/g, ' ').toUpperCase()}
                   </Text>
-                  <Text variant="bodySmall" style={styles.activityDate}>
-                    {new Date(entry.timestamp).toLocaleDateString()}
+                  <Text variant="bodySmall" style={styles.usageDetails}>
+                    Tokens: {entry.inputTokens} (in) / {entry.outputTokens} (out)
                   </Text>
-                </View>
-                <Text variant="bodyLarge" style={styles.activityCost}>
-                  ${entry.cost.toFixed(4)}
-                </Text>
-              </View>
-            </Card.Content>
-          </Card>
-        ))}
+                  <Text variant="bodySmall" style={styles.usageTimestamp}>
+                    {new Date(entry.timestamp).toLocaleString()}
+                  </Text>
+                </Card.Content>
+              </Card>
+            );
+          })
+        )}
       </View>
 
-      <Button
-        mode="outlined"
-        onPress={loadData}
-        style={styles.refreshButton}
-        icon="refresh"
-      >
-        Refresh Data
-      </Button>
+      <Divider style={styles.divider} />
+
+      {/* What-If Scenario */}
+      <Card style={styles.whatIfCard}>
+        <Card.Content>
+          <Text variant="titleMedium" style={styles.whatIfTitle}>What-If Scenario</Text>
+          <Text variant="bodyMedium" style={styles.whatIfSubtitle}>
+            See potential savings if you switched models.
+          </Text>
+          <Button mode="outlined" onPress={() => {
+            setWhatIfVisible(true);
+            setWhatIfSavings(0); // Reset savings when opening dialog
+            if (models.length > 0 && !whatIfModel) {
+              setWhatIfModel(models[0].id); // Set default model for what-if
+            }
+          }} style={styles.whatIfButton}>
+            Calculate Savings
+          </Button>
+        </Card.Content>
+      </Card>
 
       <Portal>
         <Dialog visible={whatIfVisible} onDismiss={() => setWhatIfVisible(false)}>
-          <Dialog.Title>What-If Scenario</Dialog.Title>
+          <Dialog.Title>Calculate What-If Savings</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium" style={styles.dialogText}>
-              Simulate cost savings if you switched all future tasks to a different model.
-            </Text>
-
-            <Text variant="titleSmall" style={styles.dialogSectionTitle}>
-              Select a model to compare:
-            </Text>
-            <RadioButton.Group
-              onValueChange={value => setWhatIfModel(value)}
-              value={whatIfModel}
+            <Text>Select an alternative model to compare against your past usage:</Text>
+            <Picker
+              selectedValue={whatIfModel}
+              onValueChange={(itemValue) => {
+                setWhatIfModel(itemValue);
+                setWhatIfSavings(0); // Reset savings when model changes
+              }}
+              style={styles.picker}
+              itemStyle={styles.pickerItem}
             >
-              {models.map(model => (
-                <View key={model.id} style={styles.radioItem}>
-                  <RadioButton value={model.id} />
-                  <Text variant="bodyMedium">{model.name}</Text>
-                </View>
-              ))}
-            </RadioButton.Group>
-
-            {whatIfSavings > 0 && (
-              <View style={styles.savingsResult}>
-                <Text variant="titleMedium" style={styles.savingsTitle}>
-                  Potential Savings:
+              {models.length === 0 ? (
+                <Picker.Item label="No models available" value="" />
+              ) : (
+                models.map((model) => (
+                  <Picker.Item key={model.id} label={model.name} value={model.id} />
+                ))
+              )}
+            </Picker>
+            {whatIfSavings !== 0 && (
+              <Text style={styles.whatIfResult}>
+                {whatIfSavings > 0 ? 'Projected savings:' : 'Projected additional cost:'}{' '}
+                <Text style={{ fontWeight: 'bold', color: whatIfSavings > 0 ? theme.colors.primary : theme.colors.error }}>
+                  ${Math.abs(whatIfSavings).toFixed(2)}
                 </Text>
-                <Text variant="headlineSmall" style={styles.savingsAmount}>
-                  ${whatIfSavings.toFixed(2)}
+              </Text>
+            )}
+            {whatIfModel && whatIfSavings === 0 && (
+                <Text style={styles.whatIfResult}>
+                    Select a model and tap 'Calculate' to see potential changes.
                 </Text>
-                <Text variant="bodyMedium" style={styles.savingsNote}>
-                  Based on your recent usage history
-                </Text>
-              </View>
             )}
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setWhatIfVisible(false)}>Cancel</Button>
-            <Button onPress={handleWhatIfSubmit}>Calculate</Button>
+            <Button onPress={handleWhatIfSubmit} disabled={!whatIfModel}>Calculate</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
+
+      <View style={{ height: 50 }} /> {/* Spacer at the bottom */}
     </ScrollView>
   );
 }
@@ -276,42 +423,54 @@ export default function TrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#666',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  header: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  title: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#333',
+  },
+  subtitle: {
     color: '#666',
   },
   summaryCard: {
-    marginBottom: 24,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    elevation: 2,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   totalAmount: {
     fontWeight: 'bold',
     color: '#4CAF50',
-    marginTop: 4,
   },
   projectionContainer: {
     alignItems: 'flex-end',
@@ -323,97 +482,61 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2196F3',
   },
-  budgetContainer: {
-    marginTop: 16,
+  budgetProgressContainer: {
+    marginTop: 8,
   },
   budgetLabel: {
-    marginBottom: 8,
-    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#666',
   },
-  budgetProgress: {
+  progressBar: {
     height: 8,
     borderRadius: 4,
   },
-  budgetStatus: {
-    marginTop: 4,
-    textAlign: 'right',
-    fontWeight: 'bold',
-  },
-  whatIfButton: {
-    marginBottom: 24,
-    marginHorizontal: 16,
-  },
-  savingsSection: {
-    marginVertical: 24,
-    marginHorizontal: 16,
-  },
-  sectionTitle: {
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  savingsChip: {
-    marginVertical: 4,
-    marginRight: 8,
-    backgroundColor: '#e8f5e9',
-  },
   divider: {
-    marginVertical: 24,
-  },
-  recentActivity: {
-    marginBottom: 24,
-  },
-  activityCard: {
-    marginBottom: 8,
-  },
-  activityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  activityModel: {
-    fontWeight: 'bold',
-  },
-  activityDate: {
-    color: '#666',
-    marginTop: 4,
-  },
-  activityCost: {
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  refreshButton: {
     marginVertical: 16,
     marginHorizontal: 16,
+    backgroundColor: '#e0e0e0',
   },
-  dialogText: {
+  formCard: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
+    elevation: 2,
+  },
+  formTitle: {
+    fontWeight: 'bold',
     marginBottom: 16,
+    textAlign: 'center',
   },
-  dialogSectionTitle: {
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
+  input: {
+    marginBottom: 12,
   },
-  radioItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 4,
-  },
-  savingsResult: {
-    marginTop: 24,
-    padding: 16,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
-  },
-  savingsTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  savingsAmount: {
-    fontWeight: 'bold',
-    color: '#4CAF50',
-    marginBottom: 4,
-  },
-  savingsNote: {
+  pickerLabel: {
+    fontSize: 14,
     color: '#666',
+    marginBottom: 4,
+    marginLeft: 12,
   },
-});
+  picker: {
+    height: 50,
+    marginBottom: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    justifyContent: 'center', // Center content vertically
+  },
+  pickerItem: {
+    fontSize: 16,
+    height: 50, // Ensure item height matches picker height
+  },
+  logButton: {
+    marginTop: 10,
+    paddingVertical: 8,
+  },
+  recentUsageContainer: {
+    marginHorizontal: 16,
+    marginVertical: 8,
+  },
+  recentUsage
