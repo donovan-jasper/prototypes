@@ -164,52 +164,23 @@ export class TimingEngine {
 
     // Add some variety if we have preferred categories
     if (categories.length > 0) {
-      const additionalCategories = allCategories.filter(
-        cat => !categories.includes(cat)
-      );
-
-      // Add 20% of additional categories to maintain variety
-      const varietyCount = Math.max(1, Math.floor(categories.length * 0.2));
-      for (let i = 0; i < varietyCount && additionalCategories.length > 0; i++) {
-        const randomIndex = Math.floor(Math.random() * additionalCategories.length);
-        categories.push(additionalCategories[randomIndex]);
-        additionalCategories.splice(randomIndex, 1);
-      }
-    } else {
-      // If no preferred categories, use all categories
-      categories.push(...allCategories);
+      const additionalCategories = allCategories.filter(category => !categories.includes(category));
+      categories.push(...additionalCategories.slice(0, 2));
     }
 
     return categories;
   }
 
   private calculatePriority(hour: number, activeTimes: string[]): number {
-    // Higher priority for active times
-    const activeHours = activeTimes.map(time => parseInt(time.split(':')[0]));
-    if (activeHours.includes(hour)) {
-      return 3;
-    }
-
-    // Medium priority for morning hours (7-11)
-    if (hour >= 7 && hour <= 11) {
-      return 2;
-    }
-
-    // Low priority for other times
-    return 1;
+    const activeHour = activeTimes.includes(`${hour}:00`);
+    return activeHour ? 1 : 0;
   }
 
   private isInQuietHours(hour: number, quietHours: { start: number, end: number }): boolean {
-    if (quietHours.start < quietHours.end) {
-      return hour >= quietHours.start && hour < quietHours.end;
-    } else {
-      // Handles overnight quiet hours (e.g., 22:00-07:00)
-      return hour >= quietHours.start || hour < quietHours.end;
-    }
+    return hour >= quietHours.start && hour < quietHours.end;
   }
 
   private isIgnoredTime(hour: number, ignoredTimes: string[]): boolean {
-    const ignoredHours = ignoredTimes.map(time => parseInt(time.split(':')[0]));
-    return ignoredHours.includes(hour);
+    return ignoredTimes.includes(`${hour}:00`);
   }
 }

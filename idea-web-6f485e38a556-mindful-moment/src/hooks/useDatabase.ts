@@ -1,10 +1,15 @@
+import { useState, useEffect } from 'react';
 import { DatabaseService } from '../services/database';
 
-let dbInstance: DatabaseService | null = null;
+const useDatabase = () => {
+  const [db, setDb] = useState<DatabaseService | null>(null);
 
-export function useDatabase() {
-  if (!dbInstance) {
-    dbInstance = new DatabaseService();
-  }
-  return dbInstance;
-}
+  useEffect(() => {
+    const databaseService = new DatabaseService();
+    setDb(databaseService);
+  }, []);
+
+  return db;
+};
+
+export default useDatabase;
