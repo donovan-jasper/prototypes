@@ -1,57 +1,69 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl } from 'react-native';
-import { useEmailScan } from '../../hooks/useEmailScan';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { useEmailStore } from '../../store/email-store';
 import EmailCard from '../../components/EmailCard';
-import { Email } from '../../types';
+import { Sender } from '../../types';
+import { useNavigation } from '@react-navigation/native';
 
 const ScanScreen = () => {
-  const [emails, setEmails] = useState<Email[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const { scanInbox } = useEmailScan();
+  const {
+    senders,
+    isLoading,
+    error,
+    loadSenders,
+    scanInbox,
+    unsubscribeFromSender
+  } = useEmailStore();
+  const navigation = useNavigation();
 
   useEffect(() => {
-    loadEmails();
+    loadSenders();
   }, []);
 
-  const loadEmails = async () => {
-    try {
-      setIsLoading(true);
-      const scannedEmails = await scanInbox();
-      setEmails(scannedEmails);
-    } catch (error) {
-      console.error('Failed to load emails:', error);
-    } finally {
-      setIsLoading(false);
-      setRefreshing(false);
-    }
+  const handleRefresh = async () => {
+    await scanInbox();
+    await loadSenders();
   };
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadEmails();
+  const handleUnsubscribe = async (domain: string) => {
+    await unsubscribeFromSender(domain);
+    await loadSenders();
   };
 
-  const handleUnsubscribe = (emailId: string) => {
-    setEmails(prevEmails => prevEmails.filter(email => email.id !== emailId));
-  };
-
-  const renderItem = ({ item }: { item: Email }) => (
-    <EmailCard email={item} onUnsubscribe={handleUnsubscribe} />
+  const renderItem = ({ item }: { item: Sender }) => (
+    <EmailCard
+      sender={item}
+      onUnsubscribe={() => handleUnsubscribe(item.domain)}
+      onPress={() => navigation.navigate('sender-details', { domain: item.domain })}
+    />
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyText}>No emails found in your inbox.</Text>
+      <Text style={styles.emptyText}>No senders found in your inbox.</Text>
       <Text style={styles.emptySubtext}>Pull down to refresh or connect your email account.</Text>
+      <TouchableOpacity style={styles.scanButton} onPress={scanInbox}>
+        <Text style={styles.scanButtonText}>Scan Inbox</Text>
+      </TouchableOpacity>
     </View>
   );
 
-  if (isLoading) {
+  if (isLoading && senders.length === 0) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2196F3" />
-        <Text style={styles.loadingText}>Scanning your inbox...</Text>
+        <Text style={styles.loadingText}>Loading your email senders...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -59,12 +71,12 @@ const ScanScreen = () => {
   return (
     <View style={styles.container}>
       <FlatList
-        data={emails}
+        data={senders}
         renderItem={renderItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.domain}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
+            refreshing={isLoading}
             onRefresh={handleRefresh}
             colors={['#2196F3']}
             tintColor="#2196F3"
@@ -93,6 +105,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
   listContent: {
     paddingVertical: 16,
   },
@@ -113,6 +149,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  scanButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  scanButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
 });
 

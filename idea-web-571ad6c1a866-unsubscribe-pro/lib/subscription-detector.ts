@@ -150,69 +150,71 @@ export async function getAITags(email: Email): Promise<string[]> {
 
   // Check for subscription services
   const bodyLower = email.body.toLowerCase();
-  const subjectLower = email.subject.toLowerCase();
-
-  if (SUBSCRIPTION_SERVICE_KEYWORDS.some(keyword =>
-      bodyLower.includes(keyword) || subjectLower.includes(keyword))) {
+  if (SUBSCRIPTION_SERVICE_KEYWORDS.some(keyword => bodyLower.includes(keyword))) {
     tags.push('subscription-service');
   }
 
-  // Check for payment receipts
-  if (subjectLower.includes('receipt') ||
-      subjectLower.includes('invoice') ||
-      bodyLower.includes('payment confirmation') ||
-      bodyLower.includes('billing statement')) {
-    tags.push('subscription');
+  // Check for tracking pixels
+  if (email.body.includes('src="http://tracking') ||
+      email.body.includes('src="https://tracking') ||
+      email.body.includes('src="http://pixel') ||
+      email.body.includes('src="https://pixel')) {
+    tags.push('tracking');
   }
 
-  // Check for important emails
-  if (IMPORTANT_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('important');
+  // Check for unsubscribe links
+  if (email.body.includes('unsubscribe') ||
+      email.body.includes('opt-out') ||
+      email.headers['List-Unsubscribe']) {
+    tags.push('unsubscribe-available');
   }
 
-  // Check for promotional content
-  if (PROMOTIONAL_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('promotional');
+  // Check for urgency indicators
+  if (email.subject.toLowerCase().includes('urgent') ||
+      email.subject.toLowerCase().includes('immediate') ||
+      email.subject.toLowerCase().includes('act now')) {
+    tags.push('urgent');
   }
 
-  // Check for newsletters
-  if (NEWSLETTER_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('newsletter');
-  }
-
-  // Check for marketing campaigns
-  if (subjectLower.includes('campaign') ||
-      subjectLower.includes('promo') ||
-      subjectLower.includes('special offer')) {
-    tags.push('marketing-campaign');
-  }
-
-  // Check for service notifications
-  if (SERVICE_NOTIFICATION_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('service-notification');
-  }
-
-  // Check for transactional emails
-  if (TRANSACTIONAL_KEYWORDS.some(keyword =>
-      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
-    tags.push('transactional');
-  }
-
-  // Check for spam indicators
-  if (containsSpamIndicators(email)) {
-    tags.push('spam');
-  }
-
-  // Check for high-priority emails
-  if (email.headers['X-Priority'] === '1' ||
-      email.headers['Importance'] === 'high' ||
-      email.headers['Precedence'] === 'urgent') {
-    tags.push('high-priority');
+  // Check for personalization
+  if (email.body.includes('Dear') ||
+      email.body.includes('Hi') ||
+      email.body.includes('Hello')) {
+    tags.push('personalized');
   }
 
   return tags;
+}
+
+export async function calculateSenderStats(emails: Email[]): Promise<Record<string, {
+  count: number;
+  lastEmailDate: string;
+  classification: string;
+  tags: string[];
+}>> {
+  const senderStats: Record<string, {
+    count: number;
+    lastEmailDate: string;
+    classification: string;
+    tags: string[];
+  }> = {};
+
+  for (const email of emails) {
+    const domain = email.from.split('@')[1];
+    if (!senderStats[domain]) {
+      senderStats[domain] = {
+        count: 0,
+        lastEmailDate: email.date,
+        classification: await classifyEmail(email),
+        tags: await getAITags(email)
+      };
+    }
+
+    senderStats[domain].count++;
+    if (new Date(email.date) > new Date(senderStats[domain].lastEmailDate)) {
+      senderStats[domain].lastEmailDate = email.date;
+    }
+  }
+
+  return senderStats;
 }

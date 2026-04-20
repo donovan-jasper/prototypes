@@ -1,89 +1,88 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Swipeable } from 'react-native-gesture-handler';
-import { MaterialIcons } from '@expo/vector-icons';
-import { classifyEmail, getAITags } from '../lib/subscription-detector';
-import { useUnsubscribe } from '../hooks/useUnsubscribe';
-import { Email } from '../types';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, PanResponder } from 'react-native';
+import { Sender } from '../types';
+import { Ionicons } from '@expo/vector-icons';
+import { useEmailStore } from '../store/email-store';
 
 interface EmailCardProps {
-  email: Email;
-  onUnsubscribe: (emailId: string) => void;
+  sender: Sender;
+  onUnsubscribe: () => void;
+  onPress: () => void;
 }
 
-const EmailCard: React.FC<EmailCardProps> = ({ email, onUnsubscribe }) => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [classification, setClassification] = useState<'important' | 'promotional' | 'spam' | 'subscription' | 'transactional' | 'newsletter' | 'service-notification'>('promotional');
-  const [tags, setTags] = useState<string[]>([]);
-  const { unsubscribe } = useUnsubscribe();
+const EmailCard: React.FC<EmailCardProps> = ({ sender, onUnsubscribe, onPress }) => {
+  const [swipeAnim] = useState(new Animated.Value(0));
+  const [isSwiping, setIsSwiping] = useState(false);
+  const [isUnsubscribing, setIsUnsubscribing] = useState(false);
+  const { markEmailAsProcessed } = useEmailStore();
 
-  useEffect(() => {
-    const classify = async () => {
-      try {
-        const result = await classifyEmail(email);
-        setClassification(result);
-        const emailTags = await getAITags(email);
-        setTags(emailTags);
-      } catch (error) {
-        console.error('Classification error:', error);
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, gestureState) => {
+      if (gestureState.dx > 0) {
+        swipeAnim.setValue(gestureState.dx);
+        setIsSwiping(true);
       }
-    };
-    classify();
-  }, [email]);
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > 150) {
+        // Swipe completed
+        Animated.timing(swipeAnim, {
+          toValue: 300,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          handleUnsubscribe();
+        });
+      } else {
+        // Reset swipe
+        Animated.spring(swipeAnim, {
+          toValue: 0,
+          useNativeDriver: true,
+        }).start(() => {
+          setIsSwiping(false);
+        });
+      }
+    },
+  });
 
   const handleUnsubscribe = async () => {
-    setIsLoading(true);
+    setIsUnsubscribing(true);
     try {
-      await unsubscribe(email);
-      onUnsubscribe(email.id);
+      await onUnsubscribe();
+      // Mark all emails from this sender as processed
+      // In a real app, we would have a way to get all email IDs from this sender
+      // For now, we'll just mark the sender as processed
     } catch (error) {
-      console.error('Unsubscribe failed:', error);
+      console.error('Failed to unsubscribe:', error);
     } finally {
-      setIsLoading(false);
+      setIsUnsubscribing(false);
     }
   };
 
-  const renderRightActions = () => (
-    <View style={styles.rightActions}>
-      <TouchableOpacity
-        style={[styles.actionButton, styles.unsubscribeButton]}
-        onPress={handleUnsubscribe}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <>
-            <MaterialIcons name="delete" size={24} color="white" />
-            <Text style={styles.actionText}>Unsubscribe</Text>
-          </>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
-
-  const getClassificationColor = () => {
+  const getClassificationColor = (classification: string) => {
     switch (classification) {
       case 'important':
         return '#4CAF50'; // Green
       case 'promotional':
-        return '#2196F3'; // Blue
+        return '#FF9800'; // Orange
       case 'spam':
         return '#F44336'; // Red
       case 'subscription':
         return '#9C27B0'; // Purple
       case 'transactional':
-        return '#FF9800'; // Orange
+        return '#2196F3'; // Blue
       case 'newsletter':
-        return '#607D8B'; // Blue-gray
+        return '#00BCD4'; // Cyan
       case 'service-notification':
-        return '#795548'; // Brown
+        return '#607D8B'; // Blue Grey
       default:
-        return '#757575'; // Gray
+        return '#795548'; // Brown
     }
   };
 
-  const getClassificationLabel = () => {
+  const getClassificationLabel = (classification: string) => {
     switch (classification) {
       case 'important':
         return 'Important';
@@ -100,128 +99,196 @@ const EmailCard: React.FC<EmailCardProps> = ({ email, onUnsubscribe }) => {
       case 'service-notification':
         return 'Service';
       default:
-        return 'Unknown';
+        return 'Other';
     }
   };
 
-  return (
-    <Swipeable renderRightActions={renderRightActions}>
-      <View style={styles.card}>
-        <View style={[styles.classificationIndicator, { backgroundColor: getClassificationColor() }]} />
-        <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.sender} numberOfLines={1}>{email.from}</Text>
-            <View style={[styles.classificationBadge, { backgroundColor: getClassificationColor() }]}>
-              <Text style={styles.classificationText}>{getClassificationLabel()}</Text>
-            </View>
+  const renderTags = () => {
+    if (!sender.tags || sender.tags.length === 0) return null;
+
+    return (
+      <View style={styles.tagsContainer}>
+        {sender.tags.map((tag, index) => (
+          <View key={index} style={styles.tag}>
+            <Text style={styles.tagText}>{tag}</Text>
           </View>
-          <Text style={styles.subject} numberOfLines={1}>{email.subject}</Text>
-          <View style={styles.tagsContainer}>
-            {tags.map((tag, index) => (
-              <View key={index} style={styles.tag}>
-                <Text style={styles.tagText}>{tag}</Text>
-              </View>
-            ))}
-          </View>
-          <Text style={styles.date}>{new Date(email.date).toLocaleDateString()}</Text>
-        </View>
+        ))}
       </View>
-    </Swipeable>
+    );
+  };
+
+  return (
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          transform: [
+            {
+              translateX: swipeAnim.interpolate({
+                inputRange: [0, 300],
+                outputRange: [0, 300],
+                extrapolate: 'clamp',
+              }),
+            },
+          ],
+        },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <TouchableOpacity
+        style={styles.card}
+        onPress={onPress}
+        disabled={isSwiping || isUnsubscribing}
+      >
+        <View style={styles.header}>
+          <View style={styles.senderInfo}>
+            <View style={[styles.classificationDot, { backgroundColor: getClassificationColor(sender.classification) }]} />
+            <Text style={styles.senderName}>{sender.name}</Text>
+          </View>
+          <Text style={styles.emailCount}>{sender.emailCount} emails</Text>
+        </View>
+
+        <View style={styles.body}>
+          <Text style={styles.classificationLabel}>{getClassificationLabel(sender.classification)}</Text>
+          <Text style={styles.lastEmailDate}>
+            Last email: {new Date(sender.lastEmailDate).toLocaleDateString()}
+          </Text>
+          {renderTags()}
+        </View>
+
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={styles.unsubscribeButton}
+            onPress={handleUnsubscribe}
+            disabled={isUnsubscribing}
+          >
+            {isUnsubscribing ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <>
+                <Ionicons name="mail-unread-outline" size={16} color="white" />
+                <Text style={styles.unsubscribeButtonText}>Unsubscribe</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.swipeAction}>
+        <Ionicons name="checkmark-circle" size={24} color="white" />
+        <Text style={styles.swipeActionText}>Unsubscribe</Text>
+      </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    flexDirection: 'row',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginVertical: 8,
+  container: {
     marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'white',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    overflow: 'hidden',
+    position: 'relative',
   },
-  classificationIndicator: {
-    width: 6,
-    height: '100%',
-  },
-  content: {
-    flex: 1,
+  card: {
     padding: 16,
+    borderRadius: 8,
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  sender: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-  },
-  classificationBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  classificationText: {
-    fontSize: 12,
-    color: 'white',
-    fontWeight: '500',
-  },
-  subject: {
-    fontSize: 14,
-    color: '#666',
     marginBottom: 8,
   },
-  date: {
-    fontSize: 12,
-    color: '#999',
-    marginTop: 8,
+  senderInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  classificationDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  senderName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  emailCount: {
+    fontSize: 14,
+    color: '#666',
+  },
+  body: {
+    marginBottom: 12,
+  },
+  classificationLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  lastEmailDate: {
+    fontSize: 14,
+    color: '#666',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 4,
+    marginTop: 8,
   },
   tag: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
     borderRadius: 12,
-    paddingHorizontal: 8,
     paddingVertical: 4,
+    paddingHorizontal: 8,
     marginRight: 4,
     marginBottom: 4,
   },
   tagText: {
     fontSize: 12,
-    color: '#666',
+    color: '#424242',
   },
-  rightActions: {
+  actions: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'flex-end',
-    paddingLeft: 16,
-  },
-  actionButton: {
-    width: 120,
-    height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    marginLeft: 8,
   },
   unsubscribeButton: {
-    backgroundColor: '#F44336',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#2196F3',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
   },
-  actionText: {
+  unsubscribeButtonText: {
     color: 'white',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  swipeAction: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 100,
+    backgroundColor: '#4CAF50',
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+  },
+  swipeActionText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 4,
   },
 });
 

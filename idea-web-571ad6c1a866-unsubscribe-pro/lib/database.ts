@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Email } from '../types';
+import { Email, Sender } from '../types';
 
 const DB_NAME = 'inboxzen.db';
 
@@ -174,10 +174,11 @@ export async function saveEmails(emails: Email[]): Promise<void> {
       await db.execAsync(
         `INSERT OR REPLACE INTO senders
         (domain, name, email_count, last_email_date, classification, tags)
-        VALUES (?, ?, COALESCE((SELECT email_count FROM senders WHERE domain = ?), 0) + 1, ?, ?, ?)`,
+        VALUES (?, ?, COALESCE((SELECT email_count FROM senders WHERE domain = ?) + 1, 1),
+                ?, ?, ?)`,
         [
           domain,
-          email.from,
+          domain, // Using domain as name for now
           domain,
           email.date,
           email.classification,
@@ -185,15 +186,6 @@ export async function saveEmails(emails: Email[]): Promise<void> {
         ]
       );
     }
-
-    // Update user stats
-    await db.execAsync(
-      `UPDATE user_stats
-       SET total_emails = total_emails + ?,
-           last_active_date = CURRENT_TIMESTAMP
-       WHERE id = 1`,
-      [emails.length]
-    );
 
     // Commit transaction
     await db.execAsync('COMMIT');
@@ -204,149 +196,147 @@ export async function saveEmails(emails: Email[]): Promise<void> {
   }
 }
 
+export async function getSenders(): Promise<Sender[]> {
+  const db = await getDatabase();
+  const rows = await db.getAll(`
+    SELECT id, domain, name, email_count, last_email_date, classification, tags
+    FROM senders
+    ORDER BY email_count DESC
+  `);
+
+  return rows.map(row => ({
+    id: row.id,
+    domain: row.domain,
+    name: row.name,
+    emailCount: row.email_count,
+    lastEmailDate: row.last_email_date,
+    classification: row.classification,
+    tags: row.tags ? JSON.parse(row.tags) : []
+  }));
+}
+
+export async function getEmailsBySender(domain: string): Promise<Email[]> {
+  const db = await getDatabase();
+  const rows = await db.getAll(`
+    SELECT id, from, subject, body, date, headers, classification, tags
+    FROM emails
+    WHERE from LIKE ? AND date >= datetime('now', '-30 days')
+    ORDER BY date DESC
+  `, [`%@${domain}`]);
+
+  return rows.map(row => ({
+    id: row.id,
+    from: row.from,
+    subject: row.subject,
+    body: row.body,
+    date: row.date,
+    headers: JSON.parse(row.headers),
+    classification: row.classification,
+    tags: row.tags ? JSON.parse(row.tags) : []
+  }));
+}
+
 export async function markEmailAsUnsubscribed(emailId: string): Promise<void> {
   const db = await getDatabase();
-
-  await db.execAsync(
-    `UPDATE emails
-     SET unsubscribed = 1, processed = 1
-     WHERE id = ?`,
-    [emailId]
-  );
-
-  // Update user stats
-  await db.execAsync(
-    `UPDATE user_stats
-     SET total_unsubscribed = total_unsubscribed + 1
-     WHERE id = 1`
-  );
-
-  // Update streak
-  const today = new Date().toISOString().split('T')[0];
-  const lastActive = await db.getFirstValue(
-    'SELECT last_active_date FROM user_stats WHERE id = 1'
-  );
-
-  if (lastActive === today) {
-    // Already active today, don't update streak
-    return;
-  }
-
-  if (lastActive === new Date(new Date().setDate(new Date().getDate() - 1)).toISOString().split('T')[0]) {
-    // Consecutive day, increment streak
-    await db.execAsync(
-      `UPDATE user_stats
-       SET streak = streak + 1,
-           last_active_date = ?
-       WHERE id = 1`,
-      [today]
-    );
-  } else {
-    // Not consecutive, reset streak
-    await db.execAsync(
-      `UPDATE user_stats
-       SET streak = 1,
-           last_active_date = ?
-       WHERE id = 1`,
-      [today]
-    );
-  }
+  await db.execAsync(`
+    UPDATE emails
+    SET unsubscribed = 1
+    WHERE id = ?
+  `, [emailId]);
 }
 
 export async function addToUnsubscribeQueue(emailId: string, action: string): Promise<void> {
   const db = await getDatabase();
-
-  await db.execAsync(
-    `INSERT INTO unsubscribe_queue (email_id, action)
-     VALUES (?, ?)`,
-    [emailId, action]
-  );
+  await db.execAsync(`
+    INSERT INTO unsubscribe_queue (email_id, action)
+    VALUES (?, ?)
+  `, [emailId, action]);
 }
 
-export async function getPendingUnsubscribeActions(): Promise<Array<{ id: number; email_id: string; action: string }>> {
+export async function getPendingUnsubscribeActions(): Promise<Array<{ id: number; emailId: string; action: string }>> {
   const db = await getDatabase();
+  const rows = await db.getAll(`
+    SELECT id, email_id, action
+    FROM unsubscribe_queue
+    WHERE status = 'pending'
+  `);
 
-  return await db.getAll(
-    `SELECT id, email_id, action
-     FROM unsubscribe_queue
-     WHERE status = 'pending'`
-  );
+  return rows.map(row => ({
+    id: row.id,
+    emailId: row.email_id,
+    action: row.action
+  }));
 }
 
 export async function updateUnsubscribeActionStatus(id: number, status: string): Promise<void> {
   const db = await getDatabase();
-
-  await db.execAsync(
-    `UPDATE unsubscribe_queue
-     SET status = ?
-     WHERE id = ?`,
-    [status, id]
-  );
+  await db.execAsync(`
+    UPDATE unsubscribe_queue
+    SET status = ?
+    WHERE id = ?
+  `, [status, id]);
 }
 
-export async function updateWeeklyStats(score: number, unsubscribed: number): Promise<void> {
+export async function updateUserStats(unsubscribedCount: number, totalEmails: number): Promise<void> {
   const db = await getDatabase();
-  const today = new Date().toISOString().split('T')[0];
+  await db.execAsync(`
+    UPDATE user_stats
+    SET streak = streak + 1,
+        last_active_date = CURRENT_DATE,
+        total_unsubscribed = total_unsubscribed + ?,
+        total_emails = total_emails + ?
+    WHERE id = 1
+  `, [unsubscribedCount, totalEmails]);
+}
 
-  await db.execAsync(
-    `INSERT OR REPLACE INTO weekly_stats (date, score, unsubscribed)
-     VALUES (?, ?, ?)`,
-    [today, score, unsubscribed]
-  );
+export async function getUserStats(): Promise<{
+  streak: number;
+  lastActiveDate: string | null;
+  totalUnsubscribed: number;
+  totalEmails: number;
+}> {
+  const db = await getDatabase();
+  const row = await db.getFirst(`
+    SELECT streak, last_active_date, total_unsubscribed, total_emails
+    FROM user_stats
+    WHERE id = 1
+  `);
+
+  return {
+    streak: row.streak,
+    lastActiveDate: row.last_active_date,
+    totalUnsubscribed: row.total_unsubscribed,
+    totalEmails: row.total_emails
+  };
+}
+
+export async function updateUserSettings(provider: string | null, lastScanDate: string | null): Promise<void> {
+  const db = await getDatabase();
+  await db.execAsync(`
+    UPDATE user_settings
+    SET email_provider = ?,
+        last_scan_date = ?
+    WHERE id = 1
+  `, [provider, lastScanDate]);
 }
 
 export async function getUserSettings(): Promise<{
-  email_provider: string | null;
-  last_scan_date: string | null;
-  auto_unsubscribe: number;
-  notification_enabled: number;
+  emailProvider: string | null;
+  lastScanDate: string | null;
+  autoUnsubscribe: boolean;
+  notificationEnabled: boolean;
 }> {
   const db = await getDatabase();
+  const row = await db.getFirst(`
+    SELECT email_provider, last_scan_date, auto_unsubscribe, notification_enabled
+    FROM user_settings
+    WHERE id = 1
+  `);
 
-  return await db.getFirst(
-    `SELECT email_provider, last_scan_date, auto_unsubscribe, notification_enabled
-     FROM user_settings
-     WHERE id = 1`
-  );
-}
-
-export async function updateUserSettings(settings: {
-  email_provider?: string;
-  last_scan_date?: string;
-  auto_unsubscribe?: number;
-  notification_enabled?: number;
-}): Promise<void> {
-  const db = await getDatabase();
-
-  const updates = [];
-  const params = [];
-
-  if (settings.email_provider !== undefined) {
-    updates.push('email_provider = ?');
-    params.push(settings.email_provider);
-  }
-
-  if (settings.last_scan_date !== undefined) {
-    updates.push('last_scan_date = ?');
-    params.push(settings.last_scan_date);
-  }
-
-  if (settings.auto_unsubscribe !== undefined) {
-    updates.push('auto_unsubscribe = ?');
-    params.push(settings.auto_unsubscribe);
-  }
-
-  if (settings.notification_enabled !== undefined) {
-    updates.push('notification_enabled = ?');
-    params.push(settings.notification_enabled);
-  }
-
-  if (updates.length > 0) {
-    await db.execAsync(
-      `UPDATE user_settings
-       SET ${updates.join(', ')}
-       WHERE id = 1`,
-      params
-    );
-  }
+  return {
+    emailProvider: row.email_provider,
+    lastScanDate: row.last_scan_date,
+    autoUnsubscribe: row.auto_unsubscribe === 1,
+    notificationEnabled: row.notification_enabled === 1
+  };
 }
