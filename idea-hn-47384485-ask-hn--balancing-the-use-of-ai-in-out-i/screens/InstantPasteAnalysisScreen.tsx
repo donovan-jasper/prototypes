@@ -152,32 +152,19 @@ const InstantPasteAnalysisScreen = () => {
             onPress={saveAnalysis}
             disabled={isSaved}
           >
-            <Text style={styles.saveButtonText}>
-              {isSaved ? 'Saved' : 'Save Analysis'}
-            </Text>
+            <Text style={styles.saveButtonText}>{isSaved ? 'Saved' : 'Save Analysis'}</Text>
           </TouchableOpacity>
         )}
       </View>
 
       {authenticityScore !== null && (
         <View style={styles.resultContainer}>
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreLabel}>Authenticity Score:</Text>
-            <Text style={styles.scoreValue}>{authenticityScore.toFixed(1)}%</Text>
+          <Text style={styles.resultTitle}>Authenticity Score</Text>
+          <View style={[styles.scoreIndicator, { backgroundColor: getStatusColor() }]}>
+            <Text style={styles.scoreText}>{Math.round(authenticityScore)}%</Text>
           </View>
-
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}>
-            <Text style={styles.statusBadgeText}>{getStatusText()}</Text>
-          </View>
-
-          <View style={styles.scoreBarContainer}>
-            <View style={[styles.scoreBar, { width: `${authenticityScore}%`, backgroundColor: getStatusColor() }]} />
-          </View>
-
-          <Text style={styles.explanationText}>
-            {authenticityScore > 80 && "This text appears to be written by a human with high confidence."}
-            {authenticityScore >= 50 && authenticityScore <= 80 && "This text shows characteristics of both human and AI writing."}
-            {authenticityScore < 50 && "This text appears to be AI-generated with high confidence."}
+          <Text style={[styles.statusText, { color: getStatusColor() }]}>
+            {getStatusText()}
           </Text>
         </View>
       )}
@@ -199,12 +186,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   clipboardButtonContainer: {
-    marginBottom: 15,
+    marginBottom: 20,
     alignItems: 'center',
   },
   clipboardButton: {
     backgroundColor: '#2196F3',
-    padding: 12,
+    padding: 15,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
@@ -215,13 +202,13 @@ const styles = StyleSheet.create({
   },
   textInput: {
     backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 15,
     marginBottom: 20,
     minHeight: 150,
     textAlignVertical: 'top',
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -262,49 +249,32 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
-    marginTop: 10,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  scoreContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  scoreLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  scoreValue: {
-    fontSize: 16,
+  resultTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
   },
-  statusBadge: {
-    padding: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginBottom: 15,
+  scoreIndicator: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  statusBadgeText: {
-    color: 'white',
+  scoreText: {
+    fontSize: 28,
     fontWeight: 'bold',
+    color: 'white',
   },
-  scoreBarContainer: {
-    height: 10,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
-    marginBottom: 20,
-    overflow: 'hidden',
-  },
-  scoreBar: {
-    height: '100%',
-    borderRadius: 5,
-  },
-  explanationText: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  statusText: {
+    fontSize: 20,
+    fontWeight: 'bold',
   },
 });
 
