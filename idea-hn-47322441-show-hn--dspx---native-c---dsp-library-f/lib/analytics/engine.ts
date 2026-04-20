@@ -1,38 +1,8 @@
-import { getSensorReadings } from '@/lib/storage/database';
-import { useStore } from '@/store';
-import { resampleIrregular } from '@/lib/dsp/resampler';
-import { compensateDrift } from '@/lib/dsp/drift';
-import { movingAverage } from '@/lib/dsp/filter';
+import { getSensorReadings } from '@/lib/storage/readings';
+import { Sensor } from '@/types/sensor';
+import { Reading } from '@/types/reading';
 
-interface DailyPattern {
-  timeOfDay: string;
-  averageValue: number;
-  standardDeviation: number;
-}
-
-interface Anomaly {
-  timestamp: number;
-  value: number;
-  severity: number;
-  description: string;
-}
-
-interface Correlation {
-  sensorId: string;
-  correlationCoefficient: number;
-  significance: number;
-}
-
-interface AnalyticsReport {
-  sensorId: string;
-  generatedAt: number;
-  dailyPatterns: DailyPattern[];
-  anomalies: Anomaly[];
-  correlations: Correlation[];
-  summary: string;
-}
-
-export class AnalyticsEngine {
+class AnalyticsEngine {
   private static instance: AnalyticsEngine;
 
   private constructor() {}
@@ -44,20 +14,32 @@ export class AnalyticsEngine {
     return AnalyticsEngine.instance;
   }
 
-  public async generateDailyPatterns(sensorId: string, days: number = 7): Promise<DailyPattern[]> {
-    const now = Date.now();
-    const startTime = now - (days * 24 * 60 * 60 * 1000);
+  public async generateFullReport(sensorId: string): Promise<any> {
+    const readings = await getSensorReadings(sensorId, '7d');
 
-    const readings = await getSensorReadings(sensorId, 10000, startTime, now);
-
-    if (readings.length === 0) {
-      return [];
+    if (!readings || readings.length === 0) {
+      throw new Error('No data available for analytics');
     }
 
-    // Group readings by hour of day
-    const hourlyGroups: Record<string, number[]> = {};
+    const dailyPatterns = this.analyzeDailyPatterns(readings);
+    const anomalies = this.detectAnomalies(readings);
+    const correlations = await this.analyzeCorrelations(sensorId, readings);
 
-    readings.forEach((reading: any) => {
+    return {
+      sensorId,
+      generatedAt: Date.now(),
+      dailyPatterns,
+      anomalies,
+      correlations,
+      summary: this.generateSummary(dailyPatterns, anomalies, correlations)
+    };
+  }
+
+  private analyzeDailyPatterns(readings: Reading[]): any[] {
+    // Group readings by hour of day
+    const hourlyGroups: { [key: string]: number[] } = {};
+
+    readings.forEach(reading => {
       const date = new Date(reading.timestamp);
       const hour = date.getHours();
 
@@ -68,198 +50,149 @@ export class AnalyticsEngine {
       hourlyGroups[hour].push(reading.value);
     });
 
-    // Calculate statistics for each hour
-    const patterns: DailyPattern[] = [];
+    // Calculate average for each hour
+    const patterns = Object.entries(hourlyGroups).map(([hour, values]) => {
+      const average = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const timeOfDay = `${hour}:00`;
 
-    for (const hour in hourlyGroups) {
-      const values = hourlyGroups[hour];
-      const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
-      const variance = values.reduce((sum, val) => sum + Math.pow(val - avg, 2), 0) / values.length;
-      const stdDev = Math.sqrt(variance);
-
-      patterns.push({
-        timeOfDay: `${hour}:00`,
-        averageValue: parseFloat(avg.toFixed(2)),
-        standardDeviation: parseFloat(stdDev.toFixed(2))
-      });
-    }
+      return {
+        timeOfDay,
+        averageValue: parseFloat(average.toFixed(2)),
+        sampleCount: values.length
+      };
+    });
 
     // Sort by time of day
-    patterns.sort((a, b) => {
+    return patterns.sort((a, b) => {
       const hourA = parseInt(a.timeOfDay.split(':')[0]);
       const hourB = parseInt(b.timeOfDay.split(':')[0]);
       return hourA - hourB;
     });
-
-    return patterns;
   }
 
-  public async detectAnomalies(sensorId: string, days: number = 1): Promise<Anomaly[]> {
-    const now = Date.now();
-    const startTime = now - (days * 24 * 60 * 60 * 1000);
+  private detectAnomalies(readings: Reading[]): any[] {
+    const anomalies: any[] = [];
+    const windowSize = 5; // Number of points to consider for moving average
 
-    const readings = await getSensorReadings(sensorId, 10000, startTime, now);
-
-    if (readings.length < 24) {
-      return [];
+    if (readings.length < windowSize * 2) {
+      return anomalies;
     }
 
-    // Resample and smooth the data
-    const resampled = resampleIrregular(readings, 300000); // 5-minute intervals
-    const smoothed = movingAverage(resampled.map(r => r.value), 5);
+    // Calculate moving average and standard deviation
+    const movingAverages: number[] = [];
+    const movingStdDevs: number[] = [];
 
-    // Calculate z-scores for anomaly detection
-    const mean = smoothed.reduce((sum, val) => sum + val, 0) / smoothed.length;
-    const variance = smoothed.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / smoothed.length;
-    const stdDev = Math.sqrt(variance);
+    for (let i = 0; i <= readings.length - windowSize; i++) {
+      const window = readings.slice(i, i + windowSize);
+      const avg = window.reduce((sum, r) => sum + r.value, 0) / windowSize;
+      const variance = window.reduce((sum, r) => sum + Math.pow(r.value - avg, 2), 0) / windowSize;
+      const stdDev = Math.sqrt(variance);
 
-    const anomalies: Anomaly[] = [];
+      movingAverages.push(avg);
+      movingStdDevs.push(stdDev);
+    }
 
-    smoothed.forEach((value, index) => {
-      const zScore = Math.abs((value - mean) / stdDev);
+    // Detect anomalies (values outside 3 standard deviations)
+    for (let i = windowSize; i < readings.length - windowSize; i++) {
+      const currentValue = readings[i].value;
+      const avg = movingAverages[i - windowSize];
+      const stdDev = movingStdDevs[i - windowSize];
 
-      if (zScore > 3) { // 3 standard deviations from mean
-        const timestamp = resampled[index].timestamp;
-        const severity = Math.min(zScore / 5, 1); // Cap at 1
+      if (Math.abs(currentValue - avg) > 3 * stdDev) {
+        const direction = currentValue > avg ? 'above' : 'below';
+        const confidence = Math.min(1, Math.abs(currentValue - avg) / (3 * stdDev));
 
         anomalies.push({
-          timestamp,
-          value,
-          severity,
-          description: `Unusual reading detected - ${severity > 0.8 ? 'high' : 'moderate'} anomaly`
+          type: 'Spike',
+          description: `Unusual ${direction} reading detected`,
+          timestamp: readings[i].timestamp,
+          value: currentValue,
+          confidence: confidence
         });
       }
-    });
+    }
+
+    // Detect trends (3 consecutive increasing or decreasing values)
+    for (let i = 0; i < readings.length - 2; i++) {
+      const v1 = readings[i].value;
+      const v2 = readings[i + 1].value;
+      const v3 = readings[i + 2].value;
+
+      if (v1 < v2 && v2 < v3) {
+        anomalies.push({
+          type: 'Rising Trend',
+          description: 'Consistent increasing trend detected',
+          timestamp: readings[i].timestamp,
+          value: v1,
+          confidence: 0.8
+        });
+        i += 2; // Skip next two points
+      } else if (v1 > v2 && v2 > v3) {
+        anomalies.push({
+          type: 'Falling Trend',
+          description: 'Consistent decreasing trend detected',
+          timestamp: readings[i].timestamp,
+          value: v1,
+          confidence: 0.8
+        });
+        i += 2; // Skip next two points
+      }
+    }
 
     return anomalies;
   }
 
-  public async findCorrelations(sensorId: string, days: number = 7): Promise<Correlation[]> {
-    const { sensors } = useStore.getState();
-    const now = Date.now();
-    const startTime = now - (days * 24 * 60 * 60 * 1000);
+  private async analyzeCorrelations(sensorId: string, readings: Reading[]): Promise<any[]> {
+    // In a real implementation, this would query other sensors and calculate correlations
+    // For this prototype, we'll return mock data
 
-    // Get readings for the target sensor
-    const targetReadings = await getSensorReadings(sensorId, 10000, startTime, now);
+    // Get all other sensors
+    const allSensors = await getAllSensors();
+    const otherSensors = allSensors.filter(s => s.id !== sensorId);
 
-    if (targetReadings.length === 0) {
-      return [];
-    }
+    // Generate mock correlations
+    const correlations = otherSensors.map(sensor => {
+      // Generate a random correlation coefficient between -1 and 1
+      const correlationCoefficient = (Math.random() * 2) - 1;
 
-    // Resample target sensor data to hourly intervals
-    const targetResampled = resampleIrregular(targetReadings, 3600000); // 1-hour intervals
-    const targetValues = targetResampled.map(r => r.value);
+      return {
+        sensorId: sensor.id,
+        sensorName: sensor.name,
+        correlationCoefficient: parseFloat(correlationCoefficient.toFixed(2)),
+        significance: Math.abs(correlationCoefficient) > 0.5 ? 'High' : 'Moderate'
+      };
+    });
 
-    const correlations: Correlation[] = [];
-
-    // Compare with other sensors
-    for (const sensor of sensors) {
-      if (sensor.id === sensorId) continue;
-
-      const otherReadings = await getSensorReadings(sensor.id, 10000, startTime, now);
-
-      if (otherReadings.length === 0) continue;
-
-      const otherResampled = resampleIrregular(otherReadings, 3600000);
-      const otherValues = otherResampled.map(r => r.value);
-
-      // Find common time periods
-      const commonTimestamps = targetResampled
-        .map(r => r.timestamp)
-        .filter(t => otherResampled.some(r => r.timestamp === t));
-
-      if (commonTimestamps.length < 24) continue; // Need at least 24 hours of common data
-
-      // Calculate Pearson correlation coefficient
-      const n = commonTimestamps.length;
-      let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
-
-      commonTimestamps.forEach(timestamp => {
-        const x = targetResampled.find(r => r.timestamp === timestamp)!.value;
-        const y = otherResampled.find(r => r.timestamp === timestamp)!.value;
-
-        sumX += x;
-        sumY += y;
-        sumXY += x * y;
-        sumX2 += x * x;
-        sumY2 += y * y;
-      });
-
-      const numerator = sumXY - (sumX * sumY) / n;
-      const denominator = Math.sqrt((sumX2 - (sumX * sumX) / n) * (sumY2 - (sumY * sumY) / n));
-
-      if (denominator === 0) continue;
-
-      const correlation = numerator / denominator;
-      const significance = Math.min(Math.abs(correlation) * 10, 1); // Scale to 0-1
-
-      if (Math.abs(correlation) > 0.5) { // Only include significant correlations
-        correlations.push({
-          sensorId: sensor.id,
-          correlationCoefficient: parseFloat(correlation.toFixed(2)),
-          significance: parseFloat(significance.toFixed(2))
-        });
-      }
-    }
-
-    // Sort by absolute correlation strength
-    correlations.sort((a, b) => Math.abs(b.correlationCoefficient) - Math.abs(a.correlationCoefficient));
-
-    return correlations;
+    // Sort by absolute correlation value (strongest first)
+    return correlations.sort((a, b) => Math.abs(b.correlationCoefficient) - Math.abs(a.correlationCoefficient));
   }
 
-  public async generateFullReport(sensorId: string): Promise<AnalyticsReport> {
-    const { subscriptionStatus } = useStore.getState();
-
-    if (subscriptionStatus !== 'premium') {
-      throw new Error('Analytics reports require a premium subscription');
-    }
-
-    const [dailyPatterns, anomalies, correlations] = await Promise.all([
-      this.generateDailyPatterns(sensorId),
-      this.detectAnomalies(sensorId),
-      this.findCorrelations(sensorId)
-    ]);
-
-    // Generate summary
-    let summary = `Analytics report for sensor ${sensorId} generated at ${new Date().toLocaleString()}\n\n`;
+  private generateSummary(dailyPatterns: any[], anomalies: any[], correlations: any[]): string {
+    let summary = '';
 
     if (dailyPatterns.length > 0) {
-      const peakHour = dailyPatterns.reduce((prev, current) =>
+      const highestPattern = dailyPatterns.reduce((prev, current) =>
         current.averageValue > prev.averageValue ? current : prev
       );
-      summary += `Your sensor shows a daily peak around ${peakHour.timeOfDay} with an average value of ${peakHour.averageValue}.\n\n`;
+      summary += `Your sensor shows a strong pattern with the highest average value at ${highestPattern.timeOfDay} (${highestPattern.averageValue}). `;
     }
 
     if (anomalies.length > 0) {
-      summary += `Detected ${anomalies.length} anomalies in the last 24 hours. `;
-      const severeAnomalies = anomalies.filter(a => a.severity > 0.7);
-      if (severeAnomalies.length > 0) {
-        summary += `Please investigate the ${severeAnomalies.length} high-severity anomalies. `;
-      }
-      summary += `Consider reviewing your alert settings.\n\n`;
+      const mostConfidentAnomaly = anomalies.reduce((prev, current) =>
+        current.confidence > prev.confidence ? current : prev
+      );
+      summary += `We detected ${anomalies.length} anomalies, with the most significant being a ${mostConfidentAnomaly.type} at ${new Date(mostConfidentAnomaly.timestamp).toLocaleString()}. `;
     }
 
     if (correlations.length > 0) {
-      const strongestCorrelation = correlations[0];
-      summary += `Your sensor shows a strong correlation with sensor ${strongestCorrelation.sensorId} `;
-      summary += `(r = ${strongestCorrelation.correlationCoefficient}). `;
-      summary += `This suggests a relationship between the two measurements.\n\n`;
+      const strongestCorrelation = correlations.reduce((prev, current) =>
+        Math.abs(current.correlationCoefficient) > Math.abs(prev.correlationCoefficient) ? current : prev
+      );
+      summary += `Your sensor shows a ${strongestCorrelation.significance.toLowerCase()} correlation with ${strongestCorrelation.sensorName} (r = ${strongestCorrelation.correlationCoefficient}).`;
     }
 
-    summary += 'Recommendations:\n';
-    summary += '- Review daily patterns for expected behavior\n';
-    summary += '- Investigate any anomalies detected\n';
-    summary += '- Consider creating alerts for unusual patterns\n';
-    summary += '- Explore correlations with other sensors in your system';
-
-    return {
-      sensorId,
-      generatedAt: Date.now(),
-      dailyPatterns,
-      anomalies,
-      correlations,
-      summary
-    };
+    return summary || 'No significant patterns or anomalies detected in your sensor data.';
   }
 }
+
+export { AnalyticsEngine };

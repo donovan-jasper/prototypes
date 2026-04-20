@@ -1,16 +1,16 @@
-import { AnalyticsEngine } from './engine';
+import { getSensorReadings } from '@/lib/storage/readings';
 import { getSensorById } from '@/lib/storage/sensors';
-import { generateCSV } from '@/lib/export/csv';
+import { AnalyticsEngine } from './engine';
 
 interface ReportOptions {
-  format: 'json' | 'csv' | 'pdf';
-  includePatterns: boolean;
-  includeAnomalies: boolean;
-  includeCorrelations: boolean;
-  timeRange: '24h' | '7d' | '30d';
+  format: 'csv' | 'json' | 'html';
+  includePatterns?: boolean;
+  includeAnomalies?: boolean;
+  includeCorrelations?: boolean;
+  timeRange?: '1h' | '6h' | '24h' | '7d' | '30d';
 }
 
-export class ReportGenerator {
+class ReportGenerator {
   private analyticsEngine: AnalyticsEngine;
 
   constructor() {
@@ -23,116 +23,195 @@ export class ReportGenerator {
       throw new Error('Sensor not found');
     }
 
-    const days = options.timeRange === '24h' ? 1 :
-                options.timeRange === '7d' ? 7 : 30;
+    const reportData = await this.analyticsEngine.generateFullReport(sensorId);
 
-    const reportData = {
-      sensorId: sensor.id,
-      sensorName: sensor.name,
-      sensorType: sensor.type,
-      generatedAt: new Date().toISOString(),
-      timeRange: options.timeRange,
-      patterns: options.includePatterns ? await this.analyticsEngine.generateDailyPatterns(sensorId, days) : [],
-      anomalies: options.includeAnomalies ? await this.analyticsEngine.detectAnomalies(sensorId, days) : [],
-      correlations: options.includeCorrelations ? await this.analyticsEngine.findCorrelations(sensorId, days) : []
-    };
-
-    if (options.format === 'json') {
-      return JSON.stringify(reportData, null, 2);
-    } else if (options.format === 'csv') {
-      return this.generateCSVReport(reportData);
-    } else {
-      // In a real app, this would generate a PDF
-      // For this prototype, we'll return a text representation
-      return this.generateTextReport(reportData);
+    switch (options.format) {
+      case 'csv':
+        return this.generateCSV(sensor, reportData, options);
+      case 'json':
+        return JSON.stringify(reportData, null, 2);
+      case 'html':
+        return this.generateHTML(sensor, reportData, options);
+      default:
+        throw new Error('Unsupported format');
     }
   }
 
-  private generateCSVReport(reportData: any): string {
-    let csvContent = '';
+  private async generateCSV(sensor: any, reportData: any, options: ReportOptions): Promise<string> {
+    let csvContent = `SensorSync Analytics Report\n`;
+    csvContent += `Sensor: ${sensor.name}, Type: ${sensor.type}\n`;
+    csvContent += `Generated: ${new Date(reportData.generatedAt).toLocaleString()}\n\n`;
 
-    // Add sensor info
-    csvContent += `Sensor ID,${reportData.sensorId}\n`;
-    csvContent += `Sensor Name,${reportData.sensorName}\n`;
-    csvContent += `Sensor Type,${reportData.sensorType}\n`;
-    csvContent += `Generated At,${reportData.generatedAt}\n`;
-    csvContent += `Time Range,${reportData.timeRange}\n\n`;
-
-    // Add patterns
-    if (reportData.patterns.length > 0) {
-      csvContent += 'Daily Patterns\n';
-      csvContent += 'Time of Day,Average Value,Standard Deviation\n';
-      reportData.patterns.forEach((pattern: any) => {
-        csvContent += `${pattern.timeOfDay},${pattern.averageValue},${pattern.standardDeviation}\n`;
+    if (options.includePatterns && reportData.dailyPatterns) {
+      csvContent += `Daily Patterns\n`;
+      csvContent += `Time of Day,Average Value,Sample Count\n`;
+      reportData.dailyPatterns.forEach((pattern: any) => {
+        csvContent += `${pattern.timeOfDay},${pattern.averageValue},${pattern.sampleCount}\n`;
       });
-      csvContent += '\n';
+      csvContent += `\n`;
     }
 
-    // Add anomalies
-    if (reportData.anomalies.length > 0) {
-      csvContent += 'Anomalies\n';
-      csvContent += 'Timestamp,Value,Severity,Description\n';
+    if (options.includeAnomalies && reportData.anomalies) {
+      csvContent += `Anomalies\n`;
+      csvContent += `Type,Description,Timestamp,Value,Confidence\n`;
       reportData.anomalies.forEach((anomaly: any) => {
-        csvContent += `${new Date(anomaly.timestamp).toISOString()},${anomaly.value},${anomaly.severity},${anomaly.description}\n`;
+        csvContent += `${anomaly.type},"${anomaly.description}",${new Date(anomaly.timestamp).toISOString()},${anomaly.value},${anomaly.confidence}\n`;
       });
-      csvContent += '\n';
+      csvContent += `\n`;
     }
 
-    // Add correlations
-    if (reportData.correlations.length > 0) {
-      csvContent += 'Correlations\n';
-      csvContent += 'Sensor ID,Correlation Coefficient,Significance\n';
+    if (options.includeCorrelations && reportData.correlations) {
+      csvContent += `Correlations\n`;
+      csvContent += `Sensor Name,Correlation Coefficient,Significance\n`;
       reportData.correlations.forEach((correlation: any) => {
-        csvContent += `${correlation.sensorId},${correlation.correlationCoefficient},${correlation.significance}\n`;
+        csvContent += `${correlation.sensorName},${correlation.correlationCoefficient},${correlation.significance}\n`;
       });
+      csvContent += `\n`;
     }
+
+    csvContent += `Summary\n`;
+    csvContent += `"${reportData.summary}"\n`;
 
     return csvContent;
   }
 
-  private generateTextReport(reportData: any): string {
-    let textContent = `SensorSync Analytics Report\n`;
-    textContent += `Generated: ${new Date(reportData.generatedAt).toLocaleString()}\n\n`;
+  private async generateHTML(sensor: any, reportData: any, options: ReportOptions): Promise<string> {
+    let htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>SensorSync Analytics Report</title>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+          h1 { color: #007AFF; }
+          h2 { color: #444; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+          th { background-color: #f2f2f2; }
+          .summary { background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 20px; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
+          .metadata { color: #666; font-size: 0.9em; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>SensorSync Analytics Report</h1>
+          <div class="metadata">
+            Generated: ${new Date(reportData.generatedAt).toLocaleString()}<br>
+            Sensor: ${sensor.name}<br>
+            Type: ${sensor.type}
+          </div>
+        </div>
+    `;
 
-    textContent += `Sensor Information\n`;
-    textContent += `------------------\n`;
-    textContent += `ID: ${reportData.sensorId}\n`;
-    textContent += `Name: ${reportData.sensorName}\n`;
-    textContent += `Type: ${reportData.sensorType}\n`;
-    textContent += `Time Range: ${reportData.timeRange}\n\n`;
+    if (options.includePatterns && reportData.dailyPatterns) {
+      htmlContent += `
+        <h2>Daily Patterns</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Time of Day</th>
+              <th>Average Value</th>
+              <th>Sample Count</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
 
-    if (reportData.patterns.length > 0) {
-      textContent += `Daily Patterns\n`;
-      textContent += `--------------\n`;
-      reportData.patterns.forEach((pattern: any) => {
-        textContent += `${pattern.timeOfDay}: Avg ${pattern.averageValue} (±${pattern.standardDeviation})\n`;
+      reportData.dailyPatterns.forEach((pattern: any) => {
+        htmlContent += `
+          <tr>
+            <td>${pattern.timeOfDay}</td>
+            <td>${pattern.averageValue}</td>
+            <td>${pattern.sampleCount}</td>
+          </tr>
+        `;
       });
-      textContent += '\n';
+
+      htmlContent += `
+          </tbody>
+        </table>
+      `;
     }
 
-    if (reportData.anomalies.length > 0) {
-      textContent += `Anomalies Detected\n`;
-      textContent += `------------------\n`;
+    if (options.includeAnomalies && reportData.anomalies) {
+      htmlContent += `
+        <h2>Anomalies</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Timestamp</th>
+              <th>Value</th>
+              <th>Confidence</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
       reportData.anomalies.forEach((anomaly: any) => {
-        const severity = anomaly.severity > 0.8 ? 'HIGH' :
-                        anomaly.severity > 0.5 ? 'MEDIUM' : 'LOW';
-        textContent += `${new Date(anomaly.timestamp).toLocaleString()}: `;
-        textContent += `${anomaly.value} (${severity} severity)\n`;
-        textContent += `  ${anomaly.description}\n`;
+        htmlContent += `
+          <tr>
+            <td>${anomaly.type}</td>
+            <td>${anomaly.description}</td>
+            <td>${new Date(anomaly.timestamp).toLocaleString()}</td>
+            <td>${anomaly.value}</td>
+            <td>${Math.round(anomaly.confidence * 100)}%</td>
+          </tr>
+        `;
       });
-      textContent += '\n';
+
+      htmlContent += `
+          </tbody>
+        </table>
+      `;
     }
 
-    if (reportData.correlations.length > 0) {
-      textContent += `Correlations with Other Sensors\n`;
-      textContent += `-------------------------------\n`;
+    if (options.includeCorrelations && reportData.correlations) {
+      htmlContent += `
+        <h2>Correlations</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>Sensor Name</th>
+              <th>Correlation Coefficient</th>
+              <th>Significance</th>
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
       reportData.correlations.forEach((correlation: any) => {
-        const strength = Math.abs(correlation.correlationCoefficient) > 0.8 ? 'STRONG' :
-                        Math.abs(correlation.correlationCoefficient) > 0.5 ? 'MODERATE' : 'WEAK';
-        textContent += `With ${correlation.sensorId}: ${strength} (r = ${correlation.correlationCoefficient})\n`;
+        htmlContent += `
+          <tr>
+            <td>${correlation.sensorName}</td>
+            <td>${correlation.correlationCoefficient}</td>
+            <td>${correlation.significance}</td>
+          </tr>
+        `;
       });
+
+      htmlContent += `
+          </tbody>
+        </table>
+      `;
     }
 
-    return textContent;
+    htmlContent += `
+      <h2>Summary</h2>
+      <div class="summary">
+        <p>${reportData.summary}</p>
+      </div>
+    `;
+
+    htmlContent += `
+      </body>
+      </html>
+    `;
+
+    return htmlContent;
   }
 }
+
+export { ReportGenerator };
