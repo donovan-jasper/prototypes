@@ -27,13 +27,30 @@ export async function projectMonthlyCost(
     };
   }
 
-  // Get AI projection
-  const { projectedCost, savingsOpportunities } = await getCostProjection(history, currentMonth);
+  try {
+    // Get AI projection
+    const { projectedCost, savingsOpportunities } = await getCostProjection(history, currentMonth);
 
-  return {
-    projectedCost,
-    savingsOpportunities
-  };
+    return {
+      projectedCost,
+      savingsOpportunities
+    };
+  } catch (error) {
+    console.error('Error getting cost projection:', error);
+    // Fallback logic using historical usage patterns
+    const totalCost = history.reduce((sum, entry) => sum + entry.cost, 0);
+    const averageDailyCost = totalCost / history.length;
+    const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
+
+    return {
+      projectedCost,
+      savingsOpportunities: [
+        'Consider switching to cheaper models for repetitive tasks',
+        'Review your usage patterns for unusually high costs',
+        'Set up budget alerts to stay within your spending limits'
+      ]
+    };
+  }
 }
 
 export function calculateSavings(
@@ -136,8 +153,13 @@ export async function getCostProjection(
     };
   } catch (error) {
     console.error('Error getting cost projection:', error);
+    // Fallback logic using historical usage patterns
+    const totalCost = usageHistory.reduce((sum, entry) => sum + entry.cost, 0);
+    const averageDailyCost = totalCost / usageHistory.length;
+    const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
+
     return {
-      projectedCost: usageHistory.reduce((sum, entry) => sum + entry.cost, 0) * (currentMonth ? 1 : 1.1),
+      projectedCost,
       savingsOpportunities: [
         'Consider switching to cheaper models for repetitive tasks',
         'Review your usage patterns for unusually high costs',
@@ -145,4 +167,22 @@ export async function getCostProjection(
       ]
     };
   }
+}
+
+export function getFallbackCostProjection(
+  usageHistory: Array<{ date: string; cost: number }>,
+  currentMonth: boolean = true
+): { projectedCost: number; savingsOpportunities: string[] } {
+  const totalCost = usageHistory.reduce((sum, entry) => sum + entry.cost, 0);
+  const averageDailyCost = totalCost / usageHistory.length;
+  const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
+
+  return {
+    projectedCost,
+    savingsOpportunities: [
+      'Consider switching to cheaper models for repetitive tasks',
+      'Review your usage patterns for unusually high costs',
+      'Set up budget alerts to stay within your spending limits'
+    ]
+  };
 }
