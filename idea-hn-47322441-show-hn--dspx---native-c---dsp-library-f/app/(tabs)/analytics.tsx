@@ -1,114 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Share, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useStore } from '@/store';
-import { AnalyticsEngine } from '@/lib/analytics/engine';
-import { ReportGenerator } from '@/lib/analytics/reportGenerator';
-import { LineChart, BarChart, PieChart } from 'react-native-chart-kit';
-import { Ionicons } from '@expo/vector-icons';
+import { LineChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 
 const screenWidth = Dimensions.get('window').width;
 
-const AnalyticsReportScreen = () => {
-  const [reports, setReports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+const AnalyticsScreen = () => {
+  const { sensors, generateAnalyticsReport } = useStore();
+  const [selectedSensor, setSelectedSensor] = useState(sensors[0]?.id || '');
+  const [report, setReport] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedSensor, setSelectedSensor] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'patterns' | 'anomalies' | 'correlations'>('patterns');
-  const { sensors, subscriptionStatus } = useStore();
   const navigation = useNavigation();
 
   useEffect(() => {
-    const generateReports = async () => {
-      try {
-        setLoading(true);
-        const analyticsEngine = AnalyticsEngine.getInstance();
-        const reportPromises = sensors.map(sensor =>
-          analyticsEngine.generateFullReport(sensor.id)
-        );
-        const generatedReports = await Promise.all(reportPromises);
-        setReports(generatedReports);
-        if (generatedReports.length > 0) {
-          setSelectedSensor(generatedReports[0].sensorId);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to generate reports');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    generateReports();
+    if (sensors.length > 0 && !selectedSensor) {
+      setSelectedSensor(sensors[0].id);
+    }
   }, [sensors]);
 
-  const handleShare = async () => {
+  const generateReport = async () => {
     if (!selectedSensor) return;
 
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const reportGenerator = new ReportGenerator();
-      const csvContent = await reportGenerator.generateReport(selectedSensor, {
-        format: 'csv',
-        includePatterns: true,
-        includeAnomalies: true,
-        includeCorrelations: true,
-        timeRange: '7d'
-      });
-
-      await Share.share({
-        message: 'SensorSync Analytics Report',
-        url: `data:text/csv;charset=utf-8,${encodeURIComponent(csvContent)}`,
-        title: 'Share Analytics Report'
-      });
+      const reportData = await generateAnalyticsReport(selectedSensor);
+      setReport(reportData);
     } catch (err) {
-      console.error('Error sharing report:', err);
+      setError(err instanceof Error ? err.message : 'Failed to generate report');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleUpgrade = () => {
-    navigation.navigate('settings');
-  };
+  const renderDailyPatternsChart = () => {
+    if (!report || !report.dailyPatterns || report.dailyPatterns.length === 0) return null;
 
-  if (loading) {
-    return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Analyzing your sensor data...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centerContainer}>
-        <Ionicons name="alert-circle-outline" size={48} color="#FF3B30" />
-        <Text style={styles.errorText}>{error}</Text>
-        {error.includes('premium') && subscriptionStatus === 'free' && (
-          <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
-            <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  }
-
-  if (reports.length === 0) {
-    return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>No analytics data available</Text>
-        <Text style={styles.subText}>Connect sensors to see insights</Text>
-      </View>
-    );
-  }
-
-  const currentReport = reports.find(r => r.sensorId === selectedSensor) || reports[0];
-
-  const renderPatternsChart = () => {
-    if (!currentReport.dailyPatterns || currentReport.dailyPatterns.length === 0) {
-      return <Text style={styles.noDataText}>No daily patterns detected</Text>;
-    }
-
-    const labels = currentReport.dailyPatterns.map((p: any) => p.timeOfDay);
-    const data = currentReport.dailyPatterns.map((p: any) => p.averageValue);
+    const labels = report.dailyPatterns.map((p: any) => p.timeOfDay);
+    const data = report.dailyPatterns.map((p: any) => p.averageValue);
 
     return (
       <View style={styles.chartContainer}>
@@ -119,13 +52,13 @@ const AnalyticsReportScreen = () => {
             datasets: [
               {
                 data: data,
-                color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+                color: (opacity = 1) => `rgba(134, 65, 244, ${opacity})`,
                 strokeWidth: 2
               }
             ],
             legend: ['Average Value']
           }}
-          width={screenWidth - 32}
+          width={screenWidth - 40}
           height={220}
           yAxisLabel=""
           yAxisSuffix=""
@@ -143,7 +76,7 @@ const AnalyticsReportScreen = () => {
             propsForDots: {
               r: '4',
               strokeWidth: '2',
-              stroke: '#007AFF'
+              stroke: '#ffa726'
             }
           }}
           bezier
@@ -152,83 +85,49 @@ const AnalyticsReportScreen = () => {
             borderRadius: 16
           }}
         />
-        <Text style={styles.chartDescription}>
-          Your sensor shows consistent patterns throughout the day. The chart displays the average value at each hour.
-        </Text>
       </View>
     );
   };
 
   const renderAnomaliesList = () => {
-    if (!currentReport.anomalies || currentReport.anomalies.length === 0) {
-      return <Text style={styles.noDataText}>No anomalies detected in the last 7 days</Text>;
-    }
+    if (!report || !report.anomalies || report.anomalies.length === 0) return null;
 
     return (
-      <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Detected Anomalies</Text>
-        {currentReport.anomalies.map((anomaly: any, index: number) => (
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Anomalies Detected</Text>
+        {report.anomalies.map((anomaly: any, index: number) => (
           <View key={index} style={styles.anomalyItem}>
-            <View style={styles.anomalyHeader}>
-              <Text style={styles.anomalyTitle}>{anomaly.type}</Text>
-              <Text style={styles.anomalyConfidence}>Confidence: {Math.round(anomaly.confidence * 100)}%</Text>
-            </View>
+            <Text style={styles.anomalyType}>{anomaly.type}</Text>
             <Text style={styles.anomalyDescription}>{anomaly.description}</Text>
-            <Text style={styles.anomalyTime}>{new Date(anomaly.timestamp).toLocaleString()}</Text>
+            <Text style={styles.anomalyDetails}>
+              {new Date(anomaly.timestamp).toLocaleString()} - Value: {anomaly.value}
+            </Text>
+            <Text style={styles.anomalyConfidence}>Confidence: {(anomaly.confidence * 100).toFixed(0)}%</Text>
           </View>
         ))}
       </View>
     );
   };
 
-  const renderCorrelationsChart = () => {
-    if (!currentReport.correlations || currentReport.correlations.length === 0) {
-      return <Text style={styles.noDataText}>No significant correlations detected</Text>;
-    }
-
-    const correlationData = currentReport.correlations.map((c: any) => ({
-      name: c.sensorName,
-      value: Math.abs(c.correlationCoefficient),
-      color: c.correlationCoefficient > 0 ? '#34C759' : '#FF3B30',
-      legendFontColor: '#7F8C8D',
-      legendFontSize: 12
-    }));
+  const renderCorrelationsList = () => {
+    if (!report || !report.correlations || report.correlations.length === 0) return null;
 
     return (
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Sensor Correlations</Text>
-        <PieChart
-          data={correlationData}
-          width={screenWidth - 32}
-          height={220}
-          chartConfig={{
-            backgroundColor: '#ffffff',
-            backgroundGradientFrom: '#ffffff',
-            backgroundGradientTo: '#ffffff',
-            decimalPlaces: 2,
-            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-            style: {
-              borderRadius: 16
-            },
-            propsForDots: {
-              r: '4',
-              strokeWidth: '2',
-              stroke: '#007AFF'
-            }
-          }}
-          accessor="value"
-          backgroundColor="transparent"
-          paddingLeft="15"
-          absolute
-          style={{
-            marginVertical: 8,
-            borderRadius: 16
-          }}
-        />
-        <Text style={styles.chartDescription}>
-          This chart shows how strongly your sensor correlates with other sensors in your system.
-        </Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Correlations with Other Sensors</Text>
+        {report.correlations.map((correlation: any, index: number) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.correlationItem}
+            onPress={() => navigation.navigate('sensor', { id: correlation.sensorId })}
+          >
+            <Text style={styles.correlationName}>{correlation.sensorName}</Text>
+            <Text style={styles.correlationDetails}>
+              Correlation: {correlation.correlationCoefficient} ({correlation.strength})
+            </Text>
+            <Text style={styles.correlationConfidence}>Confidence: {(correlation.confidence * 100).toFixed(0)}%</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
   };
@@ -237,74 +136,60 @@ const AnalyticsReportScreen = () => {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Analytics Dashboard</Text>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <Ionicons name="share-outline" size={24} color="#007AFF" />
+
+        <View style={styles.sensorSelector}>
+          <Text style={styles.label}>Select Sensor:</Text>
+          <View style={styles.pickerContainer}>
+            {sensors.map((sensor) => (
+              <TouchableOpacity
+                key={sensor.id}
+                style={[
+                  styles.pickerItem,
+                  selectedSensor === sensor.id && styles.selectedPickerItem
+                ]}
+                onPress={() => setSelectedSensor(sensor.id)}
+              >
+                <Text style={[
+                  styles.pickerText,
+                  selectedSensor === sensor.id && styles.selectedPickerText
+                ]}>
+                  {sensor.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.generateButton}
+          onPress={generateReport}
+          disabled={isLoading}
+        >
+          <Text style={styles.generateButtonText}>
+            {isLoading ? 'Generating...' : 'Generate Report'}
+          </Text>
         </TouchableOpacity>
+
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
 
-      <View style={styles.sensorSelector}>
-        <Text style={styles.sectionTitle}>Select Sensor</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {sensors.map(sensor => (
-            <TouchableOpacity
-              key={sensor.id}
-              style={[
-                styles.sensorButton,
-                selectedSensor === sensor.id && styles.selectedSensorButton
-              ]}
-              onPress={() => setSelectedSensor(sensor.id)}
-            >
-              <Text style={[
-                styles.sensorButtonText,
-                selectedSensor === sensor.id && styles.selectedSensorButtonText
-              ]}>
-                {sensor.name}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-      </View>
+      {isLoading && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Analyzing data...</Text>
+        </View>
+      )}
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, selectedTab === 'patterns' && styles.selectedTabButton]}
-          onPress={() => setSelectedTab('patterns')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'patterns' && styles.selectedTabButtonText
-          ]}>Patterns</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, selectedTab === 'anomalies' && styles.selectedTabButton]}
-          onPress={() => setSelectedTab('anomalies')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'anomalies' && styles.selectedTabButtonText
-          ]}>Anomalies</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, selectedTab === 'correlations' && styles.selectedTabButton]}
-          onPress={() => setSelectedTab('correlations')}
-        >
-          <Text style={[
-            styles.tabButtonText,
-            selectedTab === 'correlations' && styles.selectedTabButtonText
-          ]}>Correlations</Text>
-        </TouchableOpacity>
-      </View>
+      {report && (
+        <View style={styles.reportContainer}>
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryTitle}>Summary</Text>
+            <Text style={styles.summaryText}>{report.summary}</Text>
+          </View>
 
-      {selectedTab === 'patterns' && renderPatternsChart()}
-      {selectedTab === 'anomalies' && renderAnomaliesList()}
-      {selectedTab === 'correlations' && renderCorrelationsChart()}
-
-      {subscriptionStatus === 'free' && (
-        <View style={styles.premiumNotice}>
-          <Text style={styles.premiumText}>Upgrade to Premium for advanced analytics features</Text>
-          <TouchableOpacity style={styles.premiumButton} onPress={handleUpgrade}>
-            <Text style={styles.premiumButtonText}>Learn More</Text>
-          </TouchableOpacity>
+          {renderDailyPatternsChart()}
+          {renderAnomaliesList()}
+          {renderCorrelationsList()}
         </View>
       )}
     </ScrollView>
@@ -314,110 +199,113 @@ const AnalyticsReportScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
-    padding: 16,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
+    padding: 20,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1C1C1E',
-  },
-  shareButton: {
-    padding: 8,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6D6D72',
-  },
-  errorText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#FF3B30',
-    textAlign: 'center',
-  },
-  subText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#6D6D72',
-    textAlign: 'center',
-  },
-  upgradeButton: {
-    marginTop: 20,
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  upgradeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    marginBottom: 20,
+    color: '#333',
   },
   sensorSelector: {
     marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 12,
+  label: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#666',
   },
-  sensorButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 20,
-    marginRight: 8,
+  pickerContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  selectedSensorButton: {
-    backgroundColor: '#007AFF',
+  pickerItem: {
+    padding: 10,
+    marginRight: 10,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
   },
-  sensorButtonText: {
-    color: '#1C1C1E',
-    fontSize: 14,
+  selectedPickerItem: {
+    backgroundColor: '#6200ee',
+    borderColor: '#6200ee',
   },
-  selectedSensorButtonText: {
+  pickerText: {
+    color: '#333',
+  },
+  selectedPickerText: {
     color: 'white',
   },
-  tabContainer: {
-    flexDirection: 'row',
+  generateButton: {
+    backgroundColor: '#6200ee',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  generateButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  errorText: {
+    color: 'red',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  reportContainer: {
+    padding: 20,
+  },
+  summaryContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  summaryText: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#444',
+  },
+  section: {
     marginBottom: 20,
   },
-  tabButton: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-  },
-  selectedTabButton: {
-    borderBottomColor: '#007AFF',
-  },
-  tabButtonText: {
-    fontSize: 16,
-    color: '#6D6D72',
-  },
-  selectedTabButtonText: {
-    color: '#007AFF',
-    fontWeight: '600',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
   chartContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
+    padding: 15,
+    borderRadius: 10,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -426,85 +314,68 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
-  chartDescription: {
-    fontSize: 14,
-    color: '#6D6D72',
-    marginTop: 8,
-  },
-  listContainer: {
+  anomalyItem: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  anomalyItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  anomalyHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  anomalyTitle: {
+  anomalyType: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  anomalyConfidence: {
-    fontSize: 14,
-    color: '#6D6D72',
+    fontWeight: 'bold',
+    color: '#e64a19',
+    marginBottom: 5,
   },
   anomalyDescription: {
     fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 4,
+    color: '#444',
+    marginBottom: 5,
   },
-  anomalyTime: {
+  anomalyDetails: {
     fontSize: 12,
-    color: '#6D6D72',
+    color: '#666',
+    marginBottom: 5,
   },
-  noDataText: {
+  anomalyConfidence: {
+    fontSize: 12,
+    color: '#666',
+  },
+  correlationItem: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  correlationName: {
     fontSize: 16,
-    color: '#6D6D72',
-    textAlign: 'center',
-    padding: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
   },
-  premiumNotice: {
-    backgroundColor: '#F0F0F0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  premiumText: {
+  correlationDetails: {
     fontSize: 14,
-    color: '#1C1C1E',
-    marginBottom: 12,
-    textAlign: 'center',
+    color: '#444',
+    marginBottom: 5,
   },
-  premiumButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  premiumButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+  correlationConfidence: {
+    fontSize: 12,
+    color: '#666',
   },
 });
 
-export default AnalyticsReportScreen;
+export default AnalyticsScreen;

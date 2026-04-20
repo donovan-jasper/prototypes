@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { initDatabase, saveSensorReading, getSensorReadings } from '@/lib/storage/database';
+import { AnalyticsEngine } from '@/lib/analytics/engine';
 
 type Sensor = {
   id: string;
@@ -122,29 +123,14 @@ export const useStore = create<StoreState>()(
           throw new Error('Analytics reports require a premium subscription');
         }
 
-        // In a real implementation, this would call a backend service
-        // to generate and return analytics reports
-        return {
-          sensorId,
-          generatedAt: Date.now(),
-          insights: [
-            {
-              title: 'Daily Pattern Analysis',
-              description: 'Your sensor shows a consistent pattern with peaks at 8 AM and 8 PM',
-              confidence: 0.92
-            },
-            {
-              title: 'Anomaly Detection',
-              description: 'Unusual reading detected at 3:45 PM today - possible sensor issue',
-              confidence: 0.87
-            },
-            {
-              title: 'Correlation Analysis',
-              description: 'This sensor shows a strong correlation with your heart rate monitor',
-              confidence: 0.89
-            }
-          ]
-        };
+        try {
+          const analyticsEngine = AnalyticsEngine.getInstance();
+          const report = await analyticsEngine.generateFullReport(sensorId);
+          return report;
+        } catch (error) {
+          console.error('Failed to generate analytics report:', error);
+          throw error;
+        }
       }
     }),
     {

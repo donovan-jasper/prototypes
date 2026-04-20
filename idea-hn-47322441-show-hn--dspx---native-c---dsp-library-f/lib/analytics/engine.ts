@@ -1,4 +1,5 @@
 import { getSensorReadings } from '@/lib/storage/readings';
+import { getAllSensors } from '@/lib/storage/sensors';
 import { Sensor } from '@/types/sensor';
 import { Reading } from '@/types/reading';
 
@@ -143,55 +144,114 @@ class AnalyticsEngine {
   }
 
   private async analyzeCorrelations(sensorId: string, readings: Reading[]): Promise<any[]> {
-    // In a real implementation, this would query other sensors and calculate correlations
-    // For this prototype, we'll return mock data
-
     // Get all other sensors
     const allSensors = await getAllSensors();
     const otherSensors = allSensors.filter(s => s.id !== sensorId);
 
-    // Generate mock correlations
-    const correlations = otherSensors.map(sensor => {
-      // Generate a random correlation coefficient between -1 and 1
-      const correlationCoefficient = (Math.random() * 2) - 1;
+    // Generate correlations with other sensors
+    const correlations = [];
 
-      return {
-        sensorId: sensor.id,
-        sensorName: sensor.name,
-        correlationCoefficient: parseFloat(correlationCoefficient.toFixed(2)),
-        significance: Math.abs(correlationCoefficient) > 0.5 ? 'High' : 'Moderate'
-      };
-    });
+    for (const sensor of otherSensors) {
+      const otherReadings = await getSensorReadings(sensor.id, '7d');
 
-    // Sort by absolute correlation value (strongest first)
+      if (otherReadings.length > 0) {
+        // Find matching timestamps
+        const matchedPairs = readings
+          .filter(r1 => otherReadings.some(r2 => Math.abs(r1.timestamp - r2.timestamp) < 60000))
+          .map(r1 => {
+            const closest = otherReadings.reduce((prev, curr) =>
+              Math.abs(curr.timestamp - r1.timestamp) < Math.abs(prev.timestamp - r1.timestamp) ? curr : prev
+            );
+            return { x: r1.value, y: closest.value };
+          });
+
+        if (matchedPairs.length > 10) {
+          // Calculate Pearson correlation coefficient
+          const n = matchedPairs.length;
+          const sumX = matchedPairs.reduce((sum, p) => sum + p.x, 0);
+          const sumY = matchedPairs.reduce((sum, p) => sum + p.y, 0);
+          const sumXY = matchedPairs.reduce((sum, p) => sum + p.x * p.y, 0);
+          const sumX2 = matchedPairs.reduce((sum, p) => sum + p.x * p.x, 0);
+          const sumY2 = matchedPairs.reduce((sum, p) => sum + p.y * p.y, 0);
+
+          const numerator = sumXY - (sumX * sumY) / n;
+          const denominatorX = Math.sqrt(sumX2 - (sumX * sumX) / n);
+          const denominatorY = Math.sqrt(sumY2 - (sumY * sumY) / n);
+
+          if (denominatorX > 0 && denominatorY > 0) {
+            const r = numerator / (denominatorX * denominatorY);
+            const confidence = Math.min(1, Math.abs(r) * (matchedPairs.length / 100));
+
+            correlations.push({
+              sensorId: sensor.id,
+              sensorName: sensor.name,
+              correlationCoefficient: parseFloat(r.toFixed(3)),
+              confidence: parseFloat(confidence.toFixed(2)),
+              strength: this.getCorrelationStrength(r)
+            });
+          }
+        }
+      }
+    }
+
+    // Sort by strongest correlation
     return correlations.sort((a, b) => Math.abs(b.correlationCoefficient) - Math.abs(a.correlationCoefficient));
+  }
+
+  private getCorrelationStrength(r: number): string {
+    const absR = Math.abs(r);
+
+    if (absR >= 0.8) return 'Very Strong';
+    if (absR >= 0.6) return 'Strong';
+    if (absR >= 0.4) return 'Moderate';
+    if (absR >= 0.2) return 'Weak';
+    return 'Negligible';
   }
 
   private generateSummary(dailyPatterns: any[], anomalies: any[], correlations: any[]): string {
     let summary = '';
 
+    // Daily patterns summary
     if (dailyPatterns.length > 0) {
-      const highestPattern = dailyPatterns.reduce((prev, current) =>
-        current.averageValue > prev.averageValue ? current : prev
+      const highest = dailyPatterns.reduce((prev, curr) =>
+        curr.averageValue > prev.averageValue ? curr : prev
       );
-      summary += `Your sensor shows a strong pattern with the highest average value at ${highestPattern.timeOfDay} (${highestPattern.averageValue}). `;
+      const lowest = dailyPatterns.reduce((prev, curr) =>
+        curr.averageValue < prev.averageValue ? curr : prev
+      );
+
+      summary += `Your sensor shows consistent daily patterns with peaks around ${highest.timeOfDay} and troughs around ${lowest.timeOfDay}. `;
     }
 
+    // Anomalies summary
     if (anomalies.length > 0) {
-      const mostConfidentAnomaly = anomalies.reduce((prev, current) =>
-        current.confidence > prev.confidence ? current : prev
-      );
-      summary += `We detected ${anomalies.length} anomalies, with the most significant being a ${mostConfidentAnomaly.type} at ${new Date(mostConfidentAnomaly.timestamp).toLocaleString()}. `;
+      const spikeCount = anomalies.filter(a => a.type === 'Spike').length;
+      const trendCount = anomalies.filter(a => a.type.includes('Trend')).length;
+
+      if (spikeCount > 0) {
+        summary += `We detected ${spikeCount} unusual spikes in your data that may indicate sensor issues or external factors. `;
+      }
+
+      if (trendCount > 0) {
+        summary += `Your data shows ${trendCount} significant trends that may indicate changing conditions. `;
+      }
     }
 
+    // Correlations summary
     if (correlations.length > 0) {
-      const strongestCorrelation = correlations.reduce((prev, current) =>
-        Math.abs(current.correlationCoefficient) > Math.abs(prev.correlationCoefficient) ? current : prev
-      );
-      summary += `Your sensor shows a ${strongestCorrelation.significance.toLowerCase()} correlation with ${strongestCorrelation.sensorName} (r = ${strongestCorrelation.correlationCoefficient}).`;
+      const strongCorrelations = correlations.filter(c => c.strength === 'Strong' || c.strength === 'Very Strong');
+
+      if (strongCorrelations.length > 0) {
+        const firstCorrelation = strongCorrelations[0];
+        summary += `Your sensor shows a ${firstCorrelation.strength.toLowerCase()} correlation with ${firstCorrelation.sensorName} (r=${firstCorrelation.correlationCoefficient}). `;
+      }
     }
 
-    return summary || 'No significant patterns or anomalies detected in your sensor data.';
+    if (summary === '') {
+      summary = 'No significant patterns or anomalies detected in your sensor data.';
+    }
+
+    return summary;
   }
 }
 

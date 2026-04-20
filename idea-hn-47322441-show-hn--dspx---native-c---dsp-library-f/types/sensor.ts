@@ -5,13 +5,6 @@ export interface Sensor {
   connectionType: 'bluetooth' | 'wifi' | 'cloud';
   isConnected: boolean;
   lastUpdated: number;
-  sampleRate?: number;
-  unit?: string;
-  minValue?: number;
-  maxValue?: number;
-  batteryLevel?: number;
-  firmwareVersion?: string;
-  manufacturer?: string;
-  model?: string;
-  serialNumber?: string;
+  ownerEmail?: string;
+  sharedWith?: string;
 }
