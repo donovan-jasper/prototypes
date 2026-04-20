@@ -3,12 +3,15 @@ import { persist } from 'zustand/middleware';
 import { Email, Sender } from '../types';
 import { getSenders, getEmailsBySender, saveEmails, markEmailAsUnsubscribed, addToUnsubscribeQueue } from '../lib/database';
 import { classifyEmail, getAITags, calculateSenderStats } from '../lib/subscription-detector';
+import { EmailClient } from '../lib/email-client';
 
 interface EmailState {
   emails: Email[];
   senders: Sender[];
   isLoading: boolean;
   error: string | null;
+  emailClient: EmailClient | null;
+  setEmailClient: (client: EmailClient) => void;
   setEmails: (emails: Email[]) => void;
   setSenders: (senders: Sender[]) => void;
   loadSenders: () => Promise<void>;
@@ -25,6 +28,9 @@ export const useEmailStore = create<EmailState>()(
       senders: [],
       isLoading: false,
       error: null,
+      emailClient: null,
+
+      setEmailClient: (client) => set({ emailClient: client }),
 
       setEmails: (emails) => set({ emails }),
       setSenders: (senders) => set({ senders }),
@@ -54,70 +60,17 @@ export const useEmailStore = create<EmailState>()(
       scanInbox: async () => {
         try {
           set({ isLoading: true, error: null });
+          const client = get().emailClient;
 
-          // In a real app, this would connect to the email provider API
-          // For now, we'll simulate scanning emails
-          const mockEmails: Email[] = [
-            {
-              id: '1',
-              from: 'newsletter@amazon.com',
-              subject: 'Your weekly Amazon newsletter',
-              body: 'Check out our latest offers and deals...',
-              date: new Date(Date.now() - 86400000).toISOString(),
-              headers: {
-                'List-Unsubscribe': '<mailto:unsubscribe@amazon.com>'
-              },
-              classification: 'newsletter',
-              tags: ['unsubscribe-available']
-            },
-            {
-              id: '2',
-              from: 'support@netflix.com',
-              subject: 'Your Netflix account update',
-              body: 'Your subscription will renew on...',
-              date: new Date(Date.now() - 172800000).toISOString(),
-              headers: {
-                'X-Priority': '1'
-              },
-              classification: 'service-notification',
-              tags: []
-            },
-            {
-              id: '3',
-              from: 'orders@amazon.com',
-              subject: 'Your order #12345 has shipped',
-              body: 'Your package is on its way...',
-              date: new Date(Date.now() - 259200000).toISOString(),
-              headers: {},
-              classification: 'transactional',
-              tags: []
-            },
-            {
-              id: '4',
-              from: 'promo@bestbuy.com',
-              subject: 'Exclusive deal just for you!',
-              body: 'Click here to claim your discount...',
-              date: new Date(Date.now() - 345600000).toISOString(),
-              headers: {
-                'List-Unsubscribe': '<mailto:unsubscribe@bestbuy.com>'
-              },
-              classification: 'promotional',
-              tags: ['unsubscribe-available', 'urgent']
-            },
-            {
-              id: '5',
-              from: 'spam@fakepharmacy.com',
-              subject: 'VIAGRA - 100% GUARANTEED!',
-              body: 'Order now and get 50% off...',
-              date: new Date(Date.now() - 432000000).toISOString(),
-              headers: {},
-              classification: 'spam',
-              tags: ['tracking']
-            }
-          ];
+          if (!client) {
+            throw new Error('Email client not initialized');
+          }
+
+          // Fetch real emails from the provider
+          const emails = await client.fetchEmails(50);
 
           // Classify and tag emails
-          const classifiedEmails = await Promise.all(mockEmails.map(async email => ({
+          const classifiedEmails = await Promise.all(emails.map(async email => ({
             ...email,
             classification: await classifyEmail(email),
             tags: await getAITags(email)
@@ -131,7 +84,7 @@ export const useEmailStore = create<EmailState>()(
 
           // Convert to Sender objects
           const senders: Sender[] = Object.entries(senderStats).map(([domain, stats]) => ({
-            id: domain, // Using domain as ID for simplicity
+            id: domain,
             domain,
             name: domain,
             emailCount: stats.count,
@@ -150,43 +103,84 @@ export const useEmailStore = create<EmailState>()(
       unsubscribeFromSender: async (domain: string) => {
         try {
           set({ isLoading: true, error: null });
+          const client = get().emailClient;
+
+          if (!client) {
+            throw new Error('Email client not initialized');
+          }
 
           // Get all emails from this sender
           const emails = await getEmailsBySender(domain);
 
-          // For each email, add to unsubscribe queue
-          for (const email of emails) {
-            await addToUnsubscribeQueue(email.id, 'unsubscribe');
-            await markEmailAsUnsubscribed(email.id);
+          // Find the most recent email with unsubscribe info
+          const emailWithUnsubscribe = emails.find(email =>
+            email.headers['List-Unsubscribe'] ||
+            email.body.includes('unsubscribe') ||
+            email.body.includes('Unsubscribe')
+          );
+
+          if (!emailWithUnsubscribe) {
+            throw new Error('No unsubscribe information found for this sender');
           }
 
-          // Update sender stats
+          // Extract unsubscribe link
+          let unsubscribeLink = '';
+          if (emailWithUnsubscribe.headers['List-Unsubscribe']) {
+            // Parse List-Unsubscribe header
+            const header = emailWithUnsubscribe.headers['List-Unsubscribe'];
+            const match = header.match(/<([^>]+)>/);
+            if (match) {
+              unsubscribeLink = match[1];
+            }
+          } else {
+            // Try to find unsubscribe link in body
+            const body = emailWithUnsubscribe.body;
+            const linkMatch = body.match(/(https?:\/\/[^\s"']+)/);
+            if (linkMatch) {
+              unsubscribeLink = linkMatch[0];
+            }
+          }
+
+          if (!unsubscribeLink) {
+            throw new Error('Could not find unsubscribe link');
+          }
+
+          // Execute unsubscribe action
+          await client.executeUnsubscribe(unsubscribeLink);
+
+          // Mark emails as unsubscribed
+          await markEmailAsUnsubscribed(domain);
+
+          // Update state
           const updatedSenders = get().senders.map(sender =>
-            sender.domain === domain
-              ? { ...sender, emailCount: 0, classification: 'unsubscribed' }
-              : sender
+            sender.domain === domain ? { ...sender, unsubscribed: true } : sender
           );
 
           set({ senders: updatedSenders, isLoading: false });
         } catch (error) {
           set({ error: 'Failed to unsubscribe', isLoading: false });
           console.error('Failed to unsubscribe:', error);
+          throw error;
         }
       },
 
-      markEmailAsProcessed: (emailId: string) => {
-        set(state => ({
-          emails: state.emails.map(email =>
+      markEmailAsProcessed: async (emailId: string) => {
+        try {
+          await markEmailAsUnsubscribed(emailId);
+          const updatedEmails = get().emails.map(email =>
             email.id === emailId ? { ...email, processed: true } : email
-          )
-        }));
+          );
+          set({ emails: updatedEmails });
+        } catch (error) {
+          console.error('Failed to mark email as processed:', error);
+        }
       }
     }),
     {
       name: 'email-storage',
       partialize: (state) => ({
         senders: state.senders,
-        // Don't persist emails to avoid large storage
+        // Don't persist emails to save space
       }),
     }
   )

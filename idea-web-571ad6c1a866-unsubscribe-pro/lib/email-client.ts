@@ -9,11 +9,11 @@ WebBrowser.maybeCompleteAuthSession();
 
 const GMAIL_AUTH_URL = 'https://accounts.google.com/o/oauth2/auth';
 const GMAIL_TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+const GMAIL_SCOPES = 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.modify';
 
 const OUTLOOK_AUTH_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize';
 const OUTLOOK_TOKEN_URL = 'https://login.microsoftonline.com/common/oauth2/v2.0/token';
-const OUTLOOK_SCOPES = 'https://outlook.office.com/IMAP.AccessAsUser.All';
+const OUTLOOK_SCOPES = 'https://outlook.office.com/IMAP.AccessAsUser.All https://outlook.office.com/IMAP.FullAccess';
 
 interface OAuthConfig {
   authUrl: string;
@@ -28,8 +28,25 @@ export class EmailClient {
   private accessToken: string | null = null;
   private refreshToken: string | null = null;
   private emailProvider: 'gmail' | 'outlook' | 'other' = 'other';
+  private imapConfig: {
+    host: string;
+    port: number;
+    tls: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+  } | null = null;
 
-  constructor(provider: 'gmail' | 'outlook' | 'other', clientId: string) {
+  constructor(provider: 'gmail' | 'outlook' | 'other', clientId: string, imapConfig?: {
+    host: string;
+    port: number;
+    tls: boolean;
+    auth: {
+      user: string;
+      pass: string;
+    };
+  }) {
     this.emailProvider = provider;
 
     if (provider === 'gmail') {
@@ -63,10 +80,17 @@ export class EmailClient {
         redirectUri: '',
         scopes: '',
       };
+      if (imapConfig) {
+        this.imapConfig = imapConfig;
+      }
     }
   }
 
   async authenticate(): Promise<boolean> {
+    if (this.emailProvider === 'other' && !this.imapConfig) {
+      throw new Error('IMAP configuration required for other providers');
+    }
+
     if (this.emailProvider === 'other') {
       // For IMAP, we'll handle authentication separately
       return true;
@@ -94,7 +118,7 @@ export class EmailClient {
       return false;
     } catch (error) {
       console.error('Authentication error:', error);
-      return false;
+      throw error;
     }
   }
 
@@ -181,9 +205,13 @@ export class EmailClient {
           id: message.id,
           from: message.from?.emailAddress?.address || 'Unknown',
           subject: message.subject || '(No subject)',
-          body: message.body?.content || '',
+          body: message.bodyPreview || '',
           date: message.receivedDateTime,
-          headers: this.parseHeaders(message.internetMessageHeaders),
+          headers: {
+            'List-Unsubscribe': message.internetMessageHeaders?.find(
+              (h: any) => h.name === 'List-Unsubscribe'
+            )?.value || '',
+          },
           classification: 'unknown',
           tags: [],
         });
@@ -197,66 +225,48 @@ export class EmailClient {
   }
 
   private async fetchImapEmails(limit: number): Promise<Email[]> {
-    // This would require user to provide IMAP credentials
-    // For demo purposes, we'll return mock data
-    return [
-      {
-        id: '1',
-        from: 'newsletter@amazon.com',
-        subject: 'Your weekly Amazon newsletter',
-        body: 'Check out our latest offers and deals...',
-        date: new Date(Date.now() - 86400000).toISOString(),
-        headers: {
-          'List-Unsubscribe': '<mailto:unsubscribe@amazon.com>'
-        },
-        classification: 'newsletter',
-        tags: ['unsubscribe-available']
-      },
-      {
-        id: '2',
-        from: 'support@netflix.com',
-        subject: 'Your Netflix account update',
-        body: 'Your subscription will renew on...',
-        date: new Date(Date.now() - 172800000).toISOString(),
-        headers: {
-          'X-Priority': '1'
-        },
-        classification: 'service-notification',
-        tags: []
-      },
-      {
-        id: '3',
-        from: 'orders@amazon.com',
-        subject: 'Your order #12345 has shipped',
-        body: 'Your package is on its way...',
-        date: new Date(Date.now() - 259200000).toISOString(),
-        headers: {},
-        classification: 'transactional',
-        tags: []
-      },
-      {
-        id: '4',
-        from: 'promo@bestbuy.com',
-        subject: 'Exclusive deal just for you!',
-        body: 'Click here to claim your discount...',
-        date: new Date(Date.now() - 345600000).toISOString(),
-        headers: {
-          'List-Unsubscribe': '<mailto:unsubscribe@bestbuy.com>'
-        },
-        classification: 'promotional',
-        tags: ['unsubscribe-available', 'urgent']
-      },
-      {
-        id: '5',
-        from: 'spam@fakepharmacy.com',
-        subject: 'VIAGRA - 100% GUARANTEED!',
-        body: 'Order now and get 50% off...',
-        date: new Date(Date.now() - 432000000).toISOString(),
-        headers: {},
-        classification: 'spam',
-        tags: ['tracking']
+    if (!this.imapConfig) {
+      throw new Error('IMAP configuration not provided');
+    }
+
+    try {
+      const client = new IMAPClient(
+        this.imapConfig.host,
+        this.imapConfig.port,
+        {
+          auth: this.imapConfig.auth,
+          useSecureTransport: this.imapConfig.tls,
+        }
+      );
+
+      await client.connect();
+      await client.selectMailbox('INBOX');
+
+      const messages = await client.listMessages('INBOX', '1:*', ['uid', 'envelope', 'body[]']);
+      const emails: Email[] = [];
+
+      for (const message of messages.slice(0, limit)) {
+        const headers = this.parseImapHeaders(message.envelope);
+        const body = this.decodeImapBody(message['body[]']);
+
+        emails.push({
+          id: message.uid.toString(),
+          from: headers['From'] || 'Unknown',
+          subject: headers['Subject'] || '(No subject)',
+          body,
+          date: new Date(message.envelope.date).toISOString(),
+          headers,
+          classification: 'unknown',
+          tags: [],
+        });
       }
-    ];
+
+      await client.close();
+      return emails;
+    } catch (error) {
+      console.error('Error fetching IMAP emails:', error);
+      throw error;
+    }
   }
 
   private parseHeaders(headers: any[]): Record<string, string> {
@@ -267,66 +277,55 @@ export class EmailClient {
     return result;
   }
 
+  private parseImapHeaders(envelope: any): Record<string, string> {
+    return {
+      'From': envelope.from[0].address,
+      'Subject': envelope.subject,
+      'Date': envelope.date,
+    };
+  }
+
   private decodeBody(payload: any): string {
     if (payload.parts) {
       // Handle multipart messages
       for (const part of payload.parts) {
-        if (part.mimeType === 'text/plain' || part.mimeType === 'text/html') {
+        if (part.mimeType === 'text/plain') {
           return Buffer.from(part.body.data, 'base64').toString('utf-8');
         }
       }
     } else if (payload.body && payload.body.data) {
-      // Handle single part messages
+      // Handle simple messages
       return Buffer.from(payload.body.data, 'base64').toString('utf-8');
     }
     return '';
   }
 
-  async unsubscribe(email: Email): Promise<boolean> {
-    // Extract unsubscribe link from email headers or body
-    const unsubscribeLink = this.extractUnsubscribeLink(email);
-
-    if (!unsubscribeLink) {
-      console.log('No unsubscribe link found');
-      return false;
+  private decodeImapBody(body: any): string {
+    if (typeof body === 'string') {
+      return body;
+    } else if (body instanceof Buffer) {
+      return body.toString('utf-8');
+    } else if (body && body.data) {
+      return Buffer.from(body.data, 'base64').toString('utf-8');
     }
-
-    try {
-      // For demo purposes, we'll just log the action
-      console.log(`Unsubscribing from ${email.from} via ${unsubscribeLink}`);
-      return true;
-    } catch (error) {
-      console.error('Error during unsubscribe:', error);
-      return false;
-    }
+    return '';
   }
 
-  private extractUnsubscribeLink(email: Email): string | null {
-    // Check List-Unsubscribe header first
-    if (email.headers['List-Unsubscribe']) {
-      const match = email.headers['List-Unsubscribe'].match(/<([^>]+)>/);
-      if (match) return match[1];
-    }
-
-    // Check for common unsubscribe patterns in the body
-    const body = email.body.toLowerCase();
-    const unsubscribePatterns = [
-      /unsubscribe/i,
-      /click here to stop receiving/i,
-      /remove me from this list/i,
-      /opt-out/i,
-      /stop receiving/i
-    ];
-
-    for (const pattern of unsubscribePatterns) {
-      const match = body.match(pattern);
-      if (match) {
-        // In a real app, we would need to find the actual link near this text
-        // This is simplified for the demo
-        return `https://example.com/unsubscribe?email=${encodeURIComponent(email.from)}`;
+  async executeUnsubscribe(unsubscribeLink: string): Promise<void> {
+    try {
+      // For web-based unsubscribe links
+      if (unsubscribeLink.startsWith('http')) {
+        await WebBrowser.openAuthSessionAsync(unsubscribeLink, this.config.redirectUri);
       }
+      // For mailto: links
+      else if (unsubscribeLink.startsWith('mailto:')) {
+        // In a real app, we would open the user's email client
+        // with a pre-filled unsubscribe email
+        console.log('Would open email client to send unsubscribe request to:', unsubscribeLink);
+      }
+    } catch (error) {
+      console.error('Error executing unsubscribe:', error);
+      throw error;
     }
-
-    return null;
   }
 }
