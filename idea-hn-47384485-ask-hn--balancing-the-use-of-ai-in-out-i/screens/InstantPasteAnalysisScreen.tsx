@@ -13,6 +13,7 @@ const InstantPasteAnalysisScreen = () => {
   const [authenticityScore, setAuthenticityScore] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [model, setModel] = useState<any>(null);
+  const [isSaved, setIsSaved] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -41,6 +42,7 @@ const InstantPasteAnalysisScreen = () => {
     const clipboardText = await Clipboard.getStringAsync();
     if (clipboardText) {
       setText(clipboardText);
+      setIsSaved(false);
     } else {
       Alert.alert('Clipboard Empty', 'No text found in clipboard');
     }
@@ -58,27 +60,40 @@ const InstantPasteAnalysisScreen = () => {
     }
 
     setIsLoading(true);
+    setIsSaved(false);
     try {
       // Simulate model prediction for demo purposes
       // In a real app, you would use the actual model
       const simulatedScore = Math.random() * 100;
       setAuthenticityScore(simulatedScore);
-
-      // Save to database
-      db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO analyses (text, score) VALUES (?, ?)',
-          [text, simulatedScore],
-          (_, result) => console.log('Saved to database'),
-          (_, error) => console.error('Database error:', error)
-        );
-      });
     } catch (error) {
       console.error('Analysis error:', error);
       Alert.alert('Analysis Failed', 'There was an error analyzing the text. Please try again.');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const saveAnalysis = () => {
+    if (authenticityScore === null) {
+      Alert.alert('No Analysis', 'Please analyze text before saving');
+      return;
+    }
+
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO analyses (text, score) VALUES (?, ?)',
+        [text, authenticityScore],
+        (_, result) => {
+          setIsSaved(true);
+          Alert.alert('Saved', 'Analysis saved to your conversation history');
+        },
+        (_, error) => {
+          console.error('Database error:', error);
+          Alert.alert('Save Failed', 'There was an error saving the analysis');
+        }
+      );
+    });
   };
 
   const getStatusColor = () => {
@@ -118,17 +133,31 @@ const InstantPasteAnalysisScreen = () => {
         editable={!isLoading}
       />
 
-      <TouchableOpacity
-        style={[styles.analyzeButton, isLoading && styles.analyzeButtonDisabled]}
-        onPress={analyzeText}
-        disabled={isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.analyzeButtonText}>Analyze Authenticity</Text>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.analyzeButton, isLoading && styles.analyzeButtonDisabled]}
+          onPress={analyzeText}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="white" />
+          ) : (
+            <Text style={styles.analyzeButtonText}>Analyze Authenticity</Text>
+          )}
+        </TouchableOpacity>
+
+        {authenticityScore !== null && (
+          <TouchableOpacity
+            style={[styles.saveButton, isSaved && styles.saveButtonDisabled]}
+            onPress={saveAnalysis}
+            disabled={isSaved}
+          >
+            <Text style={styles.saveButtonText}>
+              {isSaved ? 'Saved' : 'Save Analysis'}
+            </Text>
+          </TouchableOpacity>
         )}
-      </TouchableOpacity>
+      </View>
 
       {authenticityScore !== null && (
         <View style={styles.resultContainer}>
@@ -146,11 +175,9 @@ const InstantPasteAnalysisScreen = () => {
           </View>
 
           <Text style={styles.explanationText}>
-            {authenticityScore > 80
-              ? 'This text appears to be written by a human with high confidence.'
-              : authenticityScore >= 50
-              ? 'This text shows characteristics of both human and AI writing.'
-              : 'This text appears to be AI-generated with high confidence.'}
+            {authenticityScore > 80 && "This text appears to be written by a human with high confidence."}
+            {authenticityScore >= 50 && authenticityScore <= 80 && "This text shows characteristics of both human and AI writing."}
+            {authenticityScore < 50 && "This text appears to be AI-generated with high confidence."}
           </Text>
         </View>
       )}
@@ -172,56 +199,72 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   clipboardButtonContainer: {
-    marginBottom: 20,
+    marginBottom: 15,
     alignItems: 'center',
   },
   clipboardButton: {
     backgroundColor: '#2196F3',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    padding: 12,
     borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
   },
   clipboardButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   textInput: {
     backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 8,
     padding: 15,
-    fontSize: 16,
-    minHeight: 150,
     marginBottom: 20,
+    minHeight: 150,
     textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   analyzeButton: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 15,
+    padding: 15,
     borderRadius: 8,
+    flex: 1,
+    marginRight: 10,
     alignItems: 'center',
-    marginBottom: 30,
   },
   analyzeButtonDisabled: {
-    backgroundColor: '#cccccc',
+    backgroundColor: '#A5D6A7',
   },
   analyzeButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#FF9800',
+    padding: 15,
+    borderRadius: 8,
+    flex: 1,
+    marginLeft: 10,
+    alignItems: 'center',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#FFCC80',
+  },
+  saveButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
   resultContainer: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginTop: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   scoreContainer: {
     flexDirection: 'row',
@@ -233,13 +276,12 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   scoreValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
   statusBadge: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+    padding: 8,
     borderRadius: 20,
     alignSelf: 'flex-start',
     marginBottom: 15,
@@ -250,7 +292,7 @@ const styles = StyleSheet.create({
   },
   scoreBarContainer: {
     height: 10,
-    backgroundColor: '#eee',
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
     marginBottom: 20,
     overflow: 'hidden',
