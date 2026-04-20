@@ -168,34 +168,39 @@ export class TimingEngine {
         cat => !categories.includes(cat)
       );
 
-      // Add 20% of additional categories to maintain diversity
+      // Add 20% of additional categories to maintain variety
       const varietyCount = Math.max(1, Math.floor(categories.length * 0.2));
       for (let i = 0; i < varietyCount && additionalCategories.length > 0; i++) {
         const randomIndex = Math.floor(Math.random() * additionalCategories.length);
         categories.push(additionalCategories[randomIndex]);
         additionalCategories.splice(randomIndex, 1);
       }
-    } else {
-      // If no preferences, use all categories
-      categories.push(...allCategories);
     }
 
     return categories;
   }
 
   private calculatePriority(hour: number, activeTimes: string[]): number {
+    // Higher priority for active times
     const activeHours = activeTimes.map(time => parseInt(time.split(':')[0]));
-    const isActiveTime = activeHours.includes(hour);
+    if (activeHours.includes(hour)) {
+      return 3;
+    }
 
-    // Priority is higher for active times and earlier in the day
-    return isActiveTime ? 100 - hour : 50 - hour;
+    // Medium priority for morning hours (7-11)
+    if (hour >= 7 && hour <= 11) {
+      return 2;
+    }
+
+    // Low priority for other times
+    return 1;
   }
 
   private isInQuietHours(hour: number, quietHours: { start: number, end: number }): boolean {
     if (quietHours.start < quietHours.end) {
       return hour >= quietHours.start && hour < quietHours.end;
     } else {
-      // Handle overnight quiet hours (e.g., 22:00-08:00)
+      // Handle overnight quiet hours (e.g., 22:00-07:00)
       return hour >= quietHours.start || hour < quietHours.end;
     }
   }

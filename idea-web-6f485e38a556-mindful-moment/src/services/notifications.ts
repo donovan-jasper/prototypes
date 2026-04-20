@@ -3,14 +3,14 @@ import { Platform } from 'react-native';
 import { useDatabase } from '../hooks/useDatabase';
 import { Moment } from '../types';
 import { TimingEngine } from './timing-engine';
+import { MomentsService } from './moments';
 
 export class NotificationService {
   private db: any;
   private userId: string;
 
   constructor(userId: string) {
-    const { db } = useDatabase();
-    this.db = db;
+    this.db = useDatabase();
     this.userId = userId;
     this.configureNotifications();
   }

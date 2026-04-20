@@ -1,12 +1,12 @@
 import { useDatabase } from '../hooks/useDatabase';
 import { Moment } from '../types';
+import { TimingEngine } from './timing-engine';
 
 export class MomentsService {
   private db: any;
 
   constructor() {
-    const { db } = useDatabase();
-    this.db = db;
+    this.db = useDatabase();
   }
 
   async getAllMoments(): Promise<Moment[]> {
@@ -17,8 +17,8 @@ export class MomentsService {
     return await this.db.getRandomMoment(category);
   }
 
-  async completeMoment(momentId: string, moodRating?: number): Promise<void> {
-    await this.db.completeMoment(momentId, moodRating);
+  async completeMoment(userId: string, momentId: string, moodRating?: number): Promise<void> {
+    await this.db.completeMoment(userId, momentId, moodRating);
   }
 
   async getTodayMoments(userId: string): Promise<Moment[]> {

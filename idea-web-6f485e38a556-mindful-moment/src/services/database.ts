@@ -176,7 +176,10 @@ export class DatabaseService {
               resolve(null);
             }
           },
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });
@@ -202,165 +205,10 @@ export class DatabaseService {
             patterns.lastEngagement ? patterns.lastEngagement.toISOString() : null
           ],
           () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async getAllMoments(): Promise<Moment[]> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM moments;',
-          [],
-          (_, { rows }) => {
-            const moments: Moment[] = [];
-            for (let i = 0; i < rows.length; i++) {
-              moments.push(rows.item(i));
-            }
-            resolve(moments);
-          },
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async getRandomMoment(category?: string): Promise<Moment | null> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        let query = 'SELECT * FROM moments';
-        const params: any[] = [];
-
-        if (category) {
-          query += ' WHERE category = ?';
-          params.push(category);
-        }
-
-        query += ' ORDER BY RANDOM() LIMIT 1;';
-
-        tx.executeSql(
-          query,
-          params,
-          (_, { rows }) => {
-            if (rows.length > 0) {
-              resolve(rows.item(0));
-            } else {
-              resolve(null);
-            }
-          },
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async completeMoment(momentId: string, moodRating?: number): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        // Insert completed moment
-        tx.executeSql(
-          'INSERT INTO completed_moments (user_id, moment_id, completed_at, mood_rating) VALUES (?, ?, ?, ?);',
-          ['user1', momentId, new Date().toISOString(), moodRating || null],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async getScheduledMomentsForToday(userId: string): Promise<Moment[]> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          `SELECT m.* FROM moments m
-           JOIN scheduled_moments sm ON m.id = sm.moment_id
-           WHERE sm.user_id = ? AND sm.scheduled_time >= ? AND sm.scheduled_time < ?;`,
-          [userId, today.toISOString(), tomorrow.toISOString()],
-          (_, { rows }) => {
-            const moments: Moment[] = [];
-            for (let i = 0; i < rows.length; i++) {
-              moments.push(rows.item(i));
-            }
-            resolve(moments);
-          },
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async clearScheduledMomentsForToday(userId: string): Promise<void> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'DELETE FROM scheduled_moments WHERE user_id = ? AND scheduled_time >= ? AND scheduled_time < ?;',
-          [userId, today.toISOString(), tomorrow.toISOString()],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async scheduleMomentForToday(userId: string, momentId: string, scheduledTime: Date): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO scheduled_moments (user_id, moment_id, scheduled_time) VALUES (?, ?, ?);',
-          [userId, momentId, scheduledTime.toISOString()],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async scheduleNotification(userId: string, notificationId: string, momentId: string, scheduledTime: Date): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'INSERT INTO notifications (id, user_id, moment_id, scheduled_time) VALUES (?, ?, ?, ?);',
-          [notificationId, userId, momentId, scheduledTime.toISOString()],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async logEngagedNotification(notificationId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'UPDATE notifications SET was_engaged = 1 WHERE id = ?;',
-          [notificationId],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      });
-    });
-  }
-
-  async logDismissedNotification(notificationId: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'UPDATE notifications SET was_sent = 1 WHERE id = ?;',
-          [notificationId],
-          () => resolve(),
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });
@@ -391,100 +239,250 @@ export class DatabaseService {
               resolve({
                 id: '',
                 userId,
-                quietHours: { start: 22, end: 8 },
+                quietHours: { start: 22, end: 7 }, // Default quiet hours 10pm-7am
                 preferredCategories: ['Calm', 'Focus', 'Energy'],
                 notificationStyle: 'gentle',
-                voiceType: 'calm'
+                voiceType: 'calm-female'
               });
             }
           },
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });
   }
 
-  async getCurrentStreak(userId: string): Promise<number> {
+  async getAllMoments(): Promise<Moment[]> {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
         tx.executeSql(
-          'SELECT current_streak FROM streaks WHERE user_id = ?;',
-          [userId],
+          'SELECT * FROM moments;',
+          [],
           (_, { rows }) => {
-            if (rows.length > 0) {
-              resolve(rows.item(0).current_streak);
-            } else {
-              resolve(0);
+            const moments: Moment[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              moments.push(rows.item(i));
             }
+            resolve(moments);
           },
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });
   }
 
-  async updateStreak(userId: string): Promise<number> {
+  async getRandomMoment(category?: string): Promise<Moment | null> {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
-        // Get last completed moment
+        let query = 'SELECT * FROM moments';
+        const params: any[] = [];
+
+        if (category) {
+          query += ' WHERE category = ?';
+          params.push(category);
+        }
+
+        query += ' ORDER BY RANDOM() LIMIT 1;';
+
         tx.executeSql(
-          'SELECT completed_at FROM completed_moments WHERE user_id = ? ORDER BY completed_at DESC LIMIT 1;',
-          [userId],
+          query,
+          params,
           (_, { rows }) => {
             if (rows.length > 0) {
-              const lastCompleted = new Date(rows.item(0).completed_at);
-              const today = new Date();
-              today.setHours(0, 0, 0, 0);
-
-              // Check if last completed was yesterday or today
-              if (lastCompleted >= today) {
-                // Update existing streak
-                tx.executeSql(
-                  `INSERT OR REPLACE INTO streaks
-                  (id, user_id, current_streak, last_completed)
-                  VALUES (
-                    (SELECT id FROM streaks WHERE user_id = ?),
-                    ?, COALESCE((SELECT current_streak FROM streaks WHERE user_id = ?), 0) + 1, ?
-                  );`,
-                  [userId, userId, userId, new Date().toISOString()],
-                  () => {
-                    // Get the updated streak
-                    tx.executeSql(
-                      'SELECT current_streak FROM streaks WHERE user_id = ?;',
-                      [userId],
-                      (_, { rows }) => {
-                        resolve(rows.item(0).current_streak);
-                      },
-                      (_, error) => reject(error)
-                    );
-                  },
-                  (_, error) => reject(error)
-                );
-              } else {
-                // Reset streak to 1
-                tx.executeSql(
-                  `INSERT OR REPLACE INTO streaks
-                  (id, user_id, current_streak, last_completed)
-                  VALUES (
-                    (SELECT id FROM streaks WHERE user_id = ?),
-                    ?, 1, ?
-                  );`,
-                  [userId, userId, new Date().toISOString()],
-                  () => resolve(1),
-                  (_, error) => reject(error)
-                );
-              }
+              resolve(rows.item(0));
             } else {
-              // First moment ever - start streak
-              tx.executeSql(
-                'INSERT INTO streaks (user_id, current_streak, last_completed) VALUES (?, 1, ?);',
-                [userId, new Date().toISOString()],
-                () => resolve(1),
-                (_, error) => reject(error)
-              );
+              resolve(null);
             }
           },
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async completeMoment(userId: string, momentId: string, moodRating?: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        // Insert completed moment
+        tx.executeSql(
+          'INSERT INTO completed_moments (user_id, moment_id, completed_at, mood_rating) VALUES (?, ?, ?, ?);',
+          [userId, momentId, new Date().toISOString(), moodRating || null],
+          () => {
+            // Update streak
+            this.updateStreak(userId, tx);
+            resolve();
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  private updateStreak(userId: string, tx: SQLite.SQLTransaction): void {
+    const today = new Date().toISOString().split('T')[0];
+
+    tx.executeSql(
+      'SELECT * FROM streaks WHERE user_id = ?;',
+      [userId],
+      (_, { rows }) => {
+        if (rows.length > 0) {
+          const streak = rows.item(0);
+          const lastCompletedDate = new Date(streak.last_completed).toISOString().split('T')[0];
+
+          if (lastCompletedDate === today) {
+            // Already completed today, no change
+            return;
+          }
+
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+          if (lastCompletedDate === yesterdayStr) {
+            // Increment streak
+            tx.executeSql(
+              'UPDATE streaks SET current_streak = current_streak + 1, last_completed = ? WHERE user_id = ?;',
+              [today, userId]
+            );
+          } else {
+            // Reset streak
+            tx.executeSql(
+              'UPDATE streaks SET current_streak = 1, last_completed = ? WHERE user_id = ?;',
+              [today, userId]
+            );
+          }
+        } else {
+          // Create new streak
+          tx.executeSql(
+            'INSERT INTO streaks (user_id, current_streak, last_completed) VALUES (?, 1, ?);',
+            [userId, today]
+          );
+        }
+      }
+    );
+  }
+
+  async getScheduledMomentsForToday(userId: string): Promise<Moment[]> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          `SELECT m.* FROM moments m
+           JOIN scheduled_moments sm ON m.id = sm.moment_id
+           WHERE sm.user_id = ? AND sm.scheduled_time >= ? AND sm.scheduled_time < ?;`,
+          [userId, today.toISOString(), tomorrow.toISOString()],
+          (_, { rows }) => {
+            const moments: Moment[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              moments.push(rows.item(i));
+            }
+            resolve(moments);
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async clearScheduledMomentsForToday(userId: string): Promise<void> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'DELETE FROM scheduled_moments WHERE user_id = ? AND scheduled_time >= ? AND scheduled_time < ?;',
+          [userId, today.toISOString(), tomorrow.toISOString()],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async scheduleMomentForToday(userId: string, momentId: string, scheduledTime: Date): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'INSERT INTO scheduled_moments (user_id, moment_id, scheduled_time) VALUES (?, ?, ?);',
+          [userId, momentId, scheduledTime.toISOString()],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async scheduleNotification(userId: string, notificationId: string, momentId: string, scheduledTime: Date): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'INSERT INTO notifications (id, user_id, moment_id, scheduled_time) VALUES (?, ?, ?, ?);',
+          [notificationId, userId, momentId, scheduledTime.toISOString()],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async logEngagedNotification(notificationId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'UPDATE notifications SET was_sent = 1, was_engaged = 1 WHERE id = ?;',
+          [notificationId],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async logDismissedNotification(notificationId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'UPDATE notifications SET was_sent = 1, was_engaged = 0 WHERE id = ?;',
+          [notificationId],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });
