@@ -62,9 +62,12 @@ const InstantPasteAnalysisScreen = () => {
     setIsLoading(true);
     setIsSaved(false);
     try {
-      // Simulate model prediction for demo purposes
-      // In a real app, you would use the actual model
-      const simulatedScore = Math.random() * 100;
+      // Simple heuristic analysis for demo purposes
+      const lengthScore = Math.min(100, text.length * 0.5);
+      const punctuationScore = (text.match(/[.,!?;:]/g) || []).length * 5;
+      const keywordScore = (text.match(/\b(hello|hi|thanks|please|sorry)\b/gi) || []).length * 10;
+
+      const simulatedScore = Math.min(100, lengthScore + punctuationScore + keywordScore);
       setAuthenticityScore(simulatedScore);
     } catch (error) {
       console.error('Analysis error:', error);
@@ -152,7 +155,9 @@ const InstantPasteAnalysisScreen = () => {
             onPress={saveAnalysis}
             disabled={isSaved}
           >
-            <Text style={styles.saveButtonText}>{isSaved ? 'Saved' : 'Save Analysis'}</Text>
+            <Text style={styles.saveButtonText}>
+              {isSaved ? 'Saved' : 'Save Analysis'}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -160,11 +165,18 @@ const InstantPasteAnalysisScreen = () => {
       {authenticityScore !== null && (
         <View style={styles.resultContainer}>
           <Text style={styles.resultTitle}>Authenticity Score</Text>
-          <View style={[styles.scoreIndicator, { backgroundColor: getStatusColor() }]}>
+          <View style={[styles.scoreCircle, { backgroundColor: getStatusColor() }]}>
             <Text style={styles.scoreText}>{Math.round(authenticityScore)}%</Text>
           </View>
           <Text style={[styles.statusText, { color: getStatusColor() }]}>
             {getStatusText()}
+          </Text>
+          <Text style={styles.explanationText}>
+            {authenticityScore > 80
+              ? 'This message appears to be human-written with high confidence.'
+              : authenticityScore >= 50
+              ? 'This message shows mixed characteristics of human and AI writing.'
+              : 'This message appears to be AI-generated with high probability.'}
           </Text>
         </View>
       )}
@@ -190,7 +202,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   clipboardButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#6200ee',
     padding: 15,
     borderRadius: 8,
     width: '100%',
@@ -198,6 +210,7 @@ const styles = StyleSheet.create({
   },
   clipboardButtonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   textInput: {
@@ -216,7 +229,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   analyzeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200ee',
     padding: 15,
     borderRadius: 8,
     flex: 1,
@@ -224,14 +237,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   analyzeButtonDisabled: {
-    backgroundColor: '#A5D6A7',
+    backgroundColor: '#9a7ed9',
   },
   analyzeButtonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   saveButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 8,
     flex: 1,
@@ -239,42 +253,54 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   saveButtonDisabled: {
-    backgroundColor: '#FFCC80',
+    backgroundColor: '#a5d6a7',
   },
   saveButtonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   resultContainer: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
+    marginTop: 20,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   resultTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
   },
-  scoreIndicator: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  scoreCircle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   scoreText: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
   },
   statusText: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  explanationText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
 });
 
