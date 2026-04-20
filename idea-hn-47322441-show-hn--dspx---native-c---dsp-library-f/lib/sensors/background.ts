@@ -4,6 +4,7 @@ import { evaluateAlert, getActiveAlerts, updateAlertLastTriggered } from '@/lib/
 import { triggerAlertNotification } from '@/lib/alerts/notifications';
 import { getLatestReadings } from '@/lib/storage/readings';
 import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
 
 const BACKGROUND_TASK_NAME = 'sensor-alert-monitor';
 
@@ -37,6 +38,8 @@ export const registerBackgroundTask = async () => {
 
         // For each alert, get the latest reading and evaluate
         for (const alert of alerts) {
+          if (!alert.isActive) continue;
+
           const latestReading = await getLatestReadings(alert.sensorId, 1);
 
           if (latestReading.length > 0) {
@@ -44,13 +47,20 @@ export const registerBackgroundTask = async () => {
             const shouldTrigger = evaluateAlert(alert, reading);
 
             if (shouldTrigger) {
-              // Trigger notification
-              await triggerAlertNotification(alert, reading);
+              // Check if we've already triggered this alert recently
+              const now = Date.now();
+              const lastTriggered = alert.lastTriggered ? new Date(alert.lastTriggered).getTime() : 0;
+              const cooldownPeriod = 300000; // 5 minutes cooldown
 
-              // Update alert last triggered time
-              const now = new Date().toISOString();
-              await updateAlertLastTriggered(alert.id, now);
-              alert.lastTriggered = now;
+              if (now - lastTriggered > cooldownPeriod) {
+                // Trigger notification
+                await triggerAlertNotification(alert, reading);
+
+                // Update alert last triggered time
+                const nowISO = new Date().toISOString();
+                await updateAlertLastTriggered(alert.id, nowISO);
+                alert.lastTriggered = nowISO;
+              }
             }
           }
         }

@@ -32,7 +32,42 @@ export const evaluateAlert = (alert: Alert, reading: SensorReading): boolean => 
     }
   }
 
-  // Add more alert types here as needed
+  // Disconnection alert
+  if (alert.type === 'disconnection') {
+    const now = Date.now();
+    const lastReadingTime = reading.timestamp;
+    const disconnectThreshold = alert.value || 30000; // Default 30 seconds
+
+    if (now - lastReadingTime > disconnectThreshold) {
+      return true;
+    }
+  }
+
+  // Battery low alert
+  if (alert.type === 'battery') {
+    const batteryLevel = reading.value;
+    const batteryThreshold = alert.value || 20; // Default 20%
+
+    if (batteryLevel < batteryThreshold) {
+      return true;
+    }
+  }
+
+  // Pattern detection (simple rising/falling)
+  if (alert.type === 'pattern') {
+    if (!reading.previousValue) return false;
+
+    const delta = reading.value - reading.previousValue;
+    const threshold = alert.value || 1; // Default 1 unit change
+
+    if (alert.condition === 'rising' && delta > threshold) {
+      return true;
+    }
+    if (alert.condition === 'falling' && delta < -threshold) {
+      return true;
+    }
+  }
+
   return false;
 };
 
@@ -48,6 +83,7 @@ export const getActiveAlerts = async (): Promise<Alert[]> => {
       condition: 'above',
       hysteresis: 5,
       lastTriggered: null,
+      isActive: true,
     },
     {
       id: '2',
@@ -57,6 +93,29 @@ export const getActiveAlerts = async (): Promise<Alert[]> => {
       condition: 'below',
       hysteresis: 2,
       lastTriggered: null,
+      isActive: true,
+    },
+    {
+      id: '3',
+      sensorId: 'sensor-1',
+      type: 'disconnection',
+      value: 30000, // 30 seconds
+      isActive: true,
+    },
+    {
+      id: '4',
+      sensorId: 'battery-sensor',
+      type: 'battery',
+      value: 20, // 20%
+      isActive: true,
+    },
+    {
+      id: '5',
+      sensorId: 'temperature-sensor',
+      type: 'pattern',
+      condition: 'rising',
+      value: 1, // 1°C change
+      isActive: true,
     },
   ];
 };
