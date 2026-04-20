@@ -8,9 +8,12 @@ class Terminal {
     this.historyIndex = -1;
     this.isAgentTyping = false;
     this.typingIndicator = null;
+    this.lastScrollPosition = 0;
+    this.isAtBottom = true;
 
     this.terminalInput.addEventListener('keydown', this.handleInput.bind(this));
     this.terminalInput.addEventListener('keyup', this.handleKeyUp.bind(this));
+    this.terminalOutput.addEventListener('scroll', this.handleScroll.bind(this));
 
     // Handle terminal resizing
     window.addEventListener('resize', this.handleResize.bind(this));
@@ -27,61 +30,147 @@ class Terminal {
     // Listen for initial messages and terminal history
     this.socket.on('message-history', (messages) => {
       messages.forEach(msg => {
-        this.appendOutput(msg.content, msg.role);
+        this.appendMessage(msg.content, msg.role);
       });
       this.scrollToBottom();
     });
 
     this.socket.on('terminal-history', (history) => {
       history.forEach(entry => {
-        this.appendOutput(`$ ${entry.command}\n`, 'command');
-        this.appendOutput(entry.output, 'terminal');
+        this.appendCommand(entry.command, entry.output);
       });
       this.scrollToBottom();
     });
 
     // Listen for streaming terminal output
     this.socket.on('terminal-output', (data) => {
-      this.appendOutput(data, 'terminal');
-      this.scrollToBottom();
+      this.appendTerminalOutput(data);
+      this.scrollToBottomIfAtBottom();
     });
 
     // Listen for streaming agent responses
     this.socket.on('message-chunk', (data) => {
       if (data.role === 'user') {
-        this.appendOutput(`> ${data.content}\n`, 'user');
+        this.appendMessage(data.content, 'user');
       } else if (data.role === 'assistant') {
         if (!this.isAgentTyping) {
           this.isAgentTyping = true;
-          this.typingIndicator = document.createElement('span');
-          this.typingIndicator.classList.add('typing-indicator');
-          this.typingIndicator.textContent = '...';
+          this.typingIndicator = document.createElement('div');
+          this.typingIndicator.classList.add('message-container', 'ai-message');
+          this.typingIndicator.innerHTML = `
+            <span class="message-icon">🤖</span>
+            <span class="message-content typing-indicator">...</span>
+          `;
           this.terminalOutput.appendChild(this.typingIndicator);
         }
-        // Remove typing indicator to append text
+
         if (this.typingIndicator && this.typingIndicator.parentNode) {
-          this.typingIndicator.parentNode.removeChild(this.typingIndicator);
+          const contentSpan = this.typingIndicator.querySelector('.message-content');
+          if (contentSpan) {
+            contentSpan.textContent = data.content;
+          }
         }
-        this.appendOutput(data.content, 'agent');
-        // Re-add typing indicator if not complete
-        if (!data.isComplete) {
-          this.terminalOutput.appendChild(this.typingIndicator);
-        } else {
+
+        if (data.isComplete) {
           this.isAgentTyping = false;
           this.typingIndicator = null;
-          this.appendOutput('\n', 'agent'); // Newline after agent response
         }
       }
-      this.scrollToBottom();
+      this.scrollToBottomIfAtBottom();
     });
 
     this.socket.on('error', (error) => {
-      this.appendOutput(`Error: ${error.message}\n`, 'error');
-      this.scrollToBottom();
+      this.appendError(error.message);
+      this.scrollToBottomIfAtBottom();
     });
 
     // Initial resize
     this.handleResize();
+  }
+
+  handleScroll() {
+    const scrollTop = this.terminalOutput.scrollTop;
+    const scrollHeight = this.terminalOutput.scrollHeight;
+    const clientHeight = this.terminalOutput.clientHeight;
+
+    this.isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
+    this.lastScrollPosition = scrollTop;
+  }
+
+  scrollToBottomIfAtBottom() {
+    if (this.isAtBottom) {
+      this.scrollToBottom();
+    }
+  }
+
+  appendMessage(content, role) {
+    const messageContainer = document.createElement('div');
+    messageContainer.classList.add('message-container');
+
+    let icon = '';
+    let messageClass = '';
+
+    switch(role) {
+      case 'user':
+        icon = '👤';
+        messageClass = 'user-message';
+        break;
+      case 'assistant':
+        icon = '🤖';
+        messageClass = 'ai-message';
+        break;
+      case 'system':
+        icon = '💻';
+        messageClass = 'system-message';
+        break;
+      default:
+        icon = 'ℹ️';
+        messageClass = 'system-message';
+    }
+
+    messageContainer.classList.add(messageClass);
+    messageContainer.innerHTML = `
+      <span class="message-icon">${icon}</span>
+      <span class="message-content">${content}</span>
+    `;
+
+    this.terminalOutput.appendChild(messageContainer);
+  }
+
+  appendCommand(command, output) {
+    const commandContainer = document.createElement('div');
+    commandContainer.classList.add('message-container', 'command-message');
+    commandContainer.innerHTML = `
+      <span class="message-icon">$</span>
+      <span class="message-content">
+        <span class="command">$ ${command}</span>
+        <span class="terminal-output">${output}</span>
+      </span>
+    `;
+
+    this.terminalOutput.appendChild(commandContainer);
+  }
+
+  appendTerminalOutput(output) {
+    const outputContainer = document.createElement('div');
+    outputContainer.classList.add('message-container', 'terminal-message');
+    outputContainer.innerHTML = `
+      <span class="message-icon">></span>
+      <span class="message-content terminal">${output}</span>
+    `;
+
+    this.terminalOutput.appendChild(outputContainer);
+  }
+
+  appendError(error) {
+    const errorContainer = document.createElement('div');
+    errorContainer.classList.add('message-container', 'error-message');
+    errorContainer.innerHTML = `
+      <span class="message-icon">⚠️</span>
+      <span class="message-content error">${error}</span>
+    `;
+
+    this.terminalOutput.appendChild(errorContainer);
   }
 
   handleInput(event) {
@@ -98,11 +187,11 @@ class Terminal {
           // It's a shell command
           const command = text.substring(2);
           this.executeCommand(command);
-          this.appendOutput(`$ ${command}\n`, 'command');
+          this.appendCommand(command, '');
         } else {
           // It's an AI message
           this.sendMessage(text);
-          // User message will be appended by the 'message-chunk' listener
+          this.appendMessage(text, 'user');
         }
       }
     } else if (event.key === 'ArrowUp') {
@@ -143,75 +232,40 @@ class Terminal {
     }
   }
 
-  sendMessage(prompt) {
+  sendMessage(text) {
     if (this.socket && this.sessionId) {
-      this.socket.emit('send-message', { sessionId: this.sessionId, message: prompt });
-    } else {
-      console.error('Socket or Session ID not initialized for sending message.');
+      this.socket.emit('send-message', {
+        sessionId: this.sessionId,
+        content: text,
+        role: 'user'
+      });
     }
   }
 
   executeCommand(command) {
     if (this.socket && this.sessionId) {
-      this.socket.emit('execute-command', { sessionId: this.sessionId, command });
-    } else {
-      console.error('Socket or Session ID not initialized for executing command.');
-    }
-  }
-
-  appendOutput(text, type = 'terminal') {
-    const span = document.createElement('span');
-    span.classList.add(type);
-    span.textContent = text;
-    this.terminalOutput.appendChild(span);
-    this.scrollToBottom();
-  }
-
-  clear() {
-    this.terminalOutput.innerHTML = '';
-    this.commandHistory = [];
-    this.historyIndex = -1;
-  }
-
-  scrollToBottom() {
-    this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight;
-  }
-
-  handleResize() {
-    if (!this.socket || !this.sessionId) return;
-
-    // Calculate cols and rows based on terminalOutput dimensions and font size
-    const charWidth = 8; // Approximate character width in pixels (adjust based on CSS)
-    const lineHeight = 18; // Approximate line height in pixels (adjust based on CSS)
-
-    const terminalWidth = this.terminalOutput.clientWidth;
-    const terminalHeight = this.terminalOutput.clientHeight;
-
-    const cols = Math.floor(terminalWidth / charWidth);
-    const rows = Math.floor(terminalHeight / lineHeight);
-
-    if (cols > 0 && rows > 0) {
-      this.socket.emit('resize-terminal', {
+      this.socket.emit('execute-command', {
         sessionId: this.sessionId,
-        cols,
-        rows
+        command: command
       });
     }
   }
 
-  destroy() {
-    // Clean up event listeners
-    this.terminalInput.removeEventListener('keydown', this.handleInput.bind(this));
-    this.terminalInput.removeEventListener('keyup', this.handleKeyUp.bind(this));
-    window.removeEventListener('resize', this.handleResize.bind(this));
+  clear() {
+    this.terminalOutput.innerHTML = '';
+  }
 
-    // Remove socket listeners
-    if (this.socket) {
-      this.socket.off('message-history');
-      this.socket.off('terminal-history');
-      this.socket.off('terminal-output');
-      this.socket.off('message-chunk');
-      this.socket.off('error');
-    }
+  scrollToBottom() {
+    this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight;
+    this.isAtBottom = true;
+  }
+
+  handleResize() {
+    // Adjust terminal height based on window size
+    const headerHeight = document.querySelector('.header')?.offsetHeight || 0;
+    const inputHeight = this.terminalInput.offsetHeight;
+    const availableHeight = window.innerHeight - headerHeight - inputHeight - 20; // 20px for margins
+
+    this.terminalOutput.style.height = `${availableHeight}px`;
   }
 }
