@@ -175,6 +175,10 @@ export class DatabaseService {
             } else {
               resolve(null);
             }
+          },
+          (_, error) => {
+            reject(error);
+            return false;
           }
         );
       });
@@ -185,8 +189,14 @@ export class DatabaseService {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
         tx.executeSql(
-          'INSERT OR REPLACE INTO user_patterns (user_id, active_times, ignored_times, preferred_categories, daily_moments, last_engagement) VALUES (?, ?, ?, ?, ?, ?);',
+          `INSERT OR REPLACE INTO user_patterns
+          (id, user_id, active_times, ignored_times, preferred_categories, daily_moments, last_engagement)
+          VALUES (
+            (SELECT id FROM user_patterns WHERE user_id = ?),
+            ?, ?, ?, ?, ?, ?
+          );`,
           [
+            userId,
             userId,
             JSON.stringify(patterns.activeTimes),
             JSON.stringify(patterns.ignoredTimes),
@@ -195,7 +205,112 @@ export class DatabaseService {
             patterns.lastEngagement ? patterns.lastEngagement.toISOString() : null
           ],
           () => resolve(),
-          (_, error) => reject(error)
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async getUserSettings(userId: string): Promise<UserSettings> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'SELECT * FROM settings WHERE user_id = ?;',
+          [userId],
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              const settings = rows.item(0);
+              resolve({
+                id: settings.id,
+                userId: settings.user_id,
+                quietHours: {
+                  start: settings.quiet_hours_start,
+                  end: settings.quiet_hours_end
+                },
+                preferredCategories: JSON.parse(settings.preferred_categories),
+                notificationStyle: settings.notification_style,
+                voiceType: settings.voice_type
+              });
+            } else {
+              // Return default settings if none exist
+              resolve({
+                id: '',
+                userId,
+                quietHours: { start: 22, end: 7 }, // Default quiet hours 10pm-7am
+                preferredCategories: ['Calm', 'Focus', 'Energy'],
+                notificationStyle: 'gentle',
+                voiceType: 'calm-female'
+              });
+            }
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async scheduleNotification(userId: string, notificationId: string, momentId: string, scheduledTime: Date): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          `INSERT INTO notifications
+          (id, user_id, moment_id, scheduled_time, was_sent, was_engaged)
+          VALUES (?, ?, ?, ?, ?, ?);`,
+          [
+            notificationId,
+            userId,
+            momentId,
+            scheduledTime.toISOString(),
+            0,
+            0
+          ],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async logEngagedNotification(notificationId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          `UPDATE notifications
+          SET was_sent = 1, was_engaged = 1
+          WHERE id = ?;`,
+          [notificationId],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      });
+    });
+  }
+
+  async logDismissedNotification(notificationId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          `UPDATE notifications
+          SET was_sent = 1, was_engaged = 0
+          WHERE id = ?;`,
+          [notificationId],
+          () => resolve(),
+          (_, error) => {
+            reject(error);
+            return false;
+          }
         );
       });
     });

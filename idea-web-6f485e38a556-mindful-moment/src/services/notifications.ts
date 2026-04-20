@@ -73,12 +73,20 @@ export class NotificationService {
     });
   }
 
-  async scheduleMomentNotification(moment: Moment, time: Date) {
+  async scheduleMomentNotification(moment: Moment, time: Date, settings: any): Promise<void> {
+    // Check if time is within quiet hours
+    if (this.isInQuietHours(time, settings.quietHours)) {
+      console.log('Notification time is within quiet hours, skipping');
+      return;
+    }
+
     const notificationId = `moment_${moment.id}_${time.getTime()}`;
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: `Your ${moment.category} moment is ready`,
+        title: settings.notificationStyle === 'direct' ?
+          `Time for your ${moment.category} moment` :
+          `A moment of ${moment.category} is waiting for you`,
         body: moment.title,
         sound: 'default',
         data: { momentId: moment.id, notificationId },
@@ -98,22 +106,24 @@ export class NotificationService {
     // Cancel existing notifications
     await this.cancelAllNotifications();
 
+    // Get user settings
+    const userSettings = await this.db.getUserSettings(this.userId);
+
     // Get today's moments
     const momentsService = new MomentsService();
     const moments = await momentsService.getTodayMoments(this.userId);
 
     // Get optimal windows from timing engine
     const timingEngine = new TimingEngine(this.userId);
-    const userSettings = await this.db.getUserSettings(this.userId);
     const optimalWindows = await timingEngine.calculateOptimalWindows(userSettings);
 
     // Schedule notifications for each moment in optimal windows
     for (let i = 0; i < moments.length && i < optimalWindows.length; i++) {
-      await this.scheduleMomentNotification(moments[i], optimalWindows[i].start);
+      await this.scheduleMomentNotification(moments[i], optimalWindows[i].start, userSettings);
     }
   }
 
-  async cancelAllNotifications() {
+  async cancelAllNotifications(): Promise<void> {
     await Notifications.cancelAllScheduledNotificationsAsync();
   }
 
@@ -125,5 +135,17 @@ export class NotificationService {
   async requestNotificationPermissions(): Promise<boolean> {
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
+  }
+
+  private isInQuietHours(time: Date, quietHours: { start: number, end: number }): boolean {
+    const hour = time.getHours();
+
+    if (quietHours.start < quietHours.end) {
+      // Quiet hours don't cross midnight
+      return hour >= quietHours.start && hour < quietHours.end;
+    } else {
+      // Quiet hours cross midnight
+      return hour >= quietHours.start || hour < quietHours.end;
+    }
   }
 }

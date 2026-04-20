@@ -164,23 +164,60 @@ export class TimingEngine {
 
     // Add some variety if we have preferred categories
     if (categories.length > 0) {
-      const additionalCategories = allCategories.filter(category => !categories.includes(category));
-      categories.push(...additionalCategories.slice(0, 2));
+      const additionalCategories = allCategories.filter(
+        cat => !categories.includes(cat)
+      );
+
+      // Add 20% of additional categories to maintain variety
+      const varietyCount = Math.max(1, Math.floor(categories.length * 0.2));
+      for (let i = 0; i < varietyCount && additionalCategories.length > 0; i++) {
+        const randomIndex = Math.floor(Math.random() * additionalCategories.length);
+        categories.push(additionalCategories[randomIndex]);
+        additionalCategories.splice(randomIndex, 1);
+      }
+    } else {
+      // If no preferred categories, use all categories
+      categories.push(...allCategories);
     }
 
     return categories;
   }
 
   private calculatePriority(hour: number, activeTimes: string[]): number {
-    const activeHour = activeTimes.includes(`${hour}:00`);
-    return activeHour ? 1 : 0;
+    let priority = 0;
+
+    // Higher priority for active times
+    if (activeTimes.includes(`${hour}:00`)) {
+      priority += 2;
+    }
+
+    // Higher priority for morning hours (7-11)
+    if (hour >= 7 && hour <= 11) {
+      priority += 1;
+    }
+
+    // Lower priority for late night (1-4)
+    if (hour >= 1 && hour <= 4) {
+      priority -= 1;
+    }
+
+    return priority;
   }
 
   private isInQuietHours(hour: number, quietHours: { start: number, end: number }): boolean {
-    return hour >= quietHours.start && hour < quietHours.end;
+    if (quietHours.start < quietHours.end) {
+      // Quiet hours don't cross midnight
+      return hour >= quietHours.start && hour < quietHours.end;
+    } else {
+      // Quiet hours cross midnight
+      return hour >= quietHours.start || hour < quietHours.end;
+    }
   }
 
   private isIgnoredTime(hour: number, ignoredTimes: string[]): boolean {
-    return ignoredTimes.includes(`${hour}:00`);
+    return ignoredTimes.some(time => {
+      const ignoredHour = parseInt(time.split(':')[0]);
+      return Math.abs(hour - ignoredHour) <= 1; // Consider times within 1 hour of ignored times
+    });
   }
 }
