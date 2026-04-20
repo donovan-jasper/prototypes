@@ -4,6 +4,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as tf from '@tensorflow/tfjs';
 import { loadLayersModel } from '@tensorflow/tfjs-react-native';
 import { useNavigation } from '@react-navigation/native';
+import * as SQLite from 'expo-sqlite';
+
+const db = SQLite.openDatabase('authentichat.db');
 
 const InstantPasteAnalysisScreen = () => {
   const [text, setText] = useState('');
@@ -13,6 +16,13 @@ const InstantPasteAnalysisScreen = () => {
   const navigation = useNavigation();
 
   useEffect(() => {
+    // Initialize database
+    db.transaction(tx => {
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS analyses (id INTEGER PRIMARY KEY AUTOINCREMENT, text TEXT, score REAL, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);'
+      );
+    });
+
     const loadModel = async () => {
       try {
         await tf.ready();
@@ -52,7 +62,18 @@ const InstantPasteAnalysisScreen = () => {
       const input = tf.tensor2d([text], [1, 1], 'string');
       const output = model.predict(input);
       const score = await output.data();
-      setAuthenticityScore(score[0] * 100); // Convert to percentage
+      const finalScore = score[0] * 100;
+      setAuthenticityScore(finalScore);
+
+      // Save to database
+      db.transaction(tx => {
+        tx.executeSql(
+          'INSERT INTO analyses (text, score) VALUES (?, ?)',
+          [text, finalScore],
+          (_, result) => console.log('Saved to database'),
+          (_, error) => console.error('Database error:', error)
+        );
+      });
     } catch (error) {
       console.error('Analysis error:', error);
       Alert.alert('Analysis Failed', 'There was an error analyzing the text. Please try again.');
@@ -122,7 +143,7 @@ const InstantPasteAnalysisScreen = () => {
           </View>
 
           <View style={styles.scoreBarContainer}>
-            <View style={[styles.scoreBar, { width: `${authenticityScore}%` }]} />
+            <View style={[styles.scoreBar, { width: `${authenticityScore}%`, backgroundColor: getStatusColor() }]} />
           </View>
         </View>
       )}
@@ -168,8 +189,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   analyzeButton: {
-    backgroundColor: '#ff6347',
-    padding: 15,
+    backgroundColor: '#4a90e2',
+    paddingVertical: 15,
     borderRadius: 5,
     alignItems: 'center',
     marginBottom: 20,
@@ -183,12 +204,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   resultContainer: {
-    marginTop: 10,
+    marginTop: 20,
     padding: 15,
     backgroundColor: 'white',
     borderRadius: 5,
-    borderColor: '#ddd',
     borderWidth: 1,
+    borderColor: '#ddd',
   },
   scoreContainer: {
     flexDirection: 'row',
@@ -200,7 +221,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   scoreValue: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -209,7 +230,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     borderRadius: 20,
     alignSelf: 'flex-start',
-    marginBottom: 15,
+    marginBottom: 10,
   },
   statusBadgeText: {
     color: 'white',
@@ -223,7 +244,6 @@ const styles = StyleSheet.create({
   },
   scoreBar: {
     height: '100%',
-    backgroundColor: '#4CAF50',
     borderRadius: 5,
   },
 });
