@@ -4,6 +4,9 @@ import { Email, Sender } from '../types';
 import { getSenders, getEmailsBySender, saveEmails, markEmailAsUnsubscribed, addToUnsubscribeQueue } from '../lib/database';
 import { classifyEmail, getAITags, calculateSenderStats } from '../lib/subscription-detector';
 import { EmailClient } from '../lib/email-client';
+import * as Linking from 'expo-linking';
+import * as Haptics from 'expo-haptics';
+import { Alert } from 'react-native';
 
 interface EmailState {
   emails: Email[];
@@ -145,22 +148,67 @@ export const useEmailStore = create<EmailState>()(
             throw new Error('Could not find unsubscribe link');
           }
 
-          // Execute unsubscribe action
-          await client.executeUnsubscribe(unsubscribeLink);
+          // Execute unsubscribe link via email client
+          try {
+            await Linking.openURL(unsubscribeLink);
 
-          // Mark emails as unsubscribed
-          await markEmailAsUnsubscribed(domain);
+            // Mark emails as unsubscribed in database
+            await markEmailAsUnsubscribed(domain);
 
-          // Update state
-          const updatedSenders = get().senders.map(sender =>
-            sender.domain === domain ? { ...sender, unsubscribed: true } : sender
+            // Update sender stats
+            const updatedSenders = get().senders.map(sender =>
+              sender.domain === domain
+                ? { ...sender, emailCount: 0, unsubscribed: true }
+                : sender
+            );
+            set({ senders: updatedSenders });
+
+            // Show success feedback
+            Alert.alert(
+              'Success',
+              'You have been unsubscribed from this sender',
+              [{ text: 'OK' }]
+            );
+
+            // Trigger haptic feedback
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+          } catch (error) {
+            console.error('Error opening unsubscribe link:', error);
+
+            // If offline, add to queue
+            if (error.message.includes('Network request failed')) {
+              await addToUnsubscribeQueue({
+                emailId: emailWithUnsubscribe.id,
+                domain,
+                actionType: 'unsubscribe',
+                status: 'pending'
+              });
+
+              Alert.alert(
+                'Offline',
+                'Action saved for when you\'re back online',
+                [{ text: 'OK' }]
+              );
+            } else {
+              throw error;
+            }
+          }
+
+          set({ isLoading: false });
+        } catch (error) {
+          set({ error: error.message || 'Failed to unsubscribe', isLoading: false });
+          console.error('Unsubscribe error:', error);
+
+          // Show error feedback
+          Alert.alert(
+            'Error',
+            error.message || 'Failed to unsubscribe',
+            [{ text: 'OK' }]
           );
 
-          set({ senders: updatedSenders, isLoading: false });
-        } catch (error) {
-          set({ error: 'Failed to unsubscribe', isLoading: false });
-          console.error('Failed to unsubscribe:', error);
-          throw error;
+          // Trigger haptic feedback for error
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
       },
 
@@ -178,10 +226,7 @@ export const useEmailStore = create<EmailState>()(
     }),
     {
       name: 'email-storage',
-      partialize: (state) => ({
-        senders: state.senders,
-        // Don't persist emails to save space
-      }),
+      getStorage: () => require('expo-secure-store').default,
     }
   )
 );
