@@ -1,0 +1,57 @@
+[
+  {
+    "id": "gpt-4-turbo",
+    "name": "GPT-4 Turbo",
+    "provider": "OpenAI",
+    "inputCostPer1k": 0.01,
+    "outputCostPer1k": 0.03,
+    "qualityScore": 95,
+    "speedRating": "medium",
+    "capabilities": ["text_generation", "code_generation", "chat", "summarization"],
+    "contextWindow": 128000
+  },
+  {
+    "id": "gpt-3.5-turbo",
+    "name": "GPT-3.5 Turbo",
+    "provider": "OpenAI",
+    "inputCostPer1k": 0.0005,
+    "outputCostPer1k": 0.0015,
+    "qualityScore": 80,
+    "speedRating": "fast",
+    "capabilities": ["text_generation", "code_generation", "chat", "summarization"],
+    "contextWindow": 16385
+  },
+  {
+    "id": "claude-3-opus",
+    "name": "Claude 3 Opus",
+    "provider": "Anthropic",
+    "inputCostPer1k": 0.015,
+    "outputCostPer1k": 0.075,
+    "qualityScore": 98,
+    "speedRating": "slow",
+    "capabilities": ["text_generation", "code_generation", "chat", "summarization"],
+    "contextWindow": 200000
+  },
+  {
+    "id": "claude-3-sonnet",
+    "name": "Claude 3 Sonnet",
+    "provider": "Anthropic",
+    "inputCostPer1k": 0.003,
+    "outputCostPer1k": 0.015,
+    "qualityScore": 90,
+    "speedRating": "medium",
+    "capabilities": ["text_generation", "code_generation", "chat", "summarization"],
+    "contextWindow": 200000
+  },
+  {
+    "id": "gemini-pro",
+    "name": "Gemini Pro",
+    "provider": "Google",
+    "inputCostPer1k": 0.00025,
+    "outputCostPer1k": 0.0005,
+    "qualityScore": 82,
+    "speedRating": "fast",
+    "capabilities": ["text_generation", "chat", "summarization"],
+    "contextWindow": 32000
+  }
+]

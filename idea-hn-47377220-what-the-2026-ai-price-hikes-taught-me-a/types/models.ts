@@ -41,13 +41,3 @@ export interface UsageEntry {
   cost: number;
   timestamp: number;
 }
-
-export interface CostProjection {
-  projectedCost: number;
-  savingsOpportunities: string[];
-}
-
-export interface AIRecommendation {
-  recommendation: string;
-  confidence: number;
-}
