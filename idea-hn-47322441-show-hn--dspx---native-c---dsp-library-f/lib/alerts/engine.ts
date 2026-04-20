@@ -60,3 +60,8 @@ export const getActiveAlerts = async (): Promise<Alert[]> => {
     },
   ];
 };
+
+export const updateAlertLastTriggered = async (alertId: string, timestamp: string) => {
+  // In a real app, this would update the database
+  console.log(`Updated alert ${alertId} last triggered to ${timestamp}`);
+};

@@ -35,3 +35,11 @@ export const triggerAlertNotification = async (alert: Alert, reading: SensorRead
     trigger: null, // Show immediately
   });
 };
+
+export const handleNotificationResponse = async (response: Notifications.NotificationResponse) => {
+  const { alertId, sensorId } = response.notification.request.content.data;
+
+  // Navigate to the sensor detail screen
+  // In a real app, this would use navigation
+  console.log(`Notification tapped for alert ${alertId} and sensor ${sensorId}`);
+};

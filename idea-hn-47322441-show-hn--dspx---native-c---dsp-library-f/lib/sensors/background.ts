@@ -1,8 +1,9 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Battery from 'expo-battery';
-import { evaluateAlert, getActiveAlerts } from '@/lib/alerts/engine';
+import { evaluateAlert, getActiveAlerts, updateAlertLastTriggered } from '@/lib/alerts/engine';
 import { triggerAlertNotification } from '@/lib/alerts/notifications';
 import { getLatestReadings } from '@/lib/storage/readings';
+import * as Notifications from 'expo-notifications';
 
 const BACKGROUND_TASK_NAME = 'sensor-alert-monitor';
 
@@ -47,7 +48,9 @@ export const registerBackgroundTask = async () => {
               await triggerAlertNotification(alert, reading);
 
               // Update alert last triggered time
-              alert.lastTriggered = new Date().toISOString();
+              const now = new Date().toISOString();
+              await updateAlertLastTriggered(alert.id, now);
+              alert.lastTriggered = now;
             }
           }
         }
