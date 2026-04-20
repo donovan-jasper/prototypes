@@ -155,15 +155,20 @@ module.exports = (io) => {
 
       try {
         if (!activeSessions.has(sessionId)) {
-          socket.emit('error', { message: 'Session not active' });
+          socket.emit('error', { message: 'Terminal session not initialized' });
           return;
         }
 
         const session = activeSessions.get(sessionId);
-        session.pty.write(command + '\r');
+        const ptyProcess = session.pty;
 
-        // Save command to terminal history
+        // Save command to history
         await saveTerminalHistory(sessionId, command, '');
+
+        // Write command to pty
+        ptyProcess.write(command + '\r');
+
+        // The pty's onData handler will emit the output to all clients
 
       } catch (error) {
         console.error('Error in execute-command:', error);
@@ -171,16 +176,27 @@ module.exports = (io) => {
       }
     });
 
+    socket.on('resize-terminal', ({ sessionId, cols, rows }) => {
+      if (!sessionId || !cols || !rows) {
+        console.error('resize-terminal event received with missing data.');
+        return;
+      }
+
+      if (activeSessions.has(sessionId)) {
+        const session = activeSessions.get(sessionId);
+        session.pty.resize(cols, rows);
+      }
+    });
+
     socket.on('disconnect', () => {
       console.log(`Socket disconnected: ${socket.id}`);
-
       if (currentSessionId && activeSessions.has(currentSessionId)) {
         const session = activeSessions.get(currentSessionId);
         session.clients.delete(socket.id);
 
-        // If no more clients in session, clean up
+        // If no more clients in this session, clean up
         if (session.clients.size === 0) {
-          console.log(`No more clients in session ${currentSessionId}, cleaning up`);
+          console.log(`No more clients in session ${currentSessionId}, cleaning up PTY`);
           session.pty.kill();
           activeSessions.delete(currentSessionId);
         }

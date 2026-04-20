@@ -18,6 +18,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const createSessionForm = document.getElementById('create-session-form');
   const closeModalBtn = document.querySelector('.close-button');
   const deleteSessionBtn = document.getElementById('delete-session-btn');
+  const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+  const sidebar = document.querySelector('.sidebar');
+  const editorContainer = document.querySelector('.editor-container');
 
   // --- Session Management ---
   async function populateSessions() {
@@ -118,6 +121,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // --- Mobile Menu Toggle ---
+  mobileMenuBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('active');
+    editorContainer.classList.toggle('active');
+  });
+
   // --- Socket.IO Event Handling ---
   socket.on('connect', () => {
     console.log('Connected to WebSocket server');
@@ -130,6 +139,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   socket.on('disconnect', () => {
     console.log('Disconnected from WebSocket server');
+    terminal.appendOutput('Disconnected from server. Attempting to reconnect...\n', 'error');
   });
 
   socket.on('error', (error) => {
@@ -139,4 +149,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize the app
   populateSessions();
+
+  // Clean up when page is unloaded
+  window.addEventListener('beforeunload', () => {
+    terminal.destroy();
+    fileManager.destroy();
+  });
 });

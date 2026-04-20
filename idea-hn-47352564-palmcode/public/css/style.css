@@ -1,0 +1,384 @@
+:root {
+  --bg-color: #1e1e1e;
+  --text-color: #d4d4d4;
+  --primary-color: #4CAF50;
+  --secondary-color: #2196F3;
+  --error-color: #f44336;
+  --command-color: #FFC107;
+  --agent-color: #9C27B0;
+  --terminal-bg: #2d2d2d;
+  --border-color: #3a3a3a;
+  --sidebar-width: 25%;
+  --editor-width: 25%;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background-color: var(--bg-color);
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header h1 {
+  color: var(--primary-color);
+  font-size: 1.5rem;
+}
+
+.session-selector {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.session-select {
+  background-color: var(--terminal-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 0.5rem;
+  font-size: 1rem;
+}
+
+.new-session-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.new-session-btn:hover {
+  background-color: #45a049;
+}
+
+.delete-session-btn {
+  background-color: var(--error-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  font-size: 1rem;
+  display: none;
+}
+
+.delete-session-btn:hover {
+  background-color: #d32f2f;
+}
+
+.main-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--terminal-bg);
+  border-right: 1px solid var(--border-color);
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+}
+
+.editor-container {
+  width: var(--editor-width);
+  background-color: var(--terminal-bg);
+  border-left: 1px solid var(--border-color);
+  overflow-y: auto;
+  transition: transform 0.3s ease;
+}
+
+.terminal-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--terminal-bg);
+  border-right: 1px solid var(--border-color);
+}
+
+.terminal-output {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+  font-family: 'Courier New', Courier, monospace;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.terminal-output span {
+  display: inline;
+}
+
+.terminal-output .command {
+  color: var(--command-color);
+}
+
+.terminal-output .terminal {
+  color: var(--text-color);
+}
+
+.terminal-output .user {
+  color: var(--secondary-color);
+}
+
+.terminal-output .agent {
+  color: var(--agent-color);
+}
+
+.terminal-output .error {
+  color: var(--error-color);
+}
+
+.terminal-output .typing-indicator {
+  color: var(--primary-color);
+  animation: blink 1s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.terminal-input {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  border: none;
+  border-top: 1px solid var(--border-color);
+  padding: 1rem;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1rem;
+  outline: none;
+  resize: none;
+  height: 60px;
+}
+
+.file-tree {
+  padding: 1rem;
+}
+
+.file-tree-item {
+  margin-bottom: 0.5rem;
+  cursor: pointer;
+}
+
+.file-tree-item:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.file-tree-item.active {
+  background-color: rgba(76, 175, 80, 0.2);
+}
+
+.file-tree-item .icon {
+  margin-right: 0.5rem;
+}
+
+.file-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editor-header {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.editor-header h3 {
+  margin: 0;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.save-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.save-btn:hover {
+  background-color: #45a049;
+}
+
+.editor-content {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.editor-textarea {
+  width: 100%;
+  height: 100%;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  border: none;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  resize: none;
+  outline: none;
+  padding: 0;
+  margin: 0;
+}
+
+.modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: var(--bg-color);
+  padding: 2rem;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  position: relative;
+}
+
+.close-button {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.close-button:hover {
+  color: var(--primary-color);
+}
+
+.modal h2 {
+  margin-bottom: 1rem;
+  color: var(--primary-color);
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.5rem;
+  background-color: var(--terminal-bg);
+  color: var(--text-color);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
+.submit-btn {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  width: 100%;
+}
+
+.submit-btn:hover {
+  background-color: #45a049;
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text-color);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.mobile-menu-btn:hover {
+  color: var(--primary-color);
+}
+
+/* Responsive styles */
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 1.2rem;
+  }
+
+  .session-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .session-select {
+    width: 100%;
+  }
+
+  .new-session-btn,
+  .delete-session-btn {
+    width: 100%;
+  }
+
+  .main-container {
+    flex-direction: column;
+  }
+
+  .sidebar,
+  .editor-container {
+    width: 100%;
+    height: 50vh;
+    transform: translateX(-100%);
+  }
+
+  .sidebar.active,
+  .editor-container.active {
+    transform: translateX(0);
+  }
+
+  .terminal-container {
+    height: calc(100vh - 120px);
+  }
+
+  .mobile-menu-btn {
+    display: block;
+  }
+}

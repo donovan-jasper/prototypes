@@ -4,10 +4,16 @@ class Terminal {
     this.terminalInput = terminalInputElement;
     this.socket = null;
     this.sessionId = null;
+    this.commandHistory = [];
+    this.historyIndex = -1;
     this.isAgentTyping = false;
     this.typingIndicator = null;
 
     this.terminalInput.addEventListener('keydown', this.handleInput.bind(this));
+    this.terminalInput.addEventListener('keyup', this.handleKeyUp.bind(this));
+
+    // Handle terminal resizing
+    window.addEventListener('resize', this.handleResize.bind(this));
   }
 
   initialize(socket, sessionId) {
@@ -19,14 +25,14 @@ class Terminal {
     this.socket.emit('join-session', { sessionId: this.sessionId });
 
     // Listen for initial messages and terminal history
-    this.socket.on('initial-messages', (messages) => {
+    this.socket.on('message-history', (messages) => {
       messages.forEach(msg => {
         this.appendOutput(msg.content, msg.role);
       });
       this.scrollToBottom();
     });
 
-    this.socket.on('initial-terminal-history', (history) => {
+    this.socket.on('terminal-history', (history) => {
       history.forEach(entry => {
         this.appendOutput(`$ ${entry.command}\n`, 'command');
         this.appendOutput(entry.output, 'terminal');
@@ -41,7 +47,7 @@ class Terminal {
     });
 
     // Listen for streaming agent responses
-    this.socket.on('agent-response-chunk', (data) => {
+    this.socket.on('message-chunk', (data) => {
       if (data.role === 'user') {
         this.appendOutput(`> ${data.content}\n`, 'user');
       } else if (data.role === 'assistant') {
@@ -74,9 +80,8 @@ class Terminal {
       this.scrollToBottom();
     });
 
-    // Handle terminal resize (e.g., window resize)
-    window.addEventListener('resize', this.resizeTerminal.bind(this));
-    this.resizeTerminal(); // Initial resize
+    // Initial resize
+    this.handleResize();
   }
 
   handleInput(event) {
@@ -84,6 +89,9 @@ class Terminal {
       event.preventDefault();
       const text = this.terminalInput.value.trim();
       if (text) {
+        // Add to command history
+        this.commandHistory.push(text);
+        this.historyIndex = this.commandHistory.length;
         this.terminalInput.value = ''; // Clear input immediately
 
         if (text.startsWith('$ ')) {
@@ -94,7 +102,42 @@ class Terminal {
         } else {
           // It's an AI message
           this.sendMessage(text);
-          // User message will be appended by the 'agent-response-chunk' listener
+          // User message will be appended by the 'message-chunk' listener
+        }
+      }
+    } else if (event.key === 'ArrowUp') {
+      // Navigate command history
+      if (this.historyIndex > 0) {
+        this.historyIndex--;
+        this.terminalInput.value = this.commandHistory[this.historyIndex];
+      }
+      event.preventDefault();
+    } else if (event.key === 'ArrowDown') {
+      if (this.historyIndex < this.commandHistory.length - 1) {
+        this.historyIndex++;
+        this.terminalInput.value = this.commandHistory[this.historyIndex];
+      } else if (this.historyIndex === this.commandHistory.length - 1) {
+        this.historyIndex++;
+        this.terminalInput.value = '';
+      }
+      event.preventDefault();
+    }
+  }
+
+  handleKeyUp(event) {
+    // Handle tab completion for commands
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      const currentInput = this.terminalInput.value;
+      if (currentInput.startsWith('$ ')) {
+        // Simple command completion - in a real app, you'd implement proper command completion
+        const command = currentInput.substring(2);
+        if (command === '') {
+          this.terminalInput.value = '$ ls';
+        } else if (command === 'ls') {
+          this.terminalInput.value = '$ ls -la';
+        } else if (command === 'cd') {
+          this.terminalInput.value = '$ cd ';
         }
       }
     }
@@ -102,7 +145,7 @@ class Terminal {
 
   sendMessage(prompt) {
     if (this.socket && this.sessionId) {
-      this.socket.emit('send-message', { sessionId: this.sessionId, prompt });
+      this.socket.emit('send-message', { sessionId: this.sessionId, message: prompt });
     } else {
       console.error('Socket or Session ID not initialized for sending message.');
     }
@@ -126,13 +169,15 @@ class Terminal {
 
   clear() {
     this.terminalOutput.innerHTML = '';
+    this.commandHistory = [];
+    this.historyIndex = -1;
   }
 
   scrollToBottom() {
     this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight;
   }
 
-  resizeTerminal() {
+  handleResize() {
     if (!this.socket || !this.sessionId) return;
 
     // Calculate cols and rows based on terminalOutput dimensions and font size
@@ -146,9 +191,27 @@ class Terminal {
     const rows = Math.floor(terminalHeight / lineHeight);
 
     if (cols > 0 && rows > 0) {
-      this.socket.emit('resize-terminal', { sessionId: this.sessionId, cols, rows });
+      this.socket.emit('resize-terminal', {
+        sessionId: this.sessionId,
+        cols,
+        rows
+      });
+    }
+  }
+
+  destroy() {
+    // Clean up event listeners
+    this.terminalInput.removeEventListener('keydown', this.handleInput.bind(this));
+    this.terminalInput.removeEventListener('keyup', this.handleKeyUp.bind(this));
+    window.removeEventListener('resize', this.handleResize.bind(this));
+
+    // Remove socket listeners
+    if (this.socket) {
+      this.socket.off('message-history');
+      this.socket.off('terminal-history');
+      this.socket.off('terminal-output');
+      this.socket.off('message-chunk');
+      this.socket.off('error');
     }
   }
 }
-
-export default Terminal;
