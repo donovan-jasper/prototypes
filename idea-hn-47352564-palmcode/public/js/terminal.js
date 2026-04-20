@@ -67,7 +67,7 @@ class Terminal {
         if (this.typingIndicator && this.typingIndicator.parentNode) {
           const contentSpan = this.typingIndicator.querySelector('.message-content');
           if (contentSpan) {
-            contentSpan.textContent = data.content;
+            contentSpan.textContent += data.content;
           }
         }
 
@@ -159,86 +159,79 @@ class Terminal {
   }
 
   handleKeyUp(e) {
-    // Handle Ctrl+L to clear terminal
-    if (e.ctrlKey && e.key === 'l') {
-      e.preventDefault();
-      this.clear();
-    }
-  }
-
-  clear() {
-    this.terminalOutput.innerHTML = '';
-    this.isAgentTyping = false;
-    this.typingIndicator = null;
+    // Handle key up events if needed
   }
 
   appendMessage(content, role) {
     const messageContainer = document.createElement('div');
     messageContainer.classList.add('message-container');
 
-    let icon = '';
-    let messageClass = '';
-
-    switch(role) {
-      case 'user':
-        icon = '👤';
-        messageClass = 'user-message';
-        break;
-      case 'assistant':
-        icon = '🤖';
-        messageClass = 'ai-message';
-        break;
-      case 'system':
-        icon = '💻';
-        messageClass = 'system-message';
-        break;
-      default:
-        icon = 'ℹ️';
-        messageClass = 'system-message';
+    if (role === 'user') {
+      messageContainer.classList.add('user-message');
+      messageContainer.innerHTML = `
+        <span class="message-icon">👤</span>
+        <span class="message-content">${this.escapeHtml(content)}</span>
+      `;
+    } else {
+      messageContainer.classList.add('ai-message');
+      messageContainer.innerHTML = `
+        <span class="message-icon">🤖</span>
+        <span class="message-content">${this.escapeHtml(content)}</span>
+      `;
     }
-
-    messageContainer.classList.add(messageClass);
-    messageContainer.innerHTML = `
-      <span class="message-icon">${icon}</span>
-      <span class="message-content">${content}</span>
-    `;
 
     this.terminalOutput.appendChild(messageContainer);
   }
 
   appendCommand(command, output) {
     const commandContainer = document.createElement('div');
-    commandContainer.classList.add('message-container', 'command-message');
+    commandContainer.classList.add('command-container');
+
     commandContainer.innerHTML = `
-      <span class="message-icon">$</span>
-      <span class="message-content">
-        <span class="command">$ ${command}</span>
-        <span class="terminal-output">${output}</span>
-      </span>
+      <div class="command-input">$ ${this.escapeHtml(command)}</div>
+      <div class="command-output">${this.escapeHtml(output)}</div>
     `;
 
     this.terminalOutput.appendChild(commandContainer);
   }
 
-  appendTerminalOutput(output) {
-    const outputContainer = document.createElement('div');
-    outputContainer.classList.add('message-container', 'terminal-message');
-    outputContainer.innerHTML = `
-      <span class="message-icon">></span>
-      <span class="message-content terminal">${output}</span>
-    `;
-
-    this.terminalOutput.appendChild(outputContainer);
+  appendTerminalOutput(data) {
+    if (data.type === 'command') {
+      this.appendCommand(data.command, '');
+    } else if (data.type === 'output') {
+      const lastCommand = this.terminalOutput.querySelector('.command-container:last-child');
+      if (lastCommand) {
+        const outputElement = lastCommand.querySelector('.command-output');
+        if (outputElement) {
+          outputElement.textContent += data.content;
+        }
+      }
+    } else if (data.type === 'error') {
+      this.appendError(data.content);
+    }
   }
 
-  appendError(error) {
+  appendError(message) {
     const errorContainer = document.createElement('div');
-    errorContainer.classList.add('message-container', 'system-message');
-    errorContainer.innerHTML = `
-      <span class="message-icon">⚠️</span>
-      <span class="message-content error">${error}</span>
-    `;
-
+    errorContainer.classList.add('error-container');
+    errorContainer.textContent = `Error: ${this.escapeHtml(message)}`;
     this.terminalOutput.appendChild(errorContainer);
+  }
+
+  clear() {
+    this.terminalOutput.innerHTML = '';
+    this.commandHistory = [];
+    this.historyIndex = -1;
+    this.isAgentTyping = false;
+    this.typingIndicator = null;
+  }
+
+  escapeHtml(unsafe) {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
   }
 }
