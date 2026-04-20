@@ -16,7 +16,7 @@ export async function getAIRecommendation(
         messages: [
           {
             role: 'system',
-            content: `You are an AI cost optimization assistant. Analyze the given task and model recommendations, then provide a concise recommendation (1-2 sentences) about which model to choose and why. Be specific about cost savings or quality improvements.`
+            content: `You are an AI cost optimization assistant. Analyze the given task and model recommendations, then provide a concise, human-readable explanation (1-2 sentences) of why this model is recommended, including cost savings and quality trade-offs. Focus on the top recommendation.`
           },
           {
             role: 'user',
@@ -39,7 +39,30 @@ export async function getAIRecommendation(
     return response.data.choices[0].message.content.trim();
   } catch (error) {
     console.error('Error getting AI recommendation:', error);
-    return 'Based on your task and available models, the top recommendation is the most cost-effective option that meets your quality needs.';
+
+    // Fallback explanation
+    const topModel = recommendations[0];
+    if (!topModel) return 'This model is recommended for your task.';
+
+    let explanation = `The ${topModel.model.name} model is recommended because it offers `;
+
+    if (topModel.costEstimate < 0.01) {
+      explanation += 'excellent cost efficiency';
+    } else if (topModel.costEstimate < 0.03) {
+      explanation += 'good value for money';
+    } else {
+      explanation += 'competitive pricing';
+    }
+
+    if (topModel.model.qualityScore > 90) {
+      explanation += ' with high-quality results';
+    } else if (topModel.model.qualityScore > 80) {
+      explanation += ' and good performance';
+    }
+
+    explanation += `. It costs $${topModel.costEstimate.toFixed(4)} per task, which is ${Math.round((1 - topModel.costEstimate / recommendations[recommendations.length - 1].costEstimate) * 100)}% cheaper than the most expensive option.`;
+
+    return explanation;
   }
 }
 
@@ -90,8 +113,14 @@ export async function getCostProjection(
     };
   } catch (error) {
     console.error('Error getting cost projection:', error);
+
+    // Fallback calculation
+    const totalCost = usageHistory.reduce((sum, entry) => sum + entry.cost, 0);
+    const daysTracked = usageHistory.length;
+    const avgDailyCost = daysTracked > 0 ? totalCost / daysTracked : 0;
+
     return {
-      projectedCost: usageHistory.reduce((sum, entry) => sum + entry.cost, 0) * (currentMonth ? 1 : 1.1),
+      projectedCost: currentMonth ? totalCost * (30 / daysTracked) : totalCost * 1.1,
       savingsOpportunities: [
         'Consider switching to cheaper models for repetitive tasks',
         'Review your usage patterns for unusually high costs',

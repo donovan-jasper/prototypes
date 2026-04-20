@@ -1,18 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, Chip, Button } from 'react-native-paper';
+import { Card, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
 import { ModelRecommendation } from '../types/models';
 import { calculateSavings } from '../services/costCalculator';
+import { getAIRecommendation } from '../services/aiService';
 
 interface Props {
   recommendation: ModelRecommendation;
   rank: number;
   onSelect?: (modelId: string) => void;
   currentModelId?: string;
+  taskDescription?: string;
 }
 
-export default function ModelCard({ recommendation, rank, onSelect, currentModelId }: Props) {
+export default function ModelCard({ recommendation, rank, onSelect, currentModelId, taskDescription }: Props) {
   const { model, costEstimate, reasoning } = recommendation;
+  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (taskDescription && rank === 1) {
+      generateAIExplanation();
+    }
+  }, [taskDescription]);
+
+  const generateAIExplanation = async () => {
+    if (!taskDescription) return;
+
+    setIsLoading(true);
+    try {
+      const explanation = await getAIRecommendation(taskDescription, [recommendation]);
+      setAiExplanation(explanation);
+    } catch (error) {
+      console.error('Failed to generate AI explanation:', error);
+      setAiExplanation('This model offers the best balance of cost and quality for your task.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const getBadgeColor = () => {
     if (rank === 1) return '#4CAF50';
@@ -51,9 +76,20 @@ export default function ModelCard({ recommendation, rank, onSelect, currentModel
           </Text>
         </View>
 
-        <Text variant="bodyMedium" style={styles.reasoning}>
-          {reasoning}
-        </Text>
+        {rank === 1 && taskDescription && (
+          <View style={styles.aiExplanationContainer}>
+            {isLoading ? (
+              <ActivityIndicator size="small" color="#4CAF50" />
+            ) : (
+              <>
+                <Text variant="titleSmall" style={styles.aiTitle}>AI Explanation:</Text>
+                <Text variant="bodyMedium" style={styles.aiText}>
+                  {aiExplanation || reasoning}
+                </Text>
+              </>
+            )}
+          </View>
+        )}
 
         <View style={styles.specs}>
           <Chip icon="speedometer" style={styles.specChip}>
@@ -121,8 +157,18 @@ const styles = StyleSheet.create({
   perTask: {
     color: '#666',
   },
-  reasoning: {
-    marginBottom: 12,
+  aiExplanationContainer: {
+    backgroundColor: '#e8f5e9',
+    padding: 12,
+    borderRadius: 8,
+    marginVertical: 12,
+  },
+  aiTitle: {
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#2e7d32',
+  },
+  aiText: {
     lineHeight: 20,
   },
   specs: {

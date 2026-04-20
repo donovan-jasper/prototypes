@@ -39,12 +39,16 @@ export default function HomeScreen() {
     const matches = matchModelsForTask(task);
     setRecommendations(matches);
 
-    // Get AI recommendation
-    try {
-      const aiRec = await getAIRecommendation(taskDescription, matches);
-      setAiRecommendation(aiRec);
-    } catch (error) {
-      console.error('Failed to get AI recommendation:', error);
+    // Get AI recommendation for the top model
+    if (matches.length > 0) {
+      try {
+        const aiRec = await getAIRecommendation(taskDescription, [matches[0]]);
+        setAiRecommendation(aiRec);
+      } catch (error) {
+        console.error('Failed to get AI recommendation:', error);
+        // Fallback to the default reasoning from the model
+        setAiRecommendation(matches[0].reasoning);
+      }
     }
 
     setLoading(false);
@@ -88,9 +92,9 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {aiRecommendation && (
+      {aiRecommendation && recommendations.length > 0 && (
         <View style={styles.aiRecommendation}>
-          <Text variant="titleSmall" style={styles.aiTitle}>AI Insight:</Text>
+          <Text variant="titleSmall" style={styles.aiTitle}>Top Recommendation:</Text>
           <Text variant="bodyMedium" style={styles.aiText}>{aiRecommendation}</Text>
         </View>
       )}
@@ -102,7 +106,12 @@ export default function HomeScreen() {
             Recommended Models
           </Text>
           {recommendations.map((rec, index) => (
-            <ModelCard key={rec.model.id} recommendation={rec} rank={index + 1} />
+            <ModelCard
+              key={rec.model.id}
+              recommendation={rec}
+              rank={index + 1}
+              taskDescription={taskDescription}
+            />
           ))}
         </>
       )}
