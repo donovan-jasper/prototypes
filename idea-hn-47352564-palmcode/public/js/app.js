@@ -149,12 +149,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
           parentElement.appendChild(fileItem);
 
-          if (file.type === 'directory' && file.children) {
-            const childrenContainer = document.createElement('div');
-            childrenContainer.classList.add('file-tree-children');
-            childrenContainer.style.marginLeft = '1rem';
-            parentElement.appendChild(childrenContainer);
-            buildTree(file.children, childrenContainer, fullPath);
+          if (file.type === 'directory' && file.children && file.children.length > 0) {
+            buildTree(file.children, parentElement, fullPath);
           }
         });
       }
@@ -172,15 +168,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const content = await response.text();
 
       editorContent.value = content;
-      currentFileName.textContent = path.split('/').pop();
+      currentFileName.textContent = path;
       currentFilePath = path;
 
       // Highlight syntax if needed
       if (path.endsWith('.js') || path.endsWith('.html') || path.endsWith('.css')) {
-        editorContent.classList.add('hljs');
-        hljs.highlightElement(editorContent);
-      } else {
-        editorContent.classList.remove('hljs');
+        // In a real app, you would use a library like highlight.js here
+        // For simplicity, we'll just show the content as-is
       }
     } catch (error) {
       console.error('Error opening file:', error);
@@ -189,10 +183,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function saveFile() {
-    if (!currentFilePath) {
-      terminal.appendError('No file selected to save.');
-      return;
-    }
+    if (!currentFilePath) return;
 
     try {
       const response = await fetch(`/api/files/${currentSessionId}/content`, {
@@ -211,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       terminal.appendMessage(`File ${currentFilePath} saved successfully.`, 'system');
+      loadFileTree(currentSessionId); // Refresh file tree to show any new files
     } catch (error) {
       console.error('Error saving file:', error);
       terminal.appendError('Failed to save file. Please try again.');
@@ -218,8 +210,14 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // Event listeners
+  sessionSelect.addEventListener('change', (e) => {
+    if (e.target.value) {
+      switchSession(e.target.value);
+    }
+  });
+
   newSessionBtn.addEventListener('click', () => {
-    newSessionModal.style.display = 'flex';
+    newSessionModal.style.display = 'block';
   });
 
   closeModalBtn.addEventListener('click', () => {
@@ -238,13 +236,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  sessionSelect.addEventListener('change', () => {
-    const sessionId = sessionSelect.value;
-    if (sessionId) {
-      switchSession(sessionId);
-    }
-  });
-
   deleteSessionBtn.addEventListener('click', () => {
     if (currentSessionId) {
       deleteSession(currentSessionId);
@@ -253,35 +244,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   saveFileBtn.addEventListener('click', saveFile);
 
+  // Close modal when clicking outside
+  window.addEventListener('click', (e) => {
+    if (e.target === newSessionModal) {
+      newSessionModal.style.display = 'none';
+    }
+  });
+
   // Initialize the app
   loadSessions();
 
-  // Handle socket connection status
-  socket.on('connect', () => {
-    terminal.appendMessage('Connected to server', 'system');
-  });
-
-  socket.on('disconnect', () => {
-    terminal.appendError('Disconnected from server. Attempting to reconnect...');
-  });
-
-  socket.on('reconnect', () => {
-    terminal.appendMessage('Reconnected to server', 'system');
-    if (currentSessionId) {
-      terminal.initialize(socket, currentSessionId);
-    }
-  });
-
-  // Handle file changes from server
-  socket.on('file-change', (data) => {
-    if (data.sessionId === currentSessionId) {
-      terminal.appendMessage(`File ${data.path} has been ${data.type}.`, 'system');
-      loadFileTree(currentSessionId);
-
-      // If the changed file is the one currently open, reload it
-      if (currentFilePath === data.path) {
-        openFile(currentFilePath);
-      }
-    }
-  });
+  // Focus terminal input when page loads
+  terminalInput.focus();
 });

@@ -13,6 +13,7 @@
   --user-message-bg: #3a3a3a;
   --ai-message-bg: #2d2d2d;
   --system-message-bg: #3a3a3a;
+  --command-message-bg: #252525;
 }
 
 * {
@@ -150,6 +151,11 @@ body {
   border-left: 4px solid var(--primary-color);
 }
 
+.command-message {
+  background-color: var(--command-message-bg);
+  border-left: 4px solid var(--command-color);
+}
+
 .message-icon {
   margin-right: 0.8rem;
   font-size: 1.2rem;
@@ -282,91 +288,7 @@ body {
   line-height: 1.5;
   resize: none;
   outline: none;
-  padding: 0;
-  margin: 0;
-}
-
-.modal {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.7);
-  z-index: 1000;
-  justify-content: center;
-  align-items: center;
-}
-
-.modal-content {
-  background-color: var(--bg-color);
-  padding: 2rem;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 500px;
-  position: relative;
-}
-
-.close-button {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  background: none;
-  border: none;
-  color: var(--text-color);
-  font-size: 1.5rem;
-  cursor: pointer;
-}
-
-.close-button:hover {
-  color: var(--primary-color);
-}
-
-.modal h2 {
-  margin-bottom: 1rem;
-  color: var(--primary-color);
-}
-
-.form-group {
-  margin-bottom: 1rem;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 0.5rem;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
   padding: 0.5rem;
-  background-color: var(--terminal-bg);
-  color: var(--text-color);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-}
-
-.btn {
-  background-color: var(--primary-color);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.5rem 1rem;
-  cursor: pointer;
-  font-size: 1rem;
-}
-
-.btn:hover {
-  background-color: #45a049;
-}
-
-.btn-danger {
-  background-color: var(--error-color);
-}
-
-.btn-danger:hover {
-  background-color: #d32f2f;
 }
 
 @media (max-width: 768px) {
@@ -376,7 +298,10 @@ body {
 
   .sidebar, .editor-container {
     width: 100%;
+    height: auto;
+    max-height: 300px;
     border-right: none;
+    border-left: none;
     border-bottom: 1px solid var(--border-color);
   }
 
@@ -384,7 +309,9 @@ body {
     border-right: none;
   }
 
-  .sidebar.collapsed, .editor-container.collapsed {
-    display: none;
+  .session-selector {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
   }
 }

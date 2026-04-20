@@ -103,6 +103,75 @@ class Terminal {
     }
   }
 
+  scrollToBottom() {
+    this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight;
+  }
+
+  handleResize() {
+    // Adjust terminal height based on window size
+    const headerHeight = document.querySelector('.header').offsetHeight;
+    const inputHeight = this.terminalInput.offsetHeight;
+    const availableHeight = window.innerHeight - headerHeight - inputHeight - 20; // 20px for padding/margin
+
+    this.terminalOutput.style.height = `${availableHeight}px`;
+  }
+
+  handleInput(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const inputText = this.terminalInput.value.trim();
+
+      if (inputText) {
+        // Check if it's a command (starts with $ or !)
+        if (inputText.startsWith('$') || inputText.startsWith('!')) {
+          const command = inputText.substring(1).trim();
+          this.socket.emit('execute-command', { sessionId: this.sessionId, command });
+          this.appendCommand(command, '');
+        } else {
+          this.socket.emit('send-message', { sessionId: this.sessionId, content: inputText, role: 'user' });
+          this.appendMessage(inputText, 'user');
+        }
+
+        // Add to command history
+        this.commandHistory.push(inputText);
+        this.historyIndex = this.commandHistory.length;
+
+        // Clear input
+        this.terminalInput.value = '';
+        this.scrollToBottom();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (this.historyIndex > 0) {
+        this.historyIndex--;
+        this.terminalInput.value = this.commandHistory[this.historyIndex];
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (this.historyIndex < this.commandHistory.length - 1) {
+        this.historyIndex++;
+        this.terminalInput.value = this.commandHistory[this.historyIndex];
+      } else {
+        this.historyIndex = this.commandHistory.length;
+        this.terminalInput.value = '';
+      }
+    }
+  }
+
+  handleKeyUp(e) {
+    // Handle Ctrl+L to clear terminal
+    if (e.ctrlKey && e.key === 'l') {
+      e.preventDefault();
+      this.clear();
+    }
+  }
+
+  clear() {
+    this.terminalOutput.innerHTML = '';
+    this.isAgentTyping = false;
+    this.typingIndicator = null;
+  }
+
   appendMessage(content, role) {
     const messageContainer = document.createElement('div');
     messageContainer.classList.add('message-container');
@@ -164,108 +233,12 @@ class Terminal {
 
   appendError(error) {
     const errorContainer = document.createElement('div');
-    errorContainer.classList.add('message-container', 'error-message');
+    errorContainer.classList.add('message-container', 'system-message');
     errorContainer.innerHTML = `
       <span class="message-icon">⚠️</span>
       <span class="message-content error">${error}</span>
     `;
 
     this.terminalOutput.appendChild(errorContainer);
-  }
-
-  handleInput(event) {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      const text = this.terminalInput.value.trim();
-      if (text) {
-        // Add to command history
-        this.commandHistory.push(text);
-        this.historyIndex = this.commandHistory.length;
-        this.terminalInput.value = ''; // Clear input immediately
-
-        if (text.startsWith('$ ')) {
-          // It's a shell command
-          const command = text.substring(2);
-          this.executeCommand(command);
-          this.appendCommand(command, '');
-        } else {
-          // It's an AI message
-          this.sendMessage(text);
-          this.appendMessage(text, 'user');
-        }
-      }
-    } else if (event.key === 'ArrowUp') {
-      // Navigate command history
-      if (this.historyIndex > 0) {
-        this.historyIndex--;
-        this.terminalInput.value = this.commandHistory[this.historyIndex];
-      }
-      event.preventDefault();
-    } else if (event.key === 'ArrowDown') {
-      if (this.historyIndex < this.commandHistory.length - 1) {
-        this.historyIndex++;
-        this.terminalInput.value = this.commandHistory[this.historyIndex];
-      } else if (this.historyIndex === this.commandHistory.length - 1) {
-        this.historyIndex++;
-        this.terminalInput.value = '';
-      }
-      event.preventDefault();
-    }
-  }
-
-  handleKeyUp(event) {
-    // Handle tab completion for commands
-    if (event.key === 'Tab') {
-      event.preventDefault();
-      const currentInput = this.terminalInput.value;
-      if (currentInput.startsWith('$ ')) {
-        // Simple command completion - in a real app, you'd implement proper command completion
-        const command = currentInput.substring(2);
-        if (command === '') {
-          this.terminalInput.value = '$ ls';
-        } else if (command === 'ls') {
-          this.terminalInput.value = '$ ls -la';
-        } else if (command === 'cd') {
-          this.terminalInput.value = '$ cd ';
-        }
-      }
-    }
-  }
-
-  sendMessage(text) {
-    if (this.socket && this.sessionId) {
-      this.socket.emit('send-message', {
-        sessionId: this.sessionId,
-        content: text,
-        role: 'user'
-      });
-    }
-  }
-
-  executeCommand(command) {
-    if (this.socket && this.sessionId) {
-      this.socket.emit('execute-command', {
-        sessionId: this.sessionId,
-        command: command
-      });
-    }
-  }
-
-  clear() {
-    this.terminalOutput.innerHTML = '';
-  }
-
-  scrollToBottom() {
-    this.terminalOutput.scrollTop = this.terminalOutput.scrollHeight;
-    this.isAtBottom = true;
-  }
-
-  handleResize() {
-    // Adjust terminal height based on window size
-    const headerHeight = document.querySelector('.header')?.offsetHeight || 0;
-    const inputHeight = this.terminalInput.offsetHeight;
-    const availableHeight = window.innerHeight - headerHeight - inputHeight - 20; // 20px for margins
-
-    this.terminalOutput.style.height = `${availableHeight}px`;
   }
 }
