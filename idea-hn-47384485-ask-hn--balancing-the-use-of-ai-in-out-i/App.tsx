@@ -9,6 +9,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import CoachScreen from './screens/CoachScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import RealTimeAnalysisScreen from './screens/RealTimeAnalysisScreen';
+import InstantPasteAnalysisScreen from './screens/InstantPasteAnalysisScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -29,6 +30,8 @@ export default function App() {
                 iconName = focused ? 'chatbubbles' : 'chatbubbles-outline';
               } else if (route.name === 'Real-Time') {
                 iconName = focused ? 'flash' : 'flash-outline';
+              } else if (route.name === 'Instant Paste Analysis') {
+                iconName = focused ? 'clipboard' : 'clipboard-outline';
               } else if (route.name === 'Settings') {
                 iconName = focused ? 'settings' : 'settings-outline';
               }
@@ -43,6 +46,7 @@ export default function App() {
           <Tab.Screen name="History" component={HistoryScreen} />
           <Tab.Screen name="Coach" component={CoachScreen} />
           <Tab.Screen name="Real-Time" component={RealTimeAnalysisScreen} />
+          <Tab.Screen name="Instant Paste Analysis" component={InstantPasteAnalysisScreen} />
           <Tab.Screen name="Settings" component={SettingsScreen} />
         </Tab.Navigator>
         <StatusBar style="auto" />
