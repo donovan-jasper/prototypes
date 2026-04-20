@@ -7,7 +7,8 @@ export class NotificationService {
   private db: any;
 
   constructor() {
-    this.db = useDatabase();
+    const { db } = useDatabase();
+    this.db = db;
     this.configureNotifications();
   }
 

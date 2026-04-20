@@ -5,7 +5,8 @@ export class AnalyticsService {
   private db: any;
 
   constructor() {
-    this.db = useDatabase();
+    const { db } = useDatabase();
+    this.db = db;
   }
 
   async logMomentCompletion(momentId: string, moodRating?: number): Promise<void> {
