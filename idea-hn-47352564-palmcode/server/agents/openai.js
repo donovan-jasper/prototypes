@@ -24,7 +24,7 @@ async function* sendMessage(prompt, conversationHistory = []) {
 
   try {
     const stream = await openai.chat.completions.create({
-      model: "gpt-4o", // Or another suitable OpenAI model like "gpt-3.5-turbo"
+      model: "gpt-4o",
       messages: messages,
       stream: true,
     });

@@ -14,7 +14,7 @@ async function* sendMessage(prompt, conversationHistory = []) {
     return;
   }
 
-  const model = genAI.getGenerativeModel({ model: "gemini-pro" }); // Or "gemini-1.5-flash"
+  const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
   // Gemini API expects history in a specific format, alternating user/model
   const history = [];

@@ -24,7 +24,7 @@ async function* sendMessage(prompt, conversationHistory = []) {
 
   try {
     const stream = anthropic.messages.stream({
-      model: "claude-3-opus-20240229", // Or another suitable Claude model
+      model: "claude-3-opus-20240229",
       max_tokens: 1024,
       messages: messages,
     });

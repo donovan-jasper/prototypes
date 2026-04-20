@@ -1,0 +1,1 @@
+print("+ rm -r " + path)
