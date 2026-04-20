@@ -175,6 +175,9 @@ export class TimingEngine {
         categories.push(additionalCategories[randomIndex]);
         additionalCategories.splice(randomIndex, 1);
       }
+    } else {
+      // If no preferred categories, use all categories
+      categories.push(...allCategories);
     }
 
     return categories;
@@ -200,7 +203,7 @@ export class TimingEngine {
     if (quietHours.start < quietHours.end) {
       return hour >= quietHours.start && hour < quietHours.end;
     } else {
-      // Handle overnight quiet hours (e.g., 22:00-07:00)
+      // Handles overnight quiet hours (e.g., 22:00-07:00)
       return hour >= quietHours.start || hour < quietHours.end;
     }
   }
