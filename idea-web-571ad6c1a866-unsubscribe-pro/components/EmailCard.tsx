@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -13,16 +13,20 @@ interface EmailCardProps {
 
 const EmailCard: React.FC<EmailCardProps> = ({ email, onUnsubscribe }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const [classification, setClassification] = useState<'important' | 'promotional' | 'spam' | 'subscription'>('promotional');
+  const [classification, setClassification] = useState<'important' | 'promotional' | 'spam' | 'subscription' | 'transactional' | 'newsletter' | 'service-notification'>('promotional');
   const [tags, setTags] = useState<string[]>([]);
   const { unsubscribe } = useUnsubscribe();
 
-  React.useEffect(() => {
+  useEffect(() => {
     const classify = async () => {
-      const result = await classifyEmail(email);
-      setClassification(result);
-      const emailTags = await getAITags(email);
-      setTags(emailTags);
+      try {
+        const result = await classifyEmail(email);
+        setClassification(result);
+        const emailTags = await getAITags(email);
+        setTags(emailTags);
+      } catch (error) {
+        console.error('Classification error:', error);
+      }
     };
     classify();
   }, [email]);
@@ -68,8 +72,35 @@ const EmailCard: React.FC<EmailCardProps> = ({ email, onUnsubscribe }) => {
         return '#F44336'; // Red
       case 'subscription':
         return '#9C27B0'; // Purple
+      case 'transactional':
+        return '#FF9800'; // Orange
+      case 'newsletter':
+        return '#607D8B'; // Blue-gray
+      case 'service-notification':
+        return '#795548'; // Brown
       default:
         return '#757575'; // Gray
+    }
+  };
+
+  const getClassificationLabel = () => {
+    switch (classification) {
+      case 'important':
+        return 'Important';
+      case 'promotional':
+        return 'Promotional';
+      case 'spam':
+        return 'Spam';
+      case 'subscription':
+        return 'Subscription';
+      case 'transactional':
+        return 'Transactional';
+      case 'newsletter':
+        return 'Newsletter';
+      case 'service-notification':
+        return 'Service';
+      default:
+        return 'Unknown';
     }
   };
 
@@ -78,7 +109,12 @@ const EmailCard: React.FC<EmailCardProps> = ({ email, onUnsubscribe }) => {
       <View style={styles.card}>
         <View style={[styles.classificationIndicator, { backgroundColor: getClassificationColor() }]} />
         <View style={styles.content}>
-          <Text style={styles.sender} numberOfLines={1}>{email.from}</Text>
+          <View style={styles.header}>
+            <Text style={styles.sender} numberOfLines={1}>{email.from}</Text>
+            <View style={[styles.classificationBadge, { backgroundColor: getClassificationColor() }]}>
+              <Text style={styles.classificationText}>{getClassificationLabel()}</Text>
+            </View>
+          </View>
           <Text style={styles.subject} numberOfLines={1}>{email.subject}</Text>
           <View style={styles.tagsContainer}>
             {tags.map((tag, index) => (
@@ -116,10 +152,27 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   sender: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    flex: 1,
+  },
+  classificationBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  classificationText: {
+    fontSize: 12,
+    color: 'white',
+    fontWeight: '500',
   },
   subject: {
     fontSize: 14,

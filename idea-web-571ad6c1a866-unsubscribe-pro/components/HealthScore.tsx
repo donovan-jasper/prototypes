@@ -1,87 +1,110 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
-import { useHealthScore } from '../hooks/useHealthScore';
 
 interface HealthScoreProps {
   score: number;
 }
 
 const HealthScore: React.FC<HealthScoreProps> = ({ score }) => {
-  const { getScoreMessage, getScoreColor } = useHealthScore();
-
+  const animatedScore = useRef(new Animated.Value(0)).current;
+  const circleRef = useRef<Circle>(null);
   const radius = 80;
   const strokeWidth = 10;
   const circumference = 2 * Math.PI * radius;
   const progress = (score / 100) * circumference;
 
-  const message = getScoreMessage(score);
-  const color = getScoreColor(score);
+  useEffect(() => {
+    Animated.timing(animatedScore, {
+      toValue: score,
+      duration: 1500,
+      useNativeDriver: true,
+    }).start();
+  }, [score]);
+
+  const animatedProgress = animatedScore.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, progress],
+  });
+
+  const getColor = (score: number) => {
+    if (score >= 80) return '#4CAF50'; // Green
+    if (score >= 60) return '#FFC107'; // Yellow
+    if (score >= 40) return '#FF9800'; // Orange
+    return '#F44336'; // Red
+  };
 
   return (
     <View style={styles.container}>
+      <Svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
+        {/* Background circle */}
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius - strokeWidth / 2}
+          stroke="#e0e0e0"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+
+        {/* Progress circle */}
+        <Circle
+          ref={circleRef}
+          cx={radius}
+          cy={radius}
+          r={radius - strokeWidth / 2}
+          stroke={getColor(score)}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference}
+          strokeLinecap="round"
+          fill="none"
+        />
+
+        {/* Animated progress */}
+        <AnimatedCircle
+          cx={radius}
+          cy={radius}
+          r={radius - strokeWidth / 2}
+          stroke={getColor(score)}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={animatedProgress}
+          strokeLinecap="round"
+          fill="none"
+        />
+      </Svg>
+
       <View style={styles.scoreContainer}>
-        <Svg width={radius * 2} height={radius * 2}>
-          <Circle
-            cx={radius}
-            cy={radius}
-            r={radius - strokeWidth / 2}
-            stroke="#e0e0e0"
-            strokeWidth={strokeWidth}
-            fill="none"
-          />
-          <Circle
-            cx={radius}
-            cy={radius}
-            r={radius - strokeWidth / 2}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            fill="none"
-            strokeDasharray={`${progress} ${circumference}`}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${radius} ${radius})`}
-          />
-        </Svg>
-        <View style={styles.scoreTextContainer}>
-          <Text style={[styles.scoreText, { color }]}>{score}</Text>
-          <Text style={styles.scoreLabel}>Health Score</Text>
-        </View>
+        <Text style={styles.scoreValue}>{Math.round(score)}</Text>
+        <Text style={styles.scoreLabel}>Health Score</Text>
       </View>
-      <Text style={styles.message}>{message}</Text>
     </View>
   );
 };
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
-    marginVertical: 24,
-  },
-  scoreContainer: {
-    position: 'relative',
     justifyContent: 'center',
     alignItems: 'center',
+    marginVertical: 16,
   },
-  scoreTextContainer: {
+  scoreContainer: {
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scoreText: {
+  scoreValue: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    color: '#333',
   },
   scoreLabel: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
-  },
-  message: {
-    fontSize: 16,
-    color: '#333',
-    marginTop: 16,
-    textAlign: 'center',
-    paddingHorizontal: 16,
   },
 });
 

@@ -30,7 +30,21 @@ const SPAM_INDICATORS = [
   'urgent', 'click here', 'exclusive deal', 'offer you can\'t refuse'
 ];
 
-export async function classifyEmail(email: Email): Promise<'important' | 'promotional' | 'spam' | 'subscription'> {
+const TRANSACTIONAL_KEYWORDS = [
+  'order', 'confirmation', 'receipt', 'invoice', 'tracking',
+  'shipment', 'delivery', 'return', 'refund', 'payment'
+];
+
+const NEWSLETTER_KEYWORDS = [
+  'newsletter', 'digest', 'weekly', 'monthly', 'update', 'summary'
+];
+
+const SERVICE_NOTIFICATION_KEYWORDS = [
+  'notification', 'update', 'maintenance', 'alert', 'warning',
+  'security', 'privacy', 'policy', 'change', 'announcement'
+];
+
+export async function classifyEmail(email: Email): Promise<'important' | 'promotional' | 'spam' | 'subscription' | 'transactional' | 'newsletter' | 'service-notification'> {
   // Check for spam indicators first
   if (containsSpamIndicators(email)) {
     return 'spam';
@@ -52,6 +66,21 @@ export async function classifyEmail(email: Email): Promise<'important' | 'promot
   const subject = email.subject.toLowerCase();
   if (IMPORTANT_KEYWORDS.some(keyword => subject.includes(keyword))) {
     return 'important';
+  }
+
+  // Check for transactional content
+  if (TRANSACTIONAL_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+    return 'transactional';
+  }
+
+  // Check for newsletter content
+  if (NEWSLETTER_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+    return 'newsletter';
+  }
+
+  // Check for service notification content
+  if (SERVICE_NOTIFICATION_KEYWORDS.some(keyword => subject.includes(keyword) || email.body.toLowerCase().includes(keyword))) {
+    return 'service-notification';
   }
 
   // Check for subscription-related content
@@ -114,10 +143,8 @@ export async function getAITags(email: Email): Promise<string[]> {
   }
 
   // Check for newsletters
-  if (subjectLower.includes('newsletter') ||
-      subjectLower.includes('digest') ||
-      bodyLower.includes('weekly update') ||
-      bodyLower.includes('monthly digest')) {
+  if (NEWSLETTER_KEYWORDS.some(keyword =>
+      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
     tags.push('newsletter');
   }
 
@@ -130,10 +157,8 @@ export async function getAITags(email: Email): Promise<string[]> {
   }
 
   // Check for service notifications
-  if (subjectLower.includes('notification') ||
-      subjectLower.includes('update') ||
-      bodyLower.includes('service update') ||
-      bodyLower.includes('maintenance notice')) {
+  if (SERVICE_NOTIFICATION_KEYWORDS.some(keyword =>
+      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
     tags.push('service-notification');
   }
 
@@ -143,11 +168,25 @@ export async function getAITags(email: Email): Promise<string[]> {
   }
 
   // Check for transactional emails
-  if (subjectLower.includes('order') ||
-      subjectLower.includes('confirmation') ||
-      bodyLower.includes('order details') ||
-      bodyLower.includes('tracking number')) {
+  if (TRANSACTIONAL_KEYWORDS.some(keyword =>
+      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
     tags.push('transactional');
+  }
+
+  // Check for subscription services
+  if (SUBSCRIPTION_SERVICE_KEYWORDS.some(keyword =>
+      subjectLower.includes(keyword) || bodyLower.includes(keyword))) {
+    tags.push('subscription-service');
+  }
+
+  // Check for email tracking indicators
+  if (email.headers['X-Open-Tracking'] || email.headers['X-Read-Receipt-To']) {
+    tags.push('tracking');
+  }
+
+  // Check for unsubscribe links
+  if (email.headers['List-Unsubscribe'] || email.body.includes('unsubscribe')) {
+    tags.push('unsubscribe-available');
   }
 
   return [...new Set(tags)]; // Remove duplicates
@@ -159,40 +198,35 @@ function containsSpamIndicators(email: Email): boolean {
 }
 
 async function isKnownSpamDomain(domain: string): Promise<boolean> {
-  // In a real implementation, this would query a domain reputation database
-  // For this prototype, we'll use a simple list
-  const spamDomains = [
-    'spam.com', 'fake.com', 'phishing.net', 'scam.org',
-    'dodgy.biz', 'untrustworthy.co', 'dodgymail.com',
-    'spamdomain.net', 'phishingsite.org', 'fakeemail.com'
+  // In a real implementation, this would query a spam domain database
+  // For now, we'll use a simple list of known spam domains
+  const knownSpamDomains = [
+    'spamdomain.com', 'fakeemail.com', 'phishing.net',
+    'scam.org', 'malware.biz', 'spammy.net'
   ];
 
-  // Also check if domain is from a known free email provider
-  const freeEmailProviders = [
-    'gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com',
-    'aol.com', 'protonmail.com', 'icloud.com'
-  ];
-
-  // If domain is from a free provider but has suspicious patterns
-  if (freeEmailProviders.includes(domain) &&
-      (email.subject.toLowerCase().includes('urgent') ||
-       email.subject.toLowerCase().includes('important'))) {
-    return true;
-  }
-
-  return spamDomains.includes(domain);
+  return knownSpamDomains.includes(domain.toLowerCase());
 }
 
 function hasPromotionalHtmlStructure(html: string): boolean {
   // Check for common promotional HTML patterns
-  const promotionalPatterns = [
-    /<table[^>]*width="100%"/i,
-    /<div[^>]*style="[^"]*background-color[^"]*"/i,
-    /<a[^>]*href="[^"]*track[^"]*"/i,
-    /<img[^>]*src="[^"]*banner[^"]*"/i,
-    /<div[^>]*class="[^"]*promo[^"]*"/i,
-    /<div[^>]*style="[^"]*font-size:[^"]*large[^"]*"/i
-  ];
+  const lowerHtml = html.toLowerCase();
 
-  return promotionalPatterns.some(pattern => pattern.test(html));
+  // Check for multiple images with links
+  const imgCount = (lowerHtml.match(/<img/g) || []).length;
+  const linkCount = (lowerHtml.match(/<a href/g) || []).length;
+
+  // Check for call-to-action buttons
+  const hasCTA = lowerHtml.includes('click here') ||
+                 lowerHtml.includes('shop now') ||
+                 lowerHtml.includes('sign up') ||
+                 lowerHtml.includes('buy now');
+
+  // Check for discount or offer language
+  const hasDiscount = lowerHtml.includes('discount') ||
+                      lowerHtml.includes('offer') ||
+                      lowerHtml.includes('sale') ||
+                      lowerHtml.includes('promo');
+
+  return (imgCount > 3 && linkCount > 5) || hasCTA || hasDiscount;
 }
