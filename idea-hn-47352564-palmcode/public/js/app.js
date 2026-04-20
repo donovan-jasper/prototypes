@@ -1,6 +1,6 @@
 import SessionManager from './sessions.js';
 import Terminal from './terminal.js';
-// import FileManager from './editor.js'; // Assuming editor.js will export FileManager
+import FileManager from './editor.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const socket = io(); // Initialize Socket.IO connection
@@ -10,7 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('terminal-output'),
     document.getElementById('terminal-input')
   );
-  // const fileManager = new FileManager(...); // Initialize FileManager when ready
+  const fileManager = new FileManager();
 
   const sessionSelect = document.getElementById('session-select');
   const newSessionBtn = document.getElementById('new-session-btn');
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function switchSession(sessionId) {
     if (!sessionId) {
       terminal.clear();
-      // fileManager.clear(); // Clear file manager
+      fileManager.clear();
       sessionManager.currentSession = null;
       deleteSessionBtn.style.display = 'none';
       return;
@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (session) {
         console.log('Switched to session:', session);
         terminal.initialize(socket, session.id);
-        // fileManager.loadFileTree(session.id); // Load file tree for new session
+        fileManager.initialize(session.id, socket);
         deleteSessionBtn.style.display = 'inline-block';
       }
     } catch (error) {
@@ -124,6 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // If a session is already selected, re-join it on reconnect
     if (sessionManager.currentSession) {
       terminal.initialize(socket, sessionManager.currentSession.id);
+      fileManager.initialize(sessionManager.currentSession.id, socket);
     }
   });
 
@@ -133,30 +134,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   socket.on('error', (error) => {
     console.error('WebSocket error:', error);
-    alert(`WebSocket Error: ${error.message}`);
+    alert('WebSocket connection error. Please check your connection.');
   });
 
-  // --- Initial Load ---
+  // Initialize the app
   populateSessions();
-
-  // Mobile menu toggle (basic implementation)
-  const mobileMenuButton = document.getElementById('mobile-menu-button');
-  const leftSidebar = document.getElementById('left-sidebar');
-  const rightSidebar = document.getElementById('right-sidebar');
-
-  if (mobileMenuButton) {
-    mobileMenuButton.addEventListener('click', () => {
-      leftSidebar.classList.toggle('active');
-      rightSidebar.classList.remove('active'); // Close other sidebar if open
-    });
-  }
-
-  // Example for right sidebar toggle (assuming an editor toggle button)
-  const editorToggleButton = document.getElementById('editor-toggle-button');
-  if (editorToggleButton) {
-    editorToggleButton.addEventListener('click', () => {
-      rightSidebar.classList.toggle('active');
-      leftSidebar.classList.remove('active'); // Close other sidebar if open
-    });
-  }
 });

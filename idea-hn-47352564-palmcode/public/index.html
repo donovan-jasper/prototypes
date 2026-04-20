@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentHub - AI Coding Assistant</title>
+  <link rel="stylesheet" href="css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css">
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <h1>AgentHub</h1>
+      <div class="session-controls">
+        <select id="session-select" class="session-select"></select>
+        <button id="new-session-btn" class="btn">New Session</button>
+        <button id="delete-session-btn" class="btn btn-danger" style="display: none;">Delete Session</button>
+      </div>
+    </header>
+
+    <div class="main-content">
+      <div class="sidebar file-browser">
+        <h2>Files</h2>
+        <div id="file-tree" class="file-tree"></div>
+      </div>
+
+      <div class="terminal-container">
+        <div id="terminal-output" class="terminal-output"></div>
+        <div class="terminal-input-container">
+          <input type="text" id="terminal-input" class="terminal-input" placeholder="Type a message or command..." autocomplete="off">
+        </div>
+      </div>
+
+      <div class="sidebar file-editor">
+        <div class="editor-header">
+          <h2 id="current-file-name">No file selected</h2>
+          <button id="save-file-btn" class="btn">Save</button>
+        </div>
+        <textarea id="editor-content" class="editor-content" spellcheck="false"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Session Modal -->
+  <div id="new-session-modal" class="modal">
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>Create New Session</h2>
+      <form id="create-session-form">
+        <div class="form-group">
+          <label for="session-name">Session Name:</label>
+          <input type="text" id="session-name" required>
+        </div>
+        <div class="form-group">
+          <label for="agent-type">AI Agent:</label>
+          <select id="agent-type" required>
+            <option value="claude">Claude</option>
+            <option value="codex">Codex</option>
+            <option value="gemini">Gemini</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">Create Session</button>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
