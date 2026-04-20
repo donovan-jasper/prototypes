@@ -5,21 +5,23 @@ import { TaskType } from '../../types/models';
 import { matchModelsForTask } from '../../services/modelService';
 import { estimateTokens } from '../../services/costCalculator';
 import ModelCard from '../../components/ModelCard';
-import { getAIRecommendation } from '../../services/aiService';
 
 export default function HomeScreen() {
   const [taskDescription, setTaskDescription] = useState('');
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [aiRecommendation, setAiRecommendation] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
 
   const handleFindModels = async () => {
-    if (!taskDescription.trim()) return;
+    if (!taskDescription.trim()) {
+      setRecommendations([]);
+      setSearched(false);
+      return;
+    }
 
     setLoading(true);
-    setAiRecommendation(null);
+    setSearched(true);
 
-    // Simple task type detection
     let taskType = TaskType.TEXT_GENERATION;
     if (taskDescription.toLowerCase().includes('code')) {
       taskType = TaskType.CODE_GENERATION;
@@ -33,24 +35,11 @@ export default function HomeScreen() {
       description: taskDescription,
       type: taskType,
       estimatedInputTokens: estimatedTokens,
-      estimatedOutputTokens: estimatedTokens * 2, // Assume output is 2x input
+      estimatedOutputTokens: estimatedTokens * 2,
     };
 
     const matches = matchModelsForTask(task);
     setRecommendations(matches);
-
-    // Get AI recommendation for the top model
-    if (matches.length > 0) {
-      try {
-        const aiRec = await getAIRecommendation(taskDescription, [matches[0]]);
-        setAiRecommendation(aiRec);
-      } catch (error) {
-        console.error('Failed to get AI recommendation:', error);
-        // Fallback to the default reasoning from the model
-        setAiRecommendation(matches[0].reasoning);
-      }
-    }
-
     setLoading(false);
   };
 
@@ -81,7 +70,7 @@ export default function HomeScreen() {
           disabled={loading}
           style={styles.button}
         >
-          {loading ? 'Finding models...' : 'Find Models'}
+          {loading ? 'Finding models...' : 'Find Best Models'}
         </Button>
       </View>
 
@@ -92,10 +81,14 @@ export default function HomeScreen() {
         </View>
       )}
 
-      {aiRecommendation && recommendations.length > 0 && (
-        <View style={styles.aiRecommendation}>
-          <Text variant="titleSmall" style={styles.aiTitle}>Top Recommendation:</Text>
-          <Text variant="bodyMedium" style={styles.aiText}>{aiRecommendation}</Text>
+      {!loading && searched && recommendations.length === 0 && (
+        <View style={styles.noResultsContainer}>
+          <Text variant="titleMedium" style={styles.noResultsText}>
+            No models found for your task.
+          </Text>
+          <Text variant="bodyMedium" style={styles.noResultsSubtext}>
+            Try a different description or adjust your task details.
+          </Text>
         </View>
       )}
 
@@ -110,7 +103,6 @@ export default function HomeScreen() {
               key={rec.model.id}
               recommendation={rec}
               rank={index + 1}
-              taskDescription={taskDescription}
             />
           ))}
         </>
@@ -153,20 +145,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     color: '#666',
   },
-  aiRecommendation: {
-    backgroundColor: '#e8f5e9',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  aiTitle: {
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#2e7d32',
-  },
-  aiText: {
-    lineHeight: 20,
-  },
   divider: {
     marginVertical: 24,
   },
@@ -174,5 +152,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 16,
     marginHorizontal: 16,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    marginVertical: 24,
+    padding: 16,
+    backgroundColor: '#fff3e0',
+    borderRadius: 8,
+    marginHorizontal: 16,
+  },
+  noResultsText: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#e65100',
+  },
+  noResultsSubtext: {
+    color: '#ff9800',
+    textAlign: 'center',
   },
 });
