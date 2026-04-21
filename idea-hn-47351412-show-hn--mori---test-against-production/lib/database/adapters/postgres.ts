@@ -27,7 +27,7 @@ const fetchData = async (connection: Connection, options: DataFetchOptions) => {
   const limit = options.limit;
   const dateRange = options.dateRange;
 
-  const results: any[] = [];
+  const results: any = {};
 
   for (const table of tables) {
     const query = {
@@ -36,7 +36,7 @@ const fetchData = async (connection: Connection, options: DataFetchOptions) => {
     };
 
     const res = await pool.query(query);
-    results.push(...res.rows);
+    results[table] = res.rows;
   }
 
   await pool.end();
