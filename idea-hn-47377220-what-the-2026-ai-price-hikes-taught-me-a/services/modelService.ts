@@ -8,17 +8,17 @@ export function matchModelsForTask(task: Task): ModelRecommendation[] {
   const compatibleModels = models.filter(model =>
     model.capabilities.includes(task.type)
   );
-  
+
   const recommendations = compatibleModels.map(model => {
     const costEstimate = calculateCost(
       model,
       task.estimatedInputTokens,
       task.estimatedOutputTokens
     );
-    
+
     // Efficiency score: balance of quality and cost
     const efficiencyScore = (model.qualityScore / 100) / (costEstimate * 100);
-    
+
     let reasoning = `${model.name} offers `;
     if (model.qualityScore >= 90) {
       reasoning += 'excellent quality';
@@ -28,7 +28,7 @@ export function matchModelsForTask(task: Task): ModelRecommendation[] {
       reasoning += 'decent quality';
     }
     reasoning += ` at $${costEstimate.toFixed(4)} per task.`;
-    
+
     return {
       model,
       costEstimate,
@@ -36,7 +36,7 @@ export function matchModelsForTask(task: Task): ModelRecommendation[] {
       reasoning
     };
   });
-  
+
   return rankByEfficiency(recommendations).slice(0, 3);
 }
 

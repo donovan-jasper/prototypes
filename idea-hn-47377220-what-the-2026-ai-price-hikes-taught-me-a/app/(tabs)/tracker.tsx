@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScrollView, StyleSheet, View, ActivityIndicator, Alert } from 'react-native';
-import { Text, Button, Divider, Card, Chip, ProgressBar, Dialog, Portal, TextInput, useTheme } from 'react-native-paper';
+import { ScrollView, StyleSheet, View, ActivityIndicator, Alert, Platform } from 'react-native';
+import { Text, Button, Divider, Card, Chip, ProgressBar, TextInput, useTheme, Portal, Modal } from 'react-native-paper';
 import CostChart from '../../components/CostChart';
 import { getUsageHistory, getMonthlyTotal, logUsage, getSetting } from '../../services/database';
 import { UsageEntry, AIModel, TaskType } from '../../types/models';
-import { projectMonthlyCost, calculateSavings } from '../../services/costCalculator';
+import { projectMonthlyCost, calculateCost } from '../../services/costCalculator';
 import { getAllModels, getModelById } from '../../services/modelService';
 import { Picker } from '@react-native-picker/picker';
 
@@ -18,55 +18,56 @@ export default function TrackerScreen() {
   const [models, setModels] = useState<AIModel[]>([]);
 
   // State for manual usage logging form
+  const [showLogForm, setShowLogForm] = useState(false);
   const [formModelId, setFormModelId] = useState<string>('');
   const [formTaskType, setFormTaskType] = useState<TaskType | ''>('');
   const [formInputTokens, setFormInputTokens] = useState<string>('');
   const [formOutputTokens, setFormOutputTokens] = useState<string>('');
-  const [formCost, setFormCost] = useState<string>('');
+  const [calculatedCost, setCalculatedCost] = useState<number | null>(null);
   const [isLogging, setIsLogging] = useState(false);
 
-  // State for What-If scenario
-  const [whatIfVisible, setWhatIfVisible] = useState(false);
-  const [whatIfModel, setWhatIfModel] = useState<string>('');
-  const [whatIfSavings, setWhatIfSavings] = useState<number>(0);
+  // Data for CostChart
+  const [dailyChartData, setDailyChartData] = useState<Array<{ date: string; cost: number }>>([]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const history = await getUsageHistory();
       const total = await getMonthlyTotal();
-      const allModels = await getAllModels();
+      const allModels = getAllModels();
 
       setUsageHistory(history);
       setMonthlyTotal(total);
       setModels(allModels);
 
-      // Prepare data for chart: group by date for daily totals
+      // Prepare data for chart and projection: group by date for daily totals
       const dailyChartDataMap = history.reduce((acc, entry) => {
-        const date = new Date(entry.timestamp).toISOString().split('T')[0];
+        const date = new Date(entry.timestamp).toISOString().split('T')[0]; // YYYY-MM-DD
         acc.set(date, (acc.get(date) || 0) + entry.cost);
         return acc;
       }, new Map<string, number>());
 
-      const chartData = Array.from(dailyChartDataMap.entries())
+      const chartDataForProjection = Array.from(dailyChartDataMap.entries())
         .map(([date, cost]) => ({ date, cost }))
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+      
+      setDailyChartData(chartDataForProjection); // Set for CostChart
 
       // Project monthly cost
-      const projected = projectMonthlyCost(chartData);
+      const projected = projectMonthlyCost(chartDataForProjection);
       setProjectedCost(projected);
 
       // Load budget limit
       const limit = await getSetting('budget_limit');
       if (limit) setBudgetLimit(parseFloat(limit));
 
-      // Set initial form model if models are available and not already set
+      // Initialize formModelId if models are available and not already set
       if (allModels.length > 0 && !formModelId) {
         setFormModelId(allModels[0].id);
       }
-      // Set initial form task type if not already set
+      // Initialize formTaskType if not already set
       if (!formTaskType) {
-        setFormTaskType(TaskType.TEXT_GENERATION); // Default task type
+        setFormTaskType(TaskType.TEXT_GENERATION);
       }
 
     } catch (error) {
@@ -75,45 +76,62 @@ export default function TrackerScreen() {
     } finally {
       setLoading(false);
     }
-  }, [formModelId, formTaskType]); // Dependencies to avoid re-setting defaults if user has selected something
+  }, [formModelId, formTaskType]); // Added formModelId, formTaskType to dependencies to avoid re-initializing if already set
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
+  // Effect to calculate cost dynamically when form inputs change
+  useEffect(() => {
+    const calculateEstimatedCost = () => {
+      const selectedModel = getModelById(formModelId);
+      const input = parseInt(formInputTokens, 10);
+      const output = parseInt(formOutputTokens, 10);
+
+      if (selectedModel && !isNaN(input) && !isNaN(output) && input >= 0 && output >= 0) {
+        const cost = calculateCost(selectedModel, input, output);
+        setCalculatedCost(cost);
+      } else {
+        setCalculatedCost(null);
+      }
+    };
+    calculateEstimatedCost();
+  }, [formModelId, formInputTokens, formOutputTokens, models]); // Re-calculate when these change
+
   const handleLogUsage = async () => {
-    if (!formModelId || !formTaskType || !formInputTokens || !formOutputTokens || !formCost) {
-      Alert.alert('Missing Information', 'Please fill in all fields.');
+    if (!formModelId || !formTaskType || !formInputTokens || !formOutputTokens || calculatedCost === null || calculatedCost < 0) {
+      Alert.alert('Missing Information', 'Please fill in all fields and ensure a valid cost is calculated.');
       return;
     }
 
     const inputTokensNum = parseInt(formInputTokens, 10);
     const outputTokensNum = parseInt(formOutputTokens, 10);
-    const costNum = parseFloat(formCost);
 
-    if (isNaN(inputTokensNum) || isNaN(outputTokensNum) || isNaN(costNum) || inputTokensNum < 0 || outputTokensNum < 0 || costNum < 0) {
-      Alert.alert('Invalid Input', 'Please enter valid positive numbers for tokens and cost.');
+    if (isNaN(inputTokensNum) || isNaN(outputTokensNum) || inputTokensNum < 0 || outputTokensNum < 0) {
+      Alert.alert('Invalid Input', 'Please enter valid positive numbers for tokens.');
       return;
     }
 
     setIsLogging(true);
     try {
-      const newEntry: UsageEntry = {
+      await logUsage({
         modelId: formModelId,
-        taskType: formTaskType as TaskType, // Cast to TaskType
+        taskType: formTaskType,
         inputTokens: inputTokensNum,
         outputTokens: outputTokensNum,
-        cost: costNum,
+        cost: calculatedCost,
         timestamp: Date.now(),
-      };
-      await logUsage(newEntry);
+      });
       Alert.alert('Success', 'Usage logged successfully!');
-      // Clear form
+      // Reset form
+      setFormModelId(models.length > 0 ? models[0].id : '');
+      setFormTaskType(TaskType.TEXT_GENERATION);
       setFormInputTokens('');
       setFormOutputTokens('');
-      setFormCost('');
-      // Reload data to update totals and history
-      await loadData();
+      setCalculatedCost(null);
+      setShowLogForm(false); // Close modal
+      loadData(); // Reload all data
     } catch (error) {
       console.error('Error logging usage:', error);
       Alert.alert('Error', 'Failed to log usage. Please try again.');
@@ -122,115 +140,50 @@ export default function TrackerScreen() {
     }
   };
 
-  const getBudgetProgress = () => {
-    if (!budgetLimit || !projectedCost) return 0;
-    return Math.min(projectedCost / budgetLimit, 1);
-  };
-
-  const getBudgetStatusColor = () => {
-    const progress = getBudgetProgress();
-    if (progress > 0.9) return theme.colors.error; // Red
-    if (progress > 0.7) return '#ff9800'; // Orange
-    return theme.colors.primary; // Green
-  };
-
-  const calculateWhatIfSavings = () => {
-    if (!whatIfModel) return 0;
-
-    const selectedModel = models.find(m => m.id === whatIfModel);
-    if (!selectedModel) return 0;
-
-    // Calculate total savings if all *past* tasks used this model instead
-    const totalSavings = usageHistory.reduce((sum, entry) => {
-      const currentModel = getModelById(entry.modelId); // Use getModelById to ensure we have the full model object
-      if (currentModel) {
-        const savings = calculateSavings(
-          currentModel,
-          selectedModel,
-          entry.inputTokens,
-          entry.outputTokens
-        );
-        return sum + savings;
-      }
-      return sum;
-    }, 0);
-
-    return totalSavings;
-  };
-
-  const handleWhatIfSubmit = () => {
-    const savings = calculateWhatIfSavings();
-    setWhatIfSavings(savings);
-  };
+  const currentMonthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+  const budgetProgress = budgetLimit ? monthlyTotal / budgetLimit : 0;
+  const budgetColor = budgetProgress > 0.9 ? theme.colors.error : budgetProgress > 0.75 ? theme.colors.warning : theme.colors.primary;
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <View style={[styles.container, styles.loadingContainer]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading your cost data...</Text>
+        <Text style={styles.loadingText}>Loading cost data...</Text>
       </View>
     );
   }
 
-  // Prepare data for CostChart component (re-calculate if usageHistory changes)
-  const dailyChartDataMap = usageHistory.reduce((acc, entry) => {
-    const date = new Date(entry.timestamp).toISOString().split('T')[0];
-    acc.set(date, (acc.get(date) || 0) + entry.cost);
-    return acc;
-  }, new Map<string, number>());
-
-  const chartDataForComponent = Array.from(dailyChartDataMap.entries())
-    .map(([date, cost]) => ({ date, cost }))
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text variant="headlineMedium" style={styles.title}>
-          Cost Tracker
-        </Text>
-        <Text variant="bodyMedium" style={styles.subtitle}>
-          Monitor your AI spending and identify savings opportunities
-        </Text>
-      </View>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <Text variant="headlineMedium" style={styles.headerTitle}>
+        AI Cost Tracker
+      </Text>
 
-      {/* Monthly Total Display */}
-      <Card style={styles.summaryCard}>
+      {/* Current Month's Total */}
+      <Card style={styles.totalCard}>
         <Card.Content>
-          <View style={styles.summaryRow}>
-            <View>
-              <Text variant="titleMedium">Monthly Total</Text>
-              <Text variant="headlineSmall" style={styles.totalAmount}>
-                ${monthlyTotal.toFixed(2)}
-              </Text>
-            </View>
-            {projectedCost !== null && (
-              <View style={styles.projectionContainer}>
-                <Text variant="bodySmall" style={styles.projectionLabel}>
-                  Projected
-                </Text>
-                <Text variant="bodyLarge" style={styles.projectionAmount}>
-                  ${projectedCost.toFixed(2)}
-                </Text>
-              </View>
-            )}
-          </View>
-          {budgetLimit !== null && projectedCost !== null && (
-            <View style={styles.budgetProgressContainer}>
-              <Text variant="bodySmall" style={styles.budgetLabel}>
+          <Text variant="titleMedium" style={styles.cardTitle}>
+            {currentMonthName} Total
+          </Text>
+          <Text variant="displaySmall" style={styles.monthlyTotalText}>
+            ${monthlyTotal.toFixed(2)}
+          </Text>
+          {projectedCost !== null && (
+            <Text variant="bodyMedium" style={styles.projectedText}>
+              Projected: ${projectedCost.toFixed(2)}
+            </Text>
+          )}
+          {budgetLimit !== null && (
+            <View style={styles.budgetContainer}>
+              <Text variant="bodySmall" style={styles.budgetText}>
                 Budget: ${budgetLimit.toFixed(2)}
               </Text>
-              <ProgressBar
-                progress={getBudgetProgress()}
-                color={getBudgetStatusColor()}
-                style={styles.progressBar}
-              />
-              {getBudgetProgress() >= 1 && (
-                <Text style={{ color: theme.colors.error, marginTop: 4 }}>
-                  You are over your budget limit!
-                </Text>
-              )}
+              <ProgressBar progress={budgetProgress} color={budgetColor} style={styles.progressBar} />
+              <Text variant="bodySmall" style={styles.budgetRemainingText}>
+                {budgetLimit - monthlyTotal > 0
+                  ? `$${(budgetLimit - monthlyTotal).toFixed(2)} remaining`
+                  : `$${(monthlyTotal - budgetLimit).toFixed(2)} over budget`}
+              </Text>
             </View>
           )}
         </Card.Content>
@@ -238,184 +191,136 @@ export default function TrackerScreen() {
 
       <Divider style={styles.divider} />
 
-      {/* Manual Usage Logging Form */}
-      <Card style={styles.formCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.formTitle}>Log New Usage</Text>
-
-          <Text style={styles.pickerLabel}>Select Model:</Text>
-          <Picker
-            selectedValue={formModelId}
-            onValueChange={(itemValue) => setFormModelId(itemValue)}
-            style={styles.picker}
-            itemStyle={styles.pickerItem}
-          >
-            {models.length === 0 ? (
-              <Picker.Item label="No models available" value="" />
-            ) : (
-              models.map((model) => (
-                <Picker.Item key={model.id} label={model.name} value={model.id} />
-              ))
-            )}
-          </Picker>
-
-          <Text style={styles.pickerLabel}>Select Task Type:</Text>
-          <Picker
-            selectedValue={formTaskType}
-            onValueChange={(itemValue) => setFormTaskType(itemValue)}
-            style={styles.picker}
-            itemStyle={styles.pickerItem}
-          >
-            {Object.values(TaskType).map((type) => (
-              <Picker.Item key={type} label={type.replace(/_/g, ' ').toUpperCase()} value={type} />
-            ))}
-          </Picker>
-
-          <TextInput
-            label="Input Tokens"
-            value={formInputTokens}
-            onChangeText={setFormInputTokens}
-            keyboardType="numeric"
-            mode="outlined"
-            style={styles.input}
-          />
-          <TextInput
-            label="Output Tokens"
-            value={formOutputTokens}
-            onChangeText={setFormOutputTokens}
-            keyboardType="numeric"
-            mode="outlined"
-            style={styles.input}
-          />
-          <TextInput
-            label="Cost ($)"
-            value={formCost}
-            onChangeText={setFormCost}
-            keyboardType="numeric"
-            mode="outlined"
-            style={styles.input}
-          />
-
-          <Button
-            mode="contained"
-            onPress={handleLogUsage}
-            loading={isLogging}
-            disabled={isLogging || models.length === 0}
-            style={styles.logButton}
-            icon="plus-circle"
-          >
-            Log Usage
-          </Button>
-        </Card.Content>
-      </Card>
-
-      <Divider style={styles.divider} />
-
       {/* Cost Chart */}
-      <CostChart data={chartDataForComponent} />
+      <CostChart data={dailyChartData} />
 
       <Divider style={styles.divider} />
 
-      {/* Recent Usage Entries */}
-      <View style={styles.recentUsageContainer}>
-        <Text variant="titleMedium" style={styles.recentUsageTitle}>Recent Usage</Text>
-        {usageHistory.length === 0 ? (
-          <Text style={styles.emptyStateText}>No recent usage entries. Log some AI tasks!</Text>
-        ) : (
-          usageHistory.map((entry, index) => {
+      {/* Log New Usage Button */}
+      <Button
+        mode="contained"
+        icon="plus-circle"
+        onPress={() => setShowLogForm(true)}
+        style={styles.logButton}
+        labelStyle={styles.logButtonLabel}
+      >
+        Log New AI Usage
+      </Button>
+
+      {/* Manual Usage Logging Form Modal */}
+      <Portal>
+        <Modal visible={showLogForm} onDismiss={() => setShowLogForm(false)} contentContainerStyle={styles.modalContent}>
+          <ScrollView>
+            <Text variant="titleLarge" style={styles.formTitle}>Log New Usage Entry</Text>
+
+            <Text style={styles.pickerLabel}>AI Model:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={formModelId}
+                onValueChange={(itemValue) => setFormModelId(itemValue as string)}
+                style={styles.picker}
+              >
+                {models.map((model) => (
+                  <Picker.Item key={model.id} label={model.name} value={model.id} />
+                ))}
+              </Picker>
+            </View>
+
+            <Text style={styles.pickerLabel}>Task Type:</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={formTaskType}
+                onValueChange={(itemValue) => setFormTaskType(itemValue as TaskType)}
+                style={styles.picker}
+              >
+                {Object.values(TaskType).map((type) => (
+                  <Picker.Item key={type} label={type.replace(/_/g, ' ').toUpperCase()} value={type} />
+                ))}
+              </Picker>
+            </View>
+
+            <TextInput
+              label="Input Tokens"
+              value={formInputTokens}
+              onChangeText={setFormInputTokens}
+              keyboardType="numeric"
+              mode="outlined"
+              style={styles.input}
+            />
+            <TextInput
+              label="Output Tokens"
+              value={formOutputTokens}
+              onChangeText={setFormOutputTokens}
+              keyboardType="numeric"
+              mode="outlined"
+              style={styles.input}
+            />
+
+            {calculatedCost !== null && (
+              <Text variant="titleMedium" style={styles.calculatedCostText}>
+                Estimated Cost: ${calculatedCost.toFixed(4)}
+              </Text>
+            )}
+
+            <Button
+              mode="contained"
+              onPress={handleLogUsage}
+              loading={isLogging}
+              disabled={isLogging || calculatedCost === null || calculatedCost < 0}
+              style={styles.submitButton}
+            >
+              Log Usage
+            </Button>
+            <Button
+              mode="outlined"
+              onPress={() => setShowLogForm(false)}
+              style={styles.cancelButton}
+            >
+              Cancel
+            </Button>
+          </ScrollView>
+        </Modal>
+      </Portal>
+
+      <Divider style={styles.divider} />
+
+      {/* Recently Logged Usage */}
+      <Text variant="titleLarge" style={styles.sectionTitle}>
+        Recent Usage History
+      </Text>
+      {usageHistory.length === 0 ? (
+        <Text style={styles.emptyHistoryText}>No usage logged yet. Start logging above!</Text>
+      ) : (
+        <View style={styles.historyList}>
+          {usageHistory.map((entry) => {
             const model = getModelById(entry.modelId);
+            const entryDate = new Date(entry.timestamp);
             return (
-              <Card key={entry.id || index} style={styles.usageEntryCard}>
+              <Card key={entry.id} style={styles.historyCard}>
                 <Card.Content>
-                  <View style={styles.usageEntryHeader}>
-                    <Text variant="titleSmall" style={styles.usageModelName}>
+                  <View style={styles.historyCardHeader}>
+                    <Text variant="titleMedium" style={styles.historyModelName}>
                       {model?.name || entry.modelId}
                     </Text>
-                    <Chip style={styles.costChip} textStyle={{ color: theme.colors.onPrimaryContainer }}>
+                    <Chip style={styles.historyCostChip} textStyle={styles.historyCostChipText}>
                       ${entry.cost.toFixed(4)}
                     </Chip>
                   </View>
-                  <Text variant="bodySmall" style={styles.usageDetails}>
+                  <Text variant="bodyMedium">
                     Task: {entry.taskType.replace(/_/g, ' ').toUpperCase()}
                   </Text>
-                  <Text variant="bodySmall" style={styles.usageDetails}>
-                    Tokens: {entry.inputTokens} (in) / {entry.outputTokens} (out)
+                  <Text variant="bodySmall" style={styles.historyTokens}>
+                    Input: {entry.inputTokens} tokens | Output: {entry.outputTokens} tokens
                   </Text>
-                  <Text variant="bodySmall" style={styles.usageTimestamp}>
-                    {new Date(entry.timestamp).toLocaleString()}
+                  <Text variant="bodySmall" style={styles.historyTimestamp}>
+                    {entryDate.toLocaleString()}
                   </Text>
                 </Card.Content>
               </Card>
             );
-          })
-        )}
-      </View>
-
-      <Divider style={styles.divider} />
-
-      {/* What-If Scenario */}
-      <Card style={styles.whatIfCard}>
-        <Card.Content>
-          <Text variant="titleMedium" style={styles.whatIfTitle}>What-If Scenario</Text>
-          <Text variant="bodyMedium" style={styles.whatIfSubtitle}>
-            See potential savings if you switched models.
-          </Text>
-          <Button mode="outlined" onPress={() => {
-            setWhatIfVisible(true);
-            setWhatIfSavings(0); // Reset savings when opening dialog
-            if (models.length > 0 && !whatIfModel) {
-              setWhatIfModel(models[0].id); // Set default model for what-if
-            }
-          }} style={styles.whatIfButton}>
-            Calculate Savings
-          </Button>
-        </Card.Content>
-      </Card>
-
-      <Portal>
-        <Dialog visible={whatIfVisible} onDismiss={() => setWhatIfVisible(false)}>
-          <Dialog.Title>Calculate What-If Savings</Dialog.Title>
-          <Dialog.Content>
-            <Text>Select an alternative model to compare against your past usage:</Text>
-            <Picker
-              selectedValue={whatIfModel}
-              onValueChange={(itemValue) => {
-                setWhatIfModel(itemValue);
-                setWhatIfSavings(0); // Reset savings when model changes
-              }}
-              style={styles.picker}
-              itemStyle={styles.pickerItem}
-            >
-              {models.length === 0 ? (
-                <Picker.Item label="No models available" value="" />
-              ) : (
-                models.map((model) => (
-                  <Picker.Item key={model.id} label={model.name} value={model.id} />
-                ))
-              )}
-            </Picker>
-            {whatIfSavings !== 0 && (
-              <Text style={styles.whatIfResult}>
-                {whatIfSavings > 0 ? 'Projected savings:' : 'Projected additional cost:'}{' '}
-                <Text style={{ fontWeight: 'bold', color: whatIfSavings > 0 ? theme.colors.primary : theme.colors.error }}>
-                  ${Math.abs(whatIfSavings).toFixed(2)}
-                </Text>
-              </Text>
-            )}
-            {whatIfModel && whatIfSavings === 0 && (
-                <Text style={styles.whatIfResult}>
-                    Select a model and tap 'Calculate' to see potential changes.
-                </Text>
-            )}
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setWhatIfVisible(false)}>Cancel</Button>
-            <Button onPress={handleWhatIfSubmit} disabled={!whatIfModel}>Calculate</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-
-      <View style={{ height: 50 }} /> {/* Spacer at the bottom */}
+          })}
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -423,120 +328,176 @@ export default function TrackerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f5f5', // Light background
+  },
+  contentContainer: {
+    paddingBottom: 24,
   },
   loadingContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
-  header: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  title: {
+  headerTitle: {
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#333',
+    textAlign: 'center',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  subtitle: {
-    color: '#666',
-  },
-  summaryCard: {
-    marginHorizontal: 16,
-    marginVertical: 8,
+  totalCard: {
+    margin: 16,
     borderRadius: 12,
     elevation: 2,
+    backgroundColor: '#fff',
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  cardTitle: {
+    marginBottom: 8,
+    color: '#666',
+  },
+  monthlyTotalText: {
+    fontWeight: 'bold',
+    color: '#4CAF50', // Green for cost
+    marginBottom: 4,
+  },
+  projectedText: {
+    color: '#888',
     marginBottom: 12,
   },
-  totalAmount: {
+  budgetContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  budgetText: {
+    marginBottom: 8,
     fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  projectionContainer: {
-    alignItems: 'flex-end',
-  },
-  projectionLabel: {
-    color: '#666',
-  },
-  projectionAmount: {
-    fontWeight: 'bold',
-    color: '#2196F3',
-  },
-  budgetProgressContainer: {
-    marginTop: 8,
-  },
-  budgetLabel: {
-    marginBottom: 4,
-    color: '#666',
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
+    marginBottom: 8,
+  },
+  budgetRemainingText: {
+    textAlign: 'right',
+    color: '#888',
   },
   divider: {
-    marginVertical: 16,
+    marginVertical: 20,
     marginHorizontal: 16,
-    backgroundColor: '#e0e0e0',
-  },
-  formCard: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 12,
-    elevation: 2,
-  },
-  formTitle: {
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  input: {
-    marginBottom: 12,
-  },
-  pickerLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-    marginLeft: 12,
-  },
-  picker: {
-    height: 50,
-    marginBottom: 12,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    justifyContent: 'center', // Center content vertically
-  },
-  pickerItem: {
-    fontSize: 16,
-    height: 50, // Ensure item height matches picker height
+    backgroundColor: '#eee',
   },
   logButton: {
-    marginTop: 10,
-    paddingVertical: 8,
-  },
-  recentUsageContainer: {
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginVertical: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
   },
-  recentUsage
+  logButtonLabel: {
+    fontSize: 16,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 12,
+    maxHeight: '80%', // Limit height for scrollability
+  },
+  formTitle: {
+    marginBottom: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  pickerLabel: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden', // Ensures picker doesn't overflow border radius
+  },
+  picker: {
+    height: Platform.OS === 'ios' ? 150 : 50, // Adjust height for iOS picker
+    width: '100%',
+  },
+  input: {
+    marginBottom: 16,
+  },
+  calculatedCostText: {
+    textAlign: 'center',
+    marginVertical: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  submitButton: {
+    marginTop: 20,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  cancelButton: {
+    marginTop: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  sectionTitle: {
+    marginHorizontal: 16,
+    marginBottom: 16,
+    fontWeight: 'bold',
+  },
+  emptyHistoryText: {
+    textAlign: 'center',
+    color: '#888',
+    marginTop: 20,
+    marginBottom: 40,
+  },
+  historyList: {
+    marginHorizontal: 16,
+  },
+  historyCard: {
+    marginBottom: 12,
+    borderRadius: 8,
+    elevation: 1,
+    backgroundColor: '#fff',
+  },
+  historyCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  historyModelName: {
+    fontWeight: 'bold',
+    flexShrink: 1,
+    marginRight: 8,
+  },
+  historyCostChip: {
+    backgroundColor: '#E8F5E9', // Light green background
+  },
+  historyCostChipText: {
+    color: '#2E7D32', // Darker green text
+    fontWeight: 'bold',
+  },
+  historyTokens: {
+    color: '#777',
+    marginTop: 4,
+  },
+  historyTimestamp: {
+    color: '#999',
+    marginTop: 8,
+    fontSize: 12,
+    textAlign: 'right',
+  },
+});

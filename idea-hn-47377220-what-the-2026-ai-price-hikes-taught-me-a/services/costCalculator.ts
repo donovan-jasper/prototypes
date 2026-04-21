@@ -1,188 +1,26 @@
 import { AIModel } from '../types/models';
-import { getAIRecommendation } from './aiService';
 
-export function calculateCost(
-  model: AIModel,
-  inputTokens: number,
-  outputTokens: number
-): number {
+export function calculateCost(model: AIModel, inputTokens: number, outputTokens: number): number {
   const inputCost = (inputTokens / 1000) * model.inputCostPer1k;
   const outputCost = (outputTokens / 1000) * model.outputCostPer1k;
   return inputCost + outputCost;
 }
 
-export function estimateTokens(text: string): number {
-  // Rough estimation: 1 token ≈ 4 characters for English text
-  return Math.ceil(text.length / 4);
-}
+export function projectMonthlyCost(dailyData: Array<{ date: string; cost: number }>): number {
+  if (dailyData.length === 0) return 0;
 
-export async function projectMonthlyCost(
-  history: Array<{ date: string; cost: number }>,
-  currentMonth: boolean = true
-): Promise<{ projectedCost: number; savingsOpportunities: string[] }> {
-  if (history.length === 0) {
-    return {
-      projectedCost: 0,
-      savingsOpportunities: []
-    };
-  }
+  // Calculate average daily cost
+  const totalCost = dailyData.reduce((sum, day) => sum + day.cost, 0);
+  const averageDailyCost = totalCost / dailyData.length;
 
-  try {
-    // Get AI projection
-    const { projectedCost, savingsOpportunities } = await getCostProjection(history, currentMonth);
+  // Get current date and days remaining in month
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysPassed = now.getDate();
+  const daysRemaining = daysInMonth - daysPassed;
 
-    return {
-      projectedCost,
-      savingsOpportunities
-    };
-  } catch (error) {
-    console.error('Error getting cost projection:', error);
-    // Fallback logic using historical usage patterns
-    const totalCost = history.reduce((sum, entry) => sum + entry.cost, 0);
-    const averageDailyCost = totalCost / history.length;
-    const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
-
-    return {
-      projectedCost,
-      savingsOpportunities: [
-        'Consider switching to cheaper models for repetitive tasks',
-        'Review your usage patterns for unusually high costs',
-        'Set up budget alerts to stay within your spending limits'
-      ]
-    };
-  }
-}
-
-export function calculateSavings(
-  currentModel: AIModel,
-  alternativeModel: AIModel,
-  inputTokens: number,
-  outputTokens: number
-): number {
-  const currentCost = calculateCost(currentModel, inputTokens, outputTokens);
-  const alternativeCost = calculateCost(alternativeModel, inputTokens, outputTokens);
-  return currentCost - alternativeCost;
-}
-
-export async function getCostRecommendation(
-  taskDescription: string,
-  currentModel: AIModel,
-  alternatives: AIModel[],
-  inputTokens: number,
-  outputTokens: number
-): Promise<string> {
-  try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI cost optimization assistant. Analyze the given task and model options, then provide a concise recommendation (1-2 sentences) about which model to choose and why, considering both cost and quality.`
-          },
-          {
-            role: 'user',
-            content: `Task: ${taskDescription}\n\nCurrent Model: ${currentModel.name} ($${calculateCost(currentModel, inputTokens, outputTokens).toFixed(4)})\n\nAlternative Models:\n${alternatives.map(model =>
-              `${model.name}: $${calculateCost(model, inputTokens, outputTokens).toFixed(4)} (${model.speedRating} speed, ${model.qualityScore}/100 quality)`
-            ).join('\n')}`
-          }
-        ],
-        max_tokens: 150,
-        temperature: 0.7
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer YOUR_OPENAI_API_KEY`
-        }
-      }
-    );
-
-    return response.data.choices[0].message.content.trim();
-  } catch (error) {
-    console.error('Error getting cost recommendation:', error);
-    return `Based on your task and available models, ${currentModel.name} is currently the most cost-effective option.`;
-  }
-}
-
-export async function getCostProjection(
-  usageHistory: Array<{ date: string; cost: number }>,
-  currentMonth: boolean = true
-): Promise<{ projectedCost: number; savingsOpportunities: string[] }> {
-  try {
-    const response = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI cost optimization assistant. Analyze the given spending history and provide:
-            1. A projected cost for the current month
-            2. 2-3 specific savings opportunities based on patterns in the data`
-          },
-          {
-            role: 'user',
-            content: `Spending History:\n${usageHistory.map(entry =>
-              `${entry.date}: $${entry.cost.toFixed(2)}`
-            ).join('\n')}\n\nCurrent month: ${currentMonth ? 'Yes' : 'No'}`
-          }
-        ],
-        max_tokens: 200,
-        temperature: 0.7
-      },
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer YOUR_OPENAI_API_KEY`
-        }
-      }
-    );
-
-    const content = response.data.choices[0].message.content;
-    const lines = content.split('\n');
-
-    // Parse the response (simplified - in production you'd want more robust parsing)
-    const projectedCost = parseFloat(lines[0].match(/\$([\d.]+)/)?.[1] || '0');
-    const savingsOpportunities = lines.slice(1).filter(line => line.trim() !== '');
-
-    return {
-      projectedCost,
-      savingsOpportunities
-    };
-  } catch (error) {
-    console.error('Error getting cost projection:', error);
-    // Fallback logic using historical usage patterns
-    const totalCost = usageHistory.reduce((sum, entry) => sum + entry.cost, 0);
-    const averageDailyCost = totalCost / usageHistory.length;
-    const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
-
-    return {
-      projectedCost,
-      savingsOpportunities: [
-        'Consider switching to cheaper models for repetitive tasks',
-        'Review your usage patterns for unusually high costs',
-        'Set up budget alerts to stay within your spending limits'
-      ]
-    };
-  }
-}
-
-export function getFallbackCostProjection(
-  usageHistory: Array<{ date: string; cost: number }>,
-  currentMonth: boolean = true
-): { projectedCost: number; savingsOpportunities: string[] } {
-  const totalCost = usageHistory.reduce((sum, entry) => sum + entry.cost, 0);
-  const averageDailyCost = totalCost / usageHistory.length;
-  const projectedCost = averageDailyCost * (currentMonth ? 30 : 30.44); // Approximate days in a month
-
-  return {
-    projectedCost,
-    savingsOpportunities: [
-      'Consider switching to cheaper models for repetitive tasks',
-      'Review your usage patterns for unusually high costs',
-      'Set up budget alerts to stay within your spending limits'
-    ]
-  };
+  // Projected cost = current total + (average daily cost * days remaining)
+  return totalCost + (averageDailyCost * daysRemaining);
 }

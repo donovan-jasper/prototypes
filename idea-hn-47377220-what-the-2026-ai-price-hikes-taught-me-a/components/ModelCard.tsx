@@ -1,51 +1,21 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, Chip, Button, ActivityIndicator } from 'react-native-paper';
+import { Card, Text, Chip } from 'react-native-paper';
 import { ModelRecommendation } from '../types/models';
-import { calculateSavings } from '../services/costCalculator';
-import { getAIRecommendation } from '../services/aiService';
 
 interface Props {
   recommendation: ModelRecommendation;
   rank: number;
-  onSelect?: (modelId: string) => void;
-  currentModelId?: string;
-  taskDescription?: string;
 }
 
-export default function ModelCard({ recommendation, rank, onSelect, currentModelId, taskDescription }: Props) {
+export default function ModelCard({ recommendation, rank }: Props) {
   const { model, costEstimate, reasoning } = recommendation;
-  const [aiExplanation, setAiExplanation] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (taskDescription && rank === 1) {
-      generateAIExplanation();
-    }
-  }, [taskDescription]);
-
-  const generateAIExplanation = async () => {
-    if (!taskDescription) return;
-
-    setIsLoading(true);
-    try {
-      const explanation = await getAIRecommendation(taskDescription, [recommendation]);
-      setAiExplanation(explanation);
-    } catch (error) {
-      console.error('Failed to generate AI explanation:', error);
-      setAiExplanation('This model offers the best balance of cost and quality for your task.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const getBadgeColor = () => {
-    if (rank === 1) return '#4CAF50';
-    if (rank === 2) return '#2196F3';
-    return '#FF9800';
+    if (rank === 1) return '#4CAF50'; 
+    if (rank === 2) return '#2196F3'; 
+    return '#FF9800'; 
   };
-
-  const isCurrentModel = currentModelId === model.id;
 
   return (
     <Card style={styles.card}>
@@ -76,20 +46,9 @@ export default function ModelCard({ recommendation, rank, onSelect, currentModel
           </Text>
         </View>
 
-        {rank === 1 && taskDescription && (
-          <View style={styles.aiExplanationContainer}>
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#4CAF50" />
-            ) : (
-              <>
-                <Text variant="titleSmall" style={styles.aiTitle}>AI Explanation:</Text>
-                <Text variant="bodyMedium" style={styles.aiText}>
-                  {aiExplanation || reasoning}
-                </Text>
-              </>
-            )}
-          </View>
-        )}
+        <Text variant="bodyMedium" style={styles.reasoning}>
+          {reasoning}
+        </Text>
 
         <View style={styles.specs}>
           <Chip icon="speedometer" style={styles.specChip}>
@@ -98,18 +57,10 @@ export default function ModelCard({ recommendation, rank, onSelect, currentModel
           <Chip icon="star" style={styles.specChip}>
             Quality: {model.qualityScore}/100
           </Chip>
+          <Chip icon="book-open-variant" style={styles.specChip}>
+            Context: {model.contextWindow / 1000}k
+          </Chip>
         </View>
-
-        {onSelect && (
-          <Button
-            mode={isCurrentModel ? 'outlined' : 'contained'}
-            onPress={() => onSelect(model.id)}
-            style={styles.selectButton}
-            icon={isCurrentModel ? 'check' : 'arrow-right'}
-          >
-            {isCurrentModel ? 'Current Model' : 'Select Model'}
-          </Button>
-        )}
       </Card.Content>
     </Card>
   );
@@ -119,6 +70,12 @@ const styles = StyleSheet.create({
   card: {
     marginVertical: 8,
     marginHorizontal: 16,
+    borderRadius: 12,
+    elevation: 2, 
+    shadowColor: '#000', 
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
   },
   header: {
     marginBottom: 12,
@@ -132,9 +89,12 @@ const styles = StyleSheet.create({
   modelName: {
     fontWeight: 'bold',
     flex: 1,
+    color: '#333',
   },
   badge: {
     marginLeft: 8,
+    borderRadius: 16,
+    paddingHorizontal: 4,
   },
   badgeText: {
     color: 'white',
@@ -143,6 +103,7 @@ const styles = StyleSheet.create({
   },
   provider: {
     color: '#666',
+    fontSize: 13,
   },
   costRow: {
     flexDirection: 'row',
@@ -151,35 +112,27 @@ const styles = StyleSheet.create({
   },
   cost: {
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#4CAF50', 
     marginRight: 4,
   },
   perTask: {
     color: '#666',
+    fontSize: 14,
   },
-  aiExplanationContainer: {
-    backgroundColor: '#e8f5e9',
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 12,
-  },
-  aiTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#2e7d32',
-  },
-  aiText: {
+  reasoning: {
+    marginBottom: 12,
     lineHeight: 20,
+    color: '#444',
   },
   specs: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    flexWrap: 'wrap', 
+    gap: 8, 
+    marginTop: 8,
   },
   specChip: {
-    height: 28,
-  },
-  selectButton: {
-    marginTop: 16,
+    height: 32, 
+    backgroundColor: '#e0e0e0', 
+    color: '#333',
   },
 });
