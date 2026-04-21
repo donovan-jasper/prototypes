@@ -1,58 +1,86 @@
 import { getLocalSchema } from './snapshot';
 import { getProductionSchema } from './adapters/postgres';
 
-const getSchemaDiff = async (id: string) => {
-  const localSchema = await getLocalSchema(id);
-  const productionSchema = await getProductionSchema();
-  const diff = [];
+interface SchemaColumn {
+  name: string;
+  type: string;
+}
 
-  // Calculate schema diff
-  productionSchema.tables.forEach((table) => {
-    const localTable = localSchema.tables.find((t) => t.name === table.name);
-    if (!localTable) {
-      diff.push({
-        type: 'added',
-        tableName: table.name,
-        columns: table.columns,
-      });
-    } else {
-      const addedColumns = table.columns.filter((column) => {
-        return !localTable.columns.find((c) => c.name === column.name);
-      });
-      const removedColumns = localTable.columns.filter((column) => {
-        return !table.columns.find((c) => c.name === column.name);
-      });
+interface SchemaTable {
+  name: string;
+  columns: SchemaColumn[];
+}
 
-      if (addedColumns.length > 0) {
+interface SchemaDiffItem {
+  type: 'added' | 'removed';
+  tableName: string;
+  columns: SchemaColumn[];
+}
+
+const getSchemaDiff = async (snapshotId: string): Promise<SchemaDiffItem[]> => {
+  try {
+    const localSchema = await getLocalSchema(snapshotId);
+    const productionSchema = await getProductionSchema();
+    const diff: SchemaDiffItem[] = [];
+
+    // Check for added or modified tables
+    productionSchema.tables.forEach((prodTable: SchemaTable) => {
+      const localTable = localSchema.tables.find((t: SchemaTable) => t.name === prodTable.name);
+
+      if (!localTable) {
+        // Table was added in production
         diff.push({
           type: 'added',
-          tableName: table.name,
-          columns: addedColumns,
+          tableName: prodTable.name,
+          columns: prodTable.columns,
         });
-      }
+      } else {
+        // Check for added columns
+        const addedColumns = prodTable.columns.filter((prodColumn) => {
+          return !localTable.columns.find((localColumn) => localColumn.name === prodColumn.name);
+        });
 
-      if (removedColumns.length > 0) {
+        if (addedColumns.length > 0) {
+          diff.push({
+            type: 'added',
+            tableName: prodTable.name,
+            columns: addedColumns,
+          });
+        }
+
+        // Check for removed columns
+        const removedColumns = localTable.columns.filter((localColumn) => {
+          return !prodTable.columns.find((prodColumn) => prodColumn.name === localColumn.name);
+        });
+
+        if (removedColumns.length > 0) {
+          diff.push({
+            type: 'removed',
+            tableName: prodTable.name,
+            columns: removedColumns,
+          });
+        }
+      }
+    });
+
+    // Check for removed tables
+    localSchema.tables.forEach((localTable: SchemaTable) => {
+      const prodTable = productionSchema.tables.find((t: SchemaTable) => t.name === localTable.name);
+
+      if (!prodTable) {
         diff.push({
           type: 'removed',
-          tableName: table.name,
-          columns: removedColumns,
+          tableName: localTable.name,
+          columns: localTable.columns,
         });
       }
-    }
-  });
+    });
 
-  localSchema.tables.forEach((table) => {
-    const productionTable = productionSchema.tables.find((t) => t.name === table.name);
-    if (!productionTable) {
-      diff.push({
-        type: 'removed',
-        tableName: table.name,
-        columns: table.columns,
-      });
-    }
-  });
-
-  return diff;
+    return diff;
+  } catch (error) {
+    console.error('Error calculating schema diff:', error);
+    throw new Error('Failed to calculate schema differences');
+  }
 };
 
 export { getSchemaDiff };
