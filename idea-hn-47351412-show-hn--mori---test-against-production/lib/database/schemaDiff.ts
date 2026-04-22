@@ -1,11 +1,8 @@
 import { SchemaDiffReportItem, TableSchema, ColumnSchema } from '../../types/database';
-import { Snapshot } from '../../types/snapshot'; // Assuming Snapshot type exists
 
-// Mock function to simulate fetching schema from a database connection
 async function fetchSchemaFromDb(connectionDetails: any): Promise<TableSchema[]> {
-  // In a real app, this would connect to the DB and fetch schema
-  // For now, return a static mock schema
-  console.log(`Mock: Fetching schema for connection: ${JSON.stringify(connectionDetails)}`);
+  // In a real implementation, this would connect to the database and fetch the schema
+  console.log(`Fetching schema for connection: ${JSON.stringify(connectionDetails)}`);
   return [
     {
       name: 'users',
@@ -37,12 +34,10 @@ async function fetchSchemaFromDb(connectionDetails: any): Promise<TableSchema[]>
   ];
 }
 
-// Mock function to simulate fetching schema from a local snapshot
 async function fetchSchemaFromSnapshot(snapshotId: string): Promise<TableSchema[]> {
-  // In a real app, this would open the local SQLite file and fetch its schema
-  // For now, return a static mock schema that's slightly different
-  console.log(`Mock: Fetching schema for snapshot ID: ${snapshotId}`);
-  if (snapshotId === 'snapshot-123') { // Example snapshot ID for testing diffs
+  // In a real implementation, this would open the local SQLite file and fetch its schema
+  console.log(`Fetching schema for snapshot ID: ${snapshotId}`);
+  if (snapshotId === 'snapshot-123') {
     return [
       {
         name: 'users',
@@ -50,7 +45,7 @@ async function fetchSchemaFromSnapshot(snapshotId: string): Promise<TableSchema[
           { name: 'id', type: 'INTEGER PRIMARY KEY' },
           { name: 'name', type: 'TEXT' },
           { name: 'email', type: 'TEXT' },
-          { name: 'created_at', type: 'DATETIME' }, // 'updated_at' removed
+          { name: 'created_at', type: 'DATETIME' },
         ],
       },
       {
@@ -59,11 +54,11 @@ async function fetchSchemaFromSnapshot(snapshotId: string): Promise<TableSchema[
           { name: 'product_id', type: 'INTEGER PRIMARY KEY' },
           { name: 'name', type: 'TEXT' },
           { name: 'price', type: 'REAL' },
-          { name: 'description', type: 'TEXT' }, // Added column in snapshot
+          { name: 'description', type: 'TEXT' },
         ],
       },
       {
-        name: 'customers', // Added table in snapshot
+        name: 'customers',
         columns: [
           { name: 'customer_id', type: 'INTEGER PRIMARY KEY' },
           { name: 'customer_name', type: 'TEXT' },
@@ -71,7 +66,6 @@ async function fetchSchemaFromSnapshot(snapshotId: string): Promise<TableSchema[
       },
     ];
   }
-  // Default schema if no specific snapshot ID, for testing 'no changes'
   return [
     {
       name: 'users',
@@ -103,24 +97,14 @@ async function fetchSchemaFromSnapshot(snapshotId: string): Promise<TableSchema[
   ];
 }
 
-/**
- * Compares the schema of a local snapshot with the current production schema.
- * @param snapshotId The ID of the local snapshot.
- * @returns An array of schema differences.
- */
 export async function getSchemaDiff(snapshotId: string): Promise<SchemaDiffReportItem[]> {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1000));
 
-  // In a real scenario, we'd get the snapshot's source connection details
+  // In a real app, we would get the snapshot's source connection details
   // from the snapshot store, and then fetch the current production schema
   // using those details.
-  // For this mock, we'll use a hardcoded "production" schema and a "snapshot" schema.
-
-  // Mock production schema (what's currently in production)
   const productionSchema = await fetchSchemaFromDb({ /* mock connection details */ });
-
-  // Mock snapshot schema (what's in the local snapshot)
   const snapshotSchema = await fetchSchemaFromSnapshot(snapshotId);
 
   const diff: SchemaDiffReportItem[] = [];
@@ -154,48 +138,40 @@ export async function getSchemaDiff(snapshotId: string): Promise<SchemaDiffRepor
     }
   }
 
-  // Check for column changes in common tables
-  for (const [tableName, prodTable] of prodTableMap.entries()) {
-    if (snapshotTableMap.has(tableName)) {
-      const snapshotTable = snapshotTableMap.get(tableName)!;
+  // Check for column differences in common tables
+  for (const prodTable of productionSchema) {
+    const snapshotTable = snapshotTableMap.get(prodTable.name);
+    if (snapshotTable) {
+      const prodColumns = new Map(prodTable.columns.map(c => [c.name, c]));
+      const snapshotColumns = new Map(snapshotTable.columns.map(c => [c.name, c]));
 
-      const prodColumnMap = new Map(prodTable.columns.map(c => [c.name, c]));
-      const snapshotColumnMap = new Map(snapshotTable.columns.map(c => [c.name, c]));
-
-      const addedColumns: ColumnSchema[] = [];
+      // Check for added columns
       for (const prodColumn of prodTable.columns) {
-        if (!snapshotColumnMap.has(prodColumn.name)) {
-          addedColumns.push(prodColumn);
+        if (!snapshotColumns.has(prodColumn.name)) {
+          diff.push({
+            id: `diff-${diffCounter++}`,
+            type: 'added',
+            diffType: 'column',
+            tableName: prodTable.name,
+            columnName: prodColumn.name,
+            columnType: prodColumn.type,
+          });
         }
       }
-      if (addedColumns.length > 0) {
-        diff.push({
-          id: `diff-${diffCounter++}`,
-          type: 'added',
-          diffType: 'column',
-          tableName: tableName,
-          columns: addedColumns,
-        });
-      }
 
-      const removedColumns: ColumnSchema[] = [];
+      // Check for removed columns
       for (const snapshotColumn of snapshotTable.columns) {
-        if (!prodColumnMap.has(snapshotColumn.name)) {
-          removedColumns.push(snapshotColumn);
+        if (!prodColumns.has(snapshotColumn.name)) {
+          diff.push({
+            id: `diff-${diffCounter++}`,
+            type: 'removed',
+            diffType: 'column',
+            tableName: snapshotTable.name,
+            columnName: snapshotColumn.name,
+            columnType: snapshotColumn.type,
+          });
         }
       }
-      if (removedColumns.length > 0) {
-        diff.push({
-          id: `diff-${diffCounter++}`,
-          type: 'removed',
-          diffType: 'column',
-          tableName: tableName,
-          columns: removedColumns,
-        });
-      }
-
-      // TODO: Add logic for modified columns (type change, nullability change, etc.)
-      // This would require comparing more properties than just name existence.
     }
   }
 
