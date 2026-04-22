@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { Message, Task } from '../types'; 
+import { Message, Task } from '../types';
 
 export const db = SQLite.openDatabaseSync('voxcrew.db');
 
@@ -12,7 +12,8 @@ export async function initDatabase() {
       text TEXT NOT NULL,
       audio_url TEXT,
       timestamp INTEGER NOT NULL,
-      synced INTEGER DEFAULT 1 
+      synced INTEGER DEFAULT 1,
+      version INTEGER DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS tasks (
@@ -21,7 +22,8 @@ export async function initDatabase() {
       description TEXT,
       due_date INTEGER,
       completed INTEGER DEFAULT 0,
-      created_at INTEGER NOT NULL
+      created_at INTEGER NOT NULL,
+      version INTEGER DEFAULT 1
     );
 
     CREATE TABLE IF NOT EXISTS pending_messages (
@@ -37,8 +39,8 @@ export async function initDatabase() {
 
 export async function saveMessage(message: Message, synced: boolean = true) {
   await db.runAsync(
-    'INSERT INTO messages (id, channel_id, user_id, text, audio_url, timestamp, synced) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [message.id, message.channelId, message.userId, message.text, message.audioUrl || null, message.timestamp, synced ? 1 : 0]
+    'INSERT INTO messages (id, channel_id, user_id, text, audio_url, timestamp, synced, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [message.id, message.channelId, message.userId, message.text, message.audioUrl || null, message.timestamp, synced ? 1 : 0, 1]
   );
 }
 
@@ -60,10 +62,24 @@ export async function updateMessageSyncedStatus(messageId: string, synced: boole
   );
 }
 
+export async function updateMessageText(messageId: string, newText: string) {
+  await db.runAsync(
+    'UPDATE messages SET text = ?, version = version + 1 WHERE id = ?',
+    [newText, messageId]
+  );
+}
+
+export async function updateMessageVersion(messageId: string, version: number) {
+  await db.runAsync(
+    'UPDATE messages SET version = ? WHERE id = ?',
+    [version, messageId]
+  );
+}
+
 export async function saveTask(task: Task) {
   await db.runAsync(
-    'INSERT INTO tasks (id, title, description, due_date, completed, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [task.id, task.title, task.description || null, task.dueDate || null, task.completed ? 1 : 0, task.createdAt]
+    'INSERT INTO tasks (id, title, description, due_date, completed, created_at, version) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [task.id, task.title, task.description || null, task.dueDate || null, task.completed ? 1 : 0, task.createdAt, 1]
   );
 }
 
@@ -81,7 +97,12 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
   const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
   const values = Object.values(updates);
   await db.runAsync(
-    `UPDATE tasks SET ${fields} WHERE id = ?`,
+    `UPDATE tasks SET ${fields}, version = version + 1 WHERE id = ?`,
     [...values, taskId]
   );
+}
+
+export async function getPendingMessagesCount(): Promise<number> {
+  const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM pending_messages');
+  return result.count;
 }

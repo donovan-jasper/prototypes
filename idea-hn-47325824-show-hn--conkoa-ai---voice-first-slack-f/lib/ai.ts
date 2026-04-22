@@ -1,4 +1,4 @@
-import { ParsedCommand } from '../types'; // Import ParsedCommand type
+import { ParsedCommand } from '../types';
 
 export async function parseVoiceCommand(text: string): Promise<ParsedCommand> {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -12,20 +12,39 @@ export async function parseVoiceCommand(text: string): Promise<ParsedCommand> {
       messages: [
         {
           role: 'system',
-          content: `Parse voice commands into structured actions. Return JSON with the following structure:
-            {
-              "type": "message" | "task" | "query" | "status_update" | "unknown",
-              "content": "string", // The main text of the command
-              "target"?: "string", // Optional: For queries, who or what is being queried (e.g., "Sarah", "the delivery schedule")
-              "dueDate"?: number // Optional: Unix timestamp for tasks (e.g., for "tomorrow", "next week")
-            }
-            Examples:
-            - "Tell John I'll be late": { "type": "message", "content": "I'll be late" }
-            - "Add task to check electrical panel tomorrow": { "type": "task", "content": "check electrical panel", "dueDate": ${Math.floor(Date.now() / 1000) + 86400} }
-            - "What did Sarah say about the delivery?": { "type": "query", "content": "What did Sarah say about the delivery?", "target": "Sarah" }
-            - "Status update: finished north wall framing": { "type": "status_update", "content": "finished north wall framing" }
-            - "Just saying hi": { "type": "message", "content": "Just saying hi" }
-            If intent is unclear, default to 'message' or 'unknown'. Ensure all responses are valid JSON.`
+          content: `Parse voice commands into structured actions. Return JSON with:
+          - type: 'task'|'message'|'query'|'status_update'
+          - content: main content of the command (e.g., task title, message text, query text, status update text)
+          - details: additional descriptive information, especially for tasks (optional)
+          - dueDate: ISO date string if a due date is mentioned for a task (optional)
+          - target: recipient for messages or specific entity for queries (optional)
+
+          For task creation, extract the main action for 'content' and any additional description for 'details', and a 'dueDate' if specified. For example:
+          "Remind me to check the electrical panel tomorrow, it's making a strange noise" should return:
+          {
+            type: 'task',
+            content: 'Check electrical panel',
+            details: 'It\'s making a strange noise',
+            dueDate: '${new Date(Date.now() + 86400000).toISOString()}' // Example for tomorrow
+          }
+          For a message: "Tell Sarah that the north wall is finished"
+          {
+            type: 'message',
+            content: 'The north wall is finished',
+            target: 'Sarah'
+          }
+          For a query: "What did John say about the delivery?"
+          {
+            type: 'query',
+            content: 'What did John say about the delivery?',
+            target: 'John'
+          }
+          For a status update: "Status update: finished framing"
+          {
+            type: 'status_update',
+            content: 'finished framing'
+          }
+          `
         },
         {
           role: 'user',
@@ -37,15 +56,7 @@ export async function parseVoiceCommand(text: string): Promise<ParsedCommand> {
   });
 
   const data = await response.json();
-  if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
-    try {
-      return JSON.parse(data.choices[0].message.content);
-    } catch (e) {
-      console.error("Failed to parse AI response JSON:", e);
-      return { type: 'unknown', content: text }; // Fallback
-    }
-  }
-  return { type: 'unknown', content: text }; // Fallback
+  return JSON.parse(data.choices[0].message.content);
 }
 
 export async function generateResponse(query: string, context: any[]) {
@@ -60,7 +71,7 @@ export async function generateResponse(query: string, context: any[]) {
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant for field workers. Answer questions based on conversation history and task data. Be concise and direct.'
+          content: 'You are a helpful assistant for field workers. Answer questions based on conversation history and task data.'
         },
         {
           role: 'user',

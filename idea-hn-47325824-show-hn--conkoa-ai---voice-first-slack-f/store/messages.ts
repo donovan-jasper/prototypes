@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Message } from '../types'; // Ensure Message type is imported
+import { Message } from '../types';
 
 interface MessageStore {
   messages: Message[];
@@ -11,7 +11,7 @@ interface MessageStore {
 export const useMessageStore = create<MessageStore>((set) => ({
   messages: [],
   addMessage: (message) => set((state) => ({
-    messages: [message, ...state.messages]
+    messages: [message, ...state.messages] // Add new messages to the top
   })),
   setMessages: (messages) => set({ messages }),
   updateMessage: (messageId, updates) => set((state) => ({

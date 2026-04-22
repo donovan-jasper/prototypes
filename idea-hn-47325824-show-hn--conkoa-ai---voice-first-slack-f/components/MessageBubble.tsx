@@ -1,82 +1,126 @@
-import { View, Text, StyleSheet } from 'react-native';
-import { Message } from '../types'; // Import Message type
-import { MaterialIcons } from '@expo/vector-icons'; // For icons
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Message } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 
-export default function MessageBubble({ message }: { message: Message }) {
-  // Placeholder for current user ID. In a real app, this would come from auth state.
-  const isCurrentUser = message.userId === 'current-user'; 
+interface MessageBubbleProps {
+  message: Message;
+  isSynced: boolean;
+  onConflictResolve?: () => void;
+}
+
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isSynced, onConflictResolve }) => {
+  const isCurrentUser = message.userId === 'current-user';
+  const isAI = message.userId === 'AI-Assistant';
 
   return (
-    <View style={[styles.container, isCurrentUser ? styles.currentUserContainer : styles.otherUserContainer]}>
-      <View style={[styles.bubble, isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble]}>
-        <Text style={[styles.text, isCurrentUser ? styles.currentUserText : styles.otherUserText]}>
-          {message.text}
+    <View style={[
+      styles.container,
+      isCurrentUser ? styles.currentUser : isAI ? styles.aiUser : styles.otherUser
+    ]}>
+      {!isCurrentUser && (
+        <Text style={styles.username}>
+          {isAI ? 'AI Assistant' : message.userId}
         </Text>
-        <View style={styles.statusRow}>
-          <Text style={[styles.timestamp, isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp]}>
-            {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          {isCurrentUser && message.synced === false && ( // Visual indicator for unsynced messages
-            <MaterialIcons name="access-time" size={14} color={isCurrentUser ? 'white' : '#888'} style={styles.syncIcon} />
-          )}
-        </View>
+      )}
+
+      <View style={[
+        styles.bubble,
+        isCurrentUser ? styles.currentBubble : styles.otherBubble
+      ]}>
+        <Text style={styles.text}>{message.text}</Text>
+
+        {message.audioUrl && (
+          <TouchableOpacity style={styles.audioButton}>
+            <Ionicons name="play-circle" size={24} color={isCurrentUser ? 'white' : '#007AFF'} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={[
+          styles.timestamp,
+          isCurrentUser ? styles.currentTimestamp : styles.otherTimestamp
+        ]}>
+          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+
+        {!isSynced && (
+          <TouchableOpacity onPress={onConflictResolve} style={styles.syncIndicator}>
+            <Ionicons name="cloud-offline" size={16} color="#ff9500" />
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    marginVertical: 4,
-  },
-  currentUserContainer: {
-    justifyContent: 'flex-end',
-  },
-  otherUserContainer: {
-    justifyContent: 'flex-start',
-  },
-  bubble: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 18,
+    marginBottom: 16,
     maxWidth: '80%',
-    flexDirection: 'column', // To stack text and status
   },
-  currentUserBubble: {
-    backgroundColor: '#007AFF', // Blue for current user
+  currentUser: {
     alignSelf: 'flex-end',
   },
-  otherUserBubble: {
-    backgroundColor: '#E5E5EA', // Light gray for other users
+  otherUser: {
     alignSelf: 'flex-start',
+  },
+  aiUser: {
+    alignSelf: 'flex-start',
+  },
+  username: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    color: '#666',
+  },
+  bubble: {
+    padding: 12,
+    borderRadius: 18,
+    maxWidth: '100%',
+  },
+  currentBubble: {
+    backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
+  },
+  otherBubble: {
+    backgroundColor: '#f0f0f0',
+    borderBottomLeftRadius: 4,
   },
   text: {
     fontSize: 16,
+    lineHeight: 22,
   },
-  currentUserText: {
+  currentText: {
     color: 'white',
   },
-  otherUserText: {
-    color: 'black',
+  otherText: {
+    color: '#333',
   },
-  statusRow: {
+  audioButton: {
+    marginTop: 8,
+    alignSelf: 'flex-end',
+  },
+  footer: {
     flexDirection: 'row',
-    alignSelf: 'flex-end', // Align timestamp and icon to the right
-    marginTop: 4,
     alignItems: 'center',
+    marginTop: 4,
   },
   timestamp: {
-    fontSize: 10,
-    marginLeft: 8, // Space from text
+    fontSize: 12,
   },
-  currentUserTimestamp: {
-    color: 'rgba(255,255,255,0.7)', // Lighter white for current user
+  currentTimestamp: {
+    color: 'rgba(255, 255, 255, 0.7)',
+    marginRight: 8,
   },
-  otherUserTimestamp: {
-    color: '#888', // Gray for other users
+  otherTimestamp: {
+    color: 'rgba(0, 0, 0, 0.5)',
+    marginRight: 8,
   },
-  syncIcon: { // Style for sync indicator
+  syncIndicator: {
     marginLeft: 4,
   },
 });
+
+export default MessageBubble;

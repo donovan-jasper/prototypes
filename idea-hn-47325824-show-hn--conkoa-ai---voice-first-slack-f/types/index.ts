@@ -5,21 +5,24 @@ export interface Message {
   text: string;
   audioUrl?: string;
   timestamp: number;
-  synced?: boolean; // Added for offline sync status
+  synced: boolean;
+  version: number;
 }
 
 export interface Task {
   id: string;
   title: string;
   description?: string;
-  dueDate?: number; // Unix timestamp
+  dueDate?: number | null;
   completed: boolean;
   createdAt: number;
+  version?: number;
 }
 
 export interface ParsedCommand {
-  type: 'message' | 'task' | 'query' | 'status_update' | 'check_in' | 'unknown';
-  content: string;
-  target?: string; // For queries, who or what is being queried (e.g., "Sarah", "the delivery schedule")
-  dueDate?: number; // Unix timestamp for tasks (e.g., for "tomorrow", "next week")
+  type: 'task' | 'message' | 'query' | 'status_update';
+  content: string; // Main content, e.g., task title, message text, query text, status update text
+  details?: string; // Additional descriptive information, especially for tasks
+  dueDate?: string; // ISO date string for tasks
+  target?: string; // Recipient for messages, or target for queries
 }
