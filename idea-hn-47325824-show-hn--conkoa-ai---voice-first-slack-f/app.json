@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "VoxCrew",
+    "slug": "voxcrew",
+    "scheme": "voxcrew",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow VoxCrew to access your microphone for voice messages."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.voxcrew.app",
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.voxcrew.app",
+      "permissions": ["RECORD_AUDIO", "INTERNET"]
+    }
+  }
+}

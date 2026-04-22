@@ -1,18 +1,7 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import * as Permissions from 'expo-permissions';
 
 let recording: Audio.Recording | null = null;
-
-export async function checkPermissions(): Promise<'granted' | 'denied' | 'undetermined'> {
-  const { status } = await Permissions.getAsync(Permissions.AUDIO_RECORDING);
-  return status;
-}
-
-export async function requestPermissions(): Promise<'granted' | 'denied'> {
-  const { status } = await Permissions.requestAsync(Permissions.AUDIO_RECORDING);
-  return status;
-}
 
 export async function startRecording() {
   try {
@@ -41,12 +30,10 @@ export async function stopRecording() {
 }
 
 export async function transcribeAudio(audioUri: string): Promise<{ text: string }> {
-  // Read audio file as base64
   const base64 = await FileSystem.readAsStringAsync(audioUri, {
     encoding: FileSystem.EncodingType.Base64,
   });
 
-  // Call OpenAI Whisper API
   const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
     method: 'POST',
     headers: {
