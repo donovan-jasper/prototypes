@@ -182,26 +182,22 @@ export default function ScenarioModeler() {
                 <Text variant="titleMedium">Results</Text>
 
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">Equity Value:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
+                  <Text variant="bodyMedium">Equity Value:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
                     ${results.equityValue.toLocaleString()}
                   </Text>
                 </View>
 
-                <Divider style={styles.divider} />
-
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">Tax Impact:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
+                  <Text variant="bodyMedium">Tax Impact:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
                     ${results.taxImpact.toLocaleString()}
                   </Text>
                 </View>
 
-                <Divider style={styles.divider} />
-
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">AMT Impact:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
+                  <Text variant="bodyMedium">AMT Impact:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
                     ${results.amtImpact.toLocaleString()}
                   </Text>
                 </View>
@@ -249,8 +245,5 @@ const styles = StyleSheet.create({
   },
   resultValue: {
     fontWeight: 'bold',
-  },
-  divider: {
-    marginVertical: 8,
   },
 });
