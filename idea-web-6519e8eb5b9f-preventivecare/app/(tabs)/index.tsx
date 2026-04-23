@@ -7,10 +7,12 @@ import PreventiveCareCard from '../../components/PreventiveCareCard';
 import { PREVENTIVE_CARE_RECOMMENDATIONS } from '../../constants/PreventiveCare';
 import { getDatabase } from '../../lib/database';
 import { scheduleAllPreventiveCareReminders } from '../../lib/notifications';
+import { differenceInDays, format } from 'date-fns';
 
 const TodayScreen = () => {
   const { habits, user, loadHabits } = useAppStore();
   const [preventiveCareItems, setPreventiveCareItems] = useState<any[]>([]);
+  const [nextScreening, setNextScreening] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -83,11 +85,19 @@ const TodayScreen = () => {
         }
       }
 
+      const daysUntil = differenceInDays(nextDueDate, today);
+
       return {
         ...screening,
         nextDueDate,
+        daysUntil,
+        isOverdue: daysUntil < 0
       };
     }));
+
+    // Find the screening with the soonest due date
+    const sortedItems = [...itemsWithDates].sort((a, b) => a.daysUntil - b.daysUntil);
+    setNextScreening(sortedItems[0] || null);
 
     setPreventiveCareItems(itemsWithDates);
   };
@@ -136,6 +146,26 @@ const TodayScreen = () => {
         <HealthScore />
       </View>
 
+      {nextScreening && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Next Screening</Text>
+          <View style={styles.nextScreeningCard}>
+            <Text style={styles.nextScreeningTitle}>{nextScreening.name}</Text>
+            <Text style={styles.nextScreeningDate}>
+              Due: {format(nextScreening.nextDueDate, 'MMMM d, yyyy')}
+            </Text>
+            <Text style={[
+              styles.nextScreeningDays,
+              nextScreening.isOverdue ? styles.overdue : null
+            ]}>
+              {nextScreening.isOverdue
+                ? 'Overdue!'
+                : `${nextScreening.daysUntil} days remaining`}
+            </Text>
+          </View>
+        </View>
+      )}
+
       {preventiveCareItems.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Preventive Care Reminders</Text>
@@ -144,6 +174,8 @@ const TodayScreen = () => {
               key={index}
               screening={item}
               nextDueDate={item.nextDueDate}
+              daysUntil={item.daysUntil}
+              showReminderButton={true}
             />
           ))}
         </View>
@@ -169,7 +201,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 12,
     color: '#333',
   },
   emptyText: {
@@ -177,6 +209,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
     marginTop: 16,
+  },
+  nextScreeningCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  nextScreeningTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  nextScreeningDate: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 4,
+  },
+  nextScreeningDays: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#4A89DC',
+  },
+  overdue: {
+    color: '#E74C3C',
   },
 });
 

@@ -1,10 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
-import { useAppStore } from '../store/appStore';
-import { markScreeningAsCompleted } from '../lib/timeline';
-import { schedulePreventiveCareReminder } from '../lib/notifications';
+import { format, differenceInDays } from 'date-fns';
 
 interface PreventiveCareCardProps {
   screening: {
@@ -16,81 +12,72 @@ interface PreventiveCareCardProps {
     icon: string;
   };
   nextDueDate: Date;
+  daysUntil?: number;
+  onMarkComplete?: () => void;
+  onSetReminder?: () => void;
+  isCompleted?: boolean;
+  showReminderButton?: boolean;
 }
 
-const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({ screening, nextDueDate }) => {
-  const { user } = useAppStore();
-  const daysUntilDue = Math.ceil((nextDueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-
-  const handleMarkComplete = async () => {
-    if (!user) return;
-
-    // Mark as completed in timeline
-    await markScreeningAsCompleted(screening.type, user.id);
-
-    // Calculate next due date based on frequency
-    const today = new Date();
-    let nextDate = new Date(today);
-
-    if (screening.frequency === 'annual') {
-      nextDate.setFullYear(today.getFullYear() + 1);
-    } else if (screening.frequency === 'biennial') {
-      nextDate.setFullYear(today.getFullYear() + 2);
-    } else if (screening.frequency === 'every 10 years') {
-      nextDate.setFullYear(today.getFullYear() + 10);
-    }
-
-    // Schedule new reminder
-    await schedulePreventiveCareReminder(screening.type, nextDate, user.id);
-  };
-
-  const getStatusColor = () => {
-    if (daysUntilDue <= 0) return '#FF6B6B'; // Overdue
-    if (daysUntilDue <= 30) return '#FFD166'; // Due soon
-    return '#4ECDC4'; // On track
-  };
+const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
+  screening,
+  nextDueDate,
+  daysUntil,
+  onMarkComplete,
+  onSetReminder,
+  isCompleted = false,
+  showReminderButton = false,
+}) => {
+  const days = daysUntil !== undefined ? daysUntil : differenceInDays(nextDueDate, new Date());
+  const isOverdue = days < 0;
 
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Ionicons
-          name={screening.icon}
-          size={24}
-          color={getStatusColor()}
-          style={styles.icon}
-        />
-        <View style={styles.headerText}>
-          <Text style={styles.title}>{screening.name}</Text>
-          <Text style={styles.description}>{screening.description}</Text>
-        </View>
+        <Text style={styles.title}>{screening.name}</Text>
+        {isCompleted && (
+          <Text style={styles.completedBadge}>Completed</Text>
+        )}
       </View>
 
-      <View style={styles.details}>
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Frequency:</Text>
-          <Text style={styles.detailValue}>{screening.frequency}</Text>
-        </View>
+      <Text style={styles.description}>{screening.description}</Text>
 
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Next Due:</Text>
-          <Text style={styles.detailValue}>
-            {format(nextDueDate, 'MMM d, yyyy')}
-            {daysUntilDue > 0 ? ` (in ${daysUntilDue} days)` : ' (overdue)'}
-          </Text>
-        </View>
-
-        <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Importance:</Text>
-          <Text style={styles.detailValue}>{screening.importance}</Text>
-        </View>
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Frequency:</Text>
+        <Text style={styles.detailValue}>{screening.frequency}</Text>
       </View>
 
-      <TouchableOpacity
-        style={[styles.button, { backgroundColor: getStatusColor() }]}
-        onPress={handleMarkComplete}
-      >
-        <Text style={styles.buttonText}>Mark as Completed</Text>
-      </TouchableOpacity>
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Next Due:</Text>
+        <Text style={styles.detailValue}>{format(nextDueDate, 'MMM d, yyyy')}</Text>
+      </View>
+
+      <View style={styles.detailsRow}>
+        <Text style={styles.detailLabel}>Days Until:</Text>
+        <Text style={[styles.detailValue, isOverdue ? styles.overdue : null]}>
+          {isOverdue ? 'Overdue!' : days}
+        </Text>
+      </View>
+
+      <View style={styles.actions}>
+        {onMarkComplete && (
+          <TouchableOpacity
+            style={[styles.button, styles.completeButton]}
+            onPress={onMarkComplete}
+          >
+            <Text style={styles.buttonText}>Mark Complete</Text>
+          </TouchableOpacity>
+        )}
+
+        {(onSetReminder || showReminderButton) && (
+          <TouchableOpacity
+            style={[styles.button, styles.reminderButton]}
+            onPress={onSetReminder}
+          >
+            <Text style={styles.buttonText}>Remind Me</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
@@ -98,9 +85,9 @@ const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({ screening, next
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -109,29 +96,30 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
-  },
-  icon: {
-    marginRight: 12,
-  },
-  headerText: {
-    flex: 1,
+    marginBottom: 8,
   },
   title: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
+  },
+  completedBadge: {
+    backgroundColor: '#2ECC71',
+    color: 'white',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    fontSize: 12,
+    fontWeight: '600',
   },
   description: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
+    marginBottom: 12,
   },
-  details: {
-    marginBottom: 16,
-  },
-  detailItem: {
+  detailsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 8,
@@ -142,18 +130,33 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-    color: '#333',
     fontWeight: '500',
+    color: '#4A89DC',
+  },
+  overdue: {
+    color: '#E74C3C',
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 12,
   },
   button: {
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  completeButton: {
+    backgroundColor: '#2ECC71',
+  },
+  reminderButton: {
+    backgroundColor: '#4A89DC',
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 
