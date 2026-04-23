@@ -3,6 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { RouteProp } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
+import { getFirestore, collection, addDoc } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 
 type EventScreenRouteProp = RouteProp<RootStackParamList, 'EventScreen'>;
 type EventScreenNavigationProp = StackNavigationProp<RootStackParamList, 'EventScreen'>;
@@ -15,31 +17,62 @@ type Props = {
 const EventScreen = ({ route, navigation }: Props) => {
   const { user } = route.params;
   const [eventType, setEventType] = useState<'virtual' | 'in-person'>('virtual');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSchedule = () => {
-    Alert.alert(
-      'Event Scheduled',
-      `You've scheduled a ${eventType} event with ${user.name}!`,
-      [
-        {
-          text: 'OK',
-          onPress: () => navigation.navigate('MatchScreen'),
-        },
-      ]
-    );
+  const handleSchedule = async () => {
+    setIsLoading(true);
+    const auth = getAuth();
+    const currentUser = auth.currentUser;
+
+    if (!currentUser) {
+      Alert.alert('Error', 'You must be logged in to schedule events');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const db = getFirestore();
+      const eventsRef = collection(db, 'events');
+
+      const eventData = {
+        userId: currentUser.uid,
+        matchedUserId: user.id,
+        eventType,
+        timestamp: new Date().toISOString(),
+        status: 'scheduled'
+      };
+
+      await addDoc(eventsRef, eventData);
+
+      Alert.alert(
+        'Event Scheduled',
+        `You've scheduled a ${eventType} event with ${user.name}!`,
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('MatchScreen'),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Error scheduling event:', error);
+      Alert.alert('Error', 'Failed to schedule event. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Schedule Event with {user.name}</Text>
-      
+
       <View style={styles.userInfo}>
         <Text style={styles.label}>Shared Interests:</Text>
         <Text style={styles.hobbies}>{user.hobbies.join(', ')}</Text>
       </View>
 
       <Text style={styles.sectionTitle}>Choose Event Type:</Text>
-      
+
       <TouchableOpacity
         style={[styles.optionButton, eventType === 'virtual' && styles.optionButtonSelected]}
         onPress={() => setEventType('virtual')}
@@ -60,8 +93,14 @@ const EventScreen = ({ route, navigation }: Props) => {
         <Text style={styles.optionDescription}>Meet at a local venue</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.scheduleButton} onPress={handleSchedule}>
-        <Text style={styles.scheduleButtonText}>Schedule Event</Text>
+      <TouchableOpacity
+        style={[styles.scheduleButton, isLoading && styles.scheduleButtonDisabled]}
+        onPress={handleSchedule}
+        disabled={isLoading}
+      >
+        <Text style={styles.scheduleButtonText}>
+          {isLoading ? 'Scheduling...' : 'Schedule Event'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -130,6 +169,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 20,
+  },
+  scheduleButtonDisabled: {
+    backgroundColor: '#CCCCCC',
   },
   scheduleButtonText: {
     color: '#fff',
