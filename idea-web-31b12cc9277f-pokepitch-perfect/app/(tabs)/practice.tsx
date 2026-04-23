@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
 import DrillSession from '../../components/DrillSession';
 import { useStore } from '../../store/useStore';
 import { DrillResult } from '../../lib/types';
-import { adjustDifficulty } from '../../lib/adaptive';
+import { adjustDifficulty, shouldLevelUp } from '../../lib/adaptive';
 
 export default function Practice() {
-  const { currentDrill, startDrill, submitResult, drills } = useStore();
+  const { currentDrill, startDrill, submitResult, drills, updateStats } = useStore();
   const [result, setResult] = useState<DrillResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [drillResults, setDrillResults] = useState<DrillResult[]>([]);
 
   useEffect(() => {
     if (!currentDrill && drills.length > 0) {
@@ -17,9 +18,25 @@ export default function Practice() {
     setIsLoading(false);
   }, [currentDrill, startDrill, drills]);
 
-  const handleDrillComplete = (result: DrillResult) => {
+  const handleDrillComplete = async (result: DrillResult) => {
     setResult(result);
-    submitResult(result);
+    await submitResult(result);
+
+    // Get all results for this drill
+    const allResults = await getDrillResults(result.drillId);
+    setDrillResults(allResults);
+
+    // Check if difficulty should increase
+    if (shouldLevelUp(allResults)) {
+      const updatedDrill = adjustDifficulty(currentDrill!, allResults);
+      Alert.alert(
+        'Difficulty Increased!',
+        `Your performance is improving! The drill difficulty has increased to ${Math.round(updatedDrill.difficulty * 100)}%`,
+        [{ text: 'OK' }]
+      );
+    }
+
+    await updateStats();
   };
 
   const handleContinue = () => {
@@ -65,3 +82,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+async function getDrillResults(drillId: string): Promise<DrillResult[]> {
+  // In a real app, this would query the database
+  // For now, we'll return an empty array
+  return [];
+}

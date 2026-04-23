@@ -19,16 +19,17 @@ export default function DrillSession({ drill, onComplete, result, onContinue }: 
   const [userInputs, setUserInputs] = useState<UserInput[]>([]);
   const [timeLeft, setTimeLeft] = useState(drill.duration);
   const [isActive, setIsActive] = useState(true);
+  const [difficultyLevel, setDifficultyLevel] = useState(drill.difficulty);
 
   useEffect(() => {
     if (drill.type === 'aim') {
       const initialTargets = generateAimTargets(5, {
         width: SCREEN_WIDTH,
         height: SCREEN_HEIGHT - 200,
-      });
+      }, difficultyLevel);
       setTargets(initialTargets);
     }
-  }, [drill]);
+  }, [drill, difficultyLevel]);
 
   useEffect(() => {
     if (isActive && timeLeft > 0) {
@@ -46,11 +47,12 @@ export default function DrillSession({ drill, onComplete, result, onContinue }: 
     const score = calculateScore(targets, userInputs, timeLeft);
     const drillResult: DrillResult = {
       drillId: drill.id,
-      score,
+      score: score.total,
       accuracy: score.accuracy,
       reactionTime: score.reactionTime,
       consistency: score.consistency,
       timestamp: new Date().toISOString(),
+      difficulty: difficultyLevel,
     };
     onComplete(drillResult);
   };
@@ -62,7 +64,7 @@ export default function DrillSession({ drill, onComplete, result, onContinue }: 
     if (!target) return;
 
     const reactionTime = Date.now() - target.timestamp;
-    
+
     const input: UserInput = {
       targetId,
       timestamp: Date.now(),
@@ -76,7 +78,7 @@ export default function DrillSession({ drill, onComplete, result, onContinue }: 
     const newTarget = generateAimTargets(1, {
       width: SCREEN_WIDTH,
       height: SCREEN_HEIGHT - 200,
-    })[0];
+    }, difficultyLevel)[0];
     setTargets(prevTargets => [...prevTargets, newTarget]);
   };
 
@@ -97,22 +99,27 @@ export default function DrillSession({ drill, onComplete, result, onContinue }: 
       {result ? (
         <View style={styles.resultContainer}>
           <Text style={styles.resultTitle}>Drill Complete!</Text>
-          <Text style={styles.resultScore}>Score: {result.score.total}</Text>
-          <Text style={styles.resultDetail}>Accuracy: {result.score.accuracy}%</Text>
-          <Text style={styles.resultDetail}>Reaction Time: {result.score.reactionTime}ms</Text>
-          <Text style={styles.resultDetail}>Consistency: {result.score.consistency}%</Text>
+          <Text style={styles.resultScore}>Score: {result.score}</Text>
+          <Text style={styles.resultDetail}>Accuracy: {result.accuracy}%</Text>
+          <Text style={styles.resultDetail}>Reaction Time: {result.reactionTime}ms</Text>
+          <Text style={styles.resultDetail}>Consistency: {result.consistency}%</Text>
+          <Text style={styles.resultDetail}>Difficulty: {Math.round(difficultyLevel * 100)}%</Text>
           <TouchableOpacity style={styles.button} onPress={onContinue}>
             <Text style={styles.buttonText}>Continue</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <>
+          <View style={styles.header}>
+            <Text style={styles.drillName}>{drill.name}</Text>
+            <Text style={styles.difficulty}>Difficulty: {Math.round(difficultyLevel * 100)}%</Text>
+          </View>
           <View style={styles.timerContainer}>
             <Text style={styles.timer}>{timeLeft}</Text>
             <Text style={styles.stats}>Hits: {userInputs.filter(i => i.isHit).length} | Misses: {userInputs.filter(i => !i.isHit).length}</Text>
           </View>
-          <TouchableOpacity 
-            style={styles.targetsContainer} 
+          <TouchableOpacity
+            style={styles.targetsContainer}
             activeOpacity={1}
             onPress={handleMissPress}
           >
@@ -174,91 +181,93 @@ function AnimatedTarget({ target, onPress }: AnimatedTargetProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    width: '100%',
   },
-  timerContainer: {
-    alignItems: 'center',
-    paddingVertical: 24,
+  header: {
+    padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
+  },
+  drillName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  difficulty: {
+    fontSize: 16,
+    color: '#666',
+  },
+  timerContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   timer: {
-    fontSize: 48,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#673ab7',
   },
   stats: {
     fontSize: 16,
     color: '#666',
-    marginTop: 8,
   },
   targetsContainer: {
     flex: 1,
-    position: 'relative',
+    backgroundColor: '#f5f5f5',
   },
   targetWrapper: {
     position: 'absolute',
     width: TARGET_SIZE,
     height: TARGET_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   target: {
     width: TARGET_SIZE,
     height: TARGET_SIZE,
     borderRadius: TARGET_SIZE / 2,
-    backgroundColor: '#673ab7',
+    backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
   targetInner: {
-    width: TARGET_SIZE / 3,
-    height: TARGET_SIZE / 3,
-    borderRadius: TARGET_SIZE / 6,
+    width: TARGET_SIZE * 0.7,
+    height: TARGET_SIZE * 0.7,
+    borderRadius: TARGET_SIZE * 0.35,
     backgroundColor: '#fff',
   },
   resultContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   resultTitle: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 32,
-    color: '#673ab7',
-  },
-  resultScore: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#333',
+    marginBottom: 20,
+  },
+  resultScore: {
+    fontSize: 20,
+    marginBottom: 15,
   },
   resultDetail: {
-    fontSize: 18,
-    marginBottom: 12,
+    fontSize: 16,
+    marginBottom: 10,
     color: '#666',
   },
   button: {
-    backgroundColor: '#673ab7',
-    paddingVertical: 16,
-    paddingHorizontal: 48,
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    backgroundColor: '#4CAF50',
     borderRadius: 8,
-    marginTop: 32,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
