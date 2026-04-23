@@ -1,5 +1,6 @@
 import { Stripe } from '@stripe/stripe-react-native';
 import { createPaymentIntent, confirmPaymentIntent } from './api/stripeApi';
+import { updateOrderStatus, updatePaymentStatus } from '../lib/database';
 
 export const calculateSplit = (order, splitType = 'equal', customRules = []) => {
   const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -150,6 +151,70 @@ export const createEphemeralKey = async (customerId) => {
     return await response.json();
   } catch (error) {
     console.error('Error creating ephemeral key:', error);
+    throw error;
+  }
+};
+
+export const processReimbursement = async (orderId) => {
+  try {
+    // Get order details from database
+    const order = await getOrderById(orderId);
+
+    if (!order) {
+      throw new Error('Order not found');
+    }
+
+    // Calculate reimbursement amounts
+    const split = calculateSplit(order, order.splitType, order.customRules);
+
+    // Process reimbursements for each participant
+    for (const participant of split.participants) {
+      if (!participant.isOrganizer) {
+        // Create transfer to participant's bank account
+        const transfer = await createTransfer(
+          Math.round(participant.amount * 100),
+          participant.stripeCustomerId
+        );
+
+        // Update payment status in database
+        await updatePaymentStatus(orderId, participant.id, {
+          status: 'reimbursed',
+          transferId: transfer.id,
+          amount: participant.amount
+        });
+      }
+    }
+
+    // Update order status to completed
+    await updateOrderStatus(orderId, 'completed');
+
+    return {
+      success: true,
+      message: 'Reimbursements processed successfully',
+      orderId
+    };
+  } catch (error) {
+    console.error('Error processing reimbursement:', error);
+    throw error;
+  }
+};
+
+const createTransfer = async (amount, destination) => {
+  try {
+    const response = await fetch('https://your-backend-api.com/create-transfer', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        amount,
+        destination,
+        currency: 'usd',
+      }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating transfer:', error);
     throw error;
   }
 };

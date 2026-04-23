@@ -16,8 +16,17 @@ export interface MockPaymentMethod {
   };
 }
 
+export interface MockTransfer {
+  id: string;
+  amount: number;
+  currency: string;
+  destination: string;
+  status: 'pending' | 'paid' | 'failed';
+}
+
 let paymentIntentCounter = 1000;
 let paymentMethodCounter = 2000;
+let transferCounter = 3000;
 
 export const createMockPaymentIntent = (amount: number, currency: string = 'usd'): MockPaymentIntent => {
   const id = `pi_mock_${paymentIntentCounter++}`;
@@ -33,7 +42,7 @@ export const createMockPaymentIntent = (amount: number, currency: string = 'usd'
 export const confirmMockPaymentIntent = async (clientSecret: string): Promise<MockPaymentIntent> => {
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 2000));
-  
+
   const id = clientSecret.split('_secret_')[0];
   return {
     id,
@@ -60,4 +69,27 @@ export const saveMockPaymentMethod = async (paymentMethodId: string): Promise<bo
   // Simulate network delay
   await new Promise(resolve => setTimeout(resolve, 1000));
   return true;
+};
+
+export const createMockTransfer = (amount: number, destination: string): MockTransfer => {
+  const id = `tr_mock_${transferCounter++}`;
+  return {
+    id,
+    amount,
+    currency: 'usd',
+    destination,
+    status: 'paid',
+  };
+};
+
+export const processMockReimbursement = async (orderId: string): Promise<{ success: boolean, message: string }> => {
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // In a real app, you would fetch the order details and calculate reimbursements
+  // For the mock, we'll just return a success message
+  return {
+    success: true,
+    message: `Reimbursements processed successfully for order ${orderId}`
+  };
 };
