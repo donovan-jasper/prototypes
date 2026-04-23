@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth } from 'date-fns';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth, addMonths, subMonths } from 'date-fns';
 import { MILESTONE_DAYS, STREAK_COLORS } from '../lib/constants';
+import { getGraceDaysUsedThisWeek } from '../lib/affirmations';
 
 interface StreakDay {
   date: string;
@@ -13,10 +14,20 @@ interface StreakCalendarProps {
 }
 
 const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
+  const [currentMonth, setCurrentMonth] = React.useState(new Date());
+  const [graceDaysUsed, setGraceDaysUsed] = React.useState(0);
+
+  React.useEffect(() => {
+    const fetchGraceDays = async () => {
+      const used = await getGraceDaysUsedThisWeek(currentMonth);
+      setGraceDaysUsed(used);
+    };
+    fetchGraceDays();
+  }, [currentMonth]);
+
   // Get the current month and create an array of all days in the month
-  const today = new Date();
-  const monthStart = startOfMonth(today);
-  const monthEnd = endOfMonth(today);
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
   // Create a map of streak dates for quick lookup
@@ -28,30 +39,49 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
   // Get all milestone dates in the current month
   const milestoneDates = MILESTONE_DAYS.map(days => {
     const milestoneDate = new Date();
-    milestoneDate.setDate(today.getDate() - days);
+    milestoneDate.setDate(currentMonth.getDate() - days);
     return format(milestoneDate, 'yyyy-MM-dd');
   });
 
+  const goToPreviousMonth = () => {
+    setCurrentMonth(subMonths(currentMonth, 1));
+  };
+
+  const goToNextMonth = () => {
+    setCurrentMonth(addMonths(currentMonth, 1));
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.monthHeader}>{format(today, 'MMMM yyyy')}</Text>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={goToPreviousMonth}>
+          <Text style={styles.navButton}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.monthHeader}>{format(currentMonth, 'MMMM yyyy')}</Text>
+        <TouchableOpacity onPress={goToNextMonth}>
+          <Text style={styles.navButton}>→</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.weekdays}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
           <Text key={day} style={styles.weekday}>{day}</Text>
         ))}
       </View>
+
       <View style={styles.calendar}>
         {daysInMonth.map((day, index) => {
           const dayString = format(day, 'yyyy-MM-dd');
           const isStreakDay = streakMap.has(dayString);
           const isGraceDay = streakMap.get(dayString);
           const isMilestone = milestoneDates.includes(dayString);
+          const isToday = isSameDay(day, new Date());
 
           return (
             <View key={index} style={styles.dayContainer}>
               <Text style={[
                 styles.dayNumber,
-                isSameDay(day, today) ? styles.today : null,
+                isToday ? styles.today : null,
                 isMilestone ? styles.milestone : null
               ]}>
                 {format(day, 'd')}
@@ -69,6 +99,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
           );
         })}
       </View>
+
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
@@ -82,20 +113,43 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
           <Text style={styles.legendText}>🎉 Milestone</Text>
         </View>
       </View>
+
+      <View style={styles.graceDayInfo}>
+        <Text style={styles.graceDayText}>Grace Days Used This Week: {graceDaysUsed}/2</Text>
+        <Text style={styles.graceDaySubtext}>You can use up to 2 grace days per week</Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     marginVertical: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   monthHeader: {
     fontSize: 20,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 15,
+    color: '#333',
+  },
+  navButton: {
+    fontSize: 20,
+    paddingHorizontal: 10,
+    color: '#4CAF50',
   },
   weekdays: {
     flexDirection: 'row',
@@ -122,6 +176,7 @@ const styles = StyleSheet.create({
   dayNumber: {
     fontSize: 16,
     marginBottom: 4,
+    color: '#333',
   },
   today: {
     color: STREAK_COLORS.today,
@@ -132,35 +187,56 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginTop: 2,
   },
   milestoneBadge: {
+    fontSize: 12,
     position: 'absolute',
     top: -5,
-    right: 5,
-    fontSize: 12,
+    right: -5,
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: 15,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
     marginRight: 5,
   },
   legendText: {
     fontSize: 12,
     color: '#666',
+  },
+  graceDayInfo: {
+    marginTop: 15,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    alignItems: 'center',
+  },
+  graceDayText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  graceDaySubtext: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    textAlign: 'center',
   },
 });
 

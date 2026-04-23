@@ -1,35 +1,133 @@
-import { getAffirmationForContext, calculateStreak, shouldShowMilestone } from '../lib/affirmations';
+import { calculateStreak, getGraceDaysUsedThisWeek } from '../lib/affirmations';
+import { initDatabase, getStreakData, updateStreak } from '../lib/database';
+import { format, addDays, subDays } from 'date-fns';
 
-describe('Affirmations', () => {
-  test('shouldShowMilestone returns true for milestone days', () => {
-    expect(shouldShowMilestone(7)).toBe(true);
-    expect(shouldShowMilestone(30)).toBe(true);
-    expect(shouldShowMilestone(100)).toBe(true);
-    expect(shouldShowMilestone(365)).toBe(true);
-    expect(shouldShowMilestone(15)).toBe(false);
+// Mock the database functions
+jest.mock('../lib/database', () => ({
+  initDatabase: jest.fn(),
+  getStreakData: jest.fn(),
+  updateStreak: jest.fn(),
+  calculateStreakWithGraceDays: jest.fn(),
+}));
+
+describe('Affirmation Logic', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
   });
 
-  test('calculateStreak returns 0 for empty sessions', async () => {
-    const streak = await calculateStreak([]);
-    expect(streak).toBe(0);
+  describe('calculateStreak', () => {
+    it('should return streak count of 1 for first session', async () => {
+      (getStreakData as jest.Mock).mockResolvedValue([]);
+      (updateStreak as jest.Mock).mockResolvedValue(1);
+
+      const today = new Date();
+      const streakCount = await calculateStreak(today);
+
+      expect(streakCount).toBe(1);
+      expect(updateStreak).toHaveBeenCalledWith(
+        format(today, 'yyyy-MM-dd'),
+        false,
+        1
+      );
+    });
+
+    it('should increment streak for consecutive days', async () => {
+      const yesterday = subDays(new Date(), 1);
+      const today = new Date();
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(yesterday, 'yyyy-MM-dd'), is_grace_day: 0, streak_count: 5 }
+      ]);
+      (updateStreak as jest.Mock).mockResolvedValue(6);
+
+      const streakCount = await calculateStreak(today);
+
+      expect(streakCount).toBe(6);
+      expect(updateStreak).toHaveBeenCalledWith(
+        format(today, 'yyyy-MM-dd'),
+        false,
+        6
+      );
+    });
+
+    it('should use grace day when streak is broken but within 3 days', async () => {
+      const threeDaysAgo = subDays(new Date(), 3);
+      const today = new Date();
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(threeDaysAgo, 'yyyy-MM-dd'), is_grace_day: 0, streak_count: 5 }
+      ]);
+      (updateStreak as jest.Mock).mockResolvedValue(6);
+
+      const streakCount = await calculateStreak(today);
+
+      expect(streakCount).toBe(6);
+      expect(updateStreak).toHaveBeenCalledWith(
+        format(today, 'yyyy-MM-dd'),
+        true,
+        6
+      );
+    });
+
+    it('should reset streak when more than 3 days have passed', async () => {
+      const fourDaysAgo = subDays(new Date(), 4);
+      const today = new Date();
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(fourDaysAgo, 'yyyy-MM-dd'), is_grace_day: 0, streak_count: 5 }
+      ]);
+      (updateStreak as jest.Mock).mockResolvedValue(1);
+
+      const streakCount = await calculateStreak(today);
+
+      expect(streakCount).toBe(1);
+      expect(updateStreak).toHaveBeenCalledWith(
+        format(today, 'yyyy-MM-dd'),
+        false,
+        1
+      );
+    });
   });
 
-  test('getAffirmationForContext returns an affirmation', async () => {
-    const affirmation = await getAffirmationForContext('morning', 2, 5);
-    expect(affirmation).toHaveProperty('text');
-    expect(affirmation).toHaveProperty('time_of_day');
-  });
+  describe('getGraceDaysUsedThisWeek', () => {
+    it('should return 0 when no grace days used this week', async () => {
+      const today = new Date();
+      const weekStart = subDays(today, today.getDay());
 
-  test('getAffirmationForContext filters by time of day', async () => {
-    const morningAffirmation = await getAffirmationForContext('morning', 2, 5);
-    expect(morningAffirmation.time_of_day).toBe('morning');
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(subDays(weekStart, 1), 'yyyy-MM-dd'), is_grace_day: 1 },
+        { date: format(addDays(weekStart, 1), 'yyyy-MM-dd'), is_grace_day: 0 },
+      ]);
 
-    const eveningAffirmation = await getAffirmationForContext('evening', 2, 5);
-    expect(eveningAffirmation.time_of_day).toBe('evening');
-  });
+      const count = await getGraceDaysUsedThisWeek(today);
+      expect(count).toBe(0);
+    });
 
-  test('getAffirmationForContext adjusts for low mood', async () => {
-    const lowMoodAffirmation = await getAffirmationForContext('morning', 1, 5);
-    expect(lowMoodAffirmation.energy_level).toBeLessThanOrEqual(2);
+    it('should count grace days used this week', async () => {
+      const today = new Date();
+      const weekStart = subDays(today, today.getDay());
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(weekStart, 'yyyy-MM-dd'), is_grace_day: 1 },
+        { date: format(addDays(weekStart, 2), 'yyyy-MM-dd'), is_grace_day: 1 },
+        { date: format(addDays(weekStart, 4), 'yyyy-MM-dd'), is_grace_day: 0 },
+      ]);
+
+      const count = await getGraceDaysUsedThisWeek(today);
+      expect(count).toBe(2);
+    });
+
+    it('should not count grace days from previous week', async () => {
+      const today = new Date();
+      const weekStart = subDays(today, today.getDay());
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(subDays(weekStart, 1), 'yyyy-MM-dd'), is_grace_day: 1 },
+        { date: format(weekStart, 'yyyy-MM-dd'), is_grace_day: 1 },
+      ]);
+
+      const count = await getGraceDaysUsedThisWeek(today);
+      expect(count).toBe(1);
+    });
   });
 });

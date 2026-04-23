@@ -1,6 +1,6 @@
-import { initDatabase, seedAffirmations, getCurrentStreak } from './database';
+import { initDatabase, seedAffirmations, getCurrentStreak, getStreakData, calculateStreakWithGraceDays, updateStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
-import { format, startOfWeek, endOfWeek } from 'date-fns';
+import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek } from 'date-fns';
 import { MILESTONE_DAYS } from './constants';
 
 let initialized = false;
@@ -35,11 +35,11 @@ export const getAffirmationForContext = async (timeOfDay: string, moodRating: nu
   return filtered[randomIndex];
 };
 
-export const calculateStreak = async (sessions: any[]) => {
-  if (sessions.length === 0) return 0;
-
-  // Get current streak from database
-  return await getCurrentStreak();
+export const calculateStreak = async (date: Date) => {
+  const { streakCount, isGraceDay } = await calculateStreakWithGraceDays(date);
+  const today = format(date, 'yyyy-MM-dd');
+  await updateStreak(today, isGraceDay, streakCount);
+  return streakCount;
 };
 
 export const shouldShowMilestone = (streakCount: number) => {
@@ -54,10 +54,7 @@ export const getStreakDataForCalendar = async () => {
   const monthStart = format(startOfWeek(today), 'yyyy-MM-dd');
   const monthEnd = format(endOfWeek(today), 'yyyy-MM-dd');
 
-  const streaks = await db.getAllAsync(
-    'SELECT * FROM streaks WHERE date BETWEEN ? AND ? ORDER BY date ASC',
-    [monthStart, monthEnd]
-  );
+  const streaks = await getStreakData();
 
   // Format for calendar display
   return streaks.map(streak => ({
@@ -72,4 +69,19 @@ export const getMilestoneDates = (currentDate: Date) => {
     milestoneDate.setDate(currentDate.getDate() - days);
     return format(milestoneDate, 'yyyy-MM-dd');
   });
+};
+
+export const getGraceDaysUsedThisWeek = async (date: Date) => {
+  const weekStart = startOfWeek(date);
+  const weekEnd = endOfWeek(date);
+
+  const streaks = await getStreakData();
+  const graceDays = streaks.filter(streak => {
+    const streakDate = new Date(streak.date);
+    return streak.is_grace_day === 1 &&
+           streakDate >= weekStart &&
+           streakDate <= weekEnd;
+  });
+
+  return graceDays.length;
 };

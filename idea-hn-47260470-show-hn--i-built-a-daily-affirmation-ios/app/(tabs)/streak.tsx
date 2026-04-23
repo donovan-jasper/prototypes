@@ -1,56 +1,54 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import StreakCalendar from '../../components/StreakCalendar';
-import { getStreakData, getCurrentStreak } from '../../lib/database';
+import { getStreakDataForCalendar, getGraceDaysUsedThisWeek } from '../../lib/affirmations';
 import { useStore } from '../../store/useStore';
-import { format, startOfWeek, endOfWeek } from 'date-fns';
 
 const StreakScreen = () => {
   const [streakData, setStreakData] = useState([]);
-  const [currentStreak, setCurrentStreak] = useState(0);
   const [graceDaysUsed, setGraceDaysUsed] = useState(0);
-  const updateStreak = useStore((state) => state.updateStreak);
+  const { streakCount } = useStore();
 
   useEffect(() => {
     const fetchData = async () => {
-      await updateStreak();
-      const data = await getStreakData();
+      const data = await getStreakDataForCalendar();
       setStreakData(data);
 
-      const streak = await getCurrentStreak();
-      setCurrentStreak(streak);
-
-      // Calculate grace days used this week
       const today = new Date();
-      const weekStart = startOfWeek(today);
-      const weekEnd = endOfWeek(today);
-
-      const graceDays = data.filter(day =>
-        day.is_grace_day &&
-        new Date(day.date) >= weekStart &&
-        new Date(day.date) <= weekEnd
-      ).length;
-
-      setGraceDaysUsed(graceDays);
+      const used = await getGraceDaysUsedThisWeek(today);
+      setGraceDaysUsed(used);
     };
 
     fetchData();
-  }, [updateStreak]);
+  }, []);
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Your Streak</Text>
-      <Text style={styles.streakCount}>Current Streak: {currentStreak} days</Text>
-      <Text style={styles.graceDaysInfo}>Grace Days Used: {graceDaysUsed}/2 this week</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Your Streak</Text>
+        <Text style={styles.streakCount}>{streakCount} days</Text>
+      </View>
+
       <StreakCalendar streakData={streakData} />
-      <View style={styles.milestones}>
-        <Text style={styles.milestoneTitle}>Milestones</Text>
-        <View style={styles.milestoneList}>
-          <Text style={styles.milestoneItem}>🎉 7 days</Text>
-          <Text style={styles.milestoneItem}>🎉 30 days</Text>
-          <Text style={styles.milestoneItem}>🎉 100 days</Text>
-          <Text style={styles.milestoneItem}>🎉 365 days</Text>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statBox}>
+          <Text style={styles.statLabel}>Current Streak</Text>
+          <Text style={styles.statValue}>{streakCount} days</Text>
         </View>
+
+        <View style={styles.statBox}>
+          <Text style={styles.statLabel}>Grace Days Used</Text>
+          <Text style={styles.statValue}>{graceDaysUsed}/2</Text>
+        </View>
+      </View>
+
+      <View style={styles.infoBox}>
+        <Text style={styles.infoTitle}>What are Grace Days?</Text>
+        <Text style={styles.infoText}>
+          Grace days allow you to skip a day without breaking your streak. You can use up to 2 grace days per week.
+          This helps maintain your momentum when life gets busy.
+        </Text>
       </View>
     </ScrollView>
   );
@@ -59,42 +57,74 @@ const StreakScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  header: {
     padding: 20,
+    alignItems: 'center',
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    color: '#333',
   },
   streakCount: {
-    fontSize: 18,
-    marginBottom: 10,
-    color: '#666',
+    fontSize: 20,
+    color: '#4CAF50',
+    marginTop: 5,
   },
-  graceDaysInfo: {
-    fontSize: 16,
-    marginBottom: 20,
-    color: '#666',
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 20,
+    paddingHorizontal: 10,
   },
-  milestones: {
-    marginTop: 20,
+  statBox: {
+    backgroundColor: 'white',
     padding: 15,
-    backgroundColor: '#f8f8f8',
     borderRadius: 10,
+    alignItems: 'center',
+    width: '45%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  milestoneTitle: {
+  statLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  statValue: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
+  },
+  infoBox: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  infoTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 10,
   },
-  milestoneList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  milestoneItem: {
-    fontSize: 16,
-    marginBottom: 5,
+  infoText: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
 });
 
