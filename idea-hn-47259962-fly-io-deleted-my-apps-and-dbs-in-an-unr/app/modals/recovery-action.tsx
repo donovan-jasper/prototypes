@@ -5,6 +5,7 @@ import { useStore } from '@/lib/store';
 import * as SecureStore from 'expo-secure-store';
 import { openDatabase, saveAlert } from '@/lib/db';
 import { sendLocalNotification } from '@/lib/notifications';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 interface RecoveryActionModalProps {
   serviceId: string;
@@ -12,7 +13,7 @@ interface RecoveryActionModalProps {
   onClose: () => void;
 }
 
-export default function RecoveryActionModal({ serviceId, workflowId, onClose }: RecoveryActionModalProps) {
+export default function RecoveryActionModal() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -22,12 +23,16 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
   const services = useStore((state) => state.services);
   const updateServiceStatus = useStore((state) => state.updateServiceStatus);
   const addAlert = useStore((state) => state.addAlert);
+  const router = useRouter();
+  const { workflowId, serviceId } = useLocalSearchParams();
 
   useEffect(() => {
-    loadWorkflow();
-  }, []);
+    if (workflowId && serviceId) {
+      loadWorkflow(workflowId as string);
+    }
+  }, [workflowId, serviceId]);
 
-  async function loadWorkflow() {
+  async function loadWorkflow(workflowId: string) {
     try {
       const db = await openDatabase();
       const workflowData = await db.getFirstAsync(
@@ -148,39 +153,48 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
       const errorMessage = err instanceof Error ? err.message :
         'An unknown error occurred during recovery';
       setError(errorMessage);
-
-      // Save error alert
-      const service = services.find(s => s.id === serviceId);
-      if (service) {
-        const db = await openDatabase();
-        await saveAlert(db, {
-          serviceId: service.id,
-          severity: 'critical',
-          message: `Recovery workflow failed: ${errorMessage}`
-        });
-
-        addAlert({
-          id: Date.now(),
-          serviceId: service.id,
-          severity: 'critical',
-          message: `Recovery workflow failed: ${errorMessage}`,
-          timestamp: Date.now()
-        });
-
-        await sendLocalNotification(
-          'Recovery Failed',
-          `Failed to recover ${service.name}: ${errorMessage}`,
-          'critical'
-        );
-      }
+      console.error('Recovery failed:', err);
     } finally {
       setIsExecuting(false);
     }
   }
 
+  function getStepStatusIcon(status: 'pending' | 'success' | 'error') {
+    switch (status) {
+      case 'success':
+        return '✓';
+      case 'error':
+        return '✗';
+      default:
+        return '•';
+    }
+  }
+
+  function getStepStatusColor(status: 'pending' | 'success' | 'error') {
+    switch (status) {
+      case 'success':
+        return '#10B981';
+      case 'error':
+        return '#EF4444';
+      default:
+        return '#6B7280';
+    }
+  }
+
+  if (!workflowId || !serviceId) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Invalid workflow or service ID</Text>
+        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
+          <Text style={styles.closeButtonText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   if (!workflow) {
     return (
-      <View style={styles.modalContainer}>
+      <View style={styles.container}>
         <ActivityIndicator size="large" color="#3B82F6" />
         <Text style={styles.loadingText}>Loading workflow...</Text>
       </View>
@@ -188,116 +202,101 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
   }
 
   return (
-    <View style={styles.modalContainer}>
+    <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.modalTitle}>{workflow.name}</Text>
+        <Text style={styles.header}>Executing Workflow</Text>
+        <Text style={styles.workflowName}>{workflow.name}</Text>
+
+        {workflow.steps.map((step: any, index: number) => (
+          <View key={step.id} style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Text style={styles.stepNumber}>
+                {getStepStatusIcon(stepStatus[step.id])}
+              </Text>
+              <Text style={styles.stepTitle}>{step.title}</Text>
+            </View>
+            <Text style={styles.stepDescription}>{step.description}</Text>
+            <View style={styles.stepStatus}>
+              <Text style={[
+                styles.stepStatusText,
+                { color: getStepStatusColor(stepStatus[step.id]) }
+              ]}>
+                {stepStatus[step.id] === 'pending' ? 'Pending' :
+                 stepStatus[step.id] === 'success' ? 'Completed' : 'Failed'}
+              </Text>
+            </View>
+          </View>
+        ))}
 
         {error && (
-          <View style={[styles.statusBox, styles.errorBox]}>
-            <Text style={styles.statusText}>Error: {error}</Text>
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
           </View>
         )}
 
         {success && (
-          <View style={[styles.statusBox, styles.successBox]}>
-            <Text style={styles.statusText}>Workflow completed successfully!</Text>
+          <View style={styles.successContainer}>
+            <Text style={styles.successText}>Workflow completed successfully!</Text>
           </View>
         )}
+      </ScrollView>
 
-        <View style={styles.stepsContainer}>
-          {workflow.steps.map((step: any, index: number) => (
-            <View key={step.id} style={styles.stepContainer}>
-              <View style={styles.stepHeader}>
-                <View style={[
-                  styles.stepNumber,
-                  stepStatus[step.id] === 'success' ? styles.stepSuccess :
-                  stepStatus[step.id] === 'error' ? styles.stepError :
-                  currentStep === index ? styles.stepActive : styles.stepPending
-                ]}>
-                  <Text style={styles.stepNumberText}>{index + 1}</Text>
-                </View>
-                <Text style={styles.stepTitle}>{step.title}</Text>
-              </View>
-              <Text style={styles.stepDescription}>{step.description}</Text>
-
-              {stepStatus[step.id] === 'success' && (
-                <Text style={styles.stepStatus}>✓ Completed</Text>
-              )}
-
-              {stepStatus[step.id] === 'error' && (
-                <Text style={[styles.stepStatus, styles.errorText]}>✗ Failed</Text>
-              )}
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.buttonContainer}>
+      <View style={styles.footer}>
+        {!success && !error && (
           <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={onClose}
-            disabled={isExecuting}
-          >
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, styles.executeButton]}
+            style={styles.executeButton}
             onPress={executeWorkflow}
-            disabled={isExecuting || success}
+            disabled={isExecuting}
           >
             {isExecuting ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={[styles.buttonText, styles.executeButtonText]}>
-                {success ? 'Done' : 'Execute Workflow'}
-              </Text>
+              <Text style={styles.executeButtonText}>Execute Workflow</Text>
             )}
           </TouchableOpacity>
-        </View>
-      </ScrollView>
+        )}
+
+        <TouchableOpacity
+          style={styles.closeButton}
+          onPress={() => router.back()}
+          disabled={isExecuting}
+        >
+          <Text style={styles.closeButtonText}>Close</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
+  container: {
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
+    backgroundColor: '#F9FAFB',
   },
   scrollContent: {
-    paddingBottom: 32,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#1F2937',
-  },
-  statusBox: {
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
   },
-  errorBox: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#F87171',
-    borderWidth: 1,
-  },
-  successBox: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#34D399',
-    borderWidth: 1,
-  },
-  statusText: {
-    fontSize: 16,
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
     color: '#1F2937',
   },
-  stepsContainer: {
+  workflowName: {
+    fontSize: 18,
+    color: '#6B7280',
     marginBottom: 24,
   },
   stepContainer: {
-    marginBottom: 24,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   stepHeader: {
     flexDirection: 'row',
@@ -305,78 +304,83 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  stepNumberText: {
-    color: '#fff',
+    fontSize: 18,
     fontWeight: 'bold',
-  },
-  stepActive: {
-    backgroundColor: '#3B82F6',
-  },
-  stepPending: {
-    backgroundColor: '#E5E7EB',
-  },
-  stepSuccess: {
-    backgroundColor: '#10B981',
-  },
-  stepError: {
-    backgroundColor: '#EF4444',
+    marginRight: 12,
+    color: '#3B82F6',
   },
   stepTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1F2937',
-    flex: 1,
   },
   stepDescription: {
     fontSize: 14,
     color: '#6B7280',
-    marginLeft: 44,
+    marginBottom: 8,
   },
   stepStatus: {
-    fontSize: 14,
-    color: '#10B981',
-    marginLeft: 44,
-    marginTop: 8,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  stepStatusText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
+    padding: 16,
+    marginVertical: 16,
   },
   errorText: {
     color: '#EF4444',
+    fontSize: 14,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  button: {
-    flex: 1,
-    padding: 16,
+  successContainer: {
+    backgroundColor: '#D1FAE5',
     borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 4,
+    padding: 16,
+    marginVertical: 16,
   },
-  cancelButton: {
-    backgroundColor: '#F3F4F6',
+  successText: {
+    color: '#10B981',
+    fontSize: 14,
+  },
+  footer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
   },
   executeButton: {
     backgroundColor: '#3B82F6',
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   executeButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  closeButton: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingText: {
     marginTop: 16,
-    textAlign: 'center',
     color: '#6B7280',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });

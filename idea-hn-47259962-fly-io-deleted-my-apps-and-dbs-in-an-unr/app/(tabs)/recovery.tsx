@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { openDatabase } from '@/lib/db';
 import { useStore } from '@/lib/store';
 import RecoveryStep from '@/components/RecoveryStep';
+import { useRouter } from 'expo-router';
 
 type RecoveryWorkflow = {
   id: string;
@@ -27,6 +28,7 @@ export default function RecoveryScreen() {
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const services = useStore((state) => state.services);
+  const router = useRouter();
 
   useEffect(() => {
     loadWorkflows();
@@ -62,6 +64,13 @@ export default function RecoveryScreen() {
   function getServiceName(serviceId: string) {
     const service = services.find(s => s.id === serviceId);
     return service ? service.name : 'Unknown Service';
+  }
+
+  function handleExecuteWorkflow(workflowId: string, serviceId: string) {
+    router.push({
+      pathname: '/modals/recovery-action',
+      params: { workflowId, serviceId }
+    });
   }
 
   if (isLoading) {
@@ -139,9 +148,12 @@ export default function RecoveryScreen() {
             )}
             ListFooterComponent={
               <View style={styles.footer}>
-                <Text style={styles.footerText}>
-                  {selectedWorkflow.steps.length} steps • Estimated time: {Math.ceil(selectedWorkflow.steps.length * 1.5)} minutes
-                </Text>
+                <TouchableOpacity
+                  style={styles.executeButton}
+                  onPress={() => handleExecuteWorkflow(selectedWorkflow.id, selectedServiceId || '')}
+                >
+                  <Text style={styles.executeButtonText}>Execute Workflow</Text>
+                </TouchableOpacity>
               </View>
             }
           />
@@ -226,8 +238,8 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '500',
-    color: '#1F2937',
     marginBottom: 8,
+    color: '#1F2937',
     textAlign: 'center',
   },
   emptySubtext: {
@@ -247,7 +259,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   workflowHeader: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
     color: '#1F2937',
@@ -258,14 +270,17 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   footer: {
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    marginTop: 16,
+    paddingVertical: 24,
   },
-  footerText: {
-    color: '#6B7280',
-    fontSize: 14,
-    textAlign: 'center',
+  executeButton: {
+    backgroundColor: '#3B82F6',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+  },
+  executeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
