@@ -12,7 +12,7 @@ const getInstallCount = () => {
           },
           (_, error) => {
             console.error('Error getting install count:', error);
-            return false;
+            reject(error);
           }
         );
       },
@@ -35,7 +35,7 @@ const getDeepLinkCount = () => {
           },
           (_, error) => {
             console.error('Error getting deep link count:', error);
-            return false;
+            reject(error);
           }
         );
       },
@@ -58,7 +58,7 @@ const getInstallsBySource = () => {
           },
           (_, error) => {
             console.error('Error getting installs by source:', error);
-            return false;
+            reject(error);
           }
         );
       },
@@ -81,7 +81,7 @@ const getRecentInstalls = (limit = 20) => {
           },
           (_, error) => {
             console.error('Error getting recent installs:', error);
-            return false;
+            reject(error);
           }
         );
       },
@@ -92,4 +92,33 @@ const getRecentInstalls = (limit = 20) => {
   });
 };
 
-export { getInstallCount, getDeepLinkCount, getInstallsBySource, getRecentInstalls };
+const getInstallTrendData = async () => {
+  try {
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
+
+    const recentInstalls = await getRecentInstalls(50);
+
+    const todayCount = recentInstalls.filter(install =>
+      install.timestamp >= oneDayAgo
+    ).length;
+
+    const yesterdayCount = recentInstalls.filter(install =>
+      install.timestamp >= twoDaysAgo && install.timestamp < oneDayAgo
+    ).length;
+
+    return { today: todayCount, yesterday: yesterdayCount };
+  } catch (error) {
+    console.error('Error getting install trend data:', error);
+    throw error;
+  }
+};
+
+export {
+  getInstallCount,
+  getDeepLinkCount,
+  getInstallsBySource,
+  getRecentInstalls,
+  getInstallTrendData
+};

@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { getInstallCount, getDeepLinkCount, getInstallsBySource, getRecentInstalls } from '../services/AnalyticsService';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
+import { getInstallCount, getDeepLinkCount, getInstallsBySource, getRecentInstalls, getInstallTrendData } from '../services/AnalyticsService';
 
 const Analytics = () => {
   const [installCount, setInstallCount] = useState(0);
@@ -9,44 +9,44 @@ const Analytics = () => {
   const [recentInstalls, setRecentInstalls] = useState([]);
   const [trendData, setTrendData] = useState({ today: 0, yesterday: 0 });
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
-      const installs = await getInstallCount();
-      const deepLinks = await getDeepLinkCount();
-      const sourceData = await getInstallsBySource();
-      const recent = await getRecentInstalls();
-      
+      setLoading(true);
+      setError(null);
+
+      const [installs, deepLinks, sourceData, recent, trend] = await Promise.all([
+        getInstallCount(),
+        getDeepLinkCount(),
+        getInstallsBySource(),
+        getRecentInstalls(),
+        getInstallTrendData()
+      ]);
+
       setInstallCount(installs);
       setDeepLinkCount(deepLinks);
       setInstallsBySource(sourceData);
       setRecentInstalls(recent);
-      
-      // Calculate trend data
-      const now = Date.now();
-      const oneDayAgo = now - 24 * 60 * 60 * 1000;
-      const twoDaysAgo = now - 2 * 24 * 60 * 60 * 1000;
-      
-      const todayCount = recent.filter(install => install.timestamp >= oneDayAgo).length;
-      const yesterdayCount = recent.filter(install => 
-        install.timestamp >= twoDaysAgo && install.timestamp < oneDayAgo
-      ).length;
-      
-      setTrendData({ today: todayCount, yesterday: yesterdayCount });
-    } catch (error) {
-      console.error(error);
+      setTrendData(trend);
+    } catch (err) {
+      console.error('Error fetching analytics:', err);
+      setError('Failed to load analytics data. Please try again.');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [fetchAnalytics]);
 
-  const onRefresh = async () => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await fetchAnalytics();
     setRefreshing(false);
-  };
+  }, [fetchAnalytics]);
 
   const formatTimestamp = (timestamp) => {
     const date = new Date(timestamp);
@@ -74,15 +74,35 @@ const Analytics = () => {
 
   const trend = getTrendIndicator();
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading analytics...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.retryText} onPress={fetchAnalytics}>
+          Tap to retry
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
       <Text style={styles.title}>Analytics</Text>
-      
+
       <View style={styles.statsContainer}>
         <View style={styles.statCard}>
           <Text style={styles.statLabel}>Total Installs</Text>
@@ -117,8 +137,8 @@ const Analytics = () => {
           <Text style={styles.emptyText}>No install data yet</Text>
         ) : (
           installsBySource.map((item, index) => {
-            const percentage = installCount > 0 
-              ? ((item.count / installCount) * 100).toFixed(1) 
+            const percentage = installCount > 0
+              ? ((item.count / installCount) * 100).toFixed(1)
               : 0;
             return (
               <View key={index} style={styles.sourceCard}>
@@ -127,14 +147,14 @@ const Analytics = () => {
                   <Text style={styles.sourceCount}>{item.count}</Text>
                 </View>
                 <View style={styles.progressBar}>
-                  <View 
+                  <View
                     style={[
-                      styles.progressFill, 
+                      styles.progressFill,
                       { width: `${percentage}%` }
-                    ]} 
+                    ]}
                   />
                 </View>
-                <Text style={styles.percentage}>{percentage}%</Text>
+                <Text style={styles.percentageText}>{percentage}%</Text>
               </View>
             );
           })
@@ -147,12 +167,9 @@ const Analytics = () => {
           <Text style={styles.emptyText}>No recent installs</Text>
         ) : (
           recentInstalls.map((install, index) => (
-            <View key={index} style={styles.recentCard}>
-              <View style={styles.recentDot} />
-              <View style={styles.recentContent}>
-                <Text style={styles.recentSource}>{install.source}</Text>
-                <Text style={styles.recentTime}>{formatTimestamp(install.timestamp)}</Text>
-              </View>
+            <View key={index} style={styles.recentInstallItem}>
+              <Text style={styles.recentInstallSource}>{install.source}</Text>
+              <Text style={styles.recentInstallTime}>{formatTimestamp(install.timestamp)}</Text>
             </View>
           ))
         )}
@@ -164,34 +181,39 @@ const Analytics = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 20,
+    backgroundColor: '#F5F5F5',
+    padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 24,
     color: '#333',
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   statCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
     flex: 1,
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
-    alignItems: 'center',
+    marginHorizontal: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   statLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   statValue: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#007AFF',
   },
@@ -205,9 +227,14 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   trendCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    borderRadius: 8,
     padding: 16,
-    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   trendRow: {
     flexDirection: 'row',
@@ -220,84 +247,73 @@ const styles = StyleSheet.create({
   },
   trendValue: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
   },
   trendIndicator: {
-    marginTop: 12,
-    padding: 8,
-    borderRadius: 6,
-    alignItems: 'center',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   trendIndicatorText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    color: 'white',
+    fontWeight: '500',
   },
   sourceCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   sourceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   sourceName: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#333',
   },
   sourceCount: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontSize: 14,
+    color: '#666',
   },
   progressBar: {
-    height: 8,
+    height: 6,
     backgroundColor: '#E5E5EA',
-    borderRadius: 4,
-    overflow: 'hidden',
+    borderRadius: 3,
     marginBottom: 4,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#007AFF',
+    borderRadius: 3,
   },
-  percentage: {
+  percentageText: {
     fontSize: 12,
     color: '#666',
     textAlign: 'right',
   },
-  recentCard: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  recentDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#007AFF',
-    marginRight: 12,
-  },
-  recentContent: {
-    flex: 1,
+  recentInstallItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
-  recentSource: {
-    fontSize: 16,
-    fontWeight: '500',
+  recentInstallSource: {
+    fontSize: 14,
     color: '#333',
   },
-  recentTime: {
+  recentInstallTime: {
     fontSize: 14,
     color: '#666',
   },
@@ -305,9 +321,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryText: {
+    fontSize: 16,
+    color: '#007AFF',
+    textDecorationLine: 'underline',
   },
 });
 
