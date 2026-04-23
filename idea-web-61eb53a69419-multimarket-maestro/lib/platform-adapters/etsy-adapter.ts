@@ -1,17 +1,42 @@
 import axios from 'axios';
 import { Listing } from '../../types';
 import { BaseAdapter } from './base-adapter';
+import { SecureStorage } from '../storage';
 
 export class EtsyAdapter extends BaseAdapter {
   private static readonly API_BASE = 'https://openapi.etsy.com/v3/application';
 
+  constructor() {
+    super('etsy');
+  }
+
   async authenticate(): Promise<void> {
-    // In a real implementation, this would handle OAuth token refresh
-    console.log('EtsyAdapter: Authenticating with Etsy API');
+    try {
+      // In a real implementation, this would handle OAuth token refresh
+      console.log('EtsyAdapter: Authenticating with Etsy API');
+
+      // Check if we have tokens
+      const token = await SecureStorage.getToken('etsy');
+      const refreshToken = await SecureStorage.getRefreshToken('etsy');
+
+      if (!token || !refreshToken) {
+        throw new Error('No Etsy tokens available');
+      }
+
+      this.apiToken = token;
+      this.refreshToken = refreshToken;
+    } catch (error) {
+      console.error('EtsyAdapter authentication error:', error);
+      throw error;
+    }
   }
 
   async createListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.post(
         `${EtsyAdapter.API_BASE}/listings`,
         this.mapListingToEtsyFormat(listing),
@@ -30,6 +55,10 @@ export class EtsyAdapter extends BaseAdapter {
 
   async updateListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.put(
         `${EtsyAdapter.API_BASE}/listings/${listing.id}`,
         this.mapListingToEtsyFormat(listing),
@@ -48,6 +77,10 @@ export class EtsyAdapter extends BaseAdapter {
 
   async deleteListing(listingId: string): Promise<void> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       await axios.delete(
         `${EtsyAdapter.API_BASE}/listings/${listingId}`,
         {
@@ -63,6 +96,10 @@ export class EtsyAdapter extends BaseAdapter {
 
   async fetchListings(): Promise<Listing[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         `${EtsyAdapter.API_BASE}/shops/me/listings/active`,
         {
@@ -79,6 +116,10 @@ export class EtsyAdapter extends BaseAdapter {
 
   async fetchOrders(): Promise<any[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         `${EtsyAdapter.API_BASE}/shops/me/receipts`,
         {

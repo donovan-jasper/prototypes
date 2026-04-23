@@ -1,17 +1,42 @@
 import axios from 'axios';
 import { Listing } from '../../types';
 import { BaseAdapter } from './base-adapter';
+import { SecureStorage } from '../storage';
 
 export class EbayAdapter extends BaseAdapter {
   private static readonly API_BASE = 'https://api.ebay.com/sell/inventory/v1';
 
+  constructor() {
+    super('ebay');
+  }
+
   async authenticate(): Promise<void> {
-    // In a real implementation, this would handle OAuth token refresh
-    console.log('EbayAdapter: Authenticating with eBay API');
+    try {
+      // In a real implementation, this would handle OAuth token refresh
+      console.log('EbayAdapter: Authenticating with eBay API');
+
+      // Check if we have tokens
+      const token = await SecureStorage.getToken('ebay');
+      const refreshToken = await SecureStorage.getRefreshToken('ebay');
+
+      if (!token || !refreshToken) {
+        throw new Error('No eBay tokens available');
+      }
+
+      this.apiToken = token;
+      this.refreshToken = refreshToken;
+    } catch (error) {
+      console.error('EbayAdapter authentication error:', error);
+      throw error;
+    }
   }
 
   async createListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.post(
         `${EbayAdapter.API_BASE}/offer`,
         this.mapListingToEbayFormat(listing),
@@ -30,6 +55,10 @@ export class EbayAdapter extends BaseAdapter {
 
   async updateListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.put(
         `${EbayAdapter.API_BASE}/offer/${listing.id}`,
         this.mapListingToEbayFormat(listing),
@@ -48,6 +77,10 @@ export class EbayAdapter extends BaseAdapter {
 
   async deleteListing(listingId: string): Promise<void> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       await axios.delete(
         `${EbayAdapter.API_BASE}/offer/${listingId}`,
         {
@@ -63,6 +96,10 @@ export class EbayAdapter extends BaseAdapter {
 
   async fetchListings(): Promise<Listing[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         `${EbayAdapter.API_BASE}/offer`,
         {
@@ -79,6 +116,10 @@ export class EbayAdapter extends BaseAdapter {
 
   async fetchOrders(): Promise<any[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         'https://api.ebay.com/sell/fulfillment/v1/order',
         {

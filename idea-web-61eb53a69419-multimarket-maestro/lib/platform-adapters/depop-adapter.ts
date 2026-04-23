@@ -1,17 +1,42 @@
 import axios from 'axios';
 import { Listing } from '../../types';
 import { BaseAdapter } from './base-adapter';
+import { SecureStorage } from '../storage';
 
 export class DepopAdapter extends BaseAdapter {
   private static readonly API_BASE = 'https://web.depop.com/api/v1';
 
+  constructor() {
+    super('depop');
+  }
+
   async authenticate(): Promise<void> {
-    // In a real implementation, this would handle OAuth token refresh
-    console.log('DepopAdapter: Authenticating with Depop API');
+    try {
+      // In a real implementation, this would handle OAuth token refresh
+      console.log('DepopAdapter: Authenticating with Depop API');
+
+      // Check if we have tokens
+      const token = await SecureStorage.getToken('depop');
+      const refreshToken = await SecureStorage.getRefreshToken('depop');
+
+      if (!token || !refreshToken) {
+        throw new Error('No Depop tokens available');
+      }
+
+      this.apiToken = token;
+      this.refreshToken = refreshToken;
+    } catch (error) {
+      console.error('DepopAdapter authentication error:', error);
+      throw error;
+    }
   }
 
   async createListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.post(
         `${DepopAdapter.API_BASE}/listings`,
         this.mapListingToDepopFormat(listing),
@@ -30,6 +55,10 @@ export class DepopAdapter extends BaseAdapter {
 
   async updateListing(listing: Listing): Promise<Listing> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.put(
         `${DepopAdapter.API_BASE}/listings/${listing.id}`,
         this.mapListingToDepopFormat(listing),
@@ -48,6 +77,10 @@ export class DepopAdapter extends BaseAdapter {
 
   async deleteListing(listingId: string): Promise<void> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       await axios.delete(
         `${DepopAdapter.API_BASE}/listings/${listingId}`,
         {
@@ -63,6 +96,10 @@ export class DepopAdapter extends BaseAdapter {
 
   async fetchListings(): Promise<Listing[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         `${DepopAdapter.API_BASE}/listings`,
         {
@@ -79,6 +116,10 @@ export class DepopAdapter extends BaseAdapter {
 
   async fetchOrders(): Promise<any[]> {
     try {
+      if (!this.apiToken) {
+        await this.authenticate();
+      }
+
       const response = await axios.get(
         `${DepopAdapter.API_BASE}/orders`,
         {
