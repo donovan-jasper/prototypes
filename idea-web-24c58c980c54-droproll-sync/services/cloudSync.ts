@@ -3,6 +3,7 @@ import { insertMedia, getMediaBySource, updateMediaHash } from '../database/quer
 import * as FileSystem from 'expo-file-system';
 import { computeAndStoreHashes } from './duplicateDetector';
 import { useSyncStore } from '../store/syncStore';
+import * as MediaLibrary from 'expo-media-library';
 
 interface SyncResult {
   synced: number;
@@ -57,8 +58,12 @@ export const syncCloudService = async (service: string, token: string): Promise<
       const item = newMedia[i];
 
       try {
+        // Create directory if it doesn't exist
+        const serviceDir = `${FileSystem.documentDirectory}${service}/`;
+        await FileSystem.makeDirectoryAsync(serviceDir, { intermediates: true });
+
         // Download the file
-        const localUri = `${FileSystem.documentDirectory}${service}/${item.name}`;
+        const localUri = `${serviceDir}${item.name}`;
         await FileSystem.downloadAsync(item.path, localUri);
 
         // Create media record with placeholder hash
@@ -77,6 +82,9 @@ export const syncCloudService = async (service: string, token: string): Promise<
 
         // Insert into database
         await insertMedia(mediaRecord);
+
+        // Add to device media library
+        await MediaLibrary.createAssetAsync(localUri);
 
         // Update progress
         setSyncProgress({
@@ -97,15 +105,7 @@ export const syncCloudService = async (service: string, token: string): Promise<
     const allMedia = await getMediaBySource(service);
     const mediaWithHashes = await computeAndStoreHashes(allMedia);
 
-    // Update hashes in database
-    for (const item of mediaWithHashes) {
-      if (item.hash) {
-        await updateMediaHash(item.id, item.hash);
-      }
-    }
-
     // Now run duplicate detection
-    const { findDuplicates } = require('./duplicateDetector');
     const duplicateGroups = await findDuplicates();
     duplicates = duplicateGroups.length;
 

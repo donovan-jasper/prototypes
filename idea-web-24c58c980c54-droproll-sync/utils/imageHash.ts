@@ -1,8 +1,9 @@
 import * as FileSystem from 'expo-file-system';
 import { Image } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 
-const IMAGE_SIZE = 32; // Size to resize images to for hashing
-const HASH_SIZE = 8; // Size of the resulting hash (8x8 grid)
+const IMAGE_SIZE = 9; // 8x8 grid + 1 for comparison
+const HASH_SIZE = 8; // 8x8 grid
 
 export const computeImageHash = async (fileUri: string): Promise<string> => {
   try {
@@ -10,36 +11,34 @@ export const computeImageHash = async (fileUri: string): Promise<string> => {
     const fileInfo = await FileSystem.getInfoAsync(fileUri);
     if (!fileInfo.exists) throw new Error('File does not exist');
 
-    // Create a temporary resized image
-    const resizedUri = `${FileSystem.cacheDirectory}resized_${Date.now()}.jpg`;
+    // Resize and convert to grayscale
+    const manipulatorResult = await ImageManipulator.manipulateAsync(
+      fileUri,
+      [{ resize: { width: IMAGE_SIZE, height: IMAGE_SIZE } }],
+      { compress: 1, format: ImageManipulator.SaveFormat.JPEG, base64: true }
+    );
 
-    // Resize image (simplified - in a real app you'd use a proper image processing library)
-    // This is a placeholder - in production you'd use a library like react-native-image-resizer
-    await FileSystem.copyAsync({
-      from: fileUri,
-      to: resizedUri,
-    });
+    // Get pixel data
+    const base64Data = manipulatorResult.base64;
+    if (!base64Data) throw new Error('Failed to get image data');
 
-    // Get image dimensions
-    const { width, height } = await new Promise<{ width: number; height: number }>((resolve) => {
-      Image.getSize(resizedUri, (width, height) => resolve({ width, height }));
-    });
+    // Convert base64 to pixel array
+    const pixels = await getPixelsFromBase64(base64Data);
 
-    // Calculate average color for each block
-    const blockSize = Math.max(1, Math.floor(Math.max(width, height) / HASH_SIZE));
-    const hash: number[] = [];
+    // Calculate dHash
+    const hash = [];
+    for (let y = 0; y < HASH_SIZE; y++) {
+      for (let x = 0; x < HASH_SIZE; x++) {
+        const currentIndex = y * IMAGE_SIZE + x;
+        const nextIndex = y * IMAGE_SIZE + (x + 1);
 
-    // This is a simplified version - a real implementation would:
-    // 1. Convert to grayscale
-    // 2. Calculate average brightness for each block
-    // 3. Compare with overall average to create binary hash
-    // This is just a placeholder to demonstrate the concept
-    for (let i = 0; i < HASH_SIZE * HASH_SIZE; i++) {
-      // In a real implementation, you would:
-      // 1. Get the pixel data for the current block
-      // 2. Calculate the average brightness
-      // 3. Compare with the overall average to get a 0 or 1
-      hash.push(Math.random() > 0.5 ? 1 : 0);
+        // Compare adjacent pixels
+        if (currentIndex < pixels.length && nextIndex < pixels.length) {
+          const currentPixel = pixels[currentIndex];
+          const nextPixel = pixels[nextIndex];
+          hash.push(currentPixel < nextPixel ? 1 : 0);
+        }
+      }
     }
 
     // Convert binary array to hex string
@@ -49,9 +48,6 @@ export const computeImageHash = async (fileUri: string): Promise<string> => {
       const decimal = chunk.reduce((acc, val, idx) => acc + (val << (3 - idx)), 0);
       hexString += decimal.toString(16).padStart(1, '0');
     }
-
-    // Clean up temporary file
-    await FileSystem.deleteAsync(resizedUri, { idempotent: true });
 
     return hexString;
   } catch (error) {
@@ -90,4 +86,38 @@ const hexToBinary = (hex: string): number[] => {
     }
   }
   return binary;
+};
+
+// Helper function to get pixel data from base64 image
+const getPixelsFromBase64 = async (base64Data: string): Promise<number[]> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Failed to get canvas context'));
+        return;
+      }
+
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, img.width, img.height);
+      const pixels = [];
+
+      // Convert to grayscale and get brightness values
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        const brightness = (r + g + b) / 3;
+        pixels.push(brightness);
+      }
+
+      resolve(pixels);
+    };
+    img.onerror = reject;
+    img.src = `data:image/jpeg;base64,${base64Data}`;
+  });
 };
