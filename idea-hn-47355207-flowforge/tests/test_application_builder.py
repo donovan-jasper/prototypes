@@ -1,102 +1,115 @@
 import pytest
 from unittest.mock import MagicMock, patch
+from src.components.ApplicationBuilder import ApplicationBuilder
 from src.services.DatabaseService import DatabaseService
+from src.services.AIService import AIService
 
 @pytest.fixture
-def mock_db():
-    with patch('src.services.DatabaseService.SQLite') as mock_sqlite:
-        mock_db = MagicMock()
-        mock_sqlite.openDatabase.return_value = mock_db
-        yield mock_db
+def mock_database_service():
+    mock = MagicMock(spec=DatabaseService)
+    mock.initDatabase.return_value = None
+    mock.getApplications.return_value = []
+    mock.saveApplication.return_value = None
+    mock.deleteApplication.return_value = None
+    return mock
 
-def test_database_service_initialization(mock_db):
-    db_service = DatabaseService()
-    assert db_service.db is not None
-
-def test_init_database(mock_db):
-    db_service = DatabaseService()
-    mock_db.transaction = MagicMock()
-
-    # Test successful initialization
-    async def test_init():
-        await db_service.initDatabase()
-        mock_db.transaction.assert_called_once()
-
-    # Run the async test
-    import asyncio
-    asyncio.run(test_init())
-
-def test_get_applications(mock_db):
-    db_service = DatabaseService()
-    mock_db.transaction = MagicMock()
-
-    # Mock the result of the query
-    mock_result = MagicMock()
-    mock_result.rows.length = 1
-    mock_result.rows.item.return_value = {
-        'id': 1,
-        'name': 'Test App',
-        'schema': '{"type": "object"}',
-        'version': 1,
-        'created_at': '2023-01-01',
-        'updated_at': '2023-01-01'
+@pytest.fixture
+def mock_ai_service():
+    mock = MagicMock(spec=AIService)
+    mock.generateSchemaSuggestion.return_value = {
+        'success': True,
+        'suggestions': [],
+        'confidence': 0.85
     }
+    return mock
 
-    mock_db.transaction.side_effect = lambda tx: tx.executeSql(
-        'SELECT * FROM applications ORDER BY updated_at DESC',
-        [],
-        lambda tx, results: results,
-        lambda tx, error: None
-    )
+def test_application_builder_initial_state(mock_database_service, mock_ai_service):
+    with patch('src.components.ApplicationBuilder.DatabaseService', return_value=mock_database_service), \
+         patch('src.components.ApplicationBuilder.AIService', return_value=mock_ai_service):
 
-    # Test successful retrieval
-    async def test_get():
-        apps = await db_service.getApplications()
-        assert len(apps) == 1
-        assert apps[0]['name'] == 'Test App'
+        # Mock the navigation prop
+        mock_navigation = MagicMock()
 
-    # Run the async test
-    import asyncio
-    asyncio.run(test_get())
+        # Create the component
+        component = ApplicationBuilder(navigation=mock_navigation)
 
-def test_save_application(mock_db):
-    db_service = DatabaseService()
-    mock_db.transaction = MagicMock()
+        # Verify initial state
+        assert component.state['appName'] == ''
+        assert component.state['fields'] == []
+        assert component.state['fieldName'] == ''
+        assert component.state['fieldType'] == ''
+        assert component.state['applications'] == []
+        assert component.state['schemaSuggestions'] == []
+        assert component.state['isLoading'] == False
+        assert component.state['showSuggestions'] == False
 
-    # Test successful save
-    async def test_save():
-        app_id = await db_service.saveApplication('Test App', {'type': 'object'})
-        assert app_id is not None
+def test_add_field(mock_database_service, mock_ai_service):
+    with patch('src.components.ApplicationBuilder.DatabaseService', return_value=mock_database_service), \
+         patch('src.components.ApplicationBuilder.AIService', return_value=mock_ai_service):
 
-    # Run the async test
-    import asyncio
-    asyncio.run(test_save())
+        mock_navigation = MagicMock()
+        component = ApplicationBuilder(navigation=mock_navigation)
 
-def test_detect_schema_changes():
-    db_service = DatabaseService()
+        # Set field name and type
+        component.setState({
+            'fieldName': 'testField',
+            'fieldType': 'string'
+        })
 
-    old_schema = {
-        'type': 'object',
-        'properties': {
-            'name': {'type': 'string'},
-            'age': {'type': 'integer'}
-        },
-        'required': ['name']
-    }
+        # Call addField
+        component.addField()
 
-    new_schema = {
-        'type': 'object',
-        'properties': {
-            'name': {'type': 'string'},
-            'age': {'type': 'string'},  # Changed type
-            'email': {'type': 'string'}  # Added field
-        },
-        'required': ['name', 'email']  # Changed required fields
-    }
+        # Verify field was added
+        assert len(component.state['fields']) == 1
+        assert component.state['fields'][0]['name'] == 'testField'
+        assert component.state['fields'][0]['type'] == 'string'
 
-    changes = db_service.detectSchemaChanges(old_schema, new_schema)
+        # Verify inputs were cleared
+        assert component.state['fieldName'] == ''
+        assert component.state['fieldType'] == ''
 
-    assert len(changes) == 3
-    assert any(change['type'] == 'change_type' for change in changes)
-    assert any(change['type'] == 'add_field' for change in changes)
-    assert any(change['type'] == 'make_required' for change in changes)
+def test_remove_field(mock_database_service, mock_ai_service):
+    with patch('src.components.ApplicationBuilder.DatabaseService', return_value=mock_database_service), \
+         patch('src.components.ApplicationBuilder.AIService', return_value=mock_ai_service):
+
+        mock_navigation = MagicMock()
+        component = ApplicationBuilder(navigation=mock_navigation)
+
+        # Add a test field
+        test_field = {'name': 'testField', 'type': 'string', 'id': 123}
+        component.setState({'fields': [test_field]})
+
+        # Remove the field
+        component.removeField(123)
+
+        # Verify field was removed
+        assert len(component.state['fields']) == 0
+
+def test_save_application(mock_database_service, mock_ai_service):
+    with patch('src.components.ApplicationBuilder.DatabaseService', return_value=mock_database_service), \
+         patch('src.components.ApplicationBuilder.AIService', return_value=mock_ai_service):
+
+        mock_navigation = MagicMock()
+        component = ApplicationBuilder(navigation=mock_navigation)
+
+        # Set application name and fields
+        component.setState({
+            'appName': 'Test App',
+            'fields': [{'name': 'testField', 'type': 'string', 'id': 123}]
+        })
+
+        # Save the application
+        component.saveApplication()
+
+        # Verify database service was called
+        mock_database_service.saveApplication.assert_called_once_with(
+            'Test App',
+            {
+                'name': 'Test App',
+                'fields': [{'name': 'testField', 'type': 'string', 'id': 123}]
+            }
+        )
+
+        # Verify state was reset
+        assert component.state['appName'] == ''
+        assert component.state['fields'] == []

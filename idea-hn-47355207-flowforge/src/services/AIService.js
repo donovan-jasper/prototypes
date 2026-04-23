@@ -45,6 +45,34 @@ class AIService {
             suggestedType: 'enum'
           });
         }
+
+        // Additional type optimizations
+        if (fieldDef.type === 'string' && fieldName.toLowerCase().includes('email')) {
+          suggestions.push({
+            type: 'optimize_type',
+            property: fieldName,
+            description: `Consider using 'email' type for ${fieldName}`,
+            suggestedType: 'email'
+          });
+        }
+
+        if (fieldDef.type === 'string' && fieldName.toLowerCase().includes('date')) {
+          suggestions.push({
+            type: 'optimize_type',
+            property: fieldName,
+            description: `Consider using 'date' type for ${fieldName}`,
+            suggestedType: 'date'
+          });
+        }
+
+        if (fieldDef.type === 'string' && fieldName.toLowerCase().includes('url')) {
+          suggestions.push({
+            type: 'optimize_type',
+            property: fieldName,
+            description: `Consider using 'url' type for ${fieldName}`,
+            suggestedType: 'url'
+          });
+        }
       });
 
       // Check for potential relationships
@@ -56,6 +84,35 @@ class AIService {
           relatedTo: 'userId'
         });
       }
+
+      // Check for common patterns in field names
+      const fieldNamePatterns = {
+        'firstName': 'string',
+        'lastName': 'string',
+        'fullName': 'string',
+        'age': 'number',
+        'price': 'number',
+        'quantity': 'number',
+        'isActive': 'boolean',
+        'status': 'enum',
+        'category': 'enum',
+        'tags': 'array'
+      };
+
+      Object.entries(currentSchema.properties || {}).forEach(([fieldName, fieldDef]) => {
+        const patternMatch = Object.entries(fieldNamePatterns).find(([pattern]) =>
+          fieldName.toLowerCase().includes(pattern.toLowerCase())
+        );
+
+        if (patternMatch && fieldDef.type !== patternMatch[1]) {
+          suggestions.push({
+            type: 'optimize_type',
+            property: fieldName,
+            description: `Consider using '${patternMatch[1]}' type for ${fieldName} based on naming pattern`,
+            suggestedType: patternMatch[1]
+          });
+        }
+      });
 
       return {
         success: true,
@@ -156,12 +213,12 @@ class AIService {
             type: 'type_change',
             changes: typeChanges,
             severity: 'medium',
-            description: 'Changing property types may require data migration'
+            description: 'Changing field types may affect data validation and processing'
           });
         }
       }
 
-      // Check for required fields changes
+      // Check for added required fields
       if (oldSchema.required && newSchema.required) {
         const newRequired = newSchema.required.filter(req => !oldSchema.required.includes(req));
         if (newRequired.length > 0) {
@@ -169,7 +226,7 @@ class AIService {
             type: 'new_required',
             properties: newRequired,
             severity: 'medium',
-            description: 'Adding new required fields may break existing data'
+            description: 'Adding required fields may break existing data that doesn\'t include them'
           });
         }
       }
@@ -177,7 +234,7 @@ class AIService {
       return {
         success: true,
         impacts: impacts,
-        riskLevel: impacts.length > 0 ? (impacts.some(i => i.severity === 'high') ? 'high' : 'medium') : 'low'
+        compatibilityScore: impacts.length === 0 ? 1.0 : Math.max(0, 1.0 - (impacts.length * 0.2))
       };
     } catch (error) {
       console.error('Error predicting schema impact:', error);

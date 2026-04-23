@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, TextInput, Button, ScrollView, StyleSheet, Alert, FlatList, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import DatabaseService from '../services/DatabaseService';
 import AIService from '../services/AIService';
 
@@ -13,6 +13,7 @@ const ApplicationBuilder = ({ navigation }) => {
   const [applications, setApplications] = useState([]);
   const [schemaSuggestions, setSchemaSuggestions] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
 
   useEffect(() => {
     databaseService.initDatabase()
@@ -58,20 +59,25 @@ const ApplicationBuilder = ({ navigation }) => {
       });
   };
 
-  const addField = () => {
+  const addField = async () => {
     if (!fieldName.trim() || !fieldType.trim()) {
       Alert.alert('Error', 'Please enter field name and type');
       return;
     }
 
-    const updatedFields = [...fields, {
+    const newField = {
       name: fieldName,
       type: fieldType,
       id: Date.now()
-    }];
+    };
+
+    const updatedFields = [...fields, newField];
     setFields(updatedFields);
     setFieldName('');
     setFieldType('');
+
+    // Get suggestions after adding a field
+    await getSchemaSuggestions(updatedFields);
   };
 
   const removeField = (id) => {
@@ -102,16 +108,17 @@ const ApplicationBuilder = ({ navigation }) => {
     );
   };
 
-  const getSchemaSuggestions = async () => {
-    if (fields.length === 0) {
-      Alert.alert('Info', 'Please add some fields first');
+  const getSchemaSuggestions = async (currentFields = fields) => {
+    if (currentFields.length === 0) {
+      setSchemaSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
     setIsLoading(true);
     try {
       const currentSchema = {
-        properties: fields.reduce((acc, field) => {
+        properties: currentFields.reduce((acc, field) => {
           acc[field.name] = { type: field.type };
           return acc;
         }, {}),
@@ -119,14 +126,15 @@ const ApplicationBuilder = ({ navigation }) => {
       };
 
       const response = await aiService.generateSchemaSuggestion(currentSchema);
-      if (response.success) {
+      if (response.success && response.suggestions.length > 0) {
         setSchemaSuggestions(response.suggestions);
+        setShowSuggestions(true);
       } else {
-        Alert.alert('Error', 'Failed to get schema suggestions');
+        setShowSuggestions(false);
       }
     } catch (error) {
       console.error('Error getting schema suggestions:', error);
-      Alert.alert('Error', 'Failed to get schema suggestions');
+      setShowSuggestions(false);
     } finally {
       setIsLoading(false);
     }
@@ -161,14 +169,20 @@ const ApplicationBuilder = ({ navigation }) => {
     }
 
     // Remove the applied suggestion
-    setSchemaSuggestions(schemaSuggestions.filter(s => s !== suggestion));
+    const updatedSuggestions = schemaSuggestions.filter(s => s !== suggestion);
+    setSchemaSuggestions(updatedSuggestions);
+    if (updatedSuggestions.length === 0) {
+      setShowSuggestions(false);
+    }
   };
 
   const renderField = ({ item }) => (
     <View style={styles.fieldItem}>
-      <Text style={styles.fieldName}>{item.name}</Text>
-      <Text style={styles.fieldType}>{item.type}</Text>
-      {item.relatedTo && <Text style={styles.fieldRelation}>→ {item.relatedTo}</Text>}
+      <View style={styles.fieldInfo}>
+        <Text style={styles.fieldName}>{item.name}</Text>
+        <Text style={styles.fieldType}>{item.type}</Text>
+        {item.relatedTo && <Text style={styles.fieldRelated}>→ {item.relatedTo}</Text>}
+      </View>
       <TouchableOpacity onPress={() => removeField(item.id)} style={styles.removeButton}>
         <Text style={styles.removeButtonText}>×</Text>
       </TouchableOpacity>
@@ -176,31 +190,46 @@ const ApplicationBuilder = ({ navigation }) => {
   );
 
   const renderSuggestion = ({ item }) => (
-    <View style={styles.suggestionItem}>
-      <Text style={styles.suggestionTitle}>
-        {item.type === 'add_property' ? 'Add Field' :
-         item.type === 'make_required' ? 'Mark Required' :
-         item.type === 'optimize_type' ? 'Optimize Type' :
-         item.type === 'add_relationship' ? 'Add Relationship' : 'Suggestion'}
-      </Text>
-      <Text style={styles.suggestionDescription}>{item.description}</Text>
-      {item.dataType && <Text style={styles.suggestionDetail}>Type: {item.dataType}</Text>}
-      {item.suggestedType && <Text style={styles.suggestionDetail}>Suggested: {item.suggestedType}</Text>}
-      {item.relatedTo && <Text style={styles.suggestionDetail}>Related to: {item.relatedTo}</Text>}
+    <TouchableOpacity
+      style={styles.suggestionItem}
+      onPress={() => applySuggestion(item)}
+    >
+      <View style={styles.suggestionContent}>
+        <Text style={styles.suggestionTitle}>
+          {item.type === 'add_property' && 'Add Field'}
+          {item.type === 'make_required' && 'Mark Required'}
+          {item.type === 'optimize_type' && 'Optimize Type'}
+          {item.type === 'add_relationship' && 'Add Relationship'}
+        </Text>
+        <Text style={styles.suggestionDescription}>{item.description}</Text>
+        {item.suggestedType && (
+          <Text style={styles.suggestionDetail}>Suggested: {item.suggestedType}</Text>
+        )}
+        {item.relatedTo && (
+          <Text style={styles.suggestionDetail}>Related to: {item.relatedTo}</Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderApplication = ({ item }) => (
+    <View style={styles.applicationItem}>
+      <Text style={styles.applicationName}>{item.name}</Text>
+      <Text style={styles.applicationFields}>{item.fields.length} fields</Text>
       <TouchableOpacity
-        style={styles.applyButton}
-        onPress={() => applySuggestion(item)}
+        style={styles.deleteButton}
+        onPress={() => deleteApplication(item.id)}
       >
-        <Text style={styles.applyButtonText}>Apply</Text>
+        <Text style={styles.deleteButtonText}>Delete</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Application Builder</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Create New Application</Text>
 
-      <View style={styles.formContainer}>
         <TextInput
           style={styles.input}
           placeholder="Application Name"
@@ -208,91 +237,66 @@ const ApplicationBuilder = ({ navigation }) => {
           onChangeText={setAppName}
         />
 
-        <Button title="Save Application" onPress={saveApplication} color="#4CAF50" />
-      </View>
-
-      <View style={styles.fieldsSection}>
-        <Text style={styles.sectionTitle}>Add New Field</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Field Name"
-          value={fieldName}
-          onChangeText={setFieldName}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Field Type (string, number, boolean, etc.)"
-          value={fieldType}
-          onChangeText={setFieldType}
-        />
-
-        <Button title="Add Field" onPress={addField} color="#2196F3" />
-      </View>
-
-      {fields.length > 0 && (
-        <View style={styles.currentFieldsSection}>
-          <Text style={styles.sectionTitle}>Current Fields</Text>
-          <FlatList
-            data={fields}
-            renderItem={renderField}
-            keyExtractor={item => item.id.toString()}
-            style={styles.fieldsList}
+        <View style={styles.fieldInputContainer}>
+          <TextInput
+            style={[styles.input, styles.fieldInput]}
+            placeholder="Field Name"
+            value={fieldName}
+            onChangeText={setFieldName}
           />
+          <TextInput
+            style={[styles.input, styles.fieldInput]}
+            placeholder="Field Type"
+            value={fieldType}
+            onChangeText={setFieldType}
+          />
+          <TouchableOpacity style={styles.addButton} onPress={addField}>
+            <Text style={styles.addButtonText}>Add Field</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <View style={styles.aiSection}>
-        <Text style={styles.sectionTitle}>AI Suggestions</Text>
-        <Button
-          title="Get Schema Suggestions"
-          onPress={getSchemaSuggestions}
-          color="#9C27B0"
-          disabled={isLoading}
-        />
+        {isLoading && <ActivityIndicator size="small" color="#007AFF" />}
 
-        {isLoading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" color="#9C27B0" />
-            <Text style={styles.loadingText}>Analyzing your schema...</Text>
-          </View>
-        )}
-
-        {schemaSuggestions.length > 0 && (
+        {showSuggestions && (
           <View style={styles.suggestionsContainer}>
-            <Text style={styles.suggestionsTitle}>Suggestions ({schemaSuggestions.length})</Text>
+            <Text style={styles.suggestionsTitle}>AI Suggestions</Text>
             <FlatList
               data={schemaSuggestions}
               renderItem={renderSuggestion}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item, index) => `suggestion-${index}`}
               style={styles.suggestionsList}
             />
           </View>
         )}
+
+        {fields.length > 0 && (
+          <View style={styles.fieldsContainer}>
+            <Text style={styles.fieldsTitle}>Fields ({fields.length})</Text>
+            <FlatList
+              data={fields}
+              renderItem={renderField}
+              keyExtractor={(item) => item.id.toString()}
+              style={styles.fieldsList}
+            />
+          </View>
+        )}
+
+        <TouchableOpacity style={styles.saveButton} onPress={saveApplication}>
+          <Text style={styles.saveButtonText}>Save Application</Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.applicationsSection}>
-        <Text style={styles.sectionTitle}>Saved Applications</Text>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Your Applications</Text>
         {applications.length > 0 ? (
           <FlatList
             data={applications}
-            renderItem={({ item }) => (
-              <View style={styles.applicationItem}>
-                <Text style={styles.applicationName}>{item.name}</Text>
-                <Text style={styles.applicationFields}>{item.fields.length} fields</Text>
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteApplication(item.id)}
-                >
-                  <Text style={styles.deleteButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-            keyExtractor={item => item.id.toString()}
+            renderItem={renderApplication}
+            keyExtractor={(item) => item.id.toString()}
+            style={styles.applicationsList}
           />
         ) : (
-          <Text style={styles.noApplications}>No applications saved yet</Text>
+          <Text style={styles.noApplications}>No applications yet. Create one above!</Text>
         )}
       </View>
     </ScrollView>
@@ -302,25 +306,25 @@ const ApplicationBuilder = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#333',
-  },
-  formContainer: {
+  section: {
     backgroundColor: 'white',
-    padding: 15,
     borderRadius: 8,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+    color: '#333',
   },
   input: {
     height: 40,
@@ -331,170 +335,150 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: 'white',
   },
-  fieldsSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+  fieldInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 10,
-    color: '#444',
   },
-  currentFieldsSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  fieldInput: {
+    flex: 1,
+    marginRight: 8,
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 4,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  saveButton: {
+    backgroundColor: '#34C759',
+    paddingVertical: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  fieldsContainer: {
+    marginTop: 16,
+  },
+  fieldsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
   },
   fieldsList: {
-    marginTop: 10,
+    maxHeight: 200,
   },
   fieldItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  fieldName: {
-    fontWeight: '500',
-    marginRight: 10,
-    flex: 1,
-  },
-  fieldType: {
-    color: '#666',
-    marginRight: 10,
-  },
-  fieldRelation: {
-    color: '#9C27B0',
-    marginRight: 10,
-  },
-  removeButton: {
-    padding: 5,
-  },
-  removeButtonText: {
-    color: '#ff4444',
-    fontWeight: 'bold',
-  },
-  aiSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  loadingText: {
-    marginLeft: 10,
-    color: '#666',
-  },
-  suggestionsContainer: {
-    marginTop: 15,
-  },
-  suggestionsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#444',
-  },
-  suggestionsList: {
-    marginTop: 5,
-  },
-  suggestionItem: {
-    backgroundColor: '#f8f8f8',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#9C27B0',
-  },
-  suggestionTitle: {
-    fontWeight: '600',
-    marginBottom: 5,
-    color: '#333',
-  },
-  suggestionDescription: {
-    color: '#555',
-    marginBottom: 5,
-  },
-  suggestionDetail: {
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 3,
-  },
-  applyButton: {
-    backgroundColor: '#9C27B0',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
-  applyButtonText: {
-    color: 'white',
-    fontWeight: '500',
-  },
-  applicationsSection: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  applicationItem: {
-    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  applicationName: {
-    fontWeight: '500',
+  fieldInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  fieldName: {
+    fontWeight: '600',
+    marginRight: 8,
+  },
+  fieldType: {
+    color: '#666',
+    marginRight: 8,
+  },
+  fieldRelated: {
+    color: '#007AFF',
+  },
+  removeButton: {
+    padding: 8,
+  },
+  removeButtonText: {
+    color: '#FF3B30',
+    fontWeight: 'bold',
+    fontSize: 18,
+  },
+  suggestionsContainer: {
+    marginTop: 16,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    padding: 12,
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#007AFF',
+  },
+  suggestionsList: {
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    backgroundColor: 'white',
+    borderRadius: 6,
+    padding: 12,
+    marginBottom: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#007AFF',
+  },
+  suggestionContent: {
     flex: 1,
+  },
+  suggestionTitle: {
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  suggestionDescription: {
+    color: '#666',
+    marginBottom: 4,
+  },
+  suggestionDetail: {
+    color: '#007AFF',
+    fontSize: 12,
+  },
+  applicationsList: {
+    marginTop: 8,
+  },
+  applicationItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  applicationName: {
+    fontWeight: '600',
+    fontSize: 16,
   },
   applicationFields: {
     color: '#666',
-    marginRight: 10,
   },
   deleteButton: {
-    backgroundColor: '#ff4444',
-    paddingVertical: 5,
-    paddingHorizontal: 10,
+    backgroundColor: '#FF3B30',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 4,
   },
   deleteButtonText: {
     color: 'white',
-    fontSize: 12,
+    fontWeight: '600',
   },
   noApplications: {
-    color: '#666',
+    color: '#999',
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 16,
   },
 });
 
