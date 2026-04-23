@@ -122,6 +122,8 @@ const addSubscription = async (subscription) => {
       ...subscription
     });
   }
+
+  return result.lastInsertRowId;
 };
 
 const updateSubscription = async (id, subscription) => {
@@ -161,26 +163,53 @@ const unsubscribe = async (id) => {
 };
 
 const getSetting = async (key) => {
-  const result = await db.getAllAsync('SELECT value FROM settings WHERE key = ?', [key]);
-  return result.length > 0 ? result[0].value : null;
+  const result = await db.getFirstAsync('SELECT value FROM settings WHERE key = ?', [key]);
+  return result?.value;
 };
 
 const setSetting = async (key, value) => {
   await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
 };
 
-const initialize = async () => {
-  await initDatabase();
-  await seedDatabase();
+const getSubscriptionById = async (id) => {
+  return await db.getFirstAsync('SELECT * FROM subscriptions WHERE id = ?', [id]);
 };
 
-export {
-  initialize,
+const getTotalMonthlyCost = async () => {
+  const result = await db.getFirstAsync(`
+    SELECT SUM(cost) as total
+    FROM subscriptions
+    WHERE status = 'active'
+    AND billing_cycle = 'monthly'
+  `);
+  return result?.total || 0;
+};
+
+const getUpcomingRenewals = async () => {
+  const now = new Date().toISOString();
+  const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+  return await db.getAllAsync(`
+    SELECT * FROM subscriptions
+    WHERE status = 'active'
+    AND renewal_date BETWEEN ? AND ?
+    ORDER BY renewal_date ASC
+  `, [now, futureDate]);
+};
+
+const SubscriptionService = {
+  initDatabase,
+  seedDatabase,
   getSubscriptions,
   addSubscription,
   updateSubscription,
   markAsUnsubscribed,
   unsubscribe,
   getSetting,
-  setSetting
+  setSetting,
+  getSubscriptionById,
+  getTotalMonthlyCost,
+  getUpcomingRenewals
 };
+
+export default SubscriptionService;
