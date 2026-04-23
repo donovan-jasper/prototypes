@@ -153,58 +153,64 @@ export const useP2PTransfer = () => {
         // Handle file data chunks
         receivedData.push(event.data);
         receivedBytes += event.data.byteLength;
-        const newProgress = Math.floor((receivedBytes / fileSize) * 100);
-        setProgress(newProgress);
+        const currentProgress = Math.floor((receivedBytes / fileSize) * 100);
+        setProgress(currentProgress);
 
         if (receivedBytes === fileSize) {
           // File transfer complete
           const fileData = new Blob(receivedData);
-          saveReceivedFile(fileName, fileData);
+          const reader = new FileReader();
+          reader.onload = async () => {
+            try {
+              const fileUri = FileSystem.documentDirectory + fileName;
+              await FileSystem.writeAsStringAsync(fileUri, reader.result as string, {
+                encoding: FileSystem.EncodingType.Base64
+              });
+              await addNewFile({
+                id: Date.now().toString(),
+                name: fileName,
+                size: fileSize,
+                path: fileUri,
+                encrypted: true
+              });
+              setConnectionState('completed');
+              setIsTransferring(false);
+            } catch (error) {
+              console.error('File save error:', error);
+              setConnectionState('failed');
+            }
+          };
+          reader.readAsDataURL(fileData);
         }
       }
     };
 
     channel.onclose = () => {
       console.log('Data channel closed');
-      setConnectionState('completed');
+      setConnectionState('disconnected');
     };
 
     channel.onerror = (error) => {
       console.error('Data channel error:', error);
       setConnectionState('failed');
     };
-  }, []);
-
-  const saveReceivedFile = useCallback(async (fileName: string, fileData: Blob) => {
-    try {
-      const fileUri = FileSystem.documentDirectory + fileName;
-      await FileSystem.writeAsStringAsync(fileUri, await fileData.text(), {
-        encoding: FileSystem.EncodingType.Base64
-      });
-
-      // Add to vault
-      await addNewFile({
-        name: fileName,
-        size: fileData.size,
-        path: fileUri,
-        encrypted: false // In real app, this would be true after decryption
-      });
-
-      setIsTransferring(false);
-      setProgress(100);
-    } catch (error) {
-      console.error('Error saving received file:', error);
-      setConnectionState('failed');
-    }
   }, [addNewFile]);
 
   const sendFileP2P = useCallback(async (fileId: string, peerId: string) => {
+    if (!peerId) {
+      Alert.alert('Error', 'No peer selected');
+      return;
+    }
+
     try {
       setIsTransferring(true);
       setConnectionState('connecting');
+      setProgress(0);
 
       const file = await getFile(fileId);
-      if (!file) throw new Error('File not found');
+      if (!file) {
+        throw new Error('File not found');
+      }
 
       const pc = createPeerConnection();
       const channel = pc.createDataChannel('fileTransfer');
@@ -233,37 +239,59 @@ export const useP2PTransfer = () => {
         size: file.size
       }));
 
-      // Send file data in chunks
+      // Send file in chunks
       for (let i = 0; i < fileContent.length; i += CHUNK_SIZE) {
         const chunk = fileContent.slice(i, i + CHUNK_SIZE);
         channel.send(chunk);
-        const progress = Math.floor((i / fileContent.length) * 100);
-        setProgress(progress);
+        const currentProgress = Math.floor((i / fileContent.length) * 100);
+        setProgress(currentProgress);
       }
 
+      setProgress(100);
       setConnectionState('completed');
     } catch (error) {
-      console.error('Error sending file:', error);
+      console.error('Send file error:', error);
       setConnectionState('failed');
+      Alert.alert('Transfer Failed', 'Could not send file');
     } finally {
       setIsTransferring(false);
     }
-  }, [createPeerConnection, setupDataChannel, signalingServer, getFile]);
+  }, [createPeerConnection, setupDataChannel, getFile, signalingServer]);
 
   const receiveFileP2P = useCallback(async (peerId: string) => {
+    if (!peerId) {
+      Alert.alert('Error', 'No peer selected');
+      return;
+    }
+
     try {
       setIsTransferring(true);
       setConnectionState('connecting');
+      setProgress(0);
 
       const pc = createPeerConnection();
       setPeerConnection(pc);
 
       // Wait for data channel to be created via ondatachannel event
+      // The setupDataChannel will handle the actual file reception
     } catch (error) {
-      console.error('Error receiving file:', error);
+      console.error('Receive file error:', error);
       setConnectionState('failed');
+      Alert.alert('Transfer Failed', 'Could not receive file');
     }
   }, [createPeerConnection]);
+
+  const cancelTransfer = useCallback(() => {
+    if (dataChannel) {
+      dataChannel.close();
+    }
+    if (peerConnection) {
+      peerConnection.close();
+    }
+    setIsTransferring(false);
+    setConnectionState('disconnected');
+    setProgress(0);
+  }, [dataChannel, peerConnection]);
 
   return {
     isTransferring,
@@ -273,7 +301,6 @@ export const useP2PTransfer = () => {
     discoverPeers,
     sendFileP2P,
     receiveFileP2P,
-    peerConnection,
-    dataChannel
+    cancelTransfer
   };
 };

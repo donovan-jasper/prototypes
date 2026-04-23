@@ -1,185 +1,124 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import * as DocumentPicker from 'expo-document-picker';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { useFileVault } from '@/hooks/useFileVault';
 import { useP2PTransfer } from '@/hooks/useP2PTransfer';
 import { Colors } from '@/constants/Colors';
 import { P2PTransferModal } from '@/components/P2PTransferModal';
-import { ExpirationPicker } from '@/components/ExpirationPicker';
-import { PremiumGate } from '@/components/PremiumGate';
+import { PeerDiscoveryModal } from '@/components/PeerDiscoveryModal';
+import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function ShareScreen() {
-  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentResult | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<{ id: string; name: string } | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [expirationHours, setExpirationHours] = useState(24);
-  const [peerId, setPeerId] = useState<string | null>(null);
+  const [showPeerDiscovery, setShowPeerDiscovery] = useState(false);
+  const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
+  const { addNewFile } = useFileVault();
+  const { sendFileP2P } = useP2PTransfer();
 
-  const { addNewFile, canShare } = useFileVault();
-  const { discoverPeers } = useP2PTransfer();
-
-  const pickDocument = useCallback(async () => {
+  const pickDocument = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: '*/*',
         copyToCacheDirectory: true,
       });
 
-      if (!result.canceled) {
-        setSelectedFile(result);
+      if (result.type === 'success') {
+        const fileId = Date.now().toString();
+        await addNewFile({
+          id: fileId,
+          name: result.name,
+          size: result.size,
+          path: result.uri,
+          encrypted: false
+        });
+        setSelectedFile({ id: fileId, name: result.name });
       }
     } catch (error) {
-      console.error('Error picking document:', error);
+      console.error('Document picker error:', error);
       Alert.alert('Error', 'Could not select document');
     }
-  }, []);
+  };
 
-  const takePhoto = useCallback(async () => {
-    try {
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        quality: 1,
-      });
-
-      if (!result.canceled) {
-        setSelectedFile({
-          assets: [{
-            name: 'photo.jpg',
-            uri: result.assets[0].uri,
-            size: result.assets[0].fileSize || 0,
-            mimeType: 'image/jpeg',
-          }],
-          canceled: false,
-        });
-      }
-    } catch (error) {
-      console.error('Error taking photo:', error);
-      Alert.alert('Error', 'Could not take photo');
-    }
-  }, []);
-
-  const pickFromGallery = useCallback(async () => {
+  const pickImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         quality: 1,
       });
 
-      if (!result.canceled) {
-        setSelectedFile({
-          assets: [{
-            name: result.assets[0].fileName || 'image.jpg',
-            uri: result.assets[0].uri,
-            size: result.assets[0].fileSize || 0,
-            mimeType: result.assets[0].mimeType || 'image/jpeg',
-          }],
-          canceled: false,
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const fileId = Date.now().toString();
+        await addNewFile({
+          id: fileId,
+          name: asset.fileName || 'image.jpg',
+          size: asset.fileSize || 0,
+          path: asset.uri,
+          encrypted: false
         });
+        setSelectedFile({ id: fileId, name: asset.fileName || 'image.jpg' });
       }
     } catch (error) {
-      console.error('Error picking from gallery:', error);
+      console.error('Image picker error:', error);
       Alert.alert('Error', 'Could not select image');
     }
-  }, []);
+  };
 
-  const handleShare = useCallback(async () => {
-    if (!selectedFile || selectedFile.canceled) {
+  const handleSendP2P = () => {
+    if (!selectedFile) {
       Alert.alert('Error', 'Please select a file first');
       return;
     }
+    setShowPeerDiscovery(true);
+  };
 
-    if (!canShare()) {
-      Alert.alert('Limit Reached', 'You\'ve reached your free share limit. Upgrade to share more files.');
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Add file to vault
-      const fileId = await addNewFile({
-        name: selectedFile.assets[0].name,
-        size: selectedFile.assets[0].size,
-        path: selectedFile.assets[0].uri,
-        encrypted: false, // In real app, this would be true after encryption
-      });
-
-      // Discover peers
-      const peers = await discoverPeers();
-      if (peers.length === 0) {
-        Alert.alert('No Devices Found', 'No other devices found on your network');
-        return;
-      }
-
-      // For demo, just use the first peer
-      setPeerId(peers[0]);
-      setShowTransferModal(true);
-    } catch (error) {
-      console.error('Error sharing file:', error);
-      Alert.alert('Error', 'Could not share file');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [selectedFile, addNewFile, discoverPeers, canShare]);
+  const handlePeerSelected = (peerId: string) => {
+    setSelectedPeer(peerId);
+    setShowPeerDiscovery(false);
+    setShowTransferModal(true);
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Share a File</Text>
+      <Text style={styles.title}>Share Files Securely</Text>
 
-      <View style={styles.optionsContainer}>
-        <TouchableOpacity style={styles.optionButton} onPress={takePhoto}>
-          <Text style={styles.optionText}>Take Photo</Text>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.button} onPress={pickDocument}>
+          <Text style={styles.buttonText}>Select Document</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.optionButton} onPress={pickFromGallery}>
-          <Text style={styles.optionText}>Choose from Gallery</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.optionButton} onPress={pickDocument}>
-          <Text style={styles.optionText}>Select Document</Text>
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
+          <Text style={styles.buttonText}>Select Image</Text>
         </TouchableOpacity>
       </View>
 
-      {selectedFile && !selectedFile.canceled && (
-        <View style={styles.fileInfo}>
-          <Text style={styles.fileName}>{selectedFile.assets[0].name}</Text>
-          <Text style={styles.fileSize}>
-            {Math.round(selectedFile.assets[0].size / 1024)} KB
-          </Text>
+      {selectedFile && (
+        <View style={styles.selectedFileContainer}>
+          <Text style={styles.selectedFileText}>Selected: {selectedFile.name}</Text>
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={handleSendP2P}
+          >
+            <Text style={styles.sendButtonText}>Send via P2P</Text>
+          </TouchableOpacity>
         </View>
       )}
 
-      <ExpirationPicker
-        value={expirationHours}
-        onChange={setExpirationHours}
+      <PeerDiscoveryModal
+        visible={showPeerDiscovery}
+        onClose={() => setShowPeerDiscovery(false)}
+        onSelectPeer={handlePeerSelected}
       />
-
-      <TouchableOpacity
-        style={[
-          styles.shareButton,
-          (!selectedFile || selectedFile.canceled) && styles.disabledButton
-        ]}
-        onPress={handleShare}
-        disabled={!selectedFile || selectedFile.canceled || isLoading}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.shareButtonText}>Share via P2P</Text>
-        )}
-      </TouchableOpacity>
 
       <P2PTransferModal
         visible={showTransferModal}
         onClose={() => setShowTransferModal(false)}
-        fileId={selectedFile?.assets[0].uri} // In real app, this would be the file ID from database
-        peerId={peerId}
+        fileId={selectedFile?.id}
+        peerId={selectedPeer}
         isSender={true}
       />
-
-      <PremiumGate />
     </View>
   );
 }
@@ -197,46 +136,39 @@ const styles = StyleSheet.create({
     color: Colors.text,
     textAlign: 'center',
   },
-  optionsContainer: {
+  buttonContainer: {
     marginBottom: 30,
   },
-  optionButton: {
-    backgroundColor: Colors.card,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  optionText: {
-    color: Colors.primary,
-    fontWeight: 'bold',
-  },
-  fileInfo: {
-    backgroundColor: Colors.card,
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  fileName: {
-    color: Colors.text,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  fileSize: {
-    color: Colors.textSecondary,
-  },
-  shareButton: {
+  button: {
     backgroundColor: Colors.primary,
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 5,
+    marginBottom: 15,
     alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  selectedFileContainer: {
     marginTop: 20,
+    padding: 15,
+    backgroundColor: Colors.card,
+    borderRadius: 5,
   },
-  disabledButton: {
-    backgroundColor: Colors.disabled,
+  selectedFileText: {
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 10,
   },
-  shareButtonText: {
+  sendButton: {
+    backgroundColor: Colors.success,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  sendButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },

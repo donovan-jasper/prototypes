@@ -23,7 +23,8 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
     progress,
     connectionState,
     sendFileP2P,
-    receiveFileP2P
+    receiveFileP2P,
+    cancelTransfer
   } = useP2PTransfer();
 
   useEffect(() => {
@@ -71,12 +72,19 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
     }
   };
 
+  const handleClose = () => {
+    if (isTransferring && connectionState !== 'completed') {
+      cancelTransfer();
+    }
+    onClose();
+  };
+
   return (
     <Modal
       visible={visible}
       transparent={true}
       animationType="slide"
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
@@ -108,15 +116,11 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
           )}
 
           <TouchableOpacity
-            style={[
-              styles.closeButton,
-              (isTransferring && connectionState !== 'completed') && styles.disabledButton
-            ]}
-            onPress={onClose}
-            disabled={isTransferring && connectionState !== 'completed'}
+            style={styles.closeButton}
+            onPress={handleClose}
           >
             <Text style={styles.closeButtonText}>
-              {isTransferring && connectionState !== 'completed' ? 'Please wait...' : 'Close'}
+              {isTransferring && connectionState !== 'completed' ? 'Cancel' : 'Close'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -199,9 +203,6 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     width: '100%',
     alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: Colors.disabled,
   },
   closeButtonText: {
     color: 'white',
