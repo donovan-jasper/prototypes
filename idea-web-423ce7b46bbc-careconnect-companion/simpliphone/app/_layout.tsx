@@ -1,14 +1,16 @@
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SettingsProvider } from '../contexts/SettingsContext';
 import { initDB } from '../database/db';
 import { registerNotificationHandlers } from '../services/notifications';
+import { detectShakeGesture } from '../services/emergency';
 
 export default function RootLayout() {
   const [isDBReady, setIsDBReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     const setupDatabase = async () => {
@@ -18,7 +20,7 @@ export default function RootLayout() {
       } catch (err) {
         console.error('Database initialization failed:', err);
         setError('Failed to initialize database. Using fallback storage.');
-        
+
         try {
           await AsyncStorage.setItem('db_fallback', 'true');
           setIsDBReady(true);
@@ -36,6 +38,14 @@ export default function RootLayout() {
     const subscription = registerNotificationHandlers();
     return () => subscription?.remove();
   }, []);
+
+  useEffect(() => {
+    const shakeSubscription = detectShakeGesture(() => {
+      router.push('/emergency');
+    });
+
+    return () => shakeSubscription.remove();
+  }, [router]);
 
   if (error && !isDBReady) {
     return (
