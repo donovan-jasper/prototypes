@@ -1,9 +1,9 @@
 import db from './database';
-import { Appointment } from '../types';
+import { Appointment, Document } from '../types';
 
 export const addAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'completed'>): Promise<Appointment> => {
   const result = await db.runAsync(
-    'INSERT INTO appointments (familyMemberId, type, provider, date, location, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO appointments (family_member_id, type, provider, date, location, notes) VALUES (?, ?, ?, ?, ?, ?)',
     [data.familyMemberId, data.type, data.provider, data.date, data.location || null, data.notes || null]
   );
 
@@ -12,7 +12,7 @@ export const addAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' 
 
 export const getAppointmentsByMember = async (familyMemberId: number): Promise<Appointment[]> => {
   return await db.getAllAsync<Appointment>(
-    'SELECT * FROM appointments WHERE familyMemberId = ? ORDER BY date DESC',
+    'SELECT * FROM appointments WHERE family_member_id = ? ORDER BY date DESC',
     [familyMemberId]
   );
 };
@@ -39,7 +39,7 @@ export const getAppointmentWithDocuments = async (id: number): Promise<Appointme
   if (!appointment) throw new Error('Appointment not found');
 
   const documents = await db.getAllAsync<Document>(
-    'SELECT * FROM documents WHERE appointmentId = ? ORDER BY uploadDate DESC',
+    'SELECT * FROM documents WHERE appointment_id = ? ORDER BY upload_date DESC',
     [id]
   );
 

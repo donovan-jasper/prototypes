@@ -3,10 +3,10 @@ import { Document } from '../types';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 
-export const addDocument = async (familyMemberId: number, title: string, type: string, fileUri: string): Promise<Document> => {
+export const addDocument = async (familyMemberId: number, title: string, type: string, fileUri: string, appointmentId?: number): Promise<Document> => {
   const result = await db.runAsync(
-    'INSERT INTO documents (familyMemberId, title, type, fileUri) VALUES (?, ?, ?, ?)',
-    [familyMemberId, title, type, fileUri]
+    'INSERT INTO documents (family_member_id, title, type, file_uri, appointment_id) VALUES (?, ?, ?, ?, ?)',
+    [familyMemberId, title, type, fileUri, appointmentId || null]
   );
 
   return (await db.getFirstAsync<Document>('SELECT * FROM documents WHERE id = ?', [result.lastInsertRowId]))!;
@@ -14,14 +14,14 @@ export const addDocument = async (familyMemberId: number, title: string, type: s
 
 export const getDocumentsByMember = async (familyMemberId: number): Promise<Document[]> => {
   return await db.getAllAsync<Document>(
-    'SELECT * FROM documents WHERE familyMemberId = ? ORDER BY uploadDate DESC',
+    'SELECT * FROM documents WHERE family_member_id = ? ORDER BY upload_date DESC',
     [familyMemberId]
   );
 };
 
 export const getDocumentsByAppointment = async (appointmentId: number): Promise<Document[]> => {
   return await db.getAllAsync<Document>(
-    'SELECT * FROM documents WHERE appointmentId = ? ORDER BY uploadDate DESC',
+    'SELECT * FROM documents WHERE appointment_id = ? ORDER BY upload_date DESC',
     [appointmentId]
   );
 };
@@ -43,7 +43,7 @@ export const deleteDocument = async (id: number): Promise<void> => {
 
 export const attachDocumentToAppointment = async (documentId: number, appointmentId: number): Promise<void> => {
   await db.runAsync(
-    'UPDATE documents SET appointmentId = ? WHERE id = ?',
+    'UPDATE documents SET appointment_id = ? WHERE id = ?',
     [appointmentId, documentId]
   );
 };
