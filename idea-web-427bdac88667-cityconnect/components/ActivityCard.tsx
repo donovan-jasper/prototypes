@@ -158,14 +158,14 @@ export default function ActivityCard({ activity }: ActivityCardProps) {
                   <TouchableOpacity
                     onPress={() => handleRSVP('interested')}
                     disabled={loading}
-                    className="px-3 py-1.5 bg-blue-500 rounded-full mr-2"
+                    className="px-3 py-1.5 bg-gray-200 rounded-full mr-2"
                   >
-                    <Text className="text-white text-sm font-medium">Interested</Text>
+                    <Text className="text-gray-800 text-sm font-medium">Interested</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => handleRSVP('going')}
                     disabled={loading}
-                    className="px-3 py-1.5 bg-green-500 rounded-full"
+                    className="px-3 py-1.5 bg-blue-500 rounded-full"
                   >
                     <Text className="text-white text-sm font-medium">Going</Text>
                   </TouchableOpacity>

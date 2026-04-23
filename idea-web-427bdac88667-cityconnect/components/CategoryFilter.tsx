@@ -21,11 +21,11 @@ const categories = [
 
 export default function CategoryFilter({ selectedCategory, onSelectCategory }: CategoryFilterProps) {
   return (
-    <View className="bg-white py-2 border-b border-gray-100">
+    <View className="bg-white py-2">
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={{ paddingHorizontal: 12 }}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
       >
         {categories.map((category) => (
           <TouchableOpacity
@@ -33,7 +33,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }: C
             onPress={() => onSelectCategory(category.id === 'all' ? undefined : category.id)}
             className={`flex-row items-center px-4 py-2 rounded-full mr-2 ${
               selectedCategory === category.id || (category.id === 'all' && !selectedCategory)
-                ? 'bg-blue-100'
+                ? 'bg-blue-500'
                 : 'bg-gray-100'
             }`}
           >
@@ -42,7 +42,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }: C
               size={16}
               color={
                 selectedCategory === category.id || (category.id === 'all' && !selectedCategory)
-                  ? '#3b82f6'
+                  ? 'white'
                   : '#4b5563'
               }
               className="mr-1"
@@ -50,7 +50,7 @@ export default function CategoryFilter({ selectedCategory, onSelectCategory }: C
             <Text
               className={`text-sm font-medium ${
                 selectedCategory === category.id || (category.id === 'all' && !selectedCategory)
-                  ? 'text-blue-700'
+                  ? 'text-white'
                   : 'text-gray-700'
               }`}
             >

@@ -2,40 +2,45 @@ import { useState, useEffect, useCallback } from 'react';
 import { getActivitiesNearby } from '../lib/activities';
 import * as Location from 'expo-location';
 
-interface Coordinates {
+interface Activity {
+  id: number;
+  title: string;
+  description: string;
+  category: string;
   latitude: number;
   longitude: number;
+  startTime: string;
+  organizerId: number;
+  maxAttendees: number | null;
 }
 
 export function useActivities(
-  location: Coordinates | undefined,
+  location: Location.LocationObjectCoords | undefined,
   radius: number,
   category?: string
 ) {
-  const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchActivities = useCallback(async () => {
-    if (!location) {
-      setLoading(false);
-      setError('Location not available');
-      return;
-    }
+    if (!location) return;
 
     try {
       setLoading(true);
       setError(null);
+
       const fetchedActivities = await getActivitiesNearby(
         location.latitude,
         location.longitude,
         radius,
         category
       );
+
       setActivities(fetchedActivities);
     } catch (err) {
-      setError('Failed to fetch activities');
       console.error('Error fetching activities:', err);
+      setError('Failed to load activities. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -45,9 +50,9 @@ export function useActivities(
     fetchActivities();
   }, [fetchActivities]);
 
-  const refresh = async () => {
+  const refresh = useCallback(async () => {
     await fetchActivities();
-  };
+  }, [fetchActivities]);
 
   return { activities, loading, error, refresh };
 }
