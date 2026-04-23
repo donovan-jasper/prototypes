@@ -173,7 +173,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: 'white',
     fontFamily: 'monospace',
-    fontSize: 14,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -181,9 +180,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loadingContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginVertical: 20,
   },
   errorContainer: {
@@ -197,42 +194,38 @@ const styles = StyleSheet.create({
   },
   executionTime: {
     textAlign: 'right',
-    color: '#666',
-    fontSize: 12,
     marginBottom: 8,
+    color: '#666',
   },
   resultsContainer: {
     flex: 1,
     marginTop: 16,
   },
   resultsTitle: {
-    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
   },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: '#f0f0f0',
+    padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
   headerCell: {
-    padding: 10,
+    width: 150,
     fontWeight: 'bold',
-    minWidth: 100,
-    borderRightWidth: 1,
-    borderRightColor: '#ddd',
+    padding: 8,
   },
   row: {
     flexDirection: 'row',
+    padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   cell: {
-    padding: 10,
-    minWidth: 100,
-    borderRightWidth: 1,
-    borderRightColor: '#eee',
+    width: 150,
+    padding: 8,
   },
 });
 
