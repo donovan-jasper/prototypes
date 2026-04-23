@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { getRecommendations } from '../utils/recommendations';
+import { mockApps } from '../utils/mockApps';
 import { AppRecommendation } from '../types/app';
 
 const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [apps, setApps] = useState<AppRecommendation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [filteredApps, setFilteredApps] = useState<AppRecommendation[]>([]);
 
   useEffect(() => {
-    const fetchApps = async () => {
-      setLoading(true);
-      const result = await getRecommendations(searchQuery);
-      setApps(result.data);
-      setLoading(false);
-      setError(result.error);
-    };
-
-    fetchApps();
+    if (searchQuery.trim() === '') {
+      setFilteredApps(mockApps);
+    } else {
+      const query = searchQuery.toLowerCase();
+      const results = mockApps.filter(app =>
+        app.tags.some(tag => tag.toLowerCase().includes(query)) ||
+        app.useCases.some(useCase => useCase.toLowerCase().includes(query)) ||
+        app.name.toLowerCase().includes(query) ||
+        app.description.toLowerCase().includes(query)
+      );
+      setFilteredApps(results);
+    }
   }, [searchQuery]);
 
   const renderAppItem = ({ item }: { item: AppRecommendation }) => (
@@ -47,20 +48,19 @@ const HomeScreen = () => {
         placeholder="Search for apps (e.g., productivity, health)"
         value={searchQuery}
         onChangeText={setSearchQuery}
+        autoCapitalize="none"
       />
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.loader} />
-      ) : error ? (
-        <Text style={styles.errorText}>{error}</Text>
+      {filteredApps.length === 0 && searchQuery.trim() !== '' ? (
+        <Text style={styles.emptyText}>No apps found. Try a different search.</Text>
       ) : (
         <FlatList
-          data={apps}
+          data={filteredApps}
           renderItem={renderAppItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
           ListEmptyComponent={
-            <Text style={styles.emptyText}>No apps found. Try a different search.</Text>
+            <Text style={styles.emptyText}>Start typing to search for apps...</Text>
           }
         />
       )}
@@ -142,14 +142,6 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: 12,
     color: '#999',
-  },
-  loader: {
-    marginTop: 40,
-  },
-  errorText: {
-    color: 'red',
-    textAlign: 'center',
-    marginTop: 20,
   },
   emptyText: {
     textAlign: 'center',
