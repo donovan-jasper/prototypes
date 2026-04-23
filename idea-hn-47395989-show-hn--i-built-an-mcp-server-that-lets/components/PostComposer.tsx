@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, TextInput, TouchableOpacity, Text, View, Alert, ActivityIndicator } from 'react-native';
 import { refinePost } from '@/lib/ai';
 import { publishPost as publishToThreads } from '@/lib/threads';
-import { publishPost as publishToBluesky } from '@/lib/bluesky';
+import { publishToBluesky } from '@/lib/bluesky';
 import { saveScheduledPost } from '@/lib/db';
 
 type Platform = 'threads' | 'bluesky' | 'both';
@@ -62,13 +62,13 @@ export default function PostComposer() {
     try {
       const scheduledFor = new Date();
       scheduledFor.setHours(scheduledFor.getHours() + 24);
-      
+
       await saveScheduledPost({
         content,
         platform: selectedPlatform,
         scheduledFor,
       });
-      
+
       Alert.alert('Scheduled', `Your post will be published tomorrow at ${scheduledFor.toLocaleTimeString()}`);
       setContent('');
     } catch (error) {
@@ -88,7 +88,7 @@ export default function PostComposer() {
         maxLength={500}
         editable={!isEnhancing && !isPosting}
       />
-      
+
       <View style={styles.charCountRow}>
         <Text style={styles.charCount}>{content.length}/500</Text>
       </View>
@@ -102,7 +102,7 @@ export default function PostComposer() {
             Threads
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.platformChip, selectedPlatform === 'bluesky' && styles.platformChipActive]}
           onPress={() => setSelectedPlatform('bluesky')}
@@ -111,7 +111,7 @@ export default function PostComposer() {
             Bluesky
           </Text>
         </TouchableOpacity>
-        
+
         <TouchableOpacity
           style={[styles.platformChip, selectedPlatform === 'both' && styles.platformChipActive]}
           onPress={() => setSelectedPlatform('both')}
@@ -152,7 +152,7 @@ export default function PostComposer() {
           onPress={handleSchedule}
           disabled={!content.trim()}
         >
-          <Text style={styles.scheduleButtonText}>Schedule</Text>
+          <Text style={styles.scheduleButtonText}>Schedule for Later</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -161,61 +161,64 @@ export default function PostComposer() {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   input: {
+    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
-    color: '#000',
-    minHeight: 120,
     textAlignVertical: 'top',
     marginBottom: 8,
   },
   charCountRow: {
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
     marginBottom: 16,
   },
   charCount: {
-    fontSize: 14,
-    color: '#999',
+    color: '#666',
+    fontSize: 12,
   },
   platformSelector: {
     flexDirection: 'row',
-    gap: 8,
     marginBottom: 16,
   },
   platformChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
+    marginRight: 8,
   },
   platformChipActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#4a6bff',
+    borderColor: '#4a6bff',
   },
   platformChipText: {
-    fontSize: 14,
     color: '#666',
-    fontWeight: '500',
+    fontSize: 14,
   },
   platformChipTextActive: {
     color: '#fff',
   },
   enhanceButton: {
-    backgroundColor: '#8B5CF6',
-    paddingVertical: 12,
+    backgroundColor: '#4a6bff',
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   enhanceButtonText: {
     color: '#fff',
@@ -224,14 +227,15 @@ const styles = StyleSheet.create({
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   postButton: {
-    flex: 1,
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
+    backgroundColor: '#4a6bff',
+    padding: 12,
     borderRadius: 8,
+    flex: 1,
     alignItems: 'center',
+    marginRight: 8,
   },
   postButtonText: {
     color: '#fff',
@@ -239,16 +243,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scheduleButton: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 12,
+    backgroundColor: '#f0f0f0',
+    padding: 12,
     borderRadius: 8,
+    flex: 1,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    marginLeft: 8,
   },
   scheduleButtonText: {
-    color: '#007AFF',
+    color: '#333',
     fontSize: 16,
     fontWeight: '600',
   },
