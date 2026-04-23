@@ -10,12 +10,16 @@ interface FriendCardProps {
 }
 
 export default function FriendCard({ friend, onPress }: FriendCardProps) {
-  const lastContacted = friend.lastContacted ? new Date(friend.lastContacted) : null;
-
   const getLastContactedText = () => {
-    if (!lastContacted) return 'Never contacted';
+    if (!friend.lastContacted) return 'Never contacted';
+
+    const lastContactedDate = new Date(friend.lastContacted);
     const now = new Date();
-    const diffTime = Math.abs(now.getTime() - lastContacted.getTime());
+
+    // Handle invalid dates
+    if (isNaN(lastContactedDate.getTime())) return 'Never contacted';
+
+    const diffTime = Math.abs(now.getTime() - lastContactedDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return 'Today';
