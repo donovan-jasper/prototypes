@@ -24,6 +24,19 @@ class WorkflowService {
     });
   }
 
+  static async updateWorkflow(id, workflow) {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'UPDATE workflows SET data = ?, createdAt = ? WHERE id = ?;',
+          [JSON.stringify(workflow), workflow.createdAt, id],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
+      });
+    });
+  }
+
   static async getWorkflows() {
     return new Promise((resolve, reject) => {
       db.transaction(tx => {

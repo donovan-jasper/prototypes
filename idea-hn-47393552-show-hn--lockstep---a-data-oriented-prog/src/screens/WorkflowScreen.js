@@ -7,26 +7,12 @@ const WorkflowScreen = ({ route }) => {
   const { workflowId } = route.params || {};
 
   useEffect(() => {
-    if (workflowId) {
-      loadWorkflow(workflowId);
-    }
-  }, [workflowId]);
-
-  const loadWorkflow = async (id) => {
-    try {
-      const workflow = await WorkflowService.getWorkflowById(id);
-      if (workflow) {
-        // Here you would typically update the WorkflowBuilder state with the loaded workflow
-        console.log('Loaded workflow:', workflow);
-      }
-    } catch (error) {
-      console.error('Failed to load workflow:', error);
-    }
-  };
+    WorkflowService.initialize();
+  }, []);
 
   return (
     <View style={styles.container}>
-      <WorkflowBuilder />
+      <WorkflowBuilder workflowId={workflowId} />
     </View>
   );
 };

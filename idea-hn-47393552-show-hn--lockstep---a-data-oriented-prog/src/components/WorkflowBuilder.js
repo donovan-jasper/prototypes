@@ -1,17 +1,38 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, PanResponder, Dimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, PanResponder, Dimensions, TouchableOpacity, Modal, TextInput, ScrollView } from 'react-native';
 import { Svg, Path, Circle, G, Text as SvgText } from 'react-native-svg';
 import WorkflowService from '../services/WorkflowService';
 
 const { width, height } = Dimensions.get('window');
 
-const WorkflowBuilder = () => {
+const WorkflowBuilder = ({ workflowId }) => {
   const [nodes, setNodes] = useState([]);
   const [connections, setConnections] = useState([]);
   const [selectedNode, setSelectedNode] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionStart, setConnectionStart] = useState(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [nodeConfig, setNodeConfig] = useState({});
   const svgRef = useRef(null);
+
+  useEffect(() => {
+    if (workflowId) {
+      loadWorkflow(workflowId);
+    }
+  }, [workflowId]);
+
+  const loadWorkflow = async (id) => {
+    try {
+      const workflow = await WorkflowService.getWorkflowById(id);
+      if (workflow) {
+        const parsedData = JSON.parse(workflow.data);
+        setNodes(parsedData.nodes || []);
+        setConnections(parsedData.connections || []);
+      }
+    } catch (error) {
+      console.error('Failed to load workflow:', error);
+    }
+  };
 
   const panResponder = useRef(
     PanResponder.create({
@@ -56,7 +77,8 @@ const WorkflowBuilder = () => {
       x: width / 2,
       y: height / 3,
       type: type,
-      label: type.charAt(0).toUpperCase() + type.slice(1)
+      label: type.charAt(0).toUpperCase() + type.slice(1),
+      config: {}
     };
     setNodes([...nodes, newNode]);
   };
@@ -89,11 +111,32 @@ const WorkflowBuilder = () => {
       createdAt: new Date().toISOString()
     };
     try {
-      await WorkflowService.saveWorkflow(workflow);
+      if (workflowId) {
+        await WorkflowService.updateWorkflow(workflowId, workflow);
+      } else {
+        await WorkflowService.saveWorkflow(workflow);
+      }
       alert('Workflow saved successfully!');
     } catch (error) {
       alert('Failed to save workflow');
     }
+  };
+
+  const openNodeConfig = (nodeId) => {
+    const node = nodes.find(n => n.id === nodeId);
+    if (node) {
+      setSelectedNode(node);
+      setNodeConfig(node.config || {});
+      setShowConfigModal(true);
+    }
+  };
+
+  const saveNodeConfig = () => {
+    const updatedNodes = nodes.map(node =>
+      node.id === selectedNode.id ? { ...node, config: nodeConfig } : node
+    );
+    setNodes(updatedNodes);
+    setShowConfigModal(false);
   };
 
   const renderConnections = () => {
@@ -139,6 +182,22 @@ const WorkflowBuilder = () => {
         >
           {node.label}
         </SvgText>
+        <Circle
+          cx={node.x + 25}
+          cy={node.y - 25}
+          r="10"
+          fill="#f0ad4e"
+          onPress={() => openNodeConfig(node.id)}
+        />
+        <SvgText
+          x={node.x + 25}
+          y={node.y - 22}
+          fontSize="8"
+          fill="white"
+          textAnchor="middle"
+        >
+          ⚙️
+        </SvgText>
       </G>
     ));
   };
@@ -178,6 +237,62 @@ const WorkflowBuilder = () => {
           {renderNodes()}
         </Svg>
       </View>
+
+      <Modal
+        visible={showConfigModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowConfigModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Configure {selectedNode?.label}</Text>
+            <ScrollView style={styles.configScroll}>
+              {selectedNode?.type === 'filter' && (
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Filter Condition:</Text>
+                  <TextInput
+                    style={styles.configInput}
+                    value={nodeConfig.condition || ''}
+                    onChangeText={(text) => setNodeConfig({...nodeConfig, condition: text})}
+                    placeholder="Enter filter condition"
+                  />
+                </View>
+              )}
+              {selectedNode?.type === 'transform' && (
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Transformation:</Text>
+                  <TextInput
+                    style={styles.configInput}
+                    value={nodeConfig.transformation || ''}
+                    onChangeText={(text) => setNodeConfig({...nodeConfig, transformation: text})}
+                    placeholder="Enter transformation"
+                  />
+                </View>
+              )}
+              {selectedNode?.type === 'output' && (
+                <View style={styles.configItem}>
+                  <Text style={styles.configLabel}>Output Destination:</Text>
+                  <TextInput
+                    style={styles.configInput}
+                    value={nodeConfig.destination || ''}
+                    onChangeText={(text) => setNodeConfig({...nodeConfig, destination: text})}
+                    placeholder="Enter output destination"
+                  />
+                </View>
+              )}
+            </ScrollView>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowConfigModal(false)}>
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={saveNodeConfig}>
+                <Text style={styles.saveButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -185,12 +300,11 @@ const WorkflowBuilder = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   toolbar: {
     flexDirection: 'row',
     padding: 10,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
@@ -217,6 +331,51 @@ const styles = StyleSheet.create({
   canvas: {
     flex: 1,
     backgroundColor: 'white',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxHeight: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  configScroll: {
+    maxHeight: 300,
+  },
+  configItem: {
+    marginBottom: 15,
+  },
+  configLabel: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  configInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 10,
+    borderRadius: 5,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  cancelButton: {
+    backgroundColor: '#d9534f',
+    padding: 10,
+    borderRadius: 5,
+    marginRight: 10,
   },
 });
 
