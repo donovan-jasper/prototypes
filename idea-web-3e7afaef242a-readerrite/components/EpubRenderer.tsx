@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { EpubContent } from '../lib/epubParser';
 
@@ -7,6 +7,7 @@ interface EpubRendererProps {
   epubContent: EpubContent;
   fontSize: number;
   theme: 'light' | 'sepia' | 'dark';
+  marginSize: number;
   onPageChange: (chapterIndex: number) => void;
   onToggleControls: () => void;
 }
@@ -18,11 +19,14 @@ export default function EpubRenderer({
   epubContent,
   fontSize,
   theme,
+  marginSize,
   onPageChange,
   onToggleControls
 }: EpubRendererProps) {
   const [currentChapter, setCurrentChapter] = useState(epubContent.currentChapter);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const webViewRef = useRef<WebView>(null);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const themeStyles = {
     light: {
@@ -62,8 +66,9 @@ export default function EpubRenderer({
               line-height: 1.6;
               color: ${currentTheme.text};
               background-color: ${currentTheme.background};
-              padding: 20px;
+              padding: ${marginSize}px;
               overflow-x: hidden;
+              ${Platform.OS === 'web' ? 'padding-bottom: 20px;' : ''}
             }
             p {
               margin-bottom: 1em;
@@ -113,10 +118,27 @@ export default function EpubRenderer({
             li {
               margin-bottom: 0.5em;
             }
+            .page-break {
+              page-break-after: always;
+              break-after: page;
+              margin: 0;
+              padding: 0;
+              height: 0;
+              border: none;
+            }
           </style>
         </head>
         <body>
           ${chapterContent}
+          <script>
+            window.addEventListener('scroll', function() {
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'scroll',
+                position: window.scrollY,
+                maxScroll: document.body.scrollHeight - window.innerHeight
+              }));
+            });
+          </script>
         </body>
       </html>
     `;
@@ -139,6 +161,7 @@ export default function EpubRenderer({
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
       onPageChange(newChapter);
+      setScrollPosition(0);
     }
   };
 
@@ -147,6 +170,24 @@ export default function EpubRenderer({
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       onPageChange(newChapter);
+      setScrollPosition(0);
+    }
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'scroll') {
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+
+        scrollTimeoutRef.current = setTimeout(() => {
+          setScrollPosition(data.position);
+        }, 200);
+      }
+    } catch (error) {
+      console.error('Error parsing webview message:', error);
     }
   };
 
@@ -157,9 +198,18 @@ export default function EpubRenderer({
         document.open();
         document.write(\`${html.replace(/`/g, '\\`')}\`);
         document.close();
+        true;
       `);
     }
-  }, [currentChapter, fontSize, theme]);
+  }, [currentChapter, fontSize, theme, marginSize]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <TouchableOpacity
@@ -175,6 +225,13 @@ export default function EpubRenderer({
         scrollEnabled={true}
         showsVerticalScrollIndicator={false}
         bounces={false}
+        onMessage={handleWebViewMessage}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+        injectedJavaScript={`
+          window.scrollTo(0, ${scrollPosition});
+          true;
+        `}
       />
     </TouchableOpacity>
   );
@@ -187,5 +244,5 @@ const styles = StyleSheet.create({
   webview: {
     flex: 1,
     backgroundColor: 'transparent',
-  }
+  },
 });

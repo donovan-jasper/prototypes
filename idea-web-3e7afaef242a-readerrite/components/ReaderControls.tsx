@@ -1,201 +1,298 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
-import Slider from '@react-native-community/slider';
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  Animated,
+  Dimensions,
+  Slider,
+  Platform
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ReaderControlsProps {
   visible: boolean;
   fontSize: number;
   theme: 'light' | 'sepia' | 'dark';
+  marginSize: number;
   progress: number;
   totalChapters: number;
   currentChapter: number;
   onFontSizeChange: (size: number) => void;
   onThemeChange: (theme: 'light' | 'sepia' | 'dark') => void;
+  onMarginSizeChange: (size: number) => void;
   onClose: () => void;
 }
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ReaderControls({
   visible,
   fontSize,
   theme,
+  marginSize,
   progress,
   totalChapters,
   currentChapter,
   onFontSizeChange,
   onThemeChange,
+  onMarginSizeChange,
   onClose
 }: ReaderControlsProps) {
-  if (!visible) return null;
+  const [slideAnim] = useState(new Animated.Value(0));
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
+  useEffect(() => {
+    Animated.timing(slideAnim, {
+      toValue: visible ? 1 : 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [visible]);
+
+  const slideUp = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [300, 0],
+  });
+
+  const themeColors = {
+    light: {
+      background: '#ffffff',
+      text: '#000000',
+      controlBackground: '#f5f5f5',
+      sliderTrack: '#d3d3d3',
+      sliderThumb: '#007AFF',
+    },
+    sepia: {
+      background: '#f4ecd8',
+      text: '#5c4a3a',
+      controlBackground: '#e8dcc0',
+      sliderTrack: '#c8b898',
+      sliderThumb: '#8b6914',
+    },
+    dark: {
+      background: '#1a1a1a',
+      text: '#e0e0e0',
+      controlBackground: '#2a2a2a',
+      sliderTrack: '#4a4a4a',
+      sliderThumb: '#4a9eff',
+    }
+  };
+
+  const currentTheme = themeColors[theme];
+
+  const handleThemeChange = (newTheme: 'light' | 'sepia' | 'dark') => {
+    onThemeChange(newTheme);
+  };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      />
-      
-      <View style={styles.controlPanel}>
-        <View style={styles.section}>
-          <Text style={styles.label}>Font Size</Text>
-          <View style={styles.fontSizeControl}>
-            <TouchableOpacity
-              style={styles.fontButton}
-              onPress={() => onFontSizeChange(Math.max(12, fontSize - 2))}
-            >
-              <Text style={styles.fontButtonText}>A-</Text>
-            </TouchableOpacity>
-            <Text style={styles.fontSizeValue}>{fontSize}px</Text>
-            <TouchableOpacity
-              style={styles.fontButton}
-              onPress={() => onFontSizeChange(Math.min(32, fontSize + 2))}
-            >
-              <Text style={styles.fontButtonText}>A+</Text>
-            </TouchableOpacity>
-          </View>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          transform: [{ translateY: slideUp }],
+          backgroundColor: currentTheme.background,
+        }
+      ]}
+    >
+      <View style={styles.progressContainer}>
+        <Text style={[styles.progressText, { color: currentTheme.text }]}>
+          {Math.round(progress)}% complete
+        </Text>
+        <Text style={[styles.chapterText, { color: currentTheme.text }]}>
+          Chapter {currentChapter + 1} of {totalChapters}
+        </Text>
+      </View>
+
+      <View style={styles.controlsContainer}>
+        <View style={styles.controlGroup}>
+          <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Font Size</Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={12}
+            maximumValue={30}
+            step={1}
+            value={fontSize}
+            onValueChange={onFontSizeChange}
+            minimumTrackTintColor={currentTheme.sliderThumb}
+            maximumTrackTintColor={currentTheme.sliderTrack}
+            thumbTintColor={currentTheme.sliderThumb}
+          />
+          <Text style={[styles.sliderValue, { color: currentTheme.text }]}>{fontSize}</Text>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>Theme</Text>
+        <View style={styles.controlGroup}>
+          <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Theme</Text>
           <View style={styles.themeButtons}>
             <TouchableOpacity
               style={[
                 styles.themeButton,
-                styles.lightTheme,
-                theme === 'light' && styles.themeButtonActive
+                theme === 'light' && styles.activeThemeButton,
+                { backgroundColor: theme === 'light' ? '#ffffff' : currentTheme.controlBackground }
               ]}
-              onPress={() => onThemeChange('light')}
+              onPress={() => handleThemeChange('light')}
             >
-              <Text style={styles.themeButtonText}>Light</Text>
+              <Text style={[styles.themeButtonText, { color: theme === 'light' ? '#000000' : currentTheme.text }]}>
+                Light
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.themeButton,
-                styles.sepiaTheme,
-                theme === 'sepia' && styles.themeButtonActive
+                theme === 'sepia' && styles.activeThemeButton,
+                { backgroundColor: theme === 'sepia' ? '#f4ecd8' : currentTheme.controlBackground }
               ]}
-              onPress={() => onThemeChange('sepia')}
+              onPress={() => handleThemeChange('sepia')}
             >
-              <Text style={styles.themeButtonText}>Sepia</Text>
+              <Text style={[styles.themeButtonText, { color: theme === 'sepia' ? '#5c4a3a' : currentTheme.text }]}>
+                Sepia
+              </Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[
                 styles.themeButton,
-                styles.darkTheme,
-                theme === 'dark' && styles.themeButtonActive
+                theme === 'dark' && styles.activeThemeButton,
+                { backgroundColor: theme === 'dark' ? '#1a1a1a' : currentTheme.controlBackground }
               ]}
-              onPress={() => onThemeChange('dark')}
+              onPress={() => handleThemeChange('dark')}
             >
-              <Text style={[styles.themeButtonText, styles.darkThemeText]}>Dark</Text>
+              <Text style={[styles.themeButtonText, { color: theme === 'dark' ? '#ffffff' : currentTheme.text }]}>
+                Dark
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.label}>
-            Progress: Chapter {currentChapter + 1} of {totalChapters}
+        <TouchableOpacity
+          style={styles.advancedToggle}
+          onPress={() => setShowAdvanced(!showAdvanced)}
+        >
+          <Text style={[styles.advancedToggleText, { color: currentTheme.text }]}>
+            {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
           </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          <Ionicons
+            name={showAdvanced ? 'chevron-up' : 'chevron-down'}
+            size={18}
+            color={currentTheme.text}
+          />
+        </TouchableOpacity>
+
+        {showAdvanced && (
+          <View style={styles.advancedControls}>
+            <View style={styles.controlGroup}>
+              <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Margins</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={10}
+                maximumValue={40}
+                step={1}
+                value={marginSize}
+                onValueChange={onMarginSizeChange}
+                minimumTrackTintColor={currentTheme.sliderThumb}
+                maximumTrackTintColor={currentTheme.sliderTrack}
+                thumbTintColor={currentTheme.sliderThumb}
+              />
+              <Text style={[styles.sliderValue, { color: currentTheme.text }]}>{marginSize}</Text>
+            </View>
           </View>
-        </View>
+        )}
       </View>
-    </View>
+
+      <TouchableOpacity
+        style={styles.closeButton}
+        onPress={onClose}
+      >
+        <Ionicons name="close" size={24} color={currentTheme.text} />
+      </TouchableOpacity>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'flex-end',
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  controlPanel: {
-    backgroundColor: '#fff',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    padding: 20,
-    paddingBottom: 40,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  section: {
-    marginBottom: 24,
+  progressContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  label: {
+  progressText: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
-    color: '#000',
   },
-  fontSizeControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 20,
+  chapterText: {
+    fontSize: 14,
   },
-  fontButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  controlsContainer: {
+    marginBottom: 20,
   },
-  fontButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#007AFF',
+  controlGroup: {
+    marginBottom: 20,
   },
-  fontSizeValue: {
-    fontSize: 18,
+  controlLabel: {
+    fontSize: 16,
     fontWeight: '500',
-    color: '#000',
-    minWidth: 60,
-    textAlign: 'center',
+    marginBottom: 10,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
+  },
+  sliderValue: {
+    fontSize: 14,
+    textAlign: 'right',
+    marginTop: 5,
   },
   themeButtons: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   themeButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 2,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    borderWidth: 1,
     borderColor: 'transparent',
   },
-  themeButtonActive: {
+  activeThemeButton: {
     borderColor: '#007AFF',
-  },
-  lightTheme: {
-    backgroundColor: '#ffffff',
-  },
-  sepiaTheme: {
-    backgroundColor: '#f4ecd8',
-  },
-  darkTheme: {
-    backgroundColor: '#1a1a1a',
   },
   themeButtonText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#000',
+    fontWeight: '500',
   },
-  darkThemeText: {
-    color: '#fff',
+  advancedToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
   },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
+  advancedToggleText: {
+    fontSize: 14,
+    marginRight: 5,
   },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
-  }
+  advancedControls: {
+    marginTop: 10,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    padding: 5,
+  },
 });

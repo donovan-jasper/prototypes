@@ -6,13 +6,16 @@ import {
   Alert,
   StatusBar,
   TouchableOpacity,
-  Text
+  Text,
+  Dimensions
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getBook, updateBook } from '../../lib/database';
 import { loadEpubContent, EpubContent } from '../../lib/epubParser';
 import EpubRenderer from '../../components/EpubRenderer';
 import ReaderControls from '../../components/ReaderControls';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 export default function ReaderScreen() {
   const router = useRouter();
@@ -21,15 +24,21 @@ export default function ReaderScreen() {
   const [epubContent, setEpubContent] = useState<EpubContent | null>(null);
   const [fontSize, setFontSize] = useState(18);
   const [theme, setTheme] = useState<'light' | 'sepia' | 'dark'>('light');
+  const [marginSize, setMarginSize] = useState(20);
   const [showControls, setShowControls] = useState(false);
   const [currentChapter, setCurrentChapter] = useState(0);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     loadBook();
     return () => {
       if (saveTimerRef.current) {
         clearInterval(saveTimerRef.current);
+      }
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
       }
     };
   }, [id]);
@@ -46,7 +55,7 @@ export default function ReaderScreen() {
         }
       };
     }
-  }, [epubContent, currentChapter]);
+  }, [epubContent, currentChapter, scrollPosition]);
 
   const loadBook = async () => {
     try {
@@ -83,7 +92,10 @@ export default function ReaderScreen() {
   const saveProgress = async () => {
     try {
       const bookId = parseInt(id as string);
-      await updateBook(bookId, { currentPage: currentChapter });
+      await updateBook(bookId, {
+        currentPage: currentChapter,
+        lastOpened: Date.now()
+      });
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
@@ -91,10 +103,21 @@ export default function ReaderScreen() {
 
   const handlePageChange = (chapterIndex: number) => {
     setCurrentChapter(chapterIndex);
+    setScrollPosition(0);
   };
 
   const handleToggleControls = () => {
     setShowControls(!showControls);
+
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+
+    if (!showControls) {
+      controlsTimeoutRef.current = setTimeout(() => {
+        setShowControls(false);
+      }, 3000);
+    }
   };
 
   const handleBack = async () => {
@@ -105,6 +128,18 @@ export default function ReaderScreen() {
   const calculateProgress = () => {
     if (!epubContent) return 0;
     return ((currentChapter + 1) / epubContent.chapters.length) * 100;
+  };
+
+  const handleFontSizeChange = (size: number) => {
+    setFontSize(size);
+  };
+
+  const handleThemeChange = (newTheme: 'light' | 'sepia' | 'dark') => {
+    setTheme(newTheme);
+  };
+
+  const handleMarginSizeChange = (size: number) => {
+    setMarginSize(size);
   };
 
   if (loading) {
@@ -135,7 +170,7 @@ export default function ReaderScreen() {
         barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
         backgroundColor={themeBackgrounds[theme]}
       />
-      
+
       <TouchableOpacity
         style={styles.backButton}
         onPress={handleBack}
@@ -149,6 +184,7 @@ export default function ReaderScreen() {
         epubContent={epubContent}
         fontSize={fontSize}
         theme={theme}
+        marginSize={marginSize}
         onPageChange={handlePageChange}
         onToggleControls={handleToggleControls}
       />
@@ -157,11 +193,13 @@ export default function ReaderScreen() {
         visible={showControls}
         fontSize={fontSize}
         theme={theme}
+        marginSize={marginSize}
         progress={calculateProgress()}
         totalChapters={epubContent.chapters.length}
         currentChapter={currentChapter}
-        onFontSizeChange={setFontSize}
-        onThemeChange={setTheme}
+        onFontSizeChange={handleFontSizeChange}
+        onThemeChange={handleThemeChange}
+        onMarginSizeChange={handleMarginSizeChange}
         onClose={() => setShowControls(false)}
       />
     </View>
@@ -190,14 +228,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 8,
+    borderRadius: 20,
   },
   backButtonText: {
+    color: '#000',
     fontSize: 16,
     fontWeight: '600',
-    color: '#007AFF',
   },
   backButtonTextDark: {
-    color: '#4a9eff',
-  }
+    color: '#fff',
+  },
 });
