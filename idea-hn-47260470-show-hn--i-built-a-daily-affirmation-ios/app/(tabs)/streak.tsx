@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Platform } from 'react-native';
 import StreakCalendar from '../../components/StreakCalendar';
-import { getStreakDataForCalendar, getGraceDaysUsedThisWeek, shouldShowMilestone } from '../../lib/affirmations';
+import { getStreakDataForCalendar, getGraceDaysUsedThisWeek, shouldShowMilestone, getLongestStreak } from '../../lib/affirmations';
 import { useStore } from '../../store/useStore';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -13,6 +13,7 @@ const StreakScreen = () => {
   const [streakData, setStreakData] = useState([]);
   const [graceDaysUsed, setGraceDaysUsed] = useState(0);
   const [isSharing, setIsSharing] = useState(false);
+  const [longestStreak, setLongestStreak] = useState(0);
   const { streakCount } = useStore();
   const calendarRef = React.useRef();
 
@@ -24,6 +25,9 @@ const StreakScreen = () => {
       const today = new Date();
       const used = await getGraceDaysUsedThisWeek(today);
       setGraceDaysUsed(used);
+
+      const longest = await getLongestStreak();
+      setLongestStreak(longest);
     };
 
     fetchData();
@@ -101,6 +105,11 @@ const StreakScreen = () => {
         </View>
 
         <View style={styles.statBox}>
+          <Text style={styles.statLabel}>Longest Streak</Text>
+          <Text style={styles.statValue}>{longestStreak} days</Text>
+        </View>
+
+        <View style={styles.statBox}>
           <Text style={styles.statLabel}>Grace Days Used</Text>
           <Text style={styles.statValue}>{graceDaysUsed}/2</Text>
         </View>
@@ -158,15 +167,15 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   milestoneText: {
-    fontSize: 18,
+    fontSize: 16,
     color: 'white',
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   shareButton: {
+    marginTop: 10,
     backgroundColor: 'white',
     paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     borderRadius: 20,
   },
   shareButtonText: {
@@ -176,45 +185,33 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    margin: 15,
-    backgroundColor: 'white',
-    borderRadius: 10,
     padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'white',
+    marginVertical: 10,
   },
   statBox: {
     alignItems: 'center',
   },
   statLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginBottom: 5,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
+    marginTop: 5,
   },
   progressContainer: {
-    margin: 15,
-    backgroundColor: 'white',
-    borderRadius: 10,
     padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'white',
+    marginVertical: 10,
   },
   progressTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
+    color: '#333',
   },
   progressBar: {
     height: 10,
@@ -234,21 +231,16 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   infoBox: {
-    margin: 15,
-    backgroundColor: 'white',
-    borderRadius: 10,
     padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: 'white',
+    margin: 10,
+    borderRadius: 10,
   },
   infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 5,
+    color: '#333',
   },
   infoText: {
     fontSize: 14,

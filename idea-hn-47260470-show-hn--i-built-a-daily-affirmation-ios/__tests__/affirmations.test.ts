@@ -1,6 +1,6 @@
-import { calculateStreak, getGraceDaysUsedThisWeek } from '../lib/affirmations';
+import { calculateStreak, getGraceDaysUsedThisWeek, getConsecutiveStreakGroups, getLongestStreak } from '../lib/affirmations';
 import { initDatabase, getStreakData, updateStreak } from '../lib/database';
-import { format, subDays, addDays } from 'date-fns';
+import { format, subDays, addDays, startOfWeek, endOfWeek } from 'date-fns';
 
 // Mock the database functions
 jest.mock('../lib/database', () => ({
@@ -92,7 +92,8 @@ describe('Affirmation Logic', () => {
   describe('getGraceDaysUsedThisWeek', () => {
     it('should return 0 when no grace days used this week', async () => {
       const today = new Date();
-      const weekStart = subDays(today, today.getDay());
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
 
       (getStreakData as jest.Mock).mockResolvedValue([
         { date: format(subDays(weekStart, 1), 'yyyy-MM-dd'), is_grace_day: 1 },
@@ -105,7 +106,8 @@ describe('Affirmation Logic', () => {
 
     it('should count grace days used this week', async () => {
       const today = new Date();
-      const weekStart = subDays(today, today.getDay());
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
 
       (getStreakData as jest.Mock).mockResolvedValue([
         { date: format(weekStart, 'yyyy-MM-dd'), is_grace_day: 1 },
@@ -119,7 +121,8 @@ describe('Affirmation Logic', () => {
 
     it('should not count grace days from previous week', async () => {
       const today = new Date();
-      const weekStart = subDays(today, today.getDay());
+      const weekStart = startOfWeek(today);
+      const weekEnd = endOfWeek(today);
 
       (getStreakData as jest.Mock).mockResolvedValue([
         { date: format(subDays(weekStart, 1), 'yyyy-MM-dd'), is_grace_day: 1 },
@@ -128,6 +131,92 @@ describe('Affirmation Logic', () => {
 
       const count = await getGraceDaysUsedThisWeek(today);
       expect(count).toBe(1);
+    });
+  });
+
+  describe('getConsecutiveStreakGroups', () => {
+    it('should return empty array when no streaks exist', async () => {
+      (getStreakData as jest.Mock).mockResolvedValue([]);
+      const groups = await getConsecutiveStreakGroups(new Date());
+      expect(groups).toEqual([]);
+    });
+
+    it('should return single group for consecutive days', async () => {
+      const today = new Date();
+      const yesterday = subDays(today, 1);
+      const twoDaysAgo = subDays(today, 2);
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(twoDaysAgo, 'yyyy-MM-dd') },
+        { date: format(yesterday, 'yyyy-MM-dd') },
+        { date: format(today, 'yyyy-MM-dd') },
+      ]);
+
+      const groups = await getConsecutiveStreakGroups(today);
+      expect(groups).toEqual([
+        {
+          start: format(twoDaysAgo, 'yyyy-MM-dd'),
+          end: format(today, 'yyyy-MM-dd'),
+          length: 3
+        }
+      ]);
+    });
+
+    it('should return multiple groups for non-consecutive streaks', async () => {
+      const today = new Date();
+      const yesterday = subDays(today, 1);
+      const twoDaysAgo = subDays(today, 2);
+      const threeDaysAgo = subDays(today, 3);
+      const fiveDaysAgo = subDays(today, 5);
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(fiveDaysAgo, 'yyyy-MM-dd') },
+        { date: format(threeDaysAgo, 'yyyy-MM-dd') },
+        { date: format(twoDaysAgo, 'yyyy-MM-dd') },
+        { date: format(yesterday, 'yyyy-MM-dd') },
+        { date: format(today, 'yyyy-MM-dd') },
+      ]);
+
+      const groups = await getConsecutiveStreakGroups(today);
+      expect(groups).toEqual([
+        {
+          start: format(fiveDaysAgo, 'yyyy-MM-dd'),
+          end: format(fiveDaysAgo, 'yyyy-MM-dd'),
+          length: 1
+        },
+        {
+          start: format(threeDaysAgo, 'yyyy-MM-dd'),
+          end: format(today, 'yyyy-MM-dd'),
+          length: 4
+        }
+      ]);
+    });
+  });
+
+  describe('getLongestStreak', () => {
+    it('should return 0 when no streaks exist', async () => {
+      (getStreakData as jest.Mock).mockResolvedValue([]);
+      const longest = await getLongestStreak();
+      expect(longest).toBe(0);
+    });
+
+    it('should return length of longest consecutive streak', async () => {
+      const today = new Date();
+      const yesterday = subDays(today, 1);
+      const twoDaysAgo = subDays(today, 2);
+      const threeDaysAgo = subDays(today, 3);
+      const fiveDaysAgo = subDays(today, 5);
+
+      (getStreakData as jest.Mock).mockResolvedValue([
+        { date: format(fiveDaysAgo, 'yyyy-MM-dd') },
+        { date: format(threeDaysAgo, 'yyyy-MM-dd') },
+        { date: format(twoDaysAgo, 'yyyy-MM-dd') },
+        { date: format(yesterday, 'yyyy-MM-dd') },
+        { date: format(today, 'yyyy-MM-dd') },
+      ]);
+
+      const longest = await getLongestStreak();
+      expect(longest).toBe(4);
     });
   });
 });

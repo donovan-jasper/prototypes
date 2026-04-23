@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth, addMonths, subMonths, isBefore, isAfter } from 'date-fns';
 import { MILESTONE_DAYS, STREAK_COLORS } from '../lib/constants';
-import { getGraceDaysUsedThisWeek } from '../lib/affirmations';
+import { getGraceDaysUsedThisWeek, getConsecutiveStreakGroups } from '../lib/affirmations';
 
 interface StreakDay {
   date: string;
@@ -16,13 +16,17 @@ interface StreakCalendarProps {
 const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
   const [currentMonth, setCurrentMonth] = React.useState(new Date());
   const [graceDaysUsed, setGraceDaysUsed] = React.useState(0);
+  const [consecutiveGroups, setConsecutiveGroups] = React.useState([]);
 
   React.useEffect(() => {
-    const fetchGraceDays = async () => {
+    const fetchData = async () => {
       const used = await getGraceDaysUsedThisWeek(currentMonth);
       setGraceDaysUsed(used);
+
+      const groups = await getConsecutiveStreakGroups(currentMonth);
+      setConsecutiveGroups(groups);
     };
-    fetchGraceDays();
+    fetchData();
   }, [currentMonth]);
 
   const monthStart = startOfMonth(currentMonth);
@@ -48,42 +52,6 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  const getConsecutiveDays = () => {
-    const consecutiveGroups: string[][] = [];
-    let currentGroup: string[] = [];
-
-    const sortedStreakData = [...streakData].sort((a, b) =>
-      isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1
-    );
-
-    sortedStreakData.forEach((day, index) => {
-      if (index === 0) {
-        currentGroup.push(day.date);
-        return;
-      }
-
-      const prevDay = parseISO(sortedStreakData[index - 1].date);
-      const currentDay = parseISO(day.date);
-
-      if (isSameDay(currentDay, new Date(prevDay.getTime() + 24 * 60 * 60 * 1000))) {
-        currentGroup.push(day.date);
-      } else {
-        if (currentGroup.length > 1) {
-          consecutiveGroups.push([...currentGroup]);
-        }
-        currentGroup = [day.date];
-      }
-    });
-
-    if (currentGroup.length > 1) {
-      consecutiveGroups.push([...currentGroup]);
-    }
-
-    return consecutiveGroups;
-  };
-
-  const consecutiveGroups = getConsecutiveDays();
-
   const renderDay = (day: Date, index: number) => {
     const dayString = format(day, 'yyyy-MM-dd');
     const isStreakDay = streakMap.has(dayString);
@@ -96,8 +64,8 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     let isLastInGroup = false;
 
     consecutiveGroups.forEach(group => {
-      const firstDate = group[0];
-      const lastDate = group[group.length - 1];
+      const firstDate = group.start;
+      const lastDate = group.end;
 
       if (dayString === firstDate) {
         isInConsecutiveGroup = true;
@@ -105,7 +73,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
       } else if (dayString === lastDate) {
         isInConsecutiveGroup = true;
         isLastInGroup = true;
-      } else if (group.includes(dayString)) {
+      } else if (isAfter(parseISO(dayString), parseISO(firstDate)) && isBefore(parseISO(dayString), parseISO(lastDate))) {
         isInConsecutiveGroup = true;
       }
     });
@@ -167,7 +135,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
         ))}
       </View>
 
-      <View style={styles.legend}>
+      <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
           <Text style={styles.legendText}>Completed Day</Text>
@@ -177,14 +145,14 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
           <Text style={styles.legendText}>Grace Day</Text>
         </View>
         <View style={styles.legendItem}>
-          <Text style={styles.legendText}>🎉</Text>
+          <Text style={styles.legendBadge}>🎉</Text>
           <Text style={styles.legendText}>Milestone</Text>
         </View>
       </View>
 
       <View style={styles.graceDaysInfo}>
         <Text style={styles.graceDaysText}>
-          Grace Days Used This Week: {graceDaysUsed}/2
+          Grace Days Used This Week: {graceDaysUsed}/{MAX_GRACE_DAYS_PER_WEEK}
         </Text>
       </View>
     </View>
@@ -215,13 +183,13 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   navButton: {
-    fontSize: 24,
+    fontSize: 20,
+    padding: 10,
     color: '#4CAF50',
-    paddingHorizontal: 10,
   },
   weekdays: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginBottom: 10,
   },
   weekday: {
@@ -237,61 +205,57 @@ const styles = StyleSheet.create({
   dayWrapper: {
     width: Dimensions.get('window').width / 7,
     height: 50,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   dayContainer: {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
   dayContent: {
-    position: 'relative',
-    zIndex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dayNumber: {
     fontSize: 14,
     color: '#333',
-    textAlign: 'center',
   },
   today: {
-    fontWeight: 'bold',
     color: '#4CAF50',
+    fontWeight: 'bold',
   },
   milestone: {
-    fontWeight: 'bold',
+    color: '#FF5722',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 3,
+    marginTop: 4,
   },
   milestoneBadge: {
-    position: 'absolute',
-    top: -10,
-    right: -10,
     fontSize: 12,
+    marginTop: 2,
   },
   connectorLine: {
     position: 'absolute',
-    height: 2,
+    top: 0,
+    bottom: 0,
+    width: 2,
     backgroundColor: '#4CAF50',
-    zIndex: 0,
+    left: '50%',
+    marginLeft: -1,
   },
   firstConnector: {
-    left: '50%',
-    right: 0,
     top: '50%',
+    height: '50%',
   },
   lastConnector: {
-    left: 0,
-    right: '50%',
-    top: '50%',
+    bottom: '50%',
+    height: '50%',
   },
-  legend: {
+  legendContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: 15,
@@ -307,6 +271,10 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+    marginRight: 5,
+  },
+  legendBadge: {
+    fontSize: 12,
     marginRight: 5,
   },
   legendText: {

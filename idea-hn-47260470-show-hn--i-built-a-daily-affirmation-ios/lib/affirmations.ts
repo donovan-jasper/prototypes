@@ -1,6 +1,6 @@
 import { initDatabase, seedAffirmations, getCurrentStreak, getStreakData, calculateStreakWithGraceDays, updateStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
-import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek, parseISO, isBefore } from 'date-fns';
+import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek, parseISO, isBefore, subDays } from 'date-fns';
 import { MILESTONE_DAYS, MAX_GRACE_DAYS_PER_WEEK } from './constants';
 
 let initialized = false;
@@ -121,4 +121,64 @@ export const calculateStreakWithGraceDays = async (currentDate: Date) => {
 
   // Same day - return current streak
   return { streakCount: lastStreak.streak_count, isGraceDay: lastStreak.is_grace_day === 1 };
+};
+
+export const getConsecutiveStreakGroups = async (currentDate: Date) => {
+  const streaks = await getStreakData();
+  const sortedStreaks = [...streaks].sort((a, b) =>
+    isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1
+  );
+
+  const consecutiveGroups: { start: string; end: string; length: number }[] = [];
+  let currentGroup: string[] = [];
+
+  sortedStreaks.forEach((streak, index) => {
+    const streakDate = parseISO(streak.date);
+
+    if (index === 0) {
+      currentGroup.push(streak.date);
+      return;
+    }
+
+    const prevStreakDate = parseISO(sortedStreaks[index - 1].date);
+    const daysDiff = differenceInDays(streakDate, prevStreakDate);
+
+    if (daysDiff === 1) {
+      currentGroup.push(streak.date);
+    } else {
+      if (currentGroup.length > 0) {
+        const start = currentGroup[0];
+        const end = currentGroup[currentGroup.length - 1];
+        consecutiveGroups.push({
+          start,
+          end,
+          length: currentGroup.length
+        });
+        currentGroup = [streak.date];
+      }
+    }
+  });
+
+  // Add the last group if it exists
+  if (currentGroup.length > 0) {
+    const start = currentGroup[0];
+    const end = currentGroup[currentGroup.length - 1];
+    consecutiveGroups.push({
+      start,
+      end,
+      length: currentGroup.length
+    });
+  }
+
+  return consecutiveGroups;
+};
+
+export const getLongestStreak = async () => {
+  const groups = await getConsecutiveStreakGroups(new Date());
+  if (groups.length === 0) return 0;
+
+  const longest = groups.reduce((max, group) =>
+    group.length > max ? group.length : max, 0);
+
+  return longest;
 };
