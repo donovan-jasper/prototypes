@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
 import { useSubscription } from '../../hooks/useSubscription';
 import { getVoiceClipsByCategory, getClipsByCategoryAndMood, getPremiumClips } from '../../services/voiceLibrary';
 import VoicePlayer from '../../components/VoicePlayer';
@@ -16,6 +16,7 @@ const LibraryScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [voiceClips, setVoiceClips] = useState<VoiceClip[]>([]);
   const [premiumCount, setPremiumCount] = useState(0);
+  const [showPaywall, setShowPaywall] = useState(false);
 
   useEffect(() => {
     loadVoiceClips();
@@ -38,7 +39,16 @@ const LibraryScreen = () => {
   };
 
   const handleUpgradePress = () => {
-    purchaseSubscription();
+    if (!isPremium) {
+      setShowPaywall(true);
+    }
+  };
+
+  const handlePurchase = async () => {
+    const success = await purchaseSubscription();
+    if (success) {
+      setShowPaywall(false);
+    }
   };
 
   const renderCategoryButton = (category: string) => (
@@ -131,6 +141,60 @@ const LibraryScreen = () => {
           </View>
         }
       />
+
+      <Modal
+        visible={showPaywall}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowPaywall(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Unlock Premium Content</Text>
+
+            <View style={styles.featureComparison}>
+              <View style={styles.featureRow}>
+                <Text style={styles.featureText}>Free</Text>
+                <Text style={styles.featureText}>Premium</Text>
+              </View>
+
+              <View style={styles.featureRow}>
+                <Text style={styles.featureText}>10 rotating clips</Text>
+                <Text style={styles.featureText}>50+ clips</Text>
+              </View>
+
+              <View style={styles.featureRow}>
+                <Text style={styles.featureText}>1 goal</Text>
+                <Text style={styles.featureText}>5 goals</Text>
+              </View>
+
+              <View style={styles.featureRow}>
+                <Text style={styles.featureText}>Basic scheduling</Text>
+                <Text style={styles.featureText}>Advanced scheduling</Text>
+              </View>
+
+              <View style={styles.featureRow}>
+                <Text style={styles.featureText}>Standard prompts</Text>
+                <Text style={styles.featureText}>Personalized TTS</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.purchaseButton}
+              onPress={handlePurchase}
+            >
+              <Text style={styles.purchaseButtonText}>Upgrade to Premium - $7.99/month</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowPaywall(false)}
+            >
+              <Text style={styles.closeButtonText}>Maybe Later</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -177,7 +241,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   filterSection: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   filterTitle: {
     fontSize: 16,
@@ -189,47 +253,42 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   categoryButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: '#e0e0e0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
+    backgroundColor: '#e0e0e0',
     marginRight: 8,
     marginBottom: 8,
   },
   selectedCategoryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#673ab7',
   },
   categoryButtonText: {
     color: '#333',
-    fontSize: 14,
   },
   selectedCategoryButtonText: {
     color: 'white',
-    fontWeight: '600',
   },
   moodButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   moodButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 20,
     flex: 1,
-    marginHorizontal: 4,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    marginRight: 8,
     alignItems: 'center',
   },
   selectedMoodButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#673ab7',
   },
   moodButtonText: {
     color: '#333',
-    fontSize: 14,
   },
   selectedMoodButtonText: {
     color: 'white',
-    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 20,
@@ -239,6 +298,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  featureComparison: {
+    marginBottom: 20,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  featureText: {
+    fontSize: 16,
+  },
+  purchaseButton: {
+    backgroundColor: '#673ab7',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+  },
+  purchaseButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  closeButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  closeButtonText: {
     color: '#666',
     fontSize: 16,
   },

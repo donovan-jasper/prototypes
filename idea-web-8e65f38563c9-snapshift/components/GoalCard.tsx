@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGoals } from '../hooks/useGoals';
 import { SubscriptionContext } from '../context/SubscriptionContext';
@@ -11,13 +11,14 @@ interface GoalCardProps {
     completed: boolean;
     createdAt: number;
   };
+  onUpgradePress: () => void;
 }
 
-export default function GoalCard({ goal }: GoalCardProps) {
+export default function GoalCard({ goal, onUpgradePress }: GoalCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(goal.title);
   const { updateGoal, deleteGoal, toggleGoalCompletion } = useGoals();
-  const { isFeatureUnlocked } = useContext(SubscriptionContext);
+  const { isPremium } = useContext(SubscriptionContext);
 
   const handleSave = () => {
     updateGoal(goal.id, { title });

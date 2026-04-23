@@ -109,7 +109,15 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{clip.title}</Text>
+      <View style={styles.clipHeader}>
+        <Text style={styles.title}>{clip.title}</Text>
+        {clip.isPremium && (
+          <View style={styles.premiumBadge}>
+            <Ionicons name="star" size={12} color="#FFD700" />
+            <Text style={styles.premiumBadgeText}>Premium</Text>
+          </View>
+        )}
+      </View>
       <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
 
       <View style={styles.controls}>
@@ -154,10 +162,48 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  lockedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    opacity: 0.8,
+  },
+  lockIconContainer: {
+    marginRight: 12,
+  },
+  clipInfo: {
+    flex: 1,
+  },
+  clipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   title: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  premiumBadgeText: {
+    color: 'white',
+    marginLeft: 4,
+    fontSize: 12,
   },
   category: {
     fontSize: 14,
@@ -190,35 +236,16 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'right',
   },
-  lockedContainer: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lockIconContainer: {
-    marginRight: 12,
-  },
-  clipInfo: {
-    flex: 1,
-  },
   upgradeButton: {
-    backgroundColor: '#FFD700',
-    paddingVertical: 8,
+    backgroundColor: '#673ab7',
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     marginLeft: 8,
   },
   upgradeButtonText: {
-    color: '#333',
-    fontSize: 14,
+    color: 'white',
+    fontSize: 12,
     fontWeight: '600',
   },
 });
