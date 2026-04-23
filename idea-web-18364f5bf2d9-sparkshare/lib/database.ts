@@ -95,6 +95,63 @@ const initializeDatabase = async (db: SQLite.WebSQLDatabase): Promise<void> => {
           UNIQUE(user_id, idea_id)
         );`
       );
+
+      // Create skills table
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS skills (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          skill_name TEXT NOT NULL,
+          proficiency INTEGER NOT NULL CHECK(proficiency BETWEEN 1 AND 5),
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          UNIQUE(user_id, skill_name)
+        );`
+      );
+
+      // Create preferences table
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS preferences (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL,
+          preference_type TEXT NOT NULL,
+          preference_value TEXT NOT NULL,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          UNIQUE(user_id, preference_type, preference_value)
+        );`
+      );
+
+      // Create matches table
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS matches (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user1_id INTEGER NOT NULL,
+          user2_id INTEGER NOT NULL,
+          idea_id INTEGER,
+          match_score REAL NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (user1_id) REFERENCES users(id),
+          FOREIGN KEY (user2_id) REFERENCES users(id),
+          FOREIGN KEY (idea_id) REFERENCES ideas(id),
+          UNIQUE(user1_id, user2_id)
+        );`
+      );
+
+      // Create messages table
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS messages (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          match_id INTEGER NOT NULL,
+          sender_id INTEGER NOT NULL,
+          content TEXT NOT NULL,
+          read_status BOOLEAN DEFAULT 0,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (match_id) REFERENCES matches(id),
+          FOREIGN KEY (sender_id) REFERENCES users(id)
+        );`
+      );
     }, error => {
       console.error('Database initialization failed:', error);
       reject(error);

@@ -1,59 +1,48 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, FlatList, StyleSheet, TextInput, TouchableOpacity, Text } from 'react-native';
-import { Avatar, IconButton } from 'react-native-paper';
-import { getMessagesForMatch, sendMessage, markMessagesAsRead } from '../lib/messaging';
+import { View, FlatList, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, Avatar, IconButton } from 'react-native-paper';
+import { getMessages, sendMessage } from '../lib/matching';
 import { Message } from '../lib/types';
 
 interface MessageListProps {
   matchId: number;
   currentUserId: number;
-  onSendMessage?: (message: Message) => void;
+  onSendMessage: (message: Message) => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({
-  matchId,
-  currentUserId,
-  onSendMessage
-}) => {
+const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSendMessage }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
+    const loadMessages = async () => {
+      try {
+        const loadedMessages = await getMessages(matchId);
+        setMessages(loadedMessages);
+      } catch (error) {
+        console.error('Error loading messages:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadMessages();
-    const interval = setInterval(loadMessages, 5000); // Poll for new messages
+
+    // Set up polling for new messages
+    const interval = setInterval(loadMessages, 5000);
     return () => clearInterval(interval);
   }, [matchId]);
-
-  const loadMessages = async () => {
-    try {
-      const fetchedMessages = await getMessagesForMatch(matchId);
-      setMessages(fetchedMessages);
-
-      // Mark all unread messages as read
-      const unreadMessageIds = fetchedMessages
-        .filter(m => m.sender_id !== currentUserId && !m.read_status)
-        .map(m => m.id);
-
-      if (unreadMessageIds.length > 0) {
-        await markMessagesAsRead(unreadMessageIds);
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
     try {
-      const message = await sendMessage(matchId, currentUserId, newMessage.trim());
-      setMessages(prev => [...prev, message]);
+      const message = await sendMessage(matchId, currentUserId, newMessage);
+      setMessages([...messages, message]);
       setNewMessage('');
-      onSendMessage?.(message);
+      onSendMessage(message);
 
       // Scroll to bottom after sending
       setTimeout(() => {
@@ -66,54 +55,53 @@ const MessageList: React.FC<MessageListProps> = ({
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isCurrentUser = item.sender_id === currentUserId;
-    const messageTime = new Date(item.created_at).toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const messageTime = new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     return (
-      <View style={[
-        styles.messageContainer,
-        isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage
-      ]}>
+      <View style={[styles.messageContainer, isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage]}>
         {!isCurrentUser && (
-          <Avatar.Text
-            size={32}
-            label="U"
-            style={styles.avatar}
-          />
+          <Avatar.Icon size={32} icon="account" style={styles.avatar} />
         )}
         <View style={styles.messageContent}>
-          <Text style={[
-            styles.messageText,
-            isCurrentUser ? styles.currentUserText : styles.otherUserText
-          ]}>
-            {item.content}
-          </Text>
-          <Text style={styles.messageTime}>{messageTime}</Text>
+          <View style={[styles.messageBubble, isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble]}>
+            <Text style={styles.messageText}>{item.content}</Text>
+            <Text style={styles.messageTime}>{messageTime}</Text>
+          </View>
         </View>
       </View>
     );
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading messages...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
       <FlatList
         ref={flatListRef}
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={item => item.id.toString()}
-        contentContainerStyle={styles.listContent}
+        keyExtractor={(item) => item.id.toString()}
+        contentContainerStyle={styles.messagesList}
         onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
       />
 
       <View style={styles.inputContainer}>
         <TextInput
-          style={styles.textInput}
-          placeholder="Type a message..."
+          style={styles.input}
           value={newMessage}
           onChangeText={setNewMessage}
+          placeholder="Type your message..."
           multiline
         />
         <IconButton
@@ -123,55 +111,54 @@ const MessageList: React.FC<MessageListProps> = ({
           disabled={!newMessage.trim()}
         />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  listContent: {
+  messagesList: {
     padding: 16,
     paddingBottom: 80,
   },
   messageContainer: {
     flexDirection: 'row',
     marginBottom: 16,
-    maxWidth: '80%',
+    alignItems: 'flex-end',
   },
   currentUserMessage: {
-    alignSelf: 'flex-end',
-    flexDirection: 'row-reverse',
+    justifyContent: 'flex-end',
   },
   otherUserMessage: {
-    alignSelf: 'flex-start',
+    justifyContent: 'flex-start',
   },
   avatar: {
     marginRight: 8,
-    marginTop: 4,
   },
   messageContent: {
-    flex: 1,
+    maxWidth: '80%',
   },
-  messageText: {
+  messageBubble: {
     padding: 12,
     borderRadius: 16,
-    overflow: 'hidden',
   },
-  currentUserText: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
+  currentUserBubble: {
+    backgroundColor: '#6200ee',
+    borderBottomRightRadius: 4,
   },
-  otherUserText: {
-    backgroundColor: 'white',
-    color: 'black',
+  otherUserBubble: {
+    backgroundColor: '#e0e0e0',
+    borderBottomLeftRadius: 4,
+  },
+  messageText: {
+    fontSize: 16,
+    marginBottom: 4,
   },
   messageTime: {
     fontSize: 10,
     color: '#666',
-    marginTop: 4,
     textAlign: 'right',
   },
   inputContainer: {
@@ -179,16 +166,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 8,
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    backgroundColor: 'white',
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
   },
-  textInput: {
+  input: {
     flex: 1,
+    minHeight: 40,
     maxHeight: 100,
-    padding: 12,
-    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f5f5f5',
     borderRadius: 20,
     marginRight: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

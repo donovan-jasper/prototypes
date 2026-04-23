@@ -1,258 +1,398 @@
 import { getDatabase } from './database';
-import { User, Skill, Preference, Match } from './types';
+import { UserProfile, Match, Message } from './types';
 
-const db = getDatabase();
+export const createMatch = async (user1Id: number, user2Id: number, ideaId?: number): Promise<Match> => {
+  const db = await getDatabase();
+  const matchScore = await calculateMatchScore(user1Id, user2Id);
 
-export const findPotentialMatches = async (
-  userId: number,
-  ideaId?: number,
-  filters: {
-    skills?: string[];
-    location?: string;
-    minMatchScore?: number;
-  } = {}
-): Promise<UserProfile[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
-      // Get current user's skills and preferences
       tx.executeSql(
-        `SELECT * FROM skills WHERE user_id = ?`,
-        [userId],
-        (_, { rows: { _array: userSkills } }) => {
-          tx.executeSql(
-            `SELECT * FROM preferences WHERE user_id = ?`,
-            [userId],
-            (_, { rows: { _array: userPreferences } }) => {
-              // Find potential matches
-              let query = `
-                SELECT DISTINCT u.*, m.match_score
-                FROM users u
-                LEFT JOIN matches m ON (u.id = m.user2_id AND m.user1_id = ?) OR (u.id = m.user1_id AND m.user2_id = ?)
-                WHERE u.id != ?
-              `;
-
-              const params: any[] = [userId, userId, userId];
-
-              if (ideaId) {
-                query += ` AND EXISTS (
-                  SELECT 1 FROM preferences p
-                  WHERE p.user_id = u.id AND p.preference_type = 'idea_interest' AND p.preference_value = ?
-                )`;
-                params.push(ideaId.toString());
-              }
-
-              if (filters.location) {
-                query += ` AND u.location = ?`;
-                params.push(filters.location);
-              }
-
-              if (filters.skills && filters.skills.length > 0) {
-                query += ` AND EXISTS (
-                  SELECT 1 FROM skills s
-                  WHERE s.user_id = u.id AND s.skill_name IN (${filters.skills.map(() => '?').join(',')})
-                )`;
-                params.push(...filters.skills);
-              }
-
-              if (filters.minMatchScore) {
-                query += ` AND (m.match_score >= ? OR m.match_score IS NULL)`;
-                params.push(filters.minMatchScore);
-              }
-
-              query += ` ORDER BY m.match_score DESC, u.created_at DESC`;
-
-              tx.executeSql(
-                query,
-                params,
-                (_, { rows: { _array: potentialMatches } }) => {
-                  // Calculate match scores for each potential match
-                  const matchesWithScores = potentialMatches.map(match => {
-                    const matchScore = calculateMatchScore(
-                      userSkills,
-                      userPreferences,
-                      match.id
-                    );
-                    return { ...match, match_score: matchScore };
-                  });
-
-                  // Sort by match score
-                  matchesWithScores.sort((a, b) => b.match_score - a.match_score);
-
-                  // Get full user profiles
-                  const userIds = matchesWithScores.map(m => m.id);
-                  if (userIds.length === 0) {
-                    resolve([]);
-                    return;
-                  }
-
-                  tx.executeSql(
-                    `SELECT * FROM users WHERE id IN (${userIds.map(() => '?').join(',')})`,
-                    userIds,
-                    (_, { rows: { _array: users } }) => {
-                      tx.executeSql(
-                        `SELECT * FROM skills WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
-                        userIds,
-                        (_, { rows: { _array: skills } }) => {
-                          tx.executeSql(
-                            `SELECT * FROM preferences WHERE user_id IN (${userIds.map(() => '?').join(',')})`,
-                            userIds,
-                            (_, { rows: { _array: preferences } }) => {
-                              // Combine data into user profiles
-                              const profiles = users.map(user => {
-                                const userSkills = skills.filter(s => s.user_id === user.id);
-                                const userPreferences = preferences.filter(p => p.user_id === user.id);
-                                const match = matchesWithScores.find(m => m.id === user.id);
-
-                                return {
-                                  user,
-                                  skills: userSkills,
-                                  preferences: userPreferences,
-                                  sparkScore: match?.match_score || 0
-                                };
-                              });
-
-                              resolve(profiles);
-                            },
-                            (_, error) => reject(error)
-                          );
-                        },
-                        (_, error) => reject(error)
-                      );
-                    },
-                    (_, error) => reject(error)
-                  );
-                },
-                (_, error) => reject(error)
-              );
-            },
-            (_, error) => reject(error)
-          );
+        'INSERT INTO matches (user1_id, user2_id, idea_id, match_score) VALUES (?, ?, ?, ?)',
+        [user1Id, user2Id, ideaId || null, matchScore],
+        (_, result) => {
+          const matchId = result.insertId;
+          resolve({
+            id: matchId,
+            user1_id: user1Id,
+            user2_id: user2Id,
+            idea_id: ideaId,
+            match_score: matchScore,
+            status: 'pending',
+            created_at: new Date().toISOString()
+          });
         },
-        (_, error) => reject(error)
-      );
-    });
-  });
-};
-
-const calculateMatchScore = (
-  userSkills: Skill[],
-  userPreferences: Preference[],
-  targetUserId: number
-): number => {
-  // This is a simplified matching algorithm that would be enhanced in production
-  // In a real app, you'd want to:
-  // - Use more sophisticated matching (e.g., cosine similarity)
-  // - Consider location distance
-  // - Weight different factors appropriately
-  // - Add machine learning for better personalization
-
-  // For now, we'll use a simple scoring system
-  let score = 0;
-
-  // Get target user's skills and preferences
-  db.transaction(tx => {
-    tx.executeSql(
-      `SELECT * FROM skills WHERE user_id = ?`,
-      [targetUserId],
-      (_, { rows: { _array: targetSkills } }) => {
-        tx.executeSql(
-          `SELECT * FROM preferences WHERE user_id = ?`,
-          [targetUserId],
-          (_, { rows: { _array: targetPreferences } }) => {
-            // Skill matching (20% of score)
-            const commonSkills = userSkills.filter(skill =>
-              targetSkills.some(targetSkill => targetSkill.skill_name === skill.skill_name)
-            );
-            score += (commonSkills.length / Math.max(userSkills.length, targetSkills.length)) * 20;
-
-            // Preference matching (30% of score)
-            const commonPreferences = userPreferences.filter(pref =>
-              targetPreferences.some(targetPref =>
-                targetPref.preference_type === pref.preference_type &&
-                targetPref.preference_value === pref.preference_value
-              )
-            );
-            score += (commonPreferences.length / Math.max(userPreferences.length, targetPreferences.length)) * 30;
-
-            // Location matching (10% of score)
-            tx.executeSql(
-              `SELECT location FROM users WHERE id = ?`,
-              [targetUserId],
-              (_, { rows: { _array: targetUser } }) => {
-                if (targetUser.length > 0 && userPreferences.some(p => p.preference_type === 'location')) {
-                  const userLocation = userPreferences.find(p => p.preference_type === 'location')?.preference_value;
-                  if (userLocation === targetUser[0].location) {
-                    score += 10;
-                  }
-                }
-
-                // Idea interest matching (40% of score)
-                const userIdeaInterests = userPreferences.filter(p => p.preference_type === 'idea_interest');
-                const targetIdeaInterests = targetPreferences.filter(p => p.preference_type === 'idea_interest');
-                const commonInterests = userIdeaInterests.filter(interest =>
-                  targetIdeaInterests.some(targetInterest => targetInterest.preference_value === interest.preference_value)
-                );
-                score += (commonInterests.length / Math.max(userIdeaInterests.length, targetIdeaInterests.length)) * 40;
-
-                // Return the final score (0-100)
-                return Math.min(Math.max(score, 0), 100);
-              }
-            );
-          }
-        );
-      }
-    );
-  });
-
-  // Return a placeholder score while we wait for the transaction to complete
-  return 50;
-};
-
-export const createMatch = async (
-  user1Id: number,
-  user2Id: number,
-  ideaId?: number
-): Promise<Match> => {
-  return new Promise((resolve, reject) => {
-    const matchScore = calculateMatchScore([], [], user2Id);
-
-    db.transaction(tx => {
-      tx.executeSql(
-        `INSERT INTO matches (user1_id, user2_id, idea_id, match_score, status)
-         VALUES (?, ?, ?, ?, ?)`,
-        [user1Id, user2Id, ideaId || null, matchScore, 'pending'],
-        (_, { insertId }) => {
-          tx.executeSql(
-            `SELECT * FROM matches WHERE id = ?`,
-            [insertId],
-            (_, { rows: { _array: matches } }) => {
-              if (matches.length > 0) {
-                resolve(matches[0]);
-              } else {
-                reject(new Error('Failed to create match'));
-              }
-            },
-            (_, error) => reject(error)
-          );
-        },
-        (_, error) => reject(error)
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
     });
   });
 };
 
 export const getUserMatches = async (userId: number): Promise<Match[]> => {
+  const db = await getDatabase();
+
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        `SELECT * FROM matches
-         WHERE user1_id = ? OR user2_id = ?
-         ORDER BY created_at DESC`,
+        'SELECT * FROM matches WHERE user1_id = ? OR user2_id = ? ORDER BY created_at DESC',
         [userId, userId],
-        (_, { rows: { _array: matches } }) => {
+        (_, result) => {
+          const matches: Match[] = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            matches.push(result.rows.item(i));
+          }
           resolve(matches);
         },
-        (_, error) => reject(error)
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const getPotentialCollaborators = async (userId: number, limit: number = 10): Promise<UserProfile[]> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // First get the current user's skills and preferences
+      tx.executeSql(
+        `SELECT skill_name, proficiency FROM skills WHERE user_id = ?`,
+        [userId],
+        (_, skillsResult) => {
+          const userSkills: { skill_name: string; proficiency: number }[] = [];
+          for (let i = 0; i < skillsResult.rows.length; i++) {
+            userSkills.push(skillsResult.rows.item(i));
+          }
+
+          tx.executeSql(
+            `SELECT preference_type, preference_value FROM preferences WHERE user_id = ?`,
+            [userId],
+            (_, preferencesResult) => {
+              const userPreferences: { preference_type: string; preference_value: string }[] = [];
+              for (let i = 0; i < preferencesResult.rows.length; i++) {
+                userPreferences.push(preferencesResult.rows.item(i));
+              }
+
+              // Find users with complementary skills and preferences
+              const query = `
+                SELECT DISTINCT u.id, u.username, u.email, u.location, u.created_at
+                FROM users u
+                LEFT JOIN skills s ON u.id = s.user_id
+                LEFT JOIN preferences p ON u.id = p.user_id
+                WHERE u.id != ?
+                AND (
+                  s.skill_name IN (${userSkills.map(() => '?').join(',')}) OR
+                  p.preference_value IN (${userPreferences.map(() => '?').join(',')})
+                )
+                ORDER BY RANDOM()
+                LIMIT ?
+              `;
+
+              const params = [userId, ...userSkills.map(s => s.skill_name), ...userPreferences.map(p => p.preference_value), limit];
+
+              tx.executeSql(
+                query,
+                params,
+                async (_, result) => {
+                  const profiles: UserProfile[] = [];
+                  for (let i = 0; i < result.rows.length; i++) {
+                    const user = result.rows.item(i);
+                    const skills = await getUserSkills(user.id);
+                    const preferences = await getUserPreferences(user.id);
+                    const sparkScore = await calculateSparkScore(user.id);
+
+                    profiles.push({
+                      user,
+                      skills,
+                      preferences,
+                      sparkScore
+                    });
+                  }
+                  resolve(profiles);
+                },
+                (_, error) => {
+                  reject(error);
+                  return false;
+                }
+              );
+            },
+            (_, error) => {
+              reject(error);
+              return false;
+            }
+          );
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const calculateMatchScore = async (user1Id: number, user2Id: number): Promise<number> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Get user1's skills and preferences
+      tx.executeSql(
+        `SELECT skill_name, proficiency FROM skills WHERE user_id = ?`,
+        [user1Id],
+        (_, skills1Result) => {
+          const skills1: { skill_name: string; proficiency: number }[] = [];
+          for (let i = 0; i < skills1Result.rows.length; i++) {
+            skills1.push(skills1Result.rows.item(i));
+          }
+
+          tx.executeSql(
+            `SELECT preference_type, preference_value FROM preferences WHERE user_id = ?`,
+            [user1Id],
+            (_, preferences1Result) => {
+              const preferences1: { preference_type: string; preference_value: string }[] = [];
+              for (let i = 0; i < preferences1Result.rows.length; i++) {
+                preferences1.push(preferences1Result.rows.item(i));
+              }
+
+              // Get user2's skills and preferences
+              tx.executeSql(
+                `SELECT skill_name, proficiency FROM skills WHERE user_id = ?`,
+                [user2Id],
+                (_, skills2Result) => {
+                  const skills2: { skill_name: string; proficiency: number }[] = [];
+                  for (let i = 0; i < skills2Result.rows.length; i++) {
+                    skills2.push(skills2Result.rows.item(i));
+                  }
+
+                  tx.executeSql(
+                    `SELECT preference_type, preference_value FROM preferences WHERE user_id = ?`,
+                    [user2Id],
+                    (_, preferences2Result) => {
+                      const preferences2: { preference_type: string; preference_value: string }[] = [];
+                      for (let i = 0; i < preferences2Result.rows.length; i++) {
+                        preferences2.push(preferences2Result.rows.item(i));
+                      }
+
+                      // Calculate match score based on complementary skills and preferences
+                      let score = 0;
+
+                      // Skill matching (higher proficiency matches better)
+                      const skillNames1 = skills1.map(s => s.skill_name);
+                      const skillNames2 = skills2.map(s => s.skill_name);
+
+                      const commonSkills = skillNames1.filter(skill => skillNames2.includes(skill));
+                      score += commonSkills.length * 20; // 20 points per common skill
+
+                      // Preference matching
+                      const preferenceValues1 = preferences1.map(p => p.preference_value);
+                      const preferenceValues2 = preferences2.map(p => p.preference_value);
+
+                      const commonPreferences = preferenceValues1.filter(pref => preferenceValues2.includes(pref));
+                      score += commonPreferences.length * 10; // 10 points per common preference
+
+                      // Cap the score at 100
+                      score = Math.min(score, 100);
+
+                      resolve(score);
+                    },
+                    (_, error) => {
+                      reject(error);
+                      return false;
+                    }
+                  );
+                },
+                (_, error) => {
+                  reject(error);
+                  return false;
+                }
+              );
+            },
+            (_, error) => {
+              reject(error);
+              return false;
+            }
+          );
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const getUserSkills = async (userId: number) => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM skills WHERE user_id = ?',
+        [userId],
+        (_, result) => {
+          const skills = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            skills.push(result.rows.item(i));
+          }
+          resolve(skills);
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const getUserPreferences = async (userId: number) => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM preferences WHERE user_id = ?',
+        [userId],
+        (_, result) => {
+          const preferences = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            preferences.push(result.rows.item(i));
+          }
+          resolve(preferences);
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const calculateSparkScore = async (userId: number): Promise<number> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Calculate score based on various factors
+      let score = 0;
+
+      // Ideas submitted
+      tx.executeSql(
+        'SELECT COUNT(*) as count FROM ideas WHERE user_id = ?',
+        [userId],
+        (_, ideasResult) => {
+          score += ideasResult.rows.item(0).count * 10;
+
+          // Feedback given
+          tx.executeSql(
+            'SELECT COUNT(*) as count FROM feedback WHERE user_id = ?',
+            [userId],
+            (_, feedbackResult) => {
+              score += feedbackResult.rows.item(0).count * 5;
+
+              // Upvotes received
+              tx.executeSql(
+                `SELECT COUNT(*) as count FROM votes v
+                 JOIN ideas i ON v.idea_id = i.id
+                 WHERE i.user_id = ? AND v.vote_type = 'up'`,
+                [userId],
+                (_, upvotesResult) => {
+                  score += upvotesResult.rows.item(0).count * 2;
+
+                  // Matches created
+                  tx.executeSql(
+                    'SELECT COUNT(*) as count FROM matches WHERE user1_id = ? OR user2_id = ?',
+                    [userId, userId],
+                    (_, matchesResult) => {
+                      score += matchesResult.rows.item(0).count * 15;
+
+                      // Cap the score at 1000
+                      score = Math.min(score, 1000);
+                      resolve(score);
+                    },
+                    (_, error) => {
+                      reject(error);
+                      return false;
+                    }
+                  );
+                },
+                (_, error) => {
+                  reject(error);
+                  return false;
+                }
+              );
+            },
+            (_, error) => {
+              reject(error);
+              return false;
+            }
+          );
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const sendMessage = async (matchId: number, senderId: number, content: string): Promise<Message> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO messages (match_id, sender_id, content) VALUES (?, ?, ?)',
+        [matchId, senderId, content],
+        (_, result) => {
+          const messageId = result.insertId;
+          resolve({
+            id: messageId,
+            match_id: matchId,
+            sender_id: senderId,
+            content,
+            read_status: false,
+            created_at: new Date().toISOString()
+          });
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+};
+
+export const getMessages = async (matchId: number): Promise<Message[]> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM messages WHERE match_id = ? ORDER BY created_at ASC',
+        [matchId],
+        (_, result) => {
+          const messages: Message[] = [];
+          for (let i = 0; i < result.rows.length; i++) {
+            messages.push(result.rows.item(i));
+          }
+          resolve(messages);
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
     });
   });
