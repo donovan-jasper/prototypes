@@ -40,6 +40,8 @@ export function initializeAICoach(customConfig?: Partial<AIConfig>) {
     tx.executeSql(`
       CREATE TABLE IF NOT EXISTS ai_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        habit_id TEXT,
         streak_length INTEGER,
         longest_streak INTEGER,
         missed_days INTEGER,
@@ -48,8 +50,7 @@ export function initializeAICoach(customConfig?: Partial<AIConfig>) {
         status TEXT,
         user_tone TEXT,
         message TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(streak_length, longest_streak, missed_days, habit_name, completion_rate, status, user_tone)
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
       );
     `);
   });
@@ -156,20 +157,18 @@ function buildPrompt(context: CoachMessageContext): string {
     for ${context.habitName} (longest ${context.longestStreak} days) with a ${context.completionRate}% completion rate.
     Their current streak status is ${context.status}. They've missed ${context.missedDays} days recently.
     Write a ${context.userTone} message (max 50 words) to motivate them.
-    If they're on a good streak, celebrate and encourage them to keep going.
-    If they're struggling, offer encouragement and remind them of their progress.
-    If they've broken their streak, gently remind them of their longest streak and encourage them to start fresh.
   `;
 }
 
-// Get a cached message if available and not expired
+// Get a cached message if available
 async function getCachedMessage(context: CoachMessageContext): Promise<string | null> {
   return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
-        `SELECT message, created_at FROM ai_messages
-         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ?
-         AND habit_name = ? AND completion_rate = ? AND status = ? AND user_tone = ?`,
+        `SELECT message FROM ai_messages
+         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ? AND habit_name = ?
+         AND completion_rate = ? AND status = ? AND user_tone = ?
+         ORDER BY created_at DESC LIMIT 1`,
         [
           context.streakLength,
           context.longestStreak,
@@ -181,15 +180,7 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
         ],
         (_, { rows }) => {
           if (rows.length > 0) {
-            const item = rows.item(0);
-            const createdAt = new Date(item.created_at);
-            const now = new Date();
-
-            if (now.getTime() - createdAt.getTime() < config.cacheTTL) {
-              resolve(item.message);
-            } else {
-              resolve(null);
-            }
+            resolve(rows.item(0).message);
           } else {
             resolve(null);
           }
@@ -205,13 +196,15 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
 
 // Cache a generated message
 async function cacheMessage(context: CoachMessageContext, message: string): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        `INSERT OR REPLACE INTO ai_messages
-         (streak_length, longest_streak, missed_days, habit_name, completion_rate, status, user_tone, message, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO ai_messages
+         (user_id, habit_id, streak_length, longest_streak, missed_days, habit_name, completion_rate, status, user_tone, message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
+          context.userId,
+          context.habitId,
           context.streakLength,
           context.longestStreak,
           context.missedDays,
@@ -219,13 +212,12 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
           context.completionRate,
           context.status,
           context.userTone,
-          message,
-          new Date().toISOString()
+          message
         ],
         () => resolve(),
         (_, error) => {
           console.error('Error caching message:', error);
-          resolve();
+          reject(error);
         }
       );
     });
@@ -234,11 +226,44 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
 
 // Get a fallback message when API fails
 function getFallbackMessage(context: CoachMessageContext, error: Error | null): string {
-  if (context.status === 'active') {
-    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep it up!`;
-  } else if (context.status === 'at-risk') {
-    return `You're close to breaking your ${context.streakLength}-day streak. Don't give up!`;
-  } else {
-    return `Your longest streak for ${context.habitName} was ${context.longestStreak} days. Let's try to build a new one!`;
+  if (context.streakLength > 0) {
+    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep it going!`;
+  } else if (context.missedDays > 0) {
+    return `Don't worry about missing a day. Let's get back on track tomorrow!`;
   }
+  return "Great job! Keep up the good work!";
+}
+
+// Fetch all coach messages for a user
+export async function fetchCoachMessages(userId: string): Promise<CoachMessage[]> {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT id, message, created_at as timestamp, habit_id as habitId
+         FROM ai_messages
+         WHERE user_id = ?
+         ORDER BY created_at DESC`,
+        [userId],
+        (_, { rows }) => {
+          const messages: CoachMessage[] = [];
+          for (let i = 0; i < rows.length; i++) {
+            messages.push(rows.item(i));
+          }
+          resolve(messages);
+        },
+        (_, error) => {
+          console.error('Error fetching coach messages:', error);
+          reject(error);
+        }
+      );
+    });
+  });
+}
+
+// Interface for coach messages
+interface CoachMessage {
+  id: string;
+  message: string;
+  timestamp: string;
+  habitId: string;
 }

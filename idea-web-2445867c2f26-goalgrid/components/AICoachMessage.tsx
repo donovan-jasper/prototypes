@@ -6,9 +6,10 @@ import Colors from '../constants/Colors';
 interface AICoachMessageProps {
   message: string;
   isLoading?: boolean;
+  timestamp?: string;
 }
 
-const AICoachMessage: React.FC<AICoachMessageProps> = ({ message, isLoading = false }) => {
+const AICoachMessage: React.FC<AICoachMessageProps> = ({ message, isLoading = false, timestamp }) => {
   const [displayedMessage, setDisplayedMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
 
@@ -53,6 +54,11 @@ const AICoachMessage: React.FC<AICoachMessageProps> = ({ message, isLoading = fa
           {displayedMessage}
           {isTyping && <Text style={styles.cursor}>|</Text>}
         </Text>
+        {timestamp && (
+          <Text style={styles.timestamp}>
+            {new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -91,6 +97,12 @@ const styles = StyleSheet.create({
   cursor: {
     color: Colors.light.tint,
     fontSize: 16,
+  },
+  timestamp: {
+    fontSize: 12,
+    color: Colors.light.tabIconDefault,
+    marginTop: 4,
+    textAlign: 'right',
   },
 });
 
