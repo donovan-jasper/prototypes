@@ -154,23 +154,13 @@ export default function CreateHangoutScreen() {
 
   const handleShare = async () => {
     try {
-      const result = await Share.share({
-        message: `Join me for ${title} at ${date.toLocaleString()}!`,
-        url: `https://hobbyhub.app/hangout/${newHangoutId}`,
-        title: `Join my ${title} hangout`
+      await Share.share({
+        message: `Join me for ${title} at ${location} on ${date.toLocaleString()}!`,
+        url: `hobbyhub://hangout/${newHangoutId}`,
+        title: `Join my ${title} hangout!`
       });
-
-      if (result.action === Share.sharedAction) {
-        if (result.activityType) {
-          // shared with activity type of result.activityType
-        } else {
-          // shared
-        }
-      } else if (result.action === Share.dismissedAction) {
-        // dismissed
-      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to share hangout');
+      console.error('Error sharing:', error);
     }
   };
 
@@ -181,7 +171,7 @@ export default function CreateHangoutScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -189,7 +179,7 @@ export default function CreateHangoutScreen() {
         <ScrollView contentContainerStyle={styles.scrollView}>
           <View style={styles.header}>
             <Text style={styles.title}>Create Hangout</Text>
-            <Text style={styles.subtitle}>Fill in details to create your hangout</Text>
+            <Text style={styles.subtitle}>Fill in the details below</Text>
           </View>
 
           <View style={styles.form}>
@@ -200,7 +190,7 @@ export default function CreateHangoutScreen() {
                 placeholder="e.g. Board Game Night"
                 value={title}
                 onChangeText={setTitle}
-                autoCapitalize="sentences"
+                autoCapitalize="words"
               />
             </View>
 
@@ -213,7 +203,11 @@ export default function CreateHangoutScreen() {
                   style={styles.picker}
                 >
                   {hobbies.map((hobbyItem) => (
-                    <Picker.Item key={hobbyItem.id} label={hobbyItem.name} value={hobbyItem.id} />
+                    <Picker.Item
+                      key={hobbyItem.id}
+                      label={hobbyItem.name}
+                      value={hobbyItem.id}
+                    />
                   ))}
                 </Picker>
               </View>
@@ -226,14 +220,17 @@ export default function CreateHangoutScreen() {
                   style={styles.dateTimeButton}
                   onPress={() => setShowDatePicker(true)}
                 >
+                  <Ionicons name="calendar-outline" size={20} color="#666" />
                   <Text style={styles.dateTimeText}>
                     {date.toLocaleDateString()}
                   </Text>
                 </TouchableOpacity>
+
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowTimePicker(true)}
                 >
+                  <Ionicons name="time-outline" size={20} color="#666" />
                   <Text style={styles.dateTimeText}>
                     {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
@@ -263,28 +260,16 @@ export default function CreateHangoutScreen() {
               <Text style={styles.label}>Location</Text>
               <View style={styles.locationToggle}>
                 <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    useCurrentLocation && styles.toggleButtonActive
-                  ]}
+                  style={[styles.toggleButton, useCurrentLocation && styles.toggleButtonActive]}
                   onPress={() => setUseCurrentLocation(true)}
                 >
-                  <Text style={[
-                    styles.toggleButtonText,
-                    useCurrentLocation && styles.toggleButtonTextActive
-                  ]}>Current Location</Text>
+                  <Text style={styles.toggleButtonText}>Use Current Location</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    !useCurrentLocation && styles.toggleButtonActive
-                  ]}
+                  style={[styles.toggleButton, !useCurrentLocation && styles.toggleButtonActive]}
                   onPress={() => setUseCurrentLocation(false)}
                 >
-                  <Text style={[
-                    styles.toggleButtonText,
-                    !useCurrentLocation && styles.toggleButtonTextActive
-                  ]}>Custom Location</Text>
+                  <Text style={styles.toggleButtonText}>Enter Address</Text>
                 </TouchableOpacity>
               </View>
 
@@ -310,15 +295,15 @@ export default function CreateHangoutScreen() {
                     </MapView>
                   ) : (
                     <View style={styles.mapPlaceholder}>
-                      <ActivityIndicator size="large" />
-                      <Text>Loading your location...</Text>
+                      <ActivityIndicator size="large" color="#007AFF" />
+                      <Text style={styles.mapPlaceholderText}>Loading map...</Text>
                     </View>
                   )}
                 </View>
               ) : (
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter address or location name"
+                  placeholder="Enter address or venue name"
                   value={location}
                   onChangeText={setLocation}
                 />
@@ -326,21 +311,24 @@ export default function CreateHangoutScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.label}>Max Attendees: {maxAttendees}</Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={2}
-                maximumValue={20}
-                step={1}
-                value={maxAttendees}
-                onValueChange={(value) => setMaxAttendees(value)}
-                minimumTrackTintColor="#4CAF50"
-                maximumTrackTintColor="#E0E0E0"
-                thumbTintColor="#4CAF50"
-              />
-              <View style={styles.sliderLabels}>
-                <Text style={styles.sliderLabel}>2</Text>
-                <Text style={styles.sliderLabel}>20</Text>
+              <Text style={styles.label}>Max Attendees</Text>
+              <View style={styles.sliderContainer}>
+                <Text style={styles.sliderValue}>{maxAttendees}</Text>
+                <Slider
+                  style={styles.slider}
+                  minimumValue={2}
+                  maximumValue={20}
+                  step={1}
+                  value={maxAttendees}
+                  onValueChange={(value) => setMaxAttendees(Math.round(value))}
+                  minimumTrackTintColor="#007AFF"
+                  maximumTrackTintColor="#ddd"
+                  thumbTintColor="#007AFF"
+                />
+                <View style={styles.sliderLabels}>
+                  <Text style={styles.sliderLabel}>2</Text>
+                  <Text style={styles.sliderLabel}>20</Text>
+                </View>
               </View>
             </View>
 
@@ -350,7 +338,7 @@ export default function CreateHangoutScreen() {
               disabled={loading}
             >
               {loading ? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color="white" />
               ) : (
                 <Text style={styles.submitButtonText}>Create Hangout</Text>
               )}
@@ -359,45 +347,42 @@ export default function CreateHangoutScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Success Modal */}
       <Modal
         visible={showSuccessModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowSuccessModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
+            <Ionicons name="checkmark-circle-outline" size={64} color="#34C759" />
             <Text style={styles.modalTitle}>Hangout Created!</Text>
-            <Text style={styles.modalMessage}>Your hangout has been successfully created.</Text>
+            <Text style={styles.modalText}>Your hangout has been successfully created.</Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.shareButton]}
-                onPress={handleShare}
-              >
-                <Ionicons name="share-social" size={20} color="#fff" />
-                <Text style={styles.modalButtonText}>Share</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.viewButton]}
+                style={[styles.modalButton, styles.modalButtonPrimary]}
                 onPress={navigateToHangout}
               >
                 <Text style={styles.modalButtonText}>View Hangout</Text>
               </TouchableOpacity>
-            </View>
 
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => {
-                setShowSuccessModal(false);
-                router.push('/');
-              }}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSecondary]}
+                onPress={handleShare}
+              >
+                <Text style={styles.modalButtonText}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonTertiary]}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.push('/(tabs)/');
+                }}
+              >
+                <Text style={styles.modalButtonText}>Back to Feed</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -408,32 +393,32 @@ export default function CreateHangoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f8f8',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   scrollView: {
-    padding: 20,
-    paddingBottom: 40,
+    flexGrow: 1,
+    padding: 16,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
   },
   form: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -445,7 +430,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
@@ -455,13 +440,13 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
   },
   pickerContainer: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
   },
   picker: {
     height: 50,
@@ -472,48 +457,46 @@ const styles = StyleSheet.create({
   },
   dateTimeButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    marginHorizontal: 5,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
+    marginHorizontal: 4,
   },
   dateTimeText: {
     fontSize: 16,
-    textAlign: 'center',
+    marginLeft: 8,
+    color: '#333',
   },
   locationToggle: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   toggleButton: {
     flex: 1,
-    padding: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    marginHorizontal: 5,
-    backgroundColor: '#f9f9f9',
+    marginHorizontal: 4,
   },
   toggleButtonActive: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
+    backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   toggleButtonText: {
-    textAlign: 'center',
-    fontSize: 14,
-    color: '#666',
-  },
-  toggleButtonTextActive: {
-    color: '#fff',
+    color: '#333',
     fontWeight: '500',
   },
   mapContainer: {
     height: 200,
     borderRadius: 8,
     overflow: 'hidden',
-    marginTop: 10,
+    marginTop: 8,
   },
   map: {
     flex: 1,
@@ -524,89 +507,90 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0f0f0',
   },
+  mapPlaceholderText: {
+    marginTop: 8,
+    color: '#666',
+  },
+  sliderContainer: {
+    marginTop: 8,
+  },
   slider: {
-    width: '100%',
     height: 40,
+  },
+  sliderValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 8,
   },
   sliderLabels: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 5,
   },
   sliderLabel: {
     color: '#666',
     fontSize: 14,
   },
   submitButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
+    backgroundColor: '#007AFF',
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 8,
   },
   submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 30,
-    width: '85%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
+    width: '80%',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 10,
+    fontWeight: '700',
     color: '#333',
+    marginTop: 16,
+    marginBottom: 8,
   },
-  modalMessage: {
+  modalText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 20,
   },
   modalButton: {
-    flex: 1,
     padding: 12,
     borderRadius: 8,
-    marginHorizontal: 5,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  shareButton: {
-    backgroundColor: '#2196F3',
+  modalButtonPrimary: {
+    backgroundColor: '#007AFF',
   },
-  viewButton: {
-    backgroundColor: '#4CAF50',
+  modalButtonSecondary: {
+    backgroundColor: '#34C759',
+  },
+  modalButtonTertiary: {
+    backgroundColor: '#ddd',
   },
   modalButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 5,
-  },
-  closeButton: {
-    padding: 10,
-  },
-  closeButtonText: {
-    color: '#666',
-    fontSize: 16,
+    fontWeight: '600',
   },
 });
