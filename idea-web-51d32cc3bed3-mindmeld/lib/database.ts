@@ -13,7 +13,9 @@ export const initDatabase = async () => {
       date TEXT NOT NULL,
       completed INTEGER DEFAULT 0,
       category TEXT,
-      location TEXT
+      location TEXT,
+      recurrence TEXT,
+      recurrenceEnd TEXT
     );
 
     CREATE TABLE IF NOT EXISTS habits (
@@ -33,6 +35,7 @@ export const getReminders = async (callback: (reminders: Reminder[]) => void) =>
       ...row,
       completed: row.completed === 1,
       category: row.category as 'personal' | 'work' | 'health' | 'finance' | 'other' | undefined,
+      recurrence: row.recurrence as 'none' | 'daily' | 'weekly' | 'monthly' | undefined,
     }));
     callback(reminders);
   } catch (error) {
@@ -44,14 +47,16 @@ export const getReminders = async (callback: (reminders: Reminder[]) => void) =>
 export const addReminder = async (reminder: Reminder) => {
   try {
     await db.runAsync(
-      'INSERT INTO reminders (id, title, date, completed, category, location) VALUES (?, ?, ?, ?, ?, ?)',
+      'INSERT INTO reminders (id, title, date, completed, category, location, recurrence, recurrenceEnd) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [
         reminder.id,
         reminder.title,
         reminder.date,
         reminder.completed ? 1 : 0,
         reminder.category || null,
-        reminder.location || null
+        reminder.location || null,
+        reminder.recurrence || 'none',
+        reminder.recurrenceEnd || null
       ]
     );
   } catch (error) {

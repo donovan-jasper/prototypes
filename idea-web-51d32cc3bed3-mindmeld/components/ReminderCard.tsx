@@ -17,6 +17,13 @@ const categoryColors = {
   other: '#607D8B',
 };
 
+const recurrenceIcons = {
+  daily: 'repeat',
+  weekly: 'repeat',
+  monthly: 'repeat',
+  none: undefined,
+};
+
 export default function ReminderCard({ reminder }: ReminderCardProps) {
   const { toggleReminder } = useReminders();
   const date = new Date(reminder.date);
@@ -29,6 +36,14 @@ export default function ReminderCard({ reminder }: ReminderCardProps) {
           <Text style={[styles.title, reminder.completed && styles.completed]}>
             {reminder.title}
           </Text>
+          {reminder.recurrence && reminder.recurrence !== 'none' && (
+            <MaterialIcons
+              name={recurrenceIcons[reminder.recurrence]}
+              size={16}
+              color="#666"
+              style={styles.recurrenceIcon}
+            />
+          )}
         </View>
 
         <View style={styles.details}>
@@ -41,6 +56,16 @@ export default function ReminderCard({ reminder }: ReminderCardProps) {
             <View style={styles.detailRow}>
               <MaterialIcons name="location-on" size={16} color="#666" />
               <Text style={styles.detailText}>{reminder.location}</Text>
+            </View>
+          )}
+
+          {reminder.recurrence && reminder.recurrence !== 'none' && (
+            <View style={styles.detailRow}>
+              <MaterialIcons name="repeat" size={16} color="#666" />
+              <Text style={styles.detailText}>
+                {reminder.recurrence.charAt(0).toUpperCase() + reminder.recurrence.slice(1)}
+                {reminder.recurrenceEnd && ` until ${format(new Date(reminder.recurrenceEnd), 'MMM d, yyyy')}`}
+              </Text>
             </View>
           )}
         </View>
@@ -92,6 +117,9 @@ const styles = StyleSheet.create({
   completed: {
     textDecorationLine: 'line-through',
     color: '#999',
+  },
+  recurrenceIcon: {
+    marginLeft: 5,
   },
   details: {
     marginLeft: 18,

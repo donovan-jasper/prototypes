@@ -1,23 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, TouchableOpacity, Text, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, TextInput, Button, StyleSheet, TouchableOpacity, Text, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useReminders } from '../store/reminders';
 import * as Speech from 'expo-speech';
 import * as Location from 'expo-location';
-import { format, parse, isValid } from 'date-fns';
+import { format, parse, isValid, addDays, addWeeks, addMonths } from 'date-fns';
 import { MaterialIcons } from '@expo/vector-icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 export default function AddReminderScreen() {
   const [title, setTitle] = useState('');
   const [date, setDate] = useState(new Date());
+  const [time, setTime] = useState(new Date());
   const [location, setLocation] = useState<string | null>(null);
   const [category, setCategory] = useState('personal');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
+  const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
+  const [recurrenceEnd, setRecurrenceEnd] = useState<Date | null>(null);
+  const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
   const { addReminder } = useReminders();
   const router = useRouter();
 
   const categories = ['personal', 'work', 'health', 'finance', 'other'];
+  const recurrenceOptions = ['none', 'daily', 'weekly', 'monthly'];
 
   const handleAddReminder = async () => {
     if (!title.trim()) {
@@ -28,13 +37,18 @@ export default function AddReminderScreen() {
     setIsProcessing(true);
 
     try {
+      const reminderDate = new Date(date);
+      reminderDate.setHours(time.getHours(), time.getMinutes());
+
       const reminder = {
         id: Date.now().toString(),
         title,
-        date: date.toISOString(),
+        date: reminderDate.toISOString(),
         completed: false,
         category,
         location: location || undefined,
+        recurrence,
+        recurrenceEnd: recurrenceEnd ? recurrenceEnd.toISOString() : undefined,
       };
 
       await addReminder(reminder);
@@ -111,6 +125,7 @@ export default function AddReminderScreen() {
 
       if (isValid(now)) {
         setDate(now);
+        setTime(now);
       }
     }
 
@@ -140,6 +155,40 @@ export default function AddReminderScreen() {
     } else if (financeKeywords.some(keyword => lowerText.includes(keyword))) {
       setCategory('finance');
     }
+
+    // Extract recurrence
+    const recurrenceRegex = /(every day|daily|every week|weekly|every month|monthly)/;
+    const recurrenceMatch = lowerText.match(recurrenceRegex);
+    if (recurrenceMatch) {
+      if (recurrenceMatch[0].includes('day')) {
+        setRecurrence('daily');
+      } else if (recurrenceMatch[0].includes('week')) {
+        setRecurrence('weekly');
+      } else if (recurrenceMatch[0].includes('month')) {
+        setRecurrence('monthly');
+      }
+    }
+  };
+
+  const onDateChange = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(false);
+    if (selectedDate) {
+      setDate(selectedDate);
+    }
+  };
+
+  const onTimeChange = (event: any, selectedTime?: Date) => {
+    setShowTimePicker(false);
+    if (selectedTime) {
+      setTime(selectedTime);
+    }
+  };
+
+  const onRecurrenceEndChange = (event: any, selectedDate?: Date) => {
+    setShowRecurrenceEndPicker(false);
+    if (selectedDate) {
+      setRecurrenceEnd(selectedDate);
+    }
   };
 
   return (
@@ -148,49 +197,74 @@ export default function AddReminderScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Text style={styles.title}>Add New Reminder</Text>
-
-        {showSuccess && (
-          <View style={styles.successBanner}>
-            <MaterialIcons name="check-circle" size={24} color="#4CAF50" />
-            <Text style={styles.successText}>Reminder saved successfully!</Text>
-          </View>
-        )}
-
-        <View style={styles.inputContainer}>
-          <TextInput
-            placeholder="What do you need to remember?"
-            value={title}
-            onChangeText={setTitle}
-            style={styles.input}
-            onBlur={() => parseNaturalLanguage(title)}
-            editable={!isProcessing}
-          />
-
-          <TouchableOpacity
-            onPress={handleVoiceInput}
-            style={[styles.micButton, isProcessing && styles.disabledButton]}
-            disabled={isProcessing}
-          >
-            <MaterialIcons name="mic" size={24} color="#fff" />
+        <View style={styles.header}>
+          <Text style={styles.title}>Add Reminder</Text>
+          <TouchableOpacity onPress={() => router.back()}>
+            <MaterialIcons name="close" size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.dateContainer}>
-          <Text style={styles.label}>Date & Time:</Text>
-          <Text style={styles.dateText}>{format(date, 'MMM d, yyyy h:mm a')}</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="What do you need to remember?"
+            value={title}
+            onChangeText={setTitle}
+            autoFocus
+          />
+
+          <TouchableOpacity
+            style={styles.voiceButton}
+            onPress={handleVoiceInput}
+            disabled={isProcessing}
+          >
+            <MaterialIcons
+              name="mic"
+              size={24}
+              color={isProcessing ? '#ccc' : '#4CAF50'}
+            />
+          </TouchableOpacity>
         </View>
 
-        {location && (
-          <View style={styles.locationContainer}>
-            <MaterialIcons name="location-on" size={20} color="#666" />
-            <Text style={styles.locationText}>{location}</Text>
-          </View>
+        <View style={styles.dateTimeContainer}>
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <MaterialIcons name="calendar-today" size={20} color="#666" />
+            <Text style={styles.dateTimeText}>{format(date, 'MMM d, yyyy')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => setShowTimePicker(true)}
+          >
+            <MaterialIcons name="access-time" size={20} color="#666" />
+            <Text style={styles.dateTimeText}>{format(time, 'h:mm a')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
         )}
 
-        <View style={styles.categoryContainer}>
-          <Text style={styles.label}>Category:</Text>
-          <View style={styles.categoryButtons}>
+        {showTimePicker && (
+          <DateTimePicker
+            value={time}
+            mode="time"
+            display="default"
+            onChange={onTimeChange}
+          />
+        )}
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Category</Text>
+          <View style={styles.categoryContainer}>
             {categories.map((cat) => (
               <TouchableOpacity
                 key={cat}
@@ -199,7 +273,6 @@ export default function AddReminderScreen() {
                   category === cat && styles.selectedCategory
                 ]}
                 onPress={() => setCategory(cat)}
-                disabled={isProcessing}
               >
                 <Text style={[
                   styles.categoryText,
@@ -212,8 +285,83 @@ export default function AddReminderScreen() {
           </View>
         </View>
 
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Location</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Add location (optional)"
+            value={location || ''}
+            onChangeText={setLocation}
+          />
+        </View>
+
         <TouchableOpacity
-          style={[styles.addButton, isProcessing && styles.disabledButton]}
+          style={styles.advancedOptionsButton}
+          onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
+        >
+          <Text style={styles.advancedOptionsText}>
+            {showAdvancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
+          </Text>
+          <MaterialIcons
+            name={showAdvancedOptions ? 'expand-less' : 'expand-more'}
+            size={20}
+            color="#666"
+          />
+        </TouchableOpacity>
+
+        {showAdvancedOptions && (
+          <View style={styles.advancedOptionsContainer}>
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Recurrence</Text>
+              <View style={styles.recurrenceContainer}>
+                {recurrenceOptions.map((option) => (
+                  <TouchableOpacity
+                    key={option}
+                    style={[
+                      styles.recurrenceButton,
+                      recurrence === option && styles.selectedRecurrence
+                    ]}
+                    onPress={() => setRecurrence(option as any)}
+                  >
+                    <Text style={[
+                      styles.recurrenceText,
+                      recurrence === option && styles.selectedRecurrenceText
+                    ]}>
+                      {option === 'none' ? 'None' : option.charAt(0).toUpperCase() + option.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {recurrence !== 'none' && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Recurrence End Date</Text>
+                <TouchableOpacity
+                  style={styles.dateTimeButton}
+                  onPress={() => setShowRecurrenceEndPicker(true)}
+                >
+                  <MaterialIcons name="calendar-today" size={20} color="#666" />
+                  <Text style={styles.dateTimeText}>
+                    {recurrenceEnd ? format(recurrenceEnd, 'MMM d, yyyy') : 'Never'}
+                  </Text>
+                </TouchableOpacity>
+
+                {showRecurrenceEndPicker && (
+                  <DateTimePicker
+                    value={recurrenceEnd || new Date()}
+                    mode="date"
+                    display="default"
+                    onChange={onRecurrenceEndChange}
+                  />
+                )}
+              </View>
+            )}
+          </View>
+        )}
+
+        <TouchableOpacity
+          style={styles.addButton}
           onPress={handleAddReminder}
           disabled={isProcessing}
         >
@@ -222,6 +370,19 @@ export default function AddReminderScreen() {
           </Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal
+        transparent={true}
+        visible={showSuccess}
+        animationType="fade"
+      >
+        <View style={styles.successModal}>
+          <View style={styles.successContent}>
+            <MaterialIcons name="check-circle" size={50} color="#4CAF50" />
+            <Text style={styles.successText}>Reminder Added!</Text>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -229,122 +390,192 @@ export default function AddReminderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   scrollContainer: {
     padding: 20,
     paddingBottom: 40,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#333',
-  },
-  successBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E8F5E9',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  successText: {
-    marginLeft: 10,
-    color: '#4CAF50',
-    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
   },
   input: {
     flex: 1,
     backgroundColor: '#fff',
     padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderRadius: 10,
     fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  micButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
+  voiceButton: {
     marginLeft: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  dateContainer: {
+  dateTimeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
-  label: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  dateText: {
-    fontSize: 18,
-    color: '#333',
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  locationContainer: {
+  dateTimeButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
     backgroundColor: '#fff',
     padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderRadius: 10,
+    marginHorizontal: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  locationText: {
+  dateTimeText: {
     marginLeft: 10,
     fontSize: 16,
     color: '#333',
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#666',
+    marginBottom: 10,
   },
   categoryContainer: {
-    marginBottom: 20,
-  },
-  categoryButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 10,
   },
   categoryButton: {
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
     backgroundColor: '#e0e0e0',
-    marginRight: 8,
-    marginBottom: 8,
+    marginRight: 10,
+    marginBottom: 10,
   },
   selectedCategory: {
     backgroundColor: '#4CAF50',
   },
   categoryText: {
-    color: '#333',
+    color: '#666',
   },
   selectedCategoryText: {
     color: '#fff',
-    fontWeight: 'bold',
+  },
+  advancedOptionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  advancedOptionsText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  advancedOptionsContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  recurrenceContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  recurrenceButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  selectedRecurrence: {
+    backgroundColor: '#2196F3',
+  },
+  recurrenceText: {
+    color: '#666',
+  },
+  selectedRecurrenceText: {
+    color: '#fff',
   },
   addButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButtonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  successModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  successContent: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  successText: {
+    marginTop: 15,
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
 });
