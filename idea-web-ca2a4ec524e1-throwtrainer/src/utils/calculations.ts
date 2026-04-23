@@ -1,4 +1,5 @@
 import { Attempt } from '../types';
+import * as THREE from 'three';
 
 export function calculateAccuracy(hits: number, total: number): number {
   if (total === 0) return 0;
@@ -75,4 +76,37 @@ export function calculateThrowDirection(acceleration: { x: number; y: number; z:
     y: acceleration.y + gyro.y * 0.5,
     z: -1 // Fixed forward direction for simplicity
   };
+}
+
+export function screenToWorldCoordinates(
+  screenX: number,
+  screenY: number,
+  camera: THREE.PerspectiveCamera,
+  viewportWidth: number,
+  viewportHeight: number
+): THREE.Vector3 {
+  // Convert screen coordinates to normalized device coordinates (-1 to +1)
+  const x = (screenX / viewportWidth) * 2 - 1;
+  const y = -(screenY / viewportHeight) * 2 + 1;
+
+  // Create a vector in normalized device coordinates
+  const vector = new THREE.Vector3(x, y, 0.5); // 0.5 is the near plane
+
+  // Unproject the vector to world coordinates
+  vector.unproject(camera);
+
+  // Calculate direction vector
+  const direction = vector.sub(camera.position).normalize();
+
+  // Create a ray from camera position through the unprojected point
+  const raycaster = new THREE.Raycaster(camera.position, direction);
+
+  // For simplicity, we'll assume the target is on a plane at z=0
+  // In a real app, you might want to use a more sophisticated intersection test
+  const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+  const intersection = new THREE.Vector3();
+
+  raycaster.ray.intersectPlane(plane, intersection);
+
+  return intersection;
 }
