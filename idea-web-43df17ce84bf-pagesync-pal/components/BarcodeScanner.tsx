@@ -162,9 +162,7 @@ const BarcodeScanner = () => {
         style={styles.camera}
         type={cameraType}
         onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-        barCodeScannerSettings={{
-          barCodeTypes: [BarCodeScanner.Constants.BarCodeType.ean13],
-        }}
+        ratio="16:9"
       >
         <View style={styles.overlay}>
           <View style={styles.scanArea}>
@@ -190,6 +188,13 @@ const BarcodeScanner = () => {
           onPress={() => setShowManualEntry(true)}
         >
           <MaterialIcons name="keyboard" size={24} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={() => navigation.goBack()}
+        >
+          <MaterialIcons name="close" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
@@ -312,7 +317,7 @@ const styles = StyleSheet.create({
   },
   manualEntryTitle: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 20,
     marginBottom: 20,
     fontWeight: 'bold',
   },
