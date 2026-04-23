@@ -162,39 +162,38 @@ const unsubscribe = async (id) => {
   await cancelRenewalNotification(id);
 };
 
-const getSetting = async (key) => {
-  const result = await db.getFirstAsync('SELECT value FROM settings WHERE key = ?', [key]);
-  return result?.value;
-};
-
-const setSetting = async (key, value) => {
-  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
-};
-
-const getSubscriptionById = async (id) => {
-  return await db.getFirstAsync('SELECT * FROM subscriptions WHERE id = ?', [id]);
-};
-
 const getTotalMonthlyCost = async () => {
-  const result = await db.getFirstAsync(`
+  const result = await db.getAllAsync(`
     SELECT SUM(cost) as total
     FROM subscriptions
     WHERE status = 'active'
-    AND billing_cycle = 'monthly'
+    AND (billing_cycle = 'monthly' OR billing_cycle IS NULL)
   `);
-  return result?.total || 0;
+  return result[0].total || 0;
 };
 
 const getUpcomingRenewals = async () => {
   const now = new Date().toISOString();
-  const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const futureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  return await db.getAllAsync(`
-    SELECT * FROM subscriptions
+  const subscriptions = await db.getAllAsync(`
+    SELECT *
+    FROM subscriptions
     WHERE status = 'active'
     AND renewal_date BETWEEN ? AND ?
     ORDER BY renewal_date ASC
   `, [now, futureDate]);
+
+  return subscriptions;
+};
+
+const getSetting = async (key) => {
+  const result = await db.getAllAsync('SELECT value FROM settings WHERE key = ?', [key]);
+  return result.length > 0 ? result[0].value : null;
+};
+
+const setSetting = async (key, value) => {
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
 };
 
 const SubscriptionService = {
@@ -205,11 +204,10 @@ const SubscriptionService = {
   updateSubscription,
   markAsUnsubscribed,
   unsubscribe,
-  getSetting,
-  setSetting,
-  getSubscriptionById,
   getTotalMonthlyCost,
-  getUpcomingRenewals
+  getUpcomingRenewals,
+  getSetting,
+  setSetting
 };
 
 export default SubscriptionService;

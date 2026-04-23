@@ -11,6 +11,10 @@ const HomeScreen = ({ navigation }) => {
 
   const loadData = useCallback(async () => {
     try {
+      // Initialize database if not already done
+      await SubscriptionService.initDatabase();
+      await SubscriptionService.seedDatabase();
+
       const subs = await SubscriptionService.getSubscriptions();
       setSubscriptions(subs);
 
@@ -31,11 +35,22 @@ const HomeScreen = ({ navigation }) => {
   }, [loadData]);
 
   useEffect(() => {
+    loadData();
+
     const unsubscribe = navigation.addListener('focus', () => {
       loadData();
     });
     return unsubscribe;
   }, [navigation, loadData]);
+
+  const handleUnsubscribe = async (id) => {
+    try {
+      await SubscriptionService.unsubscribe(id);
+      await loadData();
+    } catch (error) {
+      console.error('Error unsubscribing:', error);
+    }
+  };
 
   return (
     <ScrollView
@@ -71,7 +86,7 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Your Subscriptions</Text>
         <SubscriptionList
           subscriptions={subscriptions}
-          onRefresh={loadData}
+          onUnsubscribe={handleUnsubscribe}
           navigation={navigation}
         />
       </View>
@@ -81,7 +96,7 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Upcoming Renewals</Text>
           <SubscriptionList
             subscriptions={upcomingRenewals}
-            onRefresh={loadData}
+            onUnsubscribe={handleUnsubscribe}
             navigation={navigation}
             showRenewalDates={true}
           />
