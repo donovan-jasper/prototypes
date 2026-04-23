@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, Divider } from 'react-native-paper';
+import { Text, Divider, List } from 'react-native-paper';
 
 export default function PaymentSplitView({ split }) {
   return (
@@ -14,12 +14,18 @@ export default function PaymentSplitView({ split }) {
         <Text variant="titleLarge">${split.perPerson.toFixed(2)}</Text>
       </View>
       <Divider style={styles.divider} />
-      {split.participants.map((participant, index) => (
-        <View key={index} style={styles.participantRow}>
-          <Text variant="bodyLarge">{participant.name}</Text>
-          <Text variant="bodyLarge">${participant.amount.toFixed(2)}</Text>
-        </View>
-      ))}
+
+      <List.Section>
+        {split.participants.map((participant, index) => (
+          <List.Item
+            key={index}
+            title={participant.name}
+            description={`Status: ${participant.paymentStatus || 'Pending'}`}
+            right={() => <Text variant="bodyLarge">${participant.amount.toFixed(2)}</Text>}
+            style={styles.participantItem}
+          />
+        ))}
+      </List.Section>
     </View>
   );
 }
@@ -33,10 +39,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  participantRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+  participantItem: {
     paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',

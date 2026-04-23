@@ -1,4 +1,5 @@
-import { createMockPaymentIntent, confirmMockPaymentIntent } from './mockStripe';
+import { Stripe } from '@stripe/stripe-react-native';
+import { createPaymentIntent, confirmPaymentIntent } from './api/stripeApi';
 
 export const calculateSplit = (order, splitType) => {
   const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -25,9 +26,10 @@ export const createPaymentIntents = async (order, participants) => {
   const paymentIntents = [];
   for (const participant of participants) {
     try {
-      const paymentIntent = createMockPaymentIntent(
+      const paymentIntent = await createPaymentIntent(
         Math.round(participant.amount * 100),
-        'usd'
+        'usd',
+        participant.id
       );
       paymentIntents.push(paymentIntent);
     } catch (error) {
@@ -41,17 +43,23 @@ export const createPaymentIntents = async (order, participants) => {
 export const processPayments = async (order) => {
   try {
     const split = calculateSplit(order, 'equal');
-    const paymentIntents = await createPaymentIntents(order, split.participants);
 
-    // Simulate payment confirmation for all intents
-    const confirmedIntents = await Promise.all(
-      paymentIntents.map(intent => confirmMockPaymentIntent(intent.clientSecret))
+    // Create payment intent for the organizer (who will pay upfront)
+    const organizer = order.participants.find(p => p.isOrganizer);
+    const paymentIntent = await createPaymentIntent(
+      Math.round(split.total * 100),
+      'usd',
+      organizer.id
     );
 
+    // Create ephemeral key for the customer
+    const ephemeralKey = await createEphemeralKey(organizer.stripeCustomerId);
+
     return {
-      status: 'success',
-      paymentIntents: confirmedIntents,
-      split
+      paymentIntent: paymentIntent.client_secret,
+      ephemeralKey: ephemeralKey.secret,
+      customer: organizer.stripeCustomerId,
+      amount: split.total
     };
   } catch (error) {
     console.error('Error processing payments:', error);
@@ -61,10 +69,28 @@ export const processPayments = async (order) => {
 
 export const confirmPayment = async (paymentIntentClientSecret, paymentMethodId) => {
   try {
-    const paymentIntent = await confirmMockPaymentIntent(paymentIntentClientSecret);
+    const paymentIntent = await confirmPaymentIntent(paymentIntentClientSecret, paymentMethodId);
     return paymentIntent;
   } catch (error) {
     console.error('Error in confirmPayment:', error);
+    throw error;
+  }
+};
+
+export const createEphemeralKey = async (customerId) => {
+  try {
+    const response = await fetch('https://your-backend-api.com/create-ephemeral-key', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        customerId,
+      }),
+    });
+    return await response.json();
+  } catch (error) {
+    console.error('Error creating ephemeral key:', error);
     throw error;
   }
 };

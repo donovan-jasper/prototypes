@@ -5,64 +5,84 @@ import { processPayments, confirmPayment } from '../lib/stripe';
 export const usePayment = () => {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const createNewPayment = async (payment) => {
     setLoading(true);
-    return new Promise((resolve) => {
-      createPayment(payment, (newPayment) => {
-        setPayments([...payments, newPayment]);
-        setLoading(false);
-        resolve(newPayment);
-      });
-    });
+    setError(null);
+    try {
+      const newPayment = await createPayment(payment);
+      setPayments([...payments, newPayment]);
+      return newPayment;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const loadPayments = (orderId) => {
+  const loadPayments = async (orderId) => {
     setLoading(true);
-    fetchPayments(orderId, (fetchedPayments) => {
+    setError(null);
+    try {
+      const fetchedPayments = await fetchPayments(orderId);
       setPayments(fetchedPayments);
+      return fetchedPayments;
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
       setLoading(false);
-    });
+    }
   };
 
   const processOrderPayment = async (order) => {
     setLoading(true);
+    setError(null);
     try {
       const result = await processPayments(order);
-      setLoading(false);
       return result;
-    } catch (error) {
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 
   const confirmOrderPayment = async (paymentIntentClientSecret, paymentMethodId) => {
     setLoading(true);
+    setError(null);
     try {
       const paymentIntent = await confirmPayment(paymentIntentClientSecret, paymentMethodId);
-      setLoading(false);
       return paymentIntent;
-    } catch (error) {
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 
   const setupPaymentMethod = async (paymentMethodId) => {
     setLoading(true);
+    setError(null);
     try {
-      setLoading(false);
+      // Implement actual payment method setup logic
       return { success: true };
-    } catch (error) {
+    } catch (err) {
+      setError(err.message);
+      throw err;
+    } finally {
       setLoading(false);
-      throw error;
     }
   };
 
   return {
     payments,
     loading,
+    error,
     createPayment: createNewPayment,
     fetchPayments: loadPayments,
     processPayment: processOrderPayment,
