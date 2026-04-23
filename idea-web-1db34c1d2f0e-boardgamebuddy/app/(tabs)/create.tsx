@@ -142,6 +142,12 @@ export default function CreateHangoutScreen() {
         [id, title.trim(), hobby, latitude, longitude, date.toISOString(), maxAttendees, 'currentUser']
       );
 
+      // Add current user as attendee
+      await db.runAsync(
+        'INSERT INTO attendees (hangoutId, userId, status) VALUES (?, ?, ?)',
+        [id, 'currentUser', 'going']
+      );
+
       setNewHangoutId(id);
       setShowSuccessModal(true);
     } catch (error) {
@@ -157,16 +163,9 @@ export default function CreateHangoutScreen() {
       await Share.share({
         message: `Join me for ${title} at ${location} on ${date.toLocaleString()}!`,
         url: `hobbyhub://hangout/${newHangoutId}`,
-        title: `Join my ${title} hangout!`
       });
     } catch (error) {
       console.error('Error sharing:', error);
-    }
-  };
-
-  const navigateToHangout = () => {
-    if (newHangoutId) {
-      router.push(`/hangout/${newHangoutId}`);
     }
   };
 
@@ -177,210 +176,198 @@ export default function CreateHangoutScreen() {
         style={styles.keyboardAvoidingView}
       >
         <ScrollView contentContainerStyle={styles.scrollView}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Create Hangout</Text>
-            <Text style={styles.subtitle}>Fill in the details below</Text>
+          <Text style={styles.title}>Create a Hangout</Text>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Title</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="e.g. Board Game Night"
+              value={title}
+              onChangeText={setTitle}
+              autoCapitalize="words"
+            />
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Title</Text>
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Hobby</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={hobby}
+                onValueChange={(itemValue) => setHobby(itemValue)}
+                style={styles.picker}
+              >
+                {hobbies.map((hobbyItem) => (
+                  <Picker.Item
+                    key={hobbyItem.id}
+                    label={hobbyItem.name}
+                    value={hobbyItem.id}
+                  />
+                ))}
+              </Picker>
+            </View>
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
+              <Ionicons name="calendar" size={20} color="#666" />
+            </TouchableOpacity>
+
+            {showDatePicker && (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Time</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={styles.dateText}>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
+              <Ionicons name="time" size={20} color="#666" />
+            </TouchableOpacity>
+
+            {showTimePicker && (
+              <DateTimePicker
+                value={date}
+                mode="time"
+                display="default"
+                onChange={handleTimeChange}
+              />
+            )}
+          </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Location</Text>
+            <View style={styles.locationToggle}>
+              <TouchableOpacity
+                style={[styles.toggleButton, useCurrentLocation && styles.toggleButtonActive]}
+                onPress={() => setUseCurrentLocation(true)}
+              >
+                <Text style={[styles.toggleText, useCurrentLocation && styles.toggleTextActive]}>Current Location</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.toggleButton, !useCurrentLocation && styles.toggleButtonActive]}
+                onPress={() => setUseCurrentLocation(false)}
+              >
+                <Text style={[styles.toggleText, !useCurrentLocation && styles.toggleTextActive]}>Custom Location</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!useCurrentLocation && (
               <TextInput
-                style={styles.input}
-                placeholder="e.g. Board Game Night"
-                value={title}
-                onChangeText={setTitle}
+                style={[styles.input, styles.locationInput]}
+                placeholder="Enter address or venue name"
+                value={location}
+                onChangeText={setLocation}
                 autoCapitalize="words"
               />
-            </View>
+            )}
 
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Hobby</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={hobby}
-                  onValueChange={(itemValue) => setHobby(itemValue)}
-                  style={styles.picker}
+            {useCurrentLocation && currentLocation && (
+              <View style={styles.mapContainer}>
+                <MapView
+                  style={styles.map}
+                  initialRegion={{
+                    latitude: currentLocation.coords.latitude,
+                    longitude: currentLocation.coords.longitude,
+                    latitudeDelta: 0.01,
+                    longitudeDelta: 0.01,
+                  }}
                 >
-                  {hobbies.map((hobbyItem) => (
-                    <Picker.Item
-                      key={hobbyItem.id}
-                      label={hobbyItem.name}
-                      value={hobbyItem.id}
-                    />
-                  ))}
-                </Picker>
+                  <Marker
+                    coordinate={{
+                      latitude: currentLocation.coords.latitude,
+                      longitude: currentLocation.coords.longitude,
+                    }}
+                    title="Your Location"
+                  />
+                </MapView>
               </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Date & Time</Text>
-              <View style={styles.dateTimeContainer}>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowDatePicker(true)}
-                >
-                  <Ionicons name="calendar-outline" size={20} color="#666" />
-                  <Text style={styles.dateTimeText}>
-                    {date.toLocaleDateString()}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowTimePicker(true)}
-                >
-                  <Ionicons name="time-outline" size={20} color="#666" />
-                  <Text style={styles.dateTimeText}>
-                    {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {showDatePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="date"
-                  display="default"
-                  onChange={handleDateChange}
-                />
-              )}
-
-              {showTimePicker && (
-                <DateTimePicker
-                  value={date}
-                  mode="time"
-                  display="default"
-                  onChange={handleTimeChange}
-                />
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Location</Text>
-              <View style={styles.locationToggle}>
-                <TouchableOpacity
-                  style={[styles.toggleButton, useCurrentLocation && styles.toggleButtonActive]}
-                  onPress={() => setUseCurrentLocation(true)}
-                >
-                  <Text style={styles.toggleButtonText}>Use Current Location</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.toggleButton, !useCurrentLocation && styles.toggleButtonActive]}
-                  onPress={() => setUseCurrentLocation(false)}
-                >
-                  <Text style={styles.toggleButtonText}>Enter Address</Text>
-                </TouchableOpacity>
-              </View>
-
-              {useCurrentLocation ? (
-                <View style={styles.mapContainer}>
-                  {currentLocation ? (
-                    <MapView
-                      style={styles.map}
-                      initialRegion={{
-                        latitude: currentLocation.coords.latitude,
-                        longitude: currentLocation.coords.longitude,
-                        latitudeDelta: 0.01,
-                        longitudeDelta: 0.01,
-                      }}
-                    >
-                      <Marker
-                        coordinate={{
-                          latitude: currentLocation.coords.latitude,
-                          longitude: currentLocation.coords.longitude,
-                        }}
-                        title="Your Location"
-                      />
-                    </MapView>
-                  ) : (
-                    <View style={styles.mapPlaceholder}>
-                      <ActivityIndicator size="large" color="#007AFF" />
-                      <Text style={styles.mapPlaceholderText}>Loading map...</Text>
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter address or venue name"
-                  value={location}
-                  onChangeText={setLocation}
-                />
-              )}
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Max Attendees</Text>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.sliderValue}>{maxAttendees}</Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={2}
-                  maximumValue={20}
-                  step={1}
-                  value={maxAttendees}
-                  onValueChange={(value) => setMaxAttendees(Math.round(value))}
-                  minimumTrackTintColor="#007AFF"
-                  maximumTrackTintColor="#ddd"
-                  thumbTintColor="#007AFF"
-                />
-                <View style={styles.sliderLabels}>
-                  <Text style={styles.sliderLabel}>2</Text>
-                  <Text style={styles.sliderLabel}>20</Text>
-                </View>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.submitButton}
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="white" />
-              ) : (
-                <Text style={styles.submitButtonText}>Create Hangout</Text>
-              )}
-            </TouchableOpacity>
+            )}
           </View>
+
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Max Attendees</Text>
+            <View style={styles.sliderContainer}>
+              <Slider
+                style={styles.slider}
+                minimumValue={2}
+                maximumValue={20}
+                step={1}
+                value={maxAttendees}
+                onValueChange={setMaxAttendees}
+                minimumTrackTintColor="#007AFF"
+                maximumTrackTintColor="#ddd"
+                thumbTintColor="#007AFF"
+              />
+              <Text style={styles.sliderValue}>{maxAttendees}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleSubmit}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.submitButtonText}>Create Hangout</Text>
+            )}
+          </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
 
       <Modal
         visible={showSuccessModal}
-        transparent={true}
         animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowSuccessModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Ionicons name="checkmark-circle-outline" size={64} color="#34C759" />
+            <Ionicons name="checkmark-circle" size={60} color="#34C759" />
             <Text style={styles.modalTitle}>Hangout Created!</Text>
-            <Text style={styles.modalText}>Your hangout has been successfully created.</Text>
+            <Text style={styles.modalText}>Your hangout has been successfully created and is now visible in the proximity feed.</Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={navigateToHangout}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.push(`/hangout/${newHangoutId}`);
+                }}
               >
-                <Text style={styles.modalButtonText}>View Hangout</Text>
+                <Text style={styles.modalButtonText}>View Details</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={handleShare}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.push('/');
+                }}
               >
-                <Text style={styles.modalButtonText}>Share</Text>
+                <Text style={styles.modalButtonText}>Back to Feed</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.modalButton, styles.modalButtonTertiary]}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  router.push('/(tabs)/');
-                }}
+                onPress={handleShare}
               >
-                <Text style={styles.modalButtonText}>Back to Feed</Text>
+                <Text style={styles.modalButtonText}>Share</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -393,37 +380,19 @@ export default function CreateHangoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   scrollView: {
-    flexGrow: 1,
     padding: 16,
-  },
-  header: {
-    marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: 'bold',
+    marginBottom: 24,
     color: '#333',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  form: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   formGroup: {
     marginBottom: 20,
@@ -431,45 +400,38 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 8,
+    color: '#444',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  pickerContainer: {
     borderWidth: 1,
     borderColor: '#ddd',
+  },
+  pickerContainer: {
+    backgroundColor: 'white',
     borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   picker: {
     height: 50,
   },
-  dateTimeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  dateTimeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+  dateButton: {
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
-    backgroundColor: '#f9f9f9',
-    marginHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  dateTimeText: {
+  dateText: {
     fontSize: 16,
-    marginLeft: 8,
-    color: '#333',
   },
   locationToggle: {
     flexDirection: 'row',
@@ -477,71 +439,62 @@ const styles = StyleSheet.create({
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    marginHorizontal: 4,
+    marginRight: 8,
   },
   toggleButtonActive: {
     backgroundColor: '#007AFF',
     borderColor: '#007AFF',
   },
-  toggleButtonText: {
-    color: '#333',
-    fontWeight: '500',
+  toggleText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  toggleTextActive: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  locationInput: {
+    marginTop: 8,
   },
   mapContainer: {
     height: 200,
     borderRadius: 8,
     overflow: 'hidden',
-    marginTop: 8,
+    marginTop: 12,
   },
   map: {
     flex: 1,
   },
-  mapPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-  },
-  mapPlaceholderText: {
-    marginTop: 8,
-    color: '#666',
-  },
   sliderContainer: {
-    marginTop: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   slider: {
+    flex: 1,
     height: 40,
   },
   sliderValue: {
+    marginLeft: 12,
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
+    minWidth: 30,
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sliderLabel: {
-    color: '#666',
-    fontSize: 14,
   },
   submitButton: {
     backgroundColor: '#007AFF',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
   },
   modalContainer: {
@@ -554,15 +507,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 24,
-    width: '80%',
+    width: '85%',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: '#333',
+    fontWeight: 'bold',
     marginTop: 16,
     marginBottom: 8,
+    color: '#333',
   },
   modalText: {
     fontSize: 16,
@@ -577,19 +530,20 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   modalButtonPrimary: {
     backgroundColor: '#007AFF',
   },
   modalButtonSecondary: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   modalButtonTertiary: {
-    backgroundColor: '#ddd',
+    backgroundColor: '#e0e0e0',
   },
   modalButtonText: {
-    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
