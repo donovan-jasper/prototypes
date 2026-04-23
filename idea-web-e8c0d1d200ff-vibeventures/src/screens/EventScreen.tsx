@@ -15,6 +15,8 @@ const EventScreen = ({ route, navigation }) => {
   const [userLocation, setUserLocation] = useState(null);
   const [distance, setDistance] = useState(null);
   const [distanceUnit, setDistanceUnit] = useState('km');
+  const [hasJoined, setHasJoined] = useState(false);
+  const [participantCount, setParticipantCount] = useState(event.participants?.length || 0);
 
   useEffect(() => {
     (async () => {
@@ -22,7 +24,7 @@ const EventScreen = ({ route, navigation }) => {
       if (status === 'granted') {
         let location = await Location.getCurrentPositionAsync({});
         setUserLocation(location.coords);
-        
+
         const distanceKm = calculateDistance(
           location.coords.latitude,
           location.coords.longitude,
@@ -32,7 +34,12 @@ const EventScreen = ({ route, navigation }) => {
         setDistance(distanceKm);
       }
     })();
-  }, [event]);
+
+    // Check if user has already joined
+    if (userId && event.participants) {
+      setHasJoined(event.participants.includes(userId));
+    }
+  }, [event, userId]);
 
   const handleJoinEvent = async () => {
     if (!userId) {
@@ -42,6 +49,9 @@ const EventScreen = ({ route, navigation }) => {
 
     try {
       await joinEvent(event.id, userId);
+      setHasJoined(true);
+      setParticipantCount(prev => prev + 1);
+      Alert.alert('Success', 'You have successfully joined the event!');
       navigation.navigate('Chat', { event });
     } catch (error) {
       Alert.alert('Error', 'Failed to join event. Please try again.');
@@ -64,18 +74,18 @@ const EventScreen = ({ route, navigation }) => {
     const now = new Date();
     const isToday = date.toDateString() === now.toDateString();
     const isTomorrow = date.toDateString() === new Date(now.getTime() + 86400000).toDateString();
-    
-    const timeStr = date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+
+    const timeStr = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
-    
+
     if (isToday) return `Today at ${timeStr}`;
     if (isTomorrow) return `Tomorrow at ${timeStr}`;
-    
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
+
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
       day: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
@@ -87,7 +97,7 @@ const EventScreen = ({ route, navigation }) => {
     const eventDate = new Date(event.date);
     const now = new Date();
     const hoursDiff = (eventDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
+
     if (hoursDiff < 0) return { label: 'Past', color: '#8E8E93' };
     if (hoursDiff < 2) return { label: 'Happening Now', color: '#34C759' };
     if (hoursDiff < 24) return { label: 'Today', color: '#FF9500' };
@@ -95,7 +105,6 @@ const EventScreen = ({ route, navigation }) => {
   };
 
   const status = getEventStatus();
-  const participantCount = event.participants?.length || 0;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -111,7 +120,7 @@ const EventScreen = ({ route, navigation }) => {
           <Ionicons name="calendar-outline" size={20} color="#007AFF" />
           <Text style={styles.infoText}>{formatDate(event.date)}</Text>
         </View>
-        
+
         <TouchableOpacity style={styles.infoItem} onPress={toggleDistanceUnit}>
           <Ionicons name="location-outline" size={20} color="#007AFF" />
           <Text style={styles.infoText}>{formatDistance()} away</Text>
@@ -125,7 +134,7 @@ const EventScreen = ({ route, navigation }) => {
             {participantCount} {participantCount === 1 ? 'participant' : 'participants'}
           </Text>
         </View>
-        
+
         {participantCount > 0 && (
           <View style={styles.avatarContainer}>
             {[...Array(Math.min(participantCount, 5))].map((_, index) => (
@@ -136,7 +145,7 @@ const EventScreen = ({ route, navigation }) => {
               </View>
             ))}
             {participantCount > 5 && (
-              <View style={[styles.avatar, styles.avatarMore, { marginLeft: -10 }]}>
+              <View style={[styles.avatar, styles.avatarMore]}>
                 <Text style={styles.avatarText}>+{participantCount - 5}</Text>
               </View>
             )}
@@ -144,8 +153,30 @@ const EventScreen = ({ route, navigation }) => {
         )}
       </View>
 
-      <View style={styles.mapSection}>
-        <Text style={styles.sectionTitle}>Location</Text>
+      <View style={styles.descriptionContainer}>
+        <Text style={styles.descriptionTitle}>About this event</Text>
+        <Text style={styles.descriptionText}>{event.description}</Text>
+      </View>
+
+      {!hasJoined && (
+        <TouchableOpacity
+          style={styles.joinButton}
+          onPress={handleJoinEvent}
+          disabled={hasJoined}
+        >
+          <Ionicons name="checkmark-circle-outline" size={24} color="white" />
+          <Text style={styles.joinButtonText}>Quick Join</Text>
+        </TouchableOpacity>
+      )}
+
+      {hasJoined && (
+        <View style={styles.joinedContainer}>
+          <Ionicons name="checkmark-circle" size={24} color="#34C759" />
+          <Text style={styles.joinedText}>You're going to this event!</Text>
+        </View>
+      )}
+
+      <View style={styles.mapContainer}>
         <MapView
           style={styles.map}
           initialRegion={{
@@ -154,10 +185,6 @@ const EventScreen = ({ route, navigation }) => {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
-          scrollEnabled={false}
-          zoomEnabled={false}
-          pitchEnabled={false}
-          rotateEnabled={false}
         >
           <Marker
             coordinate={{
@@ -166,28 +193,8 @@ const EventScreen = ({ route, navigation }) => {
             }}
             title={event.title}
           />
-          {userLocation && (
-            <Marker
-              coordinate={{
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-              }}
-              pinColor="blue"
-              title="Your Location"
-            />
-          )}
         </MapView>
       </View>
-
-      <View style={styles.descriptionSection}>
-        <Text style={styles.sectionTitle}>About this event</Text>
-        <Text style={styles.description}>{event.description}</Text>
-      </View>
-
-      <TouchableOpacity style={styles.joinButton} onPress={handleJoinEvent}>
-        <Ionicons name="checkmark-circle" size={24} color="#fff" />
-        <Text style={styles.joinButtonText}>Quick Join</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -195,67 +202,58 @@ const EventScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#fff',
   },
   contentContainer: {
-    paddingBottom: 100,
+    padding: 20,
   },
   header: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    marginBottom: 20,
   },
   statusBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 12,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   statusText: {
-    color: '#fff',
-    fontSize: 12,
+    color: 'white',
     fontWeight: '600',
+    fontSize: 14,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#000',
+    color: '#1C1C1E',
+    marginBottom: 10,
   },
   infoRow: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
   },
   infoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
   },
   infoText: {
+    marginLeft: 8,
     fontSize: 16,
-    color: '#333',
-    marginLeft: 10,
+    color: '#8E8E93',
   },
   participantsSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    marginBottom: 20,
   },
   participantsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   participantsCount: {
+    marginLeft: 8,
     fontSize: 16,
-    color: '#333',
-    marginLeft: 10,
+    color: '#1C1C1E',
     fontWeight: '600',
   },
   avatarContainer: {
@@ -270,65 +268,66 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: 'white',
+  },
+  avatarText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   avatarMore: {
     backgroundColor: '#8E8E93',
   },
-  avatarText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+  descriptionContainer: {
+    marginBottom: 20,
   },
-  mapSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 12,
-  },
-  sectionTitle: {
+  descriptionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 12,
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
-  map: {
-    width: '100%',
-    height: 200,
-    borderRadius: 12,
-  },
-  descriptionSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    marginTop: 12,
-  },
-  description: {
+  descriptionText: {
     fontSize: 16,
+    color: '#8E8E93',
     lineHeight: 24,
-    color: '#333',
   },
   joinButton: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: '#34C759',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
   },
   joinButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 18,
     fontWeight: '600',
     marginLeft: 8,
   },
+  joinedContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#E5F7E9',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  joinedText: {
+    color: '#34C759',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  mapContainer: {
+    height: 200,
+    borderRadius: 10,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  map: {
+    flex: 1,
+  },
 });
-
-export default EventScreen;
