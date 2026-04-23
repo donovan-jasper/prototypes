@@ -134,9 +134,11 @@ const AddEntryScreen: React.FC = () => {
   };
 
   const handleSkipPhoto = async () => {
-    setSkipPhoto(true);
-    setPhotoUri(null);
-    await fetchLocationAndWeather();
+    setSkipPhoto(!skipPhoto);
+    if (!skipPhoto) {
+      setPhotoUri(null);
+      await fetchLocationAndWeather();
+    }
   };
 
   const finalizeEntry = async () => {
@@ -166,16 +168,8 @@ const AddEntryScreen: React.FC = () => {
     } catch (error) {
       console.error('Error adding entry:', error);
       setError('Failed to add entry. Please try again.');
+    } finally {
       setIsLoading(false);
-    }
-  };
-
-  const handleRetry = async () => {
-    if (retryCount < maxRetries) {
-      setRetryCount(retryCount + 1);
-      await fetchLocationAndWeather();
-    } else {
-      setError('Maximum retry attempts reached. Please check your connection.');
     }
   };
 
@@ -185,90 +179,78 @@ const AddEntryScreen: React.FC = () => {
         <Text style={styles.title}>Add New Entry</Text>
       </View>
 
-      {!skipPhoto && !photoUri ? (
-        <View style={styles.photoSection}>
-          <TouchableOpacity style={styles.photoButton} onPress={pickImageFromCamera}>
-            <Ionicons name="camera" size={40} color="#4285F4" />
-            <Text style={styles.buttonText}>Take Photo</Text>
+      <View style={styles.photoSection}>
+        {photoUri ? (
+          <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+        ) : (
+          <View style={styles.photoPlaceholder}>
+            <Ionicons name="camera-outline" size={48} color="#999" />
+            <Text style={styles.photoPlaceholderText}>No photo selected</Text>
+          </View>
+        )}
+
+        <View style={styles.photoActions}>
+          <TouchableOpacity
+            style={styles.photoButton}
+            onPress={pickImageFromCamera}
+            disabled={isLoading}
+          >
+            <Ionicons name="camera" size={24} color="#fff" />
+            <Text style={styles.photoButtonText}>Take Photo</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.photoButton} onPress={pickImageFromGallery}>
-            <Ionicons name="images" size={40} color="#34A853" />
-            <Text style={styles.buttonText}>Choose from Gallery</Text>
+          <TouchableOpacity
+            style={styles.photoButton}
+            onPress={pickImageFromGallery}
+            disabled={isLoading}
+          >
+            <Ionicons name="image" size={24} color="#fff" />
+            <Text style={styles.photoButtonText}>Choose from Gallery</Text>
           </TouchableOpacity>
+        </View>
 
-          <TouchableOpacity style={styles.skipButton} onPress={handleSkipPhoto}>
-            <Text style={styles.skipText}>Skip Photo</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.previewContainer}>
-          {photoUri && (
-            <Image source={{ uri: photoUri }} style={styles.previewImage} />
-          )}
-          <TouchableOpacity style={styles.changePhotoButton} onPress={() => setSkipPhoto(false)}>
-            <Text style={styles.changePhotoText}>Change Photo</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity
+          style={[styles.skipButton, skipPhoto && styles.skipButtonActive]}
+          onPress={handleSkipPhoto}
+          disabled={isLoading}
+        >
+          <Ionicons
+            name={skipPhoto ? "checkbox-outline" : "square-outline"}
+            size={20}
+            color={skipPhoto ? "#4CAF50" : "#999"}
+          />
+          <Text style={styles.skipButtonText}>
+            {skipPhoto ? "Photo skipped" : "Skip photo"}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.noteSection}>
         <Text style={styles.sectionTitle}>Note</Text>
         <TextInput
           style={styles.noteInput}
           multiline
-          placeholder="Describe your progress..."
+          placeholder="Add a note about your entry..."
           value={note}
           onChangeText={setNote}
+          editable={!isLoading}
         />
       </View>
 
       {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4285F4" />
-          <Text style={styles.loadingText}>Fetching weather and location data...</Text>
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#4CAF50" />
+          <Text style={styles.loadingText}>Processing...</Text>
         </View>
       )}
 
-      {!isLoading && (weather || location) && (
-        <View style={styles.autoCaptureSection}>
-          <Text style={styles.sectionTitle}>Auto-Captured Data</Text>
-          {weather && (
-            <View style={styles.autoCaptureItem}>
-              <Ionicons name="partly-sunny" size={20} color="#FBBC05" />
-              <Text style={styles.autoCaptureText}>
-                {weather} {temperature ? `(${temperature}°C)` : ''}
-              </Text>
-            </View>
-          )}
-          {location && (
-            <View style={styles.autoCaptureItem}>
-              <Ionicons name="location" size={20} color="#EA4335" />
-              <Text style={styles.autoCaptureText}>{location}</Text>
-            </View>
-          )}
-          {error && (
-            <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-              <Text style={styles.retryText}>Retry ({maxRetries - retryCount} attempts left)</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-
-      <View style={styles.actionButtons}>
+      <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.saveButton]}
+          style={styles.saveButton}
           onPress={finalizeEntry}
           disabled={isLoading}
         >
-          <Text style={styles.buttonText}>Save Entry</Text>
+          <Text style={styles.saveButtonText}>Save Entry</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -281,11 +263,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 16,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
@@ -293,129 +274,128 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   photoSection: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  photoButton: {
+    marginBottom: 24,
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 15,
-    width: '100%',
-    alignItems: 'center',
+    borderRadius: 8,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  skipButton: {
-    marginTop: 10,
-  },
-  skipText: {
-    color: '#666',
-    textDecorationLine: 'underline',
-  },
-  previewContainer: {
-    marginBottom: 20,
-    alignItems: 'center',
-  },
-  previewImage: {
+  photoPreview: {
     width: '100%',
     height: 200,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderRadius: 8,
+    marginBottom: 16,
   },
-  changePhotoButton: {
-    padding: 10,
-  },
-  changePhotoText: {
-    color: '#4285F4',
-    fontWeight: 'bold',
-  },
-  noteSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
-  },
-  noteInput: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    minHeight: 100,
-    textAlignVertical: 'top',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  autoCaptureSection: {
-    marginBottom: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  autoCaptureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  autoCaptureText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  retryButton: {
-    marginTop: 10,
-    padding: 10,
+  photoPlaceholder: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
     backgroundColor: '#f0f0f0',
-    borderRadius: 5,
+    justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
-  retryText: {
-    color: '#4285F4',
-    fontWeight: 'bold',
+  photoPlaceholderText: {
+    color: '#999',
+    marginTop: 8,
   },
-  actionButtons: {
+  photoActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginBottom: 16,
   },
-  button: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
+  photoButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: 5,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    flex: 1,
+    marginHorizontal: 4,
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
+  photoButtonText: {
+    color: 'white',
+    marginLeft: 8,
+    fontWeight: '500',
+  },
+  skipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    backgroundColor: '#f9f9f9',
+  },
+  skipButtonActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  skipButtonText: {
+    marginLeft: 8,
+    color: '#666',
+  },
+  noteSection: {
+    marginBottom: 24,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
+  },
+  noteInput: {
+    minHeight: 100,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 12,
+    fontSize: 16,
+    textAlignVertical: 'top',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#4CAF50',
+  },
+  footer: {
+    marginTop: 24,
   },
   saveButton: {
-    backgroundColor: '#4285F4',
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  buttonText: {
+  saveButtonText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
