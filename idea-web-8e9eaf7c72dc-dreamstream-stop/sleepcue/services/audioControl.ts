@@ -1,8 +1,16 @@
 import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
 export class AudioController {
   private lastKnownPosition: number = 0;
   private isExternalAudioPlaying: boolean = false;
+  private fadeDuration: number = 3000; // 3 seconds default fade
+  private rewindAmount: number = 120; // 2 minutes default rewind
+
+  constructor(fadeDuration: number = 3000, rewindAmount: number = 120) {
+    this.fadeDuration = fadeDuration;
+    this.rewindAmount = rewindAmount;
+  }
 
   public async initialize() {
     try {
@@ -48,10 +56,10 @@ export class AudioController {
     }
   }
 
-  public async resumeSystemAudio(rewindSeconds: number = 0): Promise<boolean> {
+  public async resumeSystemAudio(): Promise<boolean> {
     try {
-      if (rewindSeconds > 0 && this.lastKnownPosition > 0) {
-        const newPosition = Math.max(0, this.lastKnownPosition - rewindSeconds * 1000);
+      if (this.rewindAmount > 0 && this.lastKnownPosition > 0) {
+        const newPosition = Math.max(0, this.lastKnownPosition - this.rewindAmount * 1000);
         try {
           await Audio.setPositionAsync(newPosition);
         } catch (seekError) {
@@ -67,13 +75,13 @@ export class AudioController {
     }
   }
 
-  public async fadeOutAndPause(duration: number = 3000): Promise<boolean> {
+  public async fadeOutAndPause(): Promise<boolean> {
     try {
       const isPlaying = await this.detectExternalAudio();
       if (!isPlaying) return false;
 
       const steps = 10;
-      const interval = duration / steps;
+      const interval = this.fadeDuration / steps;
 
       for (let i = steps; i >= 0; i--) {
         const volume = i / steps;
@@ -107,5 +115,21 @@ export class AudioController {
 
   public isPlaying(): boolean {
     return this.isExternalAudioPlaying;
+  }
+
+  public setFadeDuration(duration: number) {
+    this.fadeDuration = Math.max(1000, duration); // Minimum 1 second fade
+  }
+
+  public getFadeDuration(): number {
+    return this.fadeDuration;
+  }
+
+  public setRewindAmount(seconds: number) {
+    this.rewindAmount = Math.max(0, seconds);
+  }
+
+  public getRewindAmount(): number {
+    return this.rewindAmount;
   }
 }

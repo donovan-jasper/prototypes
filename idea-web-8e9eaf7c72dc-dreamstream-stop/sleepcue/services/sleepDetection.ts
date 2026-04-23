@@ -7,6 +7,8 @@ import { AudioController } from './audioControl';
 interface SleepDetectionResult {
   isSleeping: boolean;
   confidence: number;
+  motionConfidence: number;
+  audioConfidence: number;
 }
 
 export class SleepDetector {
@@ -18,14 +20,25 @@ export class SleepDetector {
   private meteringCheckInterval: NodeJS.Timeout | null = null;
   private audioController: AudioController | null = null;
   private hasTriggeredSleep: boolean = false;
+  private confidenceThreshold: number = 0.7;
+  private lastDetectionTime: number = 0;
+  private detectionInterval: number = 5000; // 5 seconds between detections
 
-  public async startDetection(onUpdate: (result: SleepDetectionResult) => void, audioController?: AudioController) {
+  constructor(confidenceThreshold: number = 0.7) {
+    this.confidenceThreshold = confidenceThreshold;
+  }
+
+  public async startDetection(
+    onUpdate: (result: SleepDetectionResult) => void,
+    audioController?: AudioController
+  ) {
     if (this.isDetecting) return;
 
     this.isDetecting = true;
     this.onUpdateCallback = onUpdate;
     this.audioController = audioController || null;
     this.hasTriggeredSleep = false;
+    this.lastDetectionTime = Date.now();
 
     if (this.audioController) {
       await this.audioController.initialize();
@@ -46,6 +59,7 @@ export class SleepDetector {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
       });
 
       const recording = new Audio.Recording();
@@ -58,7 +72,7 @@ export class SleepDetector {
 
       this.meteringCheckInterval = setInterval(() => {
         this.checkMeteringLevel();
-      }, 5000);
+      }, 1000);
     } catch (error) {
       console.error('Failed to start audio recording:', error);
     }
@@ -111,49 +125,53 @@ export class SleepDetector {
   private async detectionLoop() {
     if (!this.isDetecting) return;
 
-    const motionResult = analyzeMotion(this.motionData);
+    const now = Date.now();
+    if (now - this.lastDetectionTime < this.detectionInterval) {
+      setTimeout(() => this.detectionLoop(), 1000);
+      return;
+    }
 
-    let audioConfidence = 0;
+    this.lastDetectionTime = now;
+
+    const motionResult = analyzeMotion(this.motionData);
+    let audioResult = { confidence: 0 };
+
     if (this.audioRecording) {
       try {
         const status = await this.audioRecording.getStatusAsync();
         if (status.isRecording && status.metering !== undefined) {
-          const audioResult = analyzeMeteringLevel(status.metering);
-          audioConfidence = audioResult.confidence;
-          
-          const combinedConfidence = (motionResult.confidence + audioConfidence) / 2;
-          const isSleeping = combinedConfidence > 0.7;
-
-          if (this.onUpdateCallback) {
-            this.onUpdateCallback({
-              isSleeping,
-              confidence: combinedConfidence,
-            });
-          }
-
-          if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
-            this.hasTriggeredSleep = true;
-            await this.audioController.fadeOutAndPause();
-          }
+          audioResult = analyzeMeteringLevel(status.metering);
         }
       } catch (err) {
         console.error('Error in detection loop:', err);
       }
-    } else {
-      const isSleeping = motionResult.confidence > 0.7;
-      if (this.onUpdateCallback) {
-        this.onUpdateCallback({
-          isSleeping,
-          confidence: motionResult.confidence,
-        });
-      }
+    }
 
-      if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
-        this.hasTriggeredSleep = true;
-        await this.audioController.fadeOutAndPause();
-      }
+    const combinedConfidence = (motionResult.confidence + audioResult.confidence) / 2;
+    const isSleeping = combinedConfidence >= this.confidenceThreshold;
+
+    if (this.onUpdateCallback) {
+      this.onUpdateCallback({
+        isSleeping,
+        confidence: combinedConfidence,
+        motionConfidence: motionResult.confidence,
+        audioConfidence: audioResult.confidence,
+      });
+    }
+
+    if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
+      this.hasTriggeredSleep = true;
+      await this.audioController.fadeOutAndPause();
     }
 
     setTimeout(() => this.detectionLoop(), 1000);
+  }
+
+  public setConfidenceThreshold(threshold: number) {
+    this.confidenceThreshold = Math.max(0, Math.min(1, threshold));
+  }
+
+  public getConfidenceThreshold(): number {
+    return this.confidenceThreshold;
   }
 }
