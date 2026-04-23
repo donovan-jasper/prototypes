@@ -1,163 +1,182 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, Image } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGiftStore } from '../../store/giftStore';
-import { mockRestaurants } from '../../services/api';
 
 const HomeScreen = () => {
   const router = useRouter();
-  const { addGift } = useGiftStore();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCuisine, setSelectedCuisine] = useState('All');
+  const { gifts } = useGiftStore();
 
-  const filteredRestaurants = mockRestaurants
-    .filter(restaurant =>
-      (selectedCuisine === 'All' || restaurant.cuisine === selectedCuisine) &&
-      restaurant.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-
-  const cuisines = ['All', ...new Set(mockRestaurants.map(r => r.cuisine))];
+  const recentGifts = gifts.slice(0, 3);
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Select a Restaurant</Text>
-
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search restaurants..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
-
-      <View style={styles.cuisineFilters}>
-        {cuisines.map(cuisine => (
-          <TouchableOpacity
-            key={cuisine}
-            style={[
-              styles.cuisineButton,
-              selectedCuisine === cuisine && styles.selectedCuisine
-            ]}
-            onPress={() => setSelectedCuisine(cuisine)}
-          >
-            <Text style={styles.cuisineText}>{cuisine}</Text>
-          </TouchableOpacity>
-        ))}
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.greeting}>Hello, User!</Text>
+        <Text style={styles.subtitle}>Send a gift to someone special</Text>
       </View>
 
-      <FlatList
-        data={filteredRestaurants}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.restaurantCard}
-            onPress={() => {
-              addGift({
-                restaurant: item,
-                recipientName: '',
-                message: '',
-                amount: 0,
-                status: 'pending',
-                scheduledFor: new Date(),
-              });
-              router.push(`/gift/${item.id}`);
-            }}
-          >
-            <Image source={{ uri: item.image }} style={styles.restaurantImage} />
-            <View style={styles.restaurantInfo}>
-              <Text style={styles.restaurantName}>{item.name}</Text>
-              <Text style={styles.restaurantCuisine}>{item.cuisine}</Text>
-              <View style={styles.ratingContainer}>
-                <Text style={styles.ratingText}>{item.rating} ★</Text>
-                <Text style={styles.deliveryTime}>{item.deliveryTime} min</Text>
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
+      <TouchableOpacity
+        style={styles.sendButton}
+        onPress={() => router.push('/gift/send')}
+      >
+        <Text style={styles.sendButtonText}>Send a Gift</Text>
+      </TouchableOpacity>
+
+      {recentGifts.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Recent Gifts</Text>
+          <View style={styles.recentGiftsContainer}>
+            {recentGifts.map((gift) => (
+              <TouchableOpacity
+                key={gift.id}
+                style={styles.giftCard}
+                onPress={() => router.push(`/gift/${gift.id}`)}
+              >
+                <Image
+                  source={{ uri: gift.restaurant.image }}
+                  style={styles.giftImage}
+                />
+                <View style={styles.giftInfo}>
+                  <Text style={styles.giftRecipient}>{gift.recipientName}</Text>
+                  <Text style={styles.giftRestaurant}>{gift.restaurant.name}</Text>
+                  <Text style={styles.giftStatus}>{gift.status}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      )}
+
+      <Text style={styles.sectionTitle}>Quick Send</Text>
+      <View style={styles.quickSendContainer}>
+        <TouchableOpacity
+          style={styles.quickSendOption}
+          onPress={() => router.push('/gift/send')}
+        >
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60' }}
+            style={styles.quickSendImage}
+          />
+          <Text style={styles.quickSendText}>Pizza</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickSendOption}
+          onPress={() => router.push('/gift/send')}
+        >
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60' }}
+            style={styles.quickSendImage}
+          />
+          <Text style={styles.quickSendText}>Tacos</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickSendOption}
+          onPress={() => router.push('/gift/send')}
+        >
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60' }}
+            style={styles.quickSendImage}
+          />
+          <Text style={styles.quickSendText}>Sushi</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
+    padding: 20,
   },
-  title: {
+  header: {
+    marginBottom: 30,
+  },
+  greeting: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  searchInput: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  cuisineFilters: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  cuisineButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  selectedCuisine: {
-    backgroundColor: '#FF6B6B',
-  },
-  cuisineText: {
     color: '#333',
   },
-  restaurantCard: {
-    flexDirection: 'row',
-    marginBottom: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  restaurantImage: {
-    width: 100,
-    height: 100,
-  },
-  restaurantInfo: {
-    flex: 1,
-    padding: 12,
-  },
-  restaurantName: {
+  subtitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  restaurantCuisine: {
-    fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginTop: 5,
   },
-  ratingContainer: {
+  sendButton: {
+    backgroundColor: '#FF6B6B',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 15,
+  },
+  recentGiftsContainer: {
+    marginBottom: 30,
+  },
+  giftCard: {
     flexDirection: 'row',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
     alignItems: 'center',
   },
-  ratingText: {
-    fontSize: 14,
-    color: '#FF6B6B',
-    marginRight: 8,
+  giftImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 15,
   },
-  deliveryTime: {
+  giftInfo: {
+    flex: 1,
+  },
+  giftRecipient: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  giftRestaurant: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 5,
+  },
+  giftStatus: {
+    fontSize: 12,
+    color: '#FF6B6B',
+    fontWeight: 'bold',
+  },
+  quickSendContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickSendOption: {
+    alignItems: 'center',
+    width: '30%',
+  },
+  quickSendImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 10,
+  },
+  quickSendText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
   },
 });
 

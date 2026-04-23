@@ -1,45 +1,33 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getGiftHistory } from '../../services/database';
 import { useGiftStore } from '../../store/giftStore';
 
 const HistoryScreen = () => {
   const router = useRouter();
   const { gifts } = useGiftStore();
-  const [history, setHistory] = useState([]);
 
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const dbHistory = await getGiftHistory();
-        setHistory(dbHistory);
-      } catch (error) {
-        console.error('Failed to load history:', error);
-      }
-    };
-
-    loadHistory();
-  }, []);
-
-  const renderItem = ({ item }) => (
+  const renderGiftItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.giftCard}
+      style={styles.giftItem}
       onPress={() => router.push(`/gift/${item.id}`)}
     >
-      <Text style={styles.restaurantName}>{item.restaurantName}</Text>
-      <Text style={styles.recipientName}>To: {item.recipientName}</Text>
-      <Text style={styles.message}>{item.message}</Text>
-      <View style={styles.statusContainer}>
+      <Image source={{ uri: item.restaurant.image }} style={styles.giftImage} />
+      <View style={styles.giftInfo}>
+        <Text style={styles.giftRecipient}>{item.recipientName}</Text>
+        <Text style={styles.giftRestaurant}>{item.restaurant.name}</Text>
+        <Text style={styles.giftDate}>
+          {new Date(item.scheduledFor).toLocaleDateString()}
+        </Text>
+      </View>
+      <View style={styles.giftStatusContainer}>
         <Text style={[
-          styles.statusText,
-          item.status === 'delivered' && styles.delivered,
-          item.status === 'processing' && styles.processing,
-          item.status === 'failed' && styles.failed,
+          styles.giftStatus,
+          item.status === 'delivered' && styles.deliveredStatus,
+          item.status === 'pending' && styles.pendingStatus,
         ]}>
           {item.status}
         </Text>
-        <Text style={styles.amount}>${item.amount.toFixed(2)}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -48,13 +36,22 @@ const HistoryScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Gift History</Text>
 
-      {history.length === 0 ? (
-        <Text style={styles.emptyText}>No gifts sent yet</Text>
+      {gifts.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No gifts sent yet</Text>
+          <TouchableOpacity
+            style={styles.sendButton}
+            onPress={() => router.push('/gift/send')}
+          >
+            <Text style={styles.sendButtonText}>Send Your First Gift</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
         <FlatList
-          data={history}
+          data={gifts}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
+          renderItem={renderGiftItem}
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -64,62 +61,88 @@ const HistoryScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
+    padding: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 20,
+    color: '#333',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
-    marginTop: 20,
+    marginBottom: 20,
   },
-  giftCard: {
-    padding: 16,
-    marginBottom: 12,
+  sendButton: {
+    backgroundColor: '#FF6B6B',
+    padding: 15,
     borderRadius: 8,
-    backgroundColor: '#f8f8f8',
-  },
-  restaurantName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  recipientName: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
-  },
-  message: {
-    fontSize: 14,
-    color: '#444',
-    marginBottom: 8,
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    width: '100%',
     alignItems: 'center',
   },
-  statusText: {
-    fontSize: 14,
+  sendButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
-  delivered: {
-    color: '#4CAF50',
+  listContent: {
+    paddingBottom: 20,
   },
-  processing: {
-    color: '#FFC107',
+  giftItem: {
+    flexDirection: 'row',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
+    alignItems: 'center',
   },
-  failed: {
-    color: '#F44336',
+  giftImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    marginRight: 15,
   },
-  amount: {
+  giftInfo: {
+    flex: 1,
+  },
+  giftRecipient: {
     fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  giftRestaurant: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  giftDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  giftStatusContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    backgroundColor: '#e0e0e0',
+  },
+  giftStatus: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  deliveredStatus: {
+    color: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+  },
+  pendingStatus: {
+    color: '#FF9800',
+    backgroundColor: '#fff8e1',
   },
 });
 
