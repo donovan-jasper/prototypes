@@ -31,6 +31,11 @@ const calculateItemScore = (item, targetStats, weights) => {
     score += weights.type;
   }
 
+  // Bonus for matching game (if specified)
+  if (item.game && targetStats.game && item.game === targetStats.game) {
+    score += weights.game;
+  }
+
   return score;
 };
 
@@ -55,7 +60,8 @@ export const optimizeBuild = (stats) => {
     defense: 50,
     special: 20,
     rarity: 15,
-    type: 10
+    type: 10,
+    game: 10
   };
 
   // Select top 3 weapons
@@ -78,6 +84,15 @@ export const optimizeBuild = (stats) => {
     ? Math.min((totalStats.defense / stats.defense) * 100, 100)
     : 100;
 
+  // Calculate stat distribution percentages
+  const totalTargetStats = stats.attack + stats.defense;
+  const attackPercentage = totalTargetStats > 0
+    ? (stats.attack / totalTargetStats) * 100
+    : 50;
+  const defensePercentage = totalTargetStats > 0
+    ? (stats.defense / totalTargetStats) * 100
+    : 50;
+
   return {
     weapons,
     armor,
@@ -87,6 +102,20 @@ export const optimizeBuild = (stats) => {
       attack: attackEffectiveness,
       defense: defenseEffectiveness,
       overall: (attackEffectiveness + defenseEffectiveness) / 2,
+    },
+    statDistribution: {
+      attack: attackPercentage,
+      defense: defensePercentage,
+    },
+    recommendations: {
+      weapons: weapons.map(w => ({
+        ...w,
+        recommendationScore: calculateItemScore(w, stats, weights),
+      })),
+      armor: armor.map(a => ({
+        ...a,
+        recommendationScore: calculateItemScore(a, stats, weights),
+      })),
     },
   };
 };
