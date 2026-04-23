@@ -1,59 +1,67 @@
-import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, Image } from 'react-native';
+import { StyleSheet, View, Text, FlatList, TextInput, TouchableOpacity, Alert, Image, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import { getFollowedArtists, addArtist, removeArtist, Artist } from '@/services/database';
 import { searchArtists } from '@/services/api';
+import { useArtistStore } from '@/stores/artistStore';
+import { useUserStore } from '@/stores/userStore';
+import { Button, Card, Avatar, Searchbar, Divider } from 'react-native-paper';
+import { useColorScheme } from 'react-native';
 
 const FREE_TIER_LIMIT = 10;
 
 export default function ArtistsScreen() {
-  const [followedArtists, setFollowedArtists] = useState<Artist[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<Artist[]>([]);
   const [searching, setSearching] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const colorScheme = useColorScheme();
+
+  const { followedArtists, loadFollowedArtists, followArtist, unfollowArtist } = useArtistStore();
+  const { isPremium } = useUserStore();
 
   useEffect(() => {
     loadFollowedArtists();
   }, []);
 
-  const loadFollowedArtists = () => {
-    const artists = getFollowedArtists();
-    setFollowedArtists(artists);
-  };
-
   const handleSearch = async (query: string) => {
     setSearchQuery(query);
     if (query.trim().length < 2) {
       setSearchResults([]);
+      setError(null);
       return;
     }
 
     setSearching(true);
+    setError(null);
     try {
       const results = await searchArtists(query);
       const followedIds = new Set(followedArtists.map(a => a.id));
       setSearchResults(results.filter(artist => !followedIds.has(artist.id)));
     } catch (error) {
       console.error('Search failed:', error);
+      setError('Failed to search artists. Please try again.');
     } finally {
       setSearching(false);
     }
   };
 
   const handleFollow = (artist: Artist) => {
-    if (followedArtists.length >= FREE_TIER_LIMIT) {
+    if (!isPremium && followedArtists.length >= FREE_TIER_LIMIT) {
       Alert.alert(
         'Free Tier Limit Reached',
         `You can only follow ${FREE_TIER_LIMIT} artists on the free tier. Upgrade to premium for unlimited follows!`,
-        [{ text: 'OK' }]
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/upgrade') }
+        ]
       );
       return;
     }
 
     try {
-      addArtist({ ...artist, followedAt: Date.now() });
-      loadFollowedArtists();
+      followArtist(artist);
       setSearchResults(prev => prev.filter(a => a.id !== artist.id));
       Alert.alert('Success', `Now following ${artist.name}`);
     } catch (error) {
@@ -71,8 +79,7 @@ export default function ArtistsScreen() {
           text: 'Unfollow',
           style: 'destructive',
           onPress: () => {
-            removeArtist(artistId);
-            loadFollowedArtists();
+            unfollowArtist(artistId);
           },
         },
       ]
@@ -84,108 +91,118 @@ export default function ArtistsScreen() {
   };
 
   const renderSearchResult = ({ item }: { item: Artist }) => (
-    <TouchableOpacity
-      style={styles.artistCard}
-      onPress={() => handleArtistPress(item.id)}
-      activeOpacity={0.7}>
-      <Image
-        source={
-          item.imageUrl
-            ? { uri: item.imageUrl }
-            : require('@/assets/images/placeholder-album.png')
-        }
-        style={styles.artistImage}
+    <Card style={styles.card} onPress={() => handleArtistPress(item.id)}>
+      <Card.Title
+        title={item.name}
+        left={(props) => (
+          <Avatar.Image
+            {...props}
+            source={
+              item.imageUrl
+                ? { uri: item.imageUrl }
+                : require('@/assets/images/placeholder-artist.png')
+            }
+            size={40}
+          />
+        )}
+        right={(props) => (
+          <Button
+            {...props}
+            mode="contained"
+            onPress={() => handleFollow(item)}
+            style={styles.followButton}
+          >
+            Follow
+          </Button>
+        )}
       />
-      <View style={styles.artistInfo}>
-        <Text style={styles.artistName} numberOfLines={1}>
-          {item.name}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.followButton}
-        onPress={() => handleFollow(item)}>
-        <Text style={styles.followButtonText}>Follow</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+    </Card>
   );
 
   const renderFollowedArtist = ({ item }: { item: Artist }) => (
-    <TouchableOpacity
-      style={styles.artistCard}
-      onPress={() => handleArtistPress(item.id)}
-      activeOpacity={0.7}>
-      <Image
-        source={
-          item.imageUrl
-            ? { uri: item.imageUrl }
-            : require('@/assets/images/placeholder-album.png')
-        }
-        style={styles.artistImage}
+    <Card style={styles.card} onPress={() => handleArtistPress(item.id)}>
+      <Card.Title
+        title={item.name}
+        left={(props) => (
+          <Avatar.Image
+            {...props}
+            source={
+              item.imageUrl
+                ? { uri: item.imageUrl }
+                : require('@/assets/images/placeholder-artist.png')
+            }
+            size={40}
+          />
+        )}
+        right={(props) => (
+          <Button
+            {...props}
+            mode="outlined"
+            onPress={() => handleUnfollow(item.id, item.name)}
+            style={styles.unfollowButton}
+          >
+            Unfollow
+          </Button>
+        )}
       />
-      <View style={styles.artistInfo}>
-        <Text style={styles.artistName} numberOfLines={1}>
-          {item.name}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.unfollowButton}
-        onPress={() => handleUnfollow(item.id, item.name)}>
-        <Text style={styles.unfollowButtonText}>Unfollow</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
+    </Card>
   );
 
   return (
-    <View style={styles.container}>
-      <View style={styles.searchContainer}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search artists..."
-          placeholderTextColor="#666"
-          value={searchQuery}
-          onChangeText={handleSearch}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-      </View>
+    <View style={[styles.container, { backgroundColor: colorScheme === 'dark' ? '#121212' : '#f5f5f5' }]}>
+      <Searchbar
+        placeholder="Search artists..."
+        onChangeText={handleSearch}
+        value={searchQuery}
+        style={styles.searchBar}
+        inputStyle={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}
+      />
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={[styles.errorText, { color: colorScheme === 'dark' ? '#ff6b6b' : '#d32f2f' }]}>{error}</Text>
+        </View>
+      )}
 
       {searchQuery.trim().length >= 2 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
+          <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
             {searching ? 'Searching...' : 'Search Results'}
           </Text>
-          {searchResults.length === 0 && !searching ? (
-            <Text style={styles.emptyText}>No artists found</Text>
+          {searching ? (
+            <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#ffffff' : '#000000'} style={styles.loader} />
           ) : (
             <FlatList
               data={searchResults}
               renderItem={renderSearchResult}
               keyExtractor={(item) => item.id}
-              scrollEnabled={false}
+              contentContainerStyle={styles.listContent}
+              ListEmptyComponent={
+                <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }]}>
+                  No artists found. Try a different search.
+                </Text>
+              }
             />
           )}
         </View>
       )}
 
+      <Divider style={styles.divider} />
+
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Following</Text>
-          <Text style={styles.tierLimit}>
-            {followedArtists.length}/{FREE_TIER_LIMIT}
-          </Text>
-        </View>
+        <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+          Followed Artists ({followedArtists.length})
+        </Text>
         {followedArtists.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🎤</Text>
-            <Text style={styles.emptyText}>No artists followed yet</Text>
-            <Text style={styles.emptySubtext}>Search above to find artists</Text>
-          </View>
+          <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }]}>
+            You're not following any artists yet. Search above to find some!
+          </Text>
         ) : (
           <FlatList
             data={followedArtists}
             renderItem={renderFollowedArtist}
             keyExtractor={(item) => item.id}
-            scrollEnabled={false}
+            contentContainerStyle={styles.listContent}
           />
         )}
       </View>
@@ -196,106 +213,50 @@ export default function ArtistsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
-  },
-  searchContainer: {
     padding: 16,
-    backgroundColor: '#1a1a1a',
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
   },
-  searchInput: {
-    backgroundColor: '#2a2a2a',
-    borderRadius: 8,
+  searchBar: {
+    marginBottom: 16,
+  },
+  errorContainer: {
     padding: 12,
-    fontSize: 16,
-    color: '#fff',
+    backgroundColor: '#ffebee',
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#d32f2f',
+    textAlign: 'center',
   },
   section: {
-    padding: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
     marginBottom: 12,
   },
-  tierLimit: {
-    fontSize: 14,
-    color: '#999',
-    fontWeight: '600',
+  listContent: {
+    paddingBottom: 16,
   },
-  artistCard: {
-    flexDirection: 'row',
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  artistImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#333',
-  },
-  artistInfo: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  artistName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
+  card: {
+    marginBottom: 8,
   },
   followButton: {
-    backgroundColor: '#1DB954',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-  },
-  followButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
+    marginRight: 8,
   },
   unfollowButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#666',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    marginRight: 8,
   },
-  unfollowButtonText: {
-    color: '#999',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+  loader: {
+    marginVertical: 20,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#999',
     textAlign: 'center',
+    marginTop: 16,
+    fontStyle: 'italic',
   },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 4,
+  divider: {
+    marginVertical: 16,
   },
 });
