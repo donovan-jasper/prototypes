@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, FlatList, ActivityIndicator } from 'react-native';
 import { optimizeBuild } from '../utils/buildOptimizer';
 
 const BuildOptimizerScreen = () => {
@@ -21,6 +21,16 @@ const BuildOptimizerScreen = () => {
       setBuild(optimizedBuild);
       setIsLoading(false);
     }, 800);
+  };
+
+  const handleSaveBuild = () => {
+    // Implement save functionality
+    alert('Build saved successfully!');
+  };
+
+  const handleShareBuild = () => {
+    // Implement share functionality
+    alert('Build shared with community!');
   };
 
   const renderEffectivenessBar = (percentage) => {
@@ -108,6 +118,7 @@ const BuildOptimizerScreen = () => {
 
       {isLoading && (
         <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Analyzing game data...</Text>
         </View>
       )}
@@ -142,26 +153,64 @@ const BuildOptimizerScreen = () => {
             <View style={styles.overallContainer}>
               <Text style={styles.overallLabel}>Overall Optimization</Text>
               <Text style={styles.overallValue}>
-                {build.effectiveness.overall.toFixed(1)}%
+                {build.overallEffectiveness.toFixed(0)}%
               </Text>
             </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Recommended Weapons</Text>
-          <FlatList
-            data={build.weapons}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Recommended Weapons</Text>
+            <FlatList
+              data={build.weapons}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
 
-          <Text style={styles.sectionTitle}>Recommended Armor</Text>
-          <FlatList
-            data={build.armor}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
-          />
+          <View style={styles.sectionContainer}>
+            <Text style={styles.sectionTitle}>Recommended Armor</Text>
+            <FlatList
+              data={build.armor}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalList}
+            />
+          </View>
+
+          <View style={styles.comparisonSection}>
+            <Text style={styles.sectionTitle}>Meta Comparison</Text>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>Your Build</Text>
+              <Text style={styles.comparisonValue}>{build.overallEffectiveness.toFixed(0)}%</Text>
+            </View>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>Meta Average</Text>
+              <Text style={styles.comparisonValue}>85%</Text>
+            </View>
+            <View style={styles.comparisonRow}>
+              <Text style={styles.comparisonLabel}>Difference</Text>
+              <Text style={[
+                styles.comparisonValue,
+                { color: build.overallEffectiveness >= 85 ? '#34C759' : '#FF3B30' }
+              ]}>
+                {build.overallEffectiveness >= 85 ? '+' : ''}{(build.overallEffectiveness - 85).toFixed(0)}%
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.actionButtonsContainer}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleSaveBuild}>
+              <Text style={styles.actionButtonText}>Save Build</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.actionButton, styles.shareButton]} onPress={handleShareBuild}>
+              <Text style={[styles.actionButtonText, styles.shareButtonText]}>Share with Community</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -205,34 +254,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   button: {
-    backgroundColor: '#6200EE',
+    backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginVertical: 20,
   },
   buttonDisabled: {
-    backgroundColor: '#9E9E9E',
+    backgroundColor: '#ccc',
   },
   buttonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   loadingContainer: {
     alignItems: 'center',
     marginVertical: 20,
   },
   loadingText: {
-    color: '#666',
+    marginTop: 10,
     fontSize: 16,
+    color: '#666',
   },
   resultsContainer: {
     marginTop: 20,
   },
   statsComparisonCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 15,
     marginBottom: 20,
     shadowColor: '#000',
@@ -243,7 +293,7 @@ const styles = StyleSheet.create({
   },
   comparisonTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
     marginBottom: 15,
   },
@@ -258,7 +308,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
   effectivenessBarContainer: {
@@ -279,9 +329,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   overallContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
@@ -289,26 +336,34 @@ const styles = StyleSheet.create({
   },
   overallLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 5,
   },
   overallValue: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#6200EE',
+    color: '#007AFF',
+    textAlign: 'center',
+  },
+  sectionContainer: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
-    marginTop: 20,
     marginBottom: 10,
+  },
+  horizontalList: {
+    paddingVertical: 10,
   },
   itemCard: {
     backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 15,
-    marginBottom: 10,
+    marginRight: 15,
+    width: 200,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -323,24 +378,24 @@ const styles = StyleSheet.create({
   },
   itemName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
   scoreBadge: {
-    backgroundColor: '#6200EE',
+    backgroundColor: '#007AFF',
+    borderRadius: 10,
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 2,
   },
   scoreText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
   },
   itemGame: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   itemStats: {
     flexDirection: 'row',
@@ -356,26 +411,76 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   specialContainer: {
-    flexDirection: 'row',
-    marginTop: 5,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   specialLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
-    marginRight: 5,
+    marginBottom: 5,
   },
   specialText: {
     fontSize: 14,
     color: '#666',
-    flex: 1,
   },
   rarityContainer: {
-    marginTop: 5,
+    marginTop: 10,
   },
   rarityText: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
+  },
+  comparisonSection: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  comparisonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  comparisonLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  comparisonValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  shareButton: {
+    backgroundColor: '#34C759',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  shareButtonText: {
+    color: '#fff',
   },
 });
 
