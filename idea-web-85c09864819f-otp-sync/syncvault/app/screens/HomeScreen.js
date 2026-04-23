@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, FlatList } from 'react-native';
 import { signOut } from 'firebase/auth';
 import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { auth, db } from '../../App';
@@ -93,7 +93,7 @@ const HomeScreen = ({ navigation }) => {
       {activeTab === 'otp' ? (
         <>
           <Text style={styles.sectionTitle}>OTP Accounts</Text>
-          
+
           {otps.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyText}>No OTP accounts yet</Text>
@@ -103,7 +103,7 @@ const HomeScreen = ({ navigation }) => {
             <OTPList otps={otps} />
           )}
 
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.addButton}
             onPress={() => navigation.navigate('AddOTP')}
           >
@@ -200,14 +200,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
   },
   addButtonText: {
     fontSize: 32,
     color: '#fff',
-    fontWeight: '300',
+    lineHeight: 32,
   },
 });
 

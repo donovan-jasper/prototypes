@@ -1,54 +1,63 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 
 const OTPList = ({ otps }) => {
+  const renderItem = ({ item }) => (
+    <View style={styles.itemContainer}>
+      <View style={styles.itemHeader}>
+        <Text style={styles.accountName}>{item.name}</Text>
+        <Text style={styles.timeRemaining}>{item.timeRemaining}s</Text>
+      </View>
+      <Text style={styles.otpCode}>{item.code}</Text>
+    </View>
+  );
+
   return (
     <FlatList
       data={otps}
-      keyExtractor={(item) => item.id}
-      renderItem={({ item }) => (
-        <View style={styles.otpItem}>
-          <View style={styles.otpHeader}>
-            <Text style={styles.otpName}>{item.name}</Text>
-            <Text style={styles.otpTimer}>{item.timeRemaining}s</Text>
-          </View>
-          <Text style={styles.otpCode}>{item.code}</Text>
-        </View>
-      )}
+      renderItem={renderItem}
+      keyExtractor={item => item.id}
+      contentContainerStyle={styles.listContainer}
     />
   );
 };
 
 const styles = StyleSheet.create({
-  otpItem: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-    backgroundColor: '#f9f9f9',
-    marginBottom: 8,
-    borderRadius: 8,
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  otpHeader: {
+  itemContainer: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
-  otpName: {
+  accountName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
   },
-  otpTimer: {
+  timeRemaining: {
     fontSize: 14,
     color: '#666',
-    fontWeight: '600',
   },
   otpCode: {
-    fontSize: 28,
-    color: '#007AFF',
+    fontSize: 24,
     fontWeight: 'bold',
-    letterSpacing: 4,
+    color: '#007AFF',
+    letterSpacing: 2,
+    textAlign: 'center',
   },
 });
 
