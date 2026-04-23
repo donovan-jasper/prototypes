@@ -1,10 +1,13 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { getComments, addComment } from '../utils/offlineLibrary';
+import { db } from '../../firebase';
+import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 
 interface Comment {
-  id: number;
+  id: string;
+  contentId: number;
   author_name: string;
   comment_text: string;
   timestamp: number;
@@ -15,10 +18,20 @@ const ThreadScreen = ({ route }: any) => {
   const [comments, setComments] = useState<Comment[]>([]);
   const [authorName, setAuthorName] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadComments = useCallback(async () => {
-    const result = await getComments(contentId);
-    setComments(result as Comment[]);
+    setIsLoading(true);
+    try {
+      const result = await getComments(contentId);
+      setComments(result);
+    } catch (error) {
+      console.error('Error loading comments:', error);
+      Alert.alert('Error', 'Failed to load comments. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, [contentId]);
 
   useFocusEffect(
@@ -26,6 +39,31 @@ const ThreadScreen = ({ route }: any) => {
       loadComments();
     }, [loadComments])
   );
+
+  // Set up real-time listener for new comments
+  useEffect(() => {
+    const q = query(
+      collection(db, 'comments'),
+      where('contentId', '==', contentId),
+      orderBy('timestamp', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const newComments = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Comment));
+
+      setComments(prevComments => {
+        // Merge with existing comments and remove duplicates
+        const allComments = [...prevComments, ...newComments];
+        const uniqueComments = Array.from(new Map(allComments.map(item => [item.id, item])).values());
+        return uniqueComments.sort((a, b) => b.timestamp - a.timestamp);
+      });
+    });
+
+    return () => unsubscribe();
+  }, [contentId]);
 
   const handleSubmit = async () => {
     if (!authorName.trim()) {
@@ -37,9 +75,16 @@ const ThreadScreen = ({ route }: any) => {
       return;
     }
 
-    await addComment(contentId, authorName.trim(), commentText.trim());
-    setCommentText('');
-    loadComments();
+    setIsSubmitting(true);
+    try {
+      await addComment(contentId, authorName.trim(), commentText.trim());
+      setCommentText('');
+    } catch (error) {
+      console.error('Error submitting comment:', error);
+      Alert.alert('Error', 'Failed to post comment. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatTimestamp = (timestamp: number) => {
@@ -68,7 +113,7 @@ const ThreadScreen = ({ route }: any) => {
   );
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={100}
@@ -78,18 +123,24 @@ const ThreadScreen = ({ route }: any) => {
         <Text style={styles.headerSubtitle}>{comments.length} {comments.length === 1 ? 'comment' : 'comments'}</Text>
       </View>
 
-      <FlatList
-        data={comments}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={renderComment}
-        contentContainerStyle={styles.commentsList}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No comments yet</Text>
-            <Text style={styles.emptySubtext}>Be the first to share your thoughts!</Text>
-          </View>
-        }
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+        </View>
+      ) : (
+        <FlatList
+          data={comments}
+          keyExtractor={(item) => item.id}
+          renderItem={renderComment}
+          contentContainerStyle={styles.commentsList}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>No comments yet</Text>
+              <Text style={styles.emptySubtext}>Be the first to share your thoughts!</Text>
+            </View>
+          }
+        />
+      )}
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -98,6 +149,7 @@ const ThreadScreen = ({ route }: any) => {
           value={authorName}
           onChangeText={setAuthorName}
           maxLength={50}
+          editable={!isSubmitting}
         />
         <View style={styles.commentInputRow}>
           <TextInput
@@ -107,13 +159,18 @@ const ThreadScreen = ({ route }: any) => {
             onChangeText={setCommentText}
             multiline
             maxLength={500}
+            editable={!isSubmitting}
           />
-          <TouchableOpacity 
-            onPress={handleSubmit} 
-            style={styles.submitButton}
-            disabled={!authorName.trim() || !commentText.trim()}
+          <TouchableOpacity
+            onPress={handleSubmit}
+            style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+            disabled={!authorName.trim() || !commentText.trim() || isSubmitting}
           >
-            <Text style={styles.submitButtonText}>Post</Text>
+            {isSubmitting ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Post</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -141,6 +198,11 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 14,
     color: '#666',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   commentsList: {
     padding: 16,
@@ -178,18 +240,18 @@ const styles = StyleSheet.create({
   },
   inputContainer: {
     backgroundColor: '#fff',
-    padding: 12,
+    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
   },
   nameInput: {
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    marginBottom: 8,
+    height: 40,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 8,
+    fontSize: 14,
   },
   commentInputRow: {
     flexDirection: 'row',
@@ -197,21 +259,26 @@ const styles = StyleSheet.create({
   },
   commentInput: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
+    minHeight: 40,
     maxHeight: 100,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
     marginRight: 8,
   },
   submitButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: '#6200ee',
     borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  submitButtonDisabled: {
+    opacity: 0.7,
   },
   submitButtonText: {
     color: '#fff',
@@ -219,14 +286,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    padding: 20,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
