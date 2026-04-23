@@ -224,31 +224,31 @@ const getCuratedApps = (): App[] => {
       category: 'browser'
     },
     {
-      packageName: 'pocket://',
-      label: 'Pocket',
+      packageName: 'pinterest://',
+      label: 'Pinterest',
       icon: undefined,
-      category: 'productivity'
+      category: 'social'
     },
     {
-      packageName: 'evernote://',
-      label: 'Evernote',
+      packageName: 'reddit://',
+      label: 'Reddit',
       icon: undefined,
-      category: 'productivity'
+      category: 'social'
     },
     {
-      packageName: 'trello://',
-      label: 'Trello',
+      packageName: 'tiktok://',
+      label: 'TikTok',
       icon: undefined,
-      category: 'productivity'
+      category: 'entertainment'
     },
     {
-      packageName: 'asana://',
-      label: 'Asana',
+      packageName: 'snapchat://',
+      label: 'Snapchat',
       icon: undefined,
-      category: 'productivity'
+      category: 'social'
     },
     {
-      packageName: 'zoom://',
+      packageName: 'zoomus://',
       label: 'Zoom',
       icon: undefined,
       category: 'communication'
@@ -260,20 +260,14 @@ const getCuratedApps = (): App[] => {
       category: 'communication'
     },
     {
-      packageName: 'discord://',
-      label: 'Discord',
-      icon: undefined,
-      category: 'communication'
-    },
-    {
       packageName: 'telegram://',
       label: 'Telegram',
       icon: undefined,
       category: 'communication'
     },
     {
-      packageName: 'signal://',
-      label: 'Signal',
+      packageName: 'discord://',
+      label: 'Discord',
       icon: undefined,
       category: 'communication'
     },
@@ -284,146 +278,189 @@ const getCuratedApps = (): App[] => {
       category: 'productivity'
     },
     {
-      packageName: 'onedrive://',
-      label: 'OneDrive',
+      packageName: 'applemusic://',
+      label: 'Apple Music',
+      icon: undefined,
+      category: 'entertainment'
+    },
+    {
+      packageName: 'podcasts://',
+      label: 'Podcasts',
+      icon: undefined,
+      category: 'entertainment'
+    },
+    {
+      packageName: 'appletv://',
+      label: 'TV',
+      icon: undefined,
+      category: 'entertainment'
+    },
+    {
+      packageName: 'appstore://',
+      label: 'App Store',
+      icon: undefined,
+      category: 'system'
+    },
+    {
+      packageName: 'itunes://',
+      label: 'iTunes Store',
+      icon: undefined,
+      category: 'entertainment'
+    },
+    {
+      packageName: 'ibooks://',
+      label: 'iBooks',
+      icon: undefined,
+      category: 'education'
+    },
+    {
+      packageName: 'health://',
+      label: 'Health',
+      icon: undefined,
+      category: 'health'
+    },
+    {
+      packageName: 'workout://',
+      label: 'Workout',
+      icon: undefined,
+      category: 'health'
+    },
+    {
+      packageName: 'wallet://',
+      label: 'Wallet',
+      icon: undefined,
+      category: 'finance'
+    },
+    {
+      packageName: 'applepay://',
+      label: 'Apple Pay',
+      icon: undefined,
+      category: 'finance'
+    },
+    {
+      packageName: 'shortcuts://',
+      label: 'Shortcuts',
       icon: undefined,
       category: 'productivity'
     },
     {
-      packageName: 'icloud://',
-      label: 'iCloud',
+      packageName: 'files://',
+      label: 'Files',
       icon: undefined,
       category: 'productivity'
     },
     {
-      packageName: 'googlephotos://',
-      label: 'Google Photos',
-      icon: undefined,
-      category: 'media'
-    },
-    {
-      packageName: 'googlekeep://',
-      label: 'Google Keep',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googlecalendar://',
-      label: 'Google Calendar',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googlemaps://',
-      label: 'Google Maps',
-      icon: undefined,
-      category: 'navigation'
-    },
-    {
-      packageName: 'googledrive://',
-      label: 'Google Drive',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googletranslate://',
-      label: 'Google Translate',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googlenews://',
-      label: 'Google News',
-      icon: undefined,
-      category: 'news'
-    },
-    {
-      packageName: 'googlesheets://',
-      label: 'Google Sheets',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googledocs://',
-      label: 'Google Docs',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googleforms://',
-      label: 'Google Forms',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'googlecontacts://',
-      label: 'Google Contacts',
+      packageName: 'facetime://',
+      label: 'FaceTime',
       icon: undefined,
       category: 'communication'
     },
     {
-      packageName: 'googlefit://',
-      label: 'Google Fit',
+      packageName: 'siri://',
+      label: 'Siri',
       icon: undefined,
-      category: 'health'
+      category: 'productivity'
     },
     {
-      packageName: 'googlefitness://',
-      label: 'Google Fitness',
+      packageName: 'news://',
+      label: 'News',
       icon: undefined,
-      category: 'health'
+      category: 'entertainment'
     },
     {
-      packageName: 'googlefitnessapp://',
-      label: 'Google Fitness App',
+      packageName: 'stocks://',
+      label: 'Stocks',
       icon: undefined,
-      category: 'health'
+      category: 'finance'
     },
     {
-      packageName: 'googlefitnessapp://',
-      label: 'Google Fitness App',
+      packageName: 'weather://',
+      label: 'Weather',
       icon: undefined,
-      category: 'health'
+      category: 'productivity'
+    },
+    {
+      packageName: 'compass://',
+      label: 'Compass',
+      icon: undefined,
+      category: 'navigation'
+    },
+    {
+      packageName: 'measure://',
+      label: 'Measure',
+      icon: undefined,
+      category: 'productivity'
+    },
+    {
+      packageName: 'translate://',
+      label: 'Translate',
+      icon: undefined,
+      category: 'productivity'
+    },
+    {
+      packageName: 'voice-memos://',
+      label: 'Voice Memos',
+      icon: undefined,
+      category: 'productivity'
+    },
+    {
+      packageName: 'home://',
+      label: 'Home',
+      icon: undefined,
+      category: 'smart-home'
+    },
+    {
+      packageName: 'shortcuts://',
+      label: 'Shortcuts',
+      icon: undefined,
+      category: 'productivity'
     }
   ];
 };
 
-export const launchApp = async (packageName: string) => {
+const cacheApps = async (apps: App[]): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Clear existing apps
+      tx.executeSql('DELETE FROM apps', [], () => {
+        // Insert new apps
+        const insertSql = 'INSERT INTO apps (packageName, label, icon, category) VALUES (?, ?, ?, ?)';
+        apps.forEach(app => {
+          tx.executeSql(
+            insertSql,
+            [app.packageName, app.label, app.icon || null, app.category || null],
+            () => {},
+            (_, error) => {
+              console.error('Error inserting app:', error);
+              return true; // continue with next statement
+            }
+          );
+        });
+      }, (_, error) => {
+        console.error('Error clearing apps:', error);
+        reject(error);
+        return true;
+      });
+    }, error => {
+      console.error('Transaction error:', error);
+      reject(error);
+    }, () => {
+      resolve();
+    });
+  });
+};
+
+export const launchApp = async (packageName: string): Promise<void> => {
   try {
     if (Platform.OS === 'ios') {
       // For iOS, use URL scheme
-      const url = packageName.startsWith('http') ? packageName : packageName;
-      const supported = await Linking.canOpenURL(url);
-
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        console.log(`Don't know how to open URL: ${url}`);
-      }
+      await Linking.openURL(packageName);
     } else {
       // For Android, use package name
-      await Linking.openURL(`intent://#Intent;package=${packageName};end`);
+      await Linking.openURL(`intent:#Intent;package=${packageName};end`);
     }
   } catch (error) {
     console.error('Error launching app:', error);
-  }
-};
-
-const cacheApps = async (apps: App[]) => {
-  try {
-    await db.transactionAsync(async (tx) => {
-      // Clear existing apps
-      await tx.executeSqlAsync('DELETE FROM apps');
-
-      // Insert new apps
-      for (const app of apps) {
-        await tx.executeSqlAsync(
-          'INSERT INTO apps (packageName, label, icon, category) VALUES (?, ?, ?, ?)',
-          [app.packageName, app.label, app.icon, app.category]
-        );
-      }
-    });
-  } catch (error) {
-    console.error('Error caching apps:', error);
+    throw error;
   }
 };

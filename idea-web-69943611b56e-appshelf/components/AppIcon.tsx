@@ -3,40 +3,44 @@ import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react
 import { launchApp } from '../lib/appManager';
 
 interface AppIconProps {
-  app: {
-    packageName: string;
-    label: string;
-    icon?: string;
-  };
-  size?: number;
+  packageName: string;
+  label: string;
+  icon?: string;
   onLongPress?: () => void;
 }
 
-const AppIcon: React.FC<AppIconProps> = ({ app, size = 64, onLongPress }) => {
-  const handlePress = () => {
-    launchApp(app.packageName);
+const AppIcon: React.FC<AppIconProps> = ({ packageName, label, icon, onLongPress }) => {
+  const handlePress = async () => {
+    try {
+      await launchApp(packageName);
+    } catch (error) {
+      console.error('Failed to launch app:', error);
+      // Show error message to user
+    }
   };
 
   return (
     <TouchableOpacity
-      style={[styles.container, { width: size, height: size + 24 }]}
+      style={styles.container}
       onPress={handlePress}
       onLongPress={onLongPress}
       activeOpacity={0.7}
     >
-      {app.icon ? (
-        <Image
-          source={{ uri: app.icon }}
-          style={[styles.icon, { width: size, height: size }]}
-          resizeMode="contain"
-        />
-      ) : (
-        <View style={[styles.placeholderIcon, { width: size, height: size }]}>
-          <Text style={styles.placeholderText}>{app.label.charAt(0)}</Text>
-        </View>
-      )}
+      <View style={styles.iconContainer}>
+        {icon ? (
+          <Image
+            source={{ uri: icon }}
+            style={styles.icon}
+            resizeMode="contain"
+          />
+        ) : (
+          <View style={styles.placeholderIcon}>
+            <Text style={styles.placeholderText}>{label.charAt(0)}</Text>
+          </View>
+        )}
+      </View>
       <Text style={styles.label} numberOfLines={1}>
-        {app.label}
+        {label}
       </Text>
     </TouchableOpacity>
   );
@@ -46,26 +50,40 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    width: 80,
     margin: 8,
   },
-  icon: {
+  iconContainer: {
+    width: 60,
+    height: 60,
     borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  icon: {
+    width: 40,
+    height: 40,
   },
   placeholderIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     backgroundColor: '#e0e0e0',
-    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   placeholderText: {
-    fontSize: 24,
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#666',
   },
   label: {
-    marginTop: 4,
     fontSize: 12,
-    textAlign: 'center',
     color: '#333',
+    textAlign: 'center',
+    width: '100%',
   },
 });
 
