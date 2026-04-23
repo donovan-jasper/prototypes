@@ -159,107 +159,43 @@ export function adaptRoutine(
     return null;
   }
 
-  // Find the slot that best fits the routine duration
-  const routineDuration = routine.tasks.length * 15; // Assuming 15 minutes per task
-  const bestSlot = slotsInWindow.reduce((best, current) => {
-    const currentDuration = differenceInMinutes(current.end, current.start);
-    const bestDuration = differenceInMinutes(best.end, best.start);
+  // Calculate total duration needed for all routine tasks
+  const totalDurationMinutes = routine.tasks.reduce((sum, task) => {
+    return sum + (task.estimatedMinutes || 0);
+  }, 0);
 
-    // Prefer slots that exactly fit or are closest to the routine duration
-    if (Math.abs(currentDuration - routineDuration) < Math.abs(bestDuration - routineDuration)) {
-      return current;
-    }
-    return best;
-  });
+  // Find the first slot that can accommodate all tasks
+  for (const slot of slotsInWindow) {
+    const slotDuration = differenceInMinutes(slot.end, slot.start);
 
-  // Return the start time of the best slot
-  return bestSlot.start;
-}
-
-/**
- * Calculates energy patterns from completion history
- */
-export function calculateEnergyScore(
-  completionHistory: RoutineCompletion[]
-): { peakHours: number[], lowEnergyHours: number[] } {
-  if (!completionHistory || completionHistory.length === 0) {
-    // Default patterns if no data
-    return {
-      peakHours: [9, 10, 11], // 9am-11am
-      lowEnergyHours: [22, 23, 0, 1, 2, 3] // 10pm-3am
-    };
-  }
-
-  // Group completions by hour
-  const hourStats: Record<number, { completed: number, total: number }> = {};
-
-  for (let i = 0; i < 24; i++) {
-    hourStats[i] = { completed: 0, total: 0 };
-  }
-
-  completionHistory.forEach(completion => {
-    const hour = completion.time.getHours();
-    hourStats[hour].total++;
-    if (completion.completed) {
-      hourStats[hour].completed++;
-    }
-  });
-
-  // Calculate completion rates per hour
-  const completionRates = Object.entries(hourStats).map(([hour, stats]) => ({
-    hour: parseInt(hour),
-    rate: stats.total > 0 ? stats.completed / stats.total : 0
-  }));
-
-  // Sort by completion rate
-  const sortedHours = completionRates.sort((a, b) => b.rate - a.rate);
-
-  // Get top 3 peak hours
-  const peakHours = sortedHours.slice(0, 3).map(h => h.hour);
-
-  // Get bottom 3 low energy hours
-  const lowEnergyHours = sortedHours.slice(-3).map(h => h.hour);
-
-  return { peakHours, lowEnergyHours };
-}
-
-/**
- * Suggests optimal time for a task considering energy patterns
- */
-export function suggestOptimalTaskTime(
-  task: Task,
-  date: Date,
-  commitments: ScheduleBlock[],
-  completionHistory?: RoutineCompletion[]
-): Date | null {
-  const energyPatterns = completionHistory ? calculateEnergyScore(completionHistory) : null;
-  const baseSuggestion = suggestTaskTime(task, date, commitments);
-
-  if (!baseSuggestion || !energyPatterns) {
-    return baseSuggestion;
-  }
-
-  // If task is high priority, consider energy patterns
-  if (task.priority === 'high') {
-    const suggestionHour = baseSuggestion.getHours();
-
-    // Check if suggested time is in low energy hours
-    if (energyPatterns.lowEnergyHours.includes(suggestionHour)) {
-      // Try to find a better time in peak hours
-      const availableSlots = findAvailableSlots(date, commitments);
-      const taskDurationMs = task.estimatedMinutes * 60 * 1000;
-
-      const peakSlots = availableSlots.filter(slot => {
-        const slotDuration = slot.end.getTime() - slot.start.getTime();
-        const slotHour = slot.start.getHours();
-        return slotDuration >= taskDurationMs && energyPatterns.peakHours.includes(slotHour);
-      });
-
-      if (peakSlots.length > 0) {
-        return peakSlots[0].start;
-      }
+    if (slotDuration >= totalDurationMinutes) {
+      // Return the start time of the slot
+      return slot.start;
     }
   }
 
-  return baseSuggestion;
+  // If no single slot can fit all tasks, try to find a combination of slots
+  // This is a simplified approach - a more sophisticated algorithm could be implemented
+  let remainingDuration = totalDurationMinutes;
+  let currentTime = windowStart;
+
+  for (const slot of slotsInWindow) {
+    if (slot.start > currentTime) {
+      // There's a gap between slots - can't fit all tasks
+      break;
+    }
+
+    const availableInSlot = differenceInMinutes(slot.end, currentTime);
+    remainingDuration -= availableInSlot;
+
+    if (remainingDuration <= 0) {
+      // All tasks can fit in this slot
+      return currentTime;
+    }
+
+    currentTime = slot.end;
+  }
+
+  // If we get here, no suitable slot was found
+  return null;
 }
