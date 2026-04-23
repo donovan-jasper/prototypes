@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { StatusBar } from 'expo-status-bar';
 import ProblemCard from '../components/ProblemCard';
 import { getRandomProblems } from '../data/problems';
-import { getProblemRecommendations, savePerformanceRecord } from '../hooks/useAdaptiveLogic';
+import { getProblemRecommendations, savePerformanceRecord, calculateAdaptiveDifficulty } from '../hooks/useAdaptiveLogic';
 
 export default function DailyChallengesScreen({ navigation }) {
   const [problems, setProblems] = useState([]);
@@ -50,6 +50,10 @@ export default function DailyChallengesScreen({ navigation }) {
       const totalProblems = problems.length;
       const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000);
 
+      // Calculate new difficulty based on performance
+      const performanceScore = (totalCorrect / totalProblems) * 100;
+      const newDifficulty = calculateAdaptiveDifficulty(performanceScore, currentDifficulty);
+
       await savePerformanceRecord(currentDifficulty, totalCorrect, totalProblems, currentDomain);
 
       setTimeout(() => {
@@ -60,7 +64,8 @@ export default function DailyChallengesScreen({ navigation }) {
             total: totalProblems,
             difficulty: currentDifficulty,
             domain: currentDomain,
-            duration: sessionDuration
+            duration: sessionDuration,
+            newDifficulty: newDifficulty
           }
         });
       }, 1000);
@@ -178,19 +183,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   difficultyText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#92400e',
+    color: '#b45309',
   },
   progressBar: {
     height: 8,
     backgroundColor: '#e5e7eb',
     borderRadius: 4,
+    marginVertical: 8,
     overflow: 'hidden',
-    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
@@ -198,15 +203,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   scoreText: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: 16,
     fontWeight: '600',
+    color: '#1f2937',
     textAlign: 'center',
+    marginTop: 8,
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: 16,
+    padding: 16,
   },
 });

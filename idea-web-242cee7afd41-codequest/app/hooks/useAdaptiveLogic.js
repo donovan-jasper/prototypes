@@ -182,52 +182,30 @@ export async function getProblemRecommendations() {
   try {
     const stats = await getPerformanceStats();
 
-    // Determine which domain to focus on
-    const domains = ['logic', 'math', 'verbal'];
-    let targetDomain = domains[0];
-
-    // Find domain with lowest performance
-    if (stats.domainDistribution) {
-      const minCount = Math.min(
-        stats.domainDistribution.logic || 0,
-        stats.domainDistribution.math || 0,
-        stats.domainDistribution.verbal || 0
-      );
-
-      targetDomain = domains.find(domain =>
-        (stats.domainDistribution[domain] || 0) === minCount
-      ) || domains[0];
+    // Simple recommendation logic based on performance
+    if (stats.averageScore < 50) {
+      return { domain: 'logic', difficulty: 'easy' };
     }
 
-    const recommendedDifficulty = await getRecommendedDifficulty(targetDomain);
+    // Find the domain with the lowest count
+    const domains = Object.keys(stats.domainDistribution);
+    let recommendedDomain = domains[0];
 
-    // Adjust based on recent performance trends
-    if (stats.recentPerformance.length >= 3) {
-      const lastThreeScores = stats.recentPerformance.slice(-3).map(p => p.score);
-      const isImproving = lastThreeScores[2] < lastThreeScores[1] && lastThreeScores[1] < lastThreeScores[0];
-
-      if (isImproving) {
-        // If user is improving, slightly increase difficulty
-        const difficultyLevels = ['easy', 'medium', 'hard'];
-        const currentIndex = difficultyLevels.indexOf(recommendedDifficulty);
-        if (currentIndex < difficultyLevels.length - 1) {
-          return {
-            domain: targetDomain,
-            difficulty: difficultyLevels[currentIndex + 1]
-          };
-        }
+    for (const domain of domains) {
+      if (stats.domainDistribution[domain] < stats.domainDistribution[recommendedDomain]) {
+        recommendedDomain = domain;
       }
     }
 
+    // Get recommended difficulty for the domain
+    const recommendedDifficulty = await getRecommendedDifficulty(recommendedDomain);
+
     return {
-      domain: targetDomain,
+      domain: recommendedDomain,
       difficulty: recommendedDifficulty
     };
   } catch (error) {
     console.error('Error getting problem recommendations:', error);
-    return {
-      domain: 'logic',
-      difficulty: 'easy'
-    };
+    return { domain: 'logic', difficulty: 'medium' };
   }
 }
