@@ -171,11 +171,10 @@ export default function ArtistsScreen() {
       {searching && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
-          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>Searching artists...</Text>
         </View>
       )}
 
-      {searchResults.length > 0 && (
+      {searchQuery && !searching && searchResults.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
             Search Results
@@ -205,10 +204,10 @@ export default function ArtistsScreen() {
         </>
       )}
 
-      {followedArtists.length === 0 && searchResults.length === 0 && !searching && (
+      {followedArtists.length === 0 && !searchQuery && !searching && (
         <View style={styles.emptyState}>
           <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
-            You're not following any artists yet. Search above to find artists to follow.
+            You're not following any artists yet. Search above to find artists to follow!
           </Text>
         </View>
       )}
@@ -237,13 +236,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 8,
-    marginTop: 16,
   },
   list: {
     flex: 1,
@@ -269,6 +266,5 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: '#666',
   },
 });
