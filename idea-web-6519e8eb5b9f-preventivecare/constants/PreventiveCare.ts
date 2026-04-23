@@ -8,24 +8,24 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Mammogram',
         description: 'Breast cancer screening',
         frequency: 'annual',
-        icon: 'heart',
-        color: '#FF6B6B'
+        importance: 'high',
+        icon: 'heart'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
         description: 'Cervical cancer screening',
         frequency: 'annual',
-        icon: 'female',
-        color: '#4ECDC4'
+        importance: 'high',
+        icon: 'female'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       }
     ]
   },
@@ -38,32 +38,32 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Mammogram',
         description: 'Breast cancer screening',
         frequency: 'annual',
-        icon: 'heart',
-        color: '#FF6B6B'
+        importance: 'high',
+        icon: 'heart'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
         description: 'Cervical cancer screening',
         frequency: 'annual',
-        icon: 'female',
-        color: '#4ECDC4'
+        importance: 'high',
+        icon: 'female'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         description: 'Colorectal cancer screening',
-        frequency: 'biennial',
-        icon: 'toilet',
-        color: '#A5D8FF'
+        frequency: 'every 10 years',
+        importance: 'high',
+        icon: 'toilet'
       }
     ]
   },
@@ -76,40 +76,40 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Mammogram',
         description: 'Breast cancer screening',
         frequency: 'annual',
-        icon: 'heart',
-        color: '#FF6B6B'
+        importance: 'high',
+        icon: 'heart'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
         description: 'Cervical cancer screening',
         frequency: 'annual',
-        icon: 'female',
-        color: '#4ECDC4'
+        importance: 'high',
+        icon: 'female'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         description: 'Colorectal cancer screening',
-        frequency: 'biennial',
-        icon: 'toilet',
-        color: '#A5D8FF'
+        frequency: 'every 10 years',
+        importance: 'high',
+        icon: 'toilet'
       },
       {
         type: 'prostate_exam',
         name: 'Prostate Exam',
         description: 'Prostate cancer screening',
         frequency: 'annual',
-        icon: 'male',
-        color: '#6B5B95'
+        importance: 'medium',
+        icon: 'male'
       }
     ]
   },
@@ -122,16 +122,16 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Prostate Exam',
         description: 'Prostate cancer screening',
         frequency: 'annual',
-        icon: 'male',
-        color: '#6B5B95'
+        importance: 'medium',
+        icon: 'male'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       }
     ]
   },
@@ -144,24 +144,24 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Prostate Exam',
         description: 'Prostate cancer screening',
         frequency: 'annual',
-        icon: 'male',
-        color: '#6B5B95'
+        importance: 'medium',
+        icon: 'male'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         description: 'Colorectal cancer screening',
-        frequency: 'biennial',
-        icon: 'toilet',
-        color: '#A5D8FF'
+        frequency: 'every 10 years',
+        importance: 'high',
+        icon: 'toilet'
       }
     ]
   },
@@ -174,24 +174,24 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
         name: 'Prostate Exam',
         description: 'Prostate cancer screening',
         frequency: 'annual',
-        icon: 'male',
-        color: '#6B5B95'
+        importance: 'medium',
+        icon: 'male'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         description: 'Hypertension screening',
         frequency: 'annual',
-        icon: 'heartbeat',
-        color: '#FFE66D'
+        importance: 'medium',
+        icon: 'stethoscope'
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         description: 'Colorectal cancer screening',
-        frequency: 'biennial',
-        icon: 'toilet',
-        color: '#A5D8FF'
+        frequency: 'every 10 years',
+        importance: 'high',
+        icon: 'toilet'
       }
     ]
   }

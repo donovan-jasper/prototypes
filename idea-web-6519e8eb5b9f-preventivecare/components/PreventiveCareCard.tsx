@@ -2,6 +2,9 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
+import { useAppStore } from '../store/appStore';
+import { markScreeningAsCompleted } from '../lib/timeline';
+import { schedulePreventiveCareReminder } from '../lib/notifications';
 
 interface PreventiveCareCardProps {
   screening: {
@@ -9,27 +12,54 @@ interface PreventiveCareCardProps {
     name: string;
     description: string;
     frequency: string;
+    importance: string;
     icon: string;
-    color: string;
   };
   nextDueDate: Date;
-  onMarkComplete?: () => void;
-  isCompleted?: boolean;
 }
 
-const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
-  screening,
-  nextDueDate,
-  onMarkComplete,
-  isCompleted = false
-}) => {
+const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({ screening, nextDueDate }) => {
+  const { user } = useAppStore();
+  const daysUntilDue = Math.ceil((nextDueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+
+  const handleMarkComplete = async () => {
+    if (!user) return;
+
+    // Mark as completed in timeline
+    await markScreeningAsCompleted(screening.type, user.id);
+
+    // Calculate next due date based on frequency
+    const today = new Date();
+    let nextDate = new Date(today);
+
+    if (screening.frequency === 'annual') {
+      nextDate.setFullYear(today.getFullYear() + 1);
+    } else if (screening.frequency === 'biennial') {
+      nextDate.setFullYear(today.getFullYear() + 2);
+    } else if (screening.frequency === 'every 10 years') {
+      nextDate.setFullYear(today.getFullYear() + 10);
+    }
+
+    // Schedule new reminder
+    await schedulePreventiveCareReminder(screening.type, nextDate, user.id);
+  };
+
+  const getStatusColor = () => {
+    if (daysUntilDue <= 0) return '#FF6B6B'; // Overdue
+    if (daysUntilDue <= 30) return '#FFD166'; // Due soon
+    return '#4ECDC4'; // On track
+  };
+
   return (
-    <View style={[styles.card, isCompleted && styles.completedCard]}>
+    <View style={styles.card}>
       <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: screening.color }]}>
-          <Ionicons name={screening.icon} size={24} color="white" />
-        </View>
-        <View style={styles.textContainer}>
+        <Ionicons
+          name={screening.icon}
+          size={24}
+          color={getStatusColor()}
+          style={styles.icon}
+        />
+        <View style={styles.headerText}>
           <Text style={styles.title}>{screening.name}</Text>
           <Text style={styles.description}>{screening.description}</Text>
         </View>
@@ -40,22 +70,27 @@ const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
           <Text style={styles.detailLabel}>Frequency:</Text>
           <Text style={styles.detailValue}>{screening.frequency}</Text>
         </View>
+
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Next Due:</Text>
-          <Text style={styles.detailValue}>{format(nextDueDate, 'MMM d, yyyy')}</Text>
+          <Text style={styles.detailValue}>
+            {format(nextDueDate, 'MMM d, yyyy')}
+            {daysUntilDue > 0 ? ` (in ${daysUntilDue} days)` : ' (overdue)'}
+          </Text>
+        </View>
+
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Importance:</Text>
+          <Text style={styles.detailValue}>{screening.importance}</Text>
         </View>
       </View>
 
-      {onMarkComplete && (
-        <TouchableOpacity
-          style={[styles.button, isCompleted && styles.completedButton]}
-          onPress={onMarkComplete}
-        >
-          <Text style={styles.buttonText}>
-            {isCompleted ? 'Completed' : 'Mark as Complete'}
-          </Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: getStatusColor() }]}
+        onPress={handleMarkComplete}
+      >
+        <Text style={styles.buttonText}>Mark as Completed</Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -72,28 +107,20 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  completedCard: {
-    opacity: 0.7,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+  icon: {
     marginRight: 12,
   },
-  textContainer: {
+  headerText: {
     flex: 1,
   },
   title: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
   },
   description: {
@@ -102,12 +129,12 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   details: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   detailItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   detailLabel: {
     fontSize: 14,
@@ -115,21 +142,18 @@ const styles = StyleSheet.create({
   },
   detailValue: {
     fontSize: 14,
-    fontWeight: '500',
     color: '#333',
+    fontWeight: '500',
   },
   button: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
   },
-  completedButton: {
-    backgroundColor: '#9E9E9E',
-  },
   buttonText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

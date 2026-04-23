@@ -9,6 +9,16 @@ export async function requestNotificationPermissions() {
     console.log('Notification permissions not granted');
     return false;
   }
+
+  // Configure notification handler
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: false,
+    }),
+  });
+
   return true;
 }
 
@@ -32,6 +42,20 @@ export async function schedulePreventiveCareReminder(type: string, date: Date, u
   const user = await db.getFirstAsync('SELECT age, gender FROM users WHERE id = ?', [userId]);
 
   if (!user) return;
+
+  // First cancel any existing notification for this screening type
+  const existing = await db.getFirstAsync(
+    'SELECT notification_id FROM notifications WHERE user_id = ? AND screening_type = ?',
+    [userId, type]
+  );
+
+  if (existing) {
+    await Notifications.cancelScheduledNotificationAsync(existing.notification_id);
+    await db.runAsync(
+      'DELETE FROM notifications WHERE notification_id = ?',
+      [existing.notification_id]
+    );
+  }
 
   const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
@@ -57,6 +81,21 @@ export async function scheduleAllPreventiveCareReminders(userId: number) {
 
   if (!user) return;
 
+  // Cancel all existing preventive care notifications
+  const existingNotifications = await db.getAllAsync(
+    'SELECT notification_id FROM notifications WHERE user_id = ? AND type = ?',
+    [userId, 'preventive_care']
+  );
+
+  for (const notif of existingNotifications) {
+    await Notifications.cancelScheduledNotificationAsync(notif.notification_id);
+  }
+
+  await db.runAsync(
+    'DELETE FROM notifications WHERE user_id = ? AND type = ?',
+    [userId, 'preventive_care']
+  );
+
   const recommendations = PREVENTIVE_CARE_RECOMMENDATIONS.find(
     rec => user.age >= rec.ageRange[0] && user.age <= rec.ageRange[1] && rec.gender === user.gender
   );
@@ -64,19 +103,44 @@ export async function scheduleAllPreventiveCareReminders(userId: number) {
   if (!recommendations) return;
 
   const today = new Date();
-  const nextYear = new Date(today);
-  nextYear.setFullYear(today.getFullYear() + 1);
 
   for (const screening of recommendations.screenings) {
-    // Schedule for next occurrence based on frequency
-    const nextDate = new Date(today);
-    if (screening.frequency === 'annual') {
-      nextDate.setFullYear(today.getFullYear() + 1);
-    } else if (screening.frequency === 'biennial') {
-      nextDate.setFullYear(today.getFullYear() + 2);
+    // Check if there's already a completed entry for this screening type
+    const lastCompleted = await db.getFirstAsync(
+      'SELECT date FROM timeline_events WHERE type = ? AND user_id = ? AND completed = 1 ORDER BY date DESC LIMIT 1',
+      ['preventive_care', userId]
+    );
+
+    let nextDate: Date;
+
+    if (lastCompleted) {
+      // Schedule based on last completed date
+      const lastDate = new Date(lastCompleted.date);
+      nextDate = new Date(lastDate);
+
+      if (screening.frequency === 'annual') {
+        nextDate.setFullYear(lastDate.getFullYear() + 1);
+      } else if (screening.frequency === 'biennial') {
+        nextDate.setFullYear(lastDate.getFullYear() + 2);
+      } else if (screening.frequency === 'every 10 years') {
+        nextDate.setFullYear(lastDate.getFullYear() + 10);
+      }
+    } else {
+      // First time - schedule for next occurrence based on frequency
+      nextDate = new Date(today);
+      if (screening.frequency === 'annual') {
+        nextDate.setFullYear(today.getFullYear() + 1);
+      } else if (screening.frequency === 'biennial') {
+        nextDate.setFullYear(today.getFullYear() + 2);
+      } else if (screening.frequency === 'every 10 years') {
+        nextDate.setFullYear(today.getFullYear() + 10);
+      }
     }
 
-    await schedulePreventiveCareReminder(screening.type, nextDate, userId);
+    // Only schedule if the date is in the future
+    if (nextDate > today) {
+      await schedulePreventiveCareReminder(screening.type, nextDate, userId);
+    }
   }
 }
 

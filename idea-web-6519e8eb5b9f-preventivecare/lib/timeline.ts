@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { scheduleAllPreventiveCareReminders } from './notifications';
 
 export interface TimelineEvent {
   id?: number;
@@ -26,6 +27,11 @@ export async function addTimelineEvent(event: TimelineEvent): Promise<TimelineEv
       event.completed || false
     ]
   );
+
+  // If this is a preventive care event, reschedule reminders
+  if (event.type === 'preventive_care' && event.userId) {
+    await scheduleAllPreventiveCareReminders(event.userId);
+  }
 
   return {
     ...event,
@@ -108,11 +114,26 @@ export async function updateTimelineEvent(id: number, updates: Partial<TimelineE
     `UPDATE timeline_events SET ${fields.join(', ')} WHERE id = ?`,
     values
   );
+
+  // If this is a preventive care event, reschedule reminders
+  const event = await db.getFirstAsync('SELECT user_id FROM timeline_events WHERE id = ?', [id]);
+  if (event && event.user_id) {
+    await scheduleAllPreventiveCareReminders(event.user_id);
+  }
 }
 
 export async function deleteTimelineEvent(id: number): Promise<void> {
   const db = await getDatabase();
+
+  // Get the event to check if it's preventive care
+  const event = await db.getFirstAsync('SELECT type, user_id FROM timeline_events WHERE id = ?', [id]);
+
   await db.runAsync('DELETE FROM timeline_events WHERE id = ?', [id]);
+
+  // If this was a preventive care event, reschedule reminders
+  if (event && event.type === 'preventive_care' && event.user_id) {
+    await scheduleAllPreventiveCareReminders(event.user_id);
+  }
 }
 
 export async function markScreeningAsCompleted(screeningType: string, userId: number): Promise<void> {
@@ -141,4 +162,7 @@ export async function markScreeningAsCompleted(screeningType: string, userId: nu
       completed: true
     });
   }
+
+  // Reschedule all preventive care reminders
+  await scheduleAllPreventiveCareReminders(userId);
 }

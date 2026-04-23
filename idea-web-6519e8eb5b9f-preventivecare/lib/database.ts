@@ -1,8 +1,11 @@
 import * as SQLite from 'expo-sqlite';
+import { Platform } from 'react-native';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
-export async function initDatabase(): Promise<void> {
+export async function initDatabase() {
+  if (db) return db;
+
   db = await SQLite.openDatabaseAsync('lifethread.db');
 
   // Create tables if they don't exist
@@ -34,7 +37,8 @@ export async function initDatabase(): Promise<void> {
       date TEXT,
       completed INTEGER DEFAULT 0,
       value REAL,
-      source TEXT,
+      source TEXT DEFAULT 'manual',
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (habit_id) REFERENCES habits(id),
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
@@ -48,6 +52,7 @@ export async function initDatabase(): Promise<void> {
       notes TEXT,
       attachments TEXT,
       completed INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
@@ -58,6 +63,7 @@ export async function initDatabase(): Promise<void> {
       screening_type TEXT,
       notification_id TEXT,
       scheduled_date TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
 
@@ -66,6 +72,7 @@ export async function initDatabase(): Promise<void> {
       user_id INTEGER,
       key TEXT,
       value TEXT,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (user_id) REFERENCES users(id)
     );
   `);
@@ -75,29 +82,30 @@ export async function initDatabase(): Promise<void> {
   if (userCount.count === 0) {
     await db.runAsync(
       'INSERT INTO users (name, age, gender) VALUES (?, ?, ?)',
-      ['Default User', 45, 'female']
+      ['Default User', 30, 'female']
     );
   }
+
+  return db;
 }
 
-export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+export async function getDatabase() {
   if (!db) {
     await initDatabase();
   }
   return db!;
 }
 
-export async function resetDatabase(): Promise<void> {
-  if (db) {
-    await db.execAsync(`
-      DROP TABLE IF EXISTS users;
-      DROP TABLE IF EXISTS habits;
-      DROP TABLE IF EXISTS habit_logs;
-      DROP TABLE IF EXISTS timeline_events;
-      DROP TABLE IF EXISTS notifications;
-      DROP TABLE IF EXISTS settings;
-    `);
-    db = null;
-    await initDatabase();
-  }
+export async function resetDatabase() {
+  const db = await getDatabase();
+  await db.execAsync(`
+    DROP TABLE IF EXISTS users;
+    DROP TABLE IF EXISTS habits;
+    DROP TABLE IF EXISTS habit_logs;
+    DROP TABLE IF EXISTS timeline_events;
+    DROP TABLE IF EXISTS notifications;
+    DROP TABLE IF EXISTS settings;
+  `);
+  db = null;
+  await initDatabase();
 }

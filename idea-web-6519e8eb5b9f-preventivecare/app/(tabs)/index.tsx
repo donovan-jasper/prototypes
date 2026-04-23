@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAppStore } from '../../store/appStore';
 import HabitCard from '../../components/HabitCard';
 import HealthScore from '../../components/HealthScore';
 import PreventiveCareCard from '../../components/PreventiveCareCard';
 import { PREVENTIVE_CARE_RECOMMENDATIONS } from '../../constants/PreventiveCare';
 import { getDatabase } from '../../lib/database';
+import { scheduleAllPreventiveCareReminders } from '../../lib/notifications';
 
 const TodayScreen = () => {
   const { habits, user, loadHabits } = useAppStore();
   const [preventiveCareItems, setPreventiveCareItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -18,6 +20,7 @@ const TodayScreen = () => {
       await loadHabits();
       if (user) {
         await loadPreventiveCareItems();
+        await scheduleAllPreventiveCareReminders(user.id);
       }
       setIsLoading(false);
     };
@@ -47,22 +50,55 @@ const TodayScreen = () => {
     if (!recommendations) return;
 
     // Calculate next due dates for each screening
-    const itemsWithDates = recommendations.screenings.map(screening => {
-      // Check if there's a scheduled notification for this screening
-      const nextDueDate = new Date(today);
-      if (screening.frequency === 'annual') {
-        nextDueDate.setFullYear(today.getFullYear() + 1);
-      } else if (screening.frequency === 'biennial') {
-        nextDueDate.setFullYear(today.getFullYear() + 2);
+    const itemsWithDates = await Promise.all(recommendations.screenings.map(async (screening) => {
+      // Check if there's a completed entry for this screening type
+      const lastCompleted = await db.getFirstAsync(
+        'SELECT date FROM timeline_events WHERE type = ? AND user_id = ? AND completed = 1 ORDER BY date DESC LIMIT 1',
+        ['preventive_care', user.id]
+      );
+
+      let nextDueDate: Date;
+
+      if (lastCompleted) {
+        // Calculate next date based on last completed date
+        const lastDate = new Date(lastCompleted.date);
+        nextDueDate = new Date(lastDate);
+
+        if (screening.frequency === 'annual') {
+          nextDueDate.setFullYear(lastDate.getFullYear() + 1);
+        } else if (screening.frequency === 'biennial') {
+          nextDueDate.setFullYear(lastDate.getFullYear() + 2);
+        } else if (screening.frequency === 'every 10 years') {
+          nextDueDate.setFullYear(lastDate.getFullYear() + 10);
+        }
+      } else {
+        // First time - calculate based on current date
+        nextDueDate = new Date(today);
+        if (screening.frequency === 'annual') {
+          nextDueDate.setFullYear(today.getFullYear() + 1);
+        } else if (screening.frequency === 'biennial') {
+          nextDueDate.setFullYear(today.getFullYear() + 2);
+        } else if (screening.frequency === 'every 10 years') {
+          nextDueDate.setFullYear(today.getFullYear() + 10);
+        }
       }
 
       return {
         ...screening,
         nextDueDate,
       };
-    });
+    }));
 
     setPreventiveCareItems(itemsWithDates);
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadHabits();
+    if (user) {
+      await loadPreventiveCareItems();
+    }
+    setRefreshing(false);
   };
 
   if (isLoading) {
@@ -74,7 +110,16 @@ const TodayScreen = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#4A89DC"
+        />
+      }
+    >
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Today's Habits</Text>
         {habits.length > 0 ? (
