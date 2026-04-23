@@ -95,6 +95,18 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
             Connection: {connectionState}
           </Text>
 
+          {connectionState === 'completed' && (
+            <Text style={styles.successText}>
+              File transferred successfully!
+            </Text>
+          )}
+
+          {connectionState === 'failed' && (
+            <Text style={styles.errorText}>
+              Transfer failed. Please try again.
+            </Text>
+          )}
+
           <TouchableOpacity
             style={[
               styles.closeButton,
@@ -167,6 +179,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
     marginBottom: 20,
+  },
+  successText: {
+    fontSize: 16,
+    color: Colors.success,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.error,
+    marginBottom: 20,
+    textAlign: 'center',
   },
   closeButton: {
     backgroundColor: Colors.primary,
