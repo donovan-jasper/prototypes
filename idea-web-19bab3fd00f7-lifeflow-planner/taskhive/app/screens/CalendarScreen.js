@@ -178,18 +178,13 @@ const CalendarScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Calendar Events</Text>
             {calendarEvents.map((event, index) => (
-              <View key={`event-${index}`} style={styles.eventItem}>
+              <View key={index} style={styles.eventItem}>
                 <View style={styles.eventTimeContainer}>
-                  <Text style={styles.eventTime}>
-                    {formatTime(event.startDate)} - {formatTime(event.endDate)}
-                  </Text>
+                  <Text style={styles.eventTime}>{formatTime(event.startDate)}</Text>
+                  {event.endDate && <Text style={styles.eventTime}> - {formatTime(event.endDate)}</Text>}
                 </View>
-                <View style={styles.eventDetails}>
-                  <Text style={styles.eventTitle}>{event.title}</Text>
-                  {event.location && (
-                    <Text style={styles.eventLocation}>{event.location}</Text>
-                  )}
-                </View>
+                <Text style={styles.eventTitle}>{event.title}</Text>
+                {event.location && <Text style={styles.eventLocation}>{event.location}</Text>}
               </View>
             ))}
           </View>
@@ -199,16 +194,11 @@ const CalendarScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tasks</Text>
             {dateTasks.map((task, index) => (
-              <View key={`task-${index}`} style={styles.taskItem}>
-                <View style={[
-                  styles.taskPriorityIndicator,
-                  { backgroundColor: getPriorityColor(task.priority) }
-                ]} />
-                <View style={styles.taskDetails}>
+              <View key={index} style={styles.taskItem}>
+                <View style={[styles.taskPriorityIndicator, { backgroundColor: getPriorityColor(task.priority) }]} />
+                <View style={styles.taskContent}>
                   <Text style={styles.taskTitle}>{task.title}</Text>
-                  {task.notes && (
-                    <Text style={styles.taskNotes}>{task.notes}</Text>
-                  )}
+                  {task.notes && <Text style={styles.taskNotes}>{task.notes}</Text>}
                 </View>
               </View>
             ))}
@@ -221,7 +211,7 @@ const CalendarScreen = () => {
   const getPriorityColor = (priority) => {
     switch (priority) {
       case 'high': return '#FF3B30';
-      case 'medium': return '#FF9500';
+      case 'medium': return '#FFCC00';
       case 'low': return '#34C759';
       default: return '#8E8E93';
     }
@@ -234,30 +224,17 @@ const CalendarScreen = () => {
         markedDates={{
           ...markedDates,
           [selectedDate]: {
-            ...(markedDates[selectedDate] || {}),
+            ...markedDates[selectedDate],
             selected: true,
             selectedColor: '#007AFF'
           }
         }}
         theme={{
-          selectedDayBackgroundColor: '#007AFF',
           todayTextColor: '#007AFF',
+          selectedDayTextColor: '#FFFFFF',
           arrowColor: '#007AFF',
         }}
       />
-
-      {permissionError && (
-        <View style={styles.permissionError}>
-          <Text style={styles.permissionErrorText}>{permissionError}</Text>
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestCalendarPermissions}
-          >
-            <Text style={styles.permissionButtonText}>Retry Permission</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {renderSelectedDateContent()}
     </View>
   );
@@ -277,15 +254,14 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: '#333333',
     marginBottom: 12,
-    color: '#333',
   },
   eventItem: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -294,30 +270,28 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   eventTimeContainer: {
-    marginRight: 12,
-    width: 80,
+    flexDirection: 'row',
+    marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: '#666',
-  },
-  eventDetails: {
-    flex: 1,
+    color: '#666666',
   },
   eventTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    color: '#333333',
     marginBottom: 4,
   },
   eventLocation: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
   },
   taskItem: {
     flexDirection: 'row',
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -327,64 +301,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   taskPriorityIndicator: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 32,
+    borderRadius: 4,
     marginRight: 12,
   },
-  taskDetails: {
+  taskContent: {
     flex: 1,
   },
   taskTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    color: '#333333',
     marginBottom: 4,
   },
   taskNotes: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 16,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#666',
+    color: '#666666',
     textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 16,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 8,
     fontSize: 16,
-    color: '#666',
-  },
-  permissionError: {
-    backgroundColor: '#FFEBEE',
-    padding: 16,
-    margin: 16,
-    borderRadius: 8,
-  },
-  permissionErrorText: {
-    color: '#C62828',
-    marginBottom: 8,
-  },
-  permissionButton: {
-    backgroundColor: '#007AFF',
-    padding: 8,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-  },
-  permissionButtonText: {
-    color: 'white',
-    fontWeight: '600',
+    color: '#666666',
   },
 });
 
