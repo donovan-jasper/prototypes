@@ -18,6 +18,7 @@ export interface Recipient {
     notificationsEnabled?: boolean;
     favoriteCategory?: string;
   };
+  lastGift?: SentGift | null;
 }
 
 export interface SentGift {
