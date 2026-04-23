@@ -3,16 +3,16 @@ export function formatCurrency(amount: number): string {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    maximumFractionDigits: 2,
   }).format(amount);
 }
 
 export function formatDate(date: Date): string {
-  return date.toLocaleDateString('en-US', {
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
     month: 'short',
-    day: 'numeric'
-  });
+    day: 'numeric',
+  }).format(date);
 }
 
 export function truncateText(text: string, maxLength: number): string {

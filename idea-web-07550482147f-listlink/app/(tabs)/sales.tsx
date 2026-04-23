@@ -6,11 +6,12 @@ import { formatCurrency, formatDate } from '../../lib/utils/formatting';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { DateRangePicker } from '../../components/DateRangePicker';
 import { CSVExportButton } from '../../components/CSVExportButton';
-import { Card, ActivityIndicator } from 'react-native-paper';
+import { Card, ActivityIndicator, Divider, useTheme } from 'react-native-paper';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 export default function SalesScreen() {
+  const theme = useTheme();
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
     start: new Date(new Date().setDate(new Date().getDate() - 30)),
     end: new Date()
@@ -137,8 +138,8 @@ export default function SalesScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text>Loading sales data...</Text>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading sales data...</Text>
       </View>
     );
   }
@@ -156,48 +157,51 @@ export default function SalesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Sales Tracker</Text>
-        <DateRangePicker
-          dateRange={dateRange}
-          onChange={setDateRange}
-        />
+      <View style={styles.summaryContainer}>
+        <Card style={styles.summaryCard} mode="outlined">
+          <Text style={styles.summaryTitle}>Sales Summary</Text>
+          <Divider style={styles.divider} />
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Sales:</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(totalSales)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Total Profit:</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(totalProfit)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Average Margin:</Text>
+            <Text style={styles.summaryValue}>{avgMargin.toFixed(1)}%</Text>
+          </View>
+        </Card>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryContainer}>
-        <Card style={styles.summaryCard} mode="outlined">
-          <Text style={styles.summaryLabel}>Total Sales</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalSales)}</Text>
-        </Card>
-        <Card style={styles.summaryCard} mode="outlined">
-          <Text style={styles.summaryLabel}>Total Profit</Text>
-          <Text style={styles.summaryValue}>{formatCurrency(totalProfit)}</Text>
-        </Card>
-        <Card style={styles.summaryCard} mode="outlined">
-          <Text style={styles.summaryLabel}>Avg Margin</Text>
-          <Text style={styles.summaryValue}>{avgMargin.toFixed(1)}%</Text>
-        </Card>
-      </ScrollView>
-
-      <View style={styles.exportContainer}>
+      <View style={styles.controlsContainer}>
+        <DateRangePicker
+          startDate={dateRange.start}
+          endDate={dateRange.end}
+          onChange={(start, end) => setDateRange({ start, end })}
+        />
         <CSVExportButton
           onPress={handleExportCSV}
-          isExporting={isExporting}
-          isPremium={true}
+          disabled={isExporting}
+          loading={isExporting}
         />
       </View>
 
-      <FlatList
-        data={soldListings}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No sales in this period</Text>
-          </View>
-        }
-      />
+      {soldListings.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No sales found for the selected period</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={soldListings}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+        />
+      )}
     </View>
   );
 }
@@ -205,43 +209,69 @@ export default function SalesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     padding: 16,
   },
-  header: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    textAlign: 'center',
     marginBottom: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
+  retryText: {
+    color: 'blue',
+    fontSize: 16,
   },
   summaryContainer: {
     marginBottom: 16,
   },
   summaryCard: {
-    width: 150,
     padding: 16,
-    marginRight: 8,
-    borderRadius: 8,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  summaryValue: {
+  summaryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 8,
   },
-  exportContainer: {
+  divider: {
+    marginVertical: 8,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  controlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
-    alignItems: 'flex-end',
   },
   saleItem: {
-    marginBottom: 12,
+    marginBottom: 8,
     padding: 12,
-    borderRadius: 8,
   },
   saleItemHeader: {
     flexDirection: 'row',
@@ -261,7 +291,7 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginVertical: 4,
   },
   detailLabel: {
     fontSize: 14,
@@ -272,34 +302,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
-  emptyState: {
-    padding: 20,
+  separator: {
+    height: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryText: {
-    color: 'blue',
-    textDecorationLine: 'underline',
   },
 });

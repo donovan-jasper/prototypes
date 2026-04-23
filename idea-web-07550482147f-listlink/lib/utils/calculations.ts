@@ -1,11 +1,11 @@
-export interface ProfitCalculationParams {
+interface ProfitCalculationParams {
   salePrice: number;
   sourcingCost: number;
   platform: string;
   shippingCost: number;
 }
 
-export interface ProfitResult {
+interface ProfitResult {
   profit: number;
   margin: number;
   fees: number;
@@ -18,12 +18,13 @@ export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
   const platformFees = {
     ebay: 0.13, // 13% final value fee
     poshmark: 0.15, // 15% processing fee
-    mercari: 0.10, // 10% service fee
-    depop: 0.12, // 12% commission
-    default: 0.10 // Default 10% fee
+    mercari: 0.1, // 10% service fee
+    depop: 0.12, // 12% processing fee
+    stockx: 0.1, // 10% processing fee
+    whatnot: 0.1, // 10% processing fee
   };
 
-  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
+  const feePercentage = platformFees[platform.toLowerCase()] || 0.1;
   const fees = salePrice * feePercentage;
   const totalCost = sourcingCost + fees + shippingCost;
   const profit = salePrice - totalCost;
@@ -31,8 +32,8 @@ export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
 
   return {
     profit: Math.max(0, profit), // Ensure profit isn't negative
-    margin: isNaN(margin) ? 0 : margin,
-    fees
+    margin: Math.max(0, margin), // Ensure margin isn't negative
+    fees,
   };
 }
 
@@ -40,16 +41,16 @@ export function calculateFees(price: number, platform: string): number {
   const platformFees = {
     ebay: 0.13,
     poshmark: 0.15,
-    mercari: 0.10,
+    mercari: 0.1,
     depop: 0.12,
-    default: 0.10
+    stockx: 0.1,
+    whatnot: 0.1,
   };
 
-  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
+  const feePercentage = platformFees[platform.toLowerCase()] || 0.1;
   return price * feePercentage;
 }
 
 export function calculateMargin(profit: number, salePrice: number): number {
-  if (salePrice === 0) return 0;
   return (profit / salePrice) * 100;
 }

@@ -1,48 +1,32 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { StyleSheet } from 'react-native';
+import { Button, useTheme } from 'react-native-paper';
 
 interface CSVExportButtonProps {
   onPress: () => void;
-  isExporting: boolean;
-  isPremium: boolean;
+  disabled?: boolean;
+  loading?: boolean;
 }
 
-export function CSVExportButton({ onPress, isExporting, isPremium }: CSVExportButtonProps) {
+export function CSVExportButton({ onPress, disabled, loading }: CSVExportButtonProps) {
+  const theme = useTheme();
+
   return (
-    <TouchableOpacity
-      style={styles.button}
+    <Button
+      mode="contained"
       onPress={onPress}
-      disabled={isExporting || !isPremium}
+      disabled={disabled}
+      loading={loading}
+      style={styles.button}
+      icon="file-export"
     >
-      {isExporting ? (
-        <ActivityIndicator size="small" color="#fff" />
-      ) : (
-        <>
-          <MaterialIcons name="file-download" size={18} color="#fff" style={styles.icon} />
-          <Text style={styles.text}>Export CSV</Text>
-        </>
-      )}
-    </TouchableOpacity>
+      Export CSV
+    </Button>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    opacity: 0.8,
-  },
-  icon: {
-    marginRight: 8,
-  },
-  text: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    marginLeft: 8,
   },
 });
