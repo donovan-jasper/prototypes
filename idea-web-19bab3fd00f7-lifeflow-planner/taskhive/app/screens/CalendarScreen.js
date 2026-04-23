@@ -200,10 +200,9 @@ const CalendarScreen = () => {
             <Text style={styles.sectionTitle}>Tasks</Text>
             {dateTasks.map((task, index) => (
               <View key={index} style={styles.taskItem}>
-                <View style={[
-                  styles.taskPriorityIndicator,
-                  { backgroundColor: getPriorityColor(task.priority) }
-                ]} />
+                <View style={styles.taskTimeContainer}>
+                  <Text style={styles.taskTime}>{formatTime(task.dueDate)}</Text>
+                </View>
                 <View style={styles.taskDetails}>
                   <Text style={styles.taskTitle}>{task.title}</Text>
                   {task.notes && (
@@ -216,15 +215,6 @@ const CalendarScreen = () => {
         )}
       </ScrollView>
     );
-  };
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return '#FF3B30';
-      case 'medium': return '#FFCC00';
-      case 'low': return '#34C759';
-      default: return '#8E8E93';
-    }
   };
 
   return (
@@ -240,8 +230,8 @@ const CalendarScreen = () => {
           }
         }}
         theme={{
-          selectedDayBackgroundColor: '#007AFF',
           todayTextColor: '#007AFF',
+          selectedDayTextColor: '#FFFFFF',
           arrowColor: '#007AFF',
         }}
       />
@@ -253,7 +243,7 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
   contentContainer: {
     flex: 1,
@@ -264,60 +254,73 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
   },
   eventItem: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    padding: 12,
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  taskItem: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   eventTimeContainer: {
-    marginRight: 12,
+    width: 80,
+    justifyContent: 'center',
+  },
+  taskTimeContainer: {
+    width: 80,
     justifyContent: 'center',
   },
   eventTime: {
     fontSize: 14,
     color: '#666',
+    fontWeight: '500',
+  },
+  taskTime: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
   },
   eventDetails: {
     flex: 1,
   },
+  taskDetails: {
+    flex: 1,
+  },
   eventTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
   eventLocation: {
     fontSize: 14,
     color: '#666',
-  },
-  taskItem: {
-    flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    marginBottom: 8,
-    alignItems: 'center',
-  },
-  taskPriorityIndicator: {
-    width: 8,
-    height: 32,
-    borderRadius: 4,
-    marginRight: 12,
-  },
-  taskDetails: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 4,
   },
   taskNotes: {
     fontSize: 14,
@@ -331,7 +334,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#999',
+    color: '#666',
     textAlign: 'center',
   },
   loadingContainer: {
