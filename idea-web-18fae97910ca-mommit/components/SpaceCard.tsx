@@ -14,9 +14,7 @@ export default function SpaceCard({ space, onPress }: SpaceCardProps) {
         <Text style={styles.name}>{space.name}</Text>
         <Text style={styles.memberCount}>{space.members.length} members</Text>
       </View>
-      <Text style={styles.createdAt}>
-        Created: {new Date(space.created_at).toLocaleDateString()}
-      </Text>
+      <Text style={styles.createdAt}>Created: {new Date(space.created_at).toLocaleDateString()}</Text>
     </TouchableOpacity>
   );
 }

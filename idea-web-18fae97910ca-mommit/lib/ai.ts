@@ -1,4 +1,10 @@
+import OpenAI from 'openai';
 import { TriggerType } from './types';
+
+const openai = new OpenAI({
+  apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+});
 
 interface ParsedMemory {
   title: string;
@@ -8,94 +14,106 @@ interface ParsedMemory {
 }
 
 export const parseNaturalLanguage = async (input: string): Promise<ParsedMemory> => {
-  // In a real implementation, this would call the OpenAI API
-  // For this example, we'll use simple pattern matching
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful assistant that parses natural language reminders into structured data.
+          For each input, extract:
+          1. A title (short summary)
+          2. A description (full details)
+          3. Trigger type (time, location, or routine)
+          4. Trigger value (specific time, location name, or routine description)
 
-  // Default values
-  let title = input;
-  let description = '';
-  let triggerType: TriggerType = 'time';
-  let triggerValue = new Date(Date.now() + 86400000).toISOString(); // Default to tomorrow
+          Return the result as a JSON object with these fields: title, description, triggerType, triggerValue.`
+        },
+        {
+          role: 'user',
+          content: input
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
 
-  // Simple pattern matching for common cases
-  if (input.toLowerCase().includes('remind me')) {
-    title = input.replace(/remind me to?\s*/i, '').trim();
-  }
-
-  // Check for time-based triggers
-  const timeRegex = /(at|on|by)\s*([0-9: ]+)/i;
-  const timeMatch = input.match(timeRegex);
-  if (timeMatch) {
-    triggerType = 'time';
-    const timeStr = timeMatch[2];
-
-    // Try to parse the time
-    try {
-      // If it's just a time (e.g., "5 PM"), use today's date
-      if (/^[0-9: ]+$/.test(timeStr)) {
-        const today = new Date();
-        const [hours, minutes] = timeStr.split(':').map(Number);
-        today.setHours(hours, minutes || 0, 0, 0);
-        triggerValue = today.toISOString();
-      } else {
-        // Try to parse as full date/time
-        triggerValue = new Date(timeStr).toISOString();
-      }
-    } catch (e) {
-      // Fallback to tomorrow if parsing fails
-      triggerValue = new Date(Date.now() + 86400000).toISOString();
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('No response from AI');
     }
-  }
 
-  // Check for location-based triggers
-  const locationRegex = /(near|at|around)\s*(.+)/i;
-  const locationMatch = input.match(locationRegex);
-  if (locationMatch) {
-    triggerType = 'location';
-    triggerValue = locationMatch[2].trim();
+    const parsed = JSON.parse(content);
+    return {
+      title: parsed.title || 'New Memory',
+      description: parsed.description || input,
+      triggerType: parsed.triggerType || 'time',
+      triggerValue: parsed.triggerValue || new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error parsing natural language:', error);
+    // Fallback to basic parsing if AI fails
+    return {
+      title: input.split(' ').slice(0, 5).join(' ') + '...',
+      description: input,
+      triggerType: 'time',
+      triggerValue: new Date().toISOString()
+    };
   }
-
-  // Check for routine-based triggers
-  const routineKeywords = ['every', 'each', 'daily', 'weekly', 'monthly'];
-  if (routineKeywords.some(keyword => input.toLowerCase().includes(keyword))) {
-    triggerType = 'routine';
-    // Extract the routine pattern
-    const routineMatch = input.match(/(every|each|daily|weekly|monthly)\s*(.+)/i);
-    if (routineMatch) {
-      triggerValue = routineMatch[2].trim();
-    } else {
-      triggerValue = 'daily';
-    }
-  }
-
-  return {
-    title,
-    description,
-    triggerType,
-    triggerValue
-  };
 };
 
-export const generateSuggestions = async (userHistory: Memory[]): Promise<string[]> => {
-  // In a real implementation, this would call the OpenAI API
-  // For this example, we'll use simple pattern matching
+export const generateSuggestions = async (userHistory: ParsedMemory[]): Promise<ParsedMemory[]> => {
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a helpful assistant that suggests new reminders based on user history.
+          Analyze the user's past reminders and suggest 3-5 new reminders that would be helpful.
+          For each suggestion, provide:
+          1. A title
+          2. A description
+          3. Trigger type (time, location, or routine)
+          4. Trigger value (specific time, location name, or routine description)
 
-  const suggestions: string[] = [];
+          Return the result as a JSON array of objects with these fields: title, description, triggerType, triggerValue.`
+        },
+        {
+          role: 'user',
+          content: `Here are my past reminders: ${JSON.stringify(userHistory)}`
+        }
+      ],
+      response_format: { type: 'json_object' }
+    });
 
-  // Check for common patterns in user history
-  const timeBasedMemories = userHistory.filter(m => m.trigger_type === 'time');
-  if (timeBasedMemories.length > 3) {
-    suggestions.push('You often set time-based reminders. Would you like me to suggest some recurring ones?');
+    const content = response.choices[0].message.content;
+    if (!content) {
+      throw new Error('No response from AI');
+    }
+
+    const suggestions = JSON.parse(content);
+    return suggestions.map((suggestion: any) => ({
+      title: suggestion.title || 'New Suggestion',
+      description: suggestion.description || '',
+      triggerType: suggestion.triggerType || 'time',
+      triggerValue: suggestion.triggerValue || new Date().toISOString()
+    }));
+  } catch (error) {
+    console.error('Error generating suggestions:', error);
+    // Fallback to basic suggestions if AI fails
+    return [
+      {
+        title: 'Take a walk',
+        description: 'Get some fresh air and exercise',
+        triggerType: 'time',
+        triggerValue: new Date(Date.now() + 86400000).toISOString() // Tomorrow
+      },
+      {
+        title: 'Drink water',
+        description: 'Stay hydrated throughout the day',
+        triggerType: 'routine',
+        triggerValue: 'Every 2 hours'
+      }
+    ];
   }
-
-  const locationBasedMemories = userHistory.filter(m => m.trigger_type === 'location');
-  if (locationBasedMemories.length > 0) {
-    suggestions.push('You have location-based reminders. Would you like me to set one for a new location?');
-  }
-
-  // Add some generic suggestions
-  suggestions.push('Would you like a reminder for your weekly review?');
-  suggestions.push('Would you like me to remind you to drink water every hour?');
-
-  return suggestions;
 };

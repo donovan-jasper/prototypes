@@ -184,12 +184,12 @@ export default function SharedSpacesScreen() {
           data={spaces}
           renderItem={renderSpaceItem}
           keyExtractor={(item) => item.id}
-          style={styles.spaceList}
+          contentContainerStyle={styles.list}
         />
       ) : (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No shared spaces yet</Text>
-          <Text style={styles.emptySubtext}>Create or join a space to share memories with others</Text>
+          <Text style={styles.emptySubtext}>Create or join a space to start sharing memories</Text>
         </View>
       )}
     </ScrollView>
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   },
   createForm: {
     backgroundColor: 'white',
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
     marginBottom: 20,
     shadowColor: '#000',
@@ -260,10 +260,11 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  spaceList: {
+    justifyContent: 'space-between',
     marginTop: 10,
+  },
+  list: {
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -274,11 +275,9 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     marginTop: 50,
-    padding: 20,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: 'bold',
     color: '#666',
     marginBottom: 10,
   },

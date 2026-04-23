@@ -134,6 +134,29 @@ export const getMemoriesForUser = async (userId: string): Promise<Memory[]> => {
   });
 };
 
+export const getMemoriesForSpace = async (spaceId: string): Promise<Memory[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT m.*
+         FROM memories m
+         JOIN space_memories sm ON m.id = sm.memory_id
+         WHERE sm.space_id = ?
+         ORDER BY m.created_at DESC;`,
+        [spaceId],
+        (_, { rows }) => {
+          const memories: Memory[] = [];
+          for (let i = 0; i < rows.length; i++) {
+            memories.push(rows.item(i));
+          }
+          resolve(memories);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
 export const createSpace = async (name: string, ownerId: string, members: string[]): Promise<Space> => {
   return new Promise((resolve, reject) => {
     const id = Date.now().toString();
@@ -159,32 +182,17 @@ export const createSpace = async (name: string, ownerId: string, members: string
                   `INSERT INTO space_members (space_id, user_id) VALUES ${placeholders};`,
                   values,
                   () => {
-                    // Return the space with all members
-                    tx.executeSql(
-                      `SELECT s.*, GROUP_CONCAT(sm.user_id) as members
-                       FROM spaces s
-                       LEFT JOIN space_members sm ON s.id = sm.space_id
-                       WHERE s.id = ?
-                       GROUP BY s.id;`,
-                      [id],
-                      (_, { rows }) => {
-                        const spaceData = rows.item(0);
-                        const space: Space = {
-                          id: spaceData.id,
-                          name: spaceData.name,
-                          created_at: spaceData.created_at,
-                          owner_id: spaceData.owner_id,
-                          members: spaceData.members ? spaceData.members.split(',') : []
-                        };
-                        resolve(space);
-                      },
-                      (_, error) => reject(error)
-                    );
+                    resolve({
+                      id,
+                      name,
+                      created_at: createdAt,
+                      owner_id: ownerId,
+                      members: [ownerId, ...members]
+                    });
                   },
                   (_, error) => reject(error)
                 );
               } else {
-                // Return the space with just the owner
                 resolve({
                   id,
                   name,
@@ -216,13 +224,13 @@ export const getSpacesForUser = async (userId: string): Promise<Space[]> => {
         (_, { rows }) => {
           const spaces: Space[] = [];
           for (let i = 0; i < rows.length; i++) {
-            const spaceData = rows.item(i);
+            const space = rows.item(i);
             spaces.push({
-              id: spaceData.id,
-              name: spaceData.name,
-              created_at: spaceData.created_at,
-              owner_id: spaceData.owner_id,
-              members: spaceData.members ? spaceData.members.split(',') : []
+              id: space.id,
+              name: space.name,
+              created_at: space.created_at,
+              owner_id: space.owner_id,
+              members: space.members ? space.members.split(',') : []
             });
           }
           resolve(spaces);
@@ -244,20 +252,18 @@ export const getSpaceById = async (spaceId: string): Promise<Space> => {
          GROUP BY s.id;`,
         [spaceId],
         (_, { rows }) => {
-          if (rows.length === 0) {
+          if (rows.length > 0) {
+            const space = rows.item(0);
+            resolve({
+              id: space.id,
+              name: space.name,
+              created_at: space.created_at,
+              owner_id: space.owner_id,
+              members: space.members ? space.members.split(',') : []
+            });
+          } else {
             reject(new Error('Space not found'));
-            return;
           }
-
-          const spaceData = rows.item(0);
-          const space: Space = {
-            id: spaceData.id,
-            name: spaceData.name,
-            created_at: spaceData.created_at,
-            owner_id: spaceData.owner_id,
-            members: spaceData.members ? spaceData.members.split(',') : []
-          };
-          resolve(space);
         },
         (_, error) => reject(error)
       );
@@ -271,7 +277,9 @@ export const addMemberToSpace = async (spaceId: string, userId: string): Promise
       tx.executeSql(
         `INSERT INTO space_members (space_id, user_id) VALUES (?, ?);`,
         [spaceId, userId],
-        () => resolve(),
+        () => {
+          resolve();
+        },
         (_, error) => reject(error)
       );
     });
@@ -284,29 +292,8 @@ export const removeMemberFromSpace = async (spaceId: string, userId: string): Pr
       tx.executeSql(
         `DELETE FROM space_members WHERE space_id = ? AND user_id = ?;`,
         [spaceId, userId],
-        () => resolve(),
-        (_, error) => reject(error)
-      );
-    });
-  });
-};
-
-export const getMemoriesForSpace = async (spaceId: string): Promise<Memory[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT m.*
-         FROM memories m
-         JOIN space_memories sm ON m.id = sm.memory_id
-         WHERE sm.space_id = ?
-         ORDER BY m.created_at DESC;`,
-        [spaceId],
-        (_, { rows }) => {
-          const memories: Memory[] = [];
-          for (let i = 0; i < rows.length; i++) {
-            memories.push(rows.item(i));
-          }
-          resolve(memories);
+        () => {
+          resolve();
         },
         (_, error) => reject(error)
       );
@@ -320,7 +307,9 @@ export const addMemoryToSpace = async (spaceId: string, memoryId: string): Promi
       tx.executeSql(
         `INSERT INTO space_memories (space_id, memory_id) VALUES (?, ?);`,
         [spaceId, memoryId],
-        () => resolve(),
+        () => {
+          resolve();
+        },
         (_, error) => reject(error)
       );
     });

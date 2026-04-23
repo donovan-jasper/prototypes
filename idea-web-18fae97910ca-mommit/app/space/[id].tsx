@@ -188,7 +188,7 @@ export default function SpaceDetailScreen() {
           <View style={styles.addMemberForm}>
             <TextInput
               style={styles.input}
-              placeholder="Email address"
+              placeholder="Member email"
               value={newMemberEmail}
               onChangeText={setNewMemberEmail}
               keyboardType="email-address"
@@ -214,7 +214,7 @@ export default function SpaceDetailScreen() {
             data={space.members}
             renderItem={renderMemberItem}
             keyExtractor={(item) => item}
-            style={styles.memberList}
+            contentContainerStyle={styles.memberList}
           />
         )}
       </View>
@@ -260,12 +260,12 @@ export default function SpaceDetailScreen() {
             data={memories}
             renderItem={renderMemoryItem}
             keyExtractor={(item) => item.id}
-            style={styles.memoryList}
+            contentContainerStyle={styles.memoryList}
           />
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No memories in this space yet</Text>
-            <Text style={styles.emptySubtext}>Add memories to share with your space members</Text>
+            <Text style={styles.emptySubtext}>Add a memory to start sharing with your team</Text>
           </View>
         )}
       </View>
@@ -315,10 +315,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 12,
-  },
-  memberList: {
-    marginTop: 10,
+    fontSize: 14,
   },
   memberItem: {
     flexDirection: 'row',
@@ -334,7 +331,7 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     backgroundColor: '#f44336',
-    padding: 5,
+    padding: 6,
     borderRadius: 4,
   },
   removeButtonText: {
@@ -355,12 +352,15 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   button: {
-    padding: 8,
+    padding: 10,
     borderRadius: 4,
-    marginLeft: 10,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#9E9E9E',
@@ -370,14 +370,13 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 12,
     fontWeight: 'bold',
-  },
-  memoryList: {
-    marginTop: 10,
   },
   addMemoryForm: {
     marginTop: 10,
+  },
+  memoryList: {
+    paddingBottom: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -387,12 +386,10 @@ const styles = StyleSheet.create({
   },
   emptyState: {
     alignItems: 'center',
-    marginTop: 20,
     padding: 20,
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: 'bold',
     color: '#666',
     marginBottom: 10,
   },
