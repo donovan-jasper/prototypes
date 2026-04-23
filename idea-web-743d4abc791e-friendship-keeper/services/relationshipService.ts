@@ -15,7 +15,9 @@ export const initializeDatabase = async () => {
           category TEXT NOT NULL,
           frequency TEXT NOT NULL,
           importance INTEGER NOT NULL,
-          createdAt TEXT NOT NULL
+          createdAt TEXT NOT NULL,
+          phoneNumber TEXT,
+          nextCheckIn TEXT
         );`,
         [],
         () => {
@@ -142,13 +144,101 @@ export const calculateHealth = (relationship: Relationship, lastInteractionTimes
 };
 
 const getFrequencyDays = (frequency: string): number => {
-  switch (frequency.toLowerCase()) {
-    case 'daily': return 1;
-    case 'weekly': return 7;
-    case 'bi-weekly': return 14;
-    case 'monthly': return 30;
-    case 'quarterly': return 90;
-    case 'yearly': return 365;
-    default: return 30; // Default to monthly if unknown frequency
+  switch (frequency) {
+    case 'Weekly':
+      return 7;
+    case 'Monthly':
+      return 30;
+    case 'Quarterly':
+      return 90;
+    default:
+      return 30; // Default to monthly
+  }
+};
+
+export const createRelationship = async (relationship: Omit<Relationship, 'id'>): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO relationships (name, category, frequency, importance, createdAt, phoneNumber, nextCheckIn) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [
+          relationship.name,
+          relationship.category,
+          relationship.frequency,
+          relationship.importance,
+          relationship.createdAt,
+          relationship.phoneNumber || null,
+          relationship.nextCheckIn || null
+        ],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const updateRelationship = async (id: number, updates: Partial<Relationship>): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+      const values = Object.values(updates);
+
+      tx.executeSql(
+        `UPDATE relationships SET ${fields} WHERE id = ?`,
+        [...values, id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const deleteRelationship = async (id: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM relationships WHERE id = ?',
+        [id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getRelationshipById = async (id: number): Promise<RelationshipWithHealth | null> => {
+  try {
+    const relationship = await new Promise<Relationship | null>((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT * FROM relationships WHERE id = ?',
+          [id],
+          (_, { rows }) => resolve(rows._array[0] || null),
+          (_, error) => reject(error)
+        );
+      });
+    });
+
+    if (!relationship) return null;
+
+    const lastInteraction = await new Promise<{ timestamp: string } | null>((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT timestamp FROM interactions WHERE relationshipId = ? ORDER BY timestamp DESC LIMIT 1',
+          [relationship.id],
+          (_, { rows }) => resolve(rows._array[0] || null),
+          (_, error) => reject(error)
+        );
+      });
+    });
+
+    return {
+      ...relationship,
+      health: calculateHealth(relationship, lastInteraction?.timestamp || null),
+      lastInteraction: lastInteraction ? { timestamp: lastInteraction.timestamp } : undefined
+    };
+  } catch (error) {
+    console.error('Error fetching relationship by ID:', error);
+    throw error;
   }
 };

@@ -6,6 +6,8 @@ export interface Relationship {
   importance: number;
   createdAt: string;
   notes?: string;
+  phoneNumber?: string;
+  nextCheckIn?: string;
 }
 
 export interface Interaction {
@@ -30,6 +32,7 @@ export interface RelationshipHealth {
   status: 'healthy' | 'at-risk' | 'neglected';
   daysSinceContact: number;
   isOverdue: boolean;
+  lastInteractionTimestamp?: string;
 }
 
 export interface RelationshipWithHealth extends Relationship {

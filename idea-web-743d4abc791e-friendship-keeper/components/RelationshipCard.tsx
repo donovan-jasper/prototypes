@@ -51,15 +51,19 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
   };
 
   const handleCall = () => {
-    // In a real app, you would get the phone number from the relationship data
-    const phoneNumber = '1234567890'; // Replace with actual phone number
-    Linking.openURL(`tel:${phoneNumber}`);
+    if (relationship.phoneNumber) {
+      Linking.openURL(`tel:${relationship.phoneNumber}`);
+    } else {
+      alert('No phone number available for this relationship');
+    }
   };
 
   const handleText = () => {
-    // In a real app, you would get the phone number from the relationship data
-    const phoneNumber = '1234567890'; // Replace with actual phone number
-    Linking.openURL(`sms:${phoneNumber}`);
+    if (relationship.phoneNumber) {
+      Linking.openURL(`sms:${relationship.phoneNumber}`);
+    } else {
+      alert('No phone number available for this relationship');
+    }
   };
 
   const handleSchedule = async () => {
@@ -74,7 +78,7 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
             endDate: new Date(Date.now() + 90000000), // Tomorrow + 1 hour
             timeZone: 'local',
             location: 'To be determined',
-            notes: `Scheduled through Kinkeeper app`,
+            notes: `Scheduled through Kinkeeper app\n\nRelationship: ${relationship.name}\nCategory: ${relationship.category}\nLast contact: ${formatDaysSince()}`,
           };
 
           await Calendar.createEventAsync(calendars[0].id, eventDetails);
@@ -110,9 +114,27 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.lastContact}>{formatDaysSince()}</Text>
-        <Text style={styles.frequency}>Check-in: {relationship.frequency}</Text>
+      <View style={styles.detailsContainer}>
+        <View style={styles.detailItem}>
+          <MaterialIcons name="phone" size={16} color="#666" />
+          <Text style={styles.detailText}>
+            {relationship.phoneNumber || 'No phone number'}
+          </Text>
+        </View>
+
+        <View style={styles.detailItem}>
+          <MaterialIcons name="event" size={16} color="#666" />
+          <Text style={styles.detailText}>
+            Next check-in: {relationship.frequency}
+          </Text>
+        </View>
+
+        <View style={styles.detailItem}>
+          <MaterialIcons name="history" size={16} color="#666" />
+          <Text style={styles.detailText}>
+            Last contact: {formatDaysSince()}
+          </Text>
+        </View>
       </View>
 
       <View style={styles.actionButtons}>
@@ -146,76 +168,75 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
   },
   nameContainer: {
     flex: 1,
-    marginRight: 12,
   },
   name: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#212121',
-    marginBottom: 6,
+    color: '#333',
+    marginBottom: 4,
   },
   categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start',
   },
   categoryText: {
+    color: 'white',
     fontSize: 12,
     fontWeight: '500',
-    color: '#FFFFFF',
   },
   healthContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: 'flex-end',
   },
   healthIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginBottom: 4,
   },
   healthScore: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  detailsContainer: {
     marginBottom: 16,
   },
-  lastContact: {
-    fontSize: 14,
-    color: '#757575',
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  frequency: {
-    fontSize: 12,
-    color: '#9E9E9E',
+  detailText: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    marginTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#EEEEEE',
+    borderTopColor: '#EEE',
     paddingTop: 12,
   },
   actionButton: {
     alignItems: 'center',
+    padding: 8,
   },
   actionText: {
     fontSize: 12,
-    color: '#757575',
+    color: '#666',
     marginTop: 4,
   },
 });
