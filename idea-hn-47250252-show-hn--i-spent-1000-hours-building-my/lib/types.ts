@@ -52,3 +52,8 @@ export interface NetWorth {
   totalLiabilities: number;
   netWorth: number;
 }
+
+export interface CachedPrice {
+  price: number;
+  timestamp: number;
+}

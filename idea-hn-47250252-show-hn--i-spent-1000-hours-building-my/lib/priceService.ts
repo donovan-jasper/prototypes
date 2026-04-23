@@ -122,3 +122,6 @@ export class PriceService {
     }
   }
 }
+
+// Singleton instance for the app to use
+export const priceService = new PriceService(false);

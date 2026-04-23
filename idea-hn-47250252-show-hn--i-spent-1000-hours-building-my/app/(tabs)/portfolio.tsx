@@ -166,9 +166,13 @@ const styles = StyleSheet.create({
   summaryContainer: {
     backgroundColor: 'white',
     padding: 20,
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    margin: 10,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   summaryTitle: {
     fontSize: 16,
@@ -183,6 +187,7 @@ const styles = StyleSheet.create({
   summaryGain: {
     fontSize: 16,
     fontWeight: '500',
+    marginTop: 5,
   },
   positive: {
     color: '#4CAF50',
@@ -192,15 +197,15 @@ const styles = StyleSheet.create({
   },
   holdingItem: {
     backgroundColor: 'white',
+    marginHorizontal: 10,
     marginBottom: 10,
     padding: 15,
     borderRadius: 8,
-    marginHorizontal: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1,
   },
   holdingHeader: {
     flexDirection: 'row',
@@ -234,7 +239,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 80,
   },
   emptyState: {
     flex: 1,
@@ -257,9 +262,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
@@ -267,7 +272,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: 'white',
-    fontSize: 24,
+    fontSize: 30,
     fontWeight: 'bold',
   },
 });
