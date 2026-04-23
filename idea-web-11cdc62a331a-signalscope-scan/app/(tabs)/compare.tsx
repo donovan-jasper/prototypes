@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, Alert, TextInput } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { BarChart } from 'react-native-chart-kit';
+import MapView, { Heatmap } from 'react-native-maps';
 import { getRecentReadings, getCarrierPerformanceStats } from '../../services/database';
 import { usePremium } from '../../hooks/usePremium';
 import PremiumGate from '../../components/PremiumGate';
@@ -20,6 +21,13 @@ export default function CompareScreen() {
   const [showSavings, setShowSavings] = useState(false);
   const [currentPlanCost, setCurrentPlanCost] = useState(80);
   const [newPlanCost, setNewPlanCost] = useState(70);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: 37.78825,
+    longitude: -122.4324,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
+  });
+  const [heatmapPoints, setHeatmapPoints] = useState([]);
   const { isPremium } = usePremium();
 
   useEffect(() => {
@@ -45,6 +53,14 @@ export default function CompareScreen() {
             upload: Math.round(avgUpload),
             reliability: Math.round(reliability)
           });
+
+          // Prepare heatmap points
+          const points = carrierReadings.map(reading => ({
+            latitude: reading.latitude,
+            longitude: reading.longitude,
+            weight: reading.signal_strength / 100
+          }));
+          setHeatmapPoints(points);
         } else {
           // Fallback to mock data if no readings for carrier
           setComparisonData({
@@ -53,6 +69,7 @@ export default function CompareScreen() {
             upload: 70,
             reliability: 80
           });
+          setHeatmapPoints([]);
         }
 
         // Calculate neighborhood rankings
@@ -92,6 +109,7 @@ export default function CompareScreen() {
           score: 100 - (index * 10)
         }));
         setNeighborhoodRankings(mockRankings);
+        setHeatmapPoints([]);
       } finally {
         setIsLoading(false);
       }
@@ -143,12 +161,13 @@ export default function CompareScreen() {
     return (
       <PremiumGate
         title="Unlock Carrier Comparison"
-        description="See which carrier performs best in your area with detailed performance metrics and savings estimates."
+        description="See how different carriers perform in your area with real user data and calculate potential savings when switching."
         featureList={[
-          "Average signal strength for each carrier",
-          "Download/upload speed comparisons",
-          "Reliability scores (5G coverage)",
-          "Switch savings calculator"
+          "Compare signal strength, speed, and reliability",
+          "See neighborhood rankings for each carrier",
+          "Calculate estimated monthly savings",
+          "Access historical performance data",
+          "Get personalized carrier recommendations"
         ]}
       />
     );
@@ -165,93 +184,128 @@ export default function CompareScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Carrier Comparison</Text>
-        <Text style={styles.subtitle}>Compare performance in your area</Text>
+      <View style={styles.mapContainer}>
+        <MapView
+          style={styles.map}
+          region={mapRegion}
+          onRegionChangeComplete={setMapRegion}
+        >
+          {heatmapPoints.length > 0 && (
+            <Heatmap
+              points={heatmapPoints}
+              radius={20}
+              opacity={0.7}
+              gradient={{
+                colors: ['#00FF00', '#FFFF00', '#FF0000'],
+                startPoints: [0.2, 0.5, 0.8],
+                colorMapSize: 256
+              }}
+            />
+          )}
+        </MapView>
+        <View style={styles.mapLegend}>
+          <Text style={styles.legendTitle}>Signal Strength</Text>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: '#00FF00' }]} />
+            <Text style={styles.legendText}>Good (80-100%)</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: '#FFFF00' }]} />
+            <Text style={styles.legendText}>Fair (50-79%)</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendColor, { backgroundColor: '#FF0000' }]} />
+            <Text style={styles.legendText}>Poor (0-49%)</Text>
+          </View>
+        </View>
       </View>
 
-      <View style={styles.carrierSelector}>
-        <Text style={styles.label}>Select Carrier:</Text>
-        <Picker
-          selectedValue={selectedCarrier}
-          onValueChange={(itemValue) => setSelectedCarrier(itemValue)}
-          style={styles.picker}
-        >
-          {carriers.map(carrier => (
-            <Picker.Item key={carrier} label={carrier} value={carrier} />
-          ))}
-        </Picker>
-      </View>
-
-      {comparisonData && (
-        <View style={styles.chartContainer}>
-          <Text style={styles.chartTitle}>{selectedCarrier} Performance</Text>
-          <BarChart
-            data={chartData}
-            width={width - 32}
-            height={220}
-            yAxisLabel=""
-            yAxisSuffix="%"
-            chartConfig={chartConfig}
-            verticalLabelRotation={30}
-            fromZero={true}
-            showValuesOnTopOfBars={true}
-            withInnerLines={false}
-          />
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Carrier Comparison</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={selectedCarrier}
+            onValueChange={(itemValue) => setSelectedCarrier(itemValue)}
+            style={styles.picker}
+          >
+            {carriers.map(carrier => (
+              <Picker.Item key={carrier} label={carrier} value={carrier} />
+            ))}
+          </Picker>
         </View>
-      )}
 
-      <View style={styles.savingsCalculator}>
-        <Text style={styles.sectionTitle}>Switch Savings Calculator</Text>
-        <View style={styles.inputRow}>
-          <Text style={styles.inputLabel}>Current Plan Cost ($/month):</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={currentPlanCost.toString()}
-            onChangeText={(text) => setCurrentPlanCost(parseFloat(text) || 0)}
-          />
-        </View>
-        <View style={styles.inputRow}>
-          <Text style={styles.inputLabel}>New Plan Cost ($/month):</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={newPlanCost.toString()}
-            onChangeText={(text) => setNewPlanCost(parseFloat(text) || 0)}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.calculateButton}
-          onPress={handleCalculateSavings}
-        >
-          <Text style={styles.calculateButtonText}>Calculate Savings</Text>
-        </TouchableOpacity>
-
-        {showSavings && (
-          <View style={styles.savingsResult}>
-            <Text style={styles.savingsTitle}>Estimated Annual Savings:</Text>
-            <Text style={styles.savingsAmount}>${calculateSavings()}</Text>
-            <Text style={styles.savingsNote}>
-              Based on improved signal quality and plan cost difference
-            </Text>
+        {comparisonData && (
+          <View style={styles.chartContainer}>
+            <BarChart
+              data={chartData}
+              width={width - 40}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix="%"
+              chartConfig={chartConfig}
+              verticalLabelRotation={30}
+              fromZero={true}
+              showValuesOnTopOfBars={true}
+            />
           </View>
         )}
       </View>
 
-      <View style={styles.rankingsSection}>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Switch Savings Calculator</Text>
+        <View style={styles.savingsCalculator}>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>Current Plan Cost:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={currentPlanCost.toString()}
+              onChangeText={(text) => setCurrentPlanCost(parseFloat(text) || 0)}
+            />
+          </View>
+          <View style={styles.inputRow}>
+            <Text style={styles.inputLabel}>New Plan Cost:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              value={newPlanCost.toString()}
+              onChangeText={(text) => setNewPlanCost(parseFloat(text) || 0)}
+            />
+          </View>
+          <TouchableOpacity
+            style={styles.calculateButton}
+            onPress={handleCalculateSavings}
+          >
+            <Text style={styles.calculateButtonText}>Calculate Savings</Text>
+          </TouchableOpacity>
+
+          {showSavings && (
+            <View style={styles.savingsResult}>
+              <Text style={styles.savingsTitle}>Estimated Monthly Savings:</Text>
+              <Text style={styles.savingsAmount}>${calculateSavings()}</Text>
+              <Text style={styles.savingsNote}>
+                Based on {selectedCarrier}'s performance in your area and your plan costs.
+              </Text>
+            </View>
+          )}
+        </View>
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Neighborhood Rankings</Text>
-        {neighborhoodRankings.map((ranking, index) => (
-          <CarrierCard
-            key={ranking.carrier}
-            carrier={ranking.carrier}
-            signal={ranking.avgSignal}
-            speed={ranking.avgSpeed}
-            upload={ranking.avgUpload}
-            reliability={ranking.reliability}
-            rank={index + 1}
-          />
-        ))}
+        <View style={styles.rankingsContainer}>
+          {neighborhoodRankings.map((carrier, index) => (
+            <CarrierCard
+              key={carrier.carrier}
+              carrier={carrier.carrier}
+              signal={carrier.avgSignal}
+              speed={carrier.avgSpeed}
+              upload={carrier.avgUpload}
+              reliability={carrier.reliability}
+              rank={index + 1}
+            />
+          ))}
+        </View>
       </View>
     </ScrollView>
   );
@@ -266,91 +320,79 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
-  header: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  mapContainer: {
+    height: 300,
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 24,
+  map: {
+    flex: 1,
+  },
+  mapLegend: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 10,
+    borderRadius: 5,
+  },
+  legendTitle: {
     fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 3,
+  },
+  legendColor: {
+    width: 15,
+    height: 15,
+    marginRight: 5,
+  },
+  legendText: {
+    fontSize: 12,
+  },
+  section: {
+    backgroundColor: 'white',
+    marginBottom: 20,
+    padding: 15,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
     color: '#333',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
-  },
-  carrierSelector: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginVertical: 8,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+  pickerContainer: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    marginBottom: 20,
   },
   picker: {
     height: 50,
     width: '100%',
   },
   chartContainer: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginVertical: 8,
-    borderRadius: 8,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
+    marginVertical: 10,
+    alignItems: 'center',
   },
   savingsCalculator: {
-    backgroundColor: '#fff',
-    padding: 16,
-    marginVertical: 8,
+    padding: 15,
+    backgroundColor: '#f0f8ff',
     borderRadius: 8,
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 12,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 15,
   },
   inputLabel: {
     flex: 1,
@@ -362,47 +404,45 @@ const styles = StyleSheet.create({
     height: 40,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    fontSize: 16,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    backgroundColor: 'white',
   },
   calculateButton: {
     backgroundColor: '#007AFF',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 5,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 10,
   },
   calculateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
   },
   savingsResult: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#f0f8ff',
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#e6f7ff',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#b0e0e6',
+    alignItems: 'center',
   },
   savingsTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    marginBottom: 5,
   },
   savingsAmount: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#2E8B57',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   savingsNote: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    textAlign: 'center',
   },
-  rankingsSection: {
-    padding: 16,
+  rankingsContainer: {
+    marginTop: 10,
   },
 });
