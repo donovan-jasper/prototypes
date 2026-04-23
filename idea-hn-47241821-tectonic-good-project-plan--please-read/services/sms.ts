@@ -87,6 +87,33 @@ export const scheduleSafetyCheckIn = async (checkIn: SafetyCheckIn) => {
   }
 };
 
+export const cancelSafetyCheckIn = async () => {
+  try {
+    const db = await initDatabase();
+
+    // Get the active check-in
+    const activeCheckIn = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM check_ins ORDER BY created_at DESC LIMIT 1'
+    );
+
+    if (activeCheckIn) {
+      // Delete the check-in from database
+      await db.runAsync('DELETE FROM check_ins WHERE id = ?', [activeCheckIn.id]);
+
+      // Cancel any scheduled notifications
+      await Notifications.cancelAllScheduledNotificationsAsync();
+
+      // Cancel background task
+      await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TASK_NAME);
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error canceling safety check-in:', error);
+    throw error;
+  }
+};
+
 export const handleSafetyCheckInExpiration = async (checkInId: string) => {
   try {
     const db = await initDatabase();
@@ -182,7 +209,7 @@ const storeOfflineMessage = async (message: {
   try {
     const db = await initDatabase();
     await db.runAsync(
-      'INSERT INTO offline_messages (to_phone, body, timestamp) VALUES (?, ?, ?)',
+      'INSERT INTO offline_messages (to_phone, message_body, timestamp) VALUES (?, ?, ?)',
       [message.to, message.body, message.timestamp]
     );
   } catch (error) {
@@ -196,19 +223,19 @@ export const retryOfflineMessages = async () => {
 
     // Get all offline messages
     const messages = await db.getAllAsync<{
-      id: number;
+      id: string;
       to_phone: string;
-      body: string;
+      message_body: string;
       timestamp: string;
     }>('SELECT * FROM offline_messages');
 
     for (const message of messages) {
       try {
-        await sendSMS(message.to_phone, message.body);
+        await sendSMS(message.to_phone, message.message_body);
         // Delete message if sent successfully
         await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
       } catch (error) {
-        console.error(`Failed to retry message ${message.id}:`, error);
+        console.error(`Failed to retry message to ${message.to_phone}:`, error);
       }
     }
   } catch (error) {
