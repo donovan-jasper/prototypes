@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Platform } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import VideoPlayer from '../../components/VideoPlayer';
+import PiPController from '../../components/PiPController';
 import { useStreamUrl } from '../../hooks/useStreamUrl';
 
 export default function ChannelScreen() {
@@ -18,7 +18,7 @@ export default function ChannelScreen() {
 
   return (
     <View style={styles.container}>
-      <VideoPlayer channelNumber={id} isLocal={isLocal} />
+      <PiPController channelNumber={id} isLocal={isLocal} />
     </View>
   );
 }
