@@ -1,5 +1,9 @@
+import axios from 'axios';
+
 class KubernetesAPI {
   constructor() {
+    this.baseURL = process.env.KUBERNETES_API_URL || 'https://your-kubernetes-api-endpoint';
+    this.token = process.env.KUBERNETES_API_TOKEN || 'your-api-token';
     this.ws = null;
     this.currentCpu = 50;
     this.currentMemory = 60;
@@ -7,24 +11,107 @@ class KubernetesAPI {
     this.callback = null;
   }
 
-  /**
-   * Establishes a WebSocket connection to the specified endpoint.
-   * @param {string} endpoint The WebSocket endpoint URL.
-   * @param {(metrics: { cpu: number, memory: number, disk: number }) => void} callback
-   *   The function to call with new metric data.
-   * @returns {() => void} A function to unsubscribe (close the WebSocket connection).
-   */
+  async fetchMetrics() {
+    try {
+      const response = await axios.get(`${this.baseURL}/apis/metrics.k8s.io/v1beta1/nodes`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      });
+
+      if (response.data && response.data.items && response.data.items.length > 0) {
+        const nodeMetrics = response.data.items[0];
+        const cpuUsage = this.calculateCpuUsage(nodeMetrics);
+        const memoryUsage = this.calculateMemoryUsage(nodeMetrics);
+        const diskUsage = await this.calculateDiskUsage();
+
+        return {
+          cpu: cpuUsage,
+          memory: memoryUsage,
+          disk: diskUsage
+        };
+      }
+
+      return {
+        cpu: this.currentCpu,
+        memory: this.currentMemory,
+        disk: this.currentDisk
+      };
+    } catch (error) {
+      console.error('Error fetching Kubernetes metrics:', error);
+      return {
+        cpu: this.currentCpu,
+        memory: this.currentMemory,
+        disk: this.currentDisk
+      };
+    }
+  }
+
+  calculateCpuUsage(nodeMetrics) {
+    if (!nodeMetrics || !nodeMetrics.usage || !nodeMetrics.usage.cpu) {
+      return this.currentCpu;
+    }
+
+    const cpuValue = nodeMetrics.usage.cpu;
+    const cpuCores = parseInt(cpuValue) / 1000000000;
+    // Get node capacity from metrics
+    const capacity = nodeMetrics.usage.capacity?.cpu || '8000000000'; // Default to 8 cores
+    const totalCores = parseInt(capacity) / 1000000000;
+    const cpuPercentage = (cpuCores / totalCores) * 100;
+    return Math.min(100, Math.max(0, Math.round(cpuPercentage)));
+  }
+
+  calculateMemoryUsage(nodeMetrics) {
+    if (!nodeMetrics || !nodeMetrics.usage || !nodeMetrics.usage.memory) {
+      return this.currentMemory;
+    }
+
+    const memoryValue = nodeMetrics.usage.memory;
+    const memoryGB = parseInt(memoryValue) / (1024 * 1024 * 1024);
+    const capacity = nodeMetrics.usage.capacity?.memory || '32212254720'; // Default to 32GB
+    const totalGB = parseInt(capacity) / (1024 * 1024 * 1024);
+    const memoryPercentage = (memoryGB / totalGB) * 100;
+    return Math.min(100, Math.max(0, Math.round(memoryPercentage)));
+  }
+
+  async calculateDiskUsage() {
+    try {
+      const response = await axios.get(`${this.baseURL}/api/v1/nodes`, {
+        headers: {
+          'Authorization': `Bearer ${this.token}`
+        }
+      });
+
+      if (response.data && response.data.items && response.data.items.length > 0) {
+        const node = response.data.items[0];
+        const fsStats = node.status?.nodeInfo?.fsStats || {};
+        const total = fsStats.total || 0;
+        const used = fsStats.used || 0;
+
+        if (total > 0) {
+          return Math.min(100, Math.max(0, Math.round((used / total) * 100)));
+        }
+      }
+      return this.currentDisk;
+    } catch (error) {
+      console.error('Error fetching disk metrics:', error);
+      return this.currentDisk;
+    }
+  }
+
   subscribeToMetrics(endpoint, callback) {
     this.callback = callback;
 
-    this.ws = new WebSocket(endpoint);
+    // Use environment variable for WebSocket endpoint
+    const wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || endpoint;
+    this.ws = new WebSocket(wsEndpoint);
 
     this.ws.onmessage = (event) => {
       try {
         const metrics = JSON.parse(event.data);
-        this.currentCpu = metrics.cpu;
-        this.currentMemory = metrics.memory;
-        this.currentDisk = metrics.disk;
+        this.currentCpu = metrics.cpu || this.currentCpu;
+        this.currentMemory = metrics.memory || this.currentMemory;
+        this.currentDisk = metrics.disk || this.currentDisk;
 
         callback({
           cpu: this.currentCpu,
@@ -52,7 +139,6 @@ class KubernetesAPI {
       console.log('WebSocket connection closed');
     };
 
-    // Return a cleanup function to stop the WebSocket connection
     return () => {
       if (this.ws) {
         this.ws.close();
@@ -62,5 +148,4 @@ class KubernetesAPI {
   }
 }
 
-// Export a singleton instance of the KubernetesAPI
 export const kubernetesAPI = new KubernetesAPI();
