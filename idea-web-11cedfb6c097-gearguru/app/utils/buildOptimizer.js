@@ -3,6 +3,8 @@
  * Generates optimized weapon and armor combinations based on input stats
  */
 
+import { fetchGameData } from './gameDataLoader';
+
 // Game-specific stat weights (example for an RPG)
 const STAT_WEIGHTS = {
   attack: 0.4,
@@ -11,21 +13,36 @@ const STAT_WEIGHTS = {
   speed: 0.1
 };
 
-// Example weapon database
-const WEAPON_DATABASE = [
+// Default weapon database
+const DEFAULT_WEAPON_DATABASE = [
   { id: 'sword1', name: 'Iron Sword', attack: 50, defense: 10, magic: 5, speed: 8, type: 'sword' },
   { id: 'axe1', name: 'Steel Axe', attack: 60, defense: 5, magic: 3, speed: 6, type: 'axe' },
   { id: 'staff1', name: 'Mage Staff', attack: 30, defense: 8, magic: 40, speed: 5, type: 'staff' },
   { id: 'dagger1', name: 'Assassin Dagger', attack: 40, defense: 5, magic: 10, speed: 12, type: 'dagger' }
 ];
 
-// Example armor database
-const ARMOR_DATABASE = [
+// Default armor database
+const DEFAULT_ARMOR_DATABASE = [
   { id: 'plate1', name: 'Iron Plate', defense: 40, magicDefense: 10, speedPenalty: 2, type: 'chest' },
   { id: 'robe1', name: 'Mage Robe', defense: 20, magicDefense: 30, speedPenalty: 0, type: 'chest' },
   { id: 'leather1', name: 'Leather Armor', defense: 30, magicDefense: 5, speedPenalty: 5, type: 'chest' },
   { id: 'cloak1', name: 'Shadow Cloak', defense: 15, magicDefense: 20, speedPenalty: 8, type: 'chest' }
 ];
+
+// Current game data (initialized with defaults)
+let currentGameData = {
+  weapons: DEFAULT_WEAPON_DATABASE,
+  armor: DEFAULT_ARMOR_DATABASE
+};
+
+/**
+ * Updates the optimizer with new game data
+ * @param {string} gameId - The game identifier
+ */
+export const updateGameData = async (gameId) => {
+  const gameData = await fetchGameData(gameId);
+  currentGameData = gameData;
+};
 
 /**
  * Calculates the effectiveness score of a build combination
@@ -59,7 +76,7 @@ const calculateEffectiveness = (stats, weapon, armor) => {
  */
 export const optimizeBuild = (stats) => {
   // Find best weapon based on attack stat
-  const bestWeapon = WEAPON_DATABASE.reduce((best, current) => {
+  const bestWeapon = currentGameData.weapons.reduce((best, current) => {
     const currentScore = current.attack * STAT_WEIGHTS.attack +
                         current.defense * STAT_WEIGHTS.defense +
                         current.magic * STAT_WEIGHTS.magic +
@@ -70,17 +87,17 @@ export const optimizeBuild = (stats) => {
                       best.speed * STAT_WEIGHTS.speed;
 
     return currentScore > bestScore ? current : best;
-  }, WEAPON_DATABASE[0]);
+  }, currentGameData.weapons[0]);
 
   // Find best armor based on defense stat
-  const bestArmor = ARMOR_DATABASE.reduce((best, current) => {
+  const bestArmor = currentGameData.armor.reduce((best, current) => {
     const currentScore = current.defense * STAT_WEIGHTS.defense +
                         current.magicDefense * STAT_WEIGHTS.magic;
     const bestScore = best.defense * STAT_WEIGHTS.defense +
                       best.magicDefense * STAT_WEIGHTS.magic;
 
     return currentScore > bestScore ? current : best;
-  }, ARMOR_DATABASE[0]);
+  }, currentGameData.armor[0]);
 
   // Calculate effectiveness
   const effectiveness = calculateEffectiveness(stats, bestWeapon, bestArmor);
