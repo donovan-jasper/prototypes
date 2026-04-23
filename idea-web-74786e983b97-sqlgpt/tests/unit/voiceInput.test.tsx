@@ -3,10 +3,9 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import VoiceInput from '../../../app/components/VoiceInput';
 import * as Speech from 'expo-speech';
 
+// Mock the entire expo-speech module
 jest.mock('expo-speech', () => ({
-  startListening: jest.fn(() => ({
-    stop: jest.fn(),
-  })),
+  startListening: jest.fn(),
   stopListening: jest.fn(),
 }));
 
@@ -24,6 +23,15 @@ describe('VoiceInput', () => {
     const { getByTestId, getByText } = render(<VoiceInput onSpeechResults={() => {}} />);
     const button = getByTestId('mic-button');
 
+    // Mock the startListening implementation
+    (Speech.startListening as jest.Mock).mockImplementation((options) => {
+      // Simulate the onRecognized callback
+      if (options.onRecognized) {
+        options.onRecognized({ text: 'test' });
+      }
+      return { stop: jest.fn() };
+    });
+
     fireEvent.press(button);
     expect(Speech.startListening).toHaveBeenCalled();
     expect(getByText('Listening...')).toBeTruthy();
@@ -36,10 +44,12 @@ describe('VoiceInput', () => {
     const mockOnSpeechResults = jest.fn();
     const { getByTestId, getByText } = render(<VoiceInput onSpeechResults={mockOnSpeechResults} />);
 
-    // Mock the speech recognition result
-    const mockResult = { text: 'Show me sales last quarter' };
-    (Speech.startListening as jest.Mock).mockImplementationOnce((options) => {
-      options.onRecognized(mockResult);
+    // Mock the startListening implementation
+    (Speech.startListening as jest.Mock).mockImplementation((options) => {
+      // Simulate the onRecognized callback with test data
+      if (options.onRecognized) {
+        options.onRecognized({ text: 'Show me sales last quarter' });
+      }
       return { stop: jest.fn() };
     });
 
@@ -53,9 +63,11 @@ describe('VoiceInput', () => {
   test('handles errors gracefully', async () => {
     const { getByTestId, getByText } = render(<VoiceInput onSpeechResults={() => {}} />);
 
-    // Mock an error
-    (Speech.startListening as jest.Mock).mockImplementationOnce((options) => {
-      options.onError({ message: 'Permission denied' });
+    // Mock the startListening implementation to throw an error
+    (Speech.startListening as jest.Mock).mockImplementation((options) => {
+      if (options.onError) {
+        options.onError({ message: 'Permission denied' });
+      }
       return { stop: jest.fn() };
     });
 
