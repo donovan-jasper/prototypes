@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { webSocketService } from './WebSocketService';
+import { DEFAULT_WEBSOCKET_URL, DEFAULT_API_URL } from '../utils/constants';
 
 class KubernetesAPI {
   constructor() {
-    this.baseURL = process.env.KUBERNETES_API_URL || 'https://your-kubernetes-api-endpoint';
-    this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || 'wss://your-websocket-endpoint';
+    this.baseURL = process.env.KUBERNETES_API_URL || DEFAULT_API_URL;
+    this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || DEFAULT_WEBSOCKET_URL;
     this.token = process.env.KUBERNETES_API_TOKEN || 'your-api-token';
     this.currentCpu = 50;
     this.currentMemory = 60;
@@ -126,6 +127,11 @@ class KubernetesAPI {
     return () => {
       webSocketService.disconnect();
     };
+  }
+
+  updateEndpoints(apiUrl, wsUrl) {
+    this.baseURL = apiUrl;
+    this.wsEndpoint = wsUrl;
   }
 }
 
