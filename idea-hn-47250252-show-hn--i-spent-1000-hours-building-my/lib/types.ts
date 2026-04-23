@@ -2,9 +2,10 @@ export interface Transaction {
   id: number;
   amount: number;
   category: string;
-  note: string;
-  type: 'expense' | 'income';
-  date: string;
+  date: string; // ISO string
+  type: 'income' | 'expense';
+  note?: string;
+  receiptUri?: string;
 }
 
 export interface Holding {
@@ -12,20 +13,25 @@ export interface Holding {
   symbol: string;
   shares: number;
   costBasis: number;
-  currentPrice: number; // This will be updated by PriceService
-  assetType: 'stock' | 'crypto' | 'real estate' | 'other';
+  purchaseDate: string; // ISO string
+  currentPrice?: number;
+  gain?: number;
+  percentGain?: number;
+  currentValue?: number;
 }
 
 export interface Asset {
   id: number;
+  name: string;
   value: number;
-  type: string;
+  type: 'cash' | 'investment' | 'real_estate' | 'other';
 }
 
 export interface Liability {
   id: number;
+  name: string;
   value: number;
-  type: string;
+  type: 'loan' | 'mortgage' | 'credit_card' | 'other';
 }
 
 export interface Category {
@@ -34,8 +40,15 @@ export interface Category {
   color: string;
 }
 
-// New interface for cached prices
-export interface CachedPrice {
-  price: number;
-  timestamp: number; // Unix timestamp in milliseconds
+export interface PortfolioSummary {
+  totalValue: number;
+  totalGain: number;
+  totalPercentGain: number;
+  holdings: Holding[];
+}
+
+export interface NetWorth {
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
 }
