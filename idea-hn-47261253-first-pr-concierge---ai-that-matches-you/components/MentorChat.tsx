@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal, Alert, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { askMentor, logQuestion, getRemainingQuestions } from '../lib/ai';
 import { Issue } from '../types';
 import { useAuthStore } from '../store/authStore';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface Message {
   id: string;
@@ -25,6 +26,8 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
   const [remainingQuestions, setRemainingQuestions] = useState(5);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuthStore();
+  const flatListRef = useRef<FlatList>(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
     // Initialize with welcome message
@@ -165,6 +168,10 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
           <Text style={styles.modalText}>
             You've reached your free question limit. Upgrade to ask unlimited questions and get code reviews before submitting PRs.
           </Text>
+          <View style={styles.questionsLeftContainer}>
+            <MaterialIcons name="question-answer" size={24} color="#6200EE" />
+            <Text style={styles.questionsLeftText}>Questions left today: {remainingQuestions}</Text>
+          </View>
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalButton, styles.cancelButton]}
@@ -176,67 +183,70 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
               style={[styles.modalButton, styles.upgradeButton]}
               onPress={() => {
                 setShowPaywall(false);
-                // TODO: Implement actual upgrade flow
-                Alert.alert('Upgrade', 'This would open the subscription screen');
+                // Navigate to subscription screen
+                navigation.navigate('Subscription');
               }}
             >
               <Text style={[styles.modalButtonText, styles.upgradeButtonText]}>Upgrade Now</Text>
             </TouchableOpacity>
           </View>
-          {!isSubscribed && (
-            <Text style={styles.remainingText}>
-              Questions remaining today: {remainingQuestions}
-            </Text>
-          )}
         </View>
       </View>
     </Modal>
   );
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
+    >
       {renderIssueSelector()}
 
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.chatContainer}
-        inverted
-      />
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Ask about your issue..."
-          placeholderTextColor="#999"
-          editable={!isLoading}
+      <View style={styles.chatContainer}>
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: true })}
         />
-        <TouchableOpacity
-          style={[styles.sendButton, isLoading && styles.disabledButton]}
-          onPress={handleSend}
-          disabled={isLoading || !inputText.trim()}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <MaterialIcons name="send" size={24} color="#fff" />
-          )}
-        </TouchableOpacity>
+
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={inputText}
+            onChangeText={setInputText}
+            placeholder="Ask your AI mentor..."
+            placeholderTextColor="#999"
+            multiline
+            maxHeight={100}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, isLoading && styles.disabledButton]}
+            onPress={handleSend}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <MaterialIcons name="send" size={24} color="#fff" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        {!isSubscribed && (
+          <View style={styles.questionsLeftContainer}>
+            <MaterialIcons name="question-answer" size={20} color="#6200EE" />
+            <Text style={styles.questionsLeftText}>Questions left: {remainingQuestions}</Text>
+          </View>
+        )}
       </View>
 
-      {!isSubscribed && (
-        <View style={styles.remainingContainer}>
-          <Text style={styles.remainingText}>
-            Questions remaining today: {remainingQuestions}
-          </Text>
-        </View>
-      )}
-
       {renderPaywallModal()}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -249,7 +259,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   selectorLabel: {
     fontSize: 16,
@@ -273,6 +283,8 @@ const styles = StyleSheet.create({
   },
   selectedIssue: {
     backgroundColor: '#e3f2fd',
+    borderWidth: 1,
+    borderColor: '#6200EE',
   },
   issueText: {
     fontSize: 14,
@@ -282,10 +294,14 @@ const styles = StyleSheet.create({
   noIssuesText: {
     fontSize: 14,
     color: '#666',
+    padding: 8,
   },
   chatContainer: {
+    flex: 1,
     padding: 16,
-    paddingBottom: 80,
+  },
+  messagesList: {
+    paddingBottom: 16,
   },
   messageContainer: {
     maxWidth: '80%',
@@ -295,12 +311,12 @@ const styles = StyleSheet.create({
   },
   userMessage: {
     alignSelf: 'flex-end',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200EE',
     borderBottomRightRadius: 4,
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#e3f2fd',
     borderBottomLeftRadius: 4,
   },
   messageText: {
@@ -308,54 +324,59 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   timestampText: {
-    fontSize: 10,
-    color: '#666',
+    fontSize: 12,
+    color: '#999',
     marginTop: 4,
     textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
     alignItems: 'center',
+    marginTop: 8,
   },
   input: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 24,
+    backgroundColor: '#fff',
     fontSize: 16,
-    marginRight: 8,
+    minHeight: 50,
+    maxHeight: 100,
   },
   sendButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4CAF50',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#6200EE',
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 8,
   },
   disabledButton: {
-    backgroundColor: '#cccccc',
+    backgroundColor: '#999',
   },
-  remainingContainer: {
+  questionsLeftContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
     padding: 8,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
   },
-  remainingText: {
+  questionsLeftText: {
     fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+    color: '#6200EE',
+    marginLeft: 8,
+    fontWeight: '500',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     width: '80%',
@@ -367,19 +388,21 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 12,
     color: '#333',
+    textAlign: 'center',
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 24,
     color: '#666',
+    marginBottom: 16,
     textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    marginTop: 16,
   },
   modalButton: {
     padding: 12,
@@ -392,11 +415,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   upgradeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200EE',
   },
   modalButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
   upgradeButtonText: {
     color: '#fff',

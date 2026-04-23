@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, SafeAreaView } from 'react-native';
 import MentorChat from '../../components/MentorChat';
 import { useIssuesStore } from '../../store/issuesStore';
 import { useAuthStore } from '../../store/authStore';
@@ -9,12 +9,12 @@ export default function MentorScreen() {
   const { isSubscribed } = useAuthStore();
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <MentorChat
         claimedIssues={claimedIssues}
         isSubscribed={isSubscribed}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
