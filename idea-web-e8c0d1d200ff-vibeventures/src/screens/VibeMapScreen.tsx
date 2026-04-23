@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions, Switch } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions, Switch, ScrollView } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -168,24 +168,26 @@ const VibeMapScreen = () => {
   const toggleFilter = (category: string) => {
     setFilters(prev => ({
       ...prev,
-      [category]: !prev[category]
+      [category]: !prev[category as keyof typeof filters]
     }));
   };
 
-  const filteredEvents = events.filter(event => filters[event.category as keyof typeof filters]);
+  const filteredEvents = events.filter(event =>
+    filters[event.category as keyof typeof filters]
+  );
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading nearby events...</Text>
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={styles.loadingText}>Finding events near you...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.errorContainer}>
+      <View style={styles.container}>
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchLocationAndEvents}>
           <Text style={styles.retryButtonText}>Retry</Text>
@@ -212,56 +214,66 @@ const VibeMapScreen = () => {
               latitude: event.latitude,
               longitude: event.longitude
             }}
+            pinColor={categoryColors[event.category as keyof typeof categoryColors]}
             onPress={() => handleMarkerPress(event.id)}
-            pinColor={categoryColors[event.category as keyof typeof categoryColors] || categoryColors.other}
-            tracksViewChanges={false}
           >
             <View style={[
               styles.markerContainer,
-              { width: getMarkerSize(event.participants.length), height: getMarkerSize(event.participants.length) }
+              {
+                width: getMarkerSize(event.participants),
+                height: getMarkerSize(event.participants),
+                borderRadius: getMarkerSize(event.participants) / 2,
+                backgroundColor: categoryColors[event.category as keyof typeof categoryColors]
+              }
             ]}>
-              <Image
-                source={require('../../assets/icons/pin.png')}
-                style={[
-                  styles.markerIcon,
-                  { tintColor: categoryColors[event.category as keyof typeof categoryColors] || categoryColors.other }
-                ]}
-              />
-              <Text style={styles.markerText}>{event.participants.length}</Text>
+              <Text style={styles.markerText}>{event.participants}</Text>
             </View>
             <Callout tooltip>
-              <View style={styles.calloutContainer}>
+              <View style={styles.callout}>
                 <Text style={styles.calloutTitle}>{event.title}</Text>
-                <Text style={styles.calloutDistance}>{event.distance?.toFixed(1)} km away</Text>
-                <Text style={styles.calloutParticipants}>{event.participants.length} going</Text>
+                <Text style={styles.calloutDistance}>
+                  {event.distance.toFixed(1)} km away
+                </Text>
               </View>
             </Callout>
           </Marker>
         ))}
       </MapView>
 
-      <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
-        <Image source={require('../../assets/icons/location.png')} style={styles.recenterIcon} />
+      <TouchableOpacity
+        style={styles.recenterButton}
+        onPress={handleRecenter}
+      >
+        <Image
+          source={require('../../assets/location-arrow.png')}
+          style={styles.recenterIcon}
+        />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
-        <Image source={require('../../assets/icons/filter.png')} style={styles.filterIcon} />
+      <TouchableOpacity
+        style={styles.filterButton}
+        onPress={() => setShowFilters(!showFilters)}
+      >
+        <Text style={styles.filterButtonText}>Filters</Text>
       </TouchableOpacity>
 
       {showFilters && (
         <View style={styles.filterPanel}>
-          <Text style={styles.filterTitle}>Filter Events</Text>
-          {Object.keys(filters).map((category) => (
-            <View key={category} style={styles.filterItem}>
-              <Text style={styles.filterLabel}>{category.charAt(0).toUpperCase() + category.slice(1)}</Text>
-              <Switch
-                value={filters[category as keyof typeof filters]}
-                onValueChange={() => toggleFilter(category)}
-                trackColor={{ false: '#767577', true: categoryColors[category as keyof typeof categoryColors] || '#81b0ff' }}
-                thumbColor={filters[category as keyof typeof filters] ? '#f5dd4b' : '#f4f3f4'}
-              />
-            </View>
-          ))}
+          <ScrollView>
+            {Object.keys(filters).map((category) => (
+              <View key={category} style={styles.filterItem}>
+                <Text style={styles.filterLabel}>
+                  {category.charAt(0).toUpperCase() + category.slice(1)}
+                </Text>
+                <Switch
+                  value={filters[category as keyof typeof filters]}
+                  onValueChange={() => toggleFilter(category)}
+                  trackColor={{ false: '#767577', true: categoryColors[category as keyof typeof categoryColors] }}
+                  thumbColor={filters[category as keyof typeof filters] ? '#f5dd4b' : '#f4f3f4'}
+                />
+              </View>
+            ))}
+          </ScrollView>
         </View>
       )}
     </View>
@@ -273,76 +285,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   map: {
-    width: '100%',
-    height: '100%',
-  },
-  loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   errorText: {
-    fontSize: 16,
     color: 'red',
+    fontSize: 16,
     marginBottom: 20,
-    textAlign: 'center',
   },
   retryButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#2196F3',
     padding: 10,
     borderRadius: 5,
   },
   retryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontWeight: 'bold',
   },
   markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  markerIcon: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   markerText: {
-    position: 'absolute',
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 12,
   },
-  calloutContainer: {
+  callout: {
     width: 150,
     padding: 10,
     backgroundColor: 'white',
-    borderRadius: 10,
-    borderColor: '#ddd',
+    borderRadius: 5,
+    borderColor: '#ccc',
     borderWidth: 1,
   },
   calloutTitle: {
     fontWeight: 'bold',
-    fontSize: 14,
     marginBottom: 5,
   },
   calloutDistance: {
-    fontSize: 12,
     color: '#666',
-    marginBottom: 3,
-  },
-  calloutParticipants: {
     fontSize: 12,
-    color: '#4CAF50',
   },
   recenterButton: {
     position: 'absolute',
@@ -366,49 +354,42 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     position: 'absolute',
-    top: 60,
+    top: 20,
     right: 20,
     backgroundColor: 'white',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 10,
+    borderRadius: 5,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
   },
-  filterIcon: {
-    width: 20,
-    height: 20,
+  filterButtonText: {
+    fontWeight: 'bold',
   },
   filterPanel: {
     position: 'absolute',
-    top: 120,
+    top: 70,
     right: 20,
     width: 200,
+    maxHeight: 300,
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 5,
+    padding: 10,
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-  },
-  filterTitle: {
-    fontWeight: 'bold',
-    fontSize: 16,
-    marginBottom: 10,
-    textAlign: 'center',
   },
   filterItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   filterLabel: {
     fontSize: 14,
