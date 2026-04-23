@@ -6,40 +6,54 @@ const mockPosts = [
   {
     id: '1',
     userId: 'plantlover123',
-    plantId: '1',
-    photoUri: 'https://images.unsplash.com/photo-1520412099551-62b6baf36e71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    caption: 'My monstera is growing so big! #PlantPulse',
+    plantId: 'p1',
+    photoUri: 'https://images.unsplash.com/photo-1525382455947-f319bc05fb35?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+    caption: 'My Monstera is growing so big! 🌿 #PlantPulse',
     likes: 42,
     liked: false,
     comments: [
       { userId: 'greenthumb', text: 'Wow, that looks amazing!' },
-      { userId: 'leafy', text: 'When did you get it?' }
+      { userId: 'plantmom', text: 'When did you get it?' }
     ],
     createdAt: '2023-05-15T10:30:00Z'
   },
   {
     id: '2',
-    userId: 'succulentfan',
-    plantId: '2',
-    photoUri: 'https://images.unsplash.com/photo-1587402092301-725e37c70fd8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    caption: 'My snake plant is thriving! #PlantCare',
-    likes: 28,
+    userId: 'urbanfarmer',
+    plantId: 'p2',
+    photoUri: 'https://images.unsplash.com/photo-1587440871875-191322ee64b0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+    caption: 'First time growing herbs! 🌱 #ApartmentGarden',
+    likes: 18,
     liked: false,
-    comments: [
-      { userId: 'plantmom', text: 'So happy for you!' }
-    ],
+    comments: [],
     createdAt: '2023-05-14T08:15:00Z'
   },
   {
     id: '3',
-    userId: 'herblover',
-    plantId: '3',
-    photoUri: 'https://images.unsplash.com/photo-1587402092301-725e37c70fd8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
-    caption: 'First time growing basil! It\'s doing great!',
-    likes: 15,
+    userId: 'succulentfan',
+    plantId: 'p3',
+    photoUri: 'https://images.unsplash.com/photo-1587440871875-191322ee64b0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+    caption: 'My collection is growing! 🌵 #SucculentLife',
+    likes: 35,
     liked: false,
-    comments: [],
-    createdAt: '2023-05-13T14:45:00Z'
+    comments: [
+      { userId: 'plantcollector', text: 'Which ones are your favorites?' }
+    ],
+    createdAt: '2023-05-13T14:20:00Z'
+  },
+  {
+    id: '4',
+    userId: 'plantmom',
+    plantId: 'p4',
+    photoUri: 'https://images.unsplash.com/photo-1525382455947-f319bc05fb35?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80',
+    caption: 'Teaching my kids to care for plants! 👨‍👩‍👧‍👦 #PlantParent',
+    likes: 67,
+    liked: false,
+    comments: [
+      { userId: 'plantlover123', text: 'That looks so cute!' },
+      { userId: 'urbanfarmer', text: 'Great initiative!' }
+    ],
+    createdAt: '2023-05-12T09:45:00Z'
   }
 ];
 
@@ -50,16 +64,19 @@ export const useCommunity = () => {
 
   const loadPosts = async () => {
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setPosts(mockPosts);
-    setLoading(false);
+    try {
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setPosts(mockPosts);
+    } catch (error) {
+      console.error('Failed to load posts:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const refreshPosts = async () => {
-    // Simulate refresh
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    setPosts(mockPosts);
+    await loadPosts();
   };
 
   const likePost = (postId: string) => {
