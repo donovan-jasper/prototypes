@@ -104,7 +104,7 @@ function CallScreen() {
         statusColor = '#4CAF50';
         break;
       case 'dialing':
-        statusMessage = `Dialing ${callerInfo}...`;
+        statusMessage = `Dialing ${callData.callerId}...`;
         statusColor = '#2196F3';
         break;
       case 'onhold':
@@ -153,7 +153,7 @@ function CallScreen() {
               style={[styles.button, styles.screenButton]}
               onPress={handleScreenCall}
             >
-              <Text style={styles.buttonText}>Screen Call</Text>
+              <Text style={styles.buttonText}>Screen</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -170,49 +170,58 @@ function CallScreen() {
     );
   };
 
-  const renderCallHistory = () => {
+  const renderPastCalls = () => {
     if (isLoading) {
-      return <ActivityIndicator size="large" color="#673AB7" style={styles.loadingIndicator} />;
+      return <ActivityIndicator size="large" color="#673AB7" />;
     }
 
     if (pastCalls.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No call history yet.</Text>
+          <Text style={styles.emptyText}>No past calls yet.</Text>
           <Text style={styles.emptySubtext}>Screened calls will appear here.</Text>
         </View>
       );
     }
 
     return (
-      <ScrollView style={styles.historyContainer}>
-        {pastCalls.map((call) => (
-          <View key={call.id} style={styles.callItem}>
-            <Text style={styles.callItemTitle}>{call.caller_id || 'Unknown'}</Text>
-            <Text style={styles.callItemTime}>{new Date(call.call_time).toLocaleString()}</Text>
-            <Text style={styles.callItemSummary}>{call.summary}</Text>
-            <Text style={styles.callItemConfidence}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
+      <FlatList
+        data={pastCalls}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.callItem}>
+            <Text style={styles.callItemTitle}>{item.caller_id || 'Unknown'}</Text>
+            <Text style={styles.callItemTime}>{new Date(item.call_time).toLocaleString()}</Text>
+            <Text style={styles.callItemSummary}>{item.summary}</Text>
+            <Text style={styles.callItemConfidence}>Confidence: {(item.confidence * 100).toFixed(0)}%</Text>
           </View>
-        ))}
-      </ScrollView>
+        )}
+      />
     );
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>CallGuard</Text>
+        <Text style={styles.headerText}>CallGuard</Text>
         <TouchableOpacity
-          style={styles.historyToggle}
+          style={styles.historyButton}
           onPress={() => setShowHistory(!showHistory)}
         >
-          <Text style={styles.historyToggleText}>
+          <Text style={styles.historyButtonText}>
             {showHistory ? 'Hide History' : 'Show History'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      {showHistory ? renderCallHistory() : renderCallStatus()}
+      {showHistory ? (
+        <View style={styles.historyContainer}>
+          <Text style={styles.sectionTitle}>Call History</Text>
+          {renderPastCalls()}
+        </View>
+      ) : (
+        renderCallStatus()
+      )}
     </View>
   );
 }
@@ -229,27 +238,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  headerTitle: {
+  headerText: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#673AB7',
   },
-  historyToggle: {
+  historyButton: {
     padding: 10,
+    backgroundColor: '#673AB7',
+    borderRadius: 5,
   },
-  historyToggleText: {
-    color: '#673AB7',
+  historyButtonText: {
+    color: 'white',
     fontWeight: 'bold',
   },
   callStatusContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   statusText: {
     fontSize: 18,
-    marginBottom: 10,
+    marginBottom: 20,
     textAlign: 'center',
   },
   durationText: {
@@ -261,11 +271,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     width: '100%',
-    marginTop: 20,
+    marginBottom: 20,
   },
   button: {
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 5,
     width: 120,
     alignItems: 'center',
   },
@@ -277,12 +287,42 @@ const styles = StyleSheet.create({
   },
   endButton: {
     backgroundColor: '#F44336',
-    marginTop: 20,
     width: '100%',
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  screeningIndicator: {
+    marginVertical: 20,
+  },
+  screeningResults: {
+    width: '100%',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#673AB7',
+  },
+  transcriptText: {
+    fontSize: 14,
+    marginBottom: 15,
+    color: '#333',
+  },
+  summaryText: {
+    fontSize: 14,
+    marginBottom: 15,
+    color: '#333',
+    fontStyle: 'italic',
+  },
+  confidenceText: {
+    fontSize: 14,
+    color: '#666',
   },
   emptyState: {
     flex: 1,
@@ -299,80 +339,37 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
   },
-  screeningIndicator: {
-    marginVertical: 20,
-  },
-  screeningResults: {
-    width: '100%',
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
-    color: '#673AB7',
-  },
-  transcriptText: {
-    fontSize: 14,
-    marginBottom: 10,
-    color: '#333',
-  },
-  summaryText: {
-    fontSize: 14,
-    marginBottom: 10,
-    color: '#333',
-  },
-  confidenceText: {
-    fontSize: 14,
-    color: '#666',
-    fontStyle: 'italic',
-  },
   historyContainer: {
     flex: 1,
   },
   callItem: {
     backgroundColor: 'white',
     padding: 15,
+    borderRadius: 5,
     marginBottom: 10,
-    borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
   callItemTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
-    color: '#673AB7',
   },
   callItemTime: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
     marginBottom: 5,
   },
   callItemSummary: {
     fontSize: 14,
-    color: '#333',
     marginBottom: 5,
   },
   callItemConfidence: {
     fontSize: 12,
     color: '#666',
-    fontStyle: 'italic',
-  },
-  loadingIndicator: {
-    marginTop: 20,
   },
 });
 
