@@ -5,6 +5,7 @@ import { BarChart } from 'react-native-chart-kit';
 import { getRecentReadings, getCarrierPerformanceStats } from '../../services/database';
 import { usePremium } from '../../hooks/usePremium';
 import PremiumGate from '../../components/PremiumGate';
+import CarrierCard from '../../components/CarrierCard';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
@@ -35,27 +36,22 @@ export default function CompareScreen() {
         if (carrierReadings.length > 0) {
           const avgSignal = carrierReadings.reduce((sum, r) => sum + r.signal_strength, 0) / carrierReadings.length;
           const avgSpeed = carrierReadings.reduce((sum, r) => sum + (r.download_speed || 0), 0) / carrierReadings.length;
-          const avgLatency = carrierReadings.reduce((sum, r) => sum + (r.latency || 0), 0) / carrierReadings.length;
-
-          // Calculate reliability based on network type (simplified)
+          const avgUpload = carrierReadings.reduce((sum, r) => sum + (r.upload_speed || 0), 0) / carrierReadings.length;
           const reliability = carrierReadings.filter(r => r.network_type.includes('5G')).length / carrierReadings.length * 100;
-
-          // Mock savings calculation (would be more sophisticated in production)
-          const savings = Math.round((avgSignal / 10) * 5);
 
           setComparisonData({
             signal: Math.round(avgSignal),
             speed: Math.round(avgSpeed),
-            reliability: Math.round(reliability),
-            savings
+            upload: Math.round(avgUpload),
+            reliability: Math.round(reliability)
           });
         } else {
           // Fallback to mock data if no readings for carrier
           setComparisonData({
             signal: 75,
             speed: 85,
-            reliability: 80,
-            savings: 25
+            upload: 70,
+            reliability: 80
           });
         }
 
@@ -66,10 +62,11 @@ export default function CompareScreen() {
 
           return {
             carrier,
-            score: (stats.avgSignal * 0.4) + (stats.avgSpeed * 0.4) + (stats.reliability * 0.2),
             avgSignal: stats.avgSignal,
             avgSpeed: stats.avgSpeed,
-            reliability: stats.reliability
+            avgUpload: stats.avgUpload || 0,
+            reliability: stats.reliability,
+            score: (stats.avgSignal * 0.4) + (stats.avgSpeed * 0.4) + (stats.reliability * 0.2)
           };
         }));
 
@@ -82,16 +79,17 @@ export default function CompareScreen() {
         setComparisonData({
           signal: 75,
           speed: 85,
-          reliability: 80,
-          savings: 25
+          upload: 70,
+          reliability: 80
         });
 
         const mockRankings = carriers.map((carrier, index) => ({
           carrier,
-          score: 100 - (index * 10),
           avgSignal: 80 - (index * 5),
           avgSpeed: 85 - (index * 3),
-          reliability: 85 - (index * 2)
+          avgUpload: 70 - (index * 2),
+          reliability: 85 - (index * 2),
+          score: 100 - (index * 10)
         }));
         setNeighborhoodRankings(mockRankings);
       } finally {
@@ -103,13 +101,14 @@ export default function CompareScreen() {
   }, [selectedCarrier]);
 
   const chartData = {
-    labels: ['Signal', 'Speed', 'Reliability'],
+    labels: ['Signal', 'Download', 'Upload', 'Reliability'],
     datasets: [{
       data: comparisonData ? [
         comparisonData.signal,
         comparisonData.speed,
+        comparisonData.upload,
         comparisonData.reliability
-      ] : [0, 0, 0]
+      ] : [0, 0, 0, 0]
     }]
   };
 
@@ -144,13 +143,12 @@ export default function CompareScreen() {
     return (
       <PremiumGate
         title="Unlock Carrier Comparison"
-        description="See how your current carrier stacks up against competitors with real data from thousands of users in your area."
+        description="See which carrier performs best in your area with detailed performance metrics and savings estimates."
         featureList={[
-          "Compare signal strength, speed, and reliability",
-          "Calculate potential savings when switching",
-          "See neighborhood rankings by carrier",
-          "Access historical performance data",
-          "Get expert recommendations"
+          "Average signal strength for each carrier",
+          "Download/upload speed comparisons",
+          "Reliability scores (5G coverage)",
+          "Switch savings calculator"
         ]}
       />
     );
@@ -169,36 +167,39 @@ export default function CompareScreen() {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Carrier Comparison</Text>
-        <Text style={styles.subtitle}>Compare your current carrier with others</Text>
+        <Text style={styles.subtitle}>Compare performance in your area</Text>
       </View>
 
       <View style={styles.carrierSelector}>
-        <Text style={styles.selectorLabel}>Select Carrier to Compare:</Text>
+        <Text style={styles.label}>Select Carrier:</Text>
         <Picker
           selectedValue={selectedCarrier}
           onValueChange={(itemValue) => setSelectedCarrier(itemValue)}
           style={styles.picker}
         >
-          {carriers.map((carrier) => (
+          {carriers.map(carrier => (
             <Picker.Item key={carrier} label={carrier} value={carrier} />
           ))}
         </Picker>
       </View>
 
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Performance Comparison</Text>
-        <BarChart
-          data={chartData}
-          width={width - 40}
-          height={220}
-          yAxisLabel=""
-          yAxisSuffix="%"
-          chartConfig={chartConfig}
-          verticalLabelRotation={30}
-          fromZero={true}
-          showValuesOnTopOfBars={true}
-        />
-      </View>
+      {comparisonData && (
+        <View style={styles.chartContainer}>
+          <Text style={styles.chartTitle}>{selectedCarrier} Performance</Text>
+          <BarChart
+            data={chartData}
+            width={width - 32}
+            height={220}
+            yAxisLabel=""
+            yAxisSuffix="%"
+            chartConfig={chartConfig}
+            verticalLabelRotation={30}
+            fromZero={true}
+            showValuesOnTopOfBars={true}
+            withInnerLines={false}
+          />
+        </View>
+      )}
 
       <View style={styles.savingsCalculator}>
         <Text style={styles.sectionTitle}>Switch Savings Calculator</Text>
@@ -220,7 +221,10 @@ export default function CompareScreen() {
             onChangeText={(text) => setNewPlanCost(parseFloat(text) || 0)}
           />
         </View>
-        <TouchableOpacity style={styles.calculateButton} onPress={handleCalculateSavings}>
+        <TouchableOpacity
+          style={styles.calculateButton}
+          onPress={handleCalculateSavings}
+        >
           <Text style={styles.calculateButtonText}>Calculate Savings</Text>
         </TouchableOpacity>
 
@@ -229,39 +233,24 @@ export default function CompareScreen() {
             <Text style={styles.savingsTitle}>Estimated Annual Savings:</Text>
             <Text style={styles.savingsAmount}>${calculateSavings()}</Text>
             <Text style={styles.savingsNote}>
-              Based on improved signal quality and reduced overage charges
+              Based on improved signal quality and plan cost difference
             </Text>
           </View>
         )}
       </View>
 
-      <View style={styles.rankingsContainer}>
+      <View style={styles.rankingsSection}>
         <Text style={styles.sectionTitle}>Neighborhood Rankings</Text>
         {neighborhoodRankings.map((ranking, index) => (
-          <View key={ranking.carrier} style={styles.rankingItem}>
-            <View style={styles.rankingHeader}>
-              <Text style={styles.rankingPosition}>{index + 1}</Text>
-              <Text style={styles.rankingCarrier}>{ranking.carrier}</Text>
-              <View style={styles.scoreContainer}>
-                <Text style={styles.scoreText}>{Math.round(ranking.score)}</Text>
-                <Text style={styles.scoreLabel}>Score</Text>
-              </View>
-            </View>
-            <View style={styles.statsContainer}>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{ranking.avgSignal}%</Text>
-                <Text style={styles.statLabel}>Signal</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{ranking.avgSpeed} Mbps</Text>
-                <Text style={styles.statLabel}>Speed</Text>
-              </View>
-              <View style={styles.statItem}>
-                <Text style={styles.statValue}>{ranking.reliability}%</Text>
-                <Text style={styles.statLabel}>Reliability</Text>
-              </View>
-            </View>
-          </View>
+          <CarrierCard
+            key={ranking.carrier}
+            carrier={ranking.carrier}
+            signal={ranking.avgSignal}
+            speed={ranking.avgSpeed}
+            upload={ranking.avgUpload}
+            reliability={ranking.reliability}
+            rank={index + 1}
+          />
         ))}
       </View>
     </ScrollView>
@@ -277,88 +266,91 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   loadingText: {
-    marginTop: 20,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
   header: {
-    padding: 20,
-    backgroundColor: '#007AFF',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#666',
+    marginTop: 4,
   },
   carrierSelector: {
-    backgroundColor: 'white',
-    padding: 15,
-    margin: 20,
-    borderRadius: 10,
+    backgroundColor: '#fff',
+    padding: 16,
+    marginVertical: 8,
+    borderRadius: 8,
+    marginHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
-  selectorLabel: {
+  label: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
     color: '#333',
+    marginBottom: 8,
   },
   picker: {
     height: 50,
     width: '100%',
   },
   chartContainer: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    padding: 16,
+    marginVertical: 8,
+    borderRadius: 8,
+    marginHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#333',
+    marginBottom: 12,
   },
   savingsCalculator: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 20,
+    backgroundColor: '#fff',
+    padding: 16,
+    marginVertical: 8,
+    borderRadius: 8,
+    marginHorizontal: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
     color: '#333',
+    marginBottom: 12,
   },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   inputLabel: {
     flex: 1,
@@ -368,110 +360,49 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     height: 40,
-    borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 8,
     fontSize: 16,
   },
   calculateButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 8,
   },
   calculateButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
   savingsResult: {
-    marginTop: 20,
-    padding: 15,
+    marginTop: 16,
+    padding: 16,
     backgroundColor: '#f0f8ff',
-    borderRadius: 5,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#b0e0e6',
   },
   savingsTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   savingsAmount: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2ECC71',
-    marginBottom: 5,
+    color: '#2E8B57',
+    marginBottom: 8,
   },
   savingsNote: {
     fontSize: 14,
     color: '#666',
   },
-  rankingsContainer: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  rankingItem: {
-    marginBottom: 15,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  rankingHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  rankingPosition: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    width: 30,
-    textAlign: 'center',
-  },
-  rankingCarrier: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
-  },
-  scoreContainer: {
-    alignItems: 'flex-end',
-  },
-  scoreText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2ECC71',
-  },
-  scoreLabel: {
-    fontSize: 12,
-    color: '#666',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#666',
+  rankingsSection: {
+    padding: 16,
   },
 });
