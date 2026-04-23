@@ -27,6 +27,14 @@ interface ChartDataPoint {
   price: number;
 }
 
+interface DigestHighlight {
+  id: string;
+  title: string;
+  explanation: string;
+  impact: 'positive' | 'negative' | 'neutral';
+  audioUrl?: string;
+}
+
 export const searchStocks = async (query: string): Promise<StockSearchResult[]> => {
   try {
     // First search for symbols
@@ -151,5 +159,42 @@ export const fetchStockChartData = async (symbol: string, resolution: string = '
   } catch (error) {
     console.error('Chart data API error:', error);
     throw new Error('Failed to fetch chart data. Please try again later.');
+  }
+};
+
+export const fetchDailyDigest = async (): Promise<DigestHighlight[]> => {
+  try {
+    // In a real app, this would call your backend API that processes market data
+    // For demo purposes, we'll return mock data
+
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    return [
+      {
+        id: '1',
+        title: 'Tech Stocks Decline',
+        explanation: 'Major technology companies reported lower-than-expected earnings this quarter, leading to a sell-off in the sector. Investors are concerned about slowing growth in the digital advertising market.',
+        impact: 'negative',
+        audioUrl: 'https://example.com/audio/tech-stocks.mp3'
+      },
+      {
+        id: '2',
+        title: 'Energy Sector Rises',
+        explanation: 'Oil prices increased due to geopolitical tensions in the Middle East, benefiting energy companies. This positive development is expected to continue as global demand remains strong.',
+        impact: 'positive',
+        audioUrl: 'https://example.com/audio/energy-sector.mp3'
+      },
+      {
+        id: '3',
+        title: 'Consumer Spending Mixed',
+        explanation: 'While retail sales showed growth in the first half of the year, recent data indicates slower spending in the second quarter. This could impact consumer-facing stocks in the coming months.',
+        impact: 'neutral',
+        audioUrl: 'https://example.com/audio/consumer-spending.mp3'
+      }
+    ];
+  } catch (error) {
+    console.error('Digest API error:', error);
+    throw new Error('Failed to fetch daily digest. Please try again later.');
   }
 };

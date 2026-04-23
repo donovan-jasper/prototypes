@@ -29,6 +29,17 @@ export const initDatabase = async () => {
       condition TEXT NOT NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE TABLE IF NOT EXISTS daily_digest (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      digest_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      explanation TEXT NOT NULL,
+      impact TEXT NOT NULL,
+      audio_url TEXT,
+      date TEXT NOT NULL,
+      UNIQUE(digest_id, date)
+    );
   `);
 };
 
@@ -75,4 +86,37 @@ export const getAlerts = async () => {
 
 export const cancelAlert = async (id: number) => {
   await db.runAsync('DELETE FROM alerts WHERE id = ?', [id]);
+};
+
+export const saveDigest = async (digest: {
+  id: string;
+  title: string;
+  explanation: string;
+  impact: 'positive' | 'negative' | 'neutral';
+  audioUrl?: string;
+}[]) => {
+  // Clear existing digest for today
+  const today = new Date().toISOString().split('T')[0];
+  await db.runAsync('DELETE FROM daily_digest WHERE date = ?', [today]);
+
+  // Insert new digest items
+  for (const item of digest) {
+    await db.runAsync(
+      'INSERT INTO daily_digest (digest_id, title, explanation, impact, audio_url, date) VALUES (?, ?, ?, ?, ?, ?)',
+      [item.id, item.title, item.explanation, item.impact, item.audioUrl || null, today]
+    );
+  }
+};
+
+export const getSavedDigest = async () => {
+  const today = new Date().toISOString().split('T')[0];
+  const result = await db.getAllAsync('SELECT * FROM daily_digest WHERE date = ?', [today]);
+
+  return result.map(item => ({
+    id: item.digest_id,
+    title: item.title,
+    explanation: item.explanation,
+    impact: item.impact as 'positive' | 'negative' | 'neutral',
+    audioUrl: item.audio_url || undefined
+  }));
 };
