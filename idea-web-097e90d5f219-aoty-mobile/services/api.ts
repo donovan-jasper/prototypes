@@ -1,176 +1,138 @@
+import axios from 'axios';
 import { Artist, Album } from './database';
+
+const MUSICBRAINZ_API_BASE = 'https://musicbrainz.org/ws/2';
+const COVERART_API_BASE = 'https://coverartarchive.org/release-group';
+
+interface MusicBrainzArtist {
+  id: string;
+  name: string;
+  'sort-name': string;
+  disambiguation: string;
+  'life-span': {
+    begin: string;
+    end: string | null;
+  };
+}
+
+interface MusicBrainzReleaseGroup {
+  id: string;
+  title: string;
+  'first-release-date': string;
+  'primary-type': string;
+}
+
+interface CoverArtResponse {
+  images: Array<{
+    image: string;
+    types: string[];
+  }>;
+}
 
 export interface SearchArtistResult extends Artist {}
 
 export const searchArtists = async (query: string): Promise<SearchArtistResult[]> => {
-  await new Promise(resolve => setTimeout(resolve, 500));
+  try {
+    const response = await axios.get(`${MUSICBRAINZ_API_BASE}/artist`, {
+      params: {
+        query: query,
+        fmt: 'json',
+        limit: 10
+      },
+      headers: {
+        'User-Agent': 'CritWave/1.0 (https://github.com/yourusername/critwave)'
+      }
+    });
 
-  const mockArtists: SearchArtistResult[] = [
-    {
-      id: 'artist-1',
-      name: 'Radiohead',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eba03696716c9ee605006047fd',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-2',
-      name: 'Kendrick Lamar',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb437b9e2a82505b3d93ff1022',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-3',
-      name: 'Taylor Swift',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebe672b5f553298dcdccb0e676',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-4',
-      name: 'The Beatles',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebe9348cc01ff5d55971b22433',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-5',
-      name: 'Billie Eilish',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5ebb0c4f96e5e3c2e052f0e8c8c',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-6',
-      name: 'Pink Floyd',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb5a00969a4698c3132a15fbb0',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-7',
-      name: 'Daft Punk',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eba7bfd7835b5c1eee0c95fa6e',
-      followedAt: 0,
-    },
-    {
-      id: 'artist-8',
-      name: 'Arctic Monkeys',
-      imageUrl: 'https://i.scdn.co/image/ab6761610000e5eb7da39dea0a72f581535fb11f',
-      followedAt: 0,
-    },
-  ];
+    const artists: SearchArtistResult[] = response.data.artists.map((artist: MusicBrainzArtist) => ({
+      id: artist.id,
+      name: artist.name,
+      imageUrl: null, // Will be fetched separately
+      followedAt: 0
+    }));
 
-  const lowerQuery = query.toLowerCase();
-  return mockArtists.filter(artist => 
-    artist.name.toLowerCase().includes(lowerQuery)
-  );
+    // Fetch images for each artist
+    const artistsWithImages = await Promise.all(
+      artists.map(async (artist) => {
+        try {
+          const imageResponse = await axios.get(`${MUSICBRAINZ_API_BASE}/artist/${artist.id}`, {
+            params: {
+              inc: 'url-rels',
+              fmt: 'json'
+            },
+            headers: {
+              'User-Agent': 'CritWave/1.0 (https://github.com/yourusername/critwave)'
+            }
+          });
+
+          const imageUrl = imageResponse.data.relations?.find(
+            (rel: any) => rel.type === 'image'
+          )?.url?.resource;
+
+          return {
+            ...artist,
+            imageUrl: imageUrl || null
+          };
+        } catch (error) {
+          console.error(`Failed to fetch image for artist ${artist.id}:`, error);
+          return artist;
+        }
+      })
+    );
+
+    return artistsWithImages;
+  } catch (error) {
+    console.error('Failed to search artists:', error);
+    throw error;
+  }
 };
 
 export const fetchArtistAlbums = async (artistId: string): Promise<Album[]> => {
-  await new Promise(resolve => setTimeout(resolve, 300));
+  try {
+    // First get release groups (albums)
+    const releaseGroupsResponse = await axios.get(`${MUSICBRAINZ_API_BASE}/release-group`, {
+      params: {
+        artist: artistId,
+        type: 'album',
+        fmt: 'json',
+        limit: 20
+      },
+      headers: {
+        'User-Agent': 'CritWave/1.0 (https://github.com/yourusername/critwave)'
+      }
+    });
 
-  const mockAlbums: Record<string, Album[]> = {
-    'artist-1': [
-      {
-        id: 'album-1',
-        title: 'OK Computer',
-        artistId: 'artist-1',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273c8b444df094279e70d0ed856',
-        releaseDate: '1997-05-21',
-        consensusScore: 96,
-      },
-      {
-        id: 'album-2',
-        title: 'Kid A',
-        artistId: 'artist-1',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b2736c7112082b63bf7e9c2b4c4f',
-        releaseDate: '2000-10-02',
-        consensusScore: 94,
-      },
-    ],
-    'artist-2': [
-      {
-        id: 'album-3',
-        title: 'To Pimp a Butterfly',
-        artistId: 'artist-2',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273cdb645498cd3d8a2db4d05e1',
-        releaseDate: '2015-03-15',
-        consensusScore: 96,
-      },
-      {
-        id: 'album-4',
-        title: 'DAMN.',
-        artistId: 'artist-2',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b2738b52c6b9bc4e43d873869699',
-        releaseDate: '2017-04-14',
-        consensusScore: 95,
-      },
-    ],
-    'artist-3': [
-      {
-        id: 'album-5',
-        title: '1989',
-        artistId: 'artist-3',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273904445d70d04eb24d6bb79ac',
-        releaseDate: '2014-10-27',
-        consensusScore: 88,
-      },
-      {
-        id: 'album-6',
-        title: 'Folklore',
-        artistId: 'artist-3',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273295b680f3c2c2b5c2f5e5c5e',
-        releaseDate: '2020-07-24',
-        consensusScore: 92,
-      },
-    ],
-    'artist-4': [
-      {
-        id: 'album-7',
-        title: 'Abbey Road',
-        artistId: 'artist-4',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273dc30583ba717007b00cceb25',
-        releaseDate: '1969-09-26',
-        consensusScore: 98,
-      },
-    ],
-    'artist-5': [
-      {
-        id: 'album-8',
-        title: 'When We All Fall Asleep, Where Do We Go?',
-        artistId: 'artist-5',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b27350a3147b4edd7701a876c6ce',
-        releaseDate: '2019-03-29',
-        consensusScore: 84,
-      },
-    ],
-    'artist-6': [
-      {
-        id: 'album-9',
-        title: 'The Dark Side of the Moon',
-        artistId: 'artist-6',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273ea7caaff71dea1051d49b2fe',
-        releaseDate: '1973-03-01',
-        consensusScore: 97,
-      },
-    ],
-    'artist-7': [
-      {
-        id: 'album-10',
-        title: 'Random Access Memories',
-        artistId: 'artist-7',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b273b33d46dfa2635a47eebf63b2',
-        releaseDate: '2013-05-17',
-        consensusScore: 87,
-      },
-    ],
-    'artist-8': [
-      {
-        id: 'album-11',
-        title: 'AM',
-        artistId: 'artist-8',
-        coverUrl: 'https://i.scdn.co/image/ab67616d0000b27328933b808bfb4cbbd0385400',
-        releaseDate: '2013-09-09',
-        consensusScore: 81,
-      },
-    ],
-  };
+    const albums: Album[] = await Promise.all(
+      releaseGroupsResponse.data['release-groups'].map(async (group: MusicBrainzReleaseGroup) => {
+        let coverUrl = null;
 
-  return mockAlbums[artistId] || [];
+        try {
+          // Try to get cover art
+          const coverResponse = await axios.get(`${COVERART_API_BASE}/${group.id}`);
+          if (coverResponse.data.images && coverResponse.data.images.length > 0) {
+            coverUrl = coverResponse.data.images[0].image;
+          }
+        } catch (error) {
+          console.log(`No cover art found for release group ${group.id}`);
+        }
+
+        // Mock consensus score for demo
+        const mockScore = Math.floor(Math.random() * 30) + 70;
+
+        return {
+          id: group.id,
+          title: group.title,
+          artistId: artistId,
+          coverUrl: coverUrl,
+          releaseDate: group['first-release-date'],
+          consensusScore: mockScore
+        };
+      })
+    );
+
+    return albums;
+  } catch (error) {
+    console.error('Failed to fetch artist albums:', error);
+    throw error;
+  }
 };

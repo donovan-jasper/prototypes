@@ -5,8 +5,9 @@ import { getFollowedArtists, addArtist, removeArtist, Artist } from '@/services/
 import { searchArtists } from '@/services/api';
 import { useArtistStore } from '@/stores/artistStore';
 import { useUserStore } from '@/stores/userStore';
-import { Button, Card, Avatar, Searchbar, Divider } from 'react-native-paper';
+import { Button, Card, Avatar, Searchbar, Divider, IconButton } from 'react-native-paper';
 import { useColorScheme } from 'react-native';
+import { registerBackgroundSync } from '@/services/sync';
 
 const FREE_TIER_LIMIT = 10;
 
@@ -23,6 +24,7 @@ export default function ArtistsScreen() {
 
   useEffect(() => {
     loadFollowedArtists();
+    registerBackgroundSync();
   }, []);
 
   const handleSearch = async (query: string) => {
@@ -160,52 +162,63 @@ export default function ArtistsScreen() {
 
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={[styles.errorText, { color: colorScheme === 'dark' ? '#ff6b6b' : '#d32f2f' }]}>{error}</Text>
+          <Text style={[styles.errorText, { color: colorScheme === 'dark' ? '#ff6b6b' : '#d32f2f' }]}>
+            {error}
+          </Text>
         </View>
       )}
 
-      {searchQuery.trim().length >= 2 && (
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
-            {searching ? 'Searching...' : 'Search Results'}
-          </Text>
-          {searching ? (
-            <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#ffffff' : '#000000'} style={styles.loader} />
-          ) : (
-            <FlatList
-              data={searchResults}
-              renderItem={renderSearchResult}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={styles.listContent}
-              ListEmptyComponent={
-                <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }]}>
-                  No artists found. Try a different search.
-                </Text>
-              }
-            />
-          )}
+      {searching && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#bb86fc' : '#6200ee'} />
+          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>Searching...</Text>
         </View>
       )}
 
-      <Divider style={styles.divider} />
-
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
-          Followed Artists ({followedArtists.length})
-        </Text>
-        {followedArtists.length === 0 ? (
-          <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }]}>
-            You're not following any artists yet. Search above to find some!
+      {searchQuery && !searching && searchResults.length === 0 && (
+        <View style={styles.noResultsContainer}>
+          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>
+            No artists found. Try a different search.
           </Text>
-        ) : (
+        </View>
+      )}
+
+      {searchResults.length > 0 && (
+        <>
+          <Text style={[styles.sectionHeader, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+            Search Results
+          </Text>
           <FlatList
-            data={followedArtists}
-            renderItem={renderFollowedArtist}
+            data={searchResults}
+            renderItem={renderSearchResult}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.listContent}
+            style={styles.list}
           />
-        )}
-      </View>
+          <Divider />
+        </>
+      )}
+
+      <Text style={[styles.sectionHeader, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+        Followed Artists ({followedArtists.length})
+      </Text>
+
+      {followedArtists.length === 0 ? (
+        <View style={styles.emptyStateContainer}>
+          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>
+            You're not following any artists yet.
+          </Text>
+          <Text style={{ color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }}>
+            Search above to find artists to follow.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={followedArtists}
+          renderItem={renderFollowedArtist}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+        />
+      )}
     </View>
   );
 }
@@ -219,25 +232,32 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorContainer: {
-    padding: 12,
+    padding: 16,
     backgroundColor: '#ffebee',
     borderRadius: 4,
     marginBottom: 16,
   },
   errorText: {
-    color: '#d32f2f',
-    textAlign: 'center',
+    fontSize: 16,
   },
-  section: {
-    marginBottom: 24,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  sectionTitle: {
+  noResultsContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  sectionHeader: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 8,
+    marginTop: 16,
   },
-  listContent: {
-    paddingBottom: 16,
+  list: {
+    flexGrow: 0,
   },
   card: {
     marginBottom: 8,
@@ -248,15 +268,10 @@ const styles = StyleSheet.create({
   unfollowButton: {
     marginRight: 8,
   },
-  loader: {
-    marginVertical: 20,
-  },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: 16,
-    fontStyle: 'italic',
-  },
-  divider: {
-    marginVertical: 16,
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
 });
