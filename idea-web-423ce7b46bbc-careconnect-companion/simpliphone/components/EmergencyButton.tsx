@@ -12,6 +12,7 @@ export default function EmergencyButton({ onPress }) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Emergency"
+      accessibilityHint="Double tap to activate emergency mode"
     >
       <MaterialIcons name="warning" size={48} color={theme.colors.onError} />
       <Text style={[styles.label, { color: theme.colors.onError }]}>Emergency</Text>

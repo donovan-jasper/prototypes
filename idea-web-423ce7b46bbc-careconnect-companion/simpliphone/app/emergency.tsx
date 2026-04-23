@@ -8,6 +8,7 @@ export default function EmergencyScreen() {
   const { theme } = useContext(SettingsContext);
   const { emergencyContact, triggerEmergencyCall, sendEmergencySMS, getCurrentLocation } = useEmergency();
   const [countdown, setCountdown] = useState(3);
+  const [isShaking, setIsShaking] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -47,7 +48,7 @@ export default function EmergencyScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.error }]}>
       <Text style={[styles.text, { color: theme.colors.onError }]}>
-        CALLING {emergencyContact?.name || 'EMERGENCY CONTACT'}
+        {isShaking ? 'SHAKE DETECTED' : `CALLING ${emergencyContact?.name || 'EMERGENCY CONTACT'}`}
       </Text>
       <Text style={[styles.countdown, { color: theme.colors.onError }]}>
         {countdown}

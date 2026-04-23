@@ -1,13 +1,39 @@
-import { View, StyleSheet, Linking } from 'react-native';
-import { useContext } from 'react';
+import { View, StyleSheet, Linking, Alert } from 'react-native';
+import { useContext, useEffect } from 'react';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
 import { SettingsContext } from '../../contexts/SettingsContext';
 import BigButton from '../../components/BigButton';
+import { detectShakeGesture } from '../../services/emergency';
 
 export default function HomeScreen() {
   const { theme } = useContext(SettingsContext);
   const router = useRouter();
+
+  useEffect(() => {
+    const subscription = detectShakeGesture(() => {
+      Alert.alert(
+        'Emergency Mode',
+        'Shake detected. Activate emergency mode?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Activate',
+            onPress: () => router.push('/emergency'),
+          },
+        ]
+      );
+    });
+
+    return () => {
+      if (subscription && subscription.remove) {
+        subscription.remove();
+      }
+    };
+  }, []);
 
   const handleCall = () => {
     Linking.openURL('tel:');
