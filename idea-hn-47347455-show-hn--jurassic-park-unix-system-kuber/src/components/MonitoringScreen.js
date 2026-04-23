@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Animated, ActivityIndicator, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, Animated, ActivityIndicator, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
 import { kubernetesAPI } from '../services/KubernetesAPI';
+import { WEBSOCKET_ENDPOINT } from '../utils/constants';
 
 const MonitoringScreen = () => {
   const [cpu, setCPU] = useState(0);
@@ -9,8 +10,11 @@ const MonitoringScreen = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [apiEndpoint, setApiEndpoint] = useState(process.env.KUBERNETES_API_URL || 'https://your-kubernetes-api-endpoint');
-  const [wsEndpoint, setWsEndpoint] = useState(process.env.KUBERNETES_WS_ENDPOINT || 'ws://your-kubernetes-ws-endpoint');
+  const [wsEndpoint, setWsEndpoint] = useState(process.env.KUBERNETES_WS_ENDPOINT || WEBSOCKET_ENDPOINT);
   const [isConfiguring, setIsConfiguring] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [autoReconnect, setAutoReconnect] = useState(true);
 
   // Animation values for progress bars
   const cpuAnim = useRef(new Animated.Value(0)).current;
@@ -53,22 +57,39 @@ const MonitoringScreen = () => {
     fetchData();
 
     // Set up WebSocket for real-time updates
-    unsubscribe = kubernetesAPI.subscribeToMetrics(
-      wsEndpoint,
-      (metrics) => {
-        if (isMounted) {
-          setCPU(metrics.cpu);
-          setMemory(metrics.memory);
-          setDisk(metrics.disk);
-          setError(null);
+    const setupWebSocket = () => {
+      unsubscribe = kubernetesAPI.subscribeToMetrics(
+        wsEndpoint,
+        (metrics) => {
+          if (isMounted) {
+            setCPU(metrics.cpu);
+            setMemory(metrics.memory);
+            setDisk(metrics.disk);
+            setError(null);
+            setIsConnected(true);
+            setRetryCount(0);
 
-          // Animate the progress bars
-          animateBar(cpuAnim, metrics.cpu);
-          animateBar(memoryAnim, metrics.memory);
-          animateBar(diskAnim, metrics.disk);
+            // Animate the progress bars
+            animateBar(cpuAnim, metrics.cpu);
+            animateBar(memoryAnim, metrics.memory);
+            animateBar(diskAnim, metrics.disk);
+          }
+        },
+        (error) => {
+          if (isMounted) {
+            setIsConnected(false);
+            if (autoReconnect && retryCount < 5) {
+              setTimeout(() => {
+                setRetryCount(prev => prev + 1);
+                setupWebSocket();
+              }, 3000 * (retryCount + 1));
+            }
+          }
         }
-      }
-    );
+      );
+    };
+
+    setupWebSocket();
 
     // Set up polling as fallback
     const intervalId = setInterval(fetchData, 30000); // Poll every 30 seconds
@@ -81,7 +102,7 @@ const MonitoringScreen = () => {
       }
       clearInterval(intervalId);
     };
-  }, [wsEndpoint]);
+  }, [wsEndpoint, autoReconnect, retryCount]);
 
   const animateBar = (animRef, toValue) => {
     Animated.timing(animRef, {
@@ -145,6 +166,21 @@ const MonitoringScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>System Monitoring</Text>
 
+      <View style={styles.statusContainer}>
+        <View style={[styles.statusIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
+        <Text style={styles.statusText}>
+          {isConnected ? 'Connected' : 'Disconnected'}
+          {retryCount > 0 && ` (Retrying ${retryCount}/5)`}
+        </Text>
+        <Switch
+          value={autoReconnect}
+          onValueChange={setAutoReconnect}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={autoReconnect ? '#f5dd4b' : '#f4f3f4'}
+        />
+        <Text style={styles.switchLabel}>Auto-reconnect</Text>
+      </View>
+
       {isConfiguring ? (
         <View style={styles.configContainer}>
           <Text style={styles.configTitle}>Configuration</Text>
@@ -167,77 +203,100 @@ const MonitoringScreen = () => {
               style={styles.input}
               value={wsEndpoint}
               onChangeText={setWsEndpoint}
-              placeholder="ws://your-kubernetes-ws-endpoint"
+              placeholder={WEBSOCKET_ENDPOINT}
               autoCapitalize="none"
               autoCorrect={false}
             />
           </View>
 
           <View style={styles.buttonGroup}>
-            <TouchableOpacity
-              style={[styles.button, styles.saveButton]}
-              onPress={handleSaveConfig}
-            >
+            <TouchableOpacity style={styles.button} onPress={handleSaveConfig}>
               <Text style={styles.buttonText}>Save</Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
-              onPress={() => setIsConfiguring(false)}
-            >
+            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setIsConfiguring(false)}>
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       ) : (
         <>
-          <TouchableOpacity
-            style={styles.configButton}
-            onPress={() => setIsConfiguring(true)}
-          >
-            <Text style={styles.configButtonText}>Configure Endpoints</Text>
-          </TouchableOpacity>
-
-          {error && (
+          {isLoading ? (
+            <ActivityIndicator size="large" color="#0000ff" style={styles.loadingIndicator} />
+          ) : error ? (
             <View style={styles.errorContainer}>
               <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
-                <Text style={styles.refreshButtonText}>Retry</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+                <Text style={styles.retryButtonText}>Retry</Text>
               </TouchableOpacity>
             </View>
-          )}
-
-          {isLoading && !error ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#4CAF50" />
-              <Text style={styles.loadingText}>Loading metrics...</Text>
-            </View>
           ) : (
-            <View style={styles.metricsContainer}>
-              <View style={styles.metric}>
-                <Text style={styles.metricLabel}>CPU Usage:</Text>
-                <Text style={[styles.metricValue, { color: getStatusColor(cpu) }]}>{cpu}%</Text>
-                <Animated.View style={[styles.progressBar, { width: cpuAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]}>
-                  <View style={[styles.progressFill, { backgroundColor: getStatusColor(cpu) }]} />
-                </Animated.View>
+            <>
+              <View style={styles.metricContainer}>
+                <Text style={styles.metricLabel}>CPU Usage</Text>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: cpuAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
+                        backgroundColor: getStatusColor(cpu),
+                      },
+                    ]}
+                  />
+                  <Text style={styles.metricValue}>{cpu}%</Text>
+                </View>
               </View>
 
-              <View style={styles.metric}>
-                <Text style={styles.metricLabel}>Memory Usage:</Text>
-                <Text style={[styles.metricValue, { color: getStatusColor(memory) }]}>{memory}%</Text>
-                <Animated.View style={[styles.progressBar, { width: memoryAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]}>
-                  <View style={[styles.progressFill, { backgroundColor: getStatusColor(memory) }]} />
-                </Animated.View>
+              <View style={styles.metricContainer}>
+                <Text style={styles.metricLabel}>Memory Usage</Text>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: memoryAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
+                        backgroundColor: getStatusColor(memory),
+                      },
+                    ]}
+                  />
+                  <Text style={styles.metricValue}>{memory}%</Text>
+                </View>
               </View>
 
-              <View style={styles.metric}>
-                <Text style={styles.metricLabel}>Disk Usage:</Text>
-                <Text style={[styles.metricValue, { color: getStatusColor(disk) }]}>{disk}%</Text>
-                <Animated.View style={[styles.progressBar, { width: diskAnim.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }) }]}>
-                  <View style={[styles.progressFill, { backgroundColor: getStatusColor(disk) }]} />
-                </Animated.View>
+              <View style={styles.metricContainer}>
+                <Text style={styles.metricLabel}>Disk Usage</Text>
+                <View style={styles.progressBarContainer}>
+                  <Animated.View
+                    style={[
+                      styles.progressBar,
+                      {
+                        width: diskAnim.interpolate({
+                          inputRange: [0, 100],
+                          outputRange: ['0%', '100%'],
+                        }),
+                        backgroundColor: getStatusColor(disk),
+                      },
+                    ]}
+                  />
+                  <Text style={styles.metricValue}>{disk}%</Text>
+                </View>
               </View>
-            </View>
+
+              <View style={styles.buttonGroup}>
+                <TouchableOpacity style={styles.button} onPress={handleRefresh}>
+                  <Text style={styles.buttonText}>Refresh</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.button} onPress={() => setIsConfiguring(true)}>
+                  <Text style={styles.buttonText}>Configure</Text>
+                </TouchableOpacity>
+              </View>
+            </>
           )}
         </>
       )}
@@ -255,36 +314,43 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#333',
     textAlign: 'center',
+    color: '#333',
   },
-  configButton: {
-    backgroundColor: '#2196F3',
-    padding: 10,
-    borderRadius: 5,
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 20,
-    alignSelf: 'flex-end',
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    elevation: 2,
   },
-  configButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  statusIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  statusText: {
+    fontSize: 16,
+    marginRight: 10,
+  },
+  switchLabel: {
+    fontSize: 14,
+    marginLeft: 5,
   },
   configContainer: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderRadius: 8,
     elevation: 2,
   },
   configTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
+    textAlign: 'center',
   },
   inputGroup: {
     marginBottom: 15,
@@ -292,12 +358,12 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     marginBottom: 5,
-    color: '#555',
+    color: '#333',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
+    borderRadius: 4,
     padding: 10,
     fontSize: 16,
   },
@@ -307,78 +373,70 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   button: {
-    padding: 10,
-    borderRadius: 5,
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 4,
     flex: 1,
     marginHorizontal: 5,
     alignItems: 'center',
   },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-  },
   cancelButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#F44336',
   },
   buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  errorContainer: {
-    backgroundColor: '#ffebee',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#d32f2f',
-    marginBottom: 10,
-  },
-  refreshButton: {
-    backgroundColor: '#d32f2f',
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  refreshButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 10,
+    color: '#fff',
     fontSize: 16,
-    color: '#666',
+    fontWeight: 'bold',
   },
-  metricsContainer: {
-    marginTop: 20,
-  },
-  metric: {
+  metricContainer: {
     marginBottom: 20,
   },
   metricLabel: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 8,
     color: '#333',
   },
-  metricValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  progressBar: {
+  progressBarContainer: {
     height: 20,
     backgroundColor: '#e0e0e0',
     borderRadius: 10,
     overflow: 'hidden',
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
     borderRadius: 10,
+  },
+  metricValue: {
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    fontSize: 14,
+    color: '#333',
+  },
+  loadingIndicator: {
+    marginTop: 20,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  errorText: {
+    color: '#F44336',
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    padding: 10,
+    borderRadius: 4,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });
 

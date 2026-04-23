@@ -9,6 +9,7 @@ class KubernetesAPI {
     this.currentMemory = 60;
     this.currentDisk = 70;
     this.callback = null;
+    this.errorCallback = null;
     this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || 'ws://your-kubernetes-ws-endpoint';
   }
 
@@ -96,11 +97,18 @@ class KubernetesAPI {
     }
   }
 
-  subscribeToMetrics(endpoint, callback) {
+  subscribeToMetrics(endpoint, callback, errorCallback) {
     this.callback = callback;
+    this.errorCallback = errorCallback;
 
     // Use the configured WebSocket endpoint
     const wsEndpoint = this.wsEndpoint || endpoint;
+
+    // Close existing connection if it exists
+    if (this.ws) {
+      this.ws.close();
+    }
+
     this.ws = new WebSocket(wsEndpoint);
 
     this.ws.onmessage = (event) => {
@@ -130,10 +138,16 @@ class KubernetesAPI {
 
     this.ws.onerror = (event) => {
       console.log('Error occurred while connecting to WebSocket:', event);
+      if (this.errorCallback) {
+        this.errorCallback(event);
+      }
     };
 
     this.ws.onclose = () => {
       console.log('WebSocket connection closed');
+      if (this.errorCallback) {
+        this.errorCallback(new Error('WebSocket connection closed'));
+      }
     };
 
     return () => {
