@@ -119,11 +119,11 @@ export const getAppUsage = (callback: (usage: any[]) => void) => {
   });
 };
 
-export const saveSmartCollection = (name: string, appPackages: string, lastUpdated: number) => {
+export const saveSmartCollection = (name: string, appPackages: string[], lastUpdated: number) => {
   db.transaction((tx) => {
     tx.executeSql(
       `INSERT INTO smart_collections (name, app_packages, last_updated) VALUES (?, ?, ?);`,
-      [name, appPackages, lastUpdated],
+      [name, JSON.stringify(appPackages), lastUpdated],
       () => console.log('Smart collection saved'),
       (_, error) => {
         console.error('Error saving smart collection:', error);
@@ -138,7 +138,13 @@ export const getSmartCollections = (callback: (collections: any[]) => void) => {
     tx.executeSql(
       `SELECT * FROM smart_collections ORDER BY last_updated DESC;`,
       [],
-      (_, { rows }) => callback(rows._array),
+      (_, { rows }) => {
+        const collections = rows._array.map(col => ({
+          ...col,
+          app_packages: JSON.parse(col.app_packages)
+        }));
+        callback(collections);
+      },
       (_, error) => {
         console.error('Error fetching smart collections:', error);
         return false;
@@ -147,11 +153,42 @@ export const getSmartCollections = (callback: (collections: any[]) => void) => {
   });
 };
 
-export const saveFocusMode = (name: string, allowedApps: string, blockedApps: string, isActive: boolean) => {
+export const updateSmartCollections = async () => {
+  const collections = await generateSmartCollections();
+  const timestamp = Date.now();
+
+  db.transaction((tx) => {
+    // Clear existing collections
+    tx.executeSql(
+      `DELETE FROM smart_collections;`,
+      [],
+      () => {
+        // Insert new collections
+        collections.forEach(collection => {
+          tx.executeSql(
+            `INSERT INTO smart_collections (name, app_packages, last_updated) VALUES (?, ?, ?);`,
+            [collection.name, JSON.stringify(collection.apps), timestamp],
+            () => console.log(`Collection ${collection.name} saved`),
+            (_, error) => {
+              console.error(`Error saving collection ${collection.name}:`, error);
+              return false;
+            }
+          );
+        });
+      },
+      (_, error) => {
+        console.error('Error clearing collections:', error);
+        return false;
+      }
+    );
+  });
+};
+
+export const saveFocusMode = (name: string, allowedApps: string[], blockedApps: string[], isActive: boolean) => {
   db.transaction((tx) => {
     tx.executeSql(
       `INSERT INTO focus_modes (name, allowed_apps, blocked_apps, is_active) VALUES (?, ?, ?, ?);`,
-      [name, allowedApps, blockedApps, isActive ? 1 : 0],
+      [name, JSON.stringify(allowedApps), JSON.stringify(blockedApps), isActive ? 1 : 0],
       () => console.log('Focus mode saved'),
       (_, error) => {
         console.error('Error saving focus mode:', error);
@@ -166,7 +203,15 @@ export const getFocusModes = (callback: (modes: any[]) => void) => {
     tx.executeSql(
       `SELECT * FROM focus_modes;`,
       [],
-      (_, { rows }) => callback(rows._array),
+      (_, { rows }) => {
+        const modes = rows._array.map(mode => ({
+          ...mode,
+          allowed_apps: JSON.parse(mode.allowed_apps),
+          blocked_apps: JSON.parse(mode.blocked_apps),
+          is_active: mode.is_active === 1
+        }));
+        callback(modes);
+      },
       (_, error) => {
         console.error('Error fetching focus modes:', error);
         return false;
@@ -180,37 +225,9 @@ export const updateFocusMode = (id: number, isActive: boolean) => {
     tx.executeSql(
       `UPDATE focus_modes SET is_active = ? WHERE id = ?;`,
       [isActive ? 1 : 0, id],
-      () => console.log('Focus mode updated'),
+      () => console.log(`Focus mode ${id} updated`),
       (_, error) => {
-        console.error('Error updating focus mode:', error);
-        return false;
-      }
-    );
-  });
-};
-
-export const saveScannedApp = (packageName: string, appName: string, iconUri: string) => {
-  db.transaction((tx) => {
-    tx.executeSql(
-      `INSERT OR REPLACE INTO scanned_apps (package_name, app_name, icon_uri, last_scanned) VALUES (?, ?, ?, ?);`,
-      [packageName, appName, iconUri, Date.now()],
-      () => console.log(`Saved app: ${appName}`),
-      (_, error) => {
-        console.error('Error saving scanned app:', error);
-        return false;
-      }
-    );
-  });
-};
-
-export const getScannedApps = (callback: (apps: any[]) => void) => {
-  db.transaction((tx) => {
-    tx.executeSql(
-      `SELECT * FROM scanned_apps ORDER BY app_name ASC;`,
-      [],
-      (_, { rows }) => callback(rows._array),
-      (_, error) => {
-        console.error('Error fetching scanned apps:', error);
+        console.error(`Error updating focus mode ${id}:`, error);
         return false;
       }
     );
