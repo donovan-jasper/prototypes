@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, StyleSheet, Dimensions, Text } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Dimensions, Text, TouchableOpacity } from 'react-native';
 import { BarChart, LineChart, PieChart } from 'react-native-chart-kit';
-import { TouchableOpacity } from 'react-native-gesture-handler';
+import { Picker } from '@react-native-picker/picker';
 
 interface ChartRendererProps {
   data: {
@@ -16,6 +16,7 @@ interface ChartRendererProps {
   xAxisLabel?: string;
   yAxisLabel?: string;
   onDataPointClick?: (data: { index: number; value: number; label: string }) => void;
+  onTypeChange?: (type: 'bar' | 'line' | 'pie') => void;
 }
 
 const ChartRenderer: React.FC<ChartRendererProps> = ({
@@ -23,9 +24,18 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   type = 'bar',
   xAxisLabel = '',
   yAxisLabel = '',
-  onDataPointClick
+  onDataPointClick,
+  onTypeChange
 }) => {
   const screenWidth = Dimensions.get('window').width - 32;
+  const [selectedType, setSelectedType] = useState(type);
+
+  const handleTypeChange = (newType: 'bar' | 'line' | 'pie') => {
+    setSelectedType(newType);
+    if (onTypeChange) {
+      onTypeChange(newType);
+    }
+  };
 
   const chartConfig = {
     backgroundColor: '#ffffff',
@@ -56,7 +66,7 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
   }));
 
   const renderChart = () => {
-    switch (type) {
+    switch (selectedType) {
       case 'bar':
         return (
           <BarChart
@@ -149,8 +159,22 @@ const ChartRenderer: React.FC<ChartRendererProps> = ({
 
   return (
     <View style={styles.container}>
+      <View style={styles.typeSelectorContainer}>
+        <Text style={styles.typeSelectorLabel}>Chart Type:</Text>
+        <Picker
+          selectedValue={selectedType}
+          style={styles.typeSelector}
+          onValueChange={(itemValue) => handleTypeChange(itemValue as 'bar' | 'line' | 'pie')}
+        >
+          <Picker.Item label="Bar" value="bar" />
+          <Picker.Item label="Line" value="line" />
+          <Picker.Item label="Pie" value="pie" />
+        </Picker>
+      </View>
+
       {renderChart()}
-      {data.datasets.length > 1 && type !== 'pie' && (
+
+      {data.datasets.length > 1 && selectedType !== 'pie' && (
         <View style={styles.legendContainer}>
           {data.datasets.map((dataset, index) => (
             <View key={index} style={styles.legendItem}>
@@ -169,6 +193,19 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  typeSelectorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  typeSelectorLabel: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  typeSelector: {
+    flex: 1,
+    height: 50,
+  },
   chart: {
     marginVertical: 8,
     borderRadius: 16,
@@ -176,7 +213,7 @@ const styles = StyleSheet.create({
   pieContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
   legendContainer: {
     flexDirection: 'row',
@@ -198,6 +235,18 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 12,
+  },
+  tooltip: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 8,
+    borderRadius: 4,
+  },
+  tooltipText: {
+    color: 'white',
+    fontSize: 14,
   },
 });
 

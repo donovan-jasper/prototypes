@@ -104,3 +104,25 @@ const createGroupedChartConfig = (
     yAxisLabel: yColumn
   };
 };
+
+export const transformDataForChartType = (
+  data: { columns: string[], rows: any[] },
+  targetType: 'bar' | 'line' | 'pie'
+) => {
+  // For pie charts, we need to transform the data structure
+  if (targetType === 'pie') {
+    // Use the first two columns for pie chart
+    const labels = data.rows.map(row => String(row[data.columns[0]]));
+    const values = data.rows.map(row => Number(row[data.columns[1]]) || 0);
+
+    return {
+      labels,
+      datasets: [{
+        data: values
+      }]
+    };
+  }
+
+  // For bar and line charts, we can use the same structure
+  return generateChartConfig(data, targetType).data;
+};
