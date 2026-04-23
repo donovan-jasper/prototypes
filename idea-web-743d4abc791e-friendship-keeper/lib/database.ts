@@ -11,7 +11,8 @@ export const initDatabase = () => {
       frequency TEXT NOT NULL,
       importance INTEGER DEFAULT 5,
       notes TEXT,
-      createdAt TEXT NOT NULL
+      createdAt TEXT NOT NULL,
+      phoneNumber TEXT
     );
 
     CREATE TABLE IF NOT EXISTS interactions (

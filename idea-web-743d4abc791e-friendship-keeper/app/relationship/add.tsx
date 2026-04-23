@@ -1,165 +1,188 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  Alert,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import { createRelationship } from '../../services/relationshipService';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Platform } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { Picker } from '@react-native-picker/picker';
+import * as Contacts from 'expo-contacts';
+import { useRelationships } from '../../hooks/useRelationships';
 import { Relationship } from '../../types';
 
-export default function AddRelationshipScreen() {
+export default function AddRelationship() {
+  const { editMode, id } = useLocalSearchParams();
   const router = useRouter();
+  const { relationships, createRelationship, updateRelationship } = useRelationships();
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<Relationship['category'] | ''>('');
-  const [frequency, setFrequency] = useState<Relationship['frequency'] | ''>('');
-  const [importance, setImportance] = useState(5);
+  const [category, setCategory] = useState('Friends');
+  const [frequency, setFrequency] = useState('Monthly');
+  const [importance, setImportance] = useState(3);
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [notes, setNotes] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const categories: Relationship['category'][] = ['Family', 'Friends', 'Professional', 'Acquaintance'];
-  const frequencies: Relationship['frequency'][] = ['Weekly', 'Monthly', 'Quarterly'];
+  useEffect(() => {
+    if (editMode === 'true' && id) {
+      const relationshipToEdit = relationships.find(r => r.id === Number(id));
+      if (relationshipToEdit) {
+        setName(relationshipToEdit.name);
+        setCategory(relationshipToEdit.category);
+        setFrequency(relationshipToEdit.frequency);
+        setImportance(relationshipToEdit.importance);
+        setPhoneNumber(relationshipToEdit.phoneNumber || '');
+        setNotes(relationshipToEdit.notes || '');
+      }
+    }
+  }, [editMode, id, relationships]);
 
-  const handleSave = () => {
+  const handleImportContact = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+        });
+
+        if (data.length > 0) {
+          // For simplicity, just pick the first contact with a phone number
+          const contactWithPhone = data.find(c => c.phoneNumbers && c.phoneNumbers.length > 0);
+          if (contactWithPhone) {
+            setName(`${contactWithPhone.firstName || ''} ${contactWithPhone.lastName || ''}`.trim());
+            setPhoneNumber(contactWithPhone.phoneNumbers?.[0].number || '');
+          } else {
+            Alert.alert('No contacts with phone numbers found');
+          }
+        } else {
+          Alert.alert('No contacts found');
+        }
+      } else {
+        Alert.alert('Permission to access contacts is required');
+      }
+    } catch (error) {
+      console.error('Error importing contact:', error);
+      Alert.alert('Failed to import contact');
+    }
+  };
+
+  const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Missing Information', 'Please enter a name');
+      Alert.alert('Please enter a name');
       return;
     }
 
-    if (!category) {
-      Alert.alert('Missing Information', 'Please select a category');
-      return;
-    }
-
-    if (!frequency) {
-      Alert.alert('Missing Information', 'Please select a contact frequency');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      createRelationship({
+      const relationshipData: Omit<Relationship, 'id' | 'createdAt'> = {
         name: name.trim(),
         category,
         frequency,
         importance,
-        notes: notes.trim() || undefined,
-      });
+        phoneNumber: phoneNumber.trim(),
+        notes: notes.trim(),
+      };
+
+      if (editMode === 'true' && id) {
+        await updateRelationship(Number(id), relationshipData);
+      } else {
+        await createRelationship(relationshipData);
+      }
 
       router.back();
     } catch (error) {
-      Alert.alert('Error', 'Failed to create relationship. Please try again.');
-      console.error('Failed to create relationship:', error);
+      console.error('Error saving relationship:', error);
+      Alert.alert('Failed to save relationship');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.label}>Name *</Text>
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={styles.form}>
+        <Text style={styles.label}>Name</Text>
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.input}
+            value={name}
+            onChangeText={setName}
+            placeholder="Enter name"
+            autoFocus
+          />
+          <TouchableOpacity style={styles.importButton} onPress={handleImportContact}>
+            <MaterialIcons name="import-contacts" size={24} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={category}
+            onValueChange={(itemValue) => setCategory(itemValue)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Family" value="Family" />
+            <Picker.Item label="Friends" value="Friends" />
+            <Picker.Item label="Professional" value="Professional" />
+            <Picker.Item label="Acquaintance" value="Acquaintance" />
+          </Picker>
+        </View>
+
+        <Text style={styles.label}>Contact Frequency</Text>
+        <View style={styles.pickerContainer}>
+          <Picker
+            selectedValue={frequency}
+            onValueChange={(itemValue) => setFrequency(itemValue)}
+            style={styles.picker}
+          >
+            <Picker.Item label="Weekly" value="Weekly" />
+            <Picker.Item label="Bi-weekly" value="Bi-weekly" />
+            <Picker.Item label="Monthly" value="Monthly" />
+            <Picker.Item label="Quarterly" value="Quarterly" />
+            <Picker.Item label="Yearly" value="Yearly" />
+          </Picker>
+        </View>
+
+        <Text style={styles.label}>Importance</Text>
+        <View style={styles.starRatingContainer}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <TouchableOpacity key={star} onPress={() => setImportance(star)}>
+              <MaterialIcons
+                name={star <= importance ? 'star' : 'star-border'}
+                size={32}
+                color={star <= importance ? '#FFD700' : '#ccc'}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Phone Number</Text>
         <TextInput
           style={styles.input}
-          value={name}
-          onChangeText={setName}
-          placeholder="Enter name"
-          placeholderTextColor="#9E9E9E"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          placeholder="Enter phone number"
+          keyboardType="phone-pad"
         />
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Category *</Text>
-        <View style={styles.pickerContainer}>
-          {categories.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[
-                styles.pickerButton,
-                category === cat && styles.pickerButtonActive,
-              ]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text
-                style={[
-                  styles.pickerButtonText,
-                  category === cat && styles.pickerButtonTextActive,
-                ]}
-              >
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Contact Frequency *</Text>
-        <View style={styles.pickerContainer}>
-          {frequencies.map((freq) => (
-            <TouchableOpacity
-              key={freq}
-              style={[
-                styles.pickerButton,
-                frequency === freq && styles.pickerButtonActive,
-              ]}
-              onPress={() => setFrequency(freq)}
-            >
-              <Text
-                style={[
-                  styles.pickerButtonText,
-                  frequency === freq && styles.pickerButtonTextActive,
-                ]}
-              >
-                {freq}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Importance: {importance}</Text>
-        <View style={styles.sliderContainer}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((value) => (
-            <TouchableOpacity
-              key={value}
-              style={[
-                styles.sliderButton,
-                importance >= value && styles.sliderButtonActive,
-              ]}
-              onPress={() => setImportance(value)}
-            >
-              <Text
-                style={[
-                  styles.sliderButtonText,
-                  importance >= value && styles.sliderButtonTextActive,
-                ]}
-              >
-                {value}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Notes (Optional)</Text>
+        <Text style={styles.label}>Notes</Text>
         <TextInput
           style={[styles.input, styles.textArea]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Add any notes about this relationship..."
-          placeholderTextColor="#9E9E9E"
+          placeholder="Any additional notes about this relationship"
           multiline
           numberOfLines={4}
-          textAlignVertical="top"
         />
-      </View>
 
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Relationship</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.saveButton, isLoading && styles.disabledButton]}
+          onPress={handleSave}
+          disabled={isLoading}
+        >
+          <Text style={styles.saveButtonText}>
+            {editMode === 'true' ? 'Update Relationship' : 'Add Relationship'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -167,96 +190,68 @@ export default function AddRelationshipScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
   },
-  content: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  section: {
-    marginBottom: 24,
+  form: {
+    padding: 20,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 12,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#333',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
+    flex: 1,
+    backgroundColor: '#fff',
     padding: 12,
+    borderRadius: 5,
     fontSize: 16,
-    color: '#212121',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#ddd',
   },
-  textArea: {
-    minHeight: 100,
-    paddingTop: 12,
+  importButton: {
+    marginLeft: 10,
+    padding: 10,
   },
   pickerContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  pickerButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
+    borderRadius: 5,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#ddd',
+    marginBottom: 20,
   },
-  pickerButtonActive: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
+  picker: {
+    height: Platform.OS === 'ios' ? 150 : 50,
+    width: '100%',
   },
-  pickerButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#757575',
-  },
-  pickerButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  sliderContainer: {
+  starRatingContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 4,
+    marginBottom: 20,
   },
-  sliderButton: {
-    flex: 1,
-    aspectRatio: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  sliderButtonActive: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
-  },
-  sliderButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#757575',
-  },
-  sliderButtonTextActive: {
-    color: '#FFFFFF',
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   saveButton: {
-    backgroundColor: '#2196F3',
-    borderRadius: 8,
-    padding: 16,
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   saveButtonText: {
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
 });
