@@ -12,20 +12,29 @@ interface ModeCardProps {
   };
   onPress: () => void;
   isActive?: boolean;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-export const ModeCard: React.FC<ModeCardProps> = ({ mode, onPress, isActive }) => {
+export const ModeCard: React.FC<ModeCardProps> = ({
+  mode,
+  onPress,
+  isActive = false,
+  onEdit,
+  onDelete,
+}) => {
   return (
     <TouchableOpacity
       style={[
-        styles.card,
-        { borderColor: isActive ? mode.color : 'transparent' },
-        { backgroundColor: isActive ? `${mode.color}20` : 'white' }
+        styles.container,
+        isActive && styles.activeContainer,
+        { backgroundColor: mode.color || '#6200ee' },
       ]}
       onPress={onPress}
+      activeOpacity={0.8}
     >
       <View style={styles.content}>
-        <View style={[styles.iconContainer, { backgroundColor: mode.color }]}>
+        <View style={styles.iconContainer}>
           {mode.icon ? (
             <Text style={styles.icon}>{mode.icon}</Text>
           ) : (
@@ -37,26 +46,48 @@ export const ModeCard: React.FC<ModeCardProps> = ({ mode, onPress, isActive }) =
           <Text style={styles.subtitle}>{mode.appIds.length} apps</Text>
         </View>
       </View>
-      {isActive && (
-        <IconButton
-          icon="check"
-          color={mode.color}
-          size={20}
-        />
+
+      {(onEdit || onDelete) && (
+        <View style={styles.actions}>
+          {onEdit && (
+            <IconButton
+              icon="pencil"
+              size={20}
+              onPress={onEdit}
+              color="white"
+            />
+          )}
+          {onDelete && (
+            <IconButton
+              icon="delete"
+              size={20}
+              onPress={onDelete}
+              color="white"
+            />
+          )}
+        </View>
       )}
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 2,
+  container: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+  },
+  activeContainer: {
+    borderWidth: 2,
+    borderColor: 'white',
   },
   content: {
     flexDirection: 'row',
@@ -66,9 +97,10 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   icon: {
     color: 'white',
@@ -79,12 +111,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
   subtitle: {
-    fontSize: 14,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
+    fontSize: 12,
     marginTop: 2,
+  },
+  actions: {
+    flexDirection: 'row',
   },
 });

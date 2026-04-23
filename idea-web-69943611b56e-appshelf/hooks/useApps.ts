@@ -5,8 +5,12 @@ export const useApps = () => {
   const { apps, setApps } = useAppStore();
 
   const loadApps = async () => {
-    const installedApps = await getInstalledApps();
-    setApps(installedApps);
+    try {
+      const installedApps = await getInstalledApps();
+      setApps(installedApps);
+    } catch (error) {
+      console.error('Error loading apps:', error);
+    }
   };
 
   return {

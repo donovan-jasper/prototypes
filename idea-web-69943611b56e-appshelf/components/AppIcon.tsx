@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import * as Linking from 'expo-linking';
 
 interface AppIconProps {
   app: {
@@ -7,12 +8,36 @@ interface AppIconProps {
     label: string;
     icon?: string;
   };
-  onPress: () => void;
+  onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-export const AppIcon: React.FC<AppIconProps> = ({ app, onPress }) => {
+export const AppIcon: React.FC<AppIconProps> = ({ app, onPress, onLongPress }) => {
+  const handlePress = () => {
+    if (onPress) {
+      onPress();
+      return;
+    }
+
+    try {
+      if (Platform.OS === 'android') {
+        Linking.openURL(`intent:#Intent;package=${app.packageName};end`);
+      } else {
+        // For iOS, use URL scheme
+        Linking.openURL(app.packageName);
+      }
+    } catch (error) {
+      console.error('Error launching app:', error);
+    }
+  };
+
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.container}
+      onPress={handlePress}
+      onLongPress={onLongPress}
+      activeOpacity={0.7}
+    >
       <View style={styles.iconContainer}>
         {app.icon ? (
           <Image
@@ -49,6 +74,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
   icon: {
     width: '100%',
@@ -71,5 +101,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textAlign: 'center',
     color: '#333',
+    fontWeight: '500',
   },
 });

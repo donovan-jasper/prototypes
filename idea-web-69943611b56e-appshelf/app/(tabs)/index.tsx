@@ -1,18 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Text } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Text, Platform } from 'react-native';
 import { useAppStore } from '../../store/appStore';
 import { AppIcon } from '../../components/AppIcon';
-import { FAB, Portal, Modal, Title, Divider } from 'react-native-paper';
+import { FAB, Portal, Modal, Title, Divider, Button } from 'react-native-paper';
 import { ModeCard } from '../../components/ModeCard';
 import { useModes } from '../../hooks/useModes';
 import { useApps } from '../../hooks/useApps';
-import { Linking } from 'react-native';
+import * as Linking from 'expo-linking';
+import { FocusTimer } from '../../components/FocusTimer';
 
 export default function HomeScreen() {
-  const { activeMode, setActiveMode, modes } = useAppStore();
+  const { activeMode, setActiveMode, modes, isPremium } = useAppStore();
   const { loadModes } = useModes();
   const { loadApps, apps } = useApps();
   const [visible, setVisible] = useState(false);
+  const [showTimer, setShowTimer] = useState(false);
 
   useEffect(() => {
     loadModes();
@@ -30,7 +32,13 @@ export default function HomeScreen() {
   const renderAppItem = ({ item }) => (
     <AppIcon
       app={item}
-      onPress={() => Linking.openURL(`intent:#Intent;package=${item.packageName};end`)}
+      onPress={() => {
+        if (Platform.OS === 'android') {
+          Linking.openURL(`intent:#Intent;package=${item.packageName};end`);
+        } else {
+          Linking.openURL(item.packageName);
+        }
+      }}
     />
   );
 
@@ -38,19 +46,48 @@ export default function HomeScreen() {
     ? apps.filter(app => activeMode.appIds.includes(app.packageName))
     : apps;
 
+  const handleAppLongPress = (app) => {
+    // Handle long press (e.g., show app info or remove from mode)
+    console.log('Long press on app:', app.label);
+  };
+
   return (
     <View style={styles.container}>
       {activeMode ? (
         <>
           <View style={styles.header}>
             <Title style={styles.modeTitle}>{activeMode.name}</Title>
+            {Platform.OS === 'ios' && (
+              <Button
+                mode="text"
+                onPress={() => setShowTimer(!showTimer)}
+                style={styles.timerButton}
+              >
+                {showTimer ? 'Hide Timer' : 'Show Timer'}
+              </Button>
+            )}
           </View>
+
+          {showTimer && <FocusTimer />}
+
           <FlatList
             data={filteredApps}
             renderItem={renderAppItem}
             keyExtractor={(item) => item.packageName}
             numColumns={4}
             contentContainerStyle={styles.grid}
+            ListEmptyComponent={
+              <View style={styles.emptyApps}>
+                <Text style={styles.emptyText}>No apps in this mode</Text>
+                <Button
+                  mode="contained"
+                  onPress={showModal}
+                  style={styles.addAppsButton}
+                >
+                  Add Apps
+                </Button>
+              </View>
+            }
           />
         </>
       ) : (
@@ -66,17 +103,32 @@ export default function HomeScreen() {
         <Modal visible={visible} onDismiss={hideModal} contentContainerStyle={styles.modal}>
           <Title style={styles.modalTitle}>Select Mode</Title>
           <Divider />
-          <FlatList
-            data={modes}
-            renderItem={({ item }) => (
-              <ModeCard
-                mode={item}
-                onPress={() => handleModeSelect(item)}
-                isActive={activeMode?.id === item.id}
-              />
-            )}
-            keyExtractor={(item) => item.id}
-          />
+          {modes.length > 0 ? (
+            <FlatList
+              data={modes}
+              renderItem={({ item }) => (
+                <ModeCard
+                  mode={item}
+                  onPress={() => handleModeSelect(item)}
+                  isActive={activeMode?.id === item.id}
+                />
+              )}
+              keyExtractor={(item) => item.id}
+            />
+          ) : (
+            <View style={styles.noModes}>
+              <Text style={styles.noModesText}>No modes created yet</Text>
+              <Button
+                mode="contained"
+                onPress={() => {
+                  hideModal();
+                  // Navigate to mode creation screen
+                }}
+              >
+                Create First Mode
+              </Button>
+            </View>
+          )}
         </Modal>
       </Portal>
 
@@ -84,6 +136,7 @@ export default function HomeScreen() {
         style={styles.fab}
         icon="swap-horizontal"
         onPress={showModal}
+        label="Modes"
       />
     </View>
   );
@@ -95,6 +148,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
@@ -103,6 +159,9 @@ const styles = StyleSheet.create({
   modeTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+  },
+  timerButton: {
+    marginLeft: 'auto',
   },
   grid: {
     padding: 8,
@@ -117,12 +176,14 @@ const styles = StyleSheet.create({
     fontSize: 18,
     marginBottom: 24,
     textAlign: 'center',
+    color: '#666',
   },
   button: {
     backgroundColor: '#6200ee',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 4,
+    elevation: 2,
   },
   buttonText: {
     color: 'white',
@@ -138,6 +199,8 @@ const styles = StyleSheet.create({
   modalTitle: {
     marginBottom: 16,
     textAlign: 'center',
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   fab: {
     position: 'absolute',
@@ -145,5 +208,21 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#6200ee',
+  },
+  emptyApps: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  addAppsButton: {
+    marginTop: 16,
+  },
+  noModes: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noModesText: {
+    fontSize: 16,
+    marginBottom: 20,
+    color: '#666',
   },
 });
