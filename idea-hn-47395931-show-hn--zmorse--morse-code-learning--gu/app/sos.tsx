@@ -1,34 +1,50 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Button, Alert, Modal, TextInput, ActivityIndicator } from 'react-native';
-import { Camera, useCameraPermissions } from 'expo-camera';
+import { Camera } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
 import * as SQLite from 'expo-sqlite';
 import PremiumGate from '../components/PremiumGate';
 import { textToMorse } from '../lib/morse';
+import { FlashlightService } from '../lib/flashlightService';
 
 // Initialize database
 const db = SQLite.openDatabaseSync('morsemate.db');
 
 export default function SOSScreen() {
   const [active, setActive] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, setPermission] = useState<{ granted: boolean } | null>(null);
   const [isPremium, setIsPremium] = useState(false);
   const [customMessage, setCustomMessage] = useState('SOS');
   const [showCustomModal, setShowCustomModal] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const cameraRef = useRef<Camera>(null);
+  const flashlightService = useRef<FlashlightService | null>(null);
 
   useEffect(() => {
-    // Check premium status and load custom message
+    // Initialize services
+    if (cameraRef.current) {
+      flashlightService.current = new FlashlightService(cameraRef);
+    }
+
+    // Check permissions and premium status
+    checkPermissions();
     checkPremiumStatus();
     loadCustomMessage();
   }, []);
+
+  const checkPermissions = async () => {
+    if (flashlightService.current) {
+      const granted = await flashlightService.current.checkPermissions();
+      setPermission({ granted });
+    }
+    setLoading(false);
+  };
 
   const checkPremiumStatus = async () => {
     // In a real app, check with your payment service
     // For demo, we'll simulate it
     setIsPremium(false);
-    setLoading(false);
   };
 
   const loadCustomMessage = async () => {
@@ -56,43 +72,22 @@ export default function SOSScreen() {
 
   const flashSOS = async () => {
     if (!permission?.granted) {
-      const { status } = await requestPermission();
-      if (status !== 'granted') {
-        Alert.alert('Permission required', 'Camera permission is needed to use flashlight');
-        return;
-      }
+      Alert.alert('Permission required', 'Camera permission is needed to use flashlight');
+      return;
+    }
+
+    if (!flashlightService.current) {
+      Alert.alert('Error', 'Flashlight service not initialized');
+      return;
     }
 
     setActive(true);
 
     try {
-      // Convert message to Morse code
-      const morse = textToMorse(customMessage);
-
-      // Create pattern from Morse code
-      const pattern = [];
-      for (const char of morse) {
-        if (char === '.') {
-          pattern.push(100); // Dot duration
-        } else if (char === '-') {
-          pattern.push(300); // Dash duration
-        } else if (char === ' ') {
-          pattern.push(100); // Space between symbols
-        }
-        pattern.push(100); // Gap between symbols
-      }
-
-      // Add a short pause at the end
-      pattern.push(500);
-
-      // In a real implementation, you would use expo-camera's torch mode
-      // For this demo, we'll use haptic feedback to simulate the flash
-      for (const duration of pattern) {
-        await Haptics.impactAsync(
-          duration > 200 ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light
-        );
-        await new Promise(resolve => setTimeout(resolve, duration));
-      }
+      await flashlightService.current.sendSOS(customMessage);
+    } catch (error) {
+      console.error('Error in flashSOS:', error);
+      Alert.alert('Error', 'Failed to send SOS signal');
     } finally {
       setActive(false);
     }
@@ -123,6 +118,14 @@ export default function SOSScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Hidden camera component for flashlight control */}
+      <Camera
+        ref={cameraRef}
+        style={StyleSheet.absoluteFill}
+        type="back"
+        ratio="16:9"
+      />
+
       <Text style={styles.title}>Emergency SOS</Text>
       <Text style={styles.warning}>⚠️ Use only in real emergencies</Text>
 
@@ -170,9 +173,17 @@ export default function SOSScreen() {
               onChangeText={setNewMessage}
               maxLength={20}
             />
-            <View style={styles.buttonRow}>
-              <Button title="Cancel" onPress={() => setShowCustomModal(false)} />
-              <Button title="Save" onPress={handleSaveMessage} />
+            <View style={styles.modalButtons}>
+              <Button
+                title="Cancel"
+                onPress={() => setShowCustomModal(false)}
+                color="#999"
+              />
+              <Button
+                title="Save"
+                onPress={handleSaveMessage}
+                color="#007AFF"
+              />
             </View>
           </View>
         </View>
@@ -188,6 +199,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -197,25 +213,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FF3B30',
     marginBottom: 40,
+    textAlign: 'center',
   },
   info: {
     marginTop: 40,
     textAlign: 'center',
     color: '#666',
+    paddingHorizontal: 20,
   },
   premiumSection: {
     marginTop: 30,
-    width: '100%',
     alignItems: 'center',
   },
   premiumText: {
     fontSize: 16,
     marginBottom: 10,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -233,18 +245,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
     padding: 10,
-    marginBottom: 15,
+    marginBottom: 20,
     fontSize: 16,
   },
-  buttonRow: {
+  modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
 });
