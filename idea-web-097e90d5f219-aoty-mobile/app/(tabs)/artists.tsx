@@ -171,21 +171,12 @@ export default function ArtistsScreen() {
       {searching && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#bb86fc' : '#6200ee'} />
-          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>Searching...</Text>
         </View>
       )}
 
-      {searchQuery && !searching && searchResults.length === 0 && (
-        <View style={styles.noResultsContainer}>
-          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>
-            No artists found. Try a different search.
-          </Text>
-        </View>
-      )}
-
-      {searchResults.length > 0 && (
+      {searchQuery.length > 0 && searchResults.length > 0 && (
         <>
-          <Text style={[styles.sectionHeader, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+          <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
             Search Results
           </Text>
           <FlatList
@@ -193,31 +184,32 @@ export default function ArtistsScreen() {
             renderItem={renderSearchResult}
             keyExtractor={(item) => item.id}
             style={styles.list}
+            contentContainerStyle={styles.listContent}
           />
-          <Divider />
         </>
       )}
 
-      <Text style={[styles.sectionHeader, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
-        Followed Artists ({followedArtists.length})
-      </Text>
-
-      {followedArtists.length === 0 ? (
-        <View style={styles.emptyStateContainer}>
-          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>
-            You're not following any artists yet.
+      {followedArtists.length > 0 && (
+        <>
+          <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+            Followed Artists ({followedArtists.length}{!isPremium && `/${FREE_TIER_LIMIT}`})
           </Text>
-          <Text style={{ color: colorScheme === 'dark' ? '#aaaaaa' : '#666666' }}>
-            Search above to find artists to follow.
+          <FlatList
+            data={followedArtists}
+            renderItem={renderFollowedArtist}
+            keyExtractor={(item) => item.id}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+          />
+        </>
+      )}
+
+      {followedArtists.length === 0 && searchQuery.length === 0 && !searching && (
+        <View style={styles.emptyState}>
+          <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#b0b0b0' : '#666666' }]}>
+            You're not following any artists yet. Search above to find your favorites!
           </Text>
         </View>
-      ) : (
-        <FlatList
-          data={followedArtists}
-          renderItem={renderFollowedArtist}
-          keyExtractor={(item) => item.id}
-          style={styles.list}
-        />
       )}
     </View>
   );
@@ -232,32 +224,30 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorContainer: {
-    padding: 16,
-    backgroundColor: '#ffebee',
+    padding: 12,
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderRadius: 4,
     marginBottom: 16,
   },
   errorText: {
-    fontSize: 16,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
   },
-  noResultsContainer: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  sectionHeader: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
     marginTop: 16,
+    marginBottom: 8,
   },
   list: {
-    flexGrow: 0,
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 16,
   },
   card: {
     marginBottom: 8,
@@ -268,10 +258,14 @@ const styles = StyleSheet.create({
   unfollowButton: {
     marginRight: 8,
   },
-  emptyStateContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
   },
 });

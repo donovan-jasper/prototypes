@@ -13,6 +13,12 @@ interface MusicBrainzArtist {
     begin: string;
     end: string | null;
   };
+  relations?: Array<{
+    type: string;
+    url?: {
+      resource: string;
+    };
+  }>;
 }
 
 interface MusicBrainzReleaseGroup {
@@ -47,40 +53,11 @@ export const searchArtists = async (query: string): Promise<SearchArtistResult[]
     const artists: SearchArtistResult[] = response.data.artists.map((artist: MusicBrainzArtist) => ({
       id: artist.id,
       name: artist.name,
-      imageUrl: null, // Will be fetched separately
+      imageUrl: artist.relations?.find(rel => rel.type === 'image')?.url?.resource || null,
       followedAt: 0
     }));
 
-    // Fetch images for each artist
-    const artistsWithImages = await Promise.all(
-      artists.map(async (artist) => {
-        try {
-          const imageResponse = await axios.get(`${MUSICBRAINZ_API_BASE}/artist/${artist.id}`, {
-            params: {
-              inc: 'url-rels',
-              fmt: 'json'
-            },
-            headers: {
-              'User-Agent': 'CritWave/1.0 (https://github.com/yourusername/critwave)'
-            }
-          });
-
-          const imageUrl = imageResponse.data.relations?.find(
-            (rel: any) => rel.type === 'image'
-          )?.url?.resource;
-
-          return {
-            ...artist,
-            imageUrl: imageUrl || null
-          };
-        } catch (error) {
-          console.error(`Failed to fetch image for artist ${artist.id}:`, error);
-          return artist;
-        }
-      })
-    );
-
-    return artistsWithImages;
+    return artists;
   } catch (error) {
     console.error('Failed to search artists:', error);
     throw error;
@@ -133,6 +110,33 @@ export const fetchArtistAlbums = async (artistId: string): Promise<Album[]> => {
     return albums;
   } catch (error) {
     console.error('Failed to fetch artist albums:', error);
+    throw error;
+  }
+};
+
+export const fetchArtistDetails = async (artistId: string): Promise<Artist> => {
+  try {
+    const response = await axios.get(`${MUSICBRAINZ_API_BASE}/artist/${artistId}`, {
+      params: {
+        inc: 'url-rels',
+        fmt: 'json'
+      },
+      headers: {
+        'User-Agent': 'CritWave/1.0 (https://github.com/yourusername/critwave)'
+      }
+    });
+
+    const artistData: MusicBrainzArtist = response.data;
+    const imageUrl = artistData.relations?.find(rel => rel.type === 'image')?.url?.resource || null;
+
+    return {
+      id: artistData.id,
+      name: artistData.name,
+      imageUrl: imageUrl,
+      followedAt: 0
+    };
+  } catch (error) {
+    console.error('Failed to fetch artist details:', error);
     throw error;
   }
 };
