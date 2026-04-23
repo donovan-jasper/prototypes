@@ -5,15 +5,24 @@ import { useSettingsStore } from '@/store/settings';
 import { usePredictionsStore } from '@/store/predictions';
 import { launchApp } from '@/lib/apps/launcher';
 import { useAppsStore } from '@/store/apps';
+import { useSharedValue, withSpring, useAnimatedStyle } from 'react-native-reanimated';
 
 export default function QuickLaunchBar() {
   const theme = useSettingsStore((state) => state.theme);
   const { predictedApps, loadPredictions } = usePredictionsStore();
   const { apps } = useAppsStore();
-  const [scaleAnimations] = useState(predictedApps.map(() => new Animated.Value(1)));
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Animation values for each app icon
+  const scaleValues = predictedApps.map(() => useSharedValue(1));
+  const opacityValues = predictedApps.map(() => useSharedValue(1));
 
   useEffect(() => {
-    loadPredictions();
+    const loadData = async () => {
+      await loadPredictions();
+      setIsLoading(false);
+    };
+    loadData();
   }, []);
 
   const handleAppPress = (appId: string) => {
@@ -24,21 +33,27 @@ export default function QuickLaunchBar() {
   };
 
   const handleAppPressIn = (index: number) => {
-    Animated.timing(scaleAnimations[index], {
-      toValue: 0.9,
-      duration: 100,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    scaleValues[index].value = withSpring(0.9, {
+      damping: 10,
+      stiffness: 300,
+    });
   };
 
   const handleAppPressOut = (index: number) => {
-    Animated.timing(scaleAnimations[index], {
-      toValue: 1,
-      duration: 100,
-      easing: Easing.inOut(Easing.ease),
-      useNativeDriver: true,
-    }).start();
+    scaleValues[index].value = withSpring(1, {
+      damping: 10,
+      stiffness: 300,
+    });
+  };
+
+  const getAnimatedStyle = (index: number) => {
+    'worklet';
+    return useAnimatedStyle(() => {
+      return {
+        transform: [{ scale: scaleValues[index].value }],
+        opacity: opacityValues[index].value,
+      };
+    });
   };
 
   const getPredictedApps = () => {
@@ -52,6 +67,16 @@ export default function QuickLaunchBar() {
   };
 
   const predictedAppsData = getPredictedApps();
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color={theme.text} />
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -69,7 +94,7 @@ export default function QuickLaunchBar() {
             activeOpacity={0.7}
             style={styles.iconContainer}
           >
-            <Animated.View style={{ transform: [{ scale: scaleAnimations[index] }] }}>
+            <Animated.View style={getAnimatedStyle(index)}>
               <AppIcon app={app} />
             </Animated.View>
           </TouchableOpacity>
@@ -96,6 +121,11 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginHorizontal: 8,
+    alignItems: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
 });
