@@ -145,10 +145,10 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 15,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   searchIcon: {
-    marginRight: 8,
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
@@ -156,12 +156,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cuisineFilterContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   filterTitle: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: 10,
     color: '#333',
   },
   cuisineButtons: {
@@ -169,45 +169,48 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   cuisineButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 15,
     paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
-    marginBottom: 8,
+    marginRight: 10,
+    marginBottom: 10,
   },
   selectedCuisineButton: {
-    backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
+    backgroundColor: '#FF6B6B10',
   },
   cuisineButtonText: {
     fontSize: 14,
     color: '#666',
   },
   selectedCuisineButtonText: {
-    color: '#fff',
+    color: '#FF6B6B',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
   listContent: {
-    paddingBottom: 24,
+    paddingBottom: 20,
   },
   restaurantItem: {
     flexDirection: 'row',
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    marginBottom: 12,
+    padding: 15,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    marginBottom: 15,
+    alignItems: 'center',
   },
   selectedRestaurant: {
     borderColor: '#FF6B6B',
@@ -217,7 +220,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    marginRight: 16,
+    marginRight: 15,
   },
   restaurantInfo: {
     flex: 1,
@@ -225,13 +228,13 @@ const styles = StyleSheet.create({
   restaurantName: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 5,
     color: '#333',
   },
   restaurantDetails: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   restaurantPrice: {
     fontSize: 16,
@@ -239,24 +242,21 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
   },
   selectedIcon: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
+    marginLeft: 10,
   },
   emptyContainer: {
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: 5,
     color: '#333',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
   },
 });
 

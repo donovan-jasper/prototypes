@@ -18,6 +18,7 @@ export const initDatabase = async () => {
             amount REAL,
             status TEXT,
             scheduledFor TEXT,
+            recurring TEXT,
             createdAt TEXT
           );`
         );
@@ -64,8 +65,8 @@ export const saveGift = async (gift) => {
         tx.executeSql(
           `INSERT INTO gifts (
             id, recipientName, restaurantId, restaurantName, restaurantImage,
-            message, amount, status, scheduledFor, createdAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            message, amount, status, scheduledFor, recurring, createdAt
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             gift.id,
             gift.recipientName,
@@ -76,6 +77,7 @@ export const saveGift = async (gift) => {
             gift.amount,
             gift.status,
             gift.scheduledFor.toISOString(),
+            gift.recurring || null,
             new Date().toISOString(),
           ],
           (_, result) => resolve(result),

@@ -168,24 +168,26 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
         <View style={styles.voiceNoteContainer}>
           <View style={styles.voiceNoteHeader}>
             <Text style={styles.voiceNoteTitle}>Voice Note</Text>
-            <Text style={styles.voiceNoteDuration}>{formatDuration(voiceNoteDuration)}</Text>
+            <Text style={styles.voiceNoteDuration}>
+              {formatDuration(voiceNoteDuration)}
+            </Text>
           </View>
 
-          <View style={styles.voiceNoteActions}>
+          <View style={styles.voiceNoteControls}>
             <TouchableOpacity
-              style={styles.voiceNoteActionButton}
+              style={styles.playButton}
               onPress={playVoiceNote}
             >
               <Ionicons name="play" size={20} color="#FF6B6B" />
-              <Text style={styles.voiceNoteActionText}>Play</Text>
+              <Text style={styles.playButtonText}>Play</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.voiceNoteActionButton}
+              style={styles.deleteButton}
               onPress={deleteVoiceNote}
             >
               <Ionicons name="trash" size={20} color="#FF6B6B" />
-              <Text style={styles.voiceNoteActionText}>Delete</Text>
+              <Text style={styles.deleteButtonText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -201,23 +203,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: '600',
-    marginBottom: 16,
+    marginBottom: 20,
     color: '#333',
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    padding: 15,
     fontSize: 16,
-    minHeight: 120,
+    minHeight: 150,
     textAlignVertical: 'top',
-    marginBottom: 16,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 10,
   },
   charCount: {
     fontSize: 14,
@@ -226,20 +228,21 @@ const styles = StyleSheet.create({
   voiceButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#FF6B6B',
+    borderRadius: 20,
   },
   recordingButton: {
     backgroundColor: '#FF6B6B',
     borderColor: '#FF6B6B',
   },
   voiceButtonText: {
+    marginLeft: 5,
     color: '#FF6B6B',
     fontSize: 14,
-    marginLeft: 8,
+    fontWeight: '500',
   },
   recordingButtonText: {
     color: '#fff',
@@ -247,10 +250,7 @@ const styles = StyleSheet.create({
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 16,
-    padding: 8,
-    backgroundColor: '#FF6B6B10',
-    borderRadius: 8,
+    marginTop: 15,
   },
   recordingDot: {
     width: 10,
@@ -264,15 +264,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   voiceNoteContainer: {
-    marginTop: 24,
-    padding: 16,
-    borderRadius: 8,
+    marginTop: 20,
+    padding: 15,
     backgroundColor: '#f8f8f8',
+    borderRadius: 8,
   },
   voiceNoteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   voiceNoteTitle: {
     fontSize: 16,
@@ -283,26 +283,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  voiceNoteActions: {
+  voiceNoteControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  voiceNoteActionButton: {
+  playButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#fff',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderWidth: 1,
     borderColor: '#FF6B6B',
-    flex: 1,
-    marginHorizontal: 4,
-    justifyContent: 'center',
+    borderRadius: 20,
   },
-  voiceNoteActionText: {
+  playButtonText: {
+    marginLeft: 5,
     color: '#FF6B6B',
     fontSize: 14,
-    marginLeft: 4,
+    fontWeight: '500',
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+    borderRadius: 20,
+  },
+  deleteButtonText: {
+    marginLeft: 5,
+    color: '#FF6B6B',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 
