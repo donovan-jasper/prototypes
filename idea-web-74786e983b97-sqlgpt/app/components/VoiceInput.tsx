@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, StyleSheet, Text, Animated } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Speech from 'expo-speech';
@@ -11,11 +11,10 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const pulseAnim = new Animated.Value(1);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const recognitionRef = useRef<Speech.SpeechRecognition | null>(null);
 
   useEffect(() => {
-    let recognition: Speech.SpeechRecognition | null = null;
-
     const startPulseAnimation = () => {
       Animated.loop(
         Animated.sequence([
@@ -40,7 +39,7 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
 
     if (isListening) {
       try {
-        recognition = Speech.startListening({
+        recognitionRef.current = Speech.startListening({
           onRecognized: (result) => {
             const text = result.text;
             setTranscript(text);
@@ -57,15 +56,16 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
         setIsListening(false);
       }
     } else {
-      if (recognition) {
-        Speech.stopListening(recognition);
+      if (recognitionRef.current) {
+        Speech.stopListening(recognitionRef.current);
+        recognitionRef.current = null;
       }
       stopPulseAnimation();
     }
 
     return () => {
-      if (recognition) {
-        Speech.stopListening(recognition);
+      if (recognitionRef.current) {
+        Speech.stopListening(recognitionRef.current);
       }
       stopPulseAnimation();
     };

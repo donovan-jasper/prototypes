@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import VoiceInput from '../../app/components/VoiceInput';
+import VoiceInput from '../../../app/components/VoiceInput';
 import * as Speech from 'expo-speech';
 
 jest.mock('expo-speech', () => ({
