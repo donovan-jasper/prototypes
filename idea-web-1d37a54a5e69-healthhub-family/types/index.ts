@@ -38,8 +38,8 @@ export interface Document {
   title: string;
   type: string;
   fileUri: string;
-  uploadDate: string;
   appointmentId?: number;
+  uploadDate: string;
 }
 
 export interface Medication {

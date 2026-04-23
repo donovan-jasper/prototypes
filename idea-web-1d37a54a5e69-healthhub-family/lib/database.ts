@@ -43,10 +43,10 @@ export const initDatabase = async () => {
     CREATE TABLE IF NOT EXISTS documents (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       family_member_id INTEGER NOT NULL,
-      appointment_id INTEGER,
       title TEXT NOT NULL,
       type TEXT NOT NULL,
       file_uri TEXT NOT NULL,
+      appointment_id INTEGER,
       upload_date TEXT DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (family_member_id) REFERENCES family_members(id) ON DELETE CASCADE,
       FOREIGN KEY (appointment_id) REFERENCES appointments(id) ON DELETE CASCADE
