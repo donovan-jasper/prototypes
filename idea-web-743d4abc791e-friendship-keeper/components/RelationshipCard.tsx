@@ -61,7 +61,12 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
             <Text style={styles.categoryText}>{relationship.category}</Text>
           </View>
         </View>
-        <View style={[styles.healthIndicator, { backgroundColor: getHealthColor() }]} />
+        <View style={styles.healthContainer}>
+          <View style={[styles.healthIndicator, { backgroundColor: getHealthColor() }]} />
+          <Text style={[styles.healthScore, { color: getHealthColor() }]}>
+            Health: {Math.round(relationship.health.score)}%
+          </Text>
+        </View>
       </View>
 
       <View style={styles.footer}>
@@ -112,11 +117,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#FFFFFF',
   },
+  healthContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   healthIndicator: {
     width: 16,
     height: 16,
     borderRadius: 8,
-    marginTop: 4,
+    marginBottom: 4,
+  },
+  healthScore: {
+    fontSize: 12,
+    fontWeight: '600',
   },
   footer: {
     flexDirection: 'row',
