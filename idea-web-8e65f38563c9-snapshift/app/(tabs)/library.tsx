@@ -1,23 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
 import { useSubscription } from '../../hooks/useSubscription';
-import { getVoiceClipsByCategory, getClipsByCategoryAndMood } from '../../services/voiceLibrary';
+import { getVoiceClipsByCategory, getClipsByCategoryAndMood, getPremiumClips } from '../../services/voiceLibrary';
 import VoicePlayer from '../../components/VoicePlayer';
 import { VoiceClip } from '../../types';
+import { Ionicons } from '@expo/vector-icons';
 
 const categories = ['all', 'morning', 'focus', 'energy', 'calm', 'celebrate'];
 const moods = ['struggling', 'neutral', 'crushing'];
 
 const LibraryScreen = () => {
-  const { isPremiumUser } = useSubscription();
+  const { isPremium, purchaseSubscription } = useSubscription();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedMood, setSelectedMood] = useState('neutral');
   const [searchQuery, setSearchQuery] = useState('');
   const [voiceClips, setVoiceClips] = useState<VoiceClip[]>([]);
+  const [premiumCount, setPremiumCount] = useState(0);
 
   useEffect(() => {
     loadVoiceClips();
-  }, [selectedCategory, selectedMood, searchQuery]);
+  }, [selectedCategory, selectedMood, searchQuery, isPremium]);
 
   const loadVoiceClips = () => {
     let clips = getClipsByCategoryAndMood(selectedCategory, selectedMood);
@@ -29,7 +31,14 @@ const LibraryScreen = () => {
       );
     }
 
+    const premiumClips = getPremiumClips();
+    setPremiumCount(premiumClips.length);
+
     setVoiceClips(clips);
+  };
+
+  const handleUpgradePress = () => {
+    purchaseSubscription();
   };
 
   const renderCategoryButton = (category: string) => (
@@ -70,7 +79,15 @@ const LibraryScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Voice Library</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Voice Library</Text>
+        {!isPremium && (
+          <View style={styles.premiumBadge}>
+            <Ionicons name="lock-closed" size={16} color="#FFD700" />
+            <Text style={styles.premiumBadgeText}>{premiumCount} locked</Text>
+          </View>
+        )}
+      </View>
 
       <View style={styles.searchContainer}>
         <TextInput
@@ -103,7 +120,8 @@ const LibraryScreen = () => {
         renderItem={({ item }) => (
           <VoicePlayer
             clip={item}
-            isPremiumUser={isPremiumUser}
+            isPremiumUser={isPremium}
+            onUpgradePress={handleUpgradePress}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -123,10 +141,28 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  premiumBadgeText: {
+    color: 'white',
+    marginLeft: 4,
+    fontSize: 14,
   },
   searchContainer: {
     marginBottom: 16,
@@ -199,15 +235,12 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
     padding: 20,
+    alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
     color: '#666',
-    textAlign: 'center',
+    fontSize: 16,
   },
 });
 

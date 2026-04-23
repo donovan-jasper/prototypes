@@ -1,18 +1,22 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { VoiceClip } from '../types';
-import { SubscriptionContext } from '../context/SubscriptionContext';
-import { PremiumGate } from './PremiumGate';
 
 interface VoicePlayerProps {
   clip: VoiceClip;
+  isPremiumUser: boolean;
+  onUpgradePress: () => void;
   onPlaybackStatusUpdate?: (status: any) => void;
 }
 
-const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate }) => {
-  const { isFeatureUnlocked } = useContext(SubscriptionContext);
+const VoicePlayer: React.FC<VoicePlayerProps> = ({
+  clip,
+  isPremiumUser,
+  onUpgradePress,
+  onPlaybackStatusUpdate
+}) => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -28,14 +32,14 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate 
   }, [sound]);
 
   const loadSound = async () => {
-    if (!isFeatureUnlocked('fullLibrary') && clip.isPremium) {
+    if (!isPremiumUser && clip.isPremium) {
       return;
     }
 
     setIsLoading(true);
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: `../assets/voices/${clip.audioFile}` },
+        require(`../assets/voices/${clip.audioFile}`),
         { shouldPlay: true },
         onPlaybackStatusUpdate || handlePlaybackStatusUpdate
       );
@@ -59,6 +63,11 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate 
   };
 
   const togglePlayback = async () => {
+    if (!isPremiumUser && clip.isPremium) {
+      onUpgradePress();
+      return;
+    }
+
     if (!sound) {
       await loadSound();
       return;
@@ -78,7 +87,27 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate 
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const renderPlayer = () => (
+  if (!isPremiumUser && clip.isPremium) {
+    return (
+      <View style={styles.lockedContainer}>
+        <View style={styles.lockIconContainer}>
+          <Ionicons name="lock-closed" size={24} color="#FFD700" />
+        </View>
+        <View style={styles.clipInfo}>
+          <Text style={styles.title}>{clip.title}</Text>
+          <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
+        </View>
+        <TouchableOpacity
+          style={styles.upgradeButton}
+          onPress={onUpgradePress}
+        >
+          <Text style={styles.upgradeButtonText}>Upgrade to Unlock</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
     <View style={styles.container}>
       <Text style={styles.title}>{clip.title}</Text>
       <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
@@ -110,24 +139,6 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate 
         </View>
       </View>
     </View>
-  );
-
-  return (
-    <PremiumGate
-      feature="fullLibrary"
-      renderLocked={() => (
-        <View style={styles.lockedContainer}>
-          <Text style={styles.title}>{clip.title}</Text>
-          <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
-          <Text style={styles.lockedText}>Premium Content</Text>
-          <TouchableOpacity style={styles.upgradeButton}>
-            <Text style={styles.upgradeButtonText}>Upgrade to Unlock</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    >
-      {renderPlayer()}
-    </PremiumGate>
   );
 };
 
@@ -189,21 +200,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  lockedText: {
-    fontSize: 14,
-    color: '#FF9800',
-    marginBottom: 8,
+  lockIconContainer: {
+    marginRight: 12,
+  },
+  clipInfo: {
+    flex: 1,
   },
   upgradeButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#FFD700',
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginLeft: 8,
   },
   upgradeButtonText: {
-    color: 'white',
+    color: '#333',
+    fontSize: 14,
     fontWeight: '600',
   },
 });

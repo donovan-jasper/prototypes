@@ -3,99 +3,100 @@ import { VoiceClip } from '../types';
 const voiceClips: VoiceClip[] = [
   // Morning clips
   {
-    id: 'morning-1',
+    id: 'morning-boost-01',
     title: 'Morning Boost',
     category: 'morning',
     audioFile: 'morning-boost-01.mp3',
     duration: 45,
     intensity: 'moderate',
-    isPremium: false,
+    isPremium: false
   },
   {
-    id: 'morning-2',
+    id: 'morning-boost-02',
     title: 'Sunrise Energy',
     category: 'morning',
-    audioFile: 'morning-energy-01.mp3',
+    audioFile: 'morning-boost-02.mp3',
     duration: 50,
     intensity: 'energetic',
-    isPremium: true,
+    isPremium: false
   },
   // Focus clips
   {
-    id: 'focus-1',
+    id: 'focus-deep-01',
     title: 'Deep Focus',
     category: 'focus',
     audioFile: 'focus-deep-01.mp3',
-    duration: 40,
+    duration: 60,
     intensity: 'moderate',
-    isPremium: false,
+    isPremium: false
   },
   {
-    id: 'focus-2',
-    title: 'Productivity Push',
+    id: 'focus-deep-02',
+    title: 'Concentration Boost',
     category: 'focus',
-    audioFile: 'focus-productivity-01.mp3',
-    duration: 45,
-    intensity: 'energetic',
-    isPremium: true,
+    audioFile: 'focus-deep-02.mp3',
+    duration: 55,
+    intensity: 'moderate',
+    isPremium: true
   },
   // Energy clips
   {
-    id: 'energy-1',
-    title: 'Energy Surge',
+    id: 'energy-rush-01',
+    title: 'Energy Rush',
     category: 'energy',
-    audioFile: 'energy-surge-01.mp3',
-    duration: 35,
+    audioFile: 'energy-rush-01.mp3',
+    duration: 40,
     intensity: 'energetic',
-    isPremium: false,
+    isPremium: false
   },
   {
-    id: 'energy-2',
-    title: 'Power Hour',
+    id: 'energy-rush-02',
+    title: 'Power Surge',
     category: 'energy',
-    audioFile: 'energy-power-01.mp3',
-    duration: 50,
+    audioFile: 'energy-rush-02.mp3',
+    duration: 45,
     intensity: 'energetic',
-    isPremium: true,
+    isPremium: true
   },
   // Calm clips
   {
-    id: 'calm-1',
-    title: 'Calm Mind',
+    id: 'calm-mind-01',
+    title: 'Calm Your Mind',
     category: 'calm',
     audioFile: 'calm-mind-01.mp3',
-    duration: 40,
+    duration: 50,
     intensity: 'gentle',
-    isPremium: false,
+    isPremium: false
   },
   {
-    id: 'calm-2',
+    id: 'calm-mind-02',
     title: 'Peaceful Moment',
     category: 'calm',
-    audioFile: 'calm-peaceful-01.mp3',
-    duration: 45,
+    audioFile: 'calm-mind-02.mp3',
+    duration: 55,
     intensity: 'gentle',
-    isPremium: true,
+    isPremium: true
   },
   // Celebrate clips
   {
-    id: 'celebrate-1',
-    title: 'Small Win',
+    id: 'celebrate-win-01',
+    title: 'Celebrate Your Win',
     category: 'celebrate',
     audioFile: 'celebrate-win-01.mp3',
     duration: 30,
-    intensity: 'moderate',
-    isPremium: false,
+    intensity: 'energetic',
+    isPremium: false
   },
   {
-    id: 'celebrate-2',
-    title: 'Big Achievement',
+    id: 'celebrate-win-02',
+    title: 'Victory Cheer',
     category: 'celebrate',
-    audioFile: 'celebrate-big-01.mp3',
-    duration: 40,
+    audioFile: 'celebrate-win-02.mp3',
+    duration: 35,
     intensity: 'energetic',
-    isPremium: true,
+    isPremium: true
   },
+  // Add more clips as needed...
 ];
 
 export const getVoiceClipsByCategory = (category: string): VoiceClip[] => {
@@ -103,42 +104,33 @@ export const getVoiceClipsByCategory = (category: string): VoiceClip[] => {
   return voiceClips.filter(clip => clip.category === category);
 };
 
-export const getClipsByMood = (mood: string): VoiceClip[] => {
-  const intensityMap: Record<string, string> = {
-    struggling: 'gentle',
-    neutral: 'moderate',
-    crushing: 'energetic',
-  };
+export const getClipsByCategoryAndMood = (category: string, mood: string): VoiceClip[] => {
+  let clips = getVoiceClipsByCategory(category);
 
-  return voiceClips.filter(clip => clip.intensity === intensityMap[mood]);
-};
-
-export const getRandomClip = (category?: string, excludeIds: string[] = []): VoiceClip => {
-  const filteredClips = category
-    ? getVoiceClipsByCategory(category).filter(clip => !excludeIds.includes(clip.id))
-    : voiceClips.filter(clip => !excludeIds.includes(clip.id));
-
-  if (filteredClips.length === 0) {
-    return voiceClips[0]; // Fallback
+  // Filter by mood intensity
+  if (mood === 'struggling') {
+    clips = clips.filter(clip => clip.intensity === 'gentle');
+  } else if (mood === 'crushing') {
+    clips = clips.filter(clip => clip.intensity === 'energetic');
   }
 
-  const randomIndex = Math.floor(Math.random() * filteredClips.length);
-  return filteredClips[randomIndex];
+  return clips;
 };
 
-export const getClipsByCategoryAndMood = (category: string, mood: string): VoiceClip[] => {
-  const categoryClips = getVoiceClipsByCategory(category);
-  const moodClips = getClipsByMood(mood);
-
-  return categoryClips.filter(clip =>
-    moodClips.some(moodClip => moodClip.id === clip.id)
-  );
+export const getRandomClip = (category: string, excludeIds: string[] = []): VoiceClip => {
+  const clips = getVoiceClipsByCategory(category).filter(clip => !excludeIds.includes(clip.id));
+  const randomIndex = Math.floor(Math.random() * clips.length);
+  return clips[randomIndex];
 };
 
-export const getFreeClips = (): VoiceClip[] => {
-  return voiceClips.filter(clip => !clip.isPremium);
+export const getClipById = (id: string): VoiceClip | undefined => {
+  return voiceClips.find(clip => clip.id === id);
 };
 
 export const getPremiumClips = (): VoiceClip[] => {
   return voiceClips.filter(clip => clip.isPremium);
+};
+
+export const getFreeClips = (): VoiceClip[] => {
+  return voiceClips.filter(clip => !clip.isPremium);
 };
