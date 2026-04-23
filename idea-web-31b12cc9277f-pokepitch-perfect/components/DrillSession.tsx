@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Dimensions, Easing } from 'react-native';
 import { Drill, DrillResult } from '../lib/types';
 import { Ionicons } from '@expo/vector-icons';
+import { useStore } from '../store/useStore';
 
 interface DrillSessionProps {
   drill: Drill;
@@ -23,10 +24,14 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
   const [targetPosition, setTargetPosition] = useState({ x: width / 2, y: height / 2 });
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackType, setFeedbackType] = useState<'success' | 'error'>('success');
+  const [difficultyLevel, setDifficultyLevel] = useState(drill.difficulty);
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const targetOpacity = useRef(new Animated.Value(1)).current;
   const targetScale = useRef(new Animated.Value(1)).current;
+  const difficultyBarWidth = useRef(new Animated.Value(difficultyLevel * 100)).current;
+
+  const { userStats } = useStore();
 
   useEffect(() => {
     if (timeLeft > 0 && isActive) {
@@ -48,6 +53,16 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
     }
   }, [isActive]);
 
+  useEffect(() => {
+    // Animate difficulty bar when difficulty changes
+    Animated.timing(difficultyBarWidth, {
+      toValue: difficultyLevel * 100,
+      duration: 500,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: false,
+    }).start();
+  }, [difficultyLevel]);
+
   const startDrill = () => {
     setIsActive(true);
     setTimeLeft(drill.duration);
@@ -56,6 +71,7 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
     setReactionTimes([]);
     setTargetsHit(0);
     setTargetsMissed(0);
+    setDifficultyLevel(drill.difficulty);
   };
 
   const endDrill = () => {
@@ -77,7 +93,7 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
       reactionTime: Math.round(avgReactionTime),
       consistency: calculateConsistency(reactionTimes),
       timestamp: new Date().toISOString(),
-      difficulty: drill.difficulty,
+      difficulty: difficultyLevel,
     };
 
     onComplete(result);
@@ -123,7 +139,7 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
     ]).start();
 
     // Schedule next target after a delay
-    const delay = Math.max(500, 2000 - (drill.difficulty * 1500));
+    const delay = Math.max(500, 2000 - (difficultyLevel * 1500));
     setTimeout(moveTarget, delay);
   };
 
@@ -171,36 +187,83 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
     setTimeout(() => setShowFeedback(false), 200);
   };
 
+  const renderDifficultyIndicator = () => {
+    const difficultyColor = difficultyLevel < 0.33
+      ? '#4CAF50' // Green for easy
+      : difficultyLevel < 0.66
+      ? '#FFC107' // Yellow for medium
+      : '#F44336'; // Red for hard
+
+    return (
+      <View style={styles.difficultyContainer}>
+        <Text style={styles.difficultyLabel}>Difficulty</Text>
+        <View style={styles.difficultyBarBackground}>
+          <Animated.View
+            style={[
+              styles.difficultyBar,
+              {
+                width: difficultyBarWidth,
+                backgroundColor: difficultyColor,
+              },
+            ]}
+          />
+        </View>
+        <Text style={styles.difficultyValue}>
+          {Math.round(difficultyLevel * 100)}%
+        </Text>
+      </View>
+    );
+  };
+
   if (result) {
     return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultTitle}>Drill Complete!</Text>
+      <View style={styles.container}>
+        <View style={styles.resultContainer}>
+          <Text style={styles.resultTitle}>Drill Complete!</Text>
 
-        <View style={styles.resultStats}>
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Score</Text>
-            <Text style={styles.statValue}>{result.score}</Text>
+          <View style={styles.resultStats}>
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Score</Text>
+              <Text style={styles.statValue}>{result.score}</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Accuracy</Text>
+              <Text style={styles.statValue}>{result.accuracy}%</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Reaction Time</Text>
+              <Text style={styles.statValue}>{result.reactionTime}ms</Text>
+            </View>
+
+            <View style={styles.statItem}>
+              <Text style={styles.statLabel}>Consistency</Text>
+              <Text style={styles.statValue}>{Math.round(result.consistency)}%</Text>
+            </View>
           </View>
 
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Accuracy</Text>
-            <Text style={styles.statValue}>{result.accuracy}%</Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Reaction Time</Text>
-            <Text style={styles.statValue}>{result.reactionTime}ms</Text>
-          </View>
-
-          <View style={styles.statItem}>
-            <Text style={styles.statLabel}>Consistency</Text>
-            <Text style={styles.statValue}>{result.consistency}%</Text>
-          </View>
+          <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
+            <Text style={styles.continueButtonText}>Continue</Text>
+          </TouchableOpacity>
         </View>
+      </View>
+    );
+  }
 
-        <TouchableOpacity style={styles.continueButton} onPress={onContinue}>
-          <Text style={styles.continueButtonText}>Continue</Text>
-        </TouchableOpacity>
+  if (!isActive) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.preDrillContainer}>
+          <Text style={styles.drillTitle}>{drill.name}</Text>
+          <Text style={styles.drillDescription}>{drill.description}</Text>
+
+          {renderDifficultyIndicator()}
+
+          <TouchableOpacity style={styles.startButton} onPress={startDrill}>
+            <Text style={styles.startButtonText}>Start Drill</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   }
@@ -208,63 +271,56 @@ const DrillSession: React.FC<DrillSessionProps> = ({ drill, onComplete, result, 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.drillName}>{drill.name}</Text>
         <Text style={styles.timer}>{timeLeft}s</Text>
+        <Text style={styles.score}>Score: {score}</Text>
       </View>
 
-      <View style={styles.scoreContainer}>
-        <Text style={styles.scoreLabel}>Score:</Text>
-        <Text style={styles.scoreValue}>{score}</Text>
-      </View>
+      {renderDifficultyIndicator()}
 
-      {!isActive ? (
-        <TouchableOpacity style={styles.startButton} onPress={startDrill}>
-          <Text style={styles.startButtonText}>Start Drill</Text>
-        </TouchableOpacity>
-      ) : (
-        <View style={styles.gameArea}>
-          <TouchableOpacity
-            style={styles.missArea}
-            activeOpacity={1}
-            onPress={handleMiss}
+      <View style={styles.gameArea}>
+        <TouchableOpacity
+          activeOpacity={1}
+          style={styles.missArea}
+          onPress={handleMiss}
+        >
+          <Animated.View
+            style={[
+              styles.target,
+              {
+                left: targetPosition.x,
+                top: targetPosition.y,
+                opacity: targetOpacity,
+                transform: [{ scale: targetScale }],
+              },
+            ]}
           >
-            <Animated.View
-              style={[
-                styles.target,
-                {
-                  left: targetPosition.x - 30,
-                  top: targetPosition.y - 30,
-                  opacity: targetOpacity,
-                  transform: [{ scale: targetScale }],
-                },
-              ]}
+            <TouchableOpacity
+              style={styles.targetButton}
+              onPress={handleTargetPress}
+              activeOpacity={0.7}
             >
-              <TouchableOpacity
-                style={styles.targetInner}
-                onPress={handleTargetPress}
-                activeOpacity={0.8}
-              />
-            </Animated.View>
+              <Ionicons name="radio-button-on" size={50} color="#4CAF50" />
+            </TouchableOpacity>
+          </Animated.View>
 
-            {showFeedback && (
-              <View style={[
-                styles.feedback,
-                {
-                  left: targetPosition.x,
-                  top: targetPosition.y,
-                  backgroundColor: feedbackType === 'success' ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)',
-                }
-              ]}>
-                <Ionicons
-                  name={feedbackType === 'success' ? 'checkmark' : 'close'}
-                  size={24}
-                  color="white"
-                />
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+          {showFeedback && (
+            <View style={[
+              styles.feedback,
+              {
+                left: targetPosition.x,
+                top: targetPosition.y,
+                backgroundColor: feedbackType === 'success' ? 'rgba(76, 175, 80, 0.8)' : 'rgba(244, 67, 54, 0.8)',
+              }
+            ]}>
+              <Ionicons
+                name={feedbackType === 'success' ? 'checkmark-circle' : 'close-circle'}
+                size={30}
+                color="white"
+              />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -277,49 +333,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    padding: 16,
+    padding: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  drillName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    borderBottomColor: '#e0e0e0',
   },
   timer: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-  },
-  scoreContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  scoreLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 8,
-  },
-  scoreValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
-  startButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    margin: 16,
-  },
-  startButtonText: {
-    color: 'white',
-    fontSize: 18,
+  score: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
   },
   gameArea: {
     flex: 1,
@@ -327,45 +354,71 @@ const styles = StyleSheet.create({
   },
   missArea: {
     flex: 1,
-    backgroundColor: 'transparent',
+    position: 'relative',
   },
   target: {
+    position: 'absolute',
+    width: 80,
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  targetButton: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  feedback: {
     position: 'absolute',
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: '#F44336',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  preDrillContainer: {
+    flex: 1,
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  targetInner: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    backgroundColor: 'transparent',
+  drillTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
-  feedback: {
-    position: 'absolute',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: -20,
-    marginTop: -20,
+  drillDescription: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 30,
+    color: '#666',
+  },
+  startButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   resultContainer: {
     flex: 1,
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   resultTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 30,
+    color: '#333',
   },
   resultStats: {
     width: '100%',
@@ -376,28 +429,54 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   statLabel: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#666',
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
   continueButton: {
-    backgroundColor: '#4CAF50',
-    padding: 16,
+    backgroundColor: '#2196F3',
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
   },
   continueButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  difficultyContainer: {
+    width: '80%',
+    marginVertical: 20,
+    alignItems: 'center',
+  },
+  difficultyLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  difficultyBarBackground: {
+    width: '100%',
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  difficultyBar: {
+    height: '100%',
+    borderRadius: 5,
+  },
+  difficultyValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 5,
+    color: '#333',
   },
 });
 

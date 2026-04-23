@@ -4,9 +4,9 @@ export interface Drill {
   description: string;
   type: 'aim' | 'timing' | 'swipe' | 'pattern' | 'reflex';
   difficulty: number; // 0-1 scale
-  duration: number; // seconds
-  bestScore: number;
-  difficultyChange?: number; // Percentage change since last session
+  duration: number; // in seconds
+  bestScore?: number;
+  difficultyChange?: number; // Change since last adjustment
 }
 
 export interface DrillResult {
@@ -34,18 +34,5 @@ export interface Achievement {
   title: string;
   description: string;
   icon: string;
-}
-
-export interface Target {
-  id: string;
-  x: number;
-  y: number;
-  timestamp: number;
-}
-
-export interface UserInput {
-  targetId: string | null;
-  timestamp: number;
-  isHit: boolean;
-  reactionTime?: number;
+  unlocked: boolean;
 }

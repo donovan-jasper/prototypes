@@ -172,10 +172,33 @@ export const getUserStats = async (): Promise<UserStats> => {
   const reactionTimeHistory = results.slice(0, 30).map((row: any) => row.reactionTime);
   const consistencyHistory = results.slice(0, 30).map((row: any) => row.consistency);
 
-  const uniqueDates = new Set(
-    results.map((row: any) => new Date(row.timestamp).toDateString())
-  );
-  const streak = calculateStreak(Array.from(uniqueDates));
+  // Calculate streak
+  let streak = 0;
+  let lastDate = new Date(results[0].timestamp);
+  const today = new Date();
+
+  // Reset time parts for comparison
+  lastDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+
+  // Check if last drill was today
+  if (lastDate.getTime() === today.getTime()) {
+    streak = 1;
+
+    // Check previous days for streak
+    for (let i = 1; i < results.length; i++) {
+      const currentDate = new Date(results[i].timestamp);
+      currentDate.setHours(0, 0, 0, 0);
+
+      // If the date is consecutive day
+      if (lastDate.getTime() - currentDate.getTime() === 86400000) {
+        streak++;
+        lastDate = currentDate;
+      } else {
+        break;
+      }
+    }
+  }
 
   return {
     streak,
@@ -188,48 +211,71 @@ export const getUserStats = async (): Promise<UserStats> => {
   };
 };
 
-const calculateStreak = (dates: string[]): number => {
-  if (dates.length === 0) return 0;
-
-  const sortedDates = dates
-    .map(d => new Date(d))
-    .sort((a, b) => b.getTime() - a.getTime());
-
-  let currentStreak = 1;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (sortedDates[0].getTime() !== today.getTime()) {
-    return 0;
-  }
-
-  for (let i = 1; i < sortedDates.length; i++) {
-    const diff = Math.floor((today.getTime() - sortedDates[i].getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diff === i) {
-      currentStreak++;
-    } else {
-      break;
-    }
-  }
-
-  return currentStreak;
-};
-
 export const getAchievements = async (): Promise<Achievement[]> => {
   const database = await openDatabase();
   await initDatabase();
 
-  const results = await database.getAllAsync('SELECT * FROM achievements');
+  // Check if achievements table is empty and seed if needed
+  const achievementCount = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM achievements'
+  );
 
+  if (achievementCount && achievementCount.count === 0) {
+    const defaultAchievements: Achievement[] = [
+      {
+        id: 'first-drill',
+        title: 'First Steps',
+        description: 'Complete your first drill',
+        icon: 'trophy-outline',
+        unlocked: false,
+      },
+      {
+        id: 'streak-3',
+        title: '3-Day Streak',
+        description: 'Complete drills for 3 consecutive days',
+        icon: 'flame-outline',
+        unlocked: false,
+      },
+      {
+        id: 'accuracy-90',
+        title: 'Precision Master',
+        description: 'Achieve 90% accuracy in a drill',
+        icon: 'star-outline',
+        unlocked: false,
+      },
+      {
+        id: 'perfect-score',
+        title: 'Perfect Score',
+        description: 'Get a perfect score in a drill',
+        icon: 'ribbon-outline',
+        unlocked: false,
+      },
+    ];
+
+    for (const achievement of defaultAchievements) {
+      await database.runAsync(
+        'INSERT INTO achievements (id, title, description, icon, unlocked) VALUES (?, ?, ?, ?, ?)',
+        [achievement.id, achievement.title, achievement.description, achievement.icon, achievement.unlocked]
+      );
+    }
+  }
+
+  const results = await database.getAllAsync('SELECT * FROM achievements');
   return results.map((row: any) => ({
     id: row.id,
     title: row.title,
     description: row.description,
     icon: row.icon,
-    unlocked: row.unlocked === 1,
+    unlocked: row.unlocked === 1, // SQLite returns 1/0 for booleans
   }));
+};
+
+export const unlockAchievement = async (achievementId: string) => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  await database.runAsync(
+    'UPDATE achievements SET unlocked = 1 WHERE id = ?',
+    [achievementId]
+  );
 };

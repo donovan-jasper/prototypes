@@ -1,65 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
-import DrillSession from '../../components/DrillSession';
+import React from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useStore } from '../../store/useStore';
-import { DrillResult } from '../../lib/types';
-import { adjustDifficulty } from '../../lib/adaptive';
-import { getDrillResults } from '../../lib/database';
+import DrillSession from '../../components/DrillSession';
+import { useRouter } from 'expo-router';
 
-export default function Practice() {
-  const { currentDrill, startDrill, submitResult, drills, updateStats } = useStore();
-  const [result, setResult] = useState<DrillResult | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+const PracticeScreen = () => {
+  const { currentDrill, currentSession, submitResult } = useStore();
+  const router = useRouter();
 
-  useEffect(() => {
-    if (!currentDrill && drills.length > 0) {
-      startDrill(drills[0].id);
-    }
-    setIsLoading(false);
-  }, [currentDrill, startDrill, drills]);
-
-  const handleDrillComplete = async (result: DrillResult) => {
-    setResult(result);
+  const handleComplete = async (result: any) => {
     await submitResult(result);
-
-    // Get all results for this drill
-    const allResults = await getDrillResults(result.drillId);
-
-    // Check if difficulty should increase
-    const { shouldAdjust, newDifficulty } = adjustDifficulty(currentDrill!, allResults);
-
-    if (shouldAdjust && currentDrill) {
-      const difficultyChange = newDifficulty - currentDrill.difficulty;
-      Alert.alert(
-        'Difficulty Adjusted',
-        `Your performance has ${difficultyChange > 0 ? 'improved' : 'declined'}! ` +
-        `Difficulty is now ${Math.round(newDifficulty * 100)}%`,
-        [{ text: 'OK' }]
-      );
-    }
-
-    await updateStats();
   };
 
   const handleContinue = () => {
-    setResult(null);
-    if (currentDrill) {
-      startDrill(currentDrill.id);
-    }
+    router.push('/(tabs)');
   };
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
-      </View>
-    );
-  }
 
   if (!currentDrill) {
     return (
       <View style={styles.container}>
-        <Text>No drills available</Text>
+        <Text style={styles.noDrillText}>No active drill session</Text>
       </View>
     );
   }
@@ -68,19 +28,24 @@ export default function Practice() {
     <View style={styles.container}>
       <DrillSession
         drill={currentDrill}
-        onComplete={handleDrillComplete}
-        result={result}
+        onComplete={handleComplete}
+        result={currentSession}
         onContinue={handleContinue}
       />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
+  },
+  noDrillText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
+
+export default PracticeScreen;

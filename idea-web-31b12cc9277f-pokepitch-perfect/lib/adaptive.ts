@@ -46,3 +46,11 @@ export const adjustDifficulty = (drill: Drill, results: DrillResult[]): Difficul
     shouldAdjust,
   };
 };
+
+export const shouldLevelUp = (results: DrillResult[]): boolean => {
+  // Check if the last 3 results are all 80% or higher
+  if (results.length < 3) return false;
+
+  const lastThree = results.slice(0, 3);
+  return lastThree.every(result => result.accuracy >= 80);
+};
