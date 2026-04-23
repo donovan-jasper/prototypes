@@ -42,6 +42,40 @@ interface GenshinApiResponse {
   lastUpdated: string;
 }
 
+interface DestinyApiResponse {
+  Response: {
+    data: {
+      items: Array<{
+        itemHash: number;
+        itemInstanceId: string;
+        quantity: number;
+        bindStatus: number;
+        location: number;
+        bucketHash: number;
+        transferStatus: number;
+        lockable: boolean;
+        state: number;
+        dismantlePermission: number;
+        isWrapper: boolean;
+        tooltipNotificationIndexes: number[];
+        metricHash: number;
+        metricObjective: {
+          objectiveHash: number;
+          destinationHash: number;
+          activityHash: number;
+          visible: boolean;
+        };
+        versionNumber: number;
+        itemValue: {
+          itemHash: number;
+          quantity: number;
+          hasConditionalVisibility: boolean;
+        };
+      }>;
+    };
+  };
+}
+
 export const fetchItemPrice = async (game: string, itemId: string): Promise<number> => {
   try {
     // Real API calls for Fortnite and Genshin Impact
@@ -66,6 +100,19 @@ export const fetchItemPrice = async (game: string, itemId: string): Promise<numb
         await insertPriceHistory(itemId, response.data.price, today);
         return response.data.price;
       }
+    } else if (game === 'destiny') {
+      // Mock Destiny 2 API response since real API requires OAuth
+      const mockPrices: Record<string, number> = {
+        'weapon-1': 1250,
+        'armor-1': 850,
+        'consumable-1': 250,
+        'exotic-1': 5000,
+      };
+
+      const price = mockPrices[itemId] || 100 + Math.floor(Math.random() * 900);
+      const today = new Date().toISOString().split('T')[0];
+      await insertPriceHistory(itemId, price, today);
+      return price;
     }
 
     // Fallback to mock data for other games
@@ -129,6 +176,7 @@ export const getPriceHistory = async (itemId: string): Promise<PriceHistory[]> =
 };
 
 export const shouldBuyNow = (currentPrice: number, averagePrice: number): boolean => {
+  // Buy if current price is 10% below average
   return currentPrice < averagePrice * 0.9;
 };
 

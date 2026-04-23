@@ -49,6 +49,18 @@ export const initializeDB = async () => {
             FOREIGN KEY (item_id) REFERENCES items (id)
           );`
         );
+
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS watchlist (
+            id TEXT PRIMARY KEY,
+            game_id TEXT NOT NULL,
+            item_id TEXT NOT NULL,
+            target_price REAL NOT NULL,
+            added_at TEXT NOT NULL,
+            FOREIGN KEY (game_id) REFERENCES games (id),
+            FOREIGN KEY (item_id) REFERENCES items (id)
+          );`
+        );
       },
       (error) => {
         console.error('Error initializing database:', error);
@@ -82,6 +94,38 @@ export const getItemsFromDB = async (): Promise<Item[]> => {
               });
             }
             resolve(items);
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      }
+    );
+  });
+};
+
+export const getItemById = async (itemId: string): Promise<Item | null> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT items.*, games.name as game FROM items
+           JOIN games ON items.game_id = games.id
+           WHERE items.id = ?`,
+          [itemId],
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              resolve({
+                id: rows.item(0).id,
+                name: rows.item(0).name,
+                game: rows.item(0).game,
+                rarity: rows.item(0).rarity,
+                value: rows.item(0).value
+              });
+            } else {
+              resolve(null);
+            }
           },
           (_, error) => {
             reject(error);
@@ -162,6 +206,85 @@ export const insertPriceHistory = async (itemId: string, price: number, date: st
   });
 };
 
+export const addToWatchlist = async (gameId: string, itemId: string, targetPrice: number) => {
+  return new Promise((resolve, reject) => {
+    const id = `${gameId}-${itemId}`;
+    const addedAt = new Date().toISOString();
+
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `INSERT OR REPLACE INTO watchlist (id, game_id, item_id, target_price, added_at)
+           VALUES (?, ?, ?, ?, ?)`,
+          [id, gameId, itemId, targetPrice, addedAt],
+          (_, result) => {
+            resolve(result);
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      }
+    );
+  });
+};
+
+export const getWatchlist = async (): Promise<WatchlistItem[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT watchlist.*, items.name as item_name, games.name as game_name
+           FROM watchlist
+           JOIN items ON watchlist.item_id = items.id
+           JOIN games ON watchlist.game_id = games.id`,
+          [],
+          (_, { rows }) => {
+            const watchlist: WatchlistItem[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              watchlist.push({
+                id: rows.item(i).id,
+                gameId: rows.item(i).game_id,
+                gameName: rows.item(i).game_name,
+                itemId: rows.item(i).item_id,
+                itemName: rows.item(i).item_name,
+                targetPrice: rows.item(i).target_price,
+                addedAt: rows.item(i).added_at
+              });
+            }
+            resolve(watchlist);
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      }
+    );
+  });
+};
+
+export const removeFromWatchlist = async (id: string) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `DELETE FROM watchlist WHERE id = ?`,
+          [id],
+          (_, result) => {
+            resolve(result);
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      }
+    );
+  });
+};
+
 interface Item {
   id: string;
   name: string;
@@ -175,4 +298,14 @@ interface PriceHistory {
   itemId: string;
   price: number;
   date: string;
+}
+
+interface WatchlistItem {
+  id: string;
+  gameId: string;
+  gameName: string;
+  itemId: string;
+  itemName: string;
+  targetPrice: number;
+  addedAt: string;
 }

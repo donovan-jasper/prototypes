@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Text } from 'react-native';
+import { View, FlatList, StyleSheet, RefreshControl, TouchableOpacity, Text, Modal, TextInput, Alert } from 'react-native';
 import { useInventoryStore } from '../../lib/stores/inventoryStore';
 import { useAlertStore } from '../../lib/stores/alertStore';
 import InventoryCard from '../../components/InventoryCard';
@@ -7,18 +7,30 @@ import { fetchItemPrice } from '../../lib/api/priceService';
 import { Ionicons } from '@expo/vector-icons';
 
 const Dashboard = () => {
-  const { items, syncFromDB, totalValue } = useInventoryStore();
+  const {
+    items,
+    syncFromDB,
+    totalValue,
+    watchlist,
+    syncWatchlist,
+    addToWatchlist,
+    removeFromWatchlist
+  } = useInventoryStore();
   const { checkRules, activeAlerts } = useAlertStore();
   const [refreshing, setRefreshing] = useState(false);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
+  const [showWatchlistModal, setShowWatchlistModal] = useState(false);
+  const [watchlistItemId, setWatchlistItemId] = useState('');
+  const [watchlistTargetPrice, setWatchlistTargetPrice] = useState('');
 
   useEffect(() => {
     syncFromDB();
+    syncWatchlist();
   }, []);
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
-    syncFromDB().then(() => setRefreshing(false));
+    Promise.all([syncFromDB(), syncWatchlist()]).then(() => setRefreshing(false));
   }, []);
 
   const handleRefreshPrices = async () => {
@@ -63,6 +75,40 @@ const Dashboard = () => {
     }
   };
 
+  const handleAddToWatchlist = async () => {
+    if (!watchlistItemId || !watchlistTargetPrice) {
+      Alert.alert('Error', 'Please select an item and enter a target price');
+      return;
+    }
+
+    const item = items.find(i => i.id === watchlistItemId);
+    if (!item) {
+      Alert.alert('Error', 'Item not found');
+      return;
+    }
+
+    try {
+      await addToWatchlist(item.game, item.id, parseFloat(watchlistTargetPrice));
+      setShowWatchlistModal(false);
+      setWatchlistItemId('');
+      setWatchlistTargetPrice('');
+      Alert.alert('Success', 'Item added to watchlist');
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
+      Alert.alert('Error', 'Failed to add item to watchlist');
+    }
+  };
+
+  const handleRemoveFromWatchlist = async (id: string) => {
+    try {
+      await removeFromWatchlist(id);
+      Alert.alert('Success', 'Item removed from watchlist');
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+      Alert.alert('Error', 'Failed to remove item from watchlist');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -75,7 +121,15 @@ const Dashboard = () => {
 
       <FlatList
         data={items}
-        renderItem={({ item }) => <InventoryCard item={item} />}
+        renderItem={({ item }) => (
+          <InventoryCard
+            item={item}
+            onAddToWatchlist={() => {
+              setWatchlistItemId(item.id);
+              setShowWatchlistModal(true);
+            }}
+          />
+        )}
         keyExtractor={(item) => item.id}
         numColumns={2}
         refreshControl={
@@ -115,6 +169,45 @@ const Dashboard = () => {
           </View>
         }
       />
+
+      {/* Watchlist Modal */}
+      <Modal
+        visible={showWatchlistModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowWatchlistModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Add to Watchlist</Text>
+
+            <Text style={styles.modalLabel}>Target Price:</Text>
+            <TextInput
+              style={styles.input}
+              keyboardType="numeric"
+              placeholder="Enter target price"
+              value={watchlistTargetPrice}
+              onChangeText={setWatchlistTargetPrice}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowWatchlistModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addButton]}
+                onPress={handleAddToWatchlist}
+              >
+                <Text style={styles.modalButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -173,6 +266,57 @@ const styles = StyleSheet.create({
   },
   refreshIcon: {
     marginRight: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalLabel: {
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#f44336',
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

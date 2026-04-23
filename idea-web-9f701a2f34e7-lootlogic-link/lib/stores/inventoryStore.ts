@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getItemsFromDB, updateItemValue, getItemById } from '../db';
+import { getItemsFromDB, updateItemValue, getItemById, addToWatchlist, getWatchlist, removeFromWatchlist } from '../db';
 import { fetchItemPrice } from '../api/priceService';
 
 interface Item {
@@ -11,22 +11,37 @@ interface Item {
   imageUrl?: string;
 }
 
+interface WatchlistItem {
+  id: string;
+  gameId: string;
+  gameName: string;
+  itemId: string;
+  itemName: string;
+  targetPrice: number;
+  addedAt: string;
+}
+
 interface InventoryStore {
   items: Item[];
   totalValue: number;
   selectedGame: string | null;
+  watchlist: WatchlistItem[];
   syncFromDB: () => Promise<void>;
   addItem: (item: Item) => void;
   removeItem: (itemId: string) => void;
   updateItemValue: (itemId: string, newValue: number) => void;
   refreshItemPrice: (itemId: string) => Promise<void>;
   setSelectedGame: (game: string | null) => void;
+  addToWatchlist: (gameId: string, itemId: string, targetPrice: number) => Promise<void>;
+  removeFromWatchlist: (id: string) => Promise<void>;
+  syncWatchlist: () => Promise<void>;
 }
 
 const useInventoryStore = create<InventoryStore>((set) => ({
   items: [],
   totalValue: 0,
   selectedGame: null,
+  watchlist: [],
 
   syncFromDB: async () => {
     try {
@@ -101,6 +116,35 @@ const useInventoryStore = create<InventoryStore>((set) => ({
   },
 
   setSelectedGame: (game) => set({ selectedGame: game }),
+
+  addToWatchlist: async (gameId, itemId, targetPrice) => {
+    try {
+      await addToWatchlist(gameId, itemId, targetPrice);
+      await useInventoryStore.getState().syncWatchlist();
+    } catch (error) {
+      console.error('Error adding to watchlist:', error);
+      throw error;
+    }
+  },
+
+  removeFromWatchlist: async (id) => {
+    try {
+      await removeFromWatchlist(id);
+      await useInventoryStore.getState().syncWatchlist();
+    } catch (error) {
+      console.error('Error removing from watchlist:', error);
+      throw error;
+    }
+  },
+
+  syncWatchlist: async () => {
+    try {
+      const watchlist = await getWatchlist();
+      set({ watchlist });
+    } catch (error) {
+      console.error('Error syncing watchlist:', error);
+    }
+  },
 }));
 
 export { useInventoryStore };

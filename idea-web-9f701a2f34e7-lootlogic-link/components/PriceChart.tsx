@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme, VictoryVoronoiContainer } from 'victory-native';
-import { fetchItemPrice, getPriceHistory } from '../lib/api/priceService';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
+import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme, VictoryVoronoiContainer, VictoryTooltip } from 'victory-native';
+import { fetchItemPrice, getPriceHistory, shouldBuyNow } from '../lib/api/priceService';
+import { useInventoryStore } from '../lib/stores/inventoryStore';
 
 interface PriceChartProps {
   itemId: string;
@@ -13,6 +14,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
+  const { updateItemValue } = useInventoryStore();
 
   useEffect(() => {
     const loadData = async () => {
@@ -20,6 +22,9 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
         // Fetch current price
         const price = await fetchItemPrice(game, itemId);
         setCurrentPrice(price);
+
+        // Update item value in store
+        updateItemValue(itemId, price);
 
         // Fetch historical data
         const history = await getPriceHistory(itemId);
@@ -54,7 +59,17 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
     return 'stable';
   };
 
+  const calculateAveragePrice = () => {
+    if (priceHistory.length === 0) return 0;
+    const sum = priceHistory.reduce((acc, curr) => acc + curr.price, 0);
+    return sum / priceHistory.length;
+  };
+
   const trend = calculateTrend();
+  const averagePrice = calculateAveragePrice();
+  const buyRecommendation = currentPrice !== null && averagePrice !== 0
+    ? shouldBuyNow(currentPrice, averagePrice)
+    : null;
 
   if (loading) {
     return (
@@ -120,6 +135,13 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
           <VictoryVoronoiContainer
             voronoiDimension="x"
             labels={({ datum }) => `Date: ${datum.date}\nPrice: $${datum.price.toFixed(2)}`}
+            labelComponent={
+              <VictoryTooltip
+                cornerRadius={5}
+                flyoutStyle={{ fill: "white" }}
+                style={{ fontSize: 12 }}
+              />
+            }
           />
         }
       >
@@ -153,6 +175,19 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
         <Text style={styles.footerText}>
           {trend === 'up' ? 'Price is increasing' : trend === 'down' ? 'Price is decreasing' : 'Price is stable'}
         </Text>
+
+        {buyRecommendation !== null && (
+          <View style={styles.recommendationContainer}>
+            <Text style={styles.recommendationText}>
+              {buyRecommendation
+                ? 'Recommendation: Buy now!'
+                : 'Recommendation: Wait for better price'}
+            </Text>
+            <Text style={styles.averagePriceText}>
+              30-day average: ${averagePrice.toFixed(2)}
+            </Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -160,36 +195,28 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId, game }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 20,
-    padding: 10,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    flex: 1,
+    padding: 15,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   title: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   priceContainer: {
@@ -199,39 +226,33 @@ const styles = StyleSheet.create({
   currentPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#03A9F4',
-    marginRight: 5,
+    marginRight: 8,
   },
   trendIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 5,
+    borderRadius: 5,
   },
   upTrend: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    backgroundColor: '#4CAF50',
   },
   downTrend: {
-    backgroundColor: 'rgba(244, 67, 54, 0.2)',
+    backgroundColor: '#F44336',
   },
   stableTrend: {
-    backgroundColor: 'rgba(158, 158, 158, 0.2)',
+    backgroundColor: '#FFC107',
   },
   trendText: {
-    fontSize: 12,
+    color: 'white',
     fontWeight: 'bold',
   },
   timeRangeContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 10,
+    justifyContent: 'space-around',
+    marginBottom: 15,
   },
   timeRangeButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginHorizontal: 5,
-    borderRadius: 15,
+    padding: 8,
+    borderRadius: 5,
     backgroundColor: '#f0f0f0',
   },
   activeTimeRange: {
@@ -239,16 +260,31 @@ const styles = StyleSheet.create({
   },
   timeRangeText: {
     color: '#333',
-    fontSize: 12,
   },
   footer: {
     marginTop: 10,
-    paddingHorizontal: 10,
+    padding: 10,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 5,
   },
   footerText: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  recommendationContainer: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 5,
+  },
+  recommendationText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  averagePriceText: {
     fontSize: 12,
     color: '#666',
-    textAlign: 'center',
   },
 });
 
