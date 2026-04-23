@@ -79,11 +79,21 @@ export class FlyioClient {
       }
     `;
 
-    await axios.post(
-      this.baseUrl,
-      { query: mutation, variables: { appId } },
-      { headers: { Authorization: `Bearer ${this.token}` } }
-    );
+    try {
+      const response = await axios.post(
+        this.baseUrl,
+        { query: mutation, variables: { appId } },
+        { headers: { Authorization: `Bearer ${this.token}` } }
+      );
+
+      if (response.data.errors) {
+        throw new Error(response.data.errors[0].message);
+      }
+
+      return { success: true, message: 'App restarted successfully' };
+    } catch (error) {
+      throw new Error(`Failed to restart app: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async rollbackDeployment(appId: string) {
@@ -97,11 +107,21 @@ export class FlyioClient {
       }
     `;
 
-    await axios.post(
-      this.baseUrl,
-      { query: mutation, variables: { appId } },
-      { headers: { Authorization: `Bearer ${this.token}` } }
-    );
+    try {
+      const response = await axios.post(
+        this.baseUrl,
+        { query: mutation, variables: { appId } },
+        { headers: { Authorization: `Bearer ${this.token}` } }
+      );
+
+      if (response.data.errors) {
+        throw new Error(response.data.errors[0].message);
+      }
+
+      return { success: true, message: 'Deployment rolled back successfully' };
+    } catch (error) {
+      throw new Error(`Failed to rollback deployment: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 
   async getDeploymentHistory(appId: string) {
@@ -118,12 +138,20 @@ export class FlyioClient {
       }
     `;
 
-    const response = await axios.post(
-      this.baseUrl,
-      { query, variables: { appId } },
-      { headers: { Authorization: `Bearer ${this.token}` } }
-    );
+    try {
+      const response = await axios.post(
+        this.baseUrl,
+        { query, variables: { appId } },
+        { headers: { Authorization: `Bearer ${this.token}` } }
+      );
 
-    return response.data.data.app.deployments;
+      if (response.data.errors) {
+        throw new Error(response.data.errors[0].message);
+      }
+
+      return response.data.data.app.deployments;
+    } catch (error) {
+      throw new Error(`Failed to get deployment history: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
 }

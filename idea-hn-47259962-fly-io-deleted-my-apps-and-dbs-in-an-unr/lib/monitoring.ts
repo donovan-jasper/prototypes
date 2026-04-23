@@ -109,30 +109,45 @@ export async function executeRecoveryAction(serviceId: string, workflowId: strin
 
     const steps = JSON.parse(workflow.steps);
     let allStepsSuccessful = true;
+    let recoveryStatus = 'in_progress';
+
+    // Update UI with initial status
+    useStore.getState().updateRecoveryStatus(serviceId, recoveryStatus);
 
     for (const step of steps) {
-      if (step.action?.type === 'api') {
-        switch (service.provider) {
-          case 'flyio':
-            const flyioClient = new FlyioClient(token);
-            if (step.action.endpoint === 'restart') {
-              await flyioClient.restartApp(service.id);
-            } else if (step.action.endpoint === 'rollback') {
-              await flyioClient.rollbackDeployment(service.id);
-            }
-            break;
-          default:
-            throw new Error('Unsupported provider');
+      try {
+        if (step.action?.type === 'api') {
+          switch (service.provider) {
+            case 'flyio':
+              const flyioClient = new FlyioClient(token);
+              if (step.action.endpoint === 'restart') {
+                await flyioClient.restartApp(service.id);
+              } else if (step.action.endpoint === 'rollback') {
+                await flyioClient.rollbackDeployment(service.id);
+              }
+              break;
+            default:
+              throw new Error('Unsupported provider');
+          }
         }
-      }
 
-      // For manual steps, we just log that they need to be completed
-      if (step.action?.type === 'manual') {
-        console.log(`Manual step requires action: ${step.title}`);
+        // For manual steps, we just log that they need to be completed
+        if (step.action?.type === 'manual') {
+          console.log(`Manual step requires action: ${step.title}`);
+        }
+
+        // Update UI with step completion
+        useStore.getState().updateRecoveryStep(serviceId, step.id, 'completed');
+      } catch (stepError) {
+        allStepsSuccessful = false;
+        useStore.getState().updateRecoveryStep(serviceId, step.id, 'failed');
+        console.error(`Step failed: ${stepError instanceof Error ? stepError.message : 'Unknown error'}`);
       }
     }
 
     if (allStepsSuccessful) {
+      recoveryStatus = 'completed';
+
       // Update service status to healthy
       await db.runAsync(
         'UPDATE services SET status = ?, last_check = ? WHERE id = ?',
@@ -152,17 +167,59 @@ export async function executeRecoveryAction(serviceId: string, workflowId: strin
         `Your ${service.name} service has been recovered`,
         'info'
       );
+    } else {
+      recoveryStatus = 'failed';
 
-      // Update Zustand store
-      useStore.getState().updateServiceStatus(service.id, 'healthy');
+      // Save failure alert
+      await saveAlert(db, {
+        serviceId: service.id,
+        severity: 'warning',
+        message: `Recovery workflow ${workflow.name} failed for ${service.name}`
+      });
+
+      // Send notification
+      await sendLocalNotification(
+        'Recovery Failed',
+        `Recovery workflow for ${service.name} failed`,
+        'warning'
+      );
     }
 
-    return { success: true, message: 'Recovery workflow completed successfully' };
+    // Final update to UI
+    useStore.getState().updateRecoveryStatus(serviceId, recoveryStatus);
+
+    return {
+      success: allStepsSuccessful,
+      status: recoveryStatus,
+      message: allStepsSuccessful
+        ? 'Recovery workflow completed successfully'
+        : 'Recovery workflow completed with some failures'
+    };
   } catch (error) {
     console.error('Recovery action failed:', error);
+
+    // Update UI with failure status
+    useStore.getState().updateRecoveryStatus(serviceId, 'failed');
+
+    // Save error alert
+    const db = await openDatabase();
+    await saveAlert(db, {
+      serviceId,
+      severity: 'critical',
+      message: `Recovery workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    });
+
+    // Send notification
+    await sendLocalNotification(
+      'Recovery Error',
+      `Error executing recovery workflow: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      'critical'
+    );
+
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error during recovery'
+      status: 'failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
     };
   }
 }
