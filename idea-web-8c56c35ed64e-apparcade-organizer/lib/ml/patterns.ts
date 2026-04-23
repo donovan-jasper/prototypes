@@ -1,5 +1,8 @@
 import * as SQLite from 'expo-sqlite';
 import { useAppsStore } from '../../store/apps';
+import { usePredictionsStore } from '../../store/predictions';
+import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
 
 interface UsagePattern {
   timeOfDay: 'morning' | 'work' | 'evening' | 'night';
@@ -12,13 +15,41 @@ interface SmartCollection {
   name: string;
   apps: string[];
   lastUpdated: Date;
+  icon: string;
 }
 
 const db = SQLite.openDatabase('flowhome.db');
 
+const BACKGROUND_TASK_NAME = 'update-smart-collections';
+
+TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
+  try {
+    await generateSmartCollections();
+    return BackgroundFetch.Result.NewData;
+  } catch (error) {
+    return BackgroundFetch.Result.Failed;
+  }
+});
+
+export const registerBackgroundTask = async () => {
+  try {
+    await BackgroundFetch.registerTaskAsync(BACKGROUND_TASK_NAME, {
+      minimumInterval: 60 * 60 * 24, // Daily
+      stopOnTerminate: false,
+      startOnBoot: true,
+    });
+  } catch (error) {
+    console.error('Failed to register background task:', error);
+  }
+};
+
 export const generateSmartCollections = async (): Promise<SmartCollection[]> => {
   // 1. Query last 30 days of app usage data
   const usageData = await queryUsageData();
+
+  if (usageData.length === 0) {
+    return createDefaultCollections();
+  }
 
   // 2. Group apps by time-of-day clusters
   const timePatterns = analyzeTimePatterns(usageData);
@@ -31,6 +62,9 @@ export const generateSmartCollections = async (): Promise<SmartCollection[]> => 
 
   // 5. Store collections in SQLite
   await storeCollections(collections);
+
+  // 6. Update Zustand store
+  usePredictionsStore.getState().setSmartCollections(collections);
 
   return collections;
 };
@@ -59,17 +93,25 @@ const analyzeTimePatterns = (usageData: any[]): Record<string, UsagePattern> => 
     night: { timeOfDay: 'night', apps: [], coUsedApps: [] }
   };
 
+  // Simple k-means clustering simulation
+  const timeClusters = {
+    morning: { start: 6, end: 9 },
+    work: { start: 9, end: 17 },
+    evening: { start: 17, end: 22 },
+    night: { start: 22, end: 6 }
+  };
+
   usageData.forEach(item => {
     const date = new Date(item.timestamp);
     const hour = date.getHours();
 
     let timeOfDay: keyof typeof patterns;
 
-    if (hour >= 6 && hour < 9) {
+    if (hour >= timeClusters.morning.start && hour < timeClusters.morning.end) {
       timeOfDay = 'morning';
-    } else if (hour >= 9 && hour < 17) {
+    } else if (hour >= timeClusters.work.start && hour < timeClusters.work.end) {
       timeOfDay = 'work';
-    } else if (hour >= 17 && hour < 22) {
+    } else if (hour >= timeClusters.evening.start && hour < timeClusters.evening.end) {
       timeOfDay = 'evening';
     } else {
       timeOfDay = 'night';
@@ -85,6 +127,7 @@ const analyzeTimePatterns = (usageData: any[]): Record<string, UsagePattern> => 
 
 const analyzeCoUsagePatterns = (usageData: any[]): Record<string, string[]> => {
   const coUsageMap: Record<string, string[]> = {};
+  const coUsageCounts: Record<string, number> = {};
 
   // Sort usage data by timestamp
   const sortedData = [...usageData].sort((a, b) =>
@@ -105,11 +148,22 @@ const analyzeCoUsagePatterns = (usageData: any[]): Record<string, string[]> => {
 
       if (!coUsageMap[key]) {
         coUsageMap[key] = [current.package_name, next.package_name];
+        coUsageCounts[key] = 1;
+      } else {
+        coUsageCounts[key]++;
       }
     }
   }
 
-  return coUsageMap;
+  // Filter patterns that occur at least 3 times
+  const frequentPatterns: Record<string, string[]> = {};
+  Object.entries(coUsageCounts).forEach(([key, count]) => {
+    if (count >= 3) {
+      frequentPatterns[key] = coUsageMap[key];
+    }
+  });
+
+  return frequentPatterns;
 };
 
 const createCollections = (
@@ -117,9 +171,12 @@ const createCollections = (
   coUsagePatterns: Record<string, string[]>
 ): SmartCollection[] => {
   const collections: SmartCollection[] = [];
+  const appStore = useAppsStore.getState();
 
   // Create time-based collections
   Object.entries(timePatterns).forEach(([key, pattern]) => {
+    if (pattern.apps.length === 0) return;
+
     let name: string;
     let icon: string;
 
@@ -145,14 +202,14 @@ const createCollections = (
       id: `${key}-collection`,
       name: `${icon} ${name}`,
       apps: pattern.apps,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      icon: icon
     });
   });
 
   // Create co-usage collections
   Object.entries(coUsagePatterns).forEach(([key, apps]) => {
     const appNames = apps.map(pkg => {
-      const appStore = useAppsStore.getState();
       const app = appStore.apps.find(a => a.packageName === pkg);
       return app ? app.name : pkg;
     });
@@ -161,11 +218,68 @@ const createCollections = (
       id: `co-usage-${key}`,
       name: `Used with ${appNames.join(' & ')}`,
       apps: apps,
-      lastUpdated: new Date()
+      lastUpdated: new Date(),
+      icon: '🔗'
     });
   });
 
+  // Add "Recently Used" collection
+  const recentApps = [...new Set(usageData.slice(0, 10).map(item => item.package_name))];
+  if (recentApps.length > 0) {
+    collections.unshift({
+      id: 'recently-used',
+      name: '🕒 Recently Used',
+      apps: recentApps,
+      lastUpdated: new Date(),
+      icon: '🕒'
+    });
+  }
+
   return collections;
+};
+
+const createDefaultCollections = (): SmartCollection[] => {
+  const appStore = useAppsStore.getState();
+  const allApps = appStore.apps;
+
+  // Group apps by category (simplified)
+  const categories = {
+    productivity: ['com.google.android.apps.docs', 'com.microsoft.office.outlook', 'com.dropbox.android'],
+    social: ['com.facebook.katana', 'com.instagram.android', 'com.whatsapp'],
+    entertainment: ['com.netflix.mediaclient', 'com.spotify.music', 'com.disney.disneyplus'],
+    utilities: ['com.android.chrome', 'com.google.android.gm', 'com.google.android.calendar']
+  };
+
+  return [
+    {
+      id: 'default-productivity',
+      name: '💼 Productivity',
+      apps: allApps.filter(app => categories.productivity.includes(app.packageName)).map(app => app.packageName),
+      lastUpdated: new Date(),
+      icon: '💼'
+    },
+    {
+      id: 'default-social',
+      name: '💬 Social',
+      apps: allApps.filter(app => categories.social.includes(app.packageName)).map(app => app.packageName),
+      lastUpdated: new Date(),
+      icon: '💬'
+    },
+    {
+      id: 'default-entertainment',
+      name: '🎬 Entertainment',
+      apps: allApps.filter(app => categories.entertainment.includes(app.packageName)).map(app => app.packageName),
+      lastUpdated: new Date(),
+      icon: '🎬'
+    },
+    {
+      id: 'default-utilities',
+      name: '🛠️ Utilities',
+      apps: allApps.filter(app => categories.utilities.includes(app.packageName)).map(app => app.packageName),
+      lastUpdated: new Date(),
+      icon: '🛠️'
+    }
+  ];
 };
 
 const storeCollections = async (collections: SmartCollection[]): Promise<void> => {
@@ -185,27 +299,28 @@ const storeCollections = async (collections: SmartCollection[]): Promise<void> =
             collection.lastUpdated.toISOString()
           ],
           () => {},
-          (_, error) => reject(error)
+          (_, error) => console.error('Error inserting collection:', error)
         );
       });
 
       resolve();
-    });
+    }, (error) => reject(error));
   });
 };
 
-export const getSmartCollections = async (): Promise<SmartCollection[]> => {
+export const loadCollectionsFromDB = async (): Promise<SmartCollection[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'SELECT * FROM smart_collections ORDER BY last_updated DESC',
+        'SELECT * FROM smart_collections',
         [],
         (_, { rows }) => {
-          const collections = rows._array.map(row => ({
+          const collections: SmartCollection[] = rows._array.map(row => ({
             id: row.id,
             name: row.name,
             apps: JSON.parse(row.app_packages),
-            lastUpdated: new Date(row.last_updated)
+            lastUpdated: new Date(row.last_updated),
+            icon: row.name.split(' ')[0] // Extract emoji from name
           }));
           resolve(collections);
         },
