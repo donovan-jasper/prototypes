@@ -1,48 +1,32 @@
 import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { unsubscribe } from '../services/SubscriptionService';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 
-const SubscriptionList = ({ subscriptions, onRefresh }) => {
-  const handleUnsubscribe = async (id) => {
-    Alert.alert(
-      'Confirm Unsubscribe',
-      'Are you sure you want to unsubscribe?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Unsubscribe',
-          onPress: async () => {
-            try {
-              await unsubscribe(id);
-              if (onRefresh) onRefresh();
-            } catch (error) {
-              console.error('Failed to unsubscribe:', error);
-              Alert.alert('Error', 'Failed to unsubscribe. Please try again.');
-            }
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  };
-
+const SubscriptionList = ({ subscriptions, onUnsubscribe, navigation, showRenewalDates = false }) => {
   const renderItem = ({ item }) => (
-    <View style={styles.subscriptionItem}>
-      <View style={styles.subscriptionInfo}>
-        <Text style={styles.subscriptionName}>{item.name}</Text>
-        <Text style={styles.subscriptionSource}>{item.source}</Text>
-        {item.cost > 0 && (
-          <Text style={styles.subscriptionCost}>${item.cost.toFixed(2)} {item.billing_cycle}</Text>
+    <View style={styles.itemContainer}>
+      <TouchableOpacity
+        style={styles.itemContent}
+        onPress={() => navigation.navigate('EditSubscription', { subscription: item })}
+      >
+        <View style={styles.itemHeader}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          {item.cost > 0 && (
+            <Text style={styles.itemCost}>${item.cost.toFixed(2)}</Text>
+          )}
+        </View>
+        <Text style={styles.itemSource}>{item.source}</Text>
+        {showRenewalDates && item.renewal_date && (
+          <Text style={styles.itemRenewal}>
+            Renews on {new Date(item.renewal_date).toLocaleDateString()}
+          </Text>
         )}
-      </View>
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.unsubscribeButton}
-        onPress={() => handleUnsubscribe(item.id)}
+        onPress={() => onUnsubscribe(item.id)}
       >
-        <Text style={styles.unsubscribeButtonText}>Unsubscribe</Text>
+        <MaterialIcons name="delete" size={24} color="#FF3B30" />
       </TouchableOpacity>
     </View>
   );
@@ -55,7 +39,7 @@ const SubscriptionList = ({ subscriptions, onRefresh }) => {
       contentContainerStyle={styles.listContainer}
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No active subscriptions</Text>
+          <Text style={styles.emptyText}>No subscriptions found</Text>
         </View>
       }
     />
@@ -64,62 +48,64 @@ const SubscriptionList = ({ subscriptions, onRefresh }) => {
 
 const styles = StyleSheet.create({
   listContainer: {
-    padding: 16,
+    paddingBottom: 20,
   },
-  subscriptionItem: {
+  itemContainer: {
+    flexDirection: 'row',
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
     marginBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    overflow: 'hidden',
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
   },
-  subscriptionInfo: {
+  itemContent: {
     flex: 1,
+    padding: 16,
   },
-  subscriptionName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+  itemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  subscriptionSource: {
+  itemName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  itemCost: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#007AFF',
+  },
+  itemSource: {
     fontSize: 14,
     color: '#666',
     marginBottom: 4,
   },
-  subscriptionCost: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+  itemRenewal: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 4,
   },
   unsubscribeButton: {
-    backgroundColor: '#FF3B30',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  unsubscribeButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
-    flex: 1,
+    width: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    borderLeftWidth: 1,
+    borderLeftColor: '#e0e0e0',
+  },
+  emptyContainer: {
     padding: 20,
+    alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
   },
 });
 

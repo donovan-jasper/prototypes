@@ -193,9 +193,9 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   fabText: {
-    fontSize: 32,
     color: '#fff',
-    fontWeight: '300',
+    fontSize: 24,
+    fontWeight: 'bold',
   },
 });
 
