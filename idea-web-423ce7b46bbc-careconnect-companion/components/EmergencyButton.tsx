@@ -1,112 +1,51 @@
-import React from 'react';
 import { TouchableOpacity, Text, StyleSheet, View } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
-import { useSettings } from '../contexts/SettingsContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface EmergencyButtonProps {
   onPress: () => void;
 }
 
-export const EmergencyButton: React.FC<EmergencyButtonProps> = ({ onPress }) => {
-  const { theme } = useSettings();
-
-  const getStyles = () => {
-    switch (theme) {
-      case 'dark':
-        return {
-          button: styles.darkButton,
-          text: styles.darkText,
-          icon: styles.darkIcon,
-        };
-      case 'high-contrast':
-        return {
-          button: styles.highContrastButton,
-          text: styles.highContrastText,
-          icon: styles.highContrastIcon,
-        };
-      default: // light theme
-        return {
-          button: styles.lightButton,
-          text: styles.lightText,
-          icon: styles.lightIcon,
-        };
-    }
-  };
-
-  const currentStyles = getStyles();
-
+export function EmergencyButton({ onPress }: EmergencyButtonProps) {
   return (
     <TouchableOpacity
-      style={[styles.button, currentStyles.button]}
+      style={styles.button}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Emergency button"
-      accessibilityHint="Double tap to activate emergency mode"
+      accessibilityHint="Activates emergency mode"
     >
-      <View style={styles.content}>
-        <MaterialIcons
-          name="warning"
-          size={48}
-          style={[styles.icon, currentStyles.icon]}
-        />
-        <Text style={[styles.text, currentStyles.text]}>EMERGENCY</Text>
+      <View style={styles.iconContainer}>
+        <MaterialCommunityIcons name="alert" size={48} color="white" />
       </View>
+      <Text style={styles.label}>EMERGENCY</Text>
+      <Text style={styles.shakeText}>Shake phone to activate</Text>
     </TouchableOpacity>
   );
-};
+}
 
 const styles = StyleSheet.create({
   button: {
-    borderRadius: 10,
-    padding: 20,
-    margin: 10,
-    alignItems: 'center',
+    width: '48%',
+    aspectRatio: 1,
+    backgroundColor: '#ff0000',
+    borderRadius: 15,
     justifyContent: 'center',
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  lightButton: {
-    backgroundColor: '#ff0000',
-  },
-  darkButton: {
-    backgroundColor: '#ff3333',
-  },
-  highContrastButton: {
-    backgroundColor: '#ff0000',
-    borderWidth: 3,
-    borderColor: '#000000',
-  },
-  content: {
-    flexDirection: 'row',
     alignItems: 'center',
+    padding: 10,
   },
-  text: {
-    fontSize: 24,
+  iconContainer: {
+    marginBottom: 5,
+  },
+  label: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginLeft: 10,
+    color: 'white',
+    textAlign: 'center',
   },
-  lightText: {
-    color: '#ffffff',
-  },
-  darkText: {
-    color: '#ffffff',
-  },
-  highContrastText: {
-    color: '#ffffff',
-  },
-  icon: {
-    marginRight: 10,
-  },
-  lightIcon: {
-    color: '#ffffff',
-  },
-  darkIcon: {
-    color: '#ffffff',
-  },
-  highContrastIcon: {
-    color: '#ffffff',
+  shakeText: {
+    fontSize: 12,
+    color: 'white',
+    textAlign: 'center',
+    marginTop: 5,
   },
 });

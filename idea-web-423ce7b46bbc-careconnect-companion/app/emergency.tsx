@@ -177,39 +177,37 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 40,
   },
-  callingText: {
-    fontSize: 24,
-    color: 'white',
-    marginTop: 20,
-    textAlign: 'center',
-  },
   cancelButton: {
     backgroundColor: 'white',
     paddingVertical: 15,
     paddingHorizontal: 30,
     borderRadius: 10,
-    minWidth: 200,
+    marginTop: 20,
   },
   cancelButtonText: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#ff0000',
+  },
+  statusContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  callingText: {
+    fontSize: 24,
+    color: 'white',
+    marginTop: 20,
+  },
+  smsStatus: {
+    fontSize: 16,
+    color: 'white',
+    marginTop: 20,
     textAlign: 'center',
   },
   errorText: {
     fontSize: 24,
     color: 'white',
     marginBottom: 20,
-    textAlign: 'center',
-  },
-  statusContainer: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  smsStatus: {
-    fontSize: 16,
-    color: 'white',
-    marginTop: 20,
     textAlign: 'center',
   },
 });
