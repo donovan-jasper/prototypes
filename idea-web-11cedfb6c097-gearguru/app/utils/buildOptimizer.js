@@ -49,9 +49,9 @@ export const updateGameData = async (gameId) => {
  * @param {Object} stats - Player stats
  * @param {Object} weapon - Selected weapon
  * @param {Object} armor - Selected armor
- * @returns {number} Effectiveness score (0-100)
+ * @returns {Object} Effectiveness breakdown and total stats
  */
-const calculateEffectiveness = (stats, weapon, armor) => {
+const calculateBuildStats = (stats, weapon, armor) => {
   const totalStats = {
     attack: stats.attack + weapon.attack,
     defense: stats.defense + weapon.defense + armor.defense,
@@ -59,58 +59,74 @@ const calculateEffectiveness = (stats, weapon, armor) => {
     speed: stats.speed + weapon.speed - armor.speedPenalty
   };
 
-  let score = 0;
-  Object.entries(STAT_WEIGHTS).forEach(([stat, weight]) => {
-    score += totalStats[stat] * weight;
-  });
+  // Calculate percentage contributions
+  const attackPercent = (weapon.attack / totalStats.attack) * 100;
+  const defensePercent = ((weapon.defense + armor.defense) / totalStats.defense) * 100;
+  const magicPercent = (weapon.magic / totalStats.magic) * 100;
+  const speedPercent = ((weapon.speed - armor.speedPenalty) / totalStats.speed) * 100;
 
-  // Normalize to 0-100 scale
-  const maxPossible = Object.values(STAT_WEIGHTS).reduce((a, b) => a + b, 0) * 100;
-  return Math.min(100, Math.round((score / maxPossible) * 100));
+  return {
+    effectiveness: {
+      attack: attackPercent,
+      defense: defensePercent,
+      magic: magicPercent,
+      speed: speedPercent
+    },
+    totalStats
+  };
 };
 
 /**
- * Optimizes a build based on input stats
- * @param {Object} stats - Player stats (attack, defense, magic, speed)
- * @returns {Object} Optimized build with weapons, armor, and effectiveness
+ * Generates all possible weapon/armor combinations
+ * @returns {Array} Array of all possible builds
  */
-export const optimizeBuild = (stats) => {
-  // Find best weapon based on attack stat
-  const bestWeapon = currentGameData.weapons.reduce((best, current) => {
-    const currentScore = current.attack * STAT_WEIGHTS.attack +
-                        current.defense * STAT_WEIGHTS.defense +
-                        current.magic * STAT_WEIGHTS.magic +
-                        current.speed * STAT_WEIGHTS.speed;
-    const bestScore = best.attack * STAT_WEIGHTS.attack +
-                      best.defense * STAT_WEIGHTS.defense +
-                      best.magic * STAT_WEIGHTS.magic +
-                      best.speed * STAT_WEIGHTS.speed;
+const generateAllCombinations = () => {
+  const combinations = [];
 
-    return currentScore > bestScore ? current : best;
-  }, currentGameData.weapons[0]);
-
-  // Find best armor based on defense stat
-  const bestArmor = currentGameData.armor.reduce((best, current) => {
-    const currentScore = current.defense * STAT_WEIGHTS.defense +
-                        current.magicDefense * STAT_WEIGHTS.magic;
-    const bestScore = best.defense * STAT_WEIGHTS.defense +
-                      best.magicDefense * STAT_WEIGHTS.magic;
-
-    return currentScore > bestScore ? current : best;
-  }, currentGameData.armor[0]);
-
-  // Calculate effectiveness
-  const effectiveness = calculateEffectiveness(stats, bestWeapon, bestArmor);
-
-  return {
-    weapons: [bestWeapon],
-    armor: [bestArmor],
-    effectiveness,
-    totalStats: {
-      attack: stats.attack + bestWeapon.attack,
-      defense: stats.defense + bestWeapon.defense + bestArmor.defense,
-      magic: stats.magic + bestWeapon.magic,
-      speed: stats.speed + bestWeapon.speed - bestArmor.speedPenalty
+  for (const weapon of currentGameData.weapons) {
+    for (const armor of currentGameData.armor) {
+      combinations.push({ weapon, armor });
     }
-  };
+  }
+
+  return combinations;
+};
+
+/**
+ * Optimizes builds based on input stats
+ * @param {Object} stats - Player stats (attack, defense, magic, speed)
+ * @returns {Array} Top 3 optimized builds with detailed breakdowns
+ */
+export const optimizeBuilds = (stats) => {
+  const combinations = generateAllCombinations();
+
+  // Calculate effectiveness for each combination
+  const builds = combinations.map(({ weapon, armor }) => {
+    const { effectiveness, totalStats } = calculateBuildStats(stats, weapon, armor);
+
+    // Calculate overall score based on weighted stats
+    const score = (totalStats.attack * STAT_WEIGHTS.attack) +
+                 (totalStats.defense * STAT_WEIGHTS.defense) +
+                 (totalStats.magic * STAT_WEIGHTS.magic) +
+                 (totalStats.speed * STAT_WEIGHTS.speed);
+
+    return {
+      weapon,
+      armor,
+      effectiveness,
+      totalStats,
+      score
+    };
+  });
+
+  // Sort by score (descending) and return top 3
+  builds.sort((a, b) => b.score - a.score);
+
+  return builds.slice(0, 3).map(build => ({
+    weapons: [build.weapon],
+    armor: [build.armor],
+    effectiveness: build.effectiveness,
+    totalStats: build.totalStats,
+    score: build.score
+  }));
 };
