@@ -1,89 +1,63 @@
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { schedulePreventiveCareReminder } from '../lib/notifications';
-import { useAppStore } from '../store/appStore';
+import { format } from 'date-fns';
 
 interface PreventiveCareCardProps {
   screening: {
     type: string;
     name: string;
-    frequency: string;
     description: string;
+    frequency: string;
+    icon: string;
+    color: string;
   };
   nextDueDate: Date;
+  onMarkComplete?: () => void;
+  isCompleted?: boolean;
 }
 
-const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({ screening, nextDueDate }) => {
-  const [isReminderSet, setIsReminderSet] = useState(false);
-  const user = useAppStore(state => state.user);
-
-  const handleSetReminder = async () => {
-    if (!user) {
-      Alert.alert('Error', 'User not found');
-      return;
-    }
-
-    try {
-      await schedulePreventiveCareReminder(screening.type, nextDueDate, user.id);
-      setIsReminderSet(true);
-      Alert.alert('Success', `Reminder set for ${screening.name} on ${nextDueDate.toLocaleDateString()}`);
-    } catch (error) {
-      Alert.alert('Error', 'Failed to set reminder');
-      console.error('Error setting reminder:', error);
-    }
-  };
-
-  const daysUntilDue = Math.ceil((nextDueDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-
+const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
+  screening,
+  nextDueDate,
+  onMarkComplete,
+  isCompleted = false
+}) => {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isCompleted && styles.completedCard]}>
       <View style={styles.header}>
-        <Ionicons
-          name={getScreeningIcon(screening.type)}
-          size={24}
-          color="#4A89DC"
-        />
-        <Text style={styles.title}>{screening.name}</Text>
+        <View style={[styles.iconContainer, { backgroundColor: screening.color }]}>
+          <Ionicons name={screening.icon} size={24} color="white" />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>{screening.name}</Text>
+          <Text style={styles.description}>{screening.description}</Text>
+        </View>
       </View>
-
-      <Text style={styles.description}>{screening.description}</Text>
 
       <View style={styles.details}>
-        <Text style={styles.detailText}>
-          Frequency: {screening.frequency === 'annual' ? 'Annually' : 'Every 2 years'}
-        </Text>
-        <Text style={styles.detailText}>
-          Next due: {nextDueDate.toLocaleDateString()} ({daysUntilDue} days)
-        </Text>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Frequency:</Text>
+          <Text style={styles.detailValue}>{screening.frequency}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Text style={styles.detailLabel}>Next Due:</Text>
+          <Text style={styles.detailValue}>{format(nextDueDate, 'MMM d, yyyy')}</Text>
+        </View>
       </View>
 
-      <TouchableOpacity
-        style={[styles.button, isReminderSet && styles.buttonDisabled]}
-        onPress={handleSetReminder}
-        disabled={isReminderSet}
-      >
-        <Text style={styles.buttonText}>
-          {isReminderSet ? 'Reminder Set' : 'Remind Me'}
-        </Text>
-      </TouchableOpacity>
+      {onMarkComplete && (
+        <TouchableOpacity
+          style={[styles.button, isCompleted && styles.completedButton]}
+          onPress={onMarkComplete}
+        >
+          <Text style={styles.buttonText}>
+            {isCompleted ? 'Completed' : 'Mark as Complete'}
+          </Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
-};
-
-const getScreeningIcon = (type: string) => {
-  switch (type) {
-    case 'mammogram':
-    case 'pap_smear':
-    case 'prostate_exam':
-      return 'medical';
-    case 'blood_pressure':
-      return 'heart';
-    case 'colonoscopy':
-      return 'body';
-    default:
-      return 'alert-circle';
-  }
 };
 
 const styles = StyleSheet.create({
@@ -98,38 +72,60 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  completedCard: {
+    opacity: 0.7,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  textContainer: {
+    flex: 1,
   },
   title: {
     fontSize: 18,
     fontWeight: '600',
-    marginLeft: 8,
     color: '#333',
   },
   description: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 12,
+    marginTop: 2,
   },
   details: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  detailText: {
-    fontSize: 14,
-    color: '#444',
+  detailItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
+  detailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
   button: {
-    backgroundColor: '#4A89DC',
-    paddingVertical: 10,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
   },
-  buttonDisabled: {
-    backgroundColor: '#CCC',
+  completedButton: {
+    backgroundColor: '#9E9E9E',
   },
   buttonText: {
     color: 'white',
