@@ -93,3 +93,73 @@ export async function scheduleHealthChecks() {
   // Schedule next check
   setTimeout(scheduleHealthChecks, HEALTH_CHECK_INTERVAL);
 }
+
+export async function executeRecoveryAction(serviceId: string, workflowId: string) {
+  try {
+    const db = await openDatabase();
+    const service = await db.getFirstAsync('SELECT * FROM services WHERE id = ?', [serviceId]);
+    const workflow = await db.getFirstAsync('SELECT * FROM recovery_workflows WHERE id = ?', [workflowId]);
+
+    if (!service || !workflow) {
+      throw new Error('Service or workflow not found');
+    }
+
+    const token = await SecureStore.getItemAsync(`auth_token_${service.provider}`);
+    if (!token) throw new Error('No authentication token found');
+
+    const steps = JSON.parse(workflow.steps);
+    let allStepsSuccessful = true;
+
+    for (const step of steps) {
+      if (step.action?.type === 'api') {
+        switch (service.provider) {
+          case 'flyio':
+            const flyioClient = new FlyioClient(token);
+            if (step.action.endpoint === 'restart') {
+              await flyioClient.restartApp(service.id);
+            } else if (step.action.endpoint === 'rollback') {
+              await flyioClient.rollbackDeployment(service.id);
+            }
+            break;
+          default:
+            throw new Error('Unsupported provider');
+        }
+      }
+
+      // For manual steps, we just log that they need to be completed
+      if (step.action?.type === 'manual') {
+        console.log(`Manual step requires action: ${step.title}`);
+      }
+    }
+
+    if (allStepsSuccessful) {
+      // Update service status to healthy
+      await db.runAsync(
+        'UPDATE services SET status = ?, last_check = ? WHERE id = ?',
+        ['healthy', Date.now(), service.id]
+      );
+
+      // Save success alert
+      await saveAlert(db, {
+        serviceId: service.id,
+        severity: 'info',
+        message: `Successfully executed recovery workflow: ${workflow.name}`
+      });
+
+      // Send notification
+      await sendLocalNotification(
+        'Recovery Successful',
+        `Your ${service.name} service has been successfully recovered`,
+        'critical'
+      );
+
+      return { success: true, message: 'Recovery workflow completed successfully' };
+    }
+  } catch (error) {
+    console.error('Recovery action failed:', error);
+    return {
+      success: false,
+      message: error instanceof Error ? error.message : 'Failed to execute recovery action'
+    };
+  }
+}

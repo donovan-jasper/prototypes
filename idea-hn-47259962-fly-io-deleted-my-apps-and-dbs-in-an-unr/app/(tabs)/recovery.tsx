@@ -143,20 +143,15 @@ export default function RecoveryScreen() {
                 step={item}
                 stepNumber={index + 1}
                 totalSteps={selectedWorkflow.steps.length}
-                serviceId={selectedServiceId || ''}
               />
             )}
-            ListFooterComponent={
-              <View style={styles.footer}>
-                <TouchableOpacity
-                  style={styles.executeButton}
-                  onPress={() => handleExecuteWorkflow(selectedWorkflow.id, selectedServiceId || '')}
-                >
-                  <Text style={styles.executeButtonText}>Execute Workflow</Text>
-                </TouchableOpacity>
-              </View>
-            }
           />
+          <TouchableOpacity
+            style={styles.executeButton}
+            onPress={() => handleExecuteWorkflow(selectedWorkflow.id, selectedServiceId || '')}
+          >
+            <Text style={styles.executeButtonText}>Execute Workflow</Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -199,28 +194,25 @@ const styles = StyleSheet.create({
     color: '#1F2937',
   },
   workflowItem: {
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#3B82F6',
   },
   workflowTitle: {
     fontSize: 16,
     fontWeight: '500',
-    marginBottom: 4,
     color: '#1F2937',
   },
   workflowSteps: {
     fontSize: 14,
     color: '#6B7280',
+    marginTop: 4,
   },
   noWorkflows: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
@@ -238,8 +230,8 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '500',
-    marginBottom: 8,
     color: '#1F2937',
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtext: {
@@ -269,17 +261,15 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 24,
   },
-  footer: {
-    paddingVertical: 24,
-  },
   executeButton: {
     backgroundColor: '#3B82F6',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+    marginTop: 16,
   },
   executeButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },

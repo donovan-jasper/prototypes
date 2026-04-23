@@ -29,6 +29,17 @@ export async function openDatabase() {
       provider TEXT NOT NULL,
       steps TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS workflow_executions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      workflow_id TEXT NOT NULL,
+      service_id TEXT NOT NULL,
+      started_at INTEGER NOT NULL,
+      completed_at INTEGER,
+      status TEXT NOT NULL,
+      FOREIGN KEY (workflow_id) REFERENCES recovery_workflows(id),
+      FOREIGN KEY (service_id) REFERENCES services(id)
+    );
   `);
 
   // Seed initial workflows if table is empty
@@ -169,16 +180,42 @@ export async function saveAlert(db: SQLite.SQLiteDatabase, alert: any) {
   );
 }
 
-export async function getAlerts(db: SQLite.SQLiteDatabase, limit: number = 50) {
-  return await db.getAllAsync(
-    'SELECT * FROM alerts ORDER BY timestamp DESC LIMIT ?',
-    [limit]
-  );
+export async function getAlerts(db: SQLite.SQLiteDatabase, serviceId?: string) {
+  if (serviceId) {
+    return await db.getAllAsync(
+      'SELECT * FROM alerts WHERE service_id = ? ORDER BY timestamp DESC',
+      [serviceId]
+    );
+  }
+  return await db.getAllAsync('SELECT * FROM alerts ORDER BY timestamp DESC');
 }
 
-export async function resolveAlert(db: SQLite.SQLiteDatabase, alertId: number) {
+export async function markAlertResolved(db: SQLite.SQLiteDatabase, alertId: number) {
   await db.runAsync(
     'UPDATE alerts SET resolved = 1 WHERE id = ?',
     [alertId]
   );
+}
+
+export async function saveWorkflowExecution(db: SQLite.SQLiteDatabase, execution: any) {
+  await db.runAsync(
+    'INSERT INTO workflow_executions (workflow_id, service_id, started_at, completed_at, status) VALUES (?, ?, ?, ?, ?)',
+    [
+      execution.workflowId,
+      execution.serviceId,
+      execution.startedAt,
+      execution.completedAt || null,
+      execution.status
+    ]
+  );
+}
+
+export async function getWorkflowExecutions(db: SQLite.SQLiteDatabase, serviceId?: string) {
+  if (serviceId) {
+    return await db.getAllAsync(
+      'SELECT * FROM workflow_executions WHERE service_id = ? ORDER BY started_at DESC',
+      [serviceId]
+    );
+  }
+  return await db.getAllAsync('SELECT * FROM workflow_executions ORDER BY started_at DESC');
 }

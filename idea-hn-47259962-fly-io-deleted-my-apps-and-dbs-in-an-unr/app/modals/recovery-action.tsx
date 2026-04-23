@@ -144,52 +144,17 @@ export default function RecoveryActionModal() {
 
       await sendLocalNotification(
         'Recovery Successful',
-        `Your ${service.name} service has been recovered using ${workflow.name}`,
-        'info'
+        `Your ${service.name} service has been successfully recovered`,
+        'critical'
       );
 
       setSuccess(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message :
-        'An unknown error occurred during recovery';
-      setError(errorMessage);
-      console.error('Recovery failed:', err);
+      console.error('Workflow execution failed:', err);
+      setError(err instanceof Error ? err.message : 'Failed to execute workflow');
     } finally {
       setIsExecuting(false);
     }
-  }
-
-  function getStepStatusIcon(status: 'pending' | 'success' | 'error') {
-    switch (status) {
-      case 'success':
-        return '✓';
-      case 'error':
-        return '✗';
-      default:
-        return '•';
-    }
-  }
-
-  function getStepStatusColor(status: 'pending' | 'success' | 'error') {
-    switch (status) {
-      case 'success':
-        return '#10B981';
-      case 'error':
-        return '#EF4444';
-      default:
-        return '#6B7280';
-    }
-  }
-
-  if (!workflowId || !serviceId) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Invalid workflow or service ID</Text>
-        <TouchableOpacity style={styles.closeButton} onPress={() => router.back()}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    );
   }
 
   if (!workflow) {
@@ -204,29 +169,7 @@ export default function RecoveryActionModal() {
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.header}>Executing Workflow</Text>
-        <Text style={styles.workflowName}>{workflow.name}</Text>
-
-        {workflow.steps.map((step: any, index: number) => (
-          <View key={step.id} style={styles.stepContainer}>
-            <View style={styles.stepHeader}>
-              <Text style={styles.stepNumber}>
-                {getStepStatusIcon(stepStatus[step.id])}
-              </Text>
-              <Text style={styles.stepTitle}>{step.title}</Text>
-            </View>
-            <Text style={styles.stepDescription}>{step.description}</Text>
-            <View style={styles.stepStatus}>
-              <Text style={[
-                styles.stepStatusText,
-                { color: getStepStatusColor(stepStatus[step.id]) }
-              ]}>
-                {stepStatus[step.id] === 'pending' ? 'Pending' :
-                 stepStatus[step.id] === 'success' ? 'Completed' : 'Failed'}
-              </Text>
-            </View>
-          </View>
-        ))}
+        <Text style={styles.header}>{workflow.name}</Text>
 
         {error && (
           <View style={styles.errorContainer}>
@@ -239,9 +182,42 @@ export default function RecoveryActionModal() {
             <Text style={styles.successText}>Workflow completed successfully!</Text>
           </View>
         )}
-      </ScrollView>
 
-      <View style={styles.footer}>
+        {workflow.steps.map((step: any, index: number) => (
+          <View key={step.id} style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <View style={[
+                styles.stepNumber,
+                stepStatus[step.id] === 'success' && styles.stepSuccess,
+                stepStatus[step.id] === 'error' && styles.stepError
+              ]}>
+                <Text style={styles.stepNumberText}>{index + 1}</Text>
+              </View>
+              <Text style={styles.stepTitle}>{step.title}</Text>
+            </View>
+            <Text style={styles.stepDescription}>{step.description}</Text>
+
+            {step.action?.type === 'manual' && (
+              <Text style={styles.manualStepText}>This step requires manual action</Text>
+            )}
+
+            {isExecuting && currentStep === index && (
+              <View style={styles.executingContainer}>
+                <ActivityIndicator size="small" color="#3B82F6" />
+                <Text style={styles.executingText}>Executing...</Text>
+              </View>
+            )}
+
+            {stepStatus[step.id] === 'success' && (
+              <Text style={styles.stepStatusSuccess}>✓ Completed</Text>
+            )}
+
+            {stepStatus[step.id] === 'error' && (
+              <Text style={styles.stepStatusError}>✗ Failed</Text>
+            )}
+          </View>
+        ))}
+
         {!success && !error && (
           <TouchableOpacity
             style={styles.executeButton}
@@ -249,7 +225,7 @@ export default function RecoveryActionModal() {
             disabled={isExecuting}
           >
             {isExecuting ? (
-              <ActivityIndicator color="#fff" />
+              <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
               <Text style={styles.executeButtonText}>Execute Workflow</Text>
             )}
@@ -259,11 +235,10 @@ export default function RecoveryActionModal() {
         <TouchableOpacity
           style={styles.closeButton}
           onPress={() => router.back()}
-          disabled={isExecuting}
         >
           <Text style={styles.closeButtonText}>Close</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -279,24 +254,35 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 24,
     color: '#1F2937',
   },
-  workflowName: {
-    fontSize: 18,
-    color: '#6B7280',
-    marginBottom: 24,
-  },
-  stepContainer: {
-    backgroundColor: '#fff',
+  errorContainer: {
+    backgroundColor: '#FEE2E2',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 16,
+  },
+  successContainer: {
+    backgroundColor: '#D1FAE5',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  successText: {
+    color: '#059669',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  stepContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
   },
   stepHeader: {
     flexDirection: 'row',
@@ -304,14 +290,28 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
-    color: '#3B82F6',
+  },
+  stepSuccess: {
+    backgroundColor: '#D1FAE5',
+  },
+  stepError: {
+    backgroundColor: '#FEE2E2',
+  },
+  stepNumberText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
   },
   stepTitle: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 18,
+    fontWeight: '600',
     color: '#1F2937',
   },
   stepDescription: {
@@ -319,61 +319,55 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 8,
   },
-  stepStatus: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+  manualStepText: {
+    fontSize: 14,
+    color: '#3B82F6',
+    fontStyle: 'italic',
+    marginTop: 8,
   },
-  stepStatusText: {
-    fontSize: 12,
+  executingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  executingText: {
+    marginLeft: 8,
+    color: '#3B82F6',
+    fontSize: 14,
+  },
+  stepStatusSuccess: {
+    color: '#059669',
+    fontSize: 14,
     fontWeight: '500',
+    marginTop: 8,
   },
-  errorContainer: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    padding: 16,
-    marginVertical: 16,
-  },
-  errorText: {
-    color: '#EF4444',
+  stepStatusError: {
+    color: '#DC2626',
     fontSize: 14,
-  },
-  successContainer: {
-    backgroundColor: '#D1FAE5',
-    borderRadius: 8,
-    padding: 16,
-    marginVertical: 16,
-  },
-  successText: {
-    color: '#10B981',
-    fontSize: 14,
-  },
-  footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    fontWeight: '500',
+    marginTop: 8,
   },
   executeButton: {
     backgroundColor: '#3B82F6',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
-    marginBottom: 8,
+    marginTop: 16,
   },
   executeButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
   closeButton: {
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#E5E7EB',
     borderRadius: 8,
     padding: 16,
     alignItems: 'center',
+    marginTop: 16,
   },
   closeButtonText: {
-    color: '#374151',
+    color: '#1F2937',
     fontSize: 16,
     fontWeight: '600',
   },
