@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useMemoryStore } from '../../store/memoryStore';
 import { Space } from '../../lib/types';
 import { createSpace, getSpacesForUser, addMemberToSpace } from '../../lib/db';
+import SpaceCard from '../../components/SpaceCard';
 
 export default function SharedSpacesScreen() {
   const [spaces, setSpaces] = useState<Space[]>([]);
@@ -87,16 +88,6 @@ export default function SharedSpacesScreen() {
     }
   };
 
-  const renderSpaceItem = ({ item }: { item: Space }) => (
-    <TouchableOpacity
-      style={styles.spaceItem}
-      onPress={() => router.push(`/space/${item.id}`)}
-    >
-      <Text style={styles.spaceName}>{item.name}</Text>
-      <Text style={styles.spaceMembers}>{item.members.length} members</Text>
-    </TouchableOpacity>
-  );
-
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -110,8 +101,24 @@ export default function SharedSpacesScreen() {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Shared Spaces</Text>
 
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.button, styles.createButton]}
+          onPress={() => setIsCreating(true)}
+        >
+          <Text style={styles.buttonText}>Create Space</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.joinButton]}
+          onPress={() => setIsJoining(true)}
+        >
+          <Text style={styles.buttonText}>Join Space</Text>
+        </TouchableOpacity>
+      </View>
+
       {isCreating ? (
         <View style={styles.createForm}>
+          <Text style={styles.formTitle}>Create New Space</Text>
           <TextInput
             style={styles.input}
             placeholder="Space name"
@@ -141,6 +148,7 @@ export default function SharedSpacesScreen() {
         </View>
       ) : isJoining ? (
         <View style={styles.createForm}>
+          <Text style={styles.formTitle}>Join Space</Text>
           <TextInput
             style={styles.input}
             placeholder="Space ID"
@@ -162,34 +170,23 @@ export default function SharedSpacesScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      ) : null}
+
+      {spaces.length > 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>Your Spaces</Text>
+          <FlatList
+            data={spaces}
+            renderItem={({ item }) => <SpaceCard space={item} />}
+            keyExtractor={item => item.id}
+            scrollEnabled={false}
+          />
+        </>
       ) : (
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.button, styles.primaryButton]}
-            onPress={() => setIsCreating(true)}
-          >
-            <Text style={styles.buttonText}>Create Space</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.secondaryButton]}
-            onPress={() => setIsJoining(true)}
-          >
-            <Text style={styles.buttonText}>Join Space</Text>
-          </TouchableOpacity>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>You haven't created or joined any spaces yet.</Text>
+          <Text style={styles.emptySubtext}>Create a space to share memories with others.</Text>
         </View>
-      )}
-
-      <Text style={styles.sectionTitle}>Your Spaces</Text>
-
-      {spaces.length === 0 ? (
-        <Text style={styles.emptyText}>No spaces yet. Create or join one!</Text>
-      ) : (
-        <FlatList
-          data={spaces}
-          renderItem={renderSpaceItem}
-          keyExtractor={(item) => item.id}
-          scrollEnabled={false}
-        />
       )}
     </ScrollView>
   );
@@ -199,103 +196,96 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f7fa',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 24,
-    color: '#333',
+    color: '#2c3e50',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 24,
-    marginBottom: 16,
-    color: '#444',
-  },
-  createForm: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    marginBottom: 12,
-  },
-  buttonRow: {
+  actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 24,
   },
   button: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
     alignItems: 'center',
+  },
+  createButton: {
+    backgroundColor: '#3498db',
+  },
+  joinButton: {
+    backgroundColor: '#2ecc71',
   },
   buttonText: {
     color: 'white',
     fontWeight: '600',
   },
-  cancelButton: {
-    backgroundColor: '#999',
-  },
-  createButton: {
-    backgroundColor: '#4CAF50',
-  },
-  joinButton: {
-    backgroundColor: '#2196F3',
-  },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-    marginBottom: 8,
-  },
-  secondaryButton: {
-    backgroundColor: '#2196F3',
-  },
-  actionButtons: {
-    marginBottom: 24,
-  },
-  spaceItem: {
+  createForm: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  spaceName: {
+  formTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 16,
+    color: '#2c3e50',
   },
-  spaceMembers: {
-    fontSize: 14,
-    color: '#666',
+  input: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#e74c3c',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#2c3e50',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
   },
   emptyText: {
-    color: '#666',
+    fontSize: 16,
+    color: '#7f8c8d',
     textAlign: 'center',
-    marginTop: 16,
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#95a5a6',
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    backgroundColor: '#f5f7fa',
   },
 });

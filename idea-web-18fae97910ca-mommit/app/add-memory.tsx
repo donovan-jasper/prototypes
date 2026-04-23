@@ -5,6 +5,7 @@ import { useMemoryStore } from '../store/memoryStore';
 import { createMemory, addMemoryToSpace, getSpacesForUser } from '../lib/db';
 import { parseNaturalLanguage } from '../lib/ai';
 import { Space } from '../lib/types';
+import SpaceCard from '../components/SpaceCard';
 
 export default function AddMemoryModal() {
   const [memoryText, setMemoryText] = useState('');
@@ -164,8 +165,8 @@ export default function AddMemoryModal() {
               <FlatList
                 data={spaces}
                 renderItem={renderSpaceItem}
-                keyExtractor={(item) => item.id}
-                style={styles.spaceList}
+                keyExtractor={item => item.id}
+                contentContainerStyle={styles.spaceList}
               />
             )}
 
@@ -186,73 +187,86 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f7fa',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 24,
-    color: '#333',
+    color: '#2c3e50',
+    textAlign: 'center',
   },
   input: {
-    height: 120,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
-    marginBottom: 24,
     backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    minHeight: 120,
     textAlignVertical: 'top',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   spaceSelector: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 8,
-    color: '#444',
+    marginBottom: 12,
+    color: '#2c3e50',
   },
   spaceButton: {
     backgroundColor: 'white',
-    borderColor: '#ddd',
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
-    borderRadius: 4,
-    padding: 12,
+    borderColor: '#e0e0e0',
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   spaceButtonText: {
-    color: '#333',
+    fontSize: 16,
+    color: '#7f8c8d',
   },
   clearButton: {
-    alignSelf: 'flex-start',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    alignSelf: 'flex-end',
   },
   clearButtonText: {
-    color: '#f44336',
-    fontSize: 14,
+    color: '#e74c3c',
+    fontWeight: '600',
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginTop: 24,
   },
   button: {
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 4,
+    borderRadius: 12,
+    flex: 1,
+    marginHorizontal: 8,
     alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#e74c3c',
+  },
+  addButton: {
+    backgroundColor: '#2ecc71',
   },
   buttonText: {
     color: 'white',
     fontWeight: '600',
-  },
-  cancelButton: {
-    backgroundColor: '#999',
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
+    fontSize: 16,
   },
   spaceSelectorModal: {
     flex: 1,
@@ -261,48 +275,52 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   spaceSelectorContent: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
     width: '90%',
     maxHeight: '80%',
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
   },
   spaceSelectorTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 16,
-    color: '#333',
-  },
-  spaceList: {
-    maxHeight: 300,
+    color: '#2c3e50',
+    textAlign: 'center',
   },
   spaceItem: {
-    padding: 12,
+    padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#ecf0f1',
   },
   selectedSpaceItem: {
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#e8f4fc',
   },
   spaceName: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#2c3e50',
   },
   spaceMembers: {
     fontSize: 14,
-    color: '#666',
+    color: '#7f8c8d',
+    marginTop: 4,
+  },
+  spaceList: {
+    paddingBottom: 16,
   },
   emptyText: {
-    color: '#666',
+    fontSize: 16,
+    color: '#7f8c8d',
     textAlign: 'center',
-    marginTop: 16,
+    marginVertical: 24,
   },
   closeButton: {
-    marginTop: 16,
+    backgroundColor: '#3498db',
     padding: 12,
-    backgroundColor: '#4CAF50',
-    borderRadius: 4,
+    borderRadius: 8,
     alignItems: 'center',
+    marginTop: 16,
   },
   closeButtonText: {
     color: 'white',
