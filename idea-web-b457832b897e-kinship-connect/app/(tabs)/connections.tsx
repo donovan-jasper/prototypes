@@ -1,8 +1,9 @@
 import React, { useContext, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { ConnectionContext } from '../../contexts/ConnectionContext';
 import ConnectionCard from '../../components/ConnectionCard';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 const ConnectionsScreen = () => {
   const { connections, loading, refreshConnections } = useContext(ConnectionContext);
@@ -14,6 +15,10 @@ const ConnectionsScreen = () => {
 
   const handleConnectionPress = (connectionId: string) => {
     router.push(`/chat/${connectionId}`);
+  };
+
+  const handleStartCall = (connectionId: string) => {
+    router.push(`/call/${connectionId}`);
   };
 
   if (loading) {
@@ -34,6 +39,7 @@ const ConnectionsScreen = () => {
           <ConnectionCard
             connection={item}
             onPress={() => handleConnectionPress(item.id)}
+            onStartCall={() => handleStartCall(item.id)}
           />
         )}
         contentContainerStyle={styles.listContent}
@@ -48,6 +54,13 @@ const ConnectionsScreen = () => {
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No connections yet</Text>
             <Text style={styles.emptySubtext}>Find matches to start conversations</Text>
+            <TouchableOpacity
+              style={styles.findMatchesButton}
+              onPress={() => router.push('/(tabs)/')}
+            >
+              <Ionicons name="search" size={20} color="#fff" />
+              <Text style={styles.findMatchesText}>Find Matches</Text>
+            </TouchableOpacity>
           </View>
         }
       />
@@ -88,6 +101,21 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#999',
+    marginBottom: 20,
+  },
+  findMatchesButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  findMatchesText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 

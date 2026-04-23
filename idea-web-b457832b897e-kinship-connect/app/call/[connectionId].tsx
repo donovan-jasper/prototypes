@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Video } from 'expo-av';
 import { Audio } from 'expo-av';
@@ -69,6 +69,7 @@ export default function CallScreen() {
             resizeMode="cover"
             shouldPlay
             isMuted={false}
+            useNativeControls={false}
           />
         ) : (
           <View style={[styles.video, styles.placeholder]}>
@@ -87,6 +88,7 @@ export default function CallScreen() {
             resizeMode="cover"
             shouldPlay
             isMuted
+            useNativeControls={false}
           />
         ) : (
           <View style={[styles.localVideo, styles.placeholder]}>
@@ -129,7 +131,7 @@ const styles = StyleSheet.create({
   },
   localVideoContainer: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 40 : 20,
     right: 20,
     width: 120,
     height: 180,
@@ -152,7 +154,7 @@ const styles = StyleSheet.create({
   },
   durationContainer: {
     position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'ios' ? 20 : 10,
     left: 0,
     right: 0,
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
 
@@ -160,9 +160,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-around',
     alignItems: 'center',
     paddingVertical: 20,
-    backgroundColor: '#1a1a1a',
-    borderTopWidth: 1,
-    borderTopColor: '#333',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
   },
   controlButton: {
     alignItems: 'center',
@@ -176,41 +178,34 @@ const styles = StyleSheet.create({
   mutedText: {
     color: '#ff3b30',
   },
+  recordingText: {
+    color: '#ff3b30',
+  },
   recordingButton: {
     backgroundColor: 'rgba(255, 59, 48, 0.2)',
     borderRadius: 30,
     padding: 10,
   },
-  recordingText: {
-    color: '#ff3b30',
+  endCallButton: {
+    backgroundColor: '#ff3b30',
+    borderRadius: 30,
+    padding: 10,
   },
   recordingIndicator: {
-    position: 'absolute',
-    top: -10,
-    right: -5,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ff3b30',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    marginTop: 4,
   },
   recordingDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#fff',
+    backgroundColor: '#ff3b30',
     marginRight: 4,
   },
   recordingDuration: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  endCallButton: {
-    backgroundColor: '#ff3b30',
-    borderRadius: 30,
-    padding: 15,
+    color: '#ff3b30',
+    fontSize: 12,
   },
 });
 
