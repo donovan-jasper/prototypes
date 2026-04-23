@@ -184,7 +184,7 @@ const ARTargetPractice = () => {
         {!gameActive && (
           <View style={styles.startButtonContainer}>
             <TouchableOpacity style={styles.startButton} onPress={startGame}>
-              <Text style={styles.startButtonText}>Start Game</Text>
+              <Text style={styles.startButtonText}>Start AR Training</Text>
             </TouchableOpacity>
           </View>
         )}
