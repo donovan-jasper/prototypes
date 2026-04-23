@@ -1,11 +1,48 @@
-import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const DetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { imageUri } = route.params || {};
+  const [imageInfo, setImageInfo] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (imageUri) {
+      fetchImageMetadata();
+    } else {
+      setIsLoading(false);
+    }
+  }, [imageUri]);
+
+  const fetchImageMetadata = async () => {
+    try {
+      const manipulatorResult = await ImageManipulator.manipulateAsync(
+        imageUri,
+        [],
+        { compress: 0, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      // Get file size from the original URI
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
+      const fileSize = blob.size / (1024 * 1024); // Convert to MB
+
+      setImageInfo({
+        type: 'JPEG', // Default, could be enhanced to detect actual format
+        dimensions: `${manipulatorResult.width}x${manipulatorResult.height}`,
+        size: `${fileSize.toFixed(2)} MB`,
+        dateProcessed: new Date().toLocaleDateString()
+      });
+    } catch (error) {
+      console.error('Error fetching image metadata:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -21,12 +58,22 @@ const DetailScreen = () => {
         )}
       </View>
 
-      <View style={styles.detailsContainer}>
-        <Text style={styles.detailText}>File Type: JPEG</Text>
-        <Text style={styles.detailText}>Dimensions: 1200x800 pixels</Text>
-        <Text style={styles.detailText}>Size: 1.2 MB</Text>
-        <Text style={styles.detailText}>Date Processed: {new Date().toLocaleDateString()}</Text>
-      </View>
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
+      ) : (
+        <View style={styles.detailsContainer}>
+          {imageInfo ? (
+            <>
+              <Text style={styles.detailText}>File Type: {imageInfo.type}</Text>
+              <Text style={styles.detailText}>Dimensions: {imageInfo.dimensions} pixels</Text>
+              <Text style={styles.detailText}>Size: {imageInfo.size}</Text>
+              <Text style={styles.detailText}>Date Processed: {imageInfo.dateProcessed}</Text>
+            </>
+          ) : (
+            <Text style={styles.detailText}>Unable to load image metadata</Text>
+          )}
+        </View>
+      )}
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
@@ -114,6 +161,9 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     color: '#4CAF50',
+  },
+  loader: {
+    marginVertical: 20,
   },
 });
 
