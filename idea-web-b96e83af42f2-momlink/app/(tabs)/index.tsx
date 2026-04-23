@@ -167,7 +167,8 @@ export default function RequestBoard() {
           style={styles.createButton}
           onPress={handleCreateRequest}
         >
-          <Text style={styles.createButtonText}>+ New</Text>
+          <Ionicons name="add" size={20} color="#fff" />
+          <Text style={styles.createButtonText}>New Request</Text>
         </TouchableOpacity>
       </View>
 
@@ -178,7 +179,7 @@ export default function RequestBoard() {
         </View>
       ) : requests.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="search-outline" size={48} color="#9ca3af" />
+          <Ionicons name="search" size={48} color="#9ca3af" />
           <Text style={styles.emptyText}>No requests found</Text>
           <Text style={styles.emptySubtext}>Try increasing your search radius or create a new request</Text>
         </View>
@@ -193,15 +194,14 @@ export default function RequestBoard() {
               onPress={() => router.push(`/request/${item.id}`)}
             />
           )}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              colors={['#6366f1']}
               tintColor="#6366f1"
             />
           }
-          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -211,21 +211,20 @@ export default function RequestBoard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3f4f6',
+    backgroundColor: '#f9fafb',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   mapContainer: {
     height: 200,
     width: '100%',
-    marginBottom: 16,
   },
   map: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
   },
   marker: {
     backgroundColor: '#6366f1',
@@ -239,12 +238,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   radiusSliderContainer: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   radiusLabel: {
-    fontSize: 14,
-    color: '#4b5563',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
     marginBottom: 8,
   },
   slider: {
@@ -255,23 +257,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 16,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#1f2937',
   },
   createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#6366f1',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    paddingHorizontal: 16,
     borderRadius: 8,
   },
   createButtonText: {
     color: '#fff',
     fontWeight: '600',
+    marginLeft: 4,
+  },
+  listContent: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -281,17 +291,18 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     color: '#6b7280',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#374151',
+    color: '#1f2937',
     marginTop: 16,
     textAlign: 'center',
   },
@@ -302,29 +313,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   permissionButton: {
+    marginTop: 24,
     backgroundColor: '#6366f1',
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 20,
   },
   permissionButtonText: {
     color: '#fff',
     fontWeight: '600',
+    fontSize: 16,
   },
   loginButton: {
+    marginTop: 24,
     backgroundColor: '#6366f1',
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 20,
   },
   loginButtonText: {
     color: '#fff',
     fontWeight: '600',
-  },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    fontSize: 16,
   },
 });
