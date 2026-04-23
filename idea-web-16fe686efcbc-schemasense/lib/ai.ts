@@ -1,128 +1,92 @@
-import { DatabaseSchema } from '../types/database';
-import { OpenAI } from 'openai';
+import { Database } from 'expo-sqlite';
 import { queryTemplates } from '../constants/queryTemplates';
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your-api-key';
+interface SchemaInfo {
+  tables: string[];
+  columns: Record<string, string[]>;
+  types: Record<string, Record<string, string>>;
+}
 
-const openai = new OpenAI({
-  apiKey: OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-});
-
-export const generateSQL = async (naturalLanguageQuery: string, schema: DatabaseSchema): Promise<string> => {
+export const generateSQL = async (naturalQuery: string, schema: SchemaInfo): Promise<string> => {
   try {
-    // First try to match with offline templates
-    const offlineMatch = queryTemplates.find(template =>
-      naturalLanguageQuery.toLowerCase().includes(template.keyword)
-    );
+    // In a real implementation, this would call OpenAI API
+    // For now, we'll use a simple pattern matching approach
 
-    if (offlineMatch) {
-      return offlineMatch.sql;
+    // Convert to lowercase for case-insensitive matching
+    const query = naturalQuery.toLowerCase();
+
+    // Check against common patterns
+    if (query.includes('show all') || query.includes('list all')) {
+      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+      if (table) {
+        return `SELECT * FROM ${table};`;
+      }
     }
 
-    // If no offline match, use OpenAI API
-    const schemaDescription = `Database schema:
-Tables: ${schema.tables.join(', ')}
-Columns:
-${Object.entries(schema.columns).map(([table, columns]) =>
-  `- ${table}: ${columns.join(', ')}`).join('\n')}`;
-
-    const prompt = `Convert this natural language query to SQL:
-Query: "${naturalLanguageQuery}"
-${schemaDescription}
-
-SQL:`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: "You are a helpful assistant that converts natural language queries to SQL." },
-        { role: "user", content: prompt }
-      ],
-      max_tokens: 150,
-      temperature: 0.3,
-    });
-
-    const sql = completion.choices[0].message.content?.trim() || '';
-
-    if (!sql) {
-      throw new Error('No SQL generated from OpenAI');
+    if (query.includes('count') || query.includes('how many')) {
+      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+      if (table) {
+        return `SELECT COUNT(*) FROM ${table};`;
+      }
     }
 
-    return sql;
+    if (query.includes('average') || query.includes('avg')) {
+      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+      const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
+      if (table && column) {
+        return `SELECT AVG(${column}) FROM ${table};`;
+      }
+    }
+
+    // If no pattern matched, return a simple SELECT
+    return `SELECT * FROM ${schema.tables[0]} LIMIT 10;`;
+
   } catch (error) {
-    console.error('AI query generation failed:', error);
-
-    // Fallback to offline templates if API fails
-    const fallbackTemplate = queryTemplates.find(template =>
-      template.keyword === 'default'
-    );
-
-    if (fallbackTemplate) {
-      return fallbackTemplate.sql;
-    }
-
-    throw new Error('Failed to generate SQL query and no offline fallback available');
+    console.error('SQL generation failed:', error);
+    throw error;
   }
 };
 
 export const validateQuery = (sql: string): boolean => {
-  // Basic SQL validation - checks for common syntax errors
-  const invalidPatterns = [
-    /SELECT\s+FROM/i, // Missing columns
-    /FROM\s+WHERE/i, // Missing table
-    /WHERE\s+GROUP BY/i, // Missing condition
-    /GROUP BY\s+HAVING/i, // Missing group by
-    /HAVING\s+ORDER BY/i, // Missing having condition
-    /ORDER BY\s+LIMIT/i, // Missing order by
-    /VALUES\s+WHERE/i, // Invalid VALUES syntax
-    /INSERT\s+INTO\s+VALUES/i, // Missing columns
-    /UPDATE\s+SET/i, // Missing table
-    /DELETE\s+FROM/i, // Missing condition
-    /JOIN\s+ON/i, // Missing join condition
+  // Basic SQL syntax validation
+  const forbiddenPatterns = [
+    /;.*;/, // Multiple statements
+    /DROP\s+TABLE/i, // DROP TABLE
+    /DELETE\s+FROM/i, // DELETE FROM
+    /INSERT\s+INTO/i, // INSERT INTO
+    /UPDATE\s+/i, // UPDATE
+    /CREATE\s+TABLE/i, // CREATE TABLE
+    /ALTER\s+TABLE/i, // ALTER TABLE
   ];
 
-  return !invalidPatterns.some(pattern => pattern.test(sql));
+  return !forbiddenPatterns.some(pattern => pattern.test(sql));
 };
 
 export const explainQuery = async (sql: string): Promise<string> => {
-  try {
-    const prompt = `Explain this SQL query in simple terms:
-SQL: "${sql}"
+  // In a real implementation, this would call OpenAI API
+  // For now, we'll use a simple explanation
 
-Explanation:`;
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        { role: "system", content: "You are a helpful assistant that explains SQL queries in simple terms." },
-        { role: "user", content: prompt }
-      ],
-      max_tokens: 100,
-      temperature: 0.5,
-    });
-
-    const explanation = completion.choices[0].message.content?.trim() || '';
-
-    if (!explanation) {
-      throw new Error('No explanation generated from OpenAI');
-    }
-
-    return explanation;
-  } catch (error) {
-    console.error('Failed to explain query:', error);
-
-    // Fallback explanation
-    if (sql.includes('SELECT')) {
-      return 'This query retrieves data from the database.';
-    } else if (sql.includes('INSERT')) {
-      return 'This query adds new data to the database.';
-    } else if (sql.includes('UPDATE')) {
-      return 'This query modifies existing data in the database.';
-    } else if (sql.includes('DELETE')) {
-      return 'This query removes data from the database.';
-    }
-
-    return 'This query performs an operation on the database.';
+  if (sql.includes('SELECT *')) {
+    return "This query will retrieve all columns from the specified table.";
   }
+
+  if (sql.includes('COUNT')) {
+    return "This query will count the number of rows in the specified table.";
+  }
+
+  if (sql.includes('AVG')) {
+    return "This query will calculate the average value of the specified column.";
+  }
+
+  return "This query will retrieve data from the database.";
+};
+
+export const getOfflineQueryPattern = (naturalQuery: string): string | null => {
+  // Check against predefined query patterns
+  for (const pattern of queryTemplates) {
+    if (naturalQuery.toLowerCase().includes(pattern.natural.toLowerCase())) {
+      return pattern.sql;
+    }
+  }
+  return null;
 };

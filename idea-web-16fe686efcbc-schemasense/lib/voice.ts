@@ -99,23 +99,28 @@ export const useVoiceRecognition = () => {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // In a real implementation, you would send this to OpenAI's Whisper API
-      // This is a placeholder for the actual API call
+      // Create FormData for multipart upload
+      const formData = new FormData();
+      formData.append('file', {
+        uri: uri,
+        type: 'audio/m4a', // Adjust based on your recording format
+        name: 'recording.m4a'
+      } as any);
+      formData.append('model', 'whisper-1');
+      formData.append('language', 'en');
+
+      // Make API request to OpenAI Whisper
       const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'multipart/form-data',
         },
-        body: JSON.stringify({
-          file: audioData,
-          model: 'whisper-1',
-          language: 'en',
-        }),
+        body: formData,
       });
 
       if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(`API request failed: ${errorData.error?.message || response.statusText}`);
       }
 
       const result = await response.json();
@@ -134,6 +139,7 @@ export const useVoiceRecognition = () => {
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // In a real app, this would match against saved query patterns
+    // For now, return a sample response
     return {
       text: "Show me all customers with orders over $100",
       isFinal: true,
