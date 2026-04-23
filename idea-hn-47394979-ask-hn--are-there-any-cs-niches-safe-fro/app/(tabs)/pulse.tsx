@@ -1,33 +1,60 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { isPremiumUser, initDatabase } from '../../lib/database';
 import { PULSE_TRENDS } from '../../lib/pulse-data';
 
 export default function PulseScreen() {
   const [isPremium, setIsPremium] = useState(false);
+  const [trends, setTrends] = useState(PULSE_TRENDS);
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  
+
   useEffect(() => {
     loadPremiumStatus();
   }, []);
-  
+
   async function loadPremiumStatus() {
     await initDatabase();
     const premium = await isPremiumUser();
     setIsPremium(premium);
   }
-  
-  const visibleTrends = isPremium ? PULSE_TRENDS : PULSE_TRENDS.slice(0, 3);
-  const hiddenCount = PULSE_TRENDS.length - visibleTrends.length;
-  
+
+  async function handleRefresh() {
+    setIsLoading(true);
+    // Simulate API call with a delay
+    setTimeout(() => {
+      // In a real app, this would fetch new data from an API
+      // For now, we'll just shuffle the existing trends
+      const shuffled = [...PULSE_TRENDS].sort(() => Math.random() - 0.5);
+      setTrends(shuffled);
+      setIsLoading(false);
+    }, 1000);
+  }
+
+  const visibleTrends = isPremium ? trends : trends.slice(0, 3);
+  const hiddenCount = trends.length - visibleTrends.length;
+
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Job Security Pulse</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Job Security Pulse</Text>
+        <TouchableOpacity
+          style={styles.refreshButton}
+          onPress={handleRefresh}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#3b82f6" />
+          ) : (
+            <Text style={styles.refreshText}>Refresh</Text>
+          )}
+        </TouchableOpacity>
+      </View>
       <Text style={styles.subtitle}>
         Weekly trends showing which tech skills and roles are heating up or cooling down
       </Text>
-      
+
       <View style={styles.trendsContainer}>
         {visibleTrends.map((trend) => (
           <View key={trend.id} style={styles.trendCard}>
@@ -43,9 +70,9 @@ export default function PulseScreen() {
                 <Text style={styles.trendPercentage}>{trend.percentage}</Text>
               </View>
             </View>
-            
+
             <Text style={styles.insight}>{trend.insight}</Text>
-            
+
             <Text style={styles.timestamp}>
               {new Date(trend.timestamp).toLocaleDateString('en-US', {
                 month: 'short',
@@ -56,14 +83,14 @@ export default function PulseScreen() {
           </View>
         ))}
       </View>
-      
+
       {!isPremium && hiddenCount > 0 && (
         <View style={styles.paywallCard}>
           <Text style={styles.paywallTitle}>Unlock {hiddenCount} More Trends</Text>
           <Text style={styles.paywallText}>
             Get full weekly reports with historical data and detailed market analysis
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.upgradeButton}
             onPress={() => router.push('/paywall')}
           >
@@ -81,11 +108,25 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f9fafb'
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8,
     color: '#111827'
+  },
+  refreshButton: {
+    padding: 8,
+    backgroundColor: '#e0f2fe',
+    borderRadius: 8
+  },
+  refreshText: {
+    color: '#3b82f6',
+    fontWeight: '600'
   },
   subtitle: {
     fontSize: 16,
