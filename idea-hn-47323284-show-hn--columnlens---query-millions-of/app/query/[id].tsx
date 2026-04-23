@@ -4,6 +4,7 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { useQueriesStore } from '../../store/queries';
 import { executeQuery } from '../../lib/query-engine';
 import { useFilesStore } from '../../store/files';
+import ChartRenderer from '../../components/ChartRenderer';
 
 const QueryScreen = () => {
   const route = useRoute();
@@ -17,6 +18,7 @@ const QueryScreen = () => {
   const [executionTime, setExecutionTime] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showChart, setShowChart] = useState(false);
 
   useEffect(() => {
     const currentQuery = queries.find((q) => q.id === id);
@@ -39,6 +41,7 @@ const QueryScreen = () => {
 
     setIsLoading(true);
     setError(null);
+    setShowChart(false);
 
     try {
       const result = await executeQuery(query);
@@ -77,10 +80,11 @@ const QueryScreen = () => {
       return;
     }
 
-    navigation.navigate('Chart', {
-      id: Date.now().toString(),
-      data: { columns, rows: results }
-    });
+    setShowChart(true);
+  };
+
+  const handleBackToResults = () => {
+    setShowChart(false);
   };
 
   return (
@@ -128,31 +132,45 @@ const QueryScreen = () => {
         <Text style={styles.executionTime}>Query executed in {executionTime}ms</Text>
       )}
 
-      {results.length > 0 && (
-        <View style={styles.resultsContainer}>
-          <Text style={styles.resultsTitle}>Results ({results.length} rows)</Text>
-          <ScrollView horizontal>
-            <View>
-              <View style={styles.headerRow}>
-                {columns.map((column, index) => (
-                  <Text key={index} style={styles.headerCell}>{column}</Text>
-                ))}
-              </View>
-              <FlatList
-                data={results}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <View style={styles.row}>
-                    {columns.map((column, index) => (
-                      <Text key={index} style={styles.cell}>{String(item[column])}</Text>
-                    ))}
-                  </View>
-                )}
-                ListFooterComponent={<View style={{ height: 20 }} />}
-              />
-            </View>
-          </ScrollView>
+      {showChart ? (
+        <View style={styles.chartContainer}>
+          <Button
+            title="Back to Results"
+            onPress={handleBackToResults}
+          />
+          <ChartRenderer
+            data={{ columns, rows: results }}
+            initialType="bar"
+            onDataPointClick={(data) => console.log('Data point clicked:', data)}
+          />
         </View>
+      ) : (
+        results.length > 0 && (
+          <View style={styles.resultsContainer}>
+            <Text style={styles.resultsTitle}>Results ({results.length} rows)</Text>
+            <ScrollView horizontal>
+              <View>
+                <View style={styles.headerRow}>
+                  {columns.map((column, index) => (
+                    <Text key={index} style={styles.headerCell}>{column}</Text>
+                  ))}
+                </View>
+                <FlatList
+                  data={results}
+                  keyExtractor={(item, index) => index.toString()}
+                  renderItem={({ item }) => (
+                    <View style={styles.row}>
+                      {columns.map((column, index) => (
+                        <Text key={index} style={styles.cell}>{String(item[column])}</Text>
+                      ))}
+                    </View>
+                  )}
+                  ListFooterComponent={<View style={{ height: 20 }} />}
+                />
+              </View>
+            </ScrollView>
+          </View>
+        )
       )}
     </View>
   );
@@ -180,11 +198,13 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loadingContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    justifyContent: 'center',
+    padding: 16,
   },
   errorContainer: {
-    padding: 10,
+    padding: 16,
     backgroundColor: '#ffebee',
     borderRadius: 4,
     marginBottom: 16,
@@ -195,37 +215,44 @@ const styles = StyleSheet.create({
   executionTime: {
     textAlign: 'right',
     marginBottom: 8,
+    fontSize: 12,
     color: '#666',
   },
   resultsContainer: {
     flex: 1,
-    marginTop: 16,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    backgroundColor: 'white',
   },
   resultsTitle: {
+    padding: 8,
     fontWeight: 'bold',
-    marginBottom: 8,
+    backgroundColor: '#f0f0f0',
   },
   headerRow: {
     flexDirection: 'row',
     backgroundColor: '#f0f0f0',
-    padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
   headerCell: {
-    width: 150,
-    fontWeight: 'bold',
     padding: 8,
+    minWidth: 120,
+    fontWeight: 'bold',
   },
   row: {
     flexDirection: 'row',
-    padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   cell: {
-    width: 150,
     padding: 8,
+    minWidth: 120,
+  },
+  chartContainer: {
+    flex: 1,
+    marginTop: 16,
   },
 });
 
