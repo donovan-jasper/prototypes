@@ -40,18 +40,21 @@ export class FlashlightService {
 
   private createFlashPattern(morse: string): { duration: number; intensity: number }[] {
     const pattern: { duration: number; intensity: number }[] = [];
+    const dotDuration = 100;
+    const dashDuration = 300;
+    const gapDuration = 100;
 
     for (const char of morse) {
       if (char === '.') {
-        pattern.push({ duration: 100, intensity: 1 }); // Dot
+        pattern.push({ duration: dotDuration, intensity: 1 }); // Dot
       } else if (char === '-') {
-        pattern.push({ duration: 300, intensity: 1 }); // Dash
+        pattern.push({ duration: dashDuration, intensity: 1 }); // Dash
       } else if (char === ' ') {
-        pattern.push({ duration: 100, intensity: 0 }); // Space between symbols
+        pattern.push({ duration: gapDuration, intensity: 0 }); // Space between symbols
       }
 
       // Add gap between symbols
-      pattern.push({ duration: 100, intensity: 0 });
+      pattern.push({ duration: gapDuration, intensity: 0 });
     }
 
     // Add final pause
