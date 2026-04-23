@@ -10,19 +10,23 @@ const mockAiService = {
     const mockResponses = {
       "john": {
         transcript: "Hello, this is John calling about the project update. We need to discuss the timeline and budget constraints. The client is expecting a response by Friday.",
-        summary: "John is calling about the project update. Key points: timeline, budget constraints, client deadline by Friday."
+        summary: "John is calling about the project update. Key points: timeline, budget constraints, client deadline by Friday.",
+        confidence: 0.85
       },
       "unknown": {
         transcript: "Hello, this is a generic call. I'm calling to discuss some important information.",
-        summary: "Unknown caller discussing important information."
+        summary: "Unknown caller discussing important information.",
+        confidence: 0.65
       },
       "mom": {
         transcript: "Hi, this is your mom. Just checking in. How's everything going?",
-        summary: "Motherly call - casual check-in about daily life."
+        summary: "Motherly call - casual check-in about daily life.",
+        confidence: 0.92
       },
       "bank": {
         transcript: "This is the bank. We've noticed unusual activity on your account. Please verify your information.",
-        summary: "Bank call - account security verification required."
+        summary: "Bank call - account security verification required.",
+        confidence: 0.78
       }
     };
 
@@ -47,7 +51,7 @@ const callScreeningService = {
         transcript: result.transcript,
         summary: result.summary,
         status: 'completed',
-        confidence: Math.random() * 0.5 + 0.5 // Random confidence score between 0.5-1.0
+        confidence: result.confidence
       };
     } catch (error) {
       console.error('Call screening failed:', error);

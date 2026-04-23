@@ -43,6 +43,7 @@ function CallScreen() {
   };
 
   const handleScreenCall = async () => {
+    setIsLoading(true);
     callHandler.screenCall();
 
     try {
@@ -72,6 +73,8 @@ function CallScreen() {
     } catch (error) {
       console.error('Screening failed:', error);
       Alert.alert('Error', 'Failed to screen the call. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -124,7 +127,18 @@ function CallScreen() {
           <Text style={styles.durationText}>Duration: {callData.duration}s</Text>
         )}
         {callData.status === 'screening' && (
-          <ActivityIndicator size="large" color={statusColor} style={styles.screeningIndicator} />
+          <View>
+            <ActivityIndicator size="large" color={statusColor} style={styles.screeningIndicator} />
+            {callData.transcript && (
+              <View style={styles.screeningResults}>
+                <Text style={styles.sectionTitle}>Transcript:</Text>
+                <Text style={styles.transcriptText}>{callData.transcript}</Text>
+                <Text style={styles.sectionTitle}>Summary:</Text>
+                <Text style={styles.summaryText}>{callData.summary}</Text>
+                <Text style={styles.confidenceText}>Confidence: {(callData.confidence * 100).toFixed(0)}%</Text>
+              </View>
+            )}
+          </View>
         )}
 
         {canAnswerOrScreen && (
@@ -153,37 +167,19 @@ function CallScreen() {
             <Text style={styles.buttonText}>End Call</Text>
           </TouchableOpacity>
         )}
-
-        {(callData.status === 'offhook' || callData.status === 'screening' || callData.transcript) && (
-          <>
-            <Text style={styles.transcriptLabel}>Transcript:</Text>
-            <ScrollView style={styles.transcriptScroll}>
-              <Text style={styles.transcriptText}>{callData.transcript || 'Waiting for AI audio...'}</Text>
-            </ScrollView>
-          </>
-        )}
-        {(callData.status === 'offhook' || callData.status === 'screening' || callData.summary) && (
-          <>
-            <Text style={styles.summaryLabel}>Summary:</Text>
-            <Text style={styles.summaryText}>{callData.summary || 'Generating summary...'}</Text>
-            {callData.confidence && (
-              <Text style={styles.confidenceText}>Confidence: {(callData.confidence * 100).toFixed(0)}%</Text>
-            )}
-          </>
-        )}
       </View>
     );
   };
 
   const renderCallHistory = () => {
     if (isLoading) {
-      return <ActivityIndicator size="large" style={styles.loadingIndicator} />;
+      return <ActivityIndicator size="large" color="#673AB7" style={styles.loadingIndicator} />;
     }
 
     if (pastCalls.length === 0) {
       return (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No call history yet</Text>
+          <Text style={styles.emptyText}>No call history yet.</Text>
           <Text style={styles.emptySubtext}>Screened calls will appear here.</Text>
         </View>
       );
@@ -191,16 +187,11 @@ function CallScreen() {
 
     return (
       <ScrollView style={styles.historyContainer}>
-        {pastCalls.map((call) => (
-          <View key={call.id} style={styles.callItem}>
-            <View style={styles.callHeader}>
-              <Text style={styles.callerId}>{call.caller_id || 'Unknown'}</Text>
-              <Text style={styles.callTime}>{new Date(call.call_time).toLocaleString()}</Text>
-            </View>
+        {pastCalls.map((call, index) => (
+          <View key={index} style={styles.callItem}>
+            <Text style={styles.callDate}>{new Date(call.call_time).toLocaleString()}</Text>
             <Text style={styles.callSummary}>{call.summary}</Text>
-            {call.confidence && (
-              <Text style={styles.confidenceText}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
-            )}
+            <Text style={styles.callConfidence}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
           </View>
         ))}
       </ScrollView>
@@ -210,7 +201,7 @@ function CallScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>CallGuard</Text>
+        <Text style={styles.title}>CallGuard</Text>
         <TouchableOpacity
           style={styles.historyToggle}
           onPress={() => setShowHistory(!showHistory)}
@@ -230,67 +221,91 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 16,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
   },
-  headerTitle: {
+  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#673AB7',
   },
   historyToggle: {
-    padding: 8,
-    backgroundColor: '#673AB7',
-    borderRadius: 4,
+    padding: 10,
   },
   historyToggleText: {
-    color: 'white',
+    color: '#673AB7',
     fontWeight: 'bold',
   },
   callStatusContainer: {
     flex: 1,
-    padding: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  statusText: {
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  durationText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+  },
+  screeningIndicator: {
+    marginVertical: 20,
+  },
+  screeningResults: {
+    width: '100%',
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  statusText: {
-    fontSize: 18,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  durationText: {
+  sectionTitle: {
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 5,
+    color: '#673AB7',
   },
-  screeningIndicator: {
-    marginVertical: 20,
+  transcriptText: {
+    fontSize: 14,
+    marginBottom: 10,
+    color: '#333',
+  },
+  summaryText: {
+    fontSize: 14,
+    marginBottom: 10,
+    color: '#333',
+    fontStyle: 'italic',
+  },
+  confidenceText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginVertical: 20,
+    width: '100%',
+    marginTop: 20,
   },
   actionButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 4,
+    padding: 15,
+    borderRadius: 10,
+    minWidth: 120,
     alignItems: 'center',
-    justifyContent: 'center',
   },
   screenButton: {
     backgroundColor: '#673AB7',
@@ -306,75 +321,6 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  transcriptLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 20,
-    marginBottom: 8,
-    color: '#333',
-  },
-  transcriptScroll: {
-    maxHeight: 150,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 8,
-    marginBottom: 16,
-  },
-  transcriptText: {
-    fontSize: 14,
-    color: '#555',
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 12,
-    marginBottom: 8,
-    color: '#333',
-  },
-  summaryText: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 8,
-  },
-  confidenceText: {
-    fontSize: 12,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  historyContainer: {
-    flex: 1,
-  },
-  callItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    marginBottom: 12,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  callHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  callerId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  callTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  callSummary: {
-    fontSize: 14,
-    color: '#555',
-    marginBottom: 4,
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -384,13 +330,41 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
+  },
+  historyContainer: {
+    flex: 1,
+  },
+  callItem: {
+    backgroundColor: 'white',
+    padding: 15,
+    marginBottom: 10,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  callDate: {
+    fontSize: 12,
+    color: '#999',
+    marginBottom: 5,
+  },
+  callSummary: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 5,
+  },
+  callConfidence: {
+    fontSize: 12,
+    color: '#666',
   },
   loadingIndicator: {
     marginTop: 20,
