@@ -1,6 +1,6 @@
 import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
-import { analyzeMotion } from '../utils/motionAnalysis';
+import { analyzeMotion, smoothMotionData, detectMovementSpike } from '../utils/motionAnalysis';
 import { analyzeMeteringLevel, resetMeteringHistory } from '../utils/audioAnalysis';
 import { AudioController } from './audioControl';
 import { Platform } from 'react-native';
@@ -10,6 +10,8 @@ interface SleepDetectionResult {
   confidence: number;
   motionConfidence: number;
   audioConfidence: number;
+  stillnessDuration: number;
+  dominantFrequency: number;
 }
 
 export class SleepDetector {
@@ -24,10 +26,12 @@ export class SleepDetector {
   private confidenceThreshold: number = 0.7;
   private lastDetectionTime: number = 0;
   private detectionInterval: number = 5000; // 5 seconds between detections
-  private stillnessDuration: number = 0;
-  private stillnessThreshold: number = 3 * 60 * 1000; // 3 minutes
   private lastMotionTime: number = 0;
   private motionThreshold: number = 0.05; // m/s²
+  private stillnessDuration: number = 0;
+  private stillnessThreshold: number = 3 * 60 * 1000; // 3 minutes
+  private lastAudioResult: any = null;
+  private dominantFrequency: number = 0;
 
   constructor(confidenceThreshold: number = 0.7) {
     this.confidenceThreshold = confidenceThreshold;
@@ -44,8 +48,9 @@ export class SleepDetector {
     this.audioController = audioController || null;
     this.hasTriggeredSleep = false;
     this.lastDetectionTime = Date.now();
-    this.stillnessDuration = 0;
     this.lastMotionTime = Date.now();
+    this.stillnessDuration = 0;
+    this.dominantFrequency = 0;
 
     if (this.audioController) {
       await this.audioController.initialize();
@@ -133,7 +138,8 @@ export class SleepDetector {
     try {
       const status = await this.audioRecording.getStatusAsync();
       if (status.isRecording && status.metering !== undefined) {
-        analyzeMeteringLevel(status.metering);
+        this.lastAudioResult = analyzeMeteringLevel(status.metering);
+        this.dominantFrequency = this.lastAudioResult.dominantFrequency;
       }
     } catch (error) {
       console.error('Error checking metering level:', error);
@@ -151,67 +157,103 @@ export class SleepDetector {
 
     this.lastDetectionTime = now;
 
-    // Analyze motion data
-    const motionResult = analyzeMotion(this.motionData);
+    // Smooth motion data before analysis
+    const smoothedData = smoothMotionData(this.motionData);
 
-    // Adjust motion confidence based on stillness duration
-    let adjustedMotionConfidence = motionResult.confidence;
-    if (this.stillnessDuration >= this.stillnessThreshold) {
-      // Increase confidence if still for required duration
-      adjustedMotionConfidence = Math.min(1, motionResult.confidence + (this.stillnessDuration - this.stillnessThreshold) / (10 * 60 * 1000));
+    // Analyze motion data
+    const motionResult = analyzeMotion(smoothedData, this.lastMotionTime);
+
+    // Check for movement spikes
+    const hasMovementSpike = detectMovementSpike(this.motionData);
+
+    // Get latest audio analysis result
+    const audioResult = this.lastAudioResult || {
+      isSleepPattern: false,
+      confidence: 0,
+      averageAmplitude: 0,
+      standardDeviation: 0,
+      isLowAmplitude: false,
+      isLowVariation: false,
+      dominantFrequency: 0,
+    };
+
+    // Calculate combined confidence
+    const combinedConfidence = (motionResult.confidence * 0.6) + (audioResult.confidence * 0.4);
+
+    // Determine if sleep is detected
+    const isSleeping = combinedConfidence >= this.confidenceThreshold &&
+                      motionResult.isStill &&
+                      audioResult.isSleepPattern &&
+                      !hasMovementSpike;
+
+    // Update stillness duration
+    this.stillnessDuration = motionResult.stillnessDuration;
+
+    // Prepare result
+    const result: SleepDetectionResult = {
+      isSleeping,
+      confidence: combinedConfidence,
+      motionConfidence: motionResult.confidence,
+      audioConfidence: audioResult.confidence,
+      stillnessDuration: this.stillnessDuration,
+      dominantFrequency: this.dominantFrequency,
+    };
+
+    // Call update callback if provided
+    if (this.onUpdateCallback) {
+      this.onUpdateCallback(result);
     }
 
-    // Analyze audio data
-    let audioResult = { confidence: 0 };
-    if (this.audioRecording) {
-      try {
-        const status = await this.audioRecording.getStatusAsync();
-        if (status.isRecording && status.metering !== undefined) {
-          audioResult = analyzeMeteringLevel(status.metering);
-        }
-      } catch (err) {
-        console.error('Error in detection loop:', err);
+    // Handle sleep detection trigger
+    if (isSleeping && !this.hasTriggeredSleep) {
+      this.hasTriggeredSleep = true;
+      if (this.audioController) {
+        await this.audioController.pausePlayback();
       }
     }
 
-    // Combine results
-    const combinedConfidence = (adjustedMotionConfidence + audioResult.confidence) / 2;
-    const isSleeping = combinedConfidence >= this.confidenceThreshold;
-
-    if (this.onUpdateCallback) {
-      this.onUpdateCallback({
-        isSleeping,
-        confidence: combinedConfidence,
-        motionConfidence: adjustedMotionConfidence,
-        audioConfidence: audioResult.confidence,
-      });
+    // Reset if user moves again
+    if (hasMovementSpike) {
+      this.hasTriggeredSleep = false;
     }
 
-    if (isSleeping && !this.hasTriggeredSleep && this.audioController) {
-      this.hasTriggeredSleep = true;
-      await this.audioController.fadeOutAndPause();
-    }
-
-    setTimeout(() => this.detectionLoop(), 1000);
+    // Continue detection loop
+    setTimeout(() => this.detectionLoop(), this.detectionInterval);
   }
 
-  public updateConfidenceThreshold(threshold: number) {
-    this.confidenceThreshold = Math.min(1, Math.max(0, threshold));
-  }
+  public getCurrentStatus(): SleepDetectionResult {
+    // Smooth motion data before analysis
+    const smoothedData = smoothMotionData(this.motionData);
 
-  public getConfidenceThreshold(): number {
-    return this.confidenceThreshold;
-  }
+    // Analyze motion data
+    const motionResult = analyzeMotion(smoothedData, this.lastMotionTime);
 
-  public isCurrentlyDetecting(): boolean {
-    return this.isDetecting;
-  }
+    // Get latest audio analysis result
+    const audioResult = this.lastAudioResult || {
+      isSleepPattern: false,
+      confidence: 0,
+      averageAmplitude: 0,
+      standardDeviation: 0,
+      isLowAmplitude: false,
+      isLowVariation: false,
+      dominantFrequency: 0,
+    };
 
-  public getStillnessDuration(): number {
-    return this.stillnessDuration;
-  }
+    // Calculate combined confidence
+    const combinedConfidence = (motionResult.confidence * 0.6) + (audioResult.confidence * 0.4);
 
-  public getStillnessThreshold(): number {
-    return this.stillnessThreshold;
+    // Determine if sleep is detected
+    const isSleeping = combinedConfidence >= this.confidenceThreshold &&
+                      motionResult.isStill &&
+                      audioResult.isSleepPattern;
+
+    return {
+      isSleeping,
+      confidence: combinedConfidence,
+      motionConfidence: motionResult.confidence,
+      audioConfidence: audioResult.confidence,
+      stillnessDuration: this.stillnessDuration,
+      dominantFrequency: this.dominantFrequency,
+    };
   }
 }

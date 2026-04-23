@@ -9,15 +9,21 @@ interface MotionAnalysisResult {
   confidence: number;
   averageMagnitude: number;
   standardDeviation: number;
+  stillnessDuration: number;
 }
 
-export function analyzeMotion(data: MotionData[]): MotionAnalysisResult {
+const STILLNESS_THRESHOLD = 0.05; // m/s²
+const STILLNESS_DURATION_THRESHOLD = 3 * 60 * 1000; // 3 minutes
+const MOVEMENT_SPIKE_THRESHOLD = 0.5; // m/s²
+
+export function analyzeMotion(data: MotionData[], lastMotionTime: number): MotionAnalysisResult {
   if (data.length === 0) {
     return {
       isStill: false,
       confidence: 0,
       averageMagnitude: 0,
-      standardDeviation: 0
+      standardDeviation: 0,
+      stillnessDuration: 0
     };
   }
 
@@ -38,8 +44,14 @@ export function analyzeMotion(data: MotionData[]): MotionAnalysisResult {
   const avgSquaredDiff = squaredDiffs.reduce((acc, val) => acc + val, 0) / squaredDiffs.length;
   const standardDeviation = Math.sqrt(avgSquaredDiff);
 
+  // Calculate stillness duration
+  const now = Date.now();
+  const stillnessDuration = now - lastMotionTime;
+
   // Determine if motion is still (low average magnitude and low standard deviation)
-  const isStill = averageMagnitude < 0.05 && standardDeviation < 0.02;
+  const isStill = averageMagnitude < STILLNESS_THRESHOLD &&
+                  standardDeviation < STILLNESS_THRESHOLD / 2 &&
+                  stillnessDuration >= STILLNESS_DURATION_THRESHOLD;
 
   // Calculate confidence (0-1 scale)
   // Lower average and stdDev = higher confidence
@@ -51,6 +63,7 @@ export function analyzeMotion(data: MotionData[]): MotionAnalysisResult {
     confidence,
     averageMagnitude,
     standardDeviation,
+    stillnessDuration
   };
 }
 
@@ -82,4 +95,16 @@ export function smoothMotionData(data: MotionData[], windowSize: number = 5): Mo
   }
 
   return smoothedData;
+}
+
+// Helper function to detect movement spikes
+export function detectMovementSpike(data: MotionData[]): boolean {
+  if (data.length < 2) return false;
+
+  const magnitudes = data.map(point => {
+    return Math.sqrt(point.x * point.x + point.y * point.y + point.z * point.z);
+  });
+
+  // Check if any magnitude exceeds the spike threshold
+  return magnitudes.some(magnitude => magnitude > MOVEMENT_SPIKE_THRESHOLD);
 }
