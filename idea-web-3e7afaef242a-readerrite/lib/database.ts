@@ -27,7 +27,7 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function initDatabase(): Promise<void> {
   db = await SQLite.openDatabaseAsync('booknest.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS books (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,10 +40,10 @@ export async function initDatabase(): Promise<void> {
       lastOpened INTEGER,
       currentPage INTEGER DEFAULT 0
     );
-    
+
     CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
     CREATE INDEX IF NOT EXISTS idx_books_author ON books(author);
-    
+
     CREATE TABLE IF NOT EXISTS annotations (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       bookId INTEGER NOT NULL,
@@ -55,14 +55,14 @@ export async function initDatabase(): Promise<void> {
       createdAt INTEGER NOT NULL,
       FOREIGN KEY (bookId) REFERENCES books(id) ON DELETE CASCADE
     );
-    
+
     CREATE INDEX IF NOT EXISTS idx_annotations_bookId ON annotations(bookId);
-    
+
     CREATE TABLE IF NOT EXISTS collections (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL UNIQUE
     );
-    
+
     CREATE TABLE IF NOT EXISTS book_collections (
       bookId INTEGER NOT NULL,
       collectionId INTEGER NOT NULL,
@@ -75,7 +75,7 @@ export async function initDatabase(): Promise<void> {
 
 export async function addBook(book: Omit<Book, 'id'>): Promise<number> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const result = await db.runAsync(
     `INSERT INTO books (title, author, filePath, format, coverPath, dateAdded, lastOpened, currentPage)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -90,41 +90,41 @@ export async function addBook(book: Omit<Book, 'id'>): Promise<number> {
       book.currentPage
     ]
   );
-  
+
   return result.lastInsertRowId;
 }
 
 export async function getBooks(): Promise<Book[]> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const books = await db.getAllAsync<Book>(
     'SELECT * FROM books ORDER BY dateAdded DESC'
   );
-  
+
   return books;
 }
 
 export async function getBook(id: number): Promise<Book | null> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const book = await db.getFirstAsync<Book>(
     'SELECT * FROM books WHERE id = ?',
     [id]
   );
-  
+
   return book || null;
 }
 
 export async function updateBook(id: number, updates: Partial<Book>): Promise<void> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const fields = Object.keys(updates).filter(k => k !== 'id');
   const values = fields.map(k => updates[k as keyof Book]);
-  
+
   if (fields.length === 0) return;
-  
+
   const setClause = fields.map(f => `${f} = ?`).join(', ');
-  
+
   await db.runAsync(
     `UPDATE books SET ${setClause} WHERE id = ?`,
     [...values, id]
@@ -133,25 +133,25 @@ export async function updateBook(id: number, updates: Partial<Book>): Promise<vo
 
 export async function deleteBook(id: number): Promise<void> {
   if (!db) throw new Error('Database not initialized');
-  
+
   await db.runAsync('DELETE FROM books WHERE id = ?', [id]);
 }
 
 export async function searchBooks(query: string): Promise<Book[]> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const searchTerm = `%${query}%`;
   const books = await db.getAllAsync<Book>(
     'SELECT * FROM books WHERE title LIKE ? OR author LIKE ? ORDER BY dateAdded DESC',
     [searchTerm, searchTerm]
   );
-  
+
   return books;
 }
 
 export async function addAnnotation(annotation: Omit<Annotation, 'id'>): Promise<number> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const result = await db.runAsync(
     `INSERT INTO annotations (bookId, type, location, text, color, note, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
@@ -165,23 +165,79 @@ export async function addAnnotation(annotation: Omit<Annotation, 'id'>): Promise
       annotation.createdAt
     ]
   );
-  
+
   return result.lastInsertRowId;
 }
 
 export async function getAnnotations(bookId: number): Promise<Annotation[]> {
   if (!db) throw new Error('Database not initialized');
-  
+
   const annotations = await db.getAllAsync<Annotation>(
     'SELECT * FROM annotations WHERE bookId = ? ORDER BY createdAt DESC',
     [bookId]
   );
-  
+
   return annotations;
 }
 
 export async function deleteAnnotation(id: number): Promise<void> {
   if (!db) throw new Error('Database not initialized');
-  
+
   await db.runAsync('DELETE FROM annotations WHERE id = ?', [id]);
+}
+
+export async function getAnnotationCount(bookId: number): Promise<number> {
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await db.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM annotations WHERE bookId = ?',
+    [bookId]
+  );
+
+  return result?.count || 0;
+}
+
+export async function exportAnnotations(bookId: number, format: 'markdown' | 'text' = 'markdown'): Promise<string> {
+  const annotations = await getAnnotations(bookId);
+  const book = await getBook(bookId);
+
+  if (!book) {
+    throw new Error('Book not found');
+  }
+
+  if (format === 'markdown') {
+    let markdown = `# Annotations for "${book.title}" by ${book.author}\n\n`;
+
+    annotations.forEach(annotation => {
+      const date = new Date(annotation.createdAt).toLocaleString();
+      markdown += `## ${annotation.type} (${date})\n\n`;
+      markdown += `**Location:** ${annotation.location}\n\n`;
+      markdown += `**Text:**\n\n${annotation.text}\n\n`;
+
+      if (annotation.note) {
+        markdown += `**Note:**\n\n${annotation.note}\n\n`;
+      }
+
+      markdown += '---\n\n';
+    });
+
+    return markdown;
+  } else {
+    let text = `Annotations for "${book.title}" by ${book.author}\n\n`;
+
+    annotations.forEach(annotation => {
+      const date = new Date(annotation.createdAt).toLocaleString();
+      text += `${annotation.type} (${date})\n`;
+      text += `Location: ${annotation.location}\n\n`;
+      text += `Text:\n${annotation.text}\n\n`;
+
+      if (annotation.note) {
+        text += `Note:\n${annotation.note}\n\n`;
+      }
+
+      text += '----------------------------------------\n\n';
+    });
+
+    return text;
+  }
 }
