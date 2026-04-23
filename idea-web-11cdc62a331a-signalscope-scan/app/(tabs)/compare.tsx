@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { BarChart } from 'react-native-chart-kit';
-import { getRecentReadings } from '../../services/database';
+import { getRecentReadings, getCarrierPerformanceStats } from '../../services/database';
 import { usePremium } from '../../hooks/usePremium';
 import PremiumGate from '../../components/PremiumGate';
 import { Ionicons } from '@expo/vector-icons';
@@ -17,6 +17,8 @@ export default function CompareScreen() {
   const [neighborhoodRankings, setNeighborhoodRankings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showSavings, setShowSavings] = useState(false);
+  const [currentPlanCost, setCurrentPlanCost] = useState(80);
+  const [newPlanCost, setNewPlanCost] = useState(70);
   const { isPremium } = usePremium();
 
   useEffect(() => {
@@ -59,16 +61,15 @@ export default function CompareScreen() {
 
         // Calculate neighborhood rankings
         const rankings = await Promise.all(carriers.map(async (carrier) => {
-          const carrierReadings = readings.filter(r => r.carrier === carrier);
-          if (carrierReadings.length === 0) return null;
-
-          const avgSignal = carrierReadings.reduce((sum, r) => sum + r.signal_strength, 0) / carrierReadings.length;
-          const avgSpeed = carrierReadings.reduce((sum, r) => sum + (r.download_speed || 0), 0) / carrierReadings.length;
-          const reliability = carrierReadings.filter(r => r.network_type.includes('5G')).length / carrierReadings.length * 100;
+          const stats = await getCarrierPerformanceStats(carrier, 100);
+          if (stats.readingCount === 0) return null;
 
           return {
             carrier,
-            score: (avgSignal * 0.4) + (avgSpeed * 0.4) + (reliability * 0.2)
+            score: (stats.avgSignal * 0.4) + (stats.avgSpeed * 0.4) + (stats.reliability * 0.2),
+            avgSignal: stats.avgSignal,
+            avgSpeed: stats.avgSpeed,
+            reliability: stats.reliability
           };
         }));
 
@@ -87,7 +88,10 @@ export default function CompareScreen() {
 
         const mockRankings = carriers.map((carrier, index) => ({
           carrier,
-          score: 100 - (index * 10)
+          score: 100 - (index * 10),
+          avgSignal: 80 - (index * 5),
+          avgSpeed: 85 - (index * 3),
+          reliability: 85 - (index * 2)
         }));
         setNeighborhoodRankings(mockRankings);
       } finally {
@@ -122,6 +126,20 @@ export default function CompareScreen() {
     },
   };
 
+  const calculateSavings = () => {
+    if (!comparisonData) return 0;
+    // More sophisticated calculation would consider:
+    // - Current vs new plan costs
+    // - Signal quality improvements
+    // - Potential data overage savings
+    // - Contract length differences
+    return Math.round((comparisonData.signal / 10) * (currentPlanCost - newPlanCost) * 0.75);
+  };
+
+  const handleCalculateSavings = () => {
+    setShowSavings(true);
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -138,9 +156,10 @@ export default function CompareScreen() {
         description="See how different carriers perform in your area with detailed comparisons and savings estimates."
         featureList={[
           "Compare signal strength, speed, and reliability",
-          "Calculate potential savings from switching",
-          "View neighborhood rankings by carrier",
-          "Access historical data trends"
+          "Estimate monthly savings from switching carriers",
+          "View neighborhood rankings for each carrier",
+          "Access crowdsourced data from thousands of users",
+          "Make informed decisions before switching plans"
         ]}
       />
     );
@@ -167,7 +186,7 @@ export default function CompareScreen() {
       </View>
 
       <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Performance Metrics</Text>
+        <Text style={styles.chartTitle}>Performance Comparison</Text>
         <BarChart
           data={chartData}
           width={width - 40}
@@ -177,47 +196,66 @@ export default function CompareScreen() {
           chartConfig={chartConfig}
           verticalLabelRotation={30}
           fromZero={true}
-          showValuesOnTopOfBars={true}
+          showBarTops={false}
+          withInnerLines={false}
+          style={styles.chart}
         />
       </View>
 
-      <View style={styles.savingsContainer}>
-        <TouchableOpacity
-          style={styles.savingsButton}
-          onPress={() => setShowSavings(!showSavings)}
-        >
-          <Text style={styles.savingsButtonText}>
-            {showSavings ? 'Hide Savings Calculator' : 'Show Switch Savings Calculator'}
-          </Text>
-          <Ionicons
-            name={showSavings ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color="#007AFF"
-          />
-        </TouchableOpacity>
+      <View style={styles.savingsCalculator}>
+        <Text style={styles.sectionTitle}>Switch Savings Calculator</Text>
 
-        {showSavings && comparisonData && (
-          <View style={styles.savingsContent}>
-            <Text style={styles.savingsTitle}>Potential Savings</Text>
-            <Text style={styles.savingsAmount}>${comparisonData.savings}/month</Text>
-            <Text style={styles.savingsDescription}>
-              Based on estimated improvements in signal quality and reliability.
-              Actual savings may vary based on your current plan and usage.
+        <View style={styles.inputRow}>
+          <Text style={styles.inputLabel}>Current Plan Cost:</Text>
+          <Text style={styles.inputValue}>${currentPlanCost}/month</Text>
+        </View>
+
+        <View style={styles.inputRow}>
+          <Text style={styles.inputLabel}>New Plan Cost:</Text>
+          <Text style={styles.inputValue}>${newPlanCost}/month</Text>
+        </View>
+
+        {!showSavings ? (
+          <TouchableOpacity style={styles.calculateButton} onPress={handleCalculateSavings}>
+            <Text style={styles.calculateButtonText}>Calculate Savings</Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.savingsResult}>
+            <Text style={styles.savingsAmount}>Estimated Annual Savings: ${calculateSavings()}</Text>
+            <Text style={styles.savingsNote}>
+              Based on improved signal quality and potential data savings with {selectedCarrier}
             </Text>
           </View>
         )}
       </View>
 
       <View style={styles.rankingsContainer}>
-        <Text style={styles.rankingsTitle}>Neighborhood Rankings</Text>
+        <Text style={styles.sectionTitle}>Neighborhood Rankings</Text>
         {neighborhoodRankings.map((ranking, index) => (
           <View key={ranking.carrier} style={styles.rankingItem}>
-            <Text style={styles.rankingPosition}>{index + 1}</Text>
-            <Text style={styles.rankingCarrier}>{ranking.carrier}</Text>
-            <View style={styles.rankingBarContainer}>
-              <View style={[styles.rankingBar, { width: `${ranking.score}%` }]} />
+            <View style={styles.rankingHeader}>
+              <Text style={styles.rankingPosition}>{index + 1}</Text>
+              <Text style={styles.rankingCarrier}>{ranking.carrier}</Text>
+              <View style={styles.rankingScoreContainer}>
+                <Text style={styles.rankingScore}>{Math.round(ranking.score)}</Text>
+                <Text style={styles.rankingScoreLabel}>Score</Text>
+              </View>
             </View>
-            <Text style={styles.rankingScore}>{Math.round(ranking.score)}</Text>
+
+            <View style={styles.rankingDetails}>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Signal:</Text>
+                <Text style={styles.detailValue}>{ranking.avgSignal}%</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Speed:</Text>
+                <Text style={styles.detailValue}>{ranking.avgSpeed}%</Text>
+              </View>
+              <View style={styles.detailItem}>
+                <Text style={styles.detailLabel}>Reliability:</Text>
+                <Text style={styles.detailValue}>{ranking.reliability}%</Text>
+              </View>
+            </View>
           </View>
         ))}
       </View>
@@ -244,6 +282,8 @@ const styles = StyleSheet.create({
   header: {
     padding: 20,
     backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   title: {
     fontSize: 24,
@@ -257,8 +297,8 @@ const styles = StyleSheet.create({
   },
   carrierSelector: {
     backgroundColor: 'white',
-    padding: 15,
     margin: 20,
+    padding: 15,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -269,7 +309,7 @@ const styles = StyleSheet.create({
   selectorLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 5,
+    marginBottom: 10,
     color: '#333',
   },
   picker: {
@@ -278,8 +318,8 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     backgroundColor: 'white',
-    padding: 15,
     marginHorizontal: 20,
+    padding: 15,
     borderRadius: 10,
     marginBottom: 20,
     shadowColor: '#000',
@@ -294,54 +334,14 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     color: '#333',
   },
-  savingsContainer: {
+  chart: {
+    marginVertical: 8,
+    borderRadius: 16,
+  },
+  savingsCalculator: {
     backgroundColor: 'white',
     marginHorizontal: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  savingsButton: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     padding: 15,
-    backgroundColor: '#f0f8ff',
-  },
-  savingsButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  savingsContent: {
-    padding: 15,
-  },
-  savingsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 5,
-    color: '#333',
-  },
-  savingsAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2ECC71',
-    marginBottom: 10,
-  },
-  savingsDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
-  },
-  rankingsContainer: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginHorizontal: 20,
     borderRadius: 10,
     marginBottom: 20,
     shadowColor: '#000',
@@ -350,47 +350,119 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  rankingsTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
     color: '#333',
   },
+  inputRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  inputLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  inputValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  calculateButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  calculateButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  savingsResult: {
+    backgroundColor: '#e3f2fd',
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  savingsAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  savingsNote: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  rankingsContainer: {
+    backgroundColor: 'white',
+    marginHorizontal: 20,
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   rankingItem: {
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  rankingHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
   },
   rankingPosition: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#007AFF',
     width: 30,
-    textAlign: 'center',
-    color: '#666',
   },
   rankingCarrier: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    flex: 1,
     color: '#333',
+    flex: 1,
   },
-  rankingBarContainer: {
-    height: 10,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
-    flex: 2,
-    marginHorizontal: 10,
-  },
-  rankingBar: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 5,
+  rankingScoreContainer: {
+    alignItems: 'flex-end',
   },
   rankingScore: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2ECC71',
+  },
+  rankingScoreLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  rankingDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailItem: {
+    alignItems: 'center',
+  },
+  detailLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 3,
+  },
+  detailValue: {
     fontSize: 14,
     fontWeight: '600',
-    width: 40,
-    textAlign: 'right',
     color: '#333',
   },
 });
