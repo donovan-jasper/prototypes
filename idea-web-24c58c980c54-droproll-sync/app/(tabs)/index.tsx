@@ -1,44 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useMediaStore } from '../../store/mediaStore';
 import { MediaGrid } from '../../components/MediaGrid';
-import { DuplicateCard } from '../../components/DuplicateCard';
 import { getDuplicates } from '../../database/queries';
 
 export default function GalleryScreen() {
+  const navigation = useNavigation();
   const { media, loading, loadMedia } = useMediaStore();
-  const [duplicates, setDuplicates] = useState<any[]>([]);
-  const [currentDuplicateIndex, setCurrentDuplicateIndex] = useState(0);
+  const [duplicateCount, setDuplicateCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     loadMedia();
-    loadDuplicates();
+    loadDuplicateCount();
   }, []);
 
-  const loadDuplicates = async () => {
+  const loadDuplicateCount = async () => {
     try {
-      const foundDuplicates = await getDuplicates();
-      setDuplicates(foundDuplicates);
+      const duplicates = await getDuplicates();
+      setDuplicateCount(duplicates.length);
     } catch (error) {
-      console.error('Error loading duplicates:', error);
+      console.error('Error loading duplicate count:', error);
     }
-  };
-
-  const handleDuplicateResolved = () => {
-    if (currentDuplicateIndex < duplicates.length - 1) {
-      setCurrentDuplicateIndex(currentDuplicateIndex + 1);
-    } else {
-      setDuplicates([]);
-      setCurrentDuplicateIndex(0);
-    }
-    loadMedia(); // Refresh media after resolution
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMedia();
-    await loadDuplicates();
+    await loadDuplicateCount();
     setRefreshing(false);
   };
 
@@ -52,11 +42,15 @@ export default function GalleryScreen() {
 
   return (
     <View style={styles.container}>
-      {duplicates.length > 0 && currentDuplicateIndex < duplicates.length && (
-        <DuplicateCard
-          duplicates={duplicates[currentDuplicateIndex]}
-          onResolve={handleDuplicateResolved}
-        />
+      {duplicateCount > 0 && (
+        <TouchableOpacity
+          style={styles.duplicatesButton}
+          onPress={() => navigation.navigate('duplicates')}
+        >
+          <Text style={styles.duplicatesButtonText}>
+            {duplicateCount} duplicate{duplicateCount !== 1 ? 's' : ''} found
+          </Text>
+        </TouchableOpacity>
       )}
 
       <FlatList
@@ -97,5 +91,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  duplicatesButton: {
+    backgroundColor: '#FFC107',
+    padding: 12,
+    margin: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  duplicatesButtonText: {
+    color: '#333',
+    fontWeight: '600',
   },
 });
