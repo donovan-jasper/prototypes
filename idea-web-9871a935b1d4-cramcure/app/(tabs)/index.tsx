@@ -7,13 +7,14 @@ import { useCycleData } from '../../hooks/useCycleData';
 import { format, differenceInDays } from 'date-fns';
 import { LineChart } from 'react-native-chart-kit';
 import SOSButton from '../../components/SOSButton';
+import CycleCalendar from '../../components/CycleCalendar';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { getRecentSymptoms, getFavoriteExercises } = useDatabase();
-  const { currentCycle, nextPeriodPrediction } = useCycleData();
+  const { db, getRecentSymptoms, getFavoriteExercises } = useDatabase();
+  const { currentCycle, nextPeriodPrediction, ovulationDate, patternAnalysis } = useCycleData();
   const [recentSymptoms, setRecentSymptoms] = useState([]);
   const [favoriteExercises, setFavoriteExercises] = useState([]);
   const [painChartData, setPainChartData] = useState({
@@ -70,6 +71,21 @@ const HomeScreen = () => {
     navigation.navigate('insights');
   };
 
+  const getTrendIcon = () => {
+    if (!patternAnalysis) return null;
+
+    switch (patternAnalysis.recentTrend) {
+      case 'increasing':
+        return <MaterialIcons name="trending-up" size={20} color="#EF4444" />;
+      case 'decreasing':
+        return <MaterialIcons name="trending-down" size={20} color="#10B981" />;
+      case 'stable':
+        return <MaterialIcons name="trending-flat" size={20} color="#3B82F6" />;
+      default:
+        return null;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -104,6 +120,26 @@ const HomeScreen = () => {
               </Text>
             </View>
           </View>
+
+          {patternAnalysis && (
+            <View style={styles.statCard}>
+              <View style={styles.statIcon}>
+                <MaterialCommunityIcons name="chart-line" size={24} color="#8B5CF6" />
+              </View>
+              <View style={styles.statContent}>
+                <Text style={styles.statLabel}>Cycle Trend</Text>
+                <View style={styles.trendContainer}>
+                  {getTrendIcon()}
+                  <Text style={styles.trendText}>
+                    {patternAnalysis.recentTrend === 'unknown' ? 'No data' : patternAnalysis.recentTrend}
+                  </Text>
+                </View>
+                <Text style={styles.confidenceText}>
+                  Confidence: {Math.round(patternAnalysis.confidence * 100)}%
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* Pain Chart */}
@@ -146,25 +182,28 @@ const HomeScreen = () => {
         <View style={styles.quickActions}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={navigateToTrack}>
-              <View style={[styles.actionIcon, { backgroundColor: '#F3E8FF' }]}>
-                <MaterialCommunityIcons name="calendar-plus" size={24} color="#8B5CF6" />
-              </View>
-              <Text style={styles.actionText}>Log Symptoms</Text>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={navigateToTrack}
+            >
+              <MaterialCommunityIcons name="plus" size={24} color="#8B5CF6" />
+              <Text style={styles.actionButtonText}>Log Symptom</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={navigateToRelief}>
-              <View style={[styles.actionIcon, { backgroundColor: '#E0F2FE' }]}>
-                <MaterialCommunityIcons name="meditation" size={24} color="#3B82F6" />
-              </View>
-              <Text style={styles.actionText}>Relief Exercises</Text>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={navigateToRelief}
+            >
+              <MaterialCommunityIcons name="yoga" size={24} color="#8B5CF6" />
+              <Text style={styles.actionButtonText}>Relief Exercises</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionButton} onPress={navigateToInsights}>
-              <View style={[styles.actionIcon, { backgroundColor: '#DCFCE7' }]}>
-                <MaterialCommunityIcons name="chart-line" size={24} color="#10B981" />
-              </View>
-              <Text style={styles.actionText}>View Insights</Text>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={navigateToInsights}
+            >
+              <MaterialCommunityIcons name="chart-line" size={24} color="#8B5CF6" />
+              <Text style={styles.actionButtonText}>View Insights</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -173,35 +212,32 @@ const HomeScreen = () => {
         {favoriteExercises.length > 0 && (
           <View style={styles.favoritesContainer}>
             <Text style={styles.sectionTitle}>Favorite Exercises</Text>
-            <View style={styles.exerciseList}>
-              {favoriteExercises.map((exercise) => (
+            <View style={styles.favoriteList}>
+              {favoriteExercises.map(exercise => (
                 <TouchableOpacity
                   key={exercise.id}
-                  style={styles.exerciseItem}
+                  style={styles.favoriteItem}
                   onPress={() => navigateToExercise(exercise.id)}
                 >
-                  <View style={styles.exerciseIcon}>
-                    <MaterialCommunityIcons
-                      name={exercise.icon || 'yoga'}
-                      size={24}
-                      color="#8B5CF6"
-                    />
-                  </View>
-                  <View style={styles.exerciseInfo}>
-                    <Text style={styles.exerciseTitle}>{exercise.title}</Text>
-                    <Text style={styles.exerciseDuration}>
-                      {exercise.duration} min • {exercise.difficulty}
-                    </Text>
-                  </View>
-                  <MaterialIcons name="chevron-right" size={24} color="#9CA3AF" />
+                  <MaterialCommunityIcons name="yoga" size={24} color="#8B5CF6" />
+                  <Text style={styles.favoriteText}>{exercise.title}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
         )}
+
+        {/* Calendar */}
+        <View style={styles.calendarContainer}>
+          <Text style={styles.sectionTitle}>Cycle Calendar</Text>
+          <CycleCalendar
+            db={db}
+            predictedPeriodStart={nextPeriodPrediction}
+            ovulationDate={ovulationDate}
+          />
+        </View>
       </ScrollView>
 
-      {/* SOS Button */}
       <SOSButton />
     </View>
   );
@@ -213,11 +249,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#F9FAFB',
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 100,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   greeting: {
     fontSize: 24,
@@ -231,17 +267,18 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   statCard: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
-    marginRight: 10,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '48%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -249,13 +286,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3E8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   statContent: {
     flex: 1,
@@ -263,18 +294,34 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 12,
     color: '#6B7280',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   statValue: {
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#1F2937',
+  },
+  trendContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+    textTransform: 'capitalize',
+  },
+  confidenceText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 4,
   },
   chartContainer: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 20,
+    padding: 16,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -285,74 +332,70 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#1F2937',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   quickActions: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   actionButton: {
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  actionIcon: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  actionText: {
-    fontSize: 12,
-    color: '#4B5563',
-    textAlign: 'center',
-  },
-  favoritesContainer: {
-    marginBottom: 20,
-  },
-  exerciseList: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
+    padding: 16,
+    alignItems: 'center',
+    width: '30%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
-  exerciseItem: {
+  actionButtonText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  favoritesContainer: {
+    marginBottom: 24,
+  },
+  favoriteList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  favoriteItem: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    width: '48%',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  exerciseIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F3E8FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  exerciseInfo: {
-    flex: 1,
-  },
-  exerciseTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
-    marginBottom: 2,
-  },
-  exerciseDuration: {
+  favoriteText: {
     fontSize: 14,
-    color: '#6B7280',
+    color: '#1F2937',
+    marginLeft: 8,
+  },
+  calendarContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
 });
 

@@ -6,6 +6,14 @@ interface Cycle {
   predictedEndDate?: string;
 }
 
+interface PatternAnalysis {
+  isIrregular: boolean;
+  averageLength: number;
+  recentTrend: 'increasing' | 'decreasing' | 'stable' | 'unknown';
+  confidence: number;
+  fallbackPrediction: Date | null;
+}
+
 export const predictNextPeriod = (cycles: Cycle[]): Date | null => {
   if (cycles.length < 2) {
     return null; // Not enough data to predict
@@ -72,7 +80,7 @@ export const calculateCycleLength = (cycles: Cycle[]): number => {
   );
 };
 
-export const identifyPatterns = (cycles: Cycle[]): { isIrregular: boolean; averageLength: number } => {
+export const identifyPatterns = (cycles: Cycle[]): PatternAnalysis => {
   const avgLength = calculateCycleLength(cycles);
 
   // Consider cycles irregular if they vary by more than 7 days from average
@@ -84,9 +92,52 @@ export const identifyPatterns = (cycles: Cycle[]): { isIrregular: boolean; avera
     return Math.abs(length - avgLength) > 7;
   });
 
+  // Analyze recent trend (last 3 cycles)
+  let recentTrend: 'increasing' | 'decreasing' | 'stable' | 'unknown' = 'unknown';
+  let confidence = 0.5; // Default confidence
+
+  if (cycles.length >= 3) {
+    const recentCycles = cycles.slice(0, 3);
+    const recentLengths = recentCycles.map(cycle => {
+      if (!cycle.startDate || !cycle.endDate) return avgLength;
+      const start = parseISO(cycle.startDate);
+      const end = parseISO(cycle.endDate);
+      return differenceInDays(end, start);
+    });
+
+    const [first, second, third] = recentLengths;
+    const diff1 = second - first;
+    const diff2 = third - second;
+
+    // Determine trend based on recent changes
+    if (Math.abs(diff1) < 3 && Math.abs(diff2) < 3) {
+      recentTrend = 'stable';
+      confidence = 0.8;
+    } else if (diff1 > 0 && diff2 > 0) {
+      recentTrend = 'increasing';
+      confidence = 0.7;
+    } else if (diff1 < 0 && diff2 < 0) {
+      recentTrend = 'decreasing';
+      confidence = 0.7;
+    } else {
+      recentTrend = 'unknown';
+      confidence = 0.5;
+    }
+  }
+
+  // Calculate fallback prediction (simple average)
+  let fallbackPrediction: Date | null = null;
+  if (cycles.length > 0 && cycles[0].startDate) {
+    const lastStart = parseISO(cycles[0].startDate);
+    fallbackPrediction = addDays(lastStart, avgLength);
+  }
+
   return {
     isIrregular,
     averageLength: avgLength,
+    recentTrend,
+    confidence,
+    fallbackPrediction
   };
 };
 
@@ -136,20 +187,35 @@ export const calculateOvulationDate = (cycles: Cycle[], currentCycleStart: strin
   return ovulationDate;
 };
 
-export const predictNextPeriodWithOvulation = (cycles: Cycle[]): { predictedStart: Date | null; ovulationDate: Date | null } => {
-  const predictedStart = predictNextPeriod(cycles);
+export const predictNextPeriodWithOvulation = (cycles: Cycle[]): { predictedStart: Date | null; ovulationDate: Date | null; patternAnalysis: PatternAnalysis } => {
+  const patternAnalysis = identifyPatterns(cycles);
+  let predictedStart: Date | null = null;
 
-  if (!predictedStart || cycles.length === 0) {
-    return {
-      predictedStart: null,
-      ovulationDate: null
-    };
+  // Use pattern analysis to make more sophisticated prediction
+  if (cycles.length > 0 && cycles[0].startDate) {
+    const lastStart = parseISO(cycles[0].startDate);
+
+    // Apply different weights based on recent trend
+    switch (patternAnalysis.recentTrend) {
+      case 'increasing':
+        predictedStart = addDays(lastStart, patternAnalysis.averageLength + 2);
+        break;
+      case 'decreasing':
+        predictedStart = addDays(lastStart, patternAnalysis.averageLength - 2);
+        break;
+      case 'stable':
+        predictedStart = addDays(lastStart, patternAnalysis.averageLength);
+        break;
+      default:
+        predictedStart = patternAnalysis.fallbackPrediction;
+    }
   }
 
-  const ovulationDate = calculateOvulationDate(cycles, predictedStart.toISOString());
+  const ovulationDate = predictedStart ? calculateOvulationDate(cycles, predictedStart.toISOString()) : null;
 
   return {
     predictedStart,
-    ovulationDate
+    ovulationDate,
+    patternAnalysis
   };
 };

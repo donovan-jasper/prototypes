@@ -7,6 +7,7 @@ import {
   Modal,
   ScrollView,
   ActivityIndicator,
+  FlatList,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as SQLite from 'expo-sqlite';
@@ -15,6 +16,8 @@ import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameDay, addMont
 
 interface CycleCalendarProps {
   db: SQLite.SQLiteDatabase;
+  predictedPeriodStart?: Date | null;
+  ovulationDate?: Date | null;
 }
 
 interface DayData {
@@ -23,9 +26,10 @@ interface DayData {
   isCurrentMonth: boolean;
   isToday: boolean;
   isPredictedPeriod: boolean;
+  isOvulationDay: boolean;
 }
 
-export default function CycleCalendar({ db }: CycleCalendarProps) {
+export default function CycleCalendar({ db, predictedPeriodStart, ovulationDate }: CycleCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [calendarDays, setCalendarDays] = useState<DayData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,7 +38,7 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
 
   useEffect(() => {
     loadCalendarData();
-  }, [currentMonth, db]);
+  }, [currentMonth, db, predictedPeriodStart, ovulationDate]);
 
   const loadCalendarData = async () => {
     setIsLoading(true);
@@ -47,19 +51,27 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
       const symptoms = await getSymptomsByDateRange(db, calendarStart, calendarEnd);
 
       const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-      
+
       const dayDataArray: DayData[] = days.map(day => {
         const daySymptoms = symptoms.filter(s => {
           const symptomDate = new Date(s.date);
           return isSameDay(symptomDate, day);
         });
 
+        const isPredictedPeriod = predictedPeriodStart
+          ? isSameDay(day, predictedPeriodStart) ||
+            (day > predictedPeriodStart && day < addDays(predictedPeriodStart, 5))
+          : false;
+
+        const isOvulationDay = ovulationDate ? isSameDay(day, ovulationDate) : false;
+
         return {
           date: day,
           symptoms: daySymptoms,
           isCurrentMonth: day.getMonth() === currentMonth.getMonth(),
           isToday: isSameDay(day, new Date()),
-          isPredictedPeriod: false,
+          isPredictedPeriod,
+          isOvulationDay,
         };
       });
 
@@ -72,6 +84,8 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
   };
 
   const getDayColor = (dayData: DayData): string => {
+    if (dayData.isPredictedPeriod) return '#D1FAE5';
+    if (dayData.isOvulationDay) return '#FDE68A';
     if (dayData.symptoms.length === 0) return '#F3F4F6';
 
     const avgPain = dayData.symptoms.reduce((sum, s) => sum + s.painLevel, 0) / dayData.symptoms.length;
@@ -90,7 +104,7 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
     try {
       await deleteSymptom(db, symptomId);
       await loadCalendarData();
-      
+
       if (selectedDay) {
         const updatedDay = calendarDays.find(d => isSameDay(d.date, selectedDay.date));
         if (updatedDay) {
@@ -113,40 +127,87 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
     setCurrentMonth(prev => addMonths(prev, 1));
   };
 
-  const renderDay = (dayData: DayData, index: number) => {
-    const dayColor = getDayColor(dayData);
-    const isGrayedOut = !dayData.isCurrentMonth;
+  const renderDay = ({ item }: { item: DayData }) => {
+    const dayColor = getDayColor(item);
+    const isGrayedOut = !item.isCurrentMonth;
 
     return (
       <TouchableOpacity
-        key={index}
         style={[
           styles.dayCell,
           { backgroundColor: dayColor },
           isGrayedOut && styles.dayCellGrayed,
-          dayData.isToday && styles.dayCellToday,
-          dayData.isPredictedPeriod && styles.dayCellPredicted,
+          item.isToday && styles.dayCellToday,
+          item.isPredictedPeriod && styles.dayCellPredicted,
+          item.isOvulationDay && styles.dayCellOvulation,
         ]}
-        onPress={() => handleDayPress(dayData)}
+        onPress={() => handleDayPress(item)}
         disabled={isGrayedOut}
       >
         <Text
           style={[
             styles.dayText,
             isGrayedOut && styles.dayTextGrayed,
-            dayData.isToday && styles.dayTextToday,
+            item.isToday && styles.dayTextToday,
           ]}
         >
-          {format(dayData.date, 'd')}
+          {format(item.date, 'd')}
         </Text>
-        {dayData.symptoms.length > 0 && (
+        {item.symptoms.length > 0 && (
           <View style={styles.symptomIndicator}>
-            <Text style={styles.symptomCount}>{dayData.symptoms.length}</Text>
+            <Text style={styles.symptomCount}>{item.symptoms.length}</Text>
           </View>
         )}
       </TouchableOpacity>
     );
   };
+
+  const renderSymptomItem = ({ item }: { item: Symptom }) => (
+    <View style={styles.symptomItem}>
+      <View style={styles.symptomHeader}>
+        <Text style={styles.symptomTime}>{format(new Date(item.date), 'h:mm a')}</Text>
+        <TouchableOpacity onPress={() => handleDeleteSymptom(item.id!)}>
+          <MaterialCommunityIcons name="delete" size={20} color="#EF4444" />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.symptomContent}>
+        <View style={styles.painLevelContainer}>
+          <Text style={styles.painLabel}>Pain Level:</Text>
+          <View style={styles.painLevel}>
+            {[...Array(10)].map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.painDot,
+                  i < item.painLevel ? styles.painDotActive : styles.painDotInactive,
+                ]}
+              />
+            ))}
+          </View>
+        </View>
+        {item.location && (
+          <Text style={styles.symptomDetail}>
+            <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" /> {item.location}
+          </Text>
+        )}
+        {item.type && (
+          <Text style={styles.symptomDetail}>
+            <MaterialCommunityIcons name="alert-circle" size={16} color="#6B7280" /> {item.type}
+          </Text>
+        )}
+        {item.mood && (
+          <Text style={styles.symptomDetail}>
+            <MaterialCommunityIcons name="emoticon-happy" size={16} color="#6B7280" /> Mood: {item.mood}
+          </Text>
+        )}
+        {item.energyLevel && (
+          <Text style={styles.symptomDetail}>
+            <MaterialCommunityIcons name="battery" size={16} color="#6B7280" /> Energy: {item.energyLevel}
+          </Text>
+        )}
+      </View>
+    </View>
+  );
 
   if (isLoading) {
     return (
@@ -162,126 +223,59 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
         <TouchableOpacity onPress={goToPreviousMonth} style={styles.navButton}>
           <MaterialCommunityIcons name="chevron-left" size={28} color="#8B5CF6" />
         </TouchableOpacity>
-        
+
         <Text style={styles.monthTitle}>{format(currentMonth, 'MMMM yyyy')}</Text>
-        
+
         <TouchableOpacity onPress={goToNextMonth} style={styles.navButton}>
           <MaterialCommunityIcons name="chevron-right" size={28} color="#8B5CF6" />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.weekDaysRow}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <Text key={day} style={styles.weekDayText}>{day}</Text>
+      <View style={styles.weekdays}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+          <Text key={index} style={styles.weekday}>{day}</Text>
         ))}
       </View>
 
-      <View style={styles.calendarGrid}>
-        {calendarDays.map((dayData, index) => renderDay(dayData, index))}
-      </View>
-
-      <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#86EFAC' }]} />
-          <Text style={styles.legendText}>Low pain</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#FDE047' }]} />
-          <Text style={styles.legendText}>Medium</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#FCA5A5' }]} />
-          <Text style={styles.legendText}>High pain</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#F3F4F6' }]} />
-          <Text style={styles.legendText}>No data</Text>
-        </View>
-      </View>
+      <FlatList
+        data={calendarDays}
+        renderItem={renderDay}
+        keyExtractor={(item, index) => index.toString()}
+        numColumns={7}
+        contentContainerStyle={styles.calendarGrid}
+        scrollEnabled={false}
+      />
 
       <Modal
-        visible={modalVisible}
         animationType="slide"
         transparent={true}
+        visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDay && format(selectedDay.date, 'MMMM d, yyyy')}
+                {selectedDay ? format(selectedDay.date, 'MMMM d, yyyy') : ''}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialCommunityIcons name="close" size={24} color="#6B7280" />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll}>
-              {selectedDay?.symptoms.length === 0 ? (
-                <Text style={styles.noSymptomsText}>No symptoms logged for this day</Text>
-              ) : (
-                selectedDay?.symptoms.map((symptom, index) => (
-                  <View key={symptom.id || index} style={styles.symptomCard}>
-                    <View style={styles.symptomHeader}>
-                      <View style={styles.symptomHeaderLeft}>
-                        <Text style={styles.symptomTime}>
-                          {format(new Date(symptom.date), 'h:mm a')}
-                        </Text>
-                        <View style={[
-                          styles.painBadge,
-                          symptom.painLevel >= 7 && styles.painBadgeHigh,
-                          symptom.painLevel >= 4 && symptom.painLevel < 7 && styles.painBadgeMedium,
-                          symptom.painLevel < 4 && styles.painBadgeLow,
-                        ]}>
-                          <Text style={styles.painBadgeText}>Pain: {symptom.painLevel}/10</Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => symptom.id && handleDeleteSymptom(symptom.id)}
-                        style={styles.deleteButton}
-                      >
-                        <MaterialCommunityIcons name="delete" size={20} color="#DC2626" />
-                      </TouchableOpacity>
-                    </View>
-
-                    {symptom.location && (
-                      <View style={styles.symptomDetail}>
-                        <MaterialCommunityIcons name="map-marker" size={16} color="#6B7280" />
-                        <Text style={styles.symptomDetailText}>{symptom.location}</Text>
-                      </View>
-                    )}
-
-                    {symptom.type && (
-                      <View style={styles.symptomDetail}>
-                        <MaterialCommunityIcons name="alert-circle" size={16} color="#6B7280" />
-                        <Text style={styles.symptomDetailText}>{symptom.type}</Text>
-                      </View>
-                    )}
-
-                    {symptom.mood && (
-                      <View style={styles.symptomDetail}>
-                        <MaterialCommunityIcons name="emoticon" size={16} color="#6B7280" />
-                        <Text style={styles.symptomDetailText}>Mood: {symptom.mood}</Text>
-                      </View>
-                    )}
-
-                    {symptom.energy !== undefined && symptom.energy !== null && (
-                      <View style={styles.symptomDetail}>
-                        <MaterialCommunityIcons name="lightning-bolt" size={16} color="#6B7280" />
-                        <Text style={styles.symptomDetailText}>Energy: {symptom.energy}/5</Text>
-                      </View>
-                    )}
-
-                    {symptom.notes && (
-                      <View style={styles.notesContainer}>
-                        <Text style={styles.notesLabel}>Notes:</Text>
-                        <Text style={styles.notesText}>{symptom.notes}</Text>
-                      </View>
-                    )}
-                  </View>
-                ))
-              )}
-            </ScrollView>
+            {selectedDay?.symptoms.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialCommunityIcons name="emoticon-sad" size={48} color="#D1D5DB" />
+                <Text style={styles.emptyText}>No symptoms logged for this day</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={selectedDay?.symptoms || []}
+                renderItem={renderSymptomItem}
+                keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
+                contentContainerStyle={styles.symptomList}
+              />
+            )}
           </View>
         </View>
       </Modal>
@@ -291,21 +285,9 @@ export default function CycleCalendar({ db }: CycleCalendarProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    flex: 1,
+    backgroundColor: '#fff',
     padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  loadingContainer: {
-    padding: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -313,211 +295,169 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  monthTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
   navButton: {
     padding: 8,
   },
-  monthTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
-  },
-  weekDaysRow: {
+  weekdays: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  weekDayText: {
-    fontSize: 12,
-    fontWeight: '600',
+  weekday: {
+    fontSize: 14,
     color: '#6B7280',
-    width: 40,
+    fontWeight: '500',
+    width: '14.28%',
     textAlign: 'center',
   },
   calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexGrow: 1,
   },
   dayCell: {
     width: '14.28%',
     aspectRatio: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    position: 'relative',
+    borderRadius: 8,
+    margin: 2,
   },
   dayCellGrayed: {
-    opacity: 0.3,
+    opacity: 0.5,
   },
   dayCellToday: {
     borderWidth: 2,
     borderColor: '#8B5CF6',
-    borderRadius: 8,
   },
   dayCellPredicted: {
     borderWidth: 2,
+    borderColor: '#10B981',
+  },
+  dayCellOvulation: {
+    borderWidth: 2,
     borderColor: '#F59E0B',
-    borderStyle: 'dashed',
   },
   dayText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
   },
   dayTextGrayed: {
     color: '#9CA3AF',
   },
   dayTextToday: {
     color: '#8B5CF6',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   symptomIndicator: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    bottom: 4,
+    right: 4,
     backgroundColor: '#8B5CF6',
     borderRadius: 8,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
     paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   symptomCount: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 10,
-    fontWeight: '700',
+    fontWeight: '600',
   },
-  legend: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
-    marginRight: 6,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#6B7280',
-  },
-  modalOverlay: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
     justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
     maxHeight: '80%',
-    paddingBottom: 20,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '700',
-    color: '#111827',
+    fontWeight: '600',
+    color: '#1F2937',
   },
-  modalScroll: {
-    padding: 20,
+  symptomList: {
+    paddingBottom: 16,
   },
-  noSymptomsText: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    paddingVertical: 40,
-  },
-  symptomCard: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+  symptomItem: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
   },
   symptomHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  symptomHeaderLeft: {
-    flex: 1,
-  },
-  symptomTime: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 6,
-  },
-  painBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-  },
-  painBadgeLow: {
-    backgroundColor: '#D1FAE5',
-  },
-  painBadgeMedium: {
-    backgroundColor: '#FEF3C7',
-  },
-  painBadgeHigh: {
-    backgroundColor: '#FEE2E2',
-  },
-  painBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#111827',
-  },
-  deleteButton: {
-    padding: 4,
-  },
-  symptomDetail: {
-    flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
   },
-  symptomDetailText: {
+  symptomTime: {
     fontSize: 14,
-    color: '#374151',
-    marginLeft: 8,
-  },
-  notesContainer: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-  },
-  notesLabel: {
-    fontSize: 12,
-    fontWeight: '600',
     color: '#6B7280',
-    marginBottom: 4,
   },
-  notesText: {
+  symptomContent: {
+    gap: 8,
+  },
+  painLevelContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  painLabel: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '500',
+  },
+  painLevel: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  painDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  painDotActive: {
+    backgroundColor: '#EF4444',
+  },
+  painDotInactive: {
+    backgroundColor: '#E5E7EB',
+  },
+  symptomDetail: {
     fontSize: 14,
     color: '#374151',
-    lineHeight: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 32,
+    gap: 8,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
