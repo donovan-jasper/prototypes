@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import Colors from '../constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 
 interface SubscriptionPromptProps {
   visible: boolean;
@@ -10,16 +10,6 @@ interface SubscriptionPromptProps {
 }
 
 const SubscriptionPrompt: React.FC<SubscriptionPromptProps> = ({ visible, onClose, onUpgrade }) => {
-  const features = [
-    { icon: 'mic', text: 'Audio summaries of daily digest' },
-    { icon: 'search', text: 'Unlimited stock searches' },
-    { icon: 'book', text: 'Full lesson library' },
-    { icon: 'notifications', text: 'Advanced price alerts' },
-    { icon: 'bar-chart', text: 'Compare up to 5 stocks' },
-    { icon: 'download', text: 'Export watchlist data' },
-    { icon: 'trophy', text: 'Earn badges for learning' },
-  ];
-
   return (
     <Modal
       visible={visible}
@@ -30,32 +20,60 @@ const SubscriptionPrompt: React.FC<SubscriptionPromptProps> = ({ visible, onClos
       <View style={styles.modalContainer}>
         <View style={styles.modalContent}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color={Colors.textSecondary} />
+            <Ionicons name="close" size={24} color={Colors.text} />
           </TouchableOpacity>
 
           <Text style={styles.title}>Upgrade to Premium</Text>
-          <Text style={styles.subtitle}>Unlock all features for just $7.99/month</Text>
 
           <ScrollView style={styles.featuresContainer}>
-            {features.map((feature, index) => (
-              <View key={index} style={styles.featureItem}>
-                <View style={styles.featureIcon}>
-                  <Ionicons name={feature.icon} size={20} color={Colors.primary} />
-                </View>
-                <Text style={styles.featureText}>{feature.text}</Text>
-              </View>
-            ))}
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Unlimited stock searches</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Full Learn Mode library</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Advanced price alerts</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Audio summaries of Daily Digest</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Compare up to 5 stocks</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Export watchlist data</Text>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Ionicons name="checkmark-circle" size={20} color={Colors.success} />
+              <Text style={styles.featureText}>Ad-free experience</Text>
+            </View>
           </ScrollView>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
-              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.laterButton} onPress={onClose}>
-              <Text style={styles.laterButtonText}>Maybe Later</Text>
-            </TouchableOpacity>
+          <View style={styles.priceContainer}>
+            <Text style={styles.price}>$7.99/month</Text>
+            <Text style={styles.annualPrice}>or $59.99/year</Text>
           </View>
+
+          <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+            <Text style={styles.upgradeButtonText}>Start Free Trial</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={onClose}>
+            <Text style={styles.maybeLater}>Maybe Later</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -70,78 +88,70 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 400,
-    backgroundColor: Colors.background,
+    width: '85%',
+    maxHeight: '80%',
+    backgroundColor: Colors.card,
     borderRadius: 12,
     padding: 20,
-    maxHeight: '80%',
+    alignItems: 'center',
   },
   closeButton: {
     position: 'absolute',
-    top: 16,
-    right: 16,
+    top: 10,
+    right: 10,
     zIndex: 1,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   featuresContainer: {
-    marginBottom: 24,
+    width: '100%',
+    marginBottom: 20,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  featureIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: Colors.primaryLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
   featureText: {
     fontSize: 16,
     color: Colors.text,
-    flex: 1,
+    marginLeft: 8,
   },
-  buttonContainer: {
-    marginTop: 8,
+  priceContainer: {
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  price: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.primary,
+  },
+  annualPrice: {
+    fontSize: 16,
+    color: Colors.textSecondary,
   },
   upgradeButton: {
     backgroundColor: Colors.primary,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
     borderRadius: 8,
-    alignItems: 'center',
     marginBottom: 12,
+    width: '100%',
+    alignItems: 'center',
   },
   upgradeButtonText: {
     color: Colors.white,
     fontSize: 18,
     fontWeight: '600',
   },
-  laterButton: {
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: Colors.card,
-  },
-  laterButtonText: {
-    color: Colors.textSecondary,
+  maybeLater: {
     fontSize: 16,
+    color: Colors.textSecondary,
+    textDecorationLine: 'underline',
   },
 });
 

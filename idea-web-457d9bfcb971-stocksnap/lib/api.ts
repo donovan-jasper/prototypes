@@ -175,44 +175,54 @@ export const fetchDailyDigest = async (): Promise<DigestHighlight[]> => {
     const randomTechStock = techStocks[Math.floor(Math.random() * techStocks.length)];
 
     const techStockData = await fetchStockData(randomTechStock);
-    const marketNews = await fetchMarketNews();
+    const marketIndexData = await fetchStockData('^GSPC'); // S&P 500
 
-    // Create digest highlights
-    const digest: DigestHighlight[] = [
+    // Create 3 highlights with different impacts
+    return [
       {
-        id: 'tech-trends',
-        title: 'Tech Stocks Mixed After Earnings',
-        explanation: `Technology stocks showed mixed performance after earnings reports. ${techStockData.name} (${techStockData.symbol}) reported ${techStockData.change > 0 ? 'strong' : 'mixed'} results, driving the sector ${techStockData.change > 0 ? 'higher' : 'lower'}. Investors are watching for guidance on future growth prospects.`,
+        id: '1',
+        title: `Tech Stocks ${techStockData.change > 0 ? 'Rise' : 'Fall'}`,
+        explanation: `Technology stocks led the market ${techStockData.change > 0 ? 'higher' : 'lower'} today, with ${techStockData.name} (${techStockData.symbol}) ${techStockData.change > 0 ? 'gaining' : 'losing'} ${Math.abs(techStockData.change).toFixed(2)}%. The sector's performance was driven by strong earnings reports from major companies and positive sentiment around AI advancements.`,
         impact: techStockData.change > 0 ? 'positive' : 'negative',
-        audioUrl: 'https://example.com/audio/tech-trends.mp3'
+        audioUrl: 'https://example.com/audio/tech-stocks.mp3'
       },
       {
-        id: 'market-news',
-        title: 'Market Reacts to Central Bank Policy',
-        explanation: `Global markets reacted to the latest central bank policy statements. The Fed's decision to keep interest rates unchanged sent ${marketNews.impact === 'positive' ? 'bullish' : 'bearish'} signals through the market. Traders are now focusing on the next economic data releases.`,
-        impact: marketNews.impact,
-        audioUrl: 'https://example.com/audio/market-news.mp3'
-      },
-      {
-        id: 'sector-performance',
-        title: 'Energy Sector Shows Resilience',
-        explanation: 'The energy sector continued to show resilience amid global economic uncertainties. Companies like Exxon Mobil and Chevron reported stable performance, while oil prices remained relatively steady. Investors are keeping a close eye on geopolitical developments that could impact the sector.',
+        id: '2',
+        title: 'Market Sentiment Mixed',
+        explanation: 'Overall market sentiment remains mixed as investors weigh the potential for interest rate cuts against economic concerns. The S&P 500 index is currently trading at ' + marketIndexData.price.toFixed(2) + ', showing a ' + (marketIndexData.change > 0 ? 'positive' : 'negative') + ' change of ' + Math.abs(marketIndexData.change).toFixed(2) + '%.',
         impact: 'neutral',
-        audioUrl: 'https://example.com/audio/sector-performance.mp3'
+        audioUrl: 'https://example.com/audio/market-sentiment.mp3'
+      },
+      {
+        id: '3',
+        title: 'Economic Data Release',
+        explanation: 'Today\'s employment report showed a stronger-than-expected increase in non-farm payrolls, which could support the case for a Fed rate cut later this year. The unemployment rate remained stable at 4.1%, while average hourly earnings increased by 0.3%.',
+        impact: 'positive',
+        audioUrl: 'https://example.com/audio/economic-data.mp3'
       }
     ];
-
-    return digest;
   } catch (error) {
-    console.error('Error fetching daily digest:', error);
-    throw new Error('Failed to generate daily digest');
+    console.error('Failed to fetch daily digest:', error);
+    // Return fallback data if API fails
+    return [
+      {
+        id: '1',
+        title: 'Market Update',
+        explanation: 'The stock market showed mixed performance today with tech stocks leading the gains. Investors are watching economic indicators closely for signs of a potential interest rate cut.',
+        impact: 'neutral'
+      },
+      {
+        id: '2',
+        title: 'Sector Performance',
+        explanation: 'Energy stocks continued to rise as oil prices climbed, while financial stocks showed slight declines due to rising interest rates.',
+        impact: 'positive'
+      },
+      {
+        id: '3',
+        title: 'Earnings Season',
+        explanation: 'Several major companies have reported earnings this week, with most beating expectations. Analysts are optimistic about the upcoming quarter.',
+        impact: 'positive'
+      }
+    ];
   }
-};
-
-const fetchMarketNews = async (): Promise<{ impact: 'positive' | 'negative' | 'neutral' }> => {
-  // Mock market news data
-  const impacts: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
-  const randomImpact = impacts[Math.floor(Math.random() * impacts.length)];
-
-  return { impact: randomImpact };
 };

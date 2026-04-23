@@ -15,7 +15,7 @@ interface DigestHighlight {
   audioUrl?: string;
 }
 
-const LearnScreen = () => {
+const DailyDigestScreen = () => {
   const navigation = useNavigation();
   const { isPremium } = useUserStore();
   const [digest, setDigest] = useState<DigestHighlight[]>([]);
@@ -88,11 +88,6 @@ const LearnScreen = () => {
           <Text style={styles.highlightExplanation}>{highlight.explanation}</Text>
         </View>
       ))}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Lessons</Text>
-        {/* Lesson cards would go here */}
-      </View>
 
       <SubscriptionPrompt
         visible={showSubscriptionPrompt}
@@ -179,16 +174,6 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     lineHeight: 24,
   },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 12,
-  },
 });
 
-export default LearnScreen;
+export default DailyDigestScreen;
