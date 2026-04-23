@@ -1,109 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { sleepDetector } from '../services/sleepDetection';
-import { useAudioPlayback } from '../hooks/useAudioPlayback';
-import { usePremium } from '../hooks/usePremium';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { sleepAudioBridge } from '../services/sleepAudioBridge';
+import { Ionicons } from '@expo/vector-icons';
 
-interface SleepDetectorProps {
-  onSleepDetected?: () => void;
-  onWakeDetected?: () => void;
-}
-
-export const SleepDetector: React.FC<SleepDetectorProps> = ({ onSleepDetected, onWakeDetected }) => {
-  const [isDetecting, setIsDetecting] = useState(false);
-  const [sleepState, setSleepState] = useState({
-    isSleeping: false,
-    confidence: 0,
-    lastUpdated: new Date()
-  });
-  const [error, setError] = useState<string | null>(null);
-  const { isPremium } = usePremium();
-  const { pausePlayback, resumePlayback } = useAudioPlayback();
+const SleepDetectorComponent = () => {
+  const [isActive, setIsActive] = useState(false);
+  const [isSleeping, setIsSleeping] = useState(false);
+  const [confidence, setConfidence] = useState(0);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      const currentState = sleepDetector.getCurrentState();
-      setSleepState(currentState);
+    const updateStatus = () => {
+      const status = sleepAudioBridge.getStatus();
+      setIsActive(status.isActive);
+      setIsSleeping(status.isSleeping);
+    };
 
-      if (currentState.isSleeping && !sleepState.isSleeping) {
-        onSleepDetected?.();
-        pausePlayback();
-      } else if (!currentState.isSleeping && sleepState.isSleeping) {
-        onWakeDetected?.();
-        resumePlayback();
-      }
-    }, 1000);
+    // Initial status check
+    updateStatus();
+
+    // Set up interval to check status periodically
+    const interval = setInterval(updateStatus, 1000);
 
     return () => clearInterval(interval);
-  }, [sleepState.isSleeping, onSleepDetected, onWakeDetected, pausePlayback, resumePlayback]);
+  }, []);
 
-  const handleStartDetection = async () => {
+  const toggleDetection = async () => {
     try {
-      setError(null);
-      setIsDetecting(true);
-      await sleepDetector.startDetection();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start sleep detection');
-      setIsDetecting(false);
+      if (isActive) {
+        await sleepAudioBridge.stopMonitoring();
+      } else {
+        await sleepAudioBridge.startMonitoring();
+      }
+      setIsActive(!isActive);
+    } catch (error) {
+      console.error('Failed to toggle sleep detection:', error);
     }
-  };
-
-  const handleStopDetection = async () => {
-    try {
-      await sleepDetector.stopDetection();
-      setIsDetecting(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to stop sleep detection');
-    }
-  };
-
-  const getStatusText = () => {
-    if (!isPremium) {
-      return 'Upgrade to premium for unlimited sleep detection';
-    }
-    if (error) {
-      return `Error: ${error}`;
-    }
-    if (isDetecting) {
-      return sleepState.isSleeping
-        ? `Sleep detected (${sleepState.confidence}% confidence)`
-        : 'Monitoring for sleep...';
-    }
-    return 'Sleep detection paused';
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Sleep Detection</Text>
-
       <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>{getStatusText()}</Text>
-        {isDetecting && <ActivityIndicator size="small" color="#4CAF50" />}
+        <Text style={styles.statusText}>
+          {isActive ? 'Monitoring for sleep...' : 'Sleep detection inactive'}
+        </Text>
+        <Text style={styles.confidenceText}>
+          Confidence: {Math.round(confidence)}%
+        </Text>
       </View>
 
-      {isDetecting ? (
-        <TouchableOpacity
-          style={[styles.button, styles.stopButton]}
-          onPress={handleStopDetection}
-          disabled={!isPremium}
-        >
-          <Text style={styles.buttonText}>Stop Detection</Text>
-        </TouchableOpacity>
-      ) : (
-        <TouchableOpacity
-          style={[styles.button, styles.startButton]}
-          onPress={handleStartDetection}
-          disabled={!isPremium}
-        >
-          <Text style={styles.buttonText}>Start Detection</Text>
-        </TouchableOpacity>
-      )}
+      <View style={styles.visualIndicator}>
+        <View style={[
+          styles.circle,
+          {
+            backgroundColor: isSleeping ? '#FF6B6B' : '#4ECDC4',
+            transform: [{ scale: isSleeping ? 1.2 : 1 }]
+          }
+        ]} />
+        <Text style={styles.stateText}>
+          {isSleeping ? 'Sleeping' : 'Awake'}
+        </Text>
+      </View>
 
-      {!isPremium && (
-        <TouchableOpacity style={styles.upgradeButton}>
-          <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
-        </TouchableOpacity>
-      )}
+      <TouchableOpacity
+        style={[
+          styles.toggleButton,
+          { backgroundColor: isActive ? '#FF6B6B' : '#4ECDC4' }
+        ]}
+        onPress={toggleDetection}
+      >
+        <Ionicons
+          name={isActive ? 'pause' : 'play'}
+          size={24}
+          color="white"
+        />
+        <Text style={styles.buttonText}>
+          {isActive ? 'Stop Monitoring' : 'Start Monitoring'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 };
@@ -111,50 +84,55 @@ export const SleepDetector: React.FC<SleepDetectorProps> = ({ onSleepDetected, o
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
     borderRadius: 10,
     margin: 10,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    alignItems: 'center',
   },
   statusContainer: {
-    flexDirection: 'row',
+    marginBottom: 20,
     alignItems: 'center',
-    marginBottom: 15,
   },
   statusText: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 10,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2D3436',
+    marginBottom: 5,
   },
-  button: {
-    padding: 12,
-    borderRadius: 5,
+  confidenceText: {
+    fontSize: 16,
+    color: '#636E72',
+  },
+  visualIndicator: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  circle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
   },
-  startButton: {
-    backgroundColor: '#4CAF50',
+  stateText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D3436',
   },
-  stopButton: {
-    backgroundColor: '#f44336',
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
   },
   buttonText: {
     color: 'white',
-    fontWeight: 'bold',
-  },
-  upgradeButton: {
-    padding: 10,
-    backgroundColor: '#FFD700',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  upgradeButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
   },
 });
+
+export default SleepDetectorComponent;

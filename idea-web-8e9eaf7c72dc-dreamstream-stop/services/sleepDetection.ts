@@ -25,6 +25,7 @@ class SleepDetector {
     confidence: 0,
     lastUpdated: new Date()
   };
+  private sleepStateChangeCallback: ((isSleeping: boolean) => void) | null = null;
 
   constructor() {
     this.setupBackgroundTask();
@@ -165,55 +166,76 @@ class SleepDetector {
   }
 
   private checkStillness() {
-    if (this.lastMotionData.length < SAMPLE_RATE) return;
+    if (this.lastMotionData.length < SAMPLE_RATE * 5) return;
 
-    // Calculate average movement magnitude
+    // Calculate average magnitude of acceleration
     const magnitudes = this.lastMotionData.map(data =>
       Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z)
     );
+
     const avgMagnitude = magnitudes.reduce((sum, val) => sum + val, 0) / magnitudes.length;
 
     if (avgMagnitude < STILLNESS_THRESHOLD) {
-      if (this.stillnessStartTime === null) {
+      if (!this.stillnessStartTime) {
         this.stillnessStartTime = Date.now();
-      } else if (Date.now() - this.stillnessStartTime >= STILLNESS_DURATION) {
-        // Device has been still for 3+ minutes
-        this.updateSleepState(true);
+      }
+
+      const stillnessDuration = Date.now() - this.stillnessStartTime;
+      const confidence = Math.min(100, (stillnessDuration / STILLNESS_DURATION) * 100);
+
+      this.currentSleepState = {
+        isSleeping: stillnessDuration >= STILLNESS_DURATION,
+        confidence,
+        lastUpdated: new Date()
+      };
+
+      if (this.currentSleepState.isSleeping && this.sleepStateChangeCallback) {
+        this.sleepStateChangeCallback(true);
       }
     } else {
       this.stillnessStartTime = null;
-      this.updateSleepState(false);
-    }
-  }
-
-  private updateSleepState(isSleeping: boolean) {
-    const now = new Date();
-    const confidence = isSleeping ? 100 : 0;
-
-    if (this.currentSleepState.isSleeping !== isSleeping ||
-        this.currentSleepState.confidence !== confidence) {
       this.currentSleepState = {
-        isSleeping,
-        confidence,
-        lastUpdated: now
+        isSleeping: false,
+        confidence: 0,
+        lastUpdated: new Date()
       };
 
-      // Store in database
-      this.storeSleepState(isSleeping, confidence, now);
+      if (this.sleepStateChangeCallback) {
+        this.sleepStateChangeCallback(false);
+      }
     }
   }
 
-  private async storeSleepState(isSleeping: boolean, confidence: number, timestamp: Date) {
-    try {
-      await db.transactionAsync(async (tx) => {
-        await tx.executeSqlAsync(
-          'INSERT INTO sleep_sessions (is_sleeping, confidence, timestamp) VALUES (?, ?, ?)',
-          [isSleeping ? 1 : 0, confidence, timestamp.toISOString()]
-        );
-      });
-    } catch (error) {
-      console.error('Failed to store sleep state:', error);
+  private processSensorData(accelerometerData: any, audioData: any) {
+    if (accelerometerData) {
+      this.lastMotionData.push(accelerometerData);
+      if (this.lastMotionData.length > SAMPLE_RATE * 5) {
+        this.lastMotionData.shift();
+      }
+      this.checkStillness();
     }
+
+    if (audioData) {
+      // Process audio data for sleep detection
+      // This would include frequency analysis for breathing patterns
+      // For now, we'll just update the confidence based on audio amplitude
+      const audioConfidence = audioData.amplitude * 100;
+      this.currentSleepState.confidence = Math.min(
+        100,
+        this.currentSleepState.confidence + audioConfidence
+      );
+
+      if (this.currentSleepState.confidence >= 80 && !this.currentSleepState.isSleeping) {
+        this.currentSleepState.isSleeping = true;
+        if (this.sleepStateChangeCallback) {
+          this.sleepStateChangeCallback(true);
+        }
+      }
+    }
+  }
+
+  public onSleepStateChange(callback: (isSleeping: boolean) => void) {
+    this.sleepStateChangeCallback = callback;
   }
 
   public getCurrentState(): SleepState {
@@ -221,4 +243,4 @@ class SleepDetector {
   }
 }
 
-export const sleepDetector = new SleepDetector();
+export { SleepDetector };
