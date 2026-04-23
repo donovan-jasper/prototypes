@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { CameraView, Camera } from 'expo-camera';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator, TextInput } from 'react-native';
+import { Camera } from 'expo-camera';
 import { BarCodeScanner } from 'expo-barcode-scanner';
 import { lookupBarcode } from '../lib/api';
 import { useMediaStore } from '../store/mediaStore';
@@ -146,7 +146,7 @@ const BarcodeScanner = () => {
             disabled={isScanning}
           >
             {isScanning ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.manualEntryButtonText}>Submit</Text>
             )}
@@ -158,13 +158,13 @@ const BarcodeScanner = () => {
 
   return (
     <View style={styles.container}>
-      <CameraView
+      <Camera
         style={styles.camera}
         type={cameraType}
-        barcodeScannerSettings={{
-          barcodeTypes: [BarCodeScanner.Constants.BarCodeType.ean13],
+        onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+        barCodeScannerSettings={{
+          barCodeTypes: [BarCodeScanner.Constants.BarCodeType.ean13],
         }}
-        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
       >
         <View style={styles.overlay}>
           <View style={styles.scanArea}>
@@ -173,37 +173,32 @@ const BarcodeScanner = () => {
             <View style={styles.cornerBottomLeft} />
             <View style={styles.cornerBottomRight} />
           </View>
-          <Text style={styles.scanText}>Scan a barcode</Text>
+          <Text style={styles.scanText}>Scan a barcode to add media</Text>
         </View>
-      </CameraView>
+      </Camera>
 
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.controlButton}
           onPress={toggleCameraType}
-          disabled={isScanning}
         >
-          <MaterialIcons name="flip-camera-android" size={24} color="white" />
+          <MaterialIcons name="flip-camera-android" size={24} color="#fff" />
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.controlButton, styles.scanButton]}
-          onPress={() => setScanned(false)}
-          disabled={!scanned || isScanning}
-        >
-          <MaterialIcons name="refresh" size={24} color="white" />
-          <Text style={styles.scanButtonText}>Scan Again</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.controlButton, styles.manualButton]}
+          style={styles.controlButton}
           onPress={() => setShowManualEntry(true)}
-          disabled={isScanning}
         >
-          <MaterialIcons name="keyboard" size={24} color="white" />
-          <Text style={styles.scanButtonText}>Manual Entry</Text>
+          <MaterialIcons name="keyboard" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
+
+      {isScanning && (
+        <View style={styles.scanningOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.scanningText}>Looking up barcode...</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -211,7 +206,7 @@ const BarcodeScanner = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
+    backgroundColor: '#000',
   },
   camera: {
     flex: 1,
@@ -220,6 +215,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   scanArea: {
     width: 250,
@@ -234,7 +230,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderTopWidth: 4,
     borderLeftWidth: 4,
-    borderColor: 'white',
+    borderColor: '#6200EE',
   },
   cornerTopRight: {
     position: 'absolute',
@@ -244,7 +240,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderTopWidth: 4,
     borderRightWidth: 4,
-    borderColor: 'white',
+    borderColor: '#6200EE',
   },
   cornerBottomLeft: {
     position: 'absolute',
@@ -254,7 +250,7 @@ const styles = StyleSheet.create({
     height: 50,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
-    borderColor: 'white',
+    borderColor: '#6200EE',
   },
   cornerBottomRight: {
     position: 'absolute',
@@ -264,12 +260,12 @@ const styles = StyleSheet.create({
     height: 50,
     borderBottomWidth: 4,
     borderRightWidth: 4,
-    borderColor: 'white',
+    borderColor: '#6200EE',
   },
   scanText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#fff',
     marginTop: 20,
+    fontSize: 16,
     textAlign: 'center',
   },
   controls: {
@@ -279,80 +275,66 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
+    paddingHorizontal: 20,
   },
   controlButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 12,
-    borderRadius: 30,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  scanButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  manualButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  scanButtonText: {
-    color: 'white',
-    marginLeft: 8,
   },
   message: {
-    color: 'white',
+    color: '#fff',
     fontSize: 18,
-    textAlign: 'center',
     marginTop: 20,
-    fontWeight: 'bold',
+    textAlign: 'center',
   },
   instructions: {
-    color: 'white',
-    fontSize: 16,
+    color: '#ccc',
+    fontSize: 14,
+    marginTop: 10,
     textAlign: 'center',
-    margin: 20,
     paddingHorizontal: 20,
   },
   upgradeButton: {
     backgroundColor: '#6200EE',
-    padding: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    margin: 20,
-    alignItems: 'center',
+    marginTop: 20,
   },
   upgradeButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
   manualEntryTitle: {
-    color: 'white',
-    fontSize: 20,
-    textAlign: 'center',
-    marginTop: 40,
+    color: '#fff',
+    fontSize: 18,
     marginBottom: 20,
     fontWeight: 'bold',
   },
   manualEntryInput: {
-    backgroundColor: 'white',
-    padding: 15,
-    marginHorizontal: 20,
+    backgroundColor: '#fff',
+    width: '80%',
+    padding: 12,
     borderRadius: 8,
-    fontSize: 18,
+    fontSize: 16,
     marginBottom: 20,
   },
   manualEntryButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
+    justifyContent: 'space-between',
+    width: '80%',
   },
   manualEntryButton: {
-    padding: 15,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    width: '40%',
+    flex: 1,
+    marginHorizontal: 5,
     alignItems: 'center',
   },
   cancelButton: {
@@ -362,9 +344,24 @@ const styles = StyleSheet.create({
     backgroundColor: '#6200EE',
   },
   manualEntryButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  scanningOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanningText: {
+    color: '#fff',
+    marginTop: 20,
+    fontSize: 16,
   },
 });
 
