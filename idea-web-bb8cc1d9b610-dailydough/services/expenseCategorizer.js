@@ -1,137 +1,100 @@
 import { getDatabase } from './database';
 
-const CATEGORY_KEYWORDS = {
-  'Food & Dining': [
-    'restaurant', 'cafe', 'coffee', 'lunch', 'dinner', 'breakfast', 'food', 'pizza',
-    'burger', 'sushi', 'starbucks', 'mcdonalds', 'subway', 'chipotle', 'dominos',
-    'grocery', 'supermarket', 'whole foods', 'trader joes', 'safeway', 'kroger',
-    'meal', 'eat', 'dining', 'kitchen', 'snack', 'delivery', 'ubereats', 'doordash',
-    'grubhub', 'postmates', 'takeout', 'fastfood'
-  ],
-  'Transportation': [
-    'uber', 'lyft', 'taxi', 'gas', 'fuel', 'parking', 'metro', 'subway', 'bus',
-    'train', 'flight', 'airline', 'car', 'vehicle', 'transport', 'toll', 'transit',
-    'shell', 'chevron', 'exxon', 'bp', 'mobil', 'ride', 'trip', 'travel', 'commute'
-  ],
-  'Shopping': [
-    'amazon', 'walmart', 'target', 'ebay', 'shop', 'store', 'mall', 'retail',
-    'clothing', 'clothes', 'shoes', 'fashion', 'electronics', 'best buy', 'apple store',
-    'purchase', 'buy', 'order', 'online', 'zara', 'h&m', 'nike', 'adidas'
-  ],
-  'Bills & Utilities': [
-    'electric', 'electricity', 'water', 'gas bill', 'utility', 'internet', 'phone',
-    'mobile', 'verizon', 'at&t', 't-mobile', 'sprint', 'comcast', 'xfinity',
-    'rent', 'mortgage', 'insurance', 'bill', 'payment', 'subscription'
-  ],
-  'Entertainment': [
-    'netflix', 'hulu', 'spotify', 'disney', 'hbo', 'amazon prime', 'youtube',
-    'movie', 'cinema', 'theater', 'concert', 'game', 'gaming', 'playstation',
-    'xbox', 'nintendo', 'steam', 'entertainment', 'music', 'streaming', 'show',
-    'ticket', 'event', 'amusement', 'park', 'zoo', 'museum'
-  ],
-  'Healthcare': [
-    'doctor', 'hospital', 'pharmacy', 'medicine', 'medical', 'health', 'clinic',
-    'dentist', 'dental', 'prescription', 'cvs', 'walgreens', 'rite aid', 'drug',
-    'therapy', 'treatment', 'checkup', 'appointment', 'urgent care'
-  ],
-  'Personal Care': [
-    'salon', 'haircut', 'barber', 'spa', 'massage', 'gym', 'fitness', 'yoga',
-    'beauty', 'cosmetics', 'makeup', 'skincare', 'grooming', 'personal', 'care',
-    'wellness', 'planet fitness', 'la fitness', 'equinox', 'sephora', 'ulta'
-  ]
+// Default categories
+const DEFAULT_CATEGORIES = [
+  'Food & Drink',
+  'Transportation',
+  'Shopping',
+  'Entertainment',
+  'Utilities',
+  'Healthcare',
+  'Travel',
+  'Education',
+  'Personal',
+  'Other'
+];
+
+// Simple keyword-based categorization
+const KEYWORD_CATEGORIES = {
+  'Food & Drink': ['restaurant', 'cafe', 'coffee', 'diner', 'fast food', 'groceries', 'starbucks', 'subway'],
+  'Transportation': ['uber', 'lyft', 'taxi', 'gas', 'fuel', 'parking', 'toll', 'metro', 'train', 'bus'],
+  'Shopping': ['amazon', 'walmart', 'target', 'best buy', 'mall', 'store', 'online shopping'],
+  'Entertainment': ['movie', 'theater', 'concert', 'netflix', 'spotify', 'hulu', 'gym', 'fitness'],
+  'Utilities': ['electric', 'water', 'internet', 'phone', 'cable', 'gas bill'],
+  'Healthcare': ['doctor', 'hospital', 'pharmacy', 'dentist', 'medical', 'insurance'],
+  'Travel': ['hotel', 'airbnb', 'flight', 'vacation', 'trip', 'holiday'],
+  'Education': ['school', 'college', 'university', 'tuition', 'course', 'book'],
+  'Personal': ['haircut', 'grooming', 'clothing', 'cosmetics', 'gift', 'donation']
 };
 
+// Get all available categories
+export function getCategories() {
+  return DEFAULT_CATEGORIES;
+}
+
+// Categorize an expense based on description
 export async function categorizeExpense(description) {
-  if (!description || typeof description !== 'string') {
-    return { category: 'Other', confidence: 0, source: 'default' };
-  }
-
-  const lowerDescription = description.toLowerCase().trim();
   const db = getDatabase();
+  const lowerDesc = description.toLowerCase();
 
-  // Check user corrections first
-  const corrections = await db.getAllAsync(
-    'SELECT user_chosen_category, frequency FROM category_corrections WHERE description_pattern = ? ORDER BY frequency DESC LIMIT 1',
-    [lowerDescription]
+  // First check if we have a learned pattern
+  const learnedResult = await db.getFirstAsync(
+    'SELECT user_chosen_category, frequency FROM category_corrections WHERE ? LIKE "%" || description_pattern || "%" ORDER BY frequency DESC LIMIT 1',
+    [lowerDesc]
   );
 
-  if (corrections.length > 0) {
+  if (learnedResult) {
     return {
-      category: corrections[0].user_chosen_category,
-      confidence: Math.min(0.7 + (corrections[0].frequency * 0.05), 0.95),
+      category: learnedResult.user_chosen_category,
+      confidence: Math.min(1, learnedResult.frequency * 0.1), // Confidence increases with frequency
       source: 'learned'
     };
   }
 
-  // Check for partial matches in corrections
-  const partialCorrections = await db.getAllAsync(
-    'SELECT description_pattern, user_chosen_category, frequency FROM category_corrections ORDER BY frequency DESC'
-  );
-
-  for (const correction of partialCorrections) {
-    const pattern = correction.description_pattern.toLowerCase();
-    if (lowerDescription.includes(pattern) || pattern.includes(lowerDescription)) {
-      return {
-        category: correction.user_chosen_category,
-        confidence: Math.min(0.6 + (correction.frequency * 0.03), 0.85),
-        source: 'learned'
-      };
-    }
-  }
-
   // Fall back to keyword matching
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+  for (const [category, keywords] of Object.entries(KEYWORD_CATEGORIES)) {
     for (const keyword of keywords) {
-      if (lowerDescription.includes(keyword)) {
+      if (lowerDesc.includes(keyword.toLowerCase())) {
         return {
           category,
-          confidence: 0.5,
+          confidence: 0.7, // Medium confidence for keyword matches
           source: 'keyword'
         };
       }
     }
   }
 
-  return { category: 'Other', confidence: 0.3, source: 'default' };
+  // Default category if no match found
+  return {
+    category: 'Other',
+    confidence: 0.3, // Low confidence for default category
+    source: 'default'
+  };
 }
 
+// Record a user's category correction to improve future predictions
 export async function recordCategoryCorrection(description, userChosenCategory) {
-  if (!description || !userChosenCategory) return;
-
   const db = getDatabase();
-  const lowerDescription = description.toLowerCase().trim();
+  const lowerDesc = description.toLowerCase();
   const now = new Date().toISOString();
 
-  // Check if correction already exists
-  const existing = await db.getAllAsync(
+  // Check if we already have a record for this pattern
+  const existing = await db.getFirstAsync(
     'SELECT id, frequency FROM category_corrections WHERE description_pattern = ? AND user_chosen_category = ?',
-    [lowerDescription, userChosenCategory]
+    [lowerDesc, userChosenCategory]
   );
 
-  if (existing.length > 0) {
-    // Increment frequency
+  if (existing) {
+    // Update existing record
     await db.runAsync(
-      'UPDATE category_corrections SET frequency = frequency + 1, updated_at = ? WHERE id = ?',
-      [now, existing[0].id]
+      'UPDATE category_corrections SET frequency = ?, updated_at = ? WHERE id = ?',
+      [existing.frequency + 1, now, existing.id]
     );
   } else {
-    // Insert new correction
+    // Create new record
     await db.runAsync(
-      'INSERT INTO category_corrections (description_pattern, user_chosen_category, frequency, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
-      [lowerDescription, userChosenCategory, now, now]
+      'INSERT INTO category_corrections (description_pattern, user_chosen_category, frequency, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
+      [lowerDesc, userChosenCategory, 1, now, now]
     );
   }
-}
-
-export function getCategories() {
-  return [
-    'Food & Dining',
-    'Transportation',
-    'Shopping',
-    'Bills & Utilities',
-    'Entertainment',
-    'Healthcare',
-    'Personal Care',
-    'Other'
-  ];
 }
