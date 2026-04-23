@@ -45,3 +45,10 @@ export const getAppointmentWithDocuments = async (id: number): Promise<Appointme
 
   return { ...appointment, documents };
 };
+
+export const attachDocumentToAppointment = async (documentId: number, appointmentId: number): Promise<void> => {
+  await db.runAsync(
+    'UPDATE documents SET appointment_id = ? WHERE id = ?',
+    [appointmentId, documentId]
+  );
+};
