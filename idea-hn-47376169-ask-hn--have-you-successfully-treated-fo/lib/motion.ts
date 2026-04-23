@@ -18,8 +18,8 @@ interface CalibrationData {
 
 export class PostureDetector {
   private calibrationData: CalibrationData[] = [];
-  public isCalibrated = false; // Made public for easier access
-  public calibrationOffset = 0; // Made public for easier access
+  public isCalibrated = false;
+  public calibrationOffset = 0;
   private exerciseThresholds: Record<string, { min: number; max: number }> = {
     'chin-tuck': { min: -15, max: 15 },
     'shoulder-squeeze': { min: -10, max: 10 },
@@ -39,7 +39,7 @@ export class PostureDetector {
   public startCalibration(): void {
     this.calibrationData = [];
     this.isCalibrated = false;
-    this.calibrationOffset = 0; // Reset offset on new calibration
+    this.calibrationOffset = 0;
   }
 
   public addCalibrationSample(accelerometer: AccelerometerData, gyroscope: GyroscopeData): void {
@@ -49,7 +49,7 @@ export class PostureDetector {
       timestamp: Date.now()
     });
 
-    if (this.calibrationData.length >= 100) { // Collect 100 samples for calibration
+    if (this.calibrationData.length >= 100) {
       this.calculateCalibrationOffset();
       this.isCalibrated = true;
     }
@@ -58,9 +58,6 @@ export class PostureDetector {
   private calculateCalibrationOffset(): void {
     const angles = this.calibrationData.map(data => {
       const { x, y, z } = data.accelerometer;
-      // Calculate pitch angle (rotation around Y-axis)
-      // This assumes the phone is held upright, with its screen facing forward.
-      // If the phone is held differently, this calculation might need adjustment.
       return Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
     });
 
@@ -70,7 +67,7 @@ export class PostureDetector {
 
   public detectPosture(
     accelerometer: AccelerometerData,
-    gyroscope: GyroscopeData, // Gyroscope data is not currently used in this detection logic, but kept for future expansion
+    gyroscope: GyroscopeData,
     exerciseId: string
   ): PostureResult {
     if (!this.isCalibrated) {
@@ -78,13 +75,13 @@ export class PostureDetector {
         isCorrect: false,
         angle: 0,
         feedback: "Please complete calibration first",
-        calibrationOffset: this.calibrationOffset // Return current offset even if not calibrated
+        calibrationOffset: this.calibrationOffset
       };
     }
 
     const { x, y, z } = accelerometer;
     const currentAngle = Math.atan2(x, Math.sqrt(y * y + z * z)) * (180 / Math.PI);
-    const angle = currentAngle - this.calibrationOffset; // Apply calibration offset
+    const angle = currentAngle - this.calibrationOffset;
 
     const thresholds = this.exerciseThresholds[exerciseId] || { min: -10, max: 10 };
     const isCorrect = angle >= thresholds.min && angle <= thresholds.max;
@@ -111,9 +108,8 @@ export class PostureDetector {
     requiredDuration: number,
     exerciseId: string
   ): boolean {
-    // Different hold requirements based on exercise
     if (exerciseId === 'chin-tuck') {
-      return currentDuration >= requiredDuration * 1.2; // More precise for chin tucks
+      return currentDuration >= requiredDuration * 1.2;
     }
     return currentDuration >= requiredDuration;
   }

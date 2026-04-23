@@ -9,12 +9,12 @@ export default function ActiveRoutineScreen() {
   const { exercises, completeExercise, incrementStreak } = useStore();
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
-  const [showCalibrationModal, setShowCalibrationModal] = useState(false); // Initially false
-  const [hasCalibratedForSession, setHasCalibratedForSession] = useState(false); // New state to track calibration for current routine session
+  const [showCalibrationModal, setShowCalibrationModal] = useState(false);
+  const [hasCalibratedForSession, setHasCalibratedForSession] = useState(false);
   const [holdTimer, setHoldTimer] = useState(0);
   const [isHoldingCorrectly, setIsHoldingCorrectly] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isDetectorLoading, setIsDetectorLoading] = useState(true); // To wait for MotionDetector to load calibration
+  const [isDetectorLoading, setIsDetectorLoading] = useState(true);
 
   const currentExercise = exercises[currentExerciseIndex];
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -62,11 +62,10 @@ export default function ActiveRoutineScreen() {
       setCurrentExerciseIndex(prevIndex => prevIndex + 1);
       setHoldTimer(0);
       setIsHoldingCorrectly(false);
-      // Calibration modal logic is now handled by initial check and hasCalibratedForSession
       playSound('start');
     } else {
       setIsComplete(true);
-      completeExercise(currentExercise.id); // Assuming currentExercise is still valid here
+      completeExercise(currentExercise.id);
       incrementStreak();
       playSound('complete');
     }
@@ -102,16 +101,16 @@ export default function ActiveRoutineScreen() {
 
   const handleCalibrationComplete = useCallback(() => {
     setShowCalibrationModal(false);
-    setHasCalibratedForSession(true); // Calibration is done for this session
+    setHasCalibratedForSession(true);
     playSound('start');
   }, [playSound]);
 
   const handleInitialCalibrationStatusLoaded = useCallback((calibrated: boolean) => {
     setIsDetectorLoading(false);
     if (!calibrated) {
-      setShowCalibrationModal(true); // Show modal if not calibrated initially
+      setShowCalibrationModal(true);
     } else {
-      setHasCalibratedForSession(true); // Already calibrated from previous session, no need to show modal
+      setHasCalibratedForSession(true);
     }
   }, []);
 
@@ -142,14 +141,6 @@ export default function ActiveRoutineScreen() {
       <Text style={styles.title}>{currentExercise.name}</Text>
       <Text style={styles.instructions}>{currentExercise.instructions}</Text>
 
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerText}>
-          {isHoldingCorrectly
-            ? `Hold: ${holdTimer}/${currentExercise.duration}s`
-            : 'Adjust your posture'}
-        </Text>
-      </View>
-
       <MotionDetector
         exerciseId={currentExercise.id}
         onCalibrationComplete={handleCalibrationComplete}
@@ -157,19 +148,38 @@ export default function ActiveRoutineScreen() {
         onInitialCalibrationStatusLoaded={handleInitialCalibrationStatusLoaded}
       />
 
+      {hasCalibratedForSession && (
+        <View style={styles.timerContainer}>
+          <Text style={styles.timerText}>
+            {isHoldingCorrectly ? `Hold: ${holdTimer}s / ${currentExercise.duration}s` : "Adjust your posture"}
+          </Text>
+          {isHoldingCorrectly && (
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  { width: `${(holdTimer / currentExercise.duration) * 100}%` }
+                ]}
+              />
+            </View>
+          )}
+        </View>
+      )}
+
       {isHoldingCorrectly && (
         <TouchableOpacity
-          style={[styles.nextButton, holdTimer >= currentExercise.duration ? styles.nextButtonActive : {}]}
+          style={styles.nextButton}
           onPress={handleNextExercise}
           disabled={holdTimer < currentExercise.duration}
         >
-          <Text style={styles.nextButtonText}>Next Exercise</Text>
+          <Text style={styles.nextButtonText}>
+            {currentExerciseIndex < exercises.length - 1 ? "Next Exercise" : "Complete Routine"}
+          </Text>
         </TouchableOpacity>
       )}
 
-      {/* Only show modal if calibration is required AND not yet calibrated for this session */}
       <Modal
-        visible={showCalibrationModal && !hasCalibratedForSession}
+        visible={showCalibrationModal}
         transparent={true}
         animationType="slide"
       >
@@ -177,14 +187,14 @@ export default function ActiveRoutineScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Calibration Required</Text>
             <Text style={styles.modalText}>
-              To ensure accurate posture detection, please calibrate your device.
+              Please hold your phone steady in your ideal posture for the current exercise.
             </Text>
             <Text style={styles.modalText}>
-              Hold your phone in your ideal posture for the {currentExercise.name} exercise and tap "Start Calibration" below.
+              This helps the app understand your correct posture for this exercise.
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => setShowCalibrationModal(false)} // Allow dismissing the modal, but calibration still needed
+              onPress={() => setShowCalibrationModal(false)}
             >
               <Text style={styles.modalButtonText}>Got it</Text>
             </TouchableOpacity>
@@ -199,69 +209,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#fff',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 18,
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#666',
   },
   instructions: {
     fontSize: 16,
+    color: '#666',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#444',
   },
   timerContainer: {
+    marginVertical: 20,
     alignItems: 'center',
-    marginBottom: 20,
   },
   timerText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    marginBottom: 10,
   },
-  button: {
+  progressBar: {
+    height: 10,
+    width: '80%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  progressFill: {
+    height: '100%',
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    borderRadius: 5,
   },
   nextButton: {
-    backgroundColor: '#ccc',
-    padding: 15,
-    borderRadius: 10,
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  nextButtonActive: {
     backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
   },
   nextButtonText: {
     color: 'white',
-    fontSize: 18,
     fontWeight: 'bold',
-  },
-  streakText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#34C759',
-    textAlign: 'center',
-    marginVertical: 20,
+    fontSize: 16,
   },
   modalContainer: {
     flex: 1,
@@ -274,29 +266,50 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: '80%',
-    maxWidth: 400,
+    alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    textAlign: 'center',
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 15,
+    marginBottom: 10,
     textAlign: 'center',
   },
   modalButton: {
     backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 8,
-    marginTop: 10,
+    marginTop: 15,
+    width: '100%',
+    alignItems: 'center',
   },
   modalButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 18,
+    marginBottom: 20,
     textAlign: 'center',
+  },
+  streakText: {
+    fontSize: 16,
+    color: '#4CAF50',
+    marginBottom: 30,
+    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
