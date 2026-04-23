@@ -115,10 +115,64 @@ const getInstallTrendData = async () => {
   }
 };
 
+const getDeepLinkUsage = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        tx.executeSql(
+          'SELECT link, COUNT(*) as count FROM deep_links GROUP BY link ORDER BY count DESC',
+          [],
+          (_, result) => {
+            resolve(result.rows._array);
+          },
+          (_, error) => {
+            console.error('Error getting deep link usage:', error);
+            reject(error);
+          }
+        );
+      },
+      error => {
+        reject(error);
+      }
+    );
+  });
+};
+
+const getInstallSourcesOverTime = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        tx.executeSql(
+          `SELECT
+            strftime('%Y-%m-%d', timestamp/1000, 'unixepoch') as date,
+            source,
+            COUNT(*) as count
+          FROM installs
+          GROUP BY date, source
+          ORDER BY date DESC, count DESC`,
+          [],
+          (_, result) => {
+            resolve(result.rows._array);
+          },
+          (_, error) => {
+            console.error('Error getting install sources over time:', error);
+            reject(error);
+          }
+        );
+      },
+      error => {
+        reject(error);
+      }
+    );
+  });
+};
+
 export {
   getInstallCount,
   getDeepLinkCount,
   getInstallsBySource,
   getRecentInstalls,
-  getInstallTrendData
+  getInstallTrendData,
+  getDeepLinkUsage,
+  getInstallSourcesOverTime
 };

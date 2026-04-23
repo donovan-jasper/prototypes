@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator } from 'react-native';
-import { getInstallCount, getDeepLinkCount, getInstallsBySource, getRecentInstalls, getInstallTrendData } from '../services/AnalyticsService';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, Dimensions } from 'react-native';
+import { LineChart, BarChart } from 'react-native-chart-kit';
+import { getInstallCount, getDeepLinkCount, getInstallsBySource, getRecentInstalls, getInstallTrendData, getDeepLinkUsage, getInstallSourcesOverTime } from '../services/AnalyticsService';
 
 const Analytics = () => {
   const [installCount, setInstallCount] = useState(0);
@@ -8,6 +9,8 @@ const Analytics = () => {
   const [installsBySource, setInstallsBySource] = useState([]);
   const [recentInstalls, setRecentInstalls] = useState([]);
   const [trendData, setTrendData] = useState({ today: 0, yesterday: 0 });
+  const [deepLinkUsage, setDeepLinkUsage] = useState([]);
+  const [installSourcesOverTime, setInstallSourcesOverTime] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -17,12 +20,14 @@ const Analytics = () => {
       setLoading(true);
       setError(null);
 
-      const [installs, deepLinks, sourceData, recent, trend] = await Promise.all([
+      const [installs, deepLinks, sourceData, recent, trend, deepLinksUsage, sourcesOverTime] = await Promise.all([
         getInstallCount(),
         getDeepLinkCount(),
         getInstallsBySource(),
         getRecentInstalls(),
-        getInstallTrendData()
+        getInstallTrendData(),
+        getDeepLinkUsage(),
+        getInstallSourcesOverTime()
       ]);
 
       setInstallCount(installs);
@@ -30,6 +35,8 @@ const Analytics = () => {
       setInstallsBySource(sourceData);
       setRecentInstalls(recent);
       setTrendData(trend);
+      setDeepLinkUsage(deepLinksUsage);
+      setInstallSourcesOverTime(sourcesOverTime);
     } catch (err) {
       console.error('Error fetching analytics:', err);
       setError('Failed to load analytics data. Please try again.');
@@ -72,7 +79,32 @@ const Analytics = () => {
     return { text: '→ Stable', color: '#FF9500' };
   };
 
-  const trend = getTrendIndicator();
+  const prepareChartData = () => {
+    if (installSourcesOverTime.length === 0) return null;
+
+    // Group by date and source
+    const dates = [...new Set(installSourcesOverTime.map(item => item.date))].sort();
+    const sources = [...new Set(installSourcesOverTime.map(item => item.source))];
+
+    const datasets = sources.map(source => {
+      return {
+        data: dates.map(date => {
+          const entry = installSourcesOverTime.find(item => item.date === date && item.source === source);
+          return entry ? entry.count : 0;
+        }),
+        color: () => `rgba(${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, ${Math.floor(Math.random() * 255)}, 0.8)`,
+        strokeWidth: 2
+      };
+    });
+
+    return {
+      labels: dates,
+      datasets,
+      legend: sources
+    };
+  };
+
+  const chartData = prepareChartData();
 
   if (loading) {
     return (
@@ -93,6 +125,8 @@ const Analytics = () => {
       </View>
     );
   }
+
+  const trend = getTrendIndicator();
 
   return (
     <ScrollView
@@ -143,7 +177,7 @@ const Analytics = () => {
             return (
               <View key={index} style={styles.sourceCard}>
                 <View style={styles.sourceHeader}>
-                  <Text style={styles.sourceName}>{item.source || 'Unknown'}</Text>
+                  <Text style={styles.sourceName}>{item.source}</Text>
                   <Text style={styles.sourceCount}>{item.count} installs</Text>
                 </View>
                 <View style={styles.progressBarContainer}>
@@ -157,13 +191,61 @@ const Analytics = () => {
       </View>
 
       <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Deep Link Usage</Text>
+        {deepLinkUsage.length === 0 ? (
+          <Text style={styles.emptyText}>No deep link data yet</Text>
+        ) : (
+          deepLinkUsage.map((item, index) => (
+            <View key={index} style={styles.deepLinkCard}>
+              <Text style={styles.deepLinkText}>{item.link}</Text>
+              <Text style={styles.deepLinkCount}>{item.count} uses</Text>
+            </View>
+          ))
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Install Trends Over Time</Text>
+        {chartData ? (
+          <LineChart
+            data={chartData}
+            width={Dimensions.get('window').width - 32}
+            height={220}
+            chartConfig={{
+              backgroundColor: '#ffffff',
+              backgroundGradientFrom: '#ffffff',
+              backgroundGradientTo: '#ffffff',
+              decimalPlaces: 0,
+              color: (opacity = 1) => `rgba(0, 122, 255, ${opacity})`,
+              labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+              style: {
+                borderRadius: 16
+              },
+              propsForDots: {
+                r: '4',
+                strokeWidth: '2',
+                stroke: '#ffffff'
+              }
+            }}
+            bezier
+            style={{
+              marginVertical: 8,
+              borderRadius: 16
+            }}
+          />
+        ) : (
+          <Text style={styles.emptyText}>Not enough data for trends</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Recent Installs</Text>
         {recentInstalls.length === 0 ? (
           <Text style={styles.emptyText}>No recent installs</Text>
         ) : (
           recentInstalls.map((install, index) => (
             <View key={index} style={styles.recentInstallCard}>
-              <Text style={styles.recentInstallSource}>{install.source || 'Unknown'}</Text>
+              <Text style={styles.recentInstallSource}>{install.source}</Text>
               <Text style={styles.recentInstallTime}>{formatTimestamp(install.timestamp)}</Text>
             </View>
           ))
@@ -182,8 +264,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 24,
+    color: '#333',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -192,7 +274,7 @@ const styles = StyleSheet.create({
   },
   statCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     flex: 1,
     marginHorizontal: 4,
@@ -205,7 +287,7 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   statValue: {
     fontSize: 24,
@@ -218,12 +300,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 12,
+    color: '#333',
   },
   trendCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -247,8 +329,7 @@ const styles = StyleSheet.create({
   },
   trendIndicator: {
     borderRadius: 12,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    padding: 8,
     alignSelf: 'flex-start',
     marginTop: 8,
   },
@@ -258,7 +339,7 @@ const styles = StyleSheet.create({
   },
   sourceCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     shadowColor: '#000',
@@ -282,29 +363,46 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   progressBarContainer: {
-    height: 6,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 3,
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
     marginBottom: 4,
   },
   progressBar: {
     height: '100%',
     backgroundColor: '#007AFF',
-    borderRadius: 3,
+    borderRadius: 4,
   },
   percentageText: {
     fontSize: 12,
     color: '#666',
     textAlign: 'right',
   },
-  recentInstallCard: {
+  deepLinkCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 8,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  deepLinkText: {
+    fontSize: 14,
+    color: '#007AFF',
+    marginBottom: 4,
+  },
+  deepLinkCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  recentInstallCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -312,19 +410,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   recentInstallSource: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
     color: '#333',
+    marginBottom: 4,
   },
   recentInstallTime: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   emptyText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-    padding: 16,
+    marginTop: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -352,7 +451,7 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 16,
     color: '#007AFF',
-    textDecorationLine: 'underline',
+    textAlign: 'center',
   },
 });
 
