@@ -174,35 +174,30 @@ const ARTargetPractice = () => {
       };
       arEngineRef.current.addTarget(newTarget);
     } else {
-      // Miss
+      // Missed
       setMisses(prev => prev + 1);
     }
   };
 
-  const initGL = async (gl) => {
-    if (!gl) return;
-
-    // Initialize AR engine
+  const onContextCreate = async (gl) => {
     arEngineRef.current.initialize(gl);
 
     // Animation loop
     const animate = () => {
       if (glViewRef.current) {
-        requestAnimationFrame(animate);
-
-        // Update camera orientation based on device motion
-        if (arEngineRef.current.camera) {
-          // Convert device orientation to camera rotation
-          // Note: This is simplified - real AR would use more complex calculations
-          arEngineRef.current.camera.rotation.x = THREE.MathUtils.degToRad(deviceOrientation.beta);
-          arEngineRef.current.camera.rotation.y = THREE.MathUtils.degToRad(deviceOrientation.alpha);
-          arEngineRef.current.camera.rotation.z = THREE.MathUtils.degToRad(deviceOrientation.gamma);
-        }
-
-        arEngineRef.current.render();
-        gl.endFrameEXP();
+        glViewRef.current.requestAnimationFrame(animate);
       }
+
+      // Update camera based on device orientation
+      if (arEngineRef.current.camera) {
+        arEngineRef.current.camera.rotation.x = deviceOrientation.beta * Math.PI / 180;
+        arEngineRef.current.camera.rotation.y = deviceOrientation.alpha * Math.PI / 180;
+        arEngineRef.current.camera.rotation.z = deviceOrientation.gamma * Math.PI / 180;
+      }
+
+      arEngineRef.current.render();
     };
+
     animate();
   };
 
@@ -225,7 +220,7 @@ const ARTargetPractice = () => {
         <GLView
           ref={glViewRef}
           style={StyleSheet.absoluteFill}
-          onContextCreate={initGL}
+          onContextCreate={onContextCreate}
         />
 
         <ARTargetOverlay
@@ -236,12 +231,8 @@ const ARTargetPractice = () => {
         />
 
         {!gameActive && (
-          <View style={styles.startButtonContainer}>
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={startGame}
-              disabled={!isPremium}
-            >
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity style={styles.startButton} onPress={startGame}>
               <Text style={styles.startButtonText}>Start AR Training</Text>
             </TouchableOpacity>
           </View>
@@ -255,7 +246,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  startButtonContainer: {
+  buttonContainer: {
     position: 'absolute',
     bottom: 50,
     left: 0,
@@ -266,7 +257,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     paddingVertical: 15,
     paddingHorizontal: 30,
-    borderRadius: 25,
+    borderRadius: 10,
   },
   startButtonText: {
     color: 'white',
