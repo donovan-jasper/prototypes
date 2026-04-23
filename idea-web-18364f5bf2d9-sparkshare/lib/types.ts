@@ -44,6 +44,7 @@ export interface UserProfile {
   skills: Skill[];
   preferences: Preference[];
   sparkScore: number;
+  matchScore?: number; // Optional for potential matches
 }
 
 export interface FeedbackNotification {

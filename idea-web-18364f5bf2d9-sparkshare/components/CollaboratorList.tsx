@@ -1,83 +1,100 @@
 import React, { useState, useEffect } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Avatar, Card, Button, ProgressBar } from 'react-native-paper';
-import { getPotentialCollaborators } from '../lib/matching';
-import { UserProfile } from '../lib/types';
+import { View, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { Text, Avatar, Card, Chip, Badge, ActivityIndicator } from 'react-native-paper';
+import { UserProfile, Skill } from '../lib/types';
+import { getPotentialCollaborators, getUserProfile } from '../lib/matching';
+import { AuthContext } from '../context/AuthContext';
 
 interface CollaboratorListProps {
   currentUserId: number;
   onSelectCollaborator: (profile: UserProfile) => void;
   onMessageCollaborator: (profile: UserProfile) => void;
+  refreshControl?: React.ReactElement;
 }
 
 const CollaboratorList: React.FC<CollaboratorListProps> = ({
   currentUserId,
   onSelectCollaborator,
-  onMessageCollaborator
+  onMessageCollaborator,
+  refreshControl
 }) => {
   const [collaborators, setCollaborators] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const loadCollaborators = async () => {
-      try {
-        const profiles = await getPotentialCollaborators(currentUserId);
-        setCollaborators(profiles);
-      } catch (error) {
-        console.error('Error loading collaborators:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadCollaborators();
-  }, [currentUserId]);
+  }, []);
+
+  const loadCollaborators = async () => {
+    try {
+      setLoading(true);
+      const potentialCollaborators = await getPotentialCollaborators(currentUserId);
+      setCollaborators(potentialCollaborators);
+    } catch (error) {
+      console.error('Error loading collaborators:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadCollaborators();
+    setRefreshing(false);
+  };
+
+  const renderSkill = (skill: Skill) => {
+    const proficiencyColors = ['#FFCDD2', '#E57373', '#EF5350', '#F44336', '#D32F2F'];
+    return (
+      <Chip
+        key={skill.id}
+        style={[styles.skillChip, { backgroundColor: proficiencyColors[skill.proficiency - 1] }]}
+        textStyle={styles.skillText}
+      >
+        {skill.skill_name}
+      </Chip>
+    );
+  };
 
   const renderCollaborator = ({ item }: { item: UserProfile }) => (
     <Card style={styles.card} elevation={2}>
       <Card.Title
         title={item.user.username}
-        subtitle={`Spark Score: ${item.sparkScore}`}
+        subtitle={item.user.location || 'Location not specified'}
         left={(props) => <Avatar.Icon {...props} icon="account" />}
         right={(props) => (
-          <View style={styles.rightContent}>
-            <Text style={styles.matchScore}>{item.sparkScore}%</Text>
-            <ProgressBar progress={item.sparkScore / 100} color="#6200ee" style={styles.progressBar} />
+          <View style={styles.scoreContainer}>
+            <Text style={styles.scoreText}>{item.sparkScore}</Text>
+            <Badge style={styles.scoreBadge}>Score</Badge>
           </View>
         )}
       />
-
       <Card.Content>
         <View style={styles.skillsContainer}>
-          {item.skills.slice(0, 3).map((skill, index) => (
-            <View key={index} style={styles.skillBadge}>
-              <Text style={styles.skillText}>{skill.skill_name}</Text>
-            </View>
-          ))}
+          {item.skills.map(renderSkill)}
         </View>
-
         <View style={styles.preferencesContainer}>
-          {item.preferences.slice(0, 2).map((pref, index) => (
-            <Text key={index} style={styles.preferenceText}>
+          {item.preferences.map(pref => (
+            <Chip key={pref.id} style={styles.preferenceChip}>
               {pref.preference_value}
-            </Text>
+            </Chip>
           ))}
         </View>
       </Card.Content>
-
       <Card.Actions>
-        <Button
-          icon="account-details"
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={() => onSelectCollaborator(item)}
         >
-          View Profile
-        </Button>
-        <Button
-          icon="message"
+          <Text style={styles.actionText}>View Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.messageButton]}
           onPress={() => onMessageCollaborator(item)}
         >
-          Message
-        </Button>
+          <Text style={[styles.actionText, styles.messageText]}>Message</Text>
+        </TouchableOpacity>
       </Card.Actions>
     </Card>
   );
@@ -85,15 +102,8 @@ const CollaboratorList: React.FC<CollaboratorListProps> = ({
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading potential collaborators...</Text>
-      </View>
-    );
-  }
-
-  if (collaborators.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text>No potential collaborators found. Try adding more skills and preferences to your profile.</Text>
+        <ActivityIndicator size="large" />
+        <Text>Finding potential collaborators...</Text>
       </View>
     );
   }
@@ -104,66 +114,76 @@ const CollaboratorList: React.FC<CollaboratorListProps> = ({
       renderItem={renderCollaborator}
       keyExtractor={(item) => item.user.id.toString()}
       contentContainerStyle={styles.listContainer}
+      refreshControl={
+        refreshControl || (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+          />
+        )
+      }
     />
   );
 };
 
 const styles = StyleSheet.create({
   listContainer: {
-    padding: 16,
+    padding: 8,
   },
   card: {
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 8,
-  },
-  rightContent: {
-    marginRight: 16,
-    width: 80,
-  },
-  matchScore: {
-    fontSize: 12,
-    color: '#6200ee',
-    textAlign: 'right',
-  },
-  progressBar: {
-    marginTop: 4,
-    height: 4,
   },
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  skillBadge: {
-    backgroundColor: '#e3f2fd',
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginRight: 8,
     marginBottom: 8,
   },
+  skillChip: {
+    marginRight: 4,
+    marginBottom: 4,
+  },
   skillText: {
-    fontSize: 12,
-    color: '#0d47a1',
+    color: '#fff',
   },
   preferencesContainer: {
-    marginTop: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  preferenceText: {
-    fontSize: 12,
-    color: '#555',
+  preferenceChip: {
+    marginRight: 4,
     marginBottom: 4,
+  },
+  scoreContainer: {
+    marginRight: 16,
+    alignItems: 'center',
+  },
+  scoreText: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  scoreBadge: {
+    marginTop: 4,
+  },
+  actionButton: {
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
+  },
+  messageButton: {
+    backgroundColor: '#4CAF50',
+  },
+  actionText: {
+    color: '#333',
+  },
+  messageText: {
+    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
   },
 });
 
