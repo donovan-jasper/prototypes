@@ -1,92 +1,89 @@
-import React, { useEffect, useRef } from 'react';
-import { View, Text, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { processNotification } from '../services/notificationService';
-import { playNarration } from '../services/audioService';
+import { generateContextualAudioDescription } from '../services/contextService';
+import VoicePlayer from './VoicePlayer';
 
-// Set notification handler
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: false,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
-
-const NotificationHandler = ({ activeVoice }) => {
-  const notificationListener = useRef();
-  const responseListener = useRef();
+const NotificationHandler = ({ selectedVoice }) => {
+  const [currentNotification, setCurrentNotification] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    // Request notification permissions
-    registerForPushNotificationsAsync();
+    const subscription = Notifications.addNotificationReceivedListener(handleNotification);
 
-    // Add notification received listener
-    notificationListener.current = Notifications.addNotificationReceivedListener(handleNotification);
-
-    // Add notification response listener (when user interacts with notification)
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        console.log('Notification Response:', response);
-      }
-    );
-
-    // Clean up listeners on unmount
     return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
+      subscription.remove();
     };
   }, []);
 
-  const registerForPushNotificationsAsync = async () => {
-    try {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
+  const handleNotification = (notification) => {
+    const processed = processNotification({
+      app: notification.request.content.data?.app || 'Unknown',
+      title: notification.request.content.title,
+      body: notification.request.content.body
+    });
 
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
+    const audioDescription = generateContextualAudioDescription(
+      processed.original,
+      selectedVoice
+    );
 
-      if (finalStatus !== 'granted') {
-        Alert.alert(
-          'Permission Required',
-          'VoiceVerse needs notification permissions to read your notifications aloud.'
-        );
-        return;
-      }
+    setCurrentNotification({
+      ...processed,
+      audioDescription
+    });
 
-      // Get device token for push notifications (if needed)
-      const token = await Notifications.getExpoPushTokenAsync();
-      console.log('Expo Push Token:', token);
-    } catch (error) {
-      console.error('Error registering for notifications:', error);
-    }
-  };
-
-  const handleNotification = async (rawNotification) => {
-    try {
-      // Process the notification through our service
-      const processedNotification = processNotification(rawNotification);
-      
-      console.log('Processed notification:', processedNotification);
-      
-      // Play the narration using the selected voice
-      await playNarration(processedNotification.processed.narrative, activeVoice);
-    } catch (error) {
-      console.error('Error handling notification:', error);
-    }
+    // Play the audio automatically
+    setIsPlaying(true);
   };
 
   return (
-    <View style={{ position: 'absolute', top: -1000, left: -1000 }}>
-      {/* Invisible component that handles notifications */}
+    <View style={styles.container}>
+      {currentNotification && (
+        <View style={styles.notificationContainer}>
+          <Text style={styles.appName}>{currentNotification.original.app}</Text>
+          <Text style={styles.narrative}>{currentNotification.narrative}</Text>
+          <VoicePlayer
+            text={currentNotification.audioDescription.text}
+            voice={currentNotification.audioDescription.voice}
+            isPlaying={isPlaying}
+            onPlaybackStatusUpdate={(status) => {
+              if (status.isLoaded && status.didJustFinish) {
+                setIsPlaying(false);
+              }
+            }}
+          />
+        </View>
+      )}
     </View>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    zIndex: 1000,
+  },
+  notificationContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4a4a4a',
+  },
+  appName: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  narrative: {
+    color: '#fff',
+    marginBottom: 10,
+  },
+});
 
 export default NotificationHandler;

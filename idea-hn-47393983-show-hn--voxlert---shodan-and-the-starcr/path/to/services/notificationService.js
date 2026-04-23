@@ -82,45 +82,79 @@ const extractAmountFromBody = (body) => {
 };
 
 const generateNarrativeForEmail = (notification) => {
-  const sender = extractSenderFromTitle(notification.title) || 
-                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] || 
+  const sender = extractSenderFromTitle(notification.title) ||
+                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] ||
                  'unknown sender';
-  
+
   let narrative = `New email from ${sender}`;
-  
+
   if (notification.body && notification.body.length > 0) {
     narrative += `: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
   }
-  
+
   return narrative;
 };
 
 const generateNarrativeForMessaging = (notification) => {
-  const sender = extractSenderFromTitle(notification.title) || 
-                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] || 
+  const sender = extractSenderFromTitle(notification.title) ||
+                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] ||
                  'unknown contact';
-  
+
   let narrative = `New message from ${sender}`;
-  
+
   if (notification.body && notification.body.length > 0) {
     narrative += `: ${notification.body}`;
   }
-  
+
   return narrative;
+};
+
+const generateNarrativeForSocialLike = (notification) => {
+  const userMatch = notification.body.match(/([A-Za-z0-9_]+) liked your post/i);
+  const user = userMatch ? userMatch[1] : 'someone';
+
+  return `${user} liked your post on ${notification.app}`;
+};
+
+const generateNarrativeForSocialComment = (notification) => {
+  const userMatch = notification.body.match(/([A-Za-z0-9_]+) commented on your post/i);
+  const user = userMatch ? userMatch[1] : 'someone';
+
+  const commentMatch = notification.body.match(/commented: "([^"]+)"/i);
+  const comment = commentMatch ? commentMatch[1] : '';
+
+  return `${user} commented on your post${comment ? `: "${comment}"` : ''} on ${notification.app}`;
+};
+
+const generateNarrativeForSocialFollow = (notification) => {
+  const userMatch = notification.body.match(/([A-Za-z0-9_]+) started following you/i);
+  const user = userMatch ? userMatch[1] : 'someone';
+
+  return `${user} started following you on ${notification.app}`;
+};
+
+const generateNarrativeForSocialMention = (notification) => {
+  const userMatch = notification.body.match(/([A-Za-z0-9_]+) mentioned you/i);
+  const user = userMatch ? userMatch[1] : 'someone';
+
+  const postMatch = notification.body.match(/in a post: "([^"]+)"/i);
+  const post = postMatch ? postMatch[1] : '';
+
+  return `${user} mentioned you${post ? ` in a post: "${post}"` : ''} on ${notification.app}`;
 };
 
 const generateNarrativeForSocial = (notification) => {
   const lowerTitle = notification.title.toLowerCase();
   const lowerBody = notification.body.toLowerCase();
-  
+
   if (lowerTitle.includes('like') || lowerBody.includes('liked')) {
-    return `Someone liked your post`;
+    return generateNarrativeForSocialLike(notification);
   } else if (lowerTitle.includes('comment') || lowerBody.includes('commented')) {
-    return `Someone commented on your post`;
+    return generateNarrativeForSocialComment(notification);
   } else if (lowerTitle.includes('follow') || lowerBody.includes('followed')) {
-    return `New follower`;
+    return generateNarrativeForSocialFollow(notification);
   } else if (lowerTitle.includes('mention') || lowerBody.includes('mentioned')) {
-    return `You were mentioned in a post`;
+    return generateNarrativeForSocialMention(notification);
   } else {
     return `New activity on ${notification.app}: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
   }
@@ -129,111 +163,163 @@ const generateNarrativeForSocial = (notification) => {
 const generateNarrativeForRideSharing = (notification) => {
   const time = extractTimeFromBody(notification.body);
   const location = extractLocationFromBody(notification.body);
-  
-  if (time && location) {
-    return `Your ride is arriving in ${time} minutes at ${location}`;
-  } else if (time) {
-    return `Your ride is arriving in ${time} minutes`;
-  } else if (location) {
-    return `Your ride is heading to ${location}`;
-  } else {
-    return `Ride update: ${notification.body}`;
+
+  let narrative = `Your ${notification.app} ride`;
+
+  if (time) {
+    narrative += ` is arriving in ${time} minutes`;
   }
+
+  if (location) {
+    narrative += ` at ${location}`;
+  }
+
+  return narrative;
 };
 
 const generateNarrativeForFoodDelivery = (notification) => {
   const time = extractTimeFromBody(notification.body);
   const location = extractLocationFromBody(notification.body);
-  
-  if (time && location) {
-    return `Your food order will be delivered in ${time} minutes at ${location}`;
-  } else if (time) {
-    return `Your food order will be delivered in ${time} minutes`;
-  } else if (location) {
-    return `Your food order is being delivered to ${location}`;
-  } else {
-    return `Food delivery update: ${notification.body}`;
+
+  let narrative = `Your ${notification.app} order`;
+
+  if (time) {
+    narrative += ` will be delivered in ${time} minutes`;
   }
+
+  if (location) {
+    narrative += ` to ${location}`;
+  }
+
+  return narrative;
 };
 
 const generateNarrativeForBanking = (notification) => {
   const amount = extractAmountFromBody(notification.body);
-  
+  const transactionType = notification.body.toLowerCase().includes('deposit') ? 'deposit' :
+                         notification.body.toLowerCase().includes('withdrawal') ? 'withdrawal' :
+                         'transaction';
+
+  let narrative = `New ${transactionType} in your ${notification.app} account`;
+
   if (amount) {
-    return `Banking alert: Transaction of $${amount.toFixed(2)}`;
-  } else {
-    return `Banking alert: ${notification.body}`;
+    narrative += `: $${amount.toFixed(2)}`;
   }
+
+  return narrative;
 };
 
 const generateNarrativeForHealth = (notification) => {
-  return `Health update from ${notification.app}: ${notification.body}`;
+  const stepsMatch = notification.body.match(/(\d+)\s*steps/i);
+  const caloriesMatch = notification.body.match(/(\d+)\s*calories/i);
+
+  let narrative = `New activity on ${notification.app}`;
+
+  if (stepsMatch) {
+    narrative += `: You walked ${stepsMatch[1]} steps`;
+  } else if (caloriesMatch) {
+    narrative += `: You burned ${caloriesMatch[1]} calories`;
+  }
+
+  return narrative;
 };
 
 const generateNarrativeForProductivity = (notification) => {
-  return `Calendar reminder: ${notification.body}`;
+  const eventMatch = notification.body.match(/event:\s*([^\n]+)/i);
+  const taskMatch = notification.body.match(/task:\s*([^\n]+)/i);
+
+  let narrative = `New ${notification.app} notification`;
+
+  if (eventMatch) {
+    narrative += `: Event - ${eventMatch[1]}`;
+  } else if (taskMatch) {
+    narrative += `: Task - ${taskMatch[1]}`;
+  }
+
+  return narrative;
 };
 
 const generateNarrativeForNews = (notification) => {
-  return `Latest news from ${notification.app}: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
+  const headlineMatch = notification.body.match(/headline:\s*([^\n]+)/i);
+
+  let narrative = `Breaking news from ${notification.app}`;
+
+  if (headlineMatch) {
+    narrative += `: ${headlineMatch[1]}`;
+  }
+
+  return narrative;
 };
 
 const generateNarrativeForMusic = (notification) => {
-  return `Music update: ${notification.body}`;
-};
+  const songMatch = notification.body.match(/song:\s*([^\n]+)/i);
+  const artistMatch = notification.body.match(/artist:\s*([^\n]+)/i);
 
-const NARRATIVE_GENERATORS = {
-  email: generateNarrativeForEmail,
-  messaging: generateNarrativeForMessaging,
-  social: generateNarrativeForSocial,
-  rideSharing: generateNarrativeForRideSharing,
-  foodDelivery: generateNarrativeForFoodDelivery,
-  banking: generateNarrativeForBanking,
-  health: generateNarrativeForHealth,
-  productivity: generateNarrativeForProductivity,
-  news: generateNarrativeForNews,
-  music: generateNarrativeForMusic
-};
+  let narrative = `New ${notification.app} notification`;
 
-export const categorizeNotification = (notification) => {
-  for (const [category, rule] of Object.entries(CATEGORIZATION_RULES)) {
-    if (rule(notification)) {
-      return category;
-    }
+  if (songMatch && artistMatch) {
+    narrative += `: ${songMatch[1]} by ${artistMatch[1]}`;
+  } else if (songMatch) {
+    narrative += `: ${songMatch[1]}`;
   }
-  return 'other'; // Default category
+
+  return narrative;
 };
 
-export const generateNarrativeText = (notification) => {
-  const category = categorizeNotification(notification);
-  const generator = NARRATIVE_GENERATORS[category];
-  
-  if (generator) {
-    return generator(notification);
+const generateNarrativeForDefault = (notification) => {
+  return `New notification from ${notification.app}: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
+};
+
+const generateNarrativeText = (notification) => {
+  if (CATEGORIZATION_RULES.email(notification)) {
+    return generateNarrativeForEmail(notification);
+  } else if (CATEGORIZATION_RULES.messaging(notification)) {
+    return generateNarrativeForMessaging(notification);
+  } else if (CATEGORIZATION_RULES.social(notification)) {
+    return generateNarrativeForSocial(notification);
+  } else if (CATEGORIZATION_RULES.rideSharing(notification)) {
+    return generateNarrativeForRideSharing(notification);
+  } else if (CATEGORIZATION_RULES.foodDelivery(notification)) {
+    return generateNarrativeForFoodDelivery(notification);
+  } else if (CATEGORIZATION_RULES.banking(notification)) {
+    return generateNarrativeForBanking(notification);
+  } else if (CATEGORIZATION_RULES.health(notification)) {
+    return generateNarrativeForHealth(notification);
+  } else if (CATEGORIZATION_RULES.productivity(notification)) {
+    return generateNarrativeForProductivity(notification);
+  } else if (CATEGORIZATION_RULES.news(notification)) {
+    return generateNarrativeForNews(notification);
+  } else if (CATEGORIZATION_RULES.music(notification)) {
+    return generateNarrativeForMusic(notification);
+  } else {
+    return generateNarrativeForDefault(notification);
   }
-  
-  // Fallback narrative
-  return `${notification.app}: ${notification.title} - ${notification.body}`;
 };
 
-export const processNotification = (rawNotification) => {
-  // Extract relevant information from raw notification
-  const notificationData = {
-    app: rawNotification.request?.content?.data?.app || 'unknown',
-    title: rawNotification.request?.content?.title || '',
-    body: rawNotification.request?.content?.body || '',
-    data: rawNotification.request?.content?.data || {}
-  };
-
-  const category = categorizeNotification(notificationData);
-  const narrative = generateNarrativeText(notificationData);
+const processNotification = (notification) => {
+  const narrative = generateNarrativeText(notification);
 
   return {
-    original: rawNotification,
-    processed: {
-      ...notificationData,
-      category,
-      narrative
-    }
+    original: notification,
+    narrative: narrative,
+    timestamp: new Date().toISOString(),
+    category: Object.keys(CATEGORIZATION_RULES).find(key =>
+      CATEGORIZATION_RULES[key](notification)
+    ) || 'other'
   };
+};
+
+export {
+  processNotification,
+  generateNarrativeText,
+  generateNarrativeForEmail,
+  generateNarrativeForMessaging,
+  generateNarrativeForSocial,
+  generateNarrativeForRideSharing,
+  generateNarrativeForFoodDelivery,
+  generateNarrativeForBanking,
+  generateNarrativeForHealth,
+  generateNarrativeForProductivity,
+  generateNarrativeForNews,
+  generateNarrativeForMusic
 };
