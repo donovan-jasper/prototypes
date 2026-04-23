@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { NewsArticle } from '../types/news';
 import SentimentBadge from './SentimentBadge';
 import { formatRelativeTime } from '../utils/formatters';
@@ -11,48 +11,44 @@ interface NewsCardProps {
 
 const NewsCard: React.FC<NewsCardProps> = ({ article, onDismiss }) => {
   const handlePress = () => {
-    if (article.url) {
-      Linking.openURL(article.url).catch(() => {
-        Alert.alert('Error', 'Could not open the article link');
-      });
-    }
-  };
-
-  const handleLongPress = () => {
-    Alert.alert(
-      'Explain Like I\'m 5',
-      `This article is about ${article.title.toLowerCase()}. It was published by ${article.source.name} ${formatRelativeTime(article.publishedAt)}.`,
-      [{ text: 'OK' }]
-    );
+    Linking.openURL(article.url);
   };
 
   return (
     <TouchableOpacity
       style={styles.card}
       onPress={handlePress}
-      onLongPress={handleLongPress}
       activeOpacity={0.8}
     >
       <View style={styles.header}>
-        <Text style={styles.source}>{article.source.name}</Text>
+        <Text style={styles.symbol}>{article.symbol}</Text>
         <SentimentBadge sentiment={article.sentimentLabel} />
       </View>
-      <Text style={styles.title} numberOfLines={2}>{article.title}</Text>
+
+      <Text style={styles.title} numberOfLines={2}>
+        {article.title}
+      </Text>
+
       {article.description && (
         <Text style={styles.description} numberOfLines={3}>
           {article.description}
         </Text>
       )}
+
       <View style={styles.footer}>
+        <Text style={styles.source}>{article.source.name}</Text>
         <Text style={styles.time}>{formatRelativeTime(article.publishedAt)}</Text>
-        <TouchableOpacity
-          style={styles.dismissButton}
-          onPress={onDismiss}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Text style={styles.dismissText}>Dismiss</Text>
-        </TouchableOpacity>
       </View>
+
+      <TouchableOpacity
+        style={styles.dismissButton}
+        onPress={(e) => {
+          e.stopPropagation();
+          onDismiss();
+        }}
+      >
+        <Text style={styles.dismissText}>Dismiss</Text>
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 };
@@ -60,14 +56,14 @@ const NewsCard: React.FC<NewsCardProps> = ({ article, onDismiss }) => {
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     marginHorizontal: 16,
-    marginVertical: 8,
+    marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
   header: {
@@ -76,16 +72,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  source: {
-    fontSize: 12,
+  symbol: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#666',
-    fontWeight: '500',
   },
   title: {
     fontSize: 16,
     fontWeight: '600',
+    marginBottom: 4,
     color: '#333',
-    marginBottom: 8,
   },
   description: {
     fontSize: 14,
@@ -97,17 +93,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  source: {
+    fontSize: 12,
+    color: '#999',
+  },
   time: {
     fontSize: 12,
     color: '#999',
   },
   dismissButton: {
-    padding: 8,
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
   },
   dismissText: {
     fontSize: 12,
-    color: '#007aff',
-    fontWeight: '500',
+    color: '#999',
   },
 });
 

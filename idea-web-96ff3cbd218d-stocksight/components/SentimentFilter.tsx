@@ -44,7 +44,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
@@ -53,14 +53,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#f0f0f0',
   },
   activeFilterButton: {
     backgroundColor: '#007aff',
   },
   filterText: {
-    fontSize: 14,
     color: '#666',
+    fontSize: 14,
   },
   activeFilterText: {
     color: 'white',

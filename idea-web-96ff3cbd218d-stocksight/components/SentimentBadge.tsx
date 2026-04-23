@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 interface SentimentBadgeProps {
   sentiment: 'bullish' | 'bearish' | 'neutral';
@@ -11,62 +10,55 @@ const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
     switch (sentiment) {
       case 'bullish':
         return {
-          backgroundColor: '#e6f7ee',
-          color: '#2e7d32',
-          text: 'Bullish',
-          icon: 'trending-up',
+          backgroundColor: '#d4edda',
+          borderColor: '#c3e6cb',
+          textColor: '#155724',
+          label: 'Bullish',
         };
       case 'bearish':
         return {
-          backgroundColor: '#fff0f0',
-          color: '#c62828',
-          text: 'Bearish',
-          icon: 'trending-down',
+          backgroundColor: '#f8d7da',
+          borderColor: '#f5c6cb',
+          textColor: '#721c24',
+          label: 'Bearish',
         };
       case 'neutral':
+        return {
+          backgroundColor: '#e2e3e5',
+          borderColor: '#d6d8db',
+          textColor: '#383d41',
+          label: 'Neutral',
+        };
       default:
         return {
-          backgroundColor: '#f5f5f5',
-          color: '#666',
-          text: 'Neutral',
-          icon: 'remove',
+          backgroundColor: '#e2e3e5',
+          borderColor: '#d6d8db',
+          textColor: '#383d41',
+          label: 'Neutral',
         };
     }
   };
 
-  const badgeStyle = getBadgeStyle();
+  const { backgroundColor, borderColor, textColor, label } = getBadgeStyle();
 
   return (
-    <View style={[styles.badge, { backgroundColor: badgeStyle.backgroundColor }]}>
-      <Ionicons
-        name={badgeStyle.icon}
-        size={12}
-        color={badgeStyle.color}
-        style={styles.icon}
-      />
-      <Text style={[styles.badgeText, { color: badgeStyle.color }]}>
-        {badgeStyle.text}
-      </Text>
+    <View style={[styles.badge, { backgroundColor, borderColor }]}>
+      <Text style={[styles.badgeText, { color: textColor }]}>{label}</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
     alignSelf: 'flex-start',
   },
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
-    marginLeft: 4,
-  },
-  icon: {
-    marginRight: 2,
   },
 });
 
