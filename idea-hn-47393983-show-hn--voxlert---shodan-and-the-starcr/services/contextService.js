@@ -114,7 +114,7 @@ const generateProductivityNarrative = ({ app, title, body, data }) => {
   const event = extractEvent(title) || extractEvent(body);
 
   if (event) {
-    return `You have a ${event.type} scheduled for ${event.time} titled: ${event.title}`;
+    return `You have a ${event.type || 'event'} scheduled for ${event.time} titled: ${event.title}`;
   } else {
     return `New update from ${app}: ${body}`;
   }
@@ -170,24 +170,29 @@ const extractAmount = (text) => {
   return match ? parseFloat(match[1]) : null;
 };
 
-const extractTransactionType = (text) => {
+const extractAction = (text) => {
   const lowerText = text.toLowerCase();
-  if (lowerText.includes('deposit')) return 'deposit';
-  if (lowerText.includes('withdrawal')) return 'withdrawal';
-  if (lowerText.includes('payment')) return 'payment';
-  if (lowerText.includes('transfer')) return 'transfer';
-  return 'transaction';
+  if (lowerText.includes('like')) return 'like';
+  if (lowerText.includes('comment')) return 'comment';
+  if (lowerText.includes('follow')) return 'follow';
+  if (lowerText.includes('mention')) return 'mention';
+  return null;
 };
 
 const extractHealthMetric = (text) => {
   const stepsMatch = text.match(/(\d+)\s*steps/i);
   if (stepsMatch) {
-    return { type: 'step count', value: stepsMatch[1], change: 'updated to' };
+    return { type: 'steps', value: stepsMatch[1], change: 'increased to' };
   }
 
   const caloriesMatch = text.match(/(\d+)\s*calories/i);
   if (caloriesMatch) {
-    return { type: 'calorie count', value: caloriesMatch[1], change: 'updated to' };
+    return { type: 'calories burned', value: caloriesMatch[1], change: 'to' };
+  }
+
+  const heartRateMatch = text.match(/(\d+)\s*bpm/i);
+  if (heartRateMatch) {
+    return { type: 'heart rate', value: heartRateMatch[1], change: 'changed to' };
   }
 
   return null;
@@ -199,7 +204,6 @@ const extractEvent = (text) => {
 
   if (timeMatch && titleMatch) {
     return {
-      type: 'event',
       time: timeMatch[1],
       title: titleMatch[1].trim()
     };
@@ -209,17 +213,27 @@ const extractEvent = (text) => {
 };
 
 const extractHeadline = (text) => {
-  const match = text.match(/^(?:breaking:?\s*)?(.+)/i);
-  return match ? match[1].trim() : null;
+  const headlineMatch = text.match(/^(?:breaking:?\s*)?(.+)/i);
+  return headlineMatch ? headlineMatch[1].trim() : null;
 };
 
 const extractSongInfo = (text) => {
-  const match = text.match(/(?:playing|now playing)\s*(.+)\s*by\s*(.+)/i);
-  if (match) {
+  const songMatch = text.match(/^(?:now playing:?\s*)?(.+?)\s*-\s*(.+)/i);
+  if (songMatch) {
     return {
-      title: match[1].trim(),
-      artist: match[2].trim()
+      title: songMatch[1].trim(),
+      artist: songMatch[2].trim()
     };
   }
+
   return null;
+};
+
+const extractTransactionType = (text) => {
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('deposit')) return 'deposit';
+  if (lowerText.includes('withdrawal')) return 'withdrawal';
+  if (lowerText.includes('payment')) return 'payment';
+  if (lowerText.includes('transfer')) return 'transfer';
+  return 'transaction';
 };

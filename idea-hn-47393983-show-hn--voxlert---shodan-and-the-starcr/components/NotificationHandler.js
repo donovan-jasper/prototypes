@@ -7,9 +7,11 @@ import { playNarration } from '../services/audioService';
 import { useSettings } from '../context/SettingsContext';
 
 const NotificationHandler = () => {
-  const { selectedVoice, notificationVolume, notificationSpeed } = useSettings();
+  const { selectedVoice, notificationVolume, notificationSpeed, isNotificationEnabled } = useSettings();
 
   useEffect(() => {
+    if (!isNotificationEnabled) return;
+
     const initializeNotifications = async () => {
       try {
         // Request permissions
@@ -58,7 +60,7 @@ const NotificationHandler = () => {
     };
 
     initializeNotifications();
-  }, [selectedVoice, notificationVolume, notificationSpeed]);
+  }, [selectedVoice, notificationVolume, notificationSpeed, isNotificationEnabled]);
 
   return (
     <View style={styles.container}>

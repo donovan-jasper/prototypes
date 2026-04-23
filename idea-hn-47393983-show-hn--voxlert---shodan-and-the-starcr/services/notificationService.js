@@ -121,3 +121,62 @@ const extractAction = (text) => {
   if (lowerText.includes('mention')) return 'mention';
   return null;
 };
+
+export const extractHealthMetric = (text) => {
+  const stepsMatch = text.match(/(\d+)\s*steps/i);
+  if (stepsMatch) {
+    return { type: 'steps', value: stepsMatch[1], change: 'increased to' };
+  }
+
+  const caloriesMatch = text.match(/(\d+)\s*calories/i);
+  if (caloriesMatch) {
+    return { type: 'calories burned', value: caloriesMatch[1], change: 'to' };
+  }
+
+  const heartRateMatch = text.match(/(\d+)\s*bpm/i);
+  if (heartRateMatch) {
+    return { type: 'heart rate', value: heartRateMatch[1], change: 'changed to' };
+  }
+
+  return null;
+};
+
+export const extractEvent = (text) => {
+  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i);
+  const titleMatch = text.match(/:\s*(.+)/);
+
+  if (timeMatch && titleMatch) {
+    return {
+      time: timeMatch[1],
+      title: titleMatch[1].trim()
+    };
+  }
+
+  return null;
+};
+
+export const extractHeadline = (text) => {
+  const headlineMatch = text.match(/^(?:breaking:?\s*)?(.+)/i);
+  return headlineMatch ? headlineMatch[1].trim() : null;
+};
+
+export const extractSongInfo = (text) => {
+  const songMatch = text.match(/^(?:now playing:?\s*)?(.+?)\s*-\s*(.+)/i);
+  if (songMatch) {
+    return {
+      title: songMatch[1].trim(),
+      artist: songMatch[2].trim()
+    };
+  }
+
+  return null;
+};
+
+export const extractTransactionType = (text) => {
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('deposit')) return 'deposit';
+  if (lowerText.includes('withdrawal')) return 'withdrawal';
+  if (lowerText.includes('payment')) return 'payment';
+  if (lowerText.includes('transfer')) return 'transfer';
+  return 'transaction';
+};

@@ -22,6 +22,26 @@ const CHARACTER_VOICES = {
   professional: {
     ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
     android: 'en-us-x-sfg#male_2-local'
+  },
+  robot: {
+    ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
+    android: 'en-us-x-sfg#male_2-local'
+  },
+  cheerleader: {
+    ios: 'com.apple.ttsbundle.siri_female_en-US_compact',
+    android: 'en-us-x-sfg#female_2-local'
+  },
+  pirate: {
+    ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
+    android: 'en-us-x-sfg#male_2-local'
+  },
+  newsAnchor: {
+    ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
+    android: 'en-us-x-sfg#male_2-local'
+  },
+  grandma: {
+    ios: 'com.apple.ttsbundle.siri_female_en-US_compact',
+    android: 'en-us-x-sfg#female_2-local'
   }
 };
 
@@ -74,4 +94,14 @@ export const generateVoiceSample = async (characterVoice = 'default', options = 
 
 export const stopNarration = () => {
   Speech.stop();
+};
+
+export const getAvailableVoices = async () => {
+  try {
+    const voices = await Speech.getAvailableVoicesAsync();
+    return voices;
+  } catch (error) {
+    console.error('Error getting available voices:', error);
+    return [];
+  }
 };
