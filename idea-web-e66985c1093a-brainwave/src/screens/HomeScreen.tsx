@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'rea
 import { useAppContext } from '../context/AppContext';
 import { SessionTimer } from '../components/SessionTimer';
 import { ActivityProfileCard } from '../components/ActivityProfileCard';
+import { AlertControls } from '../components/AlertControls';
 
 const HomeScreen: React.FC = () => {
   const {
     isMonitoring,
     activeProfile,
     currentSession,
+    uiState,
     startSession,
     stopSession,
     setActiveProfile,
@@ -59,6 +61,8 @@ const HomeScreen: React.FC = () => {
         onStart={handleStartSession}
         onStop={handleStopSession}
       />
+
+      {uiState.isAlertActive && <AlertControls />}
 
       {isMonitoring && (
         <View style={styles.statusContainer}>
