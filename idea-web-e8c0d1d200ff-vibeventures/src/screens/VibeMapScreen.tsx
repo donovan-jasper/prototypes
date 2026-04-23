@@ -169,7 +169,7 @@ const VibeMapScreen = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={fetchLocationAndEvents} style={styles.retryButton}>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchLocationAndEvents}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -181,23 +181,11 @@ const VibeMapScreen = () => {
       <MapView
         ref={mapRef}
         style={styles.map}
-        region={mapRegion}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={mapRegion}
         showsUserLocation={true}
         followsUserLocation={true}
-        onRegionChangeComplete={(region) => setMapRegion(region)}
-        provider={PROVIDER_GOOGLE}
-        loadingEnabled={true}
-        loadingIndicatorColor="#007AFF"
-        loadingBackgroundColor="transparent"
       >
-        {userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="You are here"
-            pinColor="#007AFF"
-          />
-        )}
-
         {events.map((event) => (
           <Marker
             key={event.id}
@@ -205,28 +193,28 @@ const VibeMapScreen = () => {
               latitude: event.latitude,
               longitude: event.longitude,
             }}
-            onPress={() => handleMarkerPress(event.id)}
             pinColor={categoryColors[event.category] || categoryColors.other}
+            onPress={() => handleMarkerPress(event.id)}
           >
             <View style={[
               styles.markerContainer,
               {
-                width: getMarkerSize(event.participants),
-                height: getMarkerSize(event.participants),
-                borderRadius: getMarkerSize(event.participants) / 2,
+                width: getMarkerSize(event.participantsCount || 0),
+                height: getMarkerSize(event.participantsCount || 0),
+                borderRadius: getMarkerSize(event.participantsCount || 0) / 2,
                 backgroundColor: categoryColors[event.category] || categoryColors.other,
               }
             ]}>
-              <Text style={styles.markerText}>{event.participants}</Text>
+              <Text style={styles.markerText}>{event.participantsCount || 0}</Text>
             </View>
             <Callout tooltip>
               <View style={styles.calloutContainer}>
                 <Text style={styles.calloutTitle}>{event.title}</Text>
                 <Text style={styles.calloutDistance}>
-                  {event.distance.toFixed(1)} km away
+                  {event.distance?.toFixed(1)} km away
                 </Text>
                 <Text style={styles.calloutParticipants}>
-                  {event.participants} people going
+                  {event.participantsCount || 0} people going
                 </Text>
               </View>
             </Callout>
@@ -234,11 +222,7 @@ const VibeMapScreen = () => {
         ))}
       </MapView>
 
-      <TouchableOpacity
-        style={styles.recenterButton}
-        onPress={handleRecenter}
-        accessibilityLabel="Recenter map on your location"
-      >
+      <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
         <Image
           source={require('../../assets/location-arrow.png')}
           style={styles.recenterIcon}
@@ -248,7 +232,7 @@ const VibeMapScreen = () => {
       {events.length === 0 && (
         <View style={styles.noEventsContainer}>
           <Text style={styles.noEventsText}>No events found nearby</Text>
-          <Text style={styles.noEventsSubtext}>Try adjusting your search radius</Text>
+          <Text style={styles.noEventsSubtext}>Try moving to a different location</Text>
         </View>
       )}
     </View>
@@ -267,9 +251,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
@@ -278,10 +263,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   errorText: {
     fontSize: 16,
-    color: '#FF3B30',
+    color: '#d32f2f',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -307,26 +293,29 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   calloutContainer: {
-    width: 150,
+    width: 180,
     padding: 10,
     backgroundColor: 'white',
     borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   calloutTitle: {
-    fontWeight: 'bold',
     fontSize: 14,
-    marginBottom: 5,
+    fontWeight: 'bold',
+    marginBottom: 4,
   },
   calloutDistance: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 3,
+    marginBottom: 4,
   },
   calloutParticipants: {
     fontSize: 12,
-    color: '#666',
+    color: '#4CAF50',
   },
   recenterButton: {
     position: 'absolute',
@@ -354,20 +343,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     padding: 15,
-    borderRadius: 10,
     marginHorizontal: 20,
+    borderRadius: 10,
   },
   noEventsText: {
     fontSize: 16,
-    color: '#666',
     fontWeight: 'bold',
+    marginBottom: 5,
   },
   noEventsSubtext: {
     fontSize: 14,
-    color: '#888',
-    marginTop: 5,
+    color: '#666',
   },
 });
 
