@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getItems, addItem as dbAddItem, deleteItem as dbDeleteItem } from '@/lib/db';
+import { getItems, addItem as dbAddItem, deleteItem as dbDeleteItem, getCollections } from '@/lib/db';
 import { SavedItem, Collection } from '@/types';
 
 interface StoreState {

@@ -6,6 +6,7 @@ export interface ParsedContent {
   source: string;
   url: string;
   thumbnailUrl?: string;
+  downloadUrl?: string;
 }
 
 const VIDEO_PLATFORMS = [
@@ -22,39 +23,42 @@ const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.sv
 
 export function detectContentType(url: string): ContentType {
   const lowerUrl = url.toLowerCase();
-  
+
   // Check for video platforms
   for (const platform of VIDEO_PLATFORMS) {
     if (lowerUrl.includes(platform)) {
       return 'video';
     }
   }
-  
+
   // Check for image extensions
   for (const ext of IMAGE_EXTENSIONS) {
     if (lowerUrl.endsWith(ext)) {
       return 'image';
     }
   }
-  
+
   // Default to article
   return 'article';
 }
 
-export function extractMetadata(url: string, type: ContentType): { title: string; source: string } {
+export function extractMetadata(url: string, type: ContentType): { title: string; source: string; downloadUrl?: string } {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname.replace('www.', '');
     const pathname = urlObj.pathname;
-    
+
     // Extract title from URL path
     let title = '';
-    
+    let downloadUrl = url;
+
     if (type === 'video') {
       // For YouTube
       if (hostname.includes('youtube.com') || hostname.includes('youtu.be')) {
         const videoId = urlObj.searchParams.get('v') || pathname.split('/').pop();
         title = `YouTube Video ${videoId}`;
+        // For MVP, we'll use the direct video URL if available
+        downloadUrl = `https://www.youtube.com/watch?v=${videoId}`;
       }
       // For TikTok
       else if (hostname.includes('tiktok.com')) {
@@ -93,10 +97,11 @@ export function extractMetadata(url: string, type: ContentType): { title: string
         title = `Article from ${hostname}`;
       }
     }
-    
+
     return {
       title: title || `Content from ${hostname}`,
       source: hostname,
+      downloadUrl: downloadUrl !== url ? downloadUrl : undefined
     };
   } catch (error) {
     return {
@@ -108,12 +113,13 @@ export function extractMetadata(url: string, type: ContentType): { title: string
 
 export function parseUrl(url: string): ParsedContent {
   const type = detectContentType(url);
-  const { title, source } = extractMetadata(url, type);
-  
+  const { title, source, downloadUrl } = extractMetadata(url, type);
+
   return {
     type,
     title,
     source,
     url,
+    downloadUrl
   };
 }

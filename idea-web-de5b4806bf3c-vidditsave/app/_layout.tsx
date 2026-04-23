@@ -4,9 +4,11 @@ import { Alert, AppState, AppStateStatus } from 'react-native';
 import { initDB } from '@/lib/db';
 import { initStorage } from '@/lib/storage';
 import { getSharedUrl, processSharedUrl, isValidUrl } from '@/lib/share-extension';
+import { useStore } from '@/store/useStore';
 
 export default function RootLayout() {
   const [isProcessingShare, setIsProcessingShare] = useState(false);
+  const { fetchItems } = useStore();
 
   useEffect(() => {
     async function initialize() {
@@ -29,10 +31,10 @@ export default function RootLayout() {
   const checkForSharedContent = async () => {
     try {
       const sharedUrl = await getSharedUrl();
-      
+
       if (sharedUrl && isValidUrl(sharedUrl) && !isProcessingShare) {
         setIsProcessingShare(true);
-        
+
         Alert.alert(
           'Save Content',
           `Do you want to save this content?\n\n${sharedUrl.substring(0, 100)}${sharedUrl.length > 100 ? '...' : ''}`,
@@ -45,13 +47,15 @@ export default function RootLayout() {
             {
               text: 'Save',
               onPress: async () => {
-                const result = await processSharedUrl(sharedUrl, (message) => {
-                  console.log('Share progress:', message);
+                const result = await processSharedUrl(sharedUrl, (message, progress) => {
+                  console.log('Share progress:', message, progress);
                 });
 
                 setIsProcessingShare(false);
 
                 if (result.success) {
+                  // Refresh the library to show the new item
+                  await fetchItems();
                   Alert.alert('Success', 'Content saved to your library!');
                 } else {
                   Alert.alert('Error', result.error || 'Failed to save content');
@@ -70,12 +74,12 @@ export default function RootLayout() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="item/[id]" 
-        options={{ 
+      <Stack.Screen
+        name="item/[id]"
+        options={{
           presentation: 'modal',
           headerTitle: 'Item Details'
-        }} 
+        }}
       />
     </Stack>
   );
