@@ -153,19 +153,25 @@ export default function ActiveRoutineScreen() {
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Calibrate Your Posture</Text>
             <Text style={styles.modalText}>
-              Please hold your phone in your starting position for the exercise.
+              Hold your phone in your hand like you would during exercises.
+              Keep your posture neutral and still for 5 seconds.
             </Text>
-            <Text style={styles.modalText}>
-              Keep your phone steady and follow the on-screen instructions.
-            </Text>
+            <View style={styles.calibrationIndicator}>
+              <Text style={styles.calibrationText}>
+                Calibration: {Math.round(postureDetector.calibrationProgress)}%
+              </Text>
+              <View style={styles.calibrationBar}>
+                <View style={[styles.calibrationFill, { width: `${postureDetector.calibrationProgress}%` }]} />
+              </View>
+            </View>
             <TouchableOpacity
-              style={styles.modalButton}
-              onPress={() => {
-                setShowCalibrationModal(false);
-                setHasCalibratedForSession(true);
-              }}
+              style={styles.calibrateButton}
+              onPress={() => postureDetector.startCalibration()}
+              disabled={postureDetector.isCalibrated}
             >
-              <Text style={styles.modalButtonText}>Start Calibration</Text>
+              <Text style={styles.calibrateButtonText}>
+                {postureDetector.isCalibrated ? 'Calibrated!' : 'Start Calibration'}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -178,7 +184,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     marginBottom: 20,
@@ -187,8 +193,8 @@ const styles = StyleSheet.create({
   exerciseTitle: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 5,
-    textAlign: 'center',
   },
   exerciseSubtitle: {
     fontSize: 16,
@@ -199,29 +205,35 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 10,
-    width: '100%',
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4CAF50',
   },
   instructionsContainer: {
     marginBottom: 20,
     padding: 15,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   instructionsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#333',
   },
   instructionsText: {
     fontSize: 16,
-    color: '#333',
+    color: '#666',
+    lineHeight: 22,
   },
   detectorContainer: {
     flex: 1,
@@ -237,7 +249,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
-    textAlign: 'center',
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
@@ -255,7 +267,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     paddingVertical: 12,
     paddingHorizontal: 30,
-    borderRadius: 5,
+    borderRadius: 25,
   },
   buttonText: {
     color: 'white',
@@ -263,16 +275,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   loadingText: {
-    marginTop: 20,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: 'white',
@@ -285,23 +296,42 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    textAlign: 'center',
+    color: '#333',
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 15,
+    color: '#666',
+    marginBottom: 20,
     textAlign: 'center',
+  },
+  calibrationIndicator: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  calibrationText: {
+    fontSize: 16,
     color: '#333',
+    marginBottom: 5,
   },
-  modalButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  calibrationBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
-    marginTop: 10,
+    overflow: 'hidden',
   },
-  modalButtonText: {
+  calibrationFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
+  calibrateButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  calibrateButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
   },
 });

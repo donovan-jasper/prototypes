@@ -17,9 +17,10 @@ interface CalibrationData {
 }
 
 export class PostureDetector {
-  private calibrationData: CalibrationData[] = [];
+  public calibrationData: CalibrationData[] = [];
   public isCalibrated = false;
   public calibrationOffset = 0;
+  public calibrationProgress = 0;
   private exerciseThresholds: Record<string, { min: number; max: number }> = {
     'chin-tuck': { min: -15, max: 15 },
     'shoulder-squeeze': { min: -10, max: 10 },
@@ -40,6 +41,7 @@ export class PostureDetector {
     this.calibrationData = [];
     this.isCalibrated = false;
     this.calibrationOffset = 0;
+    this.calibrationProgress = 0;
   }
 
   public addCalibrationSample(accelerometer: AccelerometerData, gyroscope: GyroscopeData): void {
@@ -48,6 +50,8 @@ export class PostureDetector {
       gyroscope,
       timestamp: Date.now()
     });
+
+    this.calibrationProgress = Math.min(100, (this.calibrationData.length / 100) * 100);
 
     if (this.calibrationData.length >= 100) {
       this.calculateCalibrationOffset();

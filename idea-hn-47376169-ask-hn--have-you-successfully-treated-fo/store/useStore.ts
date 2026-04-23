@@ -214,13 +214,6 @@ export const useStore = create<UserState & UserActions>()(
     {
       name: 'posture-pal-storage',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (state) => ({
-        userId: state.userId,
-        streakCount: state.streakCount,
-        lastCompletedDate: state.lastCompletedDate,
-        routines: state.routines,
-        exercises: state.exercises
-      })
     }
   )
 );

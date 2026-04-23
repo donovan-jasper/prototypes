@@ -69,7 +69,7 @@ export function MotionDetector({
         Gyroscope.getDataAsync().then((gyroscopeData) => {
           if (!isMounted.current) return;
           postureDetector.addCalibrationSample(accelerometerData, gyroscopeData);
-          const progress = Math.min(100, (postureDetector['calibrationData'].length / 100) * 100);
+          const progress = Math.min(100, (postureDetector.calibrationData.length / 100) * 100);
           setCalibrationProgress(progress);
 
           if (progress >= 100) {
@@ -131,9 +131,9 @@ export function MotionDetector({
         sound.unloadAsync();
       }
     };
-  }, [isCalibrating, exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded, requiredDuration, onExerciseComplete, updateActiveRoutine]);
+  }, [isCalibrating, exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded, requiredDuration, updateActiveRoutine]);
 
-  const playSound = async (type: 'correct' | 'complete' | 'error' | 'next') => {
+  const playSound = async (type: 'correct' | 'incorrect') => {
     try {
       if (sound) {
         await sound.unloadAsync();
@@ -146,14 +146,8 @@ export function MotionDetector({
         case 'correct':
           source = require('../../assets/sounds/correct.mp3');
           break;
-        case 'complete':
-          source = require('../../assets/sounds/complete.mp3');
-          break;
-        case 'error':
-          source = require('../../assets/sounds/error.mp3');
-          break;
-        case 'next':
-          source = require('../../assets/sounds/next.mp3');
+        case 'incorrect':
+          source = require('../../assets/sounds/incorrect.mp3');
           break;
         default:
           return;
@@ -167,16 +161,13 @@ export function MotionDetector({
     }
   };
 
-  const startCalibration = () => {
-    postureDetector.startCalibration();
-    setIsCalibrating(true);
-    setFeedback("Hold your phone in your starting position for 5 seconds...");
-    setCalibrationProgress(0);
+  const toggleDebugInfo = () => {
+    setShowDebugInfo(!showDebugInfo);
   };
 
   if (!isDetectorReady) {
     return (
-      <View style={styles.container}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Initializing posture detector...</Text>
       </View>
@@ -185,59 +176,39 @@ export function MotionDetector({
 
   return (
     <View style={styles.container}>
-      <View style={styles.angleIndicatorContainer}>
-        <View style={styles.angleIndicator}>
-          <View style={styles.anglePointer} />
-          <View style={[styles.anglePointer, { transform: [{ rotate: `${angle}deg` }] }]} />
-        </View>
-        <View style={styles.targetZone}>
-          <View style={styles.targetZoneInner} />
-        </View>
-        {isCorrect && (
-          <View style={styles.checkmarkContainer}>
-            <Ionicons name="checkmark-circle" size={60} color="#4CAF50" />
-          </View>
+      <View style={styles.feedbackContainer}>
+        {isCorrect ? (
+          <Ionicons name="checkmark-circle" size={80} color="#4CAF50" />
+        ) : (
+          <Ionicons name="close-circle" size={80} color="#F44336" />
         )}
+        <Text style={[styles.feedbackText, isCorrect ? styles.correctText : styles.incorrectText]}>
+          {feedback}
+        </Text>
       </View>
 
-      <Text style={styles.feedbackText}>{feedback}</Text>
-
-      {isCalibrating ? (
-        <View style={styles.calibrationContainer}>
-          <Text style={styles.calibrationText}>Calibration Progress: {Math.round(calibrationProgress)}%</Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${calibrationProgress}%` }]} />
-          </View>
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressText}>
+          Hold: {Math.round(holdDuration / 1000)}s / {requiredDuration / 1000}s
+        </Text>
+        <View style={styles.holdProgressBar}>
+          <View style={[styles.holdProgressFill, { width: `${(holdDuration / requiredDuration) * 100}%` }]} />
         </View>
-      ) : (
-        <View style={styles.holdProgressContainer}>
-          <Text style={styles.holdText}>
-            Hold: {Math.round((holdDuration / requiredDuration) * 100)}%
-          </Text>
-          <View style={styles.progressBar}>
-            <View style={[styles.progressFill, { width: `${(holdDuration / requiredDuration) * 100}%` }]} />
-          </View>
-        </View>
-      )}
-
-      {!postureDetector.getIsCalibrated() && (
-        <TouchableOpacity style={styles.calibrateButton} onPress={startCalibration}>
-          <Text style={styles.calibrateButtonText}>Calibrate Posture</Text>
-        </TouchableOpacity>
-      )}
-
-      <TouchableOpacity style={styles.debugToggle} onPress={() => setShowDebugInfo(!showDebugInfo)}>
-        <Text style={styles.debugToggleText}>{showDebugInfo ? 'Hide' : 'Show'} Debug Info</Text>
-      </TouchableOpacity>
+      </View>
 
       {showDebugInfo && (
         <View style={styles.debugInfo}>
           <Text style={styles.debugText}>Angle: {angle.toFixed(1)}°</Text>
           <Text style={styles.debugText}>Calibration Offset: {calibrationOffset.toFixed(1)}°</Text>
-          <Text style={styles.debugText}>Hold Duration: {holdDuration}ms</Text>
-          <Text style={styles.debugText}>Required Duration: {requiredDuration}ms</Text>
+          <Text style={styles.debugText}>Status: {isCorrect ? 'Correct' : 'Incorrect'}</Text>
         </View>
       )}
+
+      <TouchableOpacity style={styles.debugButton} onPress={toggleDebugInfo}>
+        <Text style={styles.debugButtonText}>
+          {showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
@@ -245,132 +216,75 @@ export function MotionDetector({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  angleIndicatorContainer: {
-    width: 200,
-    height: 200,
-    marginBottom: 20,
-    position: 'relative',
-  },
-  angleIndicator: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 100,
-    borderWidth: 2,
-    borderColor: '#ccc',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
+    width: '100%',
   },
-  anglePointer: {
-    position: 'absolute',
-    width: 2,
-    height: '50%',
-    backgroundColor: '#007AFF',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -1 }, { translateY: -50 }],
-  },
-  targetZone: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -40 }, { translateY: -40 }],
-  },
-  targetZoneInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-  },
-  checkmarkContainer: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: [{ translateX: -30 }, { translateY: -30 }],
-  },
-  feedbackText: {
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
-  },
-  calibrationContainer: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  calibrationText: {
-    fontSize: 14,
-    marginBottom: 10,
-    textAlign: 'center',
-    color: '#666',
-  },
-  holdProgressContainer: {
-    width: '100%',
-    marginBottom: 20,
-  },
-  holdText: {
-    fontSize: 14,
-    marginBottom: 10,
-    textAlign: 'center',
-    color: '#666',
-  },
-  progressBar: {
-    height: 10,
-    width: '100%',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-  },
-  calibrateButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  calibrateButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  debugToggle: {
-    marginTop: 20,
-    padding: 10,
-  },
-  debugToggleText: {
-    color: '#007AFF',
-    fontSize: 14,
-  },
-  debugInfo: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 5,
-    width: '100%',
-  },
-  debugText: {
-    fontSize: 12,
-    marginBottom: 5,
-    color: '#666',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
     color: '#666',
+  },
+  feedbackContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  feedbackText: {
+    fontSize: 18,
+    marginTop: 15,
+    textAlign: 'center',
+  },
+  correctText: {
+    color: '#4CAF50',
+  },
+  incorrectText: {
+    color: '#F44336',
+  },
+  progressContainer: {
+    width: '80%',
+    marginBottom: 20,
+  },
+  progressText: {
+    fontSize: 16,
+    marginBottom: 5,
+    color: '#333',
+    textAlign: 'center',
+  },
+  holdProgressBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  holdProgressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
+  debugInfo: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    width: '80%',
+  },
+  debugText: {
+    fontSize: 14,
+    marginBottom: 5,
+    color: '#666',
+  },
+  debugButton: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+  },
+  debugButtonText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
