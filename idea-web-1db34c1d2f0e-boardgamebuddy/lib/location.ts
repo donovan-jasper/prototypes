@@ -1,120 +1,72 @@
 import * as Location from 'expo-location';
-import { useState, useEffect } from 'react';
 
-interface LocationData {
-  latitude: number;
-  longitude: number;
-  accuracy?: number;
-}
+// Request location permissions
+export const requestLocationPermission = async () => {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    return status === 'granted';
+  } catch (error) {
+    console.error('Error requesting location permission:', error);
+    return false;
+  }
+};
 
-export const useLocation = () => {
-  const [location, setLocation] = useState<LocationData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const requestLocationPermission = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== 'granted') {
-        setError('Permission to access location was denied');
-        return;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      setLocation({
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        accuracy: currentLocation.coords.accuracy,
-      });
-    } catch (err) {
-      console.error('Error getting location:', err);
-      setError('Failed to get location');
-    } finally {
-      setIsLoading(false);
+// Get current location
+export const getCurrentLocation = async () => {
+  try {
+    const hasPermission = await requestLocationPermission();
+    if (!hasPermission) {
+      throw new Error('Location permission not granted');
     }
-  };
 
-  useEffect(() => {
-    // Request location when component mounts
-    requestLocationPermission();
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+    });
 
-    // Set up location updates
-    let subscription: Location.LocationSubscription | null = null;
-
-    const startWatching = async () => {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status === 'granted') {
-        subscription = await Location.watchPositionAsync(
-          {
-            accuracy: Location.Accuracy.Balanced,
-            timeInterval: 60000, // Update every minute
-            distanceInterval: 100, // Or when moving 100 meters
-          },
-          (newLocation) => {
-            setLocation({
-              latitude: newLocation.coords.latitude,
-              longitude: newLocation.coords.longitude,
-              accuracy: newLocation.coords.accuracy,
-            });
-          }
-        );
-      }
-    };
-
-    startWatching();
-
-    return () => {
-      if (subscription) {
-        subscription.remove();
-      }
-    };
-  }, []);
-
-  return {
-    location,
-    error,
-    isLoading,
-    requestLocationPermission,
-  };
+    return location;
+  } catch (error) {
+    console.error('Error getting current location:', error);
+    throw error;
+  }
 };
 
-// Calculate distance between two points using Haversine formula
+// Calculate distance between two coordinates (in meters)
 export const calculateDistance = (
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number => {
-  const R = 3958.8; // Earth radius in miles
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R * c; // Distance in miles
+  point1: { latitude: number; longitude: number },
+  point2: { latitude: number; longitude: number }
+) => {
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = point1.latitude * Math.PI / 180;
+  const φ2 = point2.latitude * Math.PI / 180;
+  const Δφ = (point2.latitude - point1.latitude) * Math.PI / 180;
+  const Δλ = (point2.longitude - point1.longitude) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
 };
 
-// Check if a point is within a certain radius of another point
+// Check if a point is within a radius of another point
 export const isWithinRadius = (
   center: { latitude: number; longitude: number },
   point: { latitude: number; longitude: number },
-  radius: number // in miles
-): boolean => {
-  const distance = calculateDistance(
-    center.latitude,
-    center.longitude,
-    point.latitude,
-    point.longitude
-  );
-  return distance <= radius;
+  radius: number // in kilometers
+) => {
+  const distance = calculateDistance(center, point);
+  return distance <= radius * 1000; // Convert km to meters
+};
+
+// Watch location changes
+export const watchLocation = (
+  callback: (location: Location.LocationObject) => void,
+  options?: Location.LocationOptions
+) => {
+  return Location.watchPositionAsync(options || {
+    accuracy: Location.Accuracy.Balanced,
+    timeInterval: 5000,
+    distanceInterval: 10,
+  }, callback);
 };

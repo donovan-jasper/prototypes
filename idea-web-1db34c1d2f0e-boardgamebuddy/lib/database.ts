@@ -60,6 +60,17 @@ export const initDatabase = async () => {
         { id: 'music', name: 'Music', icon: 'musical-notes', category: 'indoor' },
         { id: 'cooking', name: 'Cooking', icon: 'restaurant', category: 'indoor' },
         { id: 'art', name: 'Art', icon: 'color-palette', category: 'indoor' },
+        { id: 'yoga', name: 'Yoga', icon: 'leaf', category: 'outdoor' },
+        { id: 'running', name: 'Running', icon: 'walk', category: 'outdoor' },
+        { id: 'cycling', name: 'Cycling', icon: 'bicycle', category: 'outdoor' },
+        { id: 'chess', name: 'Chess', icon: 'chessboard', category: 'indoor' },
+        { id: 'dancing', name: 'Dancing', icon: 'musical-note', category: 'indoor' },
+        { id: 'painting', name: 'Painting', icon: 'brush', category: 'indoor' },
+        { id: 'writing', name: 'Writing', icon: 'pencil', category: 'indoor' },
+        { id: 'gaming', name: 'Video Gaming', icon: 'game-controller', category: 'indoor' },
+        { id: 'travel', name: 'Travel', icon: 'airplane', category: 'outdoor' },
+        { id: 'volunteering', name: 'Volunteering', icon: 'hand-heart', category: 'outdoor' },
+        { id: 'meditation', name: 'Meditation', icon: 'moon', category: 'indoor' },
       ];
 
       const insertHobby = db.prepareSync('INSERT INTO hobbies (id, name, icon, category) VALUES ($id, $name, $icon, $category)');
@@ -91,7 +102,7 @@ export const initDatabase = async () => {
         {
           id: '2',
           title: 'Morning Yoga',
-          hobby: 'fitness',
+          hobby: 'yoga',
           latitude: 40.7138,
           longitude: -74.0070,
           startTime: new Date(Date.now() + 7200000).toISOString(), // 2 hours from now
@@ -107,6 +118,26 @@ export const initDatabase = async () => {
           startTime: new Date(Date.now() + 10800000).toISOString(), // 3 hours from now
           maxAttendees: 8,
           creatorId: 'user3'
+        },
+        {
+          id: '4',
+          title: 'Book Club Meeting',
+          hobby: 'reading',
+          latitude: 40.7158,
+          longitude: -74.0090,
+          startTime: new Date(Date.now() + 14400000).toISOString(), // 4 hours from now
+          maxAttendees: 5,
+          creatorId: 'user4'
+        },
+        {
+          id: '5',
+          title: 'Friday Night Run',
+          hobby: 'running',
+          latitude: 40.7168,
+          longitude: -74.0100,
+          startTime: new Date(Date.now() + 18000000).toISOString(), // 5 hours from now
+          maxAttendees: 12,
+          creatorId: 'user5'
         },
       ];
 
@@ -146,81 +177,87 @@ export const getHangoutsNearby = async (
   timeRange: 'any' | 'today' | 'this-week' = 'any'
 ): Promise<any[]> => {
   try {
-    // Calculate time range filter
-    let timeFilter = '';
-    const now = new Date();
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Calculate bounding box for the radius
+    const latDelta = radius / 111.32; // 1 degree ≈ 111.32 km
+    const lngDelta = radius / (111.32 * Math.cos(latitude * Math.PI / 180));
 
-    if (timeRange === 'today') {
-      timeFilter = `AND startTime BETWEEN '${now.toISOString()}' AND '${endOfDay.toISOString()}'`;
-    } else if (timeRange === 'this-week') {
-      const endOfWeek = new Date(now);
-      endOfWeek.setDate(now.getDate() + (7 - now.getDay()));
-      endOfWeek.setHours(23, 59, 59, 999);
-      timeFilter = `AND startTime BETWEEN '${now.toISOString()}' AND '${endOfWeek.toISOString()}'`;
-    }
+    const minLat = latitude - latDelta;
+    const maxLat = latitude + latDelta;
+    const minLng = longitude - lngDelta;
+    const maxLng = longitude + lngDelta;
 
-    // Calculate hobby filter
-    let hobbyFilter = '';
-    if (hobbies.length > 0) {
-      const hobbyPlaceholders = hobbies.map(() => '?').join(',');
-      hobbyFilter = `AND hobby IN (${hobbyPlaceholders})`;
-    }
-
-    // Query hangouts within radius
-    const query = `
-      SELECT
-        h.*,
-        COUNT(a.id) as attendees,
-        (6371 * ACOS(
-          COS(RADIANS(?)) * COS(RADIANS(h.latitude)) *
-          COS(RADIANS(h.longitude) - RADIANS(?)) +
-          SIN(RADIANS(?)) * SIN(RADIANS(h.latitude))
-        )) as distance
+    // Build the base query
+    let query = `
+      SELECT h.*,
+             (SELECT COUNT(*) FROM attendees a WHERE a.hangoutId = h.id) as attendees,
+             (SELECT name FROM hobbies WHERE id = h.hobby) as hobbyName,
+             (SELECT icon FROM hobbies WHERE id = h.hobby) as hobbyIcon
       FROM hangouts h
-      LEFT JOIN attendees a ON h.id = a.hangoutId AND a.status = 'going'
-      WHERE
-        (6371 * ACOS(
-          COS(RADIANS(?)) * COS(RADIANS(h.latitude)) *
-          COS(RADIANS(h.longitude) - RADIANS(?)) +
-          SIN(RADIANS(?)) * SIN(RADIANS(h.latitude))
-        )) <= ?
-        ${timeFilter}
-        ${hobbyFilter}
-      GROUP BY h.id
-      ORDER BY distance ASC, startTime ASC
+      WHERE h.latitude BETWEEN $minLat AND $maxLat
+      AND h.longitude BETWEEN $minLng AND $maxLng
     `;
 
+    // Add hobby filter if specified
+    if (hobbies.length > 0) {
+      const hobbyPlaceholders = hobbies.map(() => '?').join(',');
+      query += ` AND h.hobby IN (${hobbyPlaceholders})`;
+    }
+
+    // Add time filter if specified
+    if (timeRange === 'today') {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      query += ` AND h.startTime BETWEEN '${todayStart.toISOString()}' AND '${todayEnd.toISOString()}'`;
+    } else if (timeRange === 'this-week') {
+      const now = new Date();
+      const dayOfWeek = now.getDay();
+      const startOfWeek = new Date(now);
+      startOfWeek.setDate(now.getDate() - dayOfWeek);
+      startOfWeek.setHours(0, 0, 0, 0);
+
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+
+      query += ` AND h.startTime BETWEEN '${startOfWeek.toISOString()}' AND '${endOfWeek.toISOString()}'`;
+    }
+
+    // Add sorting
+    query += ` ORDER BY ABS(h.latitude - $latitude) + ABS(h.longitude - $longitude) ASC`;
+
+    // Prepare the statement
     const stmt = db.prepareSync(query);
 
     // Bind parameters
-    const params = [
-      latitude, longitude, latitude, // For distance calculation
-      latitude, longitude, latitude, // For distance calculation
-      radius
-    ];
-
-    // Add hobby parameters if any
+    const params: any[] = [minLat, maxLat, minLng, maxLng];
     if (hobbies.length > 0) {
       params.push(...hobbies);
     }
 
-    const result = stmt.executeSync(...params) as any[];
-    stmt.finalizeSync();
+    // Execute the query
+    const result = stmt.executeSync(...params);
 
-    // Format the results
-    return result.map(row => ({
-      id: row.id,
-      title: row.title,
-      hobby: row.hobby,
-      distance: parseFloat(row.distance.toFixed(1)),
-      startTime: row.startTime,
-      attendees: row.attendees || 0,
-      maxAttendees: row.maxAttendees,
-      latitude: row.latitude,
-      longitude: row.longitude
-    }));
+    // Process results
+    const hangouts: any[] = [];
+    for (const row of result) {
+      const distance = calculateDistance(
+        { latitude, longitude },
+        { latitude: row.latitude, longitude: row.longitude }
+      );
+
+      hangouts.push({
+        ...row,
+        distance: distance / 1609.34, // Convert meters to miles
+        attendees: row.attendees || 0,
+        hobbyName: row.hobbyName || 'Unknown',
+        hobbyIcon: row.hobbyIcon || 'help-circle'
+      });
+    }
+
+    return hangouts;
   } catch (error) {
     console.error('Error getting nearby hangouts:', error);
     throw error;
@@ -238,28 +275,52 @@ export const createHangout = async (hangoutData: {
   creatorId: string;
 }) => {
   try {
-    const id = crypto.randomUUID();
-    const stmt = db.prepareSync(`
-      INSERT INTO hangouts
-      (id, title, hobby, latitude, longitude, startTime, maxAttendees, creatorId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const id = Date.now().toString();
 
-    stmt.executeSync(
-      id,
-      hangoutData.title,
-      hangoutData.hobby,
-      hangoutData.latitude,
-      hangoutData.longitude,
-      hangoutData.startTime,
-      hangoutData.maxAttendees,
-      hangoutData.creatorId
+    await db.runAsync(
+      'INSERT INTO hangouts (id, title, hobby, latitude, longitude, startTime, maxAttendees, creatorId) ' +
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [
+        id,
+        hangoutData.title,
+        hangoutData.hobby,
+        hangoutData.latitude,
+        hangoutData.longitude,
+        hangoutData.startTime,
+        hangoutData.maxAttendees,
+        hangoutData.creatorId
+      ]
     );
 
-    stmt.finalizeSync();
     return id;
   } catch (error) {
     console.error('Error creating hangout:', error);
+    throw error;
+  }
+};
+
+// Get a single hangout by ID
+export const getHangoutById = async (id: string) => {
+  try {
+    const hangout = await db.getFirstAsync<any>(
+      'SELECT h.*, ' +
+      '(SELECT COUNT(*) FROM attendees a WHERE a.hangoutId = h.id) as attendees, ' +
+      '(SELECT name FROM hobbies WHERE id = h.hobby) as hobbyName, ' +
+      '(SELECT icon FROM hobbies WHERE id = h.hobby) as hobbyIcon ' +
+      'FROM hangouts h WHERE h.id = ?',
+      [id]
+    );
+
+    if (!hangout) return null;
+
+    return {
+      ...hangout,
+      attendees: hangout.attendees || 0,
+      hobbyName: hangout.hobbyName || 'Unknown',
+      hobbyIcon: hangout.hobbyIcon || 'help-circle'
+    };
+  } catch (error) {
+    console.error('Error getting hangout by ID:', error);
     throw error;
   }
 };
@@ -268,41 +329,30 @@ export const createHangout = async (hangoutData: {
 export const joinHangout = async (hangoutId: string, userId: string) => {
   try {
     // Check if user is already attending
-    const existing = db.getFirstSync<{count: number}>(
-      'SELECT COUNT(*) as count FROM attendees WHERE hangoutId = ? AND userId = ?',
+    const existing = await db.getFirstAsync<any>(
+      'SELECT * FROM attendees WHERE hangoutId = ? AND userId = ?',
       [hangoutId, userId]
     );
 
-    if (existing?.count && existing.count > 0) {
-      throw new Error('User is already attending this hangout');
+    if (existing) {
+      throw new Error('You are already attending this hangout');
     }
 
-    // Check if hangout has space
-    const hangout = db.getFirstSync<{maxAttendees: number}>(
-      'SELECT maxAttendees FROM hangouts WHERE id = ?',
+    // Check if hangout has available spots
+    const hangout = await db.getFirstAsync<any>(
+      'SELECT maxAttendees, (SELECT COUNT(*) FROM attendees WHERE hangoutId = ?) as currentAttendees',
       [hangoutId]
     );
 
-    if (!hangout) {
-      throw new Error('Hangout not found');
-    }
-
-    const currentAttendees = db.getFirstSync<{count: number}>(
-      'SELECT COUNT(*) as count FROM attendees WHERE hangoutId = ? AND status = "going"',
-      [hangoutId]
-    );
-
-    if (currentAttendees?.count && currentAttendees.count >= hangout.maxAttendees) {
-      throw new Error('Hangout is full');
+    if (!hangout || hangout.currentAttendees >= hangout.maxAttendees) {
+      throw new Error('This hangout is already full');
     }
 
     // Add attendee
-    const stmt = db.prepareSync(
-      'INSERT INTO attendees (hangoutId, userId, status) VALUES (?, ?, "going")'
+    await db.runAsync(
+      'INSERT INTO attendees (hangoutId, userId, status) VALUES (?, ?, ?)',
+      [hangoutId, userId, 'going']
     );
-
-    stmt.executeSync(hangoutId, userId);
-    stmt.finalizeSync();
 
     return true;
   } catch (error) {
@@ -311,45 +361,31 @@ export const joinHangout = async (hangoutId: string, userId: string) => {
   }
 };
 
-// Get hangout details
-export const getHangoutDetails = async (hangoutId: string) => {
+// Leave a hangout
+export const leaveHangout = async (hangoutId: string, userId: string) => {
   try {
-    const hangout = db.getFirstSync(`
-      SELECT
-        h.*,
-        COUNT(a.id) as attendees,
-        u.name as creatorName,
-        u.trustScore as creatorTrustScore
-      FROM hangouts h
-      LEFT JOIN attendees a ON h.id = a.hangoutId AND a.status = 'going'
-      LEFT JOIN users u ON h.creatorId = u.id
-      WHERE h.id = ?
-      GROUP BY h.id
-    `, [hangoutId]);
+    await db.runAsync(
+      'DELETE FROM attendees WHERE hangoutId = ? AND userId = ?',
+      [hangoutId, userId]
+    );
 
-    if (!hangout) {
-      throw new Error('Hangout not found');
-    }
-
-    // Get attendees
-    const attendees = db.getAllSync(`
-      SELECT
-        u.id,
-        u.name,
-        u.trustScore,
-        a.status
-      FROM attendees a
-      JOIN users u ON a.userId = u.id
-      WHERE a.hangoutId = ?
-      ORDER BY a.id
-    `, [hangoutId]);
-
-    return {
-      ...hangout,
-      attendees: attendees || []
-    };
+    return true;
   } catch (error) {
-    console.error('Error getting hangout details:', error);
+    console.error('Error leaving hangout:', error);
+    throw error;
+  }
+};
+
+// Get all hobbies
+export const getAllHobbies = async () => {
+  try {
+    const hobbies = await db.getAllAsync<{id: string, name: string, icon: string, category: string}>(
+      'SELECT * FROM hobbies ORDER BY name'
+    );
+
+    return hobbies;
+  } catch (error) {
+    console.error('Error getting hobbies:', error);
     throw error;
   }
 };
