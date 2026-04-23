@@ -1,37 +1,59 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SQLite from 'expo-sqlite';
 
-const PERFORMANCE_HISTORY_KEY = '@cogniquest_performance_history';
-const MAX_HISTORY_LENGTH = 20;
+const db = SQLite.openDatabase('cogniquest.db');
+
+const initializeDatabase = async () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'CREATE TABLE IF NOT EXISTS performance_history (id INTEGER PRIMARY KEY AUTOINCREMENT, difficulty TEXT, correct INTEGER, total INTEGER, timestamp INTEGER, score REAL);',
+        [],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
 
 export async function getPerformanceHistory() {
-  try {
-    const history = await AsyncStorage.getItem(PERFORMANCE_HISTORY_KEY);
-    return history ? JSON.parse(history) : [];
-  } catch (error) {
-    console.error('Error loading performance history:', error);
-    return [];
-  }
+  await initializeDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM performance_history ORDER BY timestamp DESC LIMIT 20;',
+        [],
+        (_, { rows: { _array } }) => resolve(_array),
+        (_, error) => reject(error)
+      );
+    });
+  });
 }
 
 export async function savePerformanceRecord(difficulty, correct, total) {
-  try {
-    const history = await getPerformanceHistory();
-    const newRecord = {
-      difficulty,
-      correct,
-      total,
-      timestamp: Date.now(),
-      score: (correct / total) * 100
-    };
+  await initializeDatabase();
 
-    const updatedHistory = [newRecord, ...history].slice(0, MAX_HISTORY_LENGTH);
-    await AsyncStorage.setItem(PERFORMANCE_HISTORY_KEY, JSON.stringify(updatedHistory));
+  const score = (correct / total) * 100;
+  const timestamp = Date.now();
 
-    return updatedHistory;
-  } catch (error) {
-    console.error('Error saving performance record:', error);
-    return [];
-  }
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO performance_history (difficulty, correct, total, timestamp, score) VALUES (?, ?, ?, ?, ?);',
+        [difficulty, correct, total, timestamp, score],
+        () => {
+          // After insert, get the updated history
+          tx.executeSql(
+            'SELECT * FROM performance_history ORDER BY timestamp DESC LIMIT 20;',
+            [],
+            (_, { rows: { _array } }) => resolve(_array),
+            (_, error) => reject(error)
+          );
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
 }
 
 export function calculateAdaptiveDifficulty(performanceScore, currentDifficulty) {
