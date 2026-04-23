@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, TextInput, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { searchBooks, searchMovies, searchAudiobooks } from '../../lib/api';
@@ -18,7 +18,10 @@ const AddScreen = () => {
   const { isPremium } = usePremiumStore();
 
   const handleSearch = async () => {
-    if (!query.trim()) return;
+    if (!query.trim()) {
+      Alert.alert('Error', 'Please enter a search term');
+      return;
+    }
 
     setIsSearching(true);
     try {
@@ -39,6 +42,7 @@ const AddScreen = () => {
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
+      Alert.alert('Error', 'Failed to search. Please try again.');
     } finally {
       setIsSearching(false);
     }
@@ -47,9 +51,11 @@ const AddScreen = () => {
   const handleAddMedia = async (media: Media) => {
     try {
       await addMedia(media);
+      Alert.alert('Success', `${media.title} added to your library!`);
       navigation.goBack();
     } catch (error) {
       console.error('Add media error:', error);
+      Alert.alert('Error', 'Failed to add media. Please try again.');
     }
   };
 
@@ -58,8 +64,15 @@ const AddScreen = () => {
       style={styles.resultItem}
       onPress={() => handleAddMedia(item)}
     >
+      {item.coverUrl && (
+        <Image
+          source={{ uri: item.coverUrl }}
+          style={styles.resultImage}
+          resizeMode="cover"
+        />
+      )}
       <View style={styles.resultContent}>
-        <Text style={styles.resultTitle}>{item.title}</Text>
+        <Text style={styles.resultTitle} numberOfLines={1}>{item.title}</Text>
         <Text style={styles.resultType}>{item.type}</Text>
         {item.totalProgress > 0 && (
           <Text style={styles.resultProgress}>
@@ -81,6 +94,7 @@ const AddScreen = () => {
           onChangeText={setQuery}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
+          autoFocus
         />
         <TouchableOpacity
           style={styles.searchButton}
@@ -162,9 +176,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
+    fontSize: 16,
   },
   searchButton: {
     backgroundColor: '#6200EE',
@@ -176,25 +190,20 @@ const styles = StyleSheet.create({
   },
   typeSelector: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     marginBottom: 16,
   },
   typeButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'white',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 10,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
   },
   typeButtonSelected: {
     backgroundColor: '#6200EE',
-    borderColor: '#6200EE',
   },
   typeButtonText: {
-    color: '#6200EE',
-    textAlign: 'center',
-    fontWeight: 'bold',
+    color: '#333',
+    fontWeight: '500',
   },
   typeButtonTextSelected: {
     color: 'white',
@@ -213,27 +222,33 @@ const styles = StyleSheet.create({
   scanButtonText: {
     color: '#6200EE',
     marginLeft: 8,
-    fontWeight: 'bold',
+    fontWeight: '500',
   },
   resultsList: {
-    paddingBottom: 16,
+    paddingBottom: 20,
   },
   resultItem: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    padding: 16,
+    padding: 12,
     borderRadius: 8,
     marginBottom: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+  },
+  resultImage: {
+    width: 50,
+    height: 75,
+    borderRadius: 4,
+    marginRight: 12,
   },
   resultContent: {
     flex: 1,
   },
   resultTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     marginBottom: 4,
   },
   resultType: {
@@ -249,7 +264,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
