@@ -108,6 +108,25 @@ export async function getRecommendedDifficulty(domain) {
   }
 }
 
+export async function getProblemRecommendations() {
+  try {
+    const domains = ['logic', 'math', 'verbal'];
+    const selectedDomain = domains[Math.floor(Math.random() * domains.length)];
+    const recommendedDifficulty = await getRecommendedDifficulty(selectedDomain);
+
+    return {
+      domain: selectedDomain,
+      difficulty: recommendedDifficulty
+    };
+  } catch (error) {
+    console.error('Error getting problem recommendations:', error);
+    return {
+      domain: 'logic',
+      difficulty: 'medium'
+    };
+  }
+}
+
 export async function getPerformanceStats() {
   try {
     const history = await getPerformanceHistory();
@@ -175,37 +194,5 @@ export async function getPerformanceStats() {
       },
       recentPerformance: []
     };
-  }
-}
-
-export async function getProblemRecommendations() {
-  try {
-    const stats = await getPerformanceStats();
-
-    // Simple recommendation logic based on performance
-    if (stats.averageScore < 50) {
-      return { domain: 'logic', difficulty: 'easy' };
-    }
-
-    // Find the domain with the lowest count
-    const domains = Object.keys(stats.domainDistribution);
-    let recommendedDomain = domains[0];
-
-    for (const domain of domains) {
-      if (stats.domainDistribution[domain] < stats.domainDistribution[recommendedDomain]) {
-        recommendedDomain = domain;
-      }
-    }
-
-    // Get recommended difficulty for the domain
-    const recommendedDifficulty = await getRecommendedDifficulty(recommendedDomain);
-
-    return {
-      domain: recommendedDomain,
-      difficulty: recommendedDifficulty
-    };
-  } catch (error) {
-    console.error('Error getting problem recommendations:', error);
-    return { domain: 'logic', difficulty: 'medium' };
   }
 }

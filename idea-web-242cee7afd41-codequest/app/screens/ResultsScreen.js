@@ -24,12 +24,12 @@ export default function ResultsScreen({ route, navigation }) {
     if (percentage >= 80) {
       return score.difficulty === 'hard'
         ? 'You\'re mastering the hardest challenges!'
-        : 'Next time, try harder problems!';
+        : `Next time, try ${score.newDifficulty} problems!`;
     }
     if (percentage < 40) {
       return score.difficulty === 'easy'
         ? 'Keep practicing at this level'
-        : 'We\'ll adjust the difficulty for you';
+        : `We'll adjust to ${score.newDifficulty} difficulty`;
     }
     return 'You\'re progressing well!';
   };
@@ -101,6 +101,13 @@ export default function ResultsScreen({ route, navigation }) {
         >
           <Text style={styles.buttonText}>Try Again</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => navigation.navigate('Dashboard')}
+        >
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>View Progress</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -122,6 +129,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: 32,
+    textAlign: 'center',
   },
   scoreCircle: {
     width: 200,
@@ -192,14 +200,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statNumber: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#1f2937',
+    marginBottom: 4,
   },
   statLabel: {
     fontSize: 14,
     color: '#6b7280',
-    marginTop: 4,
   },
   statDivider: {
     width: 1,
@@ -208,18 +216,24 @@ const styles = StyleSheet.create({
   },
   button: {
     backgroundColor: '#6366f1',
-    paddingHorizontal: 48,
-    paddingVertical: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
     borderRadius: 12,
-    shadowColor: '#6366f1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginBottom: 16,
+    width: '100%',
+    alignItems: 'center',
   },
   buttonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#6366f1',
+  },
+  secondaryButtonText: {
+    color: '#6366f1',
   },
 });
