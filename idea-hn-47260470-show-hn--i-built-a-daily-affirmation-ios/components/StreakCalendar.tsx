@@ -161,7 +161,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
 
       <View style={styles.calendarGrid}>
         {daysInMonth.map((day, index) => (
-          <View key={index} style={styles.dayCell}>
+          <View key={index} style={styles.dayWrapper}>
             {renderDay(day, index)}
           </View>
         ))}
@@ -170,16 +170,22 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
-          <Text style={styles.legendText}>Check-in</Text>
+          <Text style={styles.legendText}>Completed Day</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.grace }]} />
-          <Text style={styles.legendText}>Grace day</Text>
+          <Text style={styles.legendText}>Grace Day</Text>
         </View>
         <View style={styles.legendItem}>
-          <Text style={styles.legendBadge}>🎉</Text>
+          <Text style={styles.legendText}>🎉</Text>
           <Text style={styles.legendText}>Milestone</Text>
         </View>
+      </View>
+
+      <View style={styles.graceDaysInfo}>
+        <Text style={styles.graceDaysText}>
+          Grace Days Used This Week: {graceDaysUsed}/2
+        </Text>
       </View>
     </View>
   );
@@ -206,9 +212,11 @@ const styles = StyleSheet.create({
   monthHeader: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   navButton: {
-    fontSize: 20,
+    fontSize: 24,
+    color: '#4CAF50',
     paddingHorizontal: 10,
   },
   weekdays: {
@@ -226,7 +234,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  dayCell: {
+  dayWrapper: {
     width: Dimensions.get('window').width / 7,
     height: 50,
     justifyContent: 'center',
@@ -236,55 +244,58 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     height: '100%',
-  },
-  dayContent: {
-    position: 'absolute',
-    zIndex: 2,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
-    height: '100%',
+  },
+  dayContent: {
+    position: 'relative',
+    zIndex: 1,
   },
   dayNumber: {
     fontSize: 14,
+    color: '#333',
+    textAlign: 'center',
   },
   today: {
     fontWeight: 'bold',
     color: '#4CAF50',
   },
   milestone: {
-    color: '#FF5722',
+    fontWeight: 'bold',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 4,
+    marginTop: 3,
   },
   milestoneBadge: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
     fontSize: 12,
-    marginTop: 4,
   },
   connectorLine: {
     position: 'absolute',
     height: 2,
     backgroundColor: '#4CAF50',
-    width: '100%',
-    top: '50%',
-    zIndex: 1,
+    zIndex: 0,
   },
   firstConnector: {
-    width: '50%',
     left: '50%',
+    right: 0,
+    top: '50%',
   },
   lastConnector: {
-    width: '50%',
+    left: 0,
+    right: '50%',
+    top: '50%',
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: 15,
-    paddingTop: 10,
+    paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
@@ -298,13 +309,20 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 5,
   },
-  legendBadge: {
-    fontSize: 12,
-    marginRight: 5,
-  },
   legendText: {
     fontSize: 12,
     color: '#666',
+  },
+  graceDaysInfo: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  graceDaysText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

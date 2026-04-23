@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
   shareButton: {
     backgroundColor: 'white',
     paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 20,
     borderRadius: 20,
   },
   shareButtonText: {
@@ -176,20 +176,18 @@ const styles = StyleSheet.create({
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginVertical: 20,
-    paddingHorizontal: 10,
-  },
-  statBox: {
+    margin: 15,
     backgroundColor: 'white',
-    padding: 15,
     borderRadius: 10,
-    alignItems: 'center',
-    width: '45%',
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
+  },
+  statBox: {
+    alignItems: 'center',
   },
   statLabel: {
     fontSize: 14,
@@ -199,14 +197,13 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#333',
   },
   progressContainer: {
+    margin: 15,
     backgroundColor: 'white',
-    padding: 20,
-    marginHorizontal: 10,
     borderRadius: 10,
-    marginBottom: 20,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -216,15 +213,14 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#333',
+    marginBottom: 10,
   },
   progressBar: {
     height: 10,
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 10,
   },
   progressFill: {
     height: '100%',
@@ -232,15 +228,16 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   progressText: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    marginTop: 5,
     textAlign: 'right',
   },
   infoBox: {
+    margin: 15,
     backgroundColor: 'white',
-    padding: 20,
-    margin: 10,
     borderRadius: 10,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -250,8 +247,8 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#333',
+    marginBottom: 5,
   },
   infoText: {
     fontSize: 14,

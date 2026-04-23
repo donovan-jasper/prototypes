@@ -1,6 +1,6 @@
 import { calculateStreak, getGraceDaysUsedThisWeek } from '../lib/affirmations';
 import { initDatabase, getStreakData, updateStreak } from '../lib/database';
-import { format, addDays, subDays } from 'date-fns';
+import { format, subDays, addDays } from 'date-fns';
 
 // Mock the database functions
 jest.mock('../lib/database', () => ({

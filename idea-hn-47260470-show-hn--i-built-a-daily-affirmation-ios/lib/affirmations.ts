@@ -1,6 +1,6 @@
 import { initDatabase, seedAffirmations, getCurrentStreak, getStreakData, calculateStreakWithGraceDays, updateStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
-import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek, parseISO } from 'date-fns';
+import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek, parseISO, isBefore } from 'date-fns';
 import { MILESTONE_DAYS, MAX_GRACE_DAYS_PER_WEEK } from './constants';
 
 let initialized = false;
