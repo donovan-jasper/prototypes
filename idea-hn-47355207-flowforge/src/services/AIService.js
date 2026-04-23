@@ -114,6 +114,38 @@ class AIService {
         }
       });
 
+      // Check for potential validation rules
+      if (existingFields.includes('email') && !existingFields.includes('emailVerified')) {
+        suggestions.push({
+          type: 'add_property',
+          property: 'emailVerified',
+          description: 'Consider adding an emailVerified field to track email verification status',
+          dataType: 'boolean'
+        });
+      }
+
+      if (existingFields.includes('password') && !existingFields.includes('passwordStrength')) {
+        suggestions.push({
+          type: 'add_property',
+          property: 'passwordStrength',
+          description: 'Consider adding a passwordStrength field to track password strength',
+          dataType: 'number'
+        });
+      }
+
+      // Check for potential field groupings
+      const addressFields = ['street', 'city', 'state', 'zip', 'country'];
+      const hasAddressFields = addressFields.some(field => existingFields.includes(field));
+
+      if (hasAddressFields && !existingFields.includes('address')) {
+        suggestions.push({
+          type: 'add_property',
+          property: 'address',
+          description: 'Consider grouping address fields into a single address object',
+          dataType: 'object'
+        });
+      }
+
       return {
         success: true,
         suggestions: suggestions,
@@ -145,99 +177,34 @@ class AIService {
       if (workflowData.steps && workflowData.steps.some(step => step.duration > 10000)) {
         recommendations.push({
           type: 'optimize_performance',
-          message: 'Some steps take longer than 10 seconds - consider optimizing these',
+          message: 'Some steps in your workflow are taking longer than 10 seconds. Consider optimizing these steps.',
           priority: 'high'
         });
       }
 
-      if (workflowData.steps && workflowData.steps.length === 0) {
+      if (workflowData.steps && workflowData.steps.some(step => !step.description)) {
         recommendations.push({
-          type: 'empty_workflow',
-          message: 'This workflow has no steps - add some steps to make it functional',
-          priority: 'critical'
+          type: 'add_descriptions',
+          message: 'Some steps are missing descriptions. Adding descriptions can improve workflow clarity.',
+          priority: 'low'
+        });
+      }
+
+      if (workflowData.steps && workflowData.steps.some(step => step.dependencies && step.dependencies.length > 3)) {
+        recommendations.push({
+          type: 'reduce_dependencies',
+          message: 'Some steps have more than 3 dependencies. Consider reducing dependencies for better workflow clarity.',
+          priority: 'medium'
         });
       }
 
       return {
         success: true,
         recommendations: recommendations,
-        efficiencyScore: 0.78
+        confidence: 0.8
       };
     } catch (error) {
       console.error('Error analyzing workflow:', error);
-      return {
-        success: false,
-        error: error.message
-      };
-    }
-  }
-
-  async predictSchemaImpact(oldSchema, newSchema) {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      const impacts = [];
-
-      // Check for removed properties
-      if (oldSchema.properties && newSchema.properties) {
-        const oldProps = Object.keys(oldSchema.properties);
-        const newProps = Object.keys(newSchema.properties);
-
-        const removedProps = oldProps.filter(prop => !newProps.includes(prop));
-        if (removedProps.length > 0) {
-          impacts.push({
-            type: 'breaking_change',
-            properties: removedProps,
-            severity: 'high',
-            description: 'Removing these properties will break existing data compatibility'
-          });
-        }
-      }
-
-      // Check for type changes
-      if (oldSchema.properties && newSchema.properties) {
-        const typeChanges = [];
-
-        Object.entries(oldSchema.properties).forEach(([propName, propDef]) => {
-          if (newSchema.properties[propName] && propDef.type !== newSchema.properties[propName].type) {
-            typeChanges.push({
-              property: propName,
-              from: propDef.type,
-              to: newSchema.properties[propName].type
-            });
-          }
-        });
-
-        if (typeChanges.length > 0) {
-          impacts.push({
-            type: 'type_change',
-            changes: typeChanges,
-            severity: 'medium',
-            description: 'Changing field types may affect data validation and processing'
-          });
-        }
-      }
-
-      // Check for added required fields
-      if (oldSchema.required && newSchema.required) {
-        const newRequired = newSchema.required.filter(req => !oldSchema.required.includes(req));
-        if (newRequired.length > 0) {
-          impacts.push({
-            type: 'new_required',
-            properties: newRequired,
-            severity: 'medium',
-            description: 'Adding required fields may break existing data that doesn\'t include them'
-          });
-        }
-      }
-
-      return {
-        success: true,
-        impacts: impacts,
-        compatibilityScore: impacts.length === 0 ? 1.0 : Math.max(0, 1.0 - (impacts.length * 0.2))
-      };
-    } catch (error) {
-      console.error('Error predicting schema impact:', error);
       return {
         success: false,
         error: error.message
