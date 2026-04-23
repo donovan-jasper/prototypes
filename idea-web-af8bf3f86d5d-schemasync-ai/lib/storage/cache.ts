@@ -2,6 +2,7 @@ import { getCachedSchema, cacheSchema } from './sqlite';
 import { DatabaseConnector } from '../database/connectors';
 import { parsePostgresSchema, parseTableRelationships } from '../database/schema-parser';
 import { useDatabaseStore } from '../../store/database-store';
+import { useNetworkStore } from '../../store/network-store';
 
 export const fetchAndCacheSchema = async (database: any) => {
   const connector = new DatabaseConnector(database.type);
@@ -45,20 +46,36 @@ export const fetchAndCacheSchema = async (database: any) => {
 };
 
 export const getSchema = async (databaseId: string, forceRefresh = false) => {
-  if (!forceRefresh) {
+  // Check network status first
+  const { isOnline } = useNetworkStore.getState();
+
+  // If offline and not forcing refresh, try to get from cache
+  if (!isOnline && !forceRefresh) {
     const cachedSchema = await getCachedSchema(databaseId);
     if (cachedSchema) {
       return cachedSchema;
     }
+    throw new Error('No cached schema available and offline');
   }
 
-  // Get database details from store
-  const { databases } = useDatabaseStore.getState();
-  const database = databases.find(db => db.id === databaseId);
-  
-  if (!database) {
-    throw new Error('Database not found');
-  }
+  // If forcing refresh or online, try to fetch fresh schema
+  try {
+    const { databases } = useDatabaseStore.getState();
+    const database = databases.find(db => db.id === databaseId);
 
-  return await fetchAndCacheSchema(database);
+    if (!database) {
+      throw new Error('Database not found');
+    }
+
+    return await fetchAndCacheSchema(database);
+  } catch (error) {
+    // If online but fetch fails, fall back to cache if available
+    if (isOnline) {
+      const cachedSchema = await getCachedSchema(databaseId);
+      if (cachedSchema) {
+        return cachedSchema;
+      }
+    }
+    throw error;
+  }
 };
