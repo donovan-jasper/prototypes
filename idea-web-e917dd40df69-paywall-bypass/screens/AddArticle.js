@@ -11,29 +11,31 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { fetchArticle } from '../services/ContentService';
+import { ContentService } from '../services/ContentService';
 
 const AddArticle = ({ navigation }) => {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   const handleFetchArticle = async () => {
     if (!url.trim()) {
-      Alert.alert('Error', 'Please enter a URL');
+      setError('Please enter a URL');
       return;
     }
 
     if (!url.startsWith('http://') && !url.startsWith('https://')) {
-      Alert.alert('Error', 'Please enter a valid URL starting with http:// or https://');
+      setError('Please enter a valid URL starting with http:// or https://');
       return;
     }
 
     setLoading(true);
+    setError(null);
 
     try {
-      const article = await fetchArticle(url.trim());
+      const article = await ContentService.fetchArticle(url.trim());
       setLoading(false);
-      
+
       Alert.alert(
         'Success',
         'Article fetched and saved successfully!',
@@ -50,18 +52,25 @@ const AddArticle = ({ navigation }) => {
       );
     } catch (error) {
       setLoading(false);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to fetch article. Please try again.',
-        [{ text: 'OK' }]
-      );
+      setError(error.message || 'Failed to fetch article. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to fetch article. Please try again.');
     }
   };
 
   const handlePaste = async () => {
-    // In a real app, you'd use Clipboard API
-    // For now, just a placeholder
-    Alert.alert('Info', 'Paste functionality requires Clipboard API');
+    try {
+      const clipboardContent = await ContentService.getClipboardContent();
+      if (clipboardContent && clipboardContent.startsWith('http')) {
+        setUrl(clipboardContent);
+        setError(null);
+      } else {
+        setError('No valid URL found in clipboard');
+        Alert.alert('Error', 'No valid URL found in clipboard');
+      }
+    } catch (error) {
+      setError(error.message || 'Failed to read clipboard');
+      Alert.alert('Error', error.message || 'Failed to read clipboard');
+    }
   };
 
   const suggestedSites = [
@@ -86,13 +95,18 @@ const AddArticle = ({ navigation }) => {
           </Text>
         </View>
 
+        {error && <Text style={styles.errorText}>{error}</Text>}
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
             placeholder="https://example.com/article"
             placeholderTextColor="#999"
             value={url}
-            onChangeText={setUrl}
+            onChangeText={(text) => {
+              setUrl(text);
+              setError(null);
+            }}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="url"
@@ -166,6 +180,11 @@ const styles = StyleSheet.create({
     color: '#666',
     lineHeight: 22,
   },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    fontSize: 14,
+  },
   inputContainer: {
     flexDirection: 'row',
     marginBottom: 20,
@@ -200,7 +219,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   fetchButtonDisabled: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
   fetchButtonText: {
     color: '#fff',
@@ -214,20 +233,20 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 15,
   },
   suggestedGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    justifyContent: 'space-between',
   },
   suggestedSite: {
     backgroundColor: '#fff',
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 10,
+    marginBottom: 10,
+    width: '48%',
+    alignItems: 'center',
   },
   suggestedSiteText: {
     fontSize: 14,
@@ -237,19 +256,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     padding: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   infoTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   infoText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    lineHeight: 22,
+    lineHeight: 24,
   },
 });
 

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import * as Clipboard from 'expo-clipboard';
 
 export const ContentService = {
   async fetchFromSource(apiEndpoint) {
@@ -12,7 +13,6 @@ export const ContentService = {
   },
 
   async getContentSources() {
-    // In a real app, this would fetch from your backend
     return [
       {
         id: 'nytimes',
@@ -57,5 +57,62 @@ export const ContentService = {
         apiEndpoint: 'https://feeds.npr.org/1001/rss.xml'
       }
     ];
+  },
+
+  async fetchArticle(url) {
+    try {
+      if (!url || typeof url !== 'string') {
+        throw new Error('Invalid URL provided');
+      }
+
+      // Validate URL format
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        throw new Error('URL must start with http:// or https://');
+      }
+
+      // In a real app, you would call a backend service that handles paywall bypassing
+      // For this prototype, we'll simulate fetching article content
+      const response = await axios.get(`https://api.librio.com/fetch-article?url=${encodeURIComponent(url)}`);
+
+      if (!response.data || !response.data.content) {
+        throw new Error('No article content found');
+      }
+
+      return {
+        id: Date.now().toString(),
+        url: url,
+        title: response.data.title || 'Untitled Article',
+        content: response.data.content,
+        author: response.data.author || 'Unknown Author',
+        date: response.data.date || new Date().toISOString(),
+        source: response.data.source || 'Unknown Source',
+        image: response.data.image || null
+      };
+    } catch (error) {
+      console.error('Error fetching article:', error);
+      if (error.response) {
+        if (error.response.status === 404) {
+          throw new Error('Article not found. Please check the URL and try again.');
+        } else if (error.response.status === 403) {
+          throw new Error('Access to this article is restricted. Please try a different URL.');
+        } else {
+          throw new Error('Failed to fetch article. Please try again later.');
+        }
+      } else if (error.request) {
+        throw new Error('Network error. Please check your internet connection and try again.');
+      } else {
+        throw new Error(error.message || 'Invalid URL. Please enter a valid article URL.');
+      }
+    }
+  },
+
+  async getClipboardContent() {
+    try {
+      const text = await Clipboard.getStringAsync();
+      return text;
+    } catch (error) {
+      console.error('Error reading clipboard:', error);
+      throw new Error('Failed to read clipboard content');
+    }
   }
 };
