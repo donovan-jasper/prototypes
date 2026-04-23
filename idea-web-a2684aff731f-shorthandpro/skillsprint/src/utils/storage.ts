@@ -9,23 +9,9 @@ export interface ChallengeHistory {
   timestamp: number;
 }
 
-export interface UserProgress {
-  totalXP: number;
-  currentStreak: number;
-  lastLoginDate: string;
-  challengeHistory: ChallengeHistory[];
-}
-
-const STORAGE_KEYS = {
-  USER_XP: 'userXP',
-  CURRENT_STREAK: 'currentStreak',
-  LAST_LOGIN_DATE: 'lastLoginDate',
-  CHALLENGE_HISTORY: 'challengeHistory',
-};
-
 export const getUserXP = async (): Promise<number> => {
   try {
-    const xp = await AsyncStorage.getItem(STORAGE_KEYS.USER_XP);
+    const xp = await AsyncStorage.getItem('userXP');
     return xp ? parseInt(xp, 10) : 0;
   } catch (error) {
     console.error('Error getting user XP:', error);
@@ -35,59 +21,15 @@ export const getUserXP = async (): Promise<number> => {
 
 export const setUserXP = async (xp: number): Promise<void> => {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_XP, xp.toString());
+    await AsyncStorage.setItem('userXP', xp.toString());
   } catch (error) {
     console.error('Error setting user XP:', error);
   }
 };
 
-export const getCurrentStreak = async (): Promise<number> => {
-  try {
-    const streak = await AsyncStorage.getItem(STORAGE_KEYS.CURRENT_STREAK);
-    return streak ? parseInt(streak, 10) : 0;
-  } catch (error) {
-    console.error('Error getting current streak:', error);
-    return 0;
-  }
-};
-
-export const updateStreak = async (): Promise<number> => {
-  try {
-    const lastLoginDate = await AsyncStorage.getItem(STORAGE_KEYS.LAST_LOGIN_DATE);
-    const today = new Date().toDateString();
-    
-    if (!lastLoginDate) {
-      await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STREAK, '1');
-      await AsyncStorage.setItem(STORAGE_KEYS.LAST_LOGIN_DATE, today);
-      return 1;
-    }
-
-    const lastLogin = new Date(lastLoginDate);
-    const todayDate = new Date(today);
-    const diffTime = todayDate.getTime() - lastLogin.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-    let newStreak = 1;
-    if (diffDays === 0) {
-      const currentStreak = await getCurrentStreak();
-      newStreak = currentStreak;
-    } else if (diffDays === 1) {
-      const currentStreak = await getCurrentStreak();
-      newStreak = currentStreak + 1;
-    }
-
-    await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_STREAK, newStreak.toString());
-    await AsyncStorage.setItem(STORAGE_KEYS.LAST_LOGIN_DATE, today);
-    return newStreak;
-  } catch (error) {
-    console.error('Error updating streak:', error);
-    return 0;
-  }
-};
-
 export const getChallengeHistory = async (): Promise<ChallengeHistory[]> => {
   try {
-    const history = await AsyncStorage.getItem(STORAGE_KEYS.CHALLENGE_HISTORY);
+    const history = await AsyncStorage.getItem('challengeHistory');
     return history ? JSON.parse(history) : [];
   } catch (error) {
     console.error('Error getting challenge history:', error);
@@ -98,35 +40,35 @@ export const getChallengeHistory = async (): Promise<ChallengeHistory[]> => {
 export const addChallengeToHistory = async (challenge: ChallengeHistory): Promise<void> => {
   try {
     const history = await getChallengeHistory();
-    history.unshift(challenge);
-    await AsyncStorage.setItem(STORAGE_KEYS.CHALLENGE_HISTORY, JSON.stringify(history));
+    history.push(challenge);
+    await AsyncStorage.setItem('challengeHistory', JSON.stringify(history));
   } catch (error) {
-    console.error('Error adding challenge to history:', error);
+    console.error('Error adding to challenge history:', error);
   }
 };
 
-export const getUserProgress = async (): Promise<UserProgress> => {
+export const updateStreak = async (): Promise<void> => {
   try {
-    const [totalXP, currentStreak, lastLoginDate, challengeHistory] = await Promise.all([
-      getUserXP(),
-      getCurrentStreak(),
-      AsyncStorage.getItem(STORAGE_KEYS.LAST_LOGIN_DATE),
-      getChallengeHistory(),
-    ]);
+    const lastLogin = await AsyncStorage.getItem('lastLoginDate');
+    const today = new Date().toDateString();
 
-    return {
-      totalXP,
-      currentStreak,
-      lastLoginDate: lastLoginDate || '',
-      challengeHistory,
-    };
+    if (lastLogin !== today) {
+      const streak = await AsyncStorage.getItem('userStreak');
+      const newStreak = streak ? parseInt(streak, 10) + 1 : 1;
+      await AsyncStorage.setItem('userStreak', newStreak.toString());
+      await AsyncStorage.setItem('lastLoginDate', today);
+    }
   } catch (error) {
-    console.error('Error getting user progress:', error);
-    return {
-      totalXP: 0,
-      currentStreak: 0,
-      lastLoginDate: '',
-      challengeHistory: [],
-    };
+    console.error('Error updating streak:', error);
+  }
+};
+
+export const getStreak = async (): Promise<number> => {
+  try {
+    const streak = await AsyncStorage.getItem('userStreak');
+    return streak ? parseInt(streak, 10) : 0;
+  } catch (error) {
+    console.error('Error getting streak:', error);
+    return 0;
   }
 };
