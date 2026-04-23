@@ -1,9 +1,9 @@
 export interface Reminder {
   id: string;
   title: string;
-  date: string;
+  date: string; // ISO string
   completed: boolean;
-  category?: string;
+  category?: 'personal' | 'work' | 'health' | 'finance' | 'other';
   location?: string;
 }
 
@@ -12,11 +12,5 @@ export interface Habit {
   title: string;
   streak: number;
   completed: boolean;
-  frequency: string;
-}
-
-export interface UserPreferences {
-  isPremium: boolean;
-  notificationsEnabled: boolean;
-  theme: 'light' | 'dark';
+  frequency: 'daily' | 'weekly';
 }

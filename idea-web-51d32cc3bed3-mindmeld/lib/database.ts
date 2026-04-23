@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase;
 
 export const initDatabase = async () => {
   db = await SQLite.openDatabaseAsync('flowstate.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS reminders (
       id TEXT PRIMARY KEY,
@@ -15,7 +15,7 @@ export const initDatabase = async () => {
       category TEXT,
       location TEXT
     );
-    
+
     CREATE TABLE IF NOT EXISTS habits (
       id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
@@ -32,6 +32,7 @@ export const getReminders = async (callback: (reminders: Reminder[]) => void) =>
     const reminders = result.map((row: any) => ({
       ...row,
       completed: row.completed === 1,
+      category: row.category as 'personal' | 'work' | 'health' | 'finance' | 'other' | undefined,
     }));
     callback(reminders);
   } catch (error) {
@@ -44,7 +45,14 @@ export const addReminder = async (reminder: Reminder) => {
   try {
     await db.runAsync(
       'INSERT INTO reminders (id, title, date, completed, category, location) VALUES (?, ?, ?, ?, ?, ?)',
-      [reminder.id, reminder.title, reminder.date, reminder.completed ? 1 : 0, reminder.category || null, reminder.location || null]
+      [
+        reminder.id,
+        reminder.title,
+        reminder.date,
+        reminder.completed ? 1 : 0,
+        reminder.category || null,
+        reminder.location || null
+      ]
     );
   } catch (error) {
     console.error('Error adding reminder:', error);
@@ -68,6 +76,7 @@ export const getHabits = async (callback: (habits: Habit[]) => void) => {
     const habits = result.map((row: any) => ({
       ...row,
       completed: row.completed === 1,
+      frequency: row.frequency as 'daily' | 'weekly',
     }));
     callback(habits);
   } catch (error) {
@@ -80,7 +89,13 @@ export const addHabit = async (habit: Habit) => {
   try {
     await db.runAsync(
       'INSERT INTO habits (id, title, streak, completed, frequency) VALUES (?, ?, ?, ?, ?)',
-      [habit.id, habit.title, habit.streak, habit.completed ? 1 : 0, habit.frequency]
+      [
+        habit.id,
+        habit.title,
+        habit.streak,
+        habit.completed ? 1 : 0,
+        habit.frequency
+      ]
     );
   } catch (error) {
     console.error('Error adding habit:', error);

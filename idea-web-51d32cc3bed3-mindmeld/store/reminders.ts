@@ -18,7 +18,7 @@ export const useReminders = create<RemindersState>((set) => ({
   },
   addReminder: async (reminder) => {
     await dbAddReminder(reminder);
-    set((state) => ({ reminders: [...state.reminders, reminder] }));
+    set((state) => ({ reminders: [reminder, ...state.reminders] }));
   },
   toggleReminder: async (id) => {
     await dbToggleReminder(id);
