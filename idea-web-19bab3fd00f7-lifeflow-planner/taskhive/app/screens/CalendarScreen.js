@@ -180,11 +180,14 @@ const CalendarScreen = () => {
             {calendarEvents.map((event, index) => (
               <View key={index} style={styles.eventItem}>
                 <View style={styles.eventTimeContainer}>
-                  <Text style={styles.eventTime}>{formatTime(event.startDate)}</Text>
-                  {event.endDate && <Text style={styles.eventTime}> - {formatTime(event.endDate)}</Text>}
+                  <Text style={styles.eventTime}>
+                    {formatTime(event.startDate)} - {formatTime(event.endDate)}
+                  </Text>
                 </View>
                 <Text style={styles.eventTitle}>{event.title}</Text>
-                {event.location && <Text style={styles.eventLocation}>{event.location}</Text>}
+                {event.location && (
+                  <Text style={styles.eventLocation}>{event.location}</Text>
+                )}
               </View>
             ))}
           </View>
@@ -195,11 +198,15 @@ const CalendarScreen = () => {
             <Text style={styles.sectionTitle}>Tasks</Text>
             {dateTasks.map((task, index) => (
               <View key={index} style={styles.taskItem}>
-                <View style={[styles.taskPriorityIndicator, { backgroundColor: getPriorityColor(task.priority) }]} />
-                <View style={styles.taskContent}>
-                  <Text style={styles.taskTitle}>{task.title}</Text>
-                  {task.notes && <Text style={styles.taskNotes}>{task.notes}</Text>}
+                <View style={[
+                  styles.taskCategory,
+                  { backgroundColor: getCategoryColor(task.category) }
+                ]}>
+                  <Text style={styles.taskCategoryText}>
+                    {task.category || 'General'}
+                  </Text>
                 </View>
+                <Text style={styles.taskTitle}>{task.title}</Text>
               </View>
             ))}
           </View>
@@ -208,13 +215,15 @@ const CalendarScreen = () => {
     );
   };
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return '#FF3B30';
-      case 'medium': return '#FFCC00';
-      case 'low': return '#34C759';
-      default: return '#8E8E93';
-    }
+  const getCategoryColor = (category) => {
+    const colors = {
+      'Work': '#FF6B6B',
+      'Personal': '#4ECDC4',
+      'Shopping': '#45B7D1',
+      'Health': '#FFBE0B',
+      'General': '#A5D8FF'
+    };
+    return colors[category] || '#A5D8FF';
   };
 
   return (
@@ -224,17 +233,24 @@ const CalendarScreen = () => {
         markedDates={{
           ...markedDates,
           [selectedDate]: {
-            ...markedDates[selectedDate],
+            ...(markedDates[selectedDate] || {}),
             selected: true,
             selectedColor: '#007AFF'
           }
         }}
         theme={{
+          selectedDayBackgroundColor: '#007AFF',
           todayTextColor: '#007AFF',
-          selectedDayTextColor: '#FFFFFF',
           arrowColor: '#007AFF',
         }}
       />
+
+      {permissionError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{permissionError}</Text>
+        </View>
+      )}
+
       {renderSelectedDateContent()}
     </View>
   );
@@ -254,8 +270,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333333',
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 12,
   },
   eventItem: {
@@ -270,76 +286,79 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   eventTimeContainer: {
-    flexDirection: 'row',
     marginBottom: 4,
   },
   eventTime: {
     fontSize: 14,
-    color: '#666666',
+    color: '#666',
   },
   eventTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333333',
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 4,
   },
   eventLocation: {
     fontSize: 14,
-    color: '#666666',
+    color: '#666',
   },
   taskItem: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    alignItems: 'center',
   },
-  taskPriorityIndicator: {
+  taskCategory: {
     width: 8,
-    height: 32,
-    borderRadius: 4,
+    height: '100%',
+    borderTopLeftRadius: 8,
+    borderBottomLeftRadius: 8,
     marginRight: 12,
   },
-  taskContent: {
-    flex: 1,
+  taskCategoryText: {
+    display: 'none',
   },
   taskTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  taskNotes: {
-    fontSize: 14,
-    color: '#666666',
+    color: '#333',
+    flex: 1,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#666',
     textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
   },
   loadingText: {
-    marginTop: 8,
+    marginTop: 12,
     fontSize: 16,
-    color: '#666666',
+    color: '#666',
+  },
+  errorContainer: {
+    padding: 16,
+    backgroundColor: '#FFEBEE',
+  },
+  errorText: {
+    color: '#C62828',
+    textAlign: 'center',
   },
 });
 
