@@ -16,7 +16,18 @@ class DatabaseService {
           await this.executeSql(tx, `
             CREATE TABLE IF NOT EXISTS schema_version (
               id INTEGER PRIMARY KEY AUTOINCREMENT,
-              version INTEGER NOT NULL
+              version INTEGER NOT NULL,
+              migrated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+
+          // Create migrations table if it doesn't exist
+          await this.executeSql(tx, `
+            CREATE TABLE IF NOT EXISTS migrations (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              version INTEGER NOT NULL,
+              description TEXT,
+              executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
           `);
 
@@ -59,6 +70,12 @@ class DatabaseService {
     if (currentVersion < 1) {
       // Create initial schema version
       await this.executeSql(tx, 'INSERT INTO schema_version (version) VALUES (?)', [this.currentSchemaVersion]);
+
+      // Record the migration
+      await this.executeSql(tx, 'INSERT INTO migrations (version, description) VALUES (?, ?)', [
+        this.currentSchemaVersion,
+        'Initial schema setup with applications table'
+      ]);
     }
 
     // Add more migration steps here for future versions
@@ -73,6 +90,28 @@ class DatabaseService {
         (tx, result) => resolve(result),
         (tx, error) => reject(error)
       );
+    });
+  }
+
+  async getCurrentSchemaVersion() {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'SELECT version FROM schema_version ORDER BY id DESC LIMIT 1',
+          [],
+          (tx, results) => {
+            if (results.rows.length > 0) {
+              resolve(results.rows.item(0).version);
+            } else {
+              resolve(0);
+            }
+          },
+          (tx, error) => {
+            console.error('Error getting current schema version:', error);
+            reject(error);
+          }
+        );
+      });
     });
   }
 
@@ -159,21 +198,26 @@ class DatabaseService {
     });
   }
 
-  async getCurrentSchemaVersion() {
+  async getMigrationHistory() {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
         tx.executeSql(
-          'SELECT version FROM schema_version ORDER BY id DESC LIMIT 1',
+          'SELECT * FROM migrations ORDER BY executed_at DESC',
           [],
           (tx, results) => {
-            if (results.rows.length > 0) {
-              resolve(results.rows.item(0).version);
-            } else {
-              resolve(0);
+            const migrations = [];
+            for (let i = 0; i < results.rows.length; i++) {
+              migrations.push({
+                id: results.rows.item(i).id,
+                version: results.rows.item(i).version,
+                description: results.rows.item(i).description,
+                executed_at: results.rows.item(i).executed_at,
+              });
             }
+            resolve(migrations);
           },
           (tx, error) => {
-            console.error('Error getting schema version:', error);
+            console.error('Error fetching migration history:', error);
             reject(error);
           }
         );

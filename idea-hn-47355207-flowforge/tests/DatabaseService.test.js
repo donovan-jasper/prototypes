@@ -22,6 +22,28 @@ jest.mock('expo-sqlite', () => {
             mockResult.rows.item = jest.fn(() => ({ version: 1 }));
           }
 
+          if (sql.includes('SELECT * FROM migrations')) {
+            mockResult.rows.length = 1;
+            mockResult.rows.item = jest.fn(() => ({
+              id: 1,
+              version: 1,
+              description: 'Initial schema setup',
+              executed_at: '2023-01-01 00:00:00'
+            }));
+          }
+
+          if (sql.includes('SELECT * FROM applications')) {
+            mockResult.rows.length = 1;
+            mockResult.rows.item = jest.fn(() => ({
+              id: 1,
+              name: 'Test App',
+              schema: JSON.stringify({ components: [] }),
+              version: 1,
+              created_at: '2023-01-01 00:00:00',
+              updated_at: '2023-01-01 00:00:00'
+            }));
+          }
+
           success(mockTx, mockResult);
         }),
       };
@@ -71,5 +93,18 @@ describe('DatabaseService', () => {
   test('should get applications', async () => {
     const applications = await dbService.getApplications();
     expect(Array.isArray(applications)).toBe(true);
+    expect(applications.length).toBeGreaterThan(0);
+    expect(applications[0]).toHaveProperty('id');
+    expect(applications[0]).toHaveProperty('name');
+    expect(applications[0]).toHaveProperty('schema');
+  });
+
+  test('should get migration history', async () => {
+    const migrations = await dbService.getMigrationHistory();
+    expect(Array.isArray(migrations)).toBe(true);
+    expect(migrations.length).toBeGreaterThan(0);
+    expect(migrations[0]).toHaveProperty('version');
+    expect(migrations[0]).toHaveProperty('description');
+    expect(migrations[0]).toHaveProperty('executed_at');
   });
 });
