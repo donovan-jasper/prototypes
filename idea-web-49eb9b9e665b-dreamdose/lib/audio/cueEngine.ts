@@ -22,21 +22,19 @@ export function generateSchedule(durationMinutes: number): CueEvent[] {
   const schedule: CueEvent[] = [];
   let currentTimeSeconds = 0;
   const totalSeconds = durationMinutes * 60;
-  
+
   // Start first cue after initial settling period (3-4 minutes)
   const firstCueDelay = 180 + Math.random() * 60; // 3-4 minutes
   currentTimeSeconds = firstCueDelay;
-  
+
   while (currentTimeSeconds < totalSeconds) {
     const elapsedMinutes = currentTimeSeconds / 60;
     const intensity = getCueIntensity(elapsedMinutes, durationMinutes);
-    
+
     // Determine cue type based on intensity
-    // Early: mostly audio, some haptic
-    // Late: more combined cues for stronger intervention
     let type: CueType;
     const rand = Math.random();
-    
+
     if (intensity < 0.5) {
       // Early session: 60% audio, 30% haptic, 10% both
       if (rand < 0.6) type = 'audio';
@@ -53,18 +51,18 @@ export function generateSchedule(durationMinutes: number): CueEvent[] {
       else if (rand < 0.6) type = 'haptic';
       else type = 'both';
     }
-    
+
     schedule.push({
       timeMinutes: elapsedMinutes,
       timeSeconds: currentTimeSeconds,
       type,
       intensity,
     });
-    
+
     // Calculate next cue time
     const nextInterval = calculateNextCueTime(elapsedMinutes, durationMinutes);
     currentTimeSeconds += nextInterval;
-    
+
     // Ensure minimum 20 second spacing
     if (schedule.length > 1) {
       const lastCue = schedule[schedule.length - 2];
@@ -74,7 +72,7 @@ export function generateSchedule(durationMinutes: number): CueEvent[] {
       }
     }
   }
-  
+
   return schedule;
 }
 

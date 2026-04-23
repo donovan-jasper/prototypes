@@ -7,6 +7,8 @@ import {
   Alert,
   AppState,
   ActivityIndicator,
+  Animated,
+  Vibration,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Audio } from 'expo-av';
@@ -31,6 +33,7 @@ export default function ActiveSessionScreen() {
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [sessionStatus, setSessionStatus] = useState<'active' | 'paused'>('active');
+  const [cueAnimation] = useState(new Animated.Value(0));
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
@@ -45,12 +48,10 @@ export default function ActiveSessionScreen() {
         appState.current.match(/inactive|background/) &&
         nextAppState === 'active'
       ) {
-        // App came to foreground
         if (sessionStatus === 'active' && !isPaused) {
           startTimer();
         }
       } else if (nextAppState === 'background') {
-        // App went to background
         if (intervalRef.current) {
           clearInterval(intervalRef.current);
         }
@@ -68,26 +69,21 @@ export default function ActiveSessionScreen() {
     try {
       setIsLoading(true);
 
-      // Load user preferences
       const prefs = await getUserPreferences();
       if (prefs) {
         setHapticsEnabled(prefs.haptic_enabled === 1);
       }
 
-      // Generate cue schedule
       const schedule = generateSchedule(parseInt(duration as string));
       setCueSchedule(schedule);
 
-      // Load audio resources
       await loadAudio();
 
-      // Start session in database
       const session = await sessionManager.startSession(id as string);
       if (session) {
         setCurrentSession(session);
       }
 
-      // Start timer
       startTimer();
       setIsLoading(false);
     } catch (error) {
@@ -106,7 +102,6 @@ export default function ActiveSessionScreen() {
         interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
       });
 
-      // Load ambient soundscape
       const { sound: ambient } = await Audio.Sound.createAsync(
         require('@/assets/sounds/rain.mp3'),
         { isLooping: true, volume: 0.6 }
@@ -114,7 +109,6 @@ export default function ActiveSessionScreen() {
       setAmbientSound(ambient);
       await ambient.playAsync();
 
-      // Load cue sound
       const { sound: cue } = await Audio.Sound.createAsync(
         require('@/assets/sounds/rain.mp3'),
         { isLooping: false, volume: 0.3 }
@@ -122,7 +116,6 @@ export default function ActiveSessionScreen() {
       setCueSound(cue);
     } catch (error) {
       console.error('Error loading sound:', error);
-      // Fallback to silent mode if audio fails
       setAmbientSound(null);
       setCueSound(null);
     }
@@ -163,51 +156,42 @@ export default function ActiveSessionScreen() {
   const triggerCue = async (cue: CueEvent) => {
     const { type, intensity } = cue;
 
+    // Visual feedback animation
+    Animated.sequence([
+      Animated.timing(cueAnimation, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(cueAnimation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Audio cue
     if (type === 'audio' || type === 'both') {
-      await playAudioCue(intensity);
-    }
-
-    if ((type === 'haptic' || type === 'both') && hapticsEnabled) {
-      await playHapticCue(intensity);
-    }
-  };
-
-  const playAudioCue = async (intensity: number) => {
-    if (!cueSound) return;
-
-    try {
-      await cueSound.setVolumeAsync(0.3 + (intensity * 0.4));
-      await cueSound.setPositionAsync(0);
-      await cueSound.playAsync();
-
-      setTimeout(async () => {
-        await cueSound.stopAsync();
-      }, 2000);
-    } catch (error) {
-      console.error('Error playing audio cue:', error);
-    }
-  };
-
-  const playHapticCue = async (intensity: number) => {
-    try {
-      if (intensity < 0.5) {
-        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      } else if (intensity < 0.8) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        setTimeout(() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        }, 100);
-      } else {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        setTimeout(() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }, 100);
-        setTimeout(() => {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        }, 200);
+      if (cueSound) {
+        await cueSound.setVolumeAsync(intensity * 0.3);
+        await cueSound.replayAsync();
       }
-    } catch (error) {
-      console.error('Error playing haptic cue:', error);
+    }
+
+    // Haptic feedback
+    if (type === 'haptic' || type === 'both') {
+      if (hapticsEnabled) {
+        if (intensity < 0.5) {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        } else if (intensity < 0.8) {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          setTimeout(() => {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          }, 100);
+        } else {
+          Vibration.vibrate([0, 100, 50, 100, 50, 100]);
+        }
+      }
     }
   };
 
@@ -229,16 +213,13 @@ export default function ActiveSessionScreen() {
       'End Session',
       'Are you sure you want to end this session?',
       [
+        { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'End Session',
+          text: 'End',
           style: 'destructive',
           onPress: async () => {
-            await cleanup();
             await sessionManager.interruptSession(id as string);
+            cleanup();
             router.back();
           },
         },
@@ -251,23 +232,12 @@ export default function ActiveSessionScreen() {
       clearInterval(intervalRef.current);
     }
 
-    // Show completion UI
-    Alert.alert(
-      'Session Complete',
-      'Your rest session is complete. How do you feel?',
-      [
-        {
-          text: 'Rate Energy',
-          onPress: async () => {
-            // In a real app, this would show a rating UI
-            const energyRating = 4; // Default rating
-            await sessionManager.completeSession(id as string, energyRating);
-            router.back();
-          },
-        },
-      ],
-      { cancelable: false }
-    );
+    await sessionManager.completeSession(id as string, 0); // Default rating
+    cleanup();
+    router.push({
+      pathname: '/session/wake',
+      params: { sessionId: id },
+    });
   };
 
   const cleanup = async () => {
@@ -284,11 +254,6 @@ export default function ActiveSessionScreen() {
       await cueSound.stopAsync();
       await cueSound.unloadAsync();
     }
-
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: false,
-      staysActiveInBackground: false,
-    });
   };
 
   if (isLoading) {
@@ -300,8 +265,22 @@ export default function ActiveSessionScreen() {
     );
   }
 
+  const animatedStyle = {
+    opacity: cueAnimation,
+    transform: [
+      {
+        scale: cueAnimation.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 1.1],
+        }),
+      },
+    ],
+  };
+
   return (
     <View style={styles.container}>
+      <Animated.View style={[styles.cueIndicator, animatedStyle]} />
+
       <SessionTimer
         remainingSeconds={remainingSeconds}
         totalSeconds={totalSeconds}
@@ -337,7 +316,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#121212',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -353,11 +331,11 @@ const styles = StyleSheet.create({
   controlsContainer: {
     flexDirection: 'row',
     marginTop: 40,
-    width: '100%',
-    justifyContent: 'space-around',
+    width: '80%',
+    justifyContent: 'space-between',
   },
   controlButton: {
-    backgroundColor: '#1E1E1E',
+    backgroundColor: '#2A2A2A',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 24,
@@ -374,5 +352,13 @@ const styles = StyleSheet.create({
   },
   stopButtonText: {
     color: 'white',
+  },
+  cueIndicator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 122, 255, 0.2)',
   },
 });
