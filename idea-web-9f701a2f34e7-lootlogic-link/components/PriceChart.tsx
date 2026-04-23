@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme } from 'victory-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme, VictoryVoronoiContainer } from 'victory-native';
 import { getPriceHistory } from '../lib/api/priceService';
 
 interface PriceChartProps {
@@ -10,6 +10,7 @@ interface PriceChartProps {
 const PriceChart: React.FC<PriceChartProps> = ({ itemId }) => {
   const [priceHistory, setPriceHistory] = useState<Array<{ date: string; price: number }>>([]);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
 
   useEffect(() => {
     const loadPriceHistory = async () => {
@@ -25,6 +26,15 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId }) => {
 
     loadPriceHistory();
   }, [itemId]);
+
+  const getFilteredData = () => {
+    if (timeRange === '7d') {
+      return priceHistory.slice(-7);
+    } else if (timeRange === '90d') {
+      return priceHistory;
+    }
+    return priceHistory.slice(-30);
+  };
 
   if (loading) {
     return (
@@ -45,11 +55,41 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>30-Day Price History</Text>
+      <Text style={styles.title}>Price History</Text>
+
+      <View style={styles.timeRangeContainer}>
+        <TouchableOpacity
+          style={[styles.timeRangeButton, timeRange === '7d' && styles.activeTimeRange]}
+          onPress={() => setTimeRange('7d')}
+        >
+          <Text style={styles.timeRangeText}>7 Days</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.timeRangeButton, timeRange === '30d' && styles.activeTimeRange]}
+          onPress={() => setTimeRange('30d')}
+        >
+          <Text style={styles.timeRangeText}>30 Days</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.timeRangeButton, timeRange === '90d' && styles.activeTimeRange]}
+          onPress={() => setTimeRange('90d')}
+        >
+          <Text style={styles.timeRangeText}>90 Days</Text>
+        </TouchableOpacity>
+      </View>
+
       <VictoryChart
         theme={VictoryTheme.material}
         height={300}
         padding={{ top: 20, bottom: 50, left: 50, right: 20 }}
+        containerComponent={
+          <VictoryVoronoiContainer
+            voronoiDimension="x"
+            labels={({ datum }) => `Date: ${datum.date}\nPrice: $${datum.price.toFixed(2)}`}
+          />
+        }
       >
         <VictoryAxis
           dependentAxis
@@ -67,7 +107,7 @@ const PriceChart: React.FC<PriceChartProps> = ({ itemId }) => {
           }}
         />
         <VictoryLine
-          data={priceHistory}
+          data={getFilteredData()}
           x="date"
           y="price"
           style={{
@@ -109,6 +149,25 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
+  },
+  timeRangeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  timeRangeButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginHorizontal: 5,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+  },
+  activeTimeRange: {
+    backgroundColor: '#03A9F4',
+  },
+  timeRangeText: {
+    color: '#333',
+    fontSize: 12,
   },
 });
 

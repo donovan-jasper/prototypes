@@ -19,7 +19,7 @@ interface InventoryCardProps {
 
 const InventoryCard: React.FC<InventoryCardProps> = ({ item }) => {
   const router = useRouter();
-  const { rules } = useAlertStore();
+  const { rules, activeAlerts } = useAlertStore();
   const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [averagePrice, setAveragePrice] = useState<number | null>(null);
   const [isAlertItem, setIsAlertItem] = useState(false);
@@ -185,14 +185,13 @@ const styles = StyleSheet.create({
   },
   priceContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
   },
   value: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#03A9F4',
-    marginRight: 8,
   },
   priceIndicator: {
     flexDirection: 'row',

@@ -16,7 +16,7 @@ interface AlertStore {
   activeAlerts: string[];
   createRule: (rule: Omit<AlertRule, 'id'>) => void;
   deleteRule: (ruleId: string) => void;
-  checkRules: () => Promise<void>;
+  checkRules: (currentPrices?: Record<string, number>) => Promise<void>;
 }
 
 const useAlertStore = create<AlertStore>((set, get) => ({
@@ -26,15 +26,22 @@ const useAlertStore = create<AlertStore>((set, get) => ({
     rules: [...state.rules, { ...rule, id: Date.now().toString() }]
   })),
   deleteRule: (ruleId) => set((state) => ({
-    rules: state.rules.filter(rule => rule.id !== ruleId)
+    rules: state.rules.filter(rule => rule.id !== ruleId),
+    activeAlerts: state.activeAlerts.filter(alertId => alertId !== ruleId)
   })),
-  checkRules: async () => {
+  checkRules: async (currentPrices) => {
     const rules = get().rules;
     const newActiveAlerts: string[] = [];
 
     for (const rule of rules) {
       try {
-        const currentPrice = await fetchItemPrice(rule.game, rule.itemId);
+        let currentPrice: number;
+
+        if (currentPrices && currentPrices[`${rule.game}-${rule.itemName}`]) {
+          currentPrice = currentPrices[`${rule.game}-${rule.itemName}`];
+        } else {
+          currentPrice = await fetchItemPrice(rule.game, rule.itemId);
+        }
 
         if (currentPrice <= rule.targetPrice) {
           newActiveAlerts.push(rule.id);
