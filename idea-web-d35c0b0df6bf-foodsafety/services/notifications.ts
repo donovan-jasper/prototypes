@@ -119,3 +119,41 @@ export const setupRecallAlerts = async () => {
     await checkForRecallAlerts();
   }, interval);
 };
+
+// New function to schedule mock recall alerts for demo purposes
+export const scheduleMockRecallAlerts = async () => {
+  try {
+    const savedLocations = await getSavedLocations();
+
+    if (savedLocations.length === 0) {
+      console.log('No saved locations to schedule mock alerts for');
+      return;
+    }
+
+    // Schedule a mock alert for each saved location
+    for (const location of savedLocations) {
+      // Check if we've already scheduled a mock alert for this location
+      const existingAlerts = await getRecallAlertsForEstablishment(location.establishmentId);
+      const hasMockAlert = existingAlerts.some(alert =>
+        alert.description.includes('Mock recall alert')
+      );
+
+      if (!hasMockAlert) {
+        // Schedule a mock alert in 30 seconds
+        const triggerDate = new Date(Date.now() + 30000); // 30 seconds from now
+
+        await scheduleRecallAlert(
+          location.establishmentId,
+          location.name,
+          triggerDate.toISOString(),
+          'Mock recall alert - This is a test notification for demonstration purposes',
+          'low'
+        );
+
+        console.log(`Scheduled mock recall alert for ${location.name}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error scheduling mock recall alerts:', error);
+  }
+};

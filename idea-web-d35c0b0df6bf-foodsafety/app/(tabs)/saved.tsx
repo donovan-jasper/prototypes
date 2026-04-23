@@ -5,12 +5,14 @@ import { getSavedLocations, removeLocation, getUnreadRecallAlertCountForLocation
 import { SavedLocation } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
 import { Ionicons } from '@expo/vector-icons';
+import { useRecallAlerts } from '@/hooks/useRecallAlerts';
 
 const SavedLocationsScreen = () => {
   const router = useRouter();
   const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadAlerts, setUnreadAlerts] = useState<Record<string, number>>({});
+  const { unreadCount } = useRecallAlerts();
 
   const fetchSavedLocations = useCallback(async () => {
     try {
@@ -190,7 +192,7 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 8,
   },
   alertBadgeText: {
     color: 'white',
