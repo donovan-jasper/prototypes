@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { useEffect } from 'react';
 import { useShakeDetection } from '../hooks/useShakeDetection';
+import { SettingsProvider } from '../contexts/SettingsContext';
 
 export default function RootLayout() {
   const { startShakeListener, stopShakeListener } = useShakeDetection();
@@ -16,10 +17,12 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="emergency" options={{ headerShown: false }} />
-      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-    </Stack>
+    <SettingsProvider>
+      <Stack>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="emergency" options={{ headerShown: false }} />
+        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      </Stack>
+    </SettingsProvider>
   );
 }

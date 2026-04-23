@@ -6,6 +6,7 @@ interface Contact {
   name: string;
   phone: string;
   photo?: string;
+  isFavorite: boolean;
   isEmergency: boolean;
 }
 

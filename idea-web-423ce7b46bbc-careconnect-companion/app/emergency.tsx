@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform, ActivityIndicator } from 'react-native';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { useSettings } from '../contexts/SettingsContext';
@@ -11,6 +11,8 @@ export default function EmergencyScreen() {
   const { emergencyContacts } = useSettings();
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [isCalling, setIsCalling] = useState(false);
+  const [isSendingSMS, setIsSendingSMS] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Get the first emergency contact
   const primaryContact = emergencyContacts[0];
@@ -18,7 +20,7 @@ export default function EmergencyScreen() {
   // Start countdown when component mounts
   useEffect(() => {
     if (!primaryContact) {
-      router.back();
+      setError('No emergency contact set up');
       return;
     }
 
@@ -40,6 +42,7 @@ export default function EmergencyScreen() {
     if (!primaryContact) return;
 
     setIsCalling(true);
+    setError(null);
 
     try {
       // Make the phone call
@@ -54,17 +57,20 @@ export default function EmergencyScreen() {
       await sendLocationSMS();
     } catch (error) {
       console.error('Emergency call failed:', error);
+      setError('Failed to initiate emergency call');
     } finally {
       setIsCalling(false);
     }
   };
 
   const sendLocationSMS = async () => {
+    setIsSendingSMS(true);
     try {
       // Get current location
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
         console.log('Location permission not granted');
+        setError('Location permission not granted');
         return;
       }
 
@@ -79,15 +85,33 @@ export default function EmergencyScreen() {
         contact.phone.replace(/\D/g, '')
       );
 
-      await SMS.sendSMSAsync(phoneNumbers, locationMessage);
+      const { result } = await SMS.sendSMSAsync(phoneNumbers, locationMessage);
+
+      if (result !== 'sent') {
+        setError('Failed to send location SMS');
+      }
     } catch (error) {
       console.error('Failed to send location SMS:', error);
+      setError('Failed to send location SMS');
+    } finally {
+      setIsSendingSMS(false);
     }
   };
 
   const cancelEmergency = () => {
     router.back();
   };
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.cancelButton} onPress={cancelEmergency}>
+          <Text style={styles.cancelButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (!primaryContact) {
     return (
@@ -106,7 +130,10 @@ export default function EmergencyScreen() {
       <Text style={styles.subtitle}>Calling {primaryContact.name}</Text>
 
       {isCalling ? (
-        <Text style={styles.callingText}>Calling...</Text>
+        <View style={styles.statusContainer}>
+          <ActivityIndicator size="large" color="#ffffff" />
+          <Text style={styles.callingText}>Calling...</Text>
+        </View>
       ) : (
         <>
           <Text style={styles.countdownText}>{countdown}</Text>
@@ -114,6 +141,10 @@ export default function EmergencyScreen() {
             <Text style={styles.cancelButtonText}>CANCEL</Text>
           </TouchableOpacity>
         </>
+      )}
+
+      {isSendingSMS && (
+        <Text style={styles.smsStatus}>Sending location to emergency contacts...</Text>
       )}
     </View>
   );
@@ -147,9 +178,10 @@ const styles = StyleSheet.create({
     marginBottom: 40,
   },
   callingText: {
-    fontSize: 36,
+    fontSize: 24,
     color: 'white',
-    marginBottom: 40,
+    marginTop: 20,
+    textAlign: 'center',
   },
   cancelButton: {
     backgroundColor: 'white',
@@ -168,6 +200,16 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: 'white',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  statusContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  smsStatus: {
+    fontSize: 16,
+    color: 'white',
+    marginTop: 20,
     textAlign: 'center',
   },
 });
