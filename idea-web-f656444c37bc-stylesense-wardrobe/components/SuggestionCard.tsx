@@ -8,10 +8,10 @@ const { width } = Dimensions.get('window');
 
 interface SuggestionCardProps {
   suggestion: OutfitSuggestion;
-  onRefresh: () => void;
+  onAccepted: () => void;
 }
 
-const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }) => {
+const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onAccepted }) => {
   const { items: allItems } = useWardrobeStore();
   const [outfitItems, setOutfitItems] = useState<WardrobeItem[]>([]);
   const [isAccepted, setIsAccepted] = useState(false);
@@ -36,10 +36,8 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
       // Update local state
       setIsAccepted(true);
 
-      // Refresh suggestions after a delay
-      setTimeout(() => {
-        onRefresh();
-      }, 1000);
+      // Notify parent component
+      onAccepted();
     } catch (error) {
       console.error('Error accepting outfit:', error);
     }
@@ -47,10 +45,6 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
 
   const handleReject = () => {
     setIsRejected(true);
-    // Refresh suggestions after a delay
-    setTimeout(() => {
-      onRefresh();
-    }, 500);
   };
 
   const panResponder = PanResponder.create({
@@ -194,25 +188,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   button: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 8,
     alignItems: 'center',
   },
-  acceptButton: {
-    backgroundColor: '#4CAF50',
-  },
   rejectButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#f44336',
+  },
+  acceptButton: {
+    backgroundColor: '#4caf50',
   },
   buttonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   acceptedContainer: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#e8f5e9',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -221,12 +216,12 @@ const styles = StyleSheet.create({
   acceptedText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#2E7D32',
+    color: '#2e7d32',
     marginBottom: 8,
   },
   acceptedSubtext: {
     fontSize: 14,
-    color: '#388E3C',
+    color: '#4caf50',
   },
 });
 
