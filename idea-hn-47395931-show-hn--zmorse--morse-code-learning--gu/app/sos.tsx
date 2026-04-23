@@ -171,13 +171,13 @@ export default function SOSScreen() {
               placeholder="Enter your message"
               value={newMessage}
               onChangeText={setNewMessage}
-              autoFocus={true}
+              autoFocus
             />
-            <View style={styles.buttonRow}>
+            <View style={styles.modalButtons}>
               <Button
                 title="Cancel"
                 onPress={() => setShowCustomModal(false)}
-                color="#666"
+                color="#999"
               />
               <Button
                 title="Save"
@@ -199,6 +199,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -214,21 +219,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
     textAlign: 'center',
     color: '#666',
-    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   premiumSection: {
     marginTop: 30,
-    alignItems: 'center',
+    width: '100%',
+    paddingHorizontal: 20,
   },
   premiumText: {
     fontSize: 16,
     marginBottom: 10,
-    color: '#333',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -241,24 +242,22 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: '80%',
-    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
-    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
     padding: 10,
-    marginBottom: 20,
+    marginBottom: 15,
     fontSize: 16,
   },
-  buttonRow: {
+  modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
 });
