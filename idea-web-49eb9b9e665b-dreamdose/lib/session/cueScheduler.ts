@@ -1,98 +1,134 @@
-import { generateSchedule, CueEvent } from '../audio/cueEngine';
-import { playCue } from '../audio/soundscapeManager';
-import { playPattern } from '../haptics/patternEngine';
-import { Session } from './sessionManager';
+import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 import { calculateNextCueTime, getCueIntensity } from './adaptiveAlgorithm';
+import { logCueEvent } from '../database/queries';
+import { Session } from './sessionManager';
 
-export class CueScheduler {
-  private schedule: CueEvent[] = [];
-  private currentSession: Session | null = null;
+class CueScheduler {
+  private session: Session | null = null;
   private intervalId: NodeJS.Timeout | null = null;
-  private startTime: number = 0;
-  private pausedTime: number = 0;
-  private totalPausedDuration: number = 0;
-  private lastCueTime: number = 0;
+  private elapsedMinutes = 0;
+  private lastCueTime = 0;
+  private soundObject: Audio.Sound | null = null;
 
-  constructor() {}
-
-  initialize(session: Session): void {
-    this.currentSession = session;
-    this.schedule = generateSchedule(session.durationMinutes);
-    this.startTime = Date.now();
-    this.pausedTime = 0;
-    this.totalPausedDuration = 0;
-    this.lastCueTime = 0;
+  initialize(session: Session) {
+    this.session = session;
+    this.elapsedMinutes = 0;
+    this.lastCueTime = Date.now();
   }
 
-  start(): void {
-    if (!this.currentSession) return;
+  start() {
+    if (!this.session) return;
 
     this.intervalId = setInterval(() => {
-      const elapsedSeconds = this.getAdjustedElapsedSeconds();
-      const elapsedMinutes = elapsedSeconds / 60;
+      const now = Date.now();
+      const elapsedSeconds = (now - this.session!.startTime) / 1000;
+      this.elapsedMinutes = Math.floor(elapsedSeconds / 60);
 
-      // Calculate adaptive timing
-      if (this.lastCueTime === 0 || elapsedSeconds - this.lastCueTime >= calculateNextCueTime(elapsedMinutes, this.currentSession.durationMinutes)) {
-        const intensity = getCueIntensity(elapsedMinutes, this.currentSession.durationMinutes);
-        this.triggerAdaptiveCue(intensity);
-        this.lastCueTime = elapsedSeconds;
+      const timeSinceLastCue = (now - this.lastCueTime) / 1000;
+      const nextCueTime = calculateNextCueTime(this.elapsedMinutes, this.session!.durationMinutes);
+
+      if (timeSinceLastCue >= nextCueTime) {
+        this.triggerCue();
+        this.lastCueTime = now;
       }
-    }, 100);
+    }, 1000);
   }
 
-  pause(): void {
+  pause() {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
-      this.pausedTime = Date.now();
     }
   }
 
-  resume(): void {
-    if (this.currentSession && !this.intervalId) {
-      if (this.pausedTime > 0) {
-        this.totalPausedDuration += (Date.now() - this.pausedTime);
-        this.pausedTime = 0;
-      }
+  resume() {
+    if (this.session && !this.intervalId) {
       this.start();
     }
   }
 
-  stop(): void {
-    this.pause();
-    this.schedule = [];
-    this.currentSession = null;
-    this.pausedTime = 0;
-    this.totalPausedDuration = 0;
-    this.lastCueTime = 0;
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+    this.cleanupAudio();
   }
 
-  private triggerAdaptiveCue(intensity: number): void {
-    // Determine cue type based on intensity
-    let cueType: 'audio' | 'haptic' | 'both';
+  private async triggerCue() {
+    if (!this.session) return;
 
-    if (intensity < 0.5) {
-      cueType = 'audio';
-    } else if (intensity < 0.8) {
-      cueType = 'haptic';
-    } else {
+    const intensity = getCueIntensity(this.elapsedMinutes, this.session.durationMinutes);
+    const isFinalPhase = this.elapsedMinutes >= this.session.durationMinutes - 2;
+
+    // Determine cue type based on intensity and phase
+    let cueType: 'audio' | 'haptic' | 'both' = 'audio';
+
+    if (intensity > 0.7) {
       cueType = 'both';
+    } else if (intensity > 0.4) {
+      cueType = Math.random() > 0.5 ? 'haptic' : 'audio';
     }
 
+    // Play appropriate feedback
     if (cueType === 'audio' || cueType === 'both') {
-      playCue(intensity);
+      await this.playAudioCue(intensity);
     }
 
     if (cueType === 'haptic' || cueType === 'both') {
-      playPattern(intensity);
+      this.triggerHapticCue(intensity);
+    }
+
+    // Log the cue event
+    await logCueEvent(
+      this.session.id,
+      Date.now(),
+      cueType,
+      intensity
+    );
+  }
+
+  private async playAudioCue(intensity: number) {
+    try {
+      // Clean up previous sound if it exists
+      if (this.soundObject) {
+        await this.soundObject.unloadAsync();
+      }
+
+      const { sound } = await Audio.Sound.createAsync(
+        require('../../assets/sounds/cue.mp3'),
+        {
+          shouldPlay: true,
+          volume: intensity * 0.7, // Scale volume with intensity
+        }
+      );
+
+      this.soundObject = sound;
+    } catch (error) {
+      console.log('Error playing audio cue', error);
     }
   }
 
-  private getAdjustedElapsedSeconds(): number {
-    if (!this.currentSession) return 0;
-    const now = Date.now();
-    const elapsed = now - this.startTime - this.totalPausedDuration;
-    return elapsed / 1000;
+  private triggerHapticCue(intensity: number) {
+    if (intensity < 0.5) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } else if (intensity < 0.8) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    }
+  }
+
+  private async cleanupAudio() {
+    if (this.soundObject) {
+      try {
+        await this.soundObject.unloadAsync();
+        this.soundObject = null;
+      } catch (error) {
+        console.log('Error cleaning up audio', error);
+      }
+    }
   }
 }
 
