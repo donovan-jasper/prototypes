@@ -1,12 +1,19 @@
-import React from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePortfolio } from '../../hooks/usePortfolio';
 import { Holding } from '../../lib/types';
 
 const PortfolioScreen = () => {
   const router = useRouter();
-  const { portfolio, loading, error } = usePortfolio();
+  const { portfolio, loading, error, refreshPortfolio } = usePortfolio();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshPortfolio();
+    setRefreshing(false);
+  };
 
   const renderHolding = ({ item }: { item: Holding }) => {
     const gainLoss = item.gain || 0;
@@ -47,7 +54,7 @@ const PortfolioScreen = () => {
     );
   };
 
-  if (loading) {
+  if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -61,6 +68,9 @@ const PortfolioScreen = () => {
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Failed to load portfolio</Text>
         <Text style={styles.errorDetails}>{error.message}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={onRefresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -84,6 +94,14 @@ const PortfolioScreen = () => {
           renderItem={renderHolding}
           keyExtractor={(item) => item.id?.toString() || item.symbol}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#4CAF50']}
+              tintColor="#4CAF50"
+            />
+          }
         />
       ) : (
         <View style={styles.emptyState}>
@@ -133,6 +151,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   summaryContainer: {
     backgroundColor: '#fff',
@@ -192,20 +221,19 @@ const styles = StyleSheet.create({
   },
   holdingDetails: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
   },
   detailColumn: {
-    width: '48%',
-    marginBottom: 10,
+    flex: 1,
+    alignItems: 'center',
   },
   detailLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '500',
   },
   emptyState: {
@@ -218,7 +246,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 10,
   },
   emptySubtext: {
     fontSize: 14,
