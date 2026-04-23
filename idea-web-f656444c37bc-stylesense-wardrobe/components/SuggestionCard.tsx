@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
 import { useWardrobeStore } from '@/store/wardrobeStore';
 import { addWearLogEntry } from '@/lib/database';
 import { WardrobeItem, OutfitSuggestion } from '@/types';
@@ -15,6 +15,8 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
   const { items: allItems } = useWardrobeStore();
   const [outfitItems, setOutfitItems] = useState<WardrobeItem[]>([]);
   const [isAccepted, setIsAccepted] = useState(false);
+  const [isRejected, setIsRejected] = useState(false);
+  const [pan] = useState(new Animated.ValueXY());
 
   useEffect(() => {
     const items = allItems.filter(item => suggestion.items.includes(item.id));
@@ -44,9 +46,44 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
   };
 
   const handleReject = () => {
-    // Just refresh suggestions
-    onRefresh();
+    setIsRejected(true);
+    // Refresh suggestions after a delay
+    setTimeout(() => {
+      onRefresh();
+    }, 500);
   };
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderMove: Animated.event([
+      null,
+      { dx: pan.x, dy: pan.y }
+    ], { useNativeDriver: false }),
+    onPanResponderRelease: (e, gestureState) => {
+      if (gestureState.dx > 120) {
+        handleAccept();
+      } else if (gestureState.dx < -120) {
+        handleReject();
+      } else {
+        Animated.spring(pan, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: false
+        }).start();
+      }
+    }
+  });
+
+  const rotate = pan.x.interpolate({
+    inputRange: [-width / 2, 0, width / 2],
+    outputRange: ['-10deg', '0deg', '10deg'],
+    extrapolate: 'clamp'
+  });
+
+  const opacity = pan.x.interpolate({
+    inputRange: [-width / 2, 0, width / 2],
+    outputRange: [0.5, 1, 0.5],
+    extrapolate: 'clamp'
+  });
 
   if (isAccepted) {
     return (
@@ -57,8 +94,21 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
     );
   }
 
+  if (isRejected) {
+    return null;
+  }
+
   return (
-    <View style={styles.container}>
+    <Animated.View
+      style={[
+        styles.container,
+        {
+          transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
+          opacity
+        }
+      ]}
+      {...panResponder.panHandlers}
+    >
       <View style={styles.itemsContainer}>
         {outfitItems.map((item) => (
           <View key={item.id} style={styles.itemContainer}>
@@ -94,7 +144,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }
           <Text style={styles.buttonText}>✓ Wear This</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 

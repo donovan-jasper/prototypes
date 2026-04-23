@@ -166,20 +166,14 @@ function filterByWeather(
   return items.filter(item => {
     // Hot weather (above 70°F)
     if (context.temp > 70) {
-      return !item.tags.includes('winter') &&
-             !item.tags.includes('formal') &&
-             !item.tags.includes('heavy');
+      return !['outerwear', 'heavy'].some(tag => item.tags.includes(tag));
     }
     // Cold weather (below 50°F)
     else if (context.temp < 50) {
-      return !item.tags.includes('summer') &&
-             !item.tags.includes('casual') &&
-             !item.tags.includes('light');
+      return !['light', 'summer'].some(tag => item.tags.includes(tag));
     }
-    // Mild weather (50-70°F)
-    else {
-      return !item.tags.includes('extreme');
-    }
+    // Moderate weather
+    return true;
   });
 }
 
@@ -210,117 +204,61 @@ function calculateOutfitScore(
   let score = 0;
   const items = allItems.filter(item => itemIds.includes(item.id));
 
-  // Check if outfit has required pieces
-  const hasTop = items.some(item => item.category === 'top');
-  const hasBottom = items.some(item => item.category === 'bottom');
-  const hasDress = items.some(item => item.category === 'dress');
+  // Base score based on number of items
+  score += items.length * 2;
 
-  if (hasDress || (hasTop && hasBottom)) {
-    score += 50; // Complete outfit gets base score
-  } else {
-    score -= 30; // Penalize incomplete outfits
-  }
+  // Color harmony bonus
+  if (items.length >= 2) {
+    const primaryColors = items[0].colors;
+    const secondaryColors = items[1].colors;
 
-  // Check color harmony
-  const dominantColors = items.flatMap(item => item.colors);
-  const colorScore = calculateColorHarmonyScore(dominantColors);
-  score += colorScore * 20; // Color harmony contributes 20% to score
+    // Check for complementary colors
+    if (primaryColors.some(color =>
+      COMPLEMENTARY_COLORS[color]?.some(compColor =>
+        secondaryColors.includes(compColor)
+      )
+    )) {
+      score += 3;
+    }
 
-  // Check style preferences
-  const styleScore = calculateStylePreferenceScore(items, context);
-  score += styleScore * 15; // Style preference contributes 15% to score
+    // Check for analogous colors
+    if (primaryColors.some(color =>
+      ANALOGOUS_COLORS[color]?.some(analogColor =>
+        secondaryColors.includes(analogColor)
+      )
+    )) {
+      score += 2;
+    }
 
-  // Check weather appropriateness
-  const weatherScore = calculateWeatherAppropriatenessScore(items, context);
-  score += weatherScore * 15; // Weather appropriateness contributes 15% to score
-
-  // Normalize score to 0-100 range
-  return Math.max(0, Math.min(100, score));
-}
-
-function calculateColorHarmonyScore(colors: string[]): number {
-  if (colors.length < 2) return 1; // Single color is always harmonious
-
-  let harmonyScore = 0;
-
-  // Check for complementary colors
-  for (let i = 0; i < colors.length; i++) {
-    for (let j = i + 1; j < colors.length; j++) {
-      const color1 = colors[i];
-      const color2 = colors[j];
-
-      if (COMPLEMENTARY_COLORS[color1]?.includes(color2) ||
-          COMPLEMENTARY_COLORS[color2]?.includes(color1)) {
-        harmonyScore += 0.5;
-      }
-
-      if (ANALOGOUS_COLORS[color1]?.includes(color2) ||
-          ANALOGOUS_COLORS[color2]?.includes(color1)) {
-        harmonyScore += 0.3;
-      }
+    // Monochrome bonus
+    if (primaryColors.some(color => secondaryColors.includes(color))) {
+      score += 1;
     }
   }
 
-  // Normalize score (0-1)
-  return Math.min(1, harmonyScore / (colors.length * 0.5));
-}
+  // Weather appropriateness bonus
+  if (context.temp > 70 && !items.some(item => item.tags.includes('heavy'))) {
+    score += 1;
+  }
 
-function calculateStylePreferenceScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  let styleScore = 0;
+  if (context.temp < 50 && items.some(item => item.tags.includes('warm'))) {
+    score += 1;
+  }
 
-  // Check if outfit matches event style
-  const isFormalEvent = context.events.some(event =>
+  // Occasion appropriateness
+  const isFormal = context.events.some(event =>
     event.toLowerCase().includes('meeting') ||
     event.toLowerCase().includes('interview') ||
     event.toLowerCase().includes('dinner')
   );
 
-  const formalItems = items.filter(item =>
-    item.tags.includes('formal') ||
-    item.tags.includes('work') ||
-    item.tags.includes('business')
-  );
-
-  const casualItems = items.filter(item =>
-    item.tags.includes('casual') ||
-    item.tags.includes('athleisure') ||
-    item.tags.includes('streetwear')
-  );
-
-  if (isFormalEvent) {
-    // Formal events should have more formal items
-    styleScore += formalItems.length * 0.3;
-    styleScore -= casualItems.length * 0.2;
-  } else {
-    // Casual events should have more casual items
-    styleScore += casualItems.length * 0.3;
-    styleScore -= formalItems.length * 0.2;
+  if (isFormal && items.some(item => item.tags.includes('formal'))) {
+    score += 2;
   }
 
-  // Normalize score (0-1)
-  return Math.max(0, Math.min(1, styleScore));
-}
+  if (!isFormal && items.some(item => item.tags.includes('casual'))) {
+    score += 1;
+  }
 
-function calculateWeatherAppropriatenessScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  let weatherScore = 0;
-
-  // Check if items are appropriate for the weather
-  items.forEach(item => {
-    if (context.temp > 70 && item.tags.includes('summer')) {
-      weatherScore += 0.2;
-    } else if (context.temp < 50 && item.tags.includes('winter')) {
-      weatherScore += 0.2;
-    } else if (context.temp > 50 && context.temp < 70 && item.tags.includes('spring') || item.tags.includes('fall')) {
-      weatherScore += 0.2;
-    }
-  });
-
-  // Normalize score (0-1)
-  return Math.min(1, weatherScore / items.length);
+  return score;
 }

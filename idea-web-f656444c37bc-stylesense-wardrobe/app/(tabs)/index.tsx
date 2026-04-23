@@ -1,6 +1,6 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { generateOutfits } from '@/lib/ai/outfitGenerator';
 import { getItems } from '@/lib/database';
 import { getWeather } from '@/lib/weather';
@@ -16,52 +16,42 @@ export default function HomeScreen() {
   const [weather, setWeather] = useState<{ temp: number; condition: string } | null>(null);
   const [events, setEvents] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        // Fetch weather data
-        const weatherData = await getWeather();
-        setWeather(weatherData);
-
-        // Fetch calendar events
-        const todayEvents = await getTodayEvents();
-        setEvents(todayEvents);
-
-        // Generate outfit suggestions
-        const items = await getItems();
-        const suggestions = await generateOutfits(items, {
-          weather: weatherData.condition,
-          temp: weatherData.temp,
-          events: todayEvents
-        });
-        setOutfitSuggestions(suggestions);
-      } catch (error) {
-        console.error('Error loading data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadData();
-  }, []);
-
-  const handleRefresh = async () => {
-    setIsLoading(true);
+  const loadData = useCallback(async () => {
     try {
+      // Fetch weather data
+      const weatherData = await getWeather();
+      setWeather(weatherData);
+
+      // Fetch calendar events
+      const todayEvents = await getTodayEvents();
+      setEvents(todayEvents);
+
+      // Generate outfit suggestions
       const items = await getItems();
       const suggestions = await generateOutfits(items, {
-        weather: weather?.condition || 'sunny',
-        temp: weather?.temp || 72,
-        events: events
+        weather: weatherData.condition,
+        temp: weatherData.temp,
+        events: todayEvents
       });
       setOutfitSuggestions(suggestions);
     } catch (error) {
-      console.error('Error refreshing suggestions:', error);
+      console.error('Error loading data:', error);
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    loadData();
+  }, [loadData]);
 
   if (isLoading) {
     return (
@@ -73,7 +63,12 @@ export default function HomeScreen() {
 
   if (outfitSuggestions.length === 0) {
     return (
-      <ScrollView style={styles.container}>
+      <ScrollView
+        style={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         <View style={styles.header}>
           <Text style={styles.title}>Good morning!</Text>
           <Text style={styles.subtitle}>Here are your outfit suggestions for today</Text>
@@ -102,7 +97,12 @@ export default function HomeScreen() {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.title}>Good morning!</Text>
         <Text style={styles.subtitle}>Here are your outfit suggestions for today</Text>
@@ -136,12 +136,12 @@ export default function HomeScreen() {
           <SuggestionCard
             key={index}
             suggestion={suggestion}
-            onRefresh={handleRefresh}
+            onRefresh={onRefresh}
           />
         ))}
       </View>
 
-      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+      <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
         <Text style={styles.refreshButtonText}>Get New Suggestions</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -151,61 +151,78 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
-    padding: 20,
-    paddingTop: 10,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 4,
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+    marginTop: 4,
   },
   weatherCard: {
-    backgroundColor: '#f0f9ff',
-    marginHorizontal: 20,
+    backgroundColor: '#e3f2fd',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   weatherText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#0369a1',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    color: '#1976d2',
   },
   weatherSubtext: {
     fontSize: 14,
-    color: '#0c4a6e',
+    color: '#424242',
+    marginTop: 4,
   },
   eventsCard: {
-    backgroundColor: '#f8fafc',
-    marginHorizontal: 20,
+    backgroundColor: '#fff3e0',
     padding: 16,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   eventsTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: 'bold',
+    color: '#e65100',
     marginBottom: 8,
   },
   eventItem: {
     fontSize: 14,
-    color: '#475569',
+    color: '#5d4037',
     marginBottom: 4,
+  },
+  suggestionsContainer: {
+    marginBottom: 16,
+  },
+  refreshButton: {
+    backgroundColor: '#2196f3',
+    padding: 12,
+    borderRadius: 24,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  refreshButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
+    marginTop: 40,
   },
   emptyIcon: {
     fontSize: 64,
@@ -213,8 +230,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    color: '#1a1a1a',
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 8,
   },
   emptyText: {
@@ -222,40 +239,17 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 24,
-    lineHeight: 22,
+    paddingHorizontal: 32,
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4caf50',
+    paddingVertical: 12,
     paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 24,
   },
   addButtonText: {
-    color: '#fff',
+    color: 'white',
+    fontWeight: 'bold',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  suggestionsContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  refreshButton: {
-    backgroundColor: '#f1f5f9',
-    padding: 16,
-    marginHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  refreshButtonText: {
-    color: '#0369a1',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
   },
 });
