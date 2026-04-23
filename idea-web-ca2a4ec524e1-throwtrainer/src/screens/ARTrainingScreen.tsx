@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, Dimensions } from 'react-native';
 import { Camera } from 'expo-camera';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { useSessionStore } from '../store/useSessionStore';
 import { useUserStore } from '../store/useUserStore';
-import { ThrowData, calculateAccuracy } from '../utils/calculations';
+import { ThrowData, calculateAccuracy, screenToWorldCoordinates } from '../utils/calculations';
 import { motionAnalyzer } from '../services/motionAnalyzer';
+import { ARTargetOverlay } from '../components/ARTargetOverlay';
+import { SessionTimer } from '../components/SessionTimer';
+
+const { width: viewportWidth, height: viewportHeight } = Dimensions.get('window');
 
 export default function ARTrainingScreen({ navigation }) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -23,6 +27,7 @@ export default function ARTrainingScreen({ navigation }) {
   const rendererRef = useRef<Renderer | null>(null);
   const trajectoryLineRef = useRef<THREE.Line | null>(null);
   const targetMeshesRef = useRef<Array<THREE.Mesh>>([]);
+  const targetGroupRef = useRef<THREE.Group>(new THREE.Group());
 
   useEffect(() => {
     (async () => {
@@ -43,6 +48,35 @@ export default function ARTrainingScreen({ navigation }) {
       subscription.remove();
     };
   }, []);
+
+  const initializeScene = (gl: WebGLRenderingContext) => {
+    const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
+
+    // Create renderer
+    const renderer = new Renderer({ gl });
+    renderer.setSize(width, height);
+    renderer.setClearColor(0x000000, 0);
+    rendererRef.current = renderer;
+
+    // Create scene
+    const scene = new THREE.Scene();
+    sceneRef.current = scene;
+
+    // Create camera
+    const camera = new THREE.PerspectiveCamera(70, width / height, 0.01, 1000);
+    camera.position.set(0, 0, 5);
+    cameraRef.current = camera;
+
+    // Add target group to scene
+    scene.add(targetGroupRef.current);
+
+    // Animation loop
+    const animate = () => {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    };
+    animate();
+  };
 
   const handleThrowDetected = (throwData: ThrowData) => {
     if (!isSessionActive || targets.length === 0) return;
@@ -75,7 +109,7 @@ export default function ARTrainingScreen({ navigation }) {
   };
 
   const visualizeTrajectory = (throwData: ThrowData) => {
-    if (!sceneRef.current) return;
+    if (!sceneRef.current || !cameraRef.current) return;
 
     // Remove previous trajectory
     if (trajectoryLineRef.current) {
@@ -138,7 +172,7 @@ export default function ARTrainingScreen({ navigation }) {
       createParticleExplosion(position);
     }
 
-    // Remove after animation
+    // Remove after 1 second
     setTimeout(() => {
       if (sceneRef.current) {
         sceneRef.current.remove(sphere);
@@ -153,7 +187,7 @@ export default function ARTrainingScreen({ navigation }) {
     const particles = new THREE.Group();
 
     for (let i = 0; i < particleCount; i++) {
-      const geometry = new THREE.SphereGeometry(0.03, 8, 8);
+      const geometry = new THREE.SphereGeometry(0.05, 8, 8);
       const material = new THREE.MeshBasicMaterial({
         color: new THREE.Color(Math.random(), Math.random(), Math.random()),
         transparent: true,
@@ -170,8 +204,8 @@ export default function ARTrainingScreen({ navigation }) {
 
       particle.position.copy(position);
       particle.userData = {
-        velocity: direction.multiplyScalar(Math.random() * 0.2 + 0.1),
-        lifetime: 2.0
+        velocity: direction.multiplyScalar(Math.random() * 2 + 1),
+        lifetime: 1.0
       };
 
       particles.add(particle);
@@ -181,170 +215,117 @@ export default function ARTrainingScreen({ navigation }) {
 
     // Animate particles
     const animateParticles = () => {
-      const now = Date.now();
-      let particlesToRemove = 0;
+      const deltaTime = 0.016; // ~60fps
 
       particles.children.forEach((particle: THREE.Mesh) => {
-        const velocity = particle.userData.velocity;
-        const lifetime = particle.userData.lifetime;
-
-        particle.position.add(velocity);
-        particle.userData.lifetime -= 0.016; // ~60fps
-
         if (particle.userData.lifetime <= 0) {
-          particlesToRemove++;
+          sceneRef.current?.remove(particle);
+          return;
+        }
+
+        // Update position
+        particle.position.add(particle.userData.velocity.clone().multiplyScalar(deltaTime));
+
+        // Update lifetime
+        particle.userData.lifetime -= deltaTime;
+
+        // Fade out
+        const opacity = particle.userData.lifetime;
+        if (particle.material instanceof THREE.MeshBasicMaterial) {
+          particle.material.opacity = opacity;
         }
       });
 
-      if (particlesToRemove > 0) {
-        for (let i = 0; i < particlesToRemove; i++) {
-          particles.remove(particles.children[0]);
-        }
+      // Remove particles group when empty
+      if (particles.children.length === 0 && sceneRef.current) {
+        sceneRef.current.remove(particles);
+      } else {
+        requestAnimationFrame(animateParticles);
       }
-
-      if (particles.children.length === 0) {
-        sceneRef.current?.remove(particles);
-        return;
-      }
-
-      requestAnimationFrame(animateParticles);
     };
 
     animateParticles();
   };
 
   const handlePlaceTarget = (event: any) => {
-    if (!glViewRef.current || !sceneRef.current || !cameraRef.current) return;
+    if (!cameraRef.current || !sceneRef.current) return;
 
     const { locationX, locationY } = event.nativeEvent;
-    const { width, height } = glViewRef.current;
 
     // Convert screen coordinates to world coordinates
-    const worldPos = screenToWorldCoordinates(
+    const worldPosition = screenToWorldCoordinates(
       locationX,
       locationY,
       cameraRef.current,
-      width,
-      height
+      viewportWidth,
+      viewportHeight
     );
 
-    // Create target mesh
-    const geometry = new THREE.CircleGeometry(0.2, 32);
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffff00,
+    // Create new target
+    const targetId = Date.now().toString();
+    const newTarget = {
+      x: worldPosition.x,
+      y: worldPosition.y,
+      z: worldPosition.z,
+      id: targetId
+    };
+
+    // Create 3D target mesh
+    const targetMesh = createTargetMesh(worldPosition);
+    targetMeshesRef.current.push(targetMesh);
+    targetGroupRef.current.add(targetMesh);
+
+    setTargets(prev => [...prev, newTarget]);
+  };
+
+  const createTargetMesh = (position: THREE.Vector3): THREE.Mesh => {
+    // Create target ring
+    const ringGeometry = new THREE.RingGeometry(0.5, 0.6, 32);
+    const ringMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00ff00,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.7
     });
-    const targetMesh = new THREE.Mesh(geometry, material);
+    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
 
-    targetMesh.position.set(worldPos.x, worldPos.y, worldPos.z);
-    targetMesh.rotation.x = -Math.PI / 2; // Make it face the camera
+    // Create center dot
+    const dotGeometry = new THREE.CircleGeometry(0.1, 32);
+    const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+    const dot = new THREE.Mesh(dotGeometry, dotMaterial);
 
-    sceneRef.current.add(targetMesh);
-    targetMeshesRef.current.push(targetMesh);
+    // Combine into a group
+    const targetGroup = new THREE.Group();
+    targetGroup.add(ring);
+    targetGroup.add(dot);
+    targetGroup.position.copy(position);
 
-    setTargets(prev => [...prev, {
-      x: worldPos.x,
-      y: worldPos.y,
-      z: worldPos.z,
-      id: Date.now().toString()
-    }]);
+    return targetGroup;
   };
 
-  const screenToWorldCoordinates = (
-    screenX: number,
-    screenY: number,
-    camera: THREE.PerspectiveCamera,
-    viewportWidth: number,
-    viewportHeight: number
-  ): THREE.Vector3 => {
-    // Convert screen coordinates to normalized device coordinates (-1 to +1)
-    const x = (screenX / viewportWidth) * 2 - 1;
-    const y = -(screenY / viewportHeight) * 2 + 1;
-
-    // Create a vector in normalized device coordinates
-    const vector = new THREE.Vector3(x, y, 0.5); // 0.5 is the near plane
-
-    // Unproject the vector to world coordinates
-    vector.unproject(camera);
-
-    // Calculate direction vector
-    const direction = vector.sub(camera.position).normalize();
-
-    // Create a ray from camera position through the unprojected point
-    const raycaster = new THREE.Raycaster(camera.position, direction);
-
-    // For simplicity, we'll assume the target is on a plane at z=0
-    // In a real app, you might want to use a more sophisticated intersection test
-    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const intersection = new THREE.Vector3();
-
-    raycaster.ray.intersectPlane(plane, intersection);
-
-    return intersection;
-  };
-
-  const initializeScene = (gl: WebGLRenderingContext) => {
-    const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
-
-    // Create renderer
-    const renderer = new Renderer({ gl });
-    renderer.setSize(width, height);
-    renderer.setClearColor(0x000000, 0); // Transparent background
-
-    // Create scene
-    const scene = new THREE.Scene();
-
-    // Create camera
-    const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
-    camera.position.z = 5;
-
-    // Store references
-    sceneRef.current = scene;
-    cameraRef.current = camera;
-    rendererRef.current = renderer;
-
-    // Add ambient light
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    scene.add(ambientLight);
-
-    // Add directional light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(1, 1, 1);
-    scene.add(directionalLight);
-
-    // Animation loop
-    const animate = () => {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    };
-
-    animate();
-
-    return () => {
-      // Cleanup
-      sceneRef.current = null;
-      cameraRef.current = null;
-      rendererRef.current = null;
-    };
-  };
-
-  const startSession = () => {
+  const handleStartSession = () => {
     if (targets.length === 0) {
       Alert.alert('No Targets', 'Please place at least one target before starting a session');
       return;
     }
 
-    setIsSessionActive(true);
     startSession();
+    setIsSessionActive(true);
     setHits(0);
     setTotalAttempts(0);
   };
 
-  const endCurrentSession = () => {
-    setIsSessionActive(false);
+  const handleEndSession = () => {
     endSession();
+    setIsSessionActive(false);
+
+    // Show session summary
+    const accuracy = calculateAccuracy(hits, totalAttempts);
+    Alert.alert(
+      'Session Complete',
+      `Accuracy: ${accuracy}%\nHits: ${hits}\nTotal Attempts: ${totalAttempts}`,
+      [{ text: 'OK' }]
+    );
   };
 
   if (hasPermission === null) {
@@ -357,40 +338,40 @@ export default function ARTrainingScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
-      <Camera style={styles.camera} type={Camera.Constants.Type.back}>
+      <Camera style={StyleSheet.absoluteFill} type={Camera.Constants.Type.back}>
         <GLView
           ref={glViewRef}
-          style={styles.glView}
+          style={StyleSheet.absoluteFill}
           onContextCreate={initializeScene}
-          onTouchStart={handlePlaceTarget}
         />
-      </Camera>
 
-      <View style={styles.overlay}>
-        <Text style={styles.statsText}>
-          Accuracy: {calculateAccuracy(hits, totalAttempts)}% | Attempts: {totalAttempts}
-        </Text>
-
-        {!isSessionActive ? (
-          <TouchableOpacity style={styles.button} onPress={startSession}>
-            <Text style={styles.buttonText}>Start Session</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={endCurrentSession}>
-            <Text style={styles.buttonText}>End Session</Text>
+        {!isSessionActive && (
+          <TouchableOpacity
+            style={styles.placeTargetButton}
+            onPress={handlePlaceTarget}
+          >
+            <Text style={styles.buttonText}>Place Target</Text>
           </TouchableOpacity>
         )}
 
-        <TouchableOpacity style={styles.clearButton} onPress={() => {
-          setTargets([]);
-          if (sceneRef.current) {
-            targetMeshesRef.current.forEach(mesh => sceneRef.current?.remove(mesh));
-            targetMeshesRef.current = [];
-          }
-        }}>
-          <Text style={styles.clearButtonText}>Clear Targets</Text>
-        </TouchableOpacity>
-      </View>
+        {isSessionActive ? (
+          <SessionTimer
+            hits={hits}
+            totalAttempts={totalAttempts}
+            onEndSession={handleEndSession}
+          />
+        ) : (
+          <View style={styles.controlsContainer}>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={handleStartSession}
+              disabled={targets.length === 0}
+            >
+              <Text style={styles.buttonText}>Start Session</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Camera>
     </View>
   );
 }
@@ -399,49 +380,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  camera: {
-    flex: 1,
+  placeTargetButton: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 15,
+    borderRadius: 10,
   },
-  glView: {
-    flex: 1,
-  },
-  overlay: {
+  controlsContainer: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
-  statsText: {
-    color: 'white',
-    fontSize: 18,
-    marginBottom: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  button: {
-    backgroundColor: '#4CAF50',
+  startButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-    width: '100%',
+    borderRadius: 10,
     alignItems: 'center',
+    flex: 1,
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
-  },
-  clearButton: {
-    backgroundColor: '#f44336',
-    padding: 10,
-    borderRadius: 5,
-    width: '100%',
-    alignItems: 'center',
-  },
-  clearButtonText: {
-    color: 'white',
-    fontSize: 14,
   },
 });
