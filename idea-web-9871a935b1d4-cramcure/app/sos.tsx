@@ -151,6 +151,9 @@ const SOSModal = ({ visible, onClose }) => {
 
     return (
       <View style={styles.contentContainer}>
+        <Text style={styles.title}>4-7-8 Breathing Exercise</Text>
+        <Text style={styles.subtitle}>Deep breathing to calm your nervous system</Text>
+
         <View style={styles.breathingVisualizer}>
           <Animated.View
             style={[
@@ -159,46 +162,46 @@ const SOSModal = ({ visible, onClose }) => {
                 transform: [{
                   scale: fadeAnim.interpolate({
                     inputRange: [0, 1],
-                    outputRange: [0.5, 1],
+                    outputRange: [0.5, 1.2]
                   })
                 }]
               }
             ]}
           />
           <Text style={styles.breathingPhase}>{phase}</Text>
-          <Text style={styles.breathingTimer}>{formatTime(47 - breathingTime)}</Text>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
-          </View>
         </View>
 
-        {!isBreathingActive ? (
-          <TouchableOpacity
-            style={styles.startButton}
-            onPress={startBreathingExercise}
-          >
-            <Text style={styles.startButtonText}>Start Breathing Exercise</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.startButton, styles.stopButton]}
-            onPress={() => {
-              clearInterval(breathingIntervalRef.current);
-              setIsBreathingActive(false);
-            }}
-          >
-            <Text style={styles.startButtonText}>Stop</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.timer}>{formatTime(47 - breathingTime)}</Text>
+
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, isBreathingActive && styles.buttonDisabled]}
+          onPress={startBreathingExercise}
+          disabled={isBreathingActive}
+        >
+          <Text style={styles.buttonText}>
+            {isBreathingActive ? 'In Progress...' : 'Start Exercise'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.instructions}>
+          Inhale for 4 seconds, hold for 7, exhale for 8. Repeat until the timer completes.
+        </Text>
       </View>
     );
   };
 
   const renderHeatTherapy = () => {
-    const progress = (15 * 60 - heatTime) / (15 * 60);
+    const progress = heatTime / (15 * 60);
 
     return (
       <View style={styles.contentContainer}>
+        <Text style={styles.title}>Heat Therapy Timer</Text>
+        <Text style={styles.subtitle}>Apply heat to reduce pain and relax muscles</Text>
+
         <View style={styles.heatVisualizer}>
           <MaterialCommunityIcons
             name="fire"
@@ -206,54 +209,50 @@ const SOSModal = ({ visible, onClose }) => {
             color="#ff6b6b"
             style={{ opacity: isHeatActive ? 1 : 0.5 }}
           />
-          <Text style={styles.heatTimer}>{formatTime(heatTime)}</Text>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
-          </View>
-          <Text style={styles.heatInstruction}>
-            Apply heat pack to painful area for 15 minutes
-          </Text>
         </View>
 
-        {!isHeatActive ? (
-          <TouchableOpacity
-            style={styles.startButton}
-            onPress={startHeatTherapy}
-          >
-            <Text style={styles.startButtonText}>Start Heat Therapy</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.startButton, styles.stopButton]}
-            onPress={() => {
-              clearInterval(heatIntervalRef.current);
-              setIsHeatActive(false);
-            }}
-          >
-            <Text style={styles.startButtonText}>Stop</Text>
-          </TouchableOpacity>
-        )}
+        <Text style={styles.timer}>{formatTime(heatTime)}</Text>
+
+        <View style={styles.progressContainer}>
+          <View style={[styles.progressBar, { width: `${progress * 100}%` }]} />
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, isHeatActive && styles.buttonDisabled]}
+          onPress={startHeatTherapy}
+          disabled={isHeatActive}
+        >
+          <Text style={styles.buttonText}>
+            {isHeatActive ? 'Therapy Active' : 'Start Heat Therapy'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.instructions}>
+          Apply heat to your lower abdomen for 15 minutes. You'll receive a notification when time is up.
+        </Text>
       </View>
     );
   };
 
-  const renderQuickExercises = () => {
+  const renderQuickRelief = () => {
     return (
       <View style={styles.contentContainer}>
-        <Text style={styles.sectionTitle}>Quick Access Exercises</Text>
-        <View style={styles.exerciseList}>
-          {favoriteExercises.length > 0 ? (
-            favoriteExercises.map(exercise => (
+        <Text style={styles.title}>Quick Relief Exercises</Text>
+        <Text style={styles.subtitle}>Your most effective techniques</Text>
+
+        {favoriteExercises.length > 0 ? (
+          <View style={styles.exerciseList}>
+            {favoriteExercises.map((exercise) => (
               <TouchableOpacity
                 key={exercise.id}
-                style={styles.exerciseItem}
+                style={styles.exerciseCard}
                 onPress={() => navigateToExercise(exercise.id)}
               >
                 <View style={styles.exerciseIcon}>
                   <MaterialIcons
-                    name={exercise.painTypes.includes('Anxiety') ? 'spa' : 'fitness-center'}
+                    name={exercise.icon || 'spa'}
                     size={24}
-                    color="#fff"
+                    color="#6c5ce7"
                   />
                 </View>
                 <View style={styles.exerciseInfo}>
@@ -262,14 +261,46 @@ const SOSModal = ({ visible, onClose }) => {
                     {exercise.duration} min • {exercise.difficulty}
                   </Text>
                 </View>
-                <MaterialIcons name="chevron-right" size={24} color="#999" />
               </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.noExercisesText}>
-              No favorite exercises yet. Add some from the Relief Library!
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="spa" size={48} color="#bdc3c7" />
+            <Text style={styles.emptyText}>No favorite exercises yet</Text>
+            <Text style={styles.emptySubtext}>
+              Complete exercises to see your most effective ones here
             </Text>
-          )}
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  const renderEmergencyContact = () => {
+    return (
+      <View style={styles.contentContainer}>
+        <Text style={styles.title}>Emergency Contact</Text>
+        <Text style={styles.subtitle}>Quick access to help</Text>
+
+        <View style={styles.emergencyContainer}>
+          <MaterialIcons name="local-hospital" size={80} color="#ff6b6b" />
+          <Text style={styles.emergencyText}>
+            Need immediate medical attention?
+          </Text>
+          <Text style={styles.emergencySubtext}>
+            Tap the button below to call your emergency contact
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.button, styles.emergencyButton]}
+            onPress={callEmergencyContact}
+          >
+            <MaterialIcons name="phone" size={24} color="#fff" />
+            <Text style={[styles.buttonText, styles.emergencyButtonText]}>
+              Call Emergency Contact
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -278,7 +309,7 @@ const SOSModal = ({ visible, onClose }) => {
   return (
     <Modal
       visible={visible}
-      transparent={true}
+      transparent
       animationType="fade"
       onRequestClose={onClose}
     >
@@ -286,10 +317,13 @@ const SOSModal = ({ visible, onClose }) => {
         <View style={styles.modalContent}>
           <LinearGradient
             colors={['#ff7e5f', '#feb47b']}
-            style={styles.modalHeader}
+            style={styles.header}
           >
-            <Text style={styles.modalTitle}>Quick Relief</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <Text style={styles.modalTitle}>Quick Relief Mode</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+            >
               <MaterialIcons name="close" size={24} color="#fff" />
             </TouchableOpacity>
           </LinearGradient>
@@ -299,47 +333,68 @@ const SOSModal = ({ visible, onClose }) => {
               style={[styles.tabButton, activeTab === 'breathing' && styles.activeTab]}
               onPress={() => setActiveTab('breathing')}
             >
-              <MaterialIcons name="air" size={24} color={activeTab === 'breathing' ? '#ff7e5f' : '#666'} />
-              <Text style={[styles.tabText, activeTab === 'breathing' && styles.activeTabText]}>
-                Breathing
-              </Text>
+              <MaterialIcons
+                name="air"
+                size={20}
+                color={activeTab === 'breathing' ? '#6c5ce7' : '#7f8c8d'}
+              />
+              <Text style={[
+                styles.tabText,
+                activeTab === 'breathing' && styles.activeTabText
+              ]}>Breathing</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.tabButton, activeTab === 'heat' && styles.activeTab]}
               onPress={() => setActiveTab('heat')}
             >
-              <MaterialCommunityIcons name="fire" size={24} color={activeTab === 'heat' ? '#ff7e5f' : '#666'} />
-              <Text style={[styles.tabText, activeTab === 'heat' && styles.activeTabText]}>
-                Heat Therapy
-              </Text>
+              <MaterialCommunityIcons
+                name="fire"
+                size={20}
+                color={activeTab === 'heat' ? '#6c5ce7' : '#7f8c8d'}
+              />
+              <Text style={[
+                styles.tabText,
+                activeTab === 'heat' && styles.activeTabText
+              ]}>Heat Therapy</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.tabButton, activeTab === 'exercises' && styles.activeTab]}
-              onPress={() => setActiveTab('exercises')}
+              style={[styles.tabButton, activeTab === 'relief' && styles.activeTab]}
+              onPress={() => setActiveTab('relief')}
             >
-              <MaterialIcons name="fitness-center" size={24} color={activeTab === 'exercises' ? '#ff7e5f' : '#666'} />
-              <Text style={[styles.tabText, activeTab === 'exercises' && styles.activeTabText]}>
-                Exercises
-              </Text>
+              <MaterialIcons
+                name="spa"
+                size={20}
+                color={activeTab === 'relief' ? '#6c5ce7' : '#7f8c8d'}
+              />
+              <Text style={[
+                styles.tabText,
+                activeTab === 'relief' && styles.activeTabText
+              ]}>Quick Relief</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'emergency' && styles.activeTab]}
+              onPress={() => setActiveTab('emergency')}
+            >
+              <MaterialIcons
+                name="local-hospital"
+                size={20}
+                color={activeTab === 'emergency' ? '#6c5ce7' : '#7f8c8d'}
+              />
+              <Text style={[
+                styles.tabText,
+                activeTab === 'emergency' && styles.activeTabText
+              ]}>Emergency</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.tabContent}>
+          <View style={styles.contentWrapper}>
             {activeTab === 'breathing' && renderBreathingExercise()}
             {activeTab === 'heat' && renderHeatTherapy()}
-            {activeTab === 'exercises' && renderQuickExercises()}
-          </View>
-
-          <View style={styles.emergencyContainer}>
-            <TouchableOpacity
-              style={styles.emergencyButton}
-              onPress={callEmergencyContact}
-            >
-              <MaterialIcons name="local-hospital" size={24} color="#fff" />
-              <Text style={styles.emergencyText}>Emergency Contact</Text>
-            </TouchableOpacity>
+            {activeTab === 'relief' && renderQuickRelief()}
+            {activeTab === 'emergency' && renderEmergencyContact()}
           </View>
         </View>
       </Animated.View>
@@ -350,26 +405,27 @@ const SOSModal = ({ visible, onClose }) => {
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: width * 0.9,
-    maxHeight: height * 0.8,
+    maxHeight: height * 0.85,
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: 20,
     overflow: 'hidden',
   },
-  modalHeader: {
+  header: {
     padding: 20,
+    paddingTop: 30,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#fff',
   },
   closeButton: {
@@ -378,165 +434,183 @@ const styles = StyleSheet.create({
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#f5f5f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: 10,
   },
   tabButton: {
     flex: 1,
-    paddingVertical: 12,
     alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: 10,
   },
   activeTab: {
-    backgroundColor: '#fff',
+    borderBottomWidth: 2,
+    borderBottomColor: '#6c5ce7',
   },
   tabText: {
     fontSize: 12,
+    color: '#7f8c8d',
     marginTop: 4,
-    color: '#666',
   },
   activeTabText: {
-    color: '#ff7e5f',
+    color: '#6c5ce7',
     fontWeight: '600',
   },
-  tabContent: {
+  contentWrapper: {
     padding: 20,
+    flex: 1,
   },
   contentContainer: {
-    alignItems: 'center',
+    flex: 1,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d3436',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    marginBottom: 20,
   },
   breathingVisualizer: {
     alignItems: 'center',
     marginBottom: 20,
   },
   breathingCircle: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: '#ff7e5f',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#6c5ce7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-  },
-  breathingPhase: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
   },
-  breathingTimer: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ff7e5f',
-    marginBottom: 20,
+  breathingPhase: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2d3436',
   },
   heatVisualizer: {
     alignItems: 'center',
     marginBottom: 20,
   },
-  heatTimer: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#ff6b6b',
-    marginVertical: 20,
-  },
-  heatInstruction: {
-    fontSize: 16,
-    color: '#666',
+  timer: {
+    fontSize: 36,
+    fontWeight: '700',
+    color: '#2d3436',
     textAlign: 'center',
-    marginTop: 10,
+    marginBottom: 10,
   },
-  progressBarContainer: {
-    width: '80%',
-    height: 8,
-    backgroundColor: '#eee',
-    borderRadius: 4,
-    overflow: 'hidden',
+  progressContainer: {
+    height: 6,
+    backgroundColor: '#ecf0f1',
+    borderRadius: 3,
     marginBottom: 20,
+    overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
-    backgroundColor: '#ff7e5f',
-    borderRadius: 4,
+    backgroundColor: '#6c5ce7',
+    borderRadius: 3,
   },
-  startButton: {
-    backgroundColor: '#ff7e5f',
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 25,
-    marginTop: 20,
+  button: {
+    backgroundColor: '#6c5ce7',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  stopButton: {
-    backgroundColor: '#ff6b6b',
+  buttonDisabled: {
+    backgroundColor: '#bdc3c7',
   },
-  startButtonText: {
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 15,
-    alignSelf: 'flex-start',
+  instructions: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    lineHeight: 20,
+    textAlign: 'center',
   },
   exerciseList: {
-    width: '100%',
+    marginTop: 10,
   },
-  exerciseItem: {
+  exerciseCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: 15,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    marginBottom: 10,
   },
   exerciseIcon: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#ff7e5f',
+    backgroundColor: '#e0e7ff',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 15,
   },
   exerciseInfo: {
     flex: 1,
   },
   exerciseTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: '600',
+    color: '#2d3436',
+    marginBottom: 4,
   },
   exerciseDuration: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    color: '#7f8c8d',
   },
-  noExercisesText: {
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2d3436',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  emptySubtext: {
     fontSize: 14,
-    color: '#666',
+    color: '#7f8c8d',
     textAlign: 'center',
-    marginTop: 20,
   },
   emergencyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
     padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+  },
+  emergencyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2d3436',
+    marginTop: 20,
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  emergencySubtext: {
+    fontSize: 14,
+    color: '#7f8c8d',
+    textAlign: 'center',
+    marginBottom: 30,
   },
   emergencyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#ff6b6b',
-    paddingVertical: 12,
-    borderRadius: 25,
   },
-  emergencyText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  emergencyButtonText: {
+    marginLeft: 10,
   },
 });
 
