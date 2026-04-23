@@ -187,11 +187,11 @@ export const sendSMS = async (to: string, body: string) => {
       body,
     });
 
-    if (response.data.success) {
-      return true;
-    } else {
-      throw new Error(response.data.message || 'Failed to send SMS');
+    if (response.status !== 200) {
+      throw new Error(`Failed to send SMS: ${response.statusText}`);
     }
+
+    return response.data;
   } catch (error) {
     console.error('Error sending SMS:', error);
     throw error;
@@ -202,7 +202,7 @@ export const storeOfflineMessage = async (message: OfflineMessage) => {
   try {
     const db = await initDatabase();
     await db.runAsync(
-      'INSERT INTO offline_messages (to_phone, body, timestamp) VALUES (?, ?, ?)',
+      'INSERT INTO offline_messages (to, body, timestamp) VALUES (?, ?, ?)',
       [message.to, message.body, message.timestamp]
     );
   } catch (error) {
@@ -211,29 +211,29 @@ export const storeOfflineMessage = async (message: OfflineMessage) => {
   }
 };
 
-export const processOfflineMessages = async () => {
+export const retryOfflineMessages = async () => {
   try {
     const db = await initDatabase();
 
     // Get all offline messages
-    const messages = await db.getAllAsync<{
-      id: number;
-      to_phone: string;
-      body: string;
-      timestamp: string;
-    }>('SELECT * FROM offline_messages');
+    const messages = await db.getAllAsync<OfflineMessage>(
+      'SELECT * FROM offline_messages ORDER BY timestamp ASC'
+    );
 
-    // Try to send each message
     for (const message of messages) {
       try {
-        await sendSMS(message.to_phone, message.body);
+        await sendSMS(message.to, message.body);
         // If successful, delete the message
-        await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
+        await db.runAsync('DELETE FROM offline_messages WHERE timestamp = ?', [message.timestamp]);
       } catch (error) {
-        console.error(`Failed to send offline message to ${message.to_phone}:`, error);
+        console.error(`Failed to retry message to ${message.to}:`, error);
+        // Keep the message for next retry
       }
     }
+
+    return messages.length;
   } catch (error) {
-    console.error('Error processing offline messages:', error);
+    console.error('Error retrying offline messages:', error);
+    throw error;
   }
 };
