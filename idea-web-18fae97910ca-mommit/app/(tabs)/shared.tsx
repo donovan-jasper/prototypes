@@ -88,6 +88,13 @@ export default function SharedSpacesScreen() {
     }
   };
 
+  const renderSpaceItem = ({ item }: { item: Space }) => (
+    <SpaceCard
+      space={item}
+      onPress={() => router.push(`/space/${item.id}`)}
+    />
+  );
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -173,19 +180,16 @@ export default function SharedSpacesScreen() {
       ) : null}
 
       {spaces.length > 0 ? (
-        <>
-          <Text style={styles.sectionTitle}>Your Spaces</Text>
-          <FlatList
-            data={spaces}
-            renderItem={({ item }) => <SpaceCard space={item} />}
-            keyExtractor={item => item.id}
-            scrollEnabled={false}
-          />
-        </>
+        <FlatList
+          data={spaces}
+          renderItem={renderSpaceItem}
+          keyExtractor={(item) => item.id}
+          style={styles.spaceList}
+        />
       ) : (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>You haven't created or joined any spaces yet.</Text>
-          <Text style={styles.emptySubtext}>Create a space to share memories with others.</Text>
+          <Text style={styles.emptyText}>No shared spaces yet</Text>
+          <Text style={styles.emptySubtext}>Create or join a space to share memories with others</Text>
         </View>
       )}
     </ScrollView>
@@ -196,42 +200,44 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f7fa',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
-    color: '#2c3e50',
+    marginBottom: 20,
+    color: '#333',
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   button: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    padding: 12,
     borderRadius: 8,
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 5,
     alignItems: 'center',
   },
   createButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#4CAF50',
   },
   joinButton: {
-    backgroundColor: '#2ecc71',
+    backgroundColor: '#2196F3',
+  },
+  cancelButton: {
+    backgroundColor: '#9E9E9E',
   },
   buttonText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   createForm: {
     backgroundColor: 'white',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 24,
+    borderRadius: 8,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -240,52 +246,45 @@ const styles = StyleSheet.create({
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#2c3e50',
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
   },
   input: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    justifyContent: 'flex-end',
   },
-  cancelButton: {
-    backgroundColor: '#e74c3c',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#2c3e50',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#95a5a6',
-    textAlign: 'center',
+  spaceList: {
+    marginTop: 10,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f7fa',
+    padding: 20,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 50,
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#666',
+    marginBottom: 10,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });

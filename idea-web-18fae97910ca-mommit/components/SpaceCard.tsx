@@ -1,37 +1,32 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Space } from '../lib/types';
-import { useRouter } from 'expo-router';
 
 interface SpaceCardProps {
   space: Space;
+  onPress: () => void;
 }
 
-const SpaceCard: React.FC<SpaceCardProps> = ({ space }) => {
-  const router = useRouter();
-
+export default function SpaceCard({ space, onPress }: SpaceCardProps) {
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={() => router.push(`/space/${space.id}`)}
-    >
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.header}>
         <Text style={styles.name}>{space.name}</Text>
         <Text style={styles.memberCount}>{space.members.length} members</Text>
       </View>
-      <Text style={styles.lastUpdated}>
-        Last updated: {new Date(space.updated_at || space.created_at).toLocaleDateString()}
+      <Text style={styles.createdAt}>
+        Created: {new Date(space.created_at).toLocaleDateString()}
       </Text>
     </TouchableOpacity>
   );
-};
+}
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -41,21 +36,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 5,
   },
   name: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
+    fontWeight: 'bold',
+    color: '#333',
   },
   memberCount: {
     fontSize: 14,
-    color: '#7f8c8d',
+    color: '#666',
   },
-  lastUpdated: {
+  createdAt: {
     fontSize: 12,
-    color: '#95a5a6',
+    color: '#888',
   },
 });
-
-export default SpaceCard;
