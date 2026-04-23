@@ -199,7 +199,7 @@ const extractHealthMetric = (text) => {
 };
 
 const extractEvent = (text) => {
-  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i);
+  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i);
   const titleMatch = text.match(/:\s*(.+)/);
 
   if (timeMatch && titleMatch) {
@@ -213,19 +213,18 @@ const extractEvent = (text) => {
 };
 
 const extractHeadline = (text) => {
-  const headlineMatch = text.match(/^(?:breaking:?\s*)?(.+)/i);
-  return headlineMatch ? headlineMatch[1].trim() : null;
+  const match = text.match(/^(?:breaking:?\s*)?(.+)/i);
+  return match ? match[1].trim() : null;
 };
 
 const extractSongInfo = (text) => {
-  const songMatch = text.match(/^(?:now playing:?\s*)?(.+?)\s*-\s*(.+)/i);
-  if (songMatch) {
+  const match = text.match(/(?:playing|now playing)\s*(.+?)\s*(?:by|-)\s*(.+)/i);
+  if (match) {
     return {
-      title: songMatch[1].trim(),
-      artist: songMatch[2].trim()
+      title: match[1].trim(),
+      artist: match[2].trim()
     };
   }
-
   return null;
 };
 
@@ -235,5 +234,6 @@ const extractTransactionType = (text) => {
   if (lowerText.includes('withdrawal')) return 'withdrawal';
   if (lowerText.includes('payment')) return 'payment';
   if (lowerText.includes('transfer')) return 'transfer';
+  if (lowerText.includes('charge')) return 'charge';
   return 'transaction';
 };
