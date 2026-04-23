@@ -33,6 +33,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
 
   const loadSound = async () => {
     if (!isPremiumUser && clip.isPremium) {
+      onUpgradePress();
       return;
     }
 
@@ -190,31 +191,16 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  premiumBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  premiumBadgeText: {
-    color: 'white',
-    marginLeft: 4,
-    fontSize: 12,
+    fontWeight: 'bold',
   },
   category: {
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
-    textTransform: 'capitalize',
   },
   controls: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
   },
   progressContainer: {
     flex: 1,
@@ -234,20 +220,31 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 12,
     color: '#666',
-    textAlign: 'right',
+    textAlign: 'center',
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+  },
+  premiumBadgeText: {
+    marginLeft: 4,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
   },
   upgradeButton: {
     backgroundColor: '#673ab7',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    marginLeft: 8,
+    borderRadius: 4,
   },
   upgradeButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
-
-export default VoicePlayer;

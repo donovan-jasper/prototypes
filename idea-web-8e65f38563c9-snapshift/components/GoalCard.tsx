@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGoals } from '../hooks/useGoals';
 import { SubscriptionContext } from '../context/SubscriptionContext';
@@ -11,26 +11,46 @@ interface GoalCardProps {
     completed: boolean;
     createdAt: number;
   };
+  index: number;
   onUpgradePress: () => void;
 }
 
-export default function GoalCard({ goal, onUpgradePress }: GoalCardProps) {
+export default function GoalCard({ goal, index, onUpgradePress }: GoalCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(goal.title);
   const { updateGoal, deleteGoal, toggleGoalCompletion } = useGoals();
   const { isPremium } = useContext(SubscriptionContext);
 
   const handleSave = () => {
-    updateGoal(goal.id, { title });
+    if (title.trim() === '') {
+      Alert.alert('Error', 'Goal title cannot be empty');
+      return;
+    }
+    updateGoal(goal.id, { title: title.trim() });
     setIsEditing(false);
   };
 
   const handleDelete = () => {
-    deleteGoal(goal.id);
+    Alert.alert(
+      'Delete Goal',
+      'Are you sure you want to delete this goal?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteGoal(goal.id) }
+      ]
+    );
   };
 
   const handleToggleCompletion = () => {
     toggleGoalCompletion(goal.id);
+  };
+
+  const handleEditPress = () => {
+    if (!isPremium && index >= 1) {
+      onUpgradePress();
+      return;
+    }
+    setIsEditing(true);
   };
 
   return (
@@ -42,6 +62,7 @@ export default function GoalCard({ goal, onUpgradePress }: GoalCardProps) {
           color={goal.completed ? '#673ab7' : '#9e9e9e'}
         />
       </TouchableOpacity>
+
       {isEditing ? (
         <TextInput
           style={styles.input}
@@ -49,15 +70,18 @@ export default function GoalCard({ goal, onUpgradePress }: GoalCardProps) {
           onChangeText={setTitle}
           onBlur={handleSave}
           autoFocus
+          onSubmitEditing={handleSave}
+          returnKeyType="done"
         />
       ) : (
         <Text
           style={[styles.title, goal.completed && styles.completedTitle]}
-          onPress={() => setIsEditing(true)}
+          onPress={handleEditPress}
         >
           {goal.title}
         </Text>
       )}
+
       <TouchableOpacity onPress={handleDelete}>
         <Ionicons name="trash-outline" size={24} color="#e53935" />
       </TouchableOpacity>
@@ -89,5 +113,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#673ab7',
+    paddingVertical: 4,
   },
 });
