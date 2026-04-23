@@ -1,16 +1,30 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
+  Image,
 } from 'react-native';
-import { Broadcast } from '../types';
+import { Ionicons } from '@expo/vector-icons';
 import { formatDistance } from '../lib/location';
-import { useAuthStore } from '../store/authStore';
-import { useRouter } from 'expo-router';
+import { formatTimeLeft } from '../lib/time';
+
+interface Broadcast {
+  id: string;
+  userId: string;
+  userName: string;
+  activity: string;
+  description?: string;
+  groupSize: number;
+  lat: number;
+  lng: number;
+  distance: number;
+  expiresAt: string;
+  createdAt: string;
+  isPremium: boolean;
+  interested?: boolean;
+}
 
 interface BroadcastCardProps {
   broadcast: Broadcast;
@@ -18,217 +32,158 @@ interface BroadcastCardProps {
 }
 
 export default function BroadcastCard({ broadcast, onInterest }: BroadcastCardProps) {
-  const { user } = useAuthStore();
-  const [expressing, setExpressing] = useState(false);
-  const router = useRouter();
-
+  const timeLeft = formatTimeLeft(broadcast.expiresAt);
   const isExpired = new Date(broadcast.expiresAt) < new Date();
-  const timeLeft = getTimeLeft(broadcast.expiresAt);
 
   const handleInterest = async () => {
-    if (!user || expressing || broadcast.interested) return;
-
-    setExpressing(true);
-    try {
-      const result = await onInterest(broadcast.id);
-
-      if (result.isUnlocked) {
-        Alert.alert(
-          'Chat Unlocked!',
-          'You have a mutual interest - start chatting now!',
-          [
-            {
-              text: 'Open Chat',
-              onPress: () => router.push(`/chat/${result.chatId}`),
-            },
-            { text: 'OK' },
-          ]
-        );
-      } else {
-        Alert.alert(
-          'Interest Sent',
-          'You expressed interest. You will be notified if there is a match.',
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Error expressing interest:', error);
-      Alert.alert('Error', 'Failed to express interest. Please try again.');
-    } finally {
-      setExpressing(false);
-    }
+    if (isExpired) return;
+    await onInterest(broadcast.id);
   };
 
   return (
-    <View style={[styles.card, isExpired && styles.cardExpired]}>
+    <View style={styles.card}>
       <View style={styles.header}>
-        <View style={styles.activityContainer}>
-          <Text style={styles.activity}>{broadcast.activity}</Text>
-          {broadcast.groupSize > 1 && (
-            <Text style={styles.groupSize}>Group of {broadcast.groupSize}</Text>
-          )}
+        <View style={styles.userInfo}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{broadcast.userName.charAt(0)}</Text>
+          </View>
+          <View>
+            <Text style={styles.userName}>{broadcast.userName}</Text>
+            <Text style={styles.activity}>{broadcast.activity}</Text>
+          </View>
         </View>
-        <View style={styles.timeContainer}>
-          {broadcast.isPremium && (
-            <View style={styles.premiumBadge}>
-              <Text style={styles.premiumText}>Premium</Text>
-            </View>
-          )}
-          <Text style={styles.timeLeft}>{isExpired ? 'Expired' : timeLeft}</Text>
-        </View>
-      </View>
-
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{broadcast.userName}</Text>
-        <Text style={styles.distance}>{formatDistance(broadcast.distance)}</Text>
+        {broadcast.isPremium && (
+          <View style={styles.premiumBadge}>
+            <Ionicons name="star" size={14} color="#FFD700" />
+            <Text style={styles.premiumText}>Premium</Text>
+          </View>
+        )}
       </View>
 
       {broadcast.description && (
         <Text style={styles.description}>{broadcast.description}</Text>
       )}
 
-      {!isExpired && broadcast.userId !== user?.id && (
-        <TouchableOpacity
-          style={[
-            styles.interestButton,
-            (expressing || broadcast.interested) && styles.interestButtonDisabled,
-          ]}
-          onPress={handleInterest}
-          disabled={expressing || broadcast.interested}
-        >
-          {expressing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.interestButtonText}>
-              {broadcast.interested ? 'Interest Sent' : 'Interested'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      )}
-
-      {isExpired && (
-        <View style={styles.expiredBadge}>
-          <Text style={styles.expiredText}>Expired</Text>
+      <View style={styles.details}>
+        <View style={styles.detailItem}>
+          <Ionicons name="people" size={16} color="#666" />
+          <Text style={styles.detailText}>Group: {broadcast.groupSize}</Text>
         </View>
-      )}
+        <View style={styles.detailItem}>
+          <Ionicons name="location" size={16} color="#666" />
+          <Text style={styles.detailText}>{formatDistance(broadcast.distance)}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="time" size={16} color="#666" />
+          <Text style={styles.detailText}>{timeLeft}</Text>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[
+          styles.interestButton,
+          (isExpired || broadcast.interested) && styles.disabledButton
+        ]}
+        onPress={handleInterest}
+        disabled={isExpired || broadcast.interested}
+      >
+        <Text style={styles.interestButtonText}>
+          {isExpired ? 'Expired' : broadcast.interested ? 'Interested' : 'Interested'}
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
-function getTimeLeft(expiresAt: string): string {
-  const now = new Date();
-  const expires = new Date(expiresAt);
-  const diffMs = expires.getTime() - now.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-
-  if (diffMins < 0) return 'Expired';
-  if (diffMins < 60) return `${diffMins}m left`;
-
-  const hours = Math.floor(diffMins / 60);
-  const mins = diffMins % 60;
-  return `${hours}h ${mins}m left`;
-}
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
-    marginBottom: 16,
-  },
-  cardExpired: {
-    opacity: 0.6,
+    elevation: 2,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 12,
-  },
-  activityContainer: {
-    flex: 1,
-  },
-  activity: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 4,
-  },
-  groupSize: {
-    fontSize: 14,
-    color: '#666666',
-  },
-  timeContainer: {
-    alignItems: 'flex-end',
-  },
-  premiumBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 4,
-  },
-  premiumText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  timeLeft: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#007AFF',
   },
   userInfo: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   userName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333333',
   },
-  distance: {
+  activity: {
     fontSize: 14,
-    color: '#666666',
+    color: '#666',
+    marginTop: 2,
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFD70020',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+  },
+  premiumText: {
+    color: '#854400',
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
   },
   description: {
     fontSize: 14,
-    color: '#444444',
+    color: '#333',
+    marginBottom: 12,
+  },
+  details: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  detailText: {
+    marginLeft: 4,
+    fontSize: 13,
+    color: '#666',
   },
   interestButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
   },
-  interestButtonDisabled: {
-    backgroundColor: '#CCCCCC',
+  disabledButton: {
+    backgroundColor: '#e0e0e0',
   },
   interestButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  expiredBadge: {
-    backgroundColor: '#FF3B30',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginTop: 8,
-  },
-  expiredText: {
-    color: '#FFFFFF',
-    fontSize: 12,
+    color: 'white',
     fontWeight: '600',
   },
 });

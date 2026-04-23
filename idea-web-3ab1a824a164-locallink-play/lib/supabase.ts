@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { calculateDistance } from './matching';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
@@ -135,7 +136,7 @@ export async function expressInterest(broadcastId: string, userId: string) {
  * @param body Notification body
  * @param data Additional data to include
  */
-async function sendPushNotification(userId: string, title: string, body: string, data: any) {
+export async function sendPushNotification(userId: string, title: string, body: string, data: any) {
   try {
     // Get the user's push token
     const { data: user, error } = await supabase

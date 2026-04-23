@@ -1,13 +1,55 @@
 import { supabase } from './supabase';
 import { sendPushNotification } from './notifications';
-import { useChatStore } from '../store/chatStore';
+
+export function calculateDistance(
+  point1: { lat: number; lng: number },
+  point2: { lat: number; lng: number }
+): number {
+  // Haversine formula to calculate distance between two points in miles
+  const R = 3958.8; // Radius of the Earth in miles
+  const dLat = (point2.lat - point1.lat) * Math.PI / 180;
+  const dLng = (point2.lng - point1.lng) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(point1.lat * Math.PI / 180) *
+    Math.cos(point2.lat * Math.PI / 180) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+export function getFilteredAndRankedBroadcasts(
+  broadcasts: any[],
+  location: { lat: number; lng: number },
+  radius: number
+): any[] {
+  // Filter by radius
+  const filtered = broadcasts.filter(broadcast => {
+    const distance = calculateDistance(
+      location,
+      { lat: broadcast.lat, lng: broadcast.lng }
+    );
+    return distance <= radius;
+  });
+
+  // Rank by distance (ascending) and recency (descending)
+  return filtered.sort((a, b) => {
+    // First by distance
+    if (a.distance !== b.distance) {
+      return a.distance - b.distance;
+    }
+
+    // Then by recency (newer first)
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+  });
+}
 
 export async function handleInterest(broadcastId: string, userId: string) {
   try {
-    // 1. Check if there's an existing chat room
+    // Check if there's an existing chat room
     const { data: existingChat, error: chatError } = await supabase
       .from('chats')
-      .select('id, creator_user_id, interested_user_id')
+      .select('id, creator_user_id, interested_user_id, is_unlocked')
       .eq('broadcast_id', broadcastId)
       .single();
 
@@ -15,11 +57,11 @@ export async function handleInterest(broadcastId: string, userId: string) {
       throw chatError;
     }
 
-    // 2. If no existing chat, create one
+    // If no existing chat, create one
     if (!existingChat) {
       const { data: broadcast, error: broadcastError } = await supabase
         .from('broadcasts')
-        .select('user_id')
+        .select('user_id, activity')
         .eq('id', broadcastId)
         .single();
 
@@ -39,7 +81,7 @@ export async function handleInterest(broadcastId: string, userId: string) {
 
       if (createError) throw createError;
 
-      // 3. Send push notification to broadcast creator
+      // Send push notification to broadcast creator
       await sendPushNotification(
         broadcast.user_id,
         'New Interest',
@@ -50,13 +92,13 @@ export async function handleInterest(broadcastId: string, userId: string) {
       return { chatId: newChat.id, isUnlocked: false };
     }
 
-    // 4. If chat exists, check for mutual interest
+    // If chat exists, check for mutual interest
     const isMutualInterest =
       (existingChat.creator_user_id === userId && existingChat.interested_user_id !== userId) ||
       (existingChat.interested_user_id === userId && existingChat.creator_user_id !== userId);
 
-    if (isMutualInterest) {
-      // 5. Unlock the chat if mutual interest
+    if (isMutualInterest && !existingChat.is_unlocked) {
+      // Unlock the chat if mutual interest
       const { error: unlockError } = await supabase
         .from('chats')
         .update({ is_unlocked: true })

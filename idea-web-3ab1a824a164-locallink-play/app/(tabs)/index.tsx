@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,16 +7,26 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useBroadcastStore } from '../../store/broadcastStore';
 import BroadcastCard from '../../components/BroadcastCard';
 import { getCurrentLocation } from '../../lib/location';
-import { fetchNearbyBroadcasts } from '../../lib/supabase';
+import { fetchNearbyBroadcasts, expressInterest } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
+import { useRouter } from 'expo-router';
 
 export default function FeedScreen() {
   const { user } = useAuthStore();
-  const { broadcasts, setBroadcasts, loading, setLoading } = useBroadcastStore();
+  const router = useRouter();
+  const {
+    broadcasts,
+    setBroadcasts,
+    loading,
+    setLoading,
+    subscribeToBroadcasts,
+    unsubscribeFromBroadcasts
+  } = useBroadcastStore();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(3);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -26,11 +36,16 @@ export default function FeedScreen() {
 
   useEffect(() => {
     loadLocation();
+
+    return () => {
+      unsubscribeFromBroadcasts();
+    };
   }, []);
 
   useEffect(() => {
     if (userLocation && selectedRadius) {
       loadBroadcasts();
+      setupRealTimeSubscription();
     }
   }, [userLocation, selectedRadius]);
 
@@ -63,6 +78,22 @@ export default function FeedScreen() {
     }
   };
 
+  const setupRealTimeSubscription = useCallback(() => {
+    if (!userLocation) return;
+
+    unsubscribeFromBroadcasts();
+
+    const subscription = subscribeToBroadcasts(
+      { lat: userLocation.latitude, lng: userLocation.longitude },
+      selectedRadius,
+      (newBroadcasts) => {
+        setBroadcasts(newBroadcasts);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, [userLocation, selectedRadius]);
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLocation();
@@ -73,7 +104,10 @@ export default function FeedScreen() {
   };
 
   const handleExpressInterest = async (broadcastId: string) => {
-    if (!user) return;
+    if (!user) {
+      Alert.alert('Login Required', 'Please login to express interest in broadcasts');
+      return;
+    }
 
     try {
       setLoading(true);
@@ -87,9 +121,14 @@ export default function FeedScreen() {
       );
       setBroadcasts(updatedBroadcasts);
 
+      if (result.isUnlocked) {
+        router.push(`/chat/${result.chatId}`);
+      }
+
       return result;
     } catch (error) {
       console.error('Error expressing interest:', error);
+      Alert.alert('Error', 'Failed to express interest. Please try again.');
       throw error;
     } finally {
       setLoading(false);
@@ -153,6 +192,12 @@ export default function FeedScreen() {
           <Text style={styles.emptySubtext}>
             Be the first to create one!
           </Text>
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => router.push('/create')}
+          >
+            <Text style={styles.createButtonText}>Create Broadcast</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <FlatList
@@ -177,46 +222,38 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f8f8f8',
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    padding: 16,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
+    borderBottomColor: '#e0e0e0',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 16,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
   radiusSelector: {
     flexDirection: 'row',
-    gap: 8,
+    justifyContent: 'space-between',
   },
   radiusButton: {
-    paddingHorizontal: 16,
     paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#f0f0f0',
   },
   radiusButtonActive: {
     backgroundColor: '#007AFF',
   },
   radiusButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
+    color: '#333',
+    fontWeight: '500',
   },
   radiusButtonTextActive: {
-    color: '#FFFFFF',
-  },
-  listContent: {
-    padding: 16,
-    gap: 12,
+    color: 'white',
   },
   loadingContainer: {
     flex: 1,
@@ -224,26 +261,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-  },
-  emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333333',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
+    marginTop: 10,
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
@@ -253,19 +272,48 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#FF3B30',
+    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
     paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  listContent: {
+    padding: 12,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#333',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 20,
+  },
+  createButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
