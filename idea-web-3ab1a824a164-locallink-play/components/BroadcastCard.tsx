@@ -10,16 +10,15 @@ import {
 import { Broadcast } from '../types';
 import { formatDistance } from '../lib/location';
 import { useAuthStore } from '../store/authStore';
-import { useBroadcastStore } from '../store/broadcastStore';
 import { useRouter } from 'expo-router';
 
 interface BroadcastCardProps {
   broadcast: Broadcast;
+  onInterest: (broadcastId: string) => Promise<{ chatId: string; isUnlocked: boolean }>;
 }
 
-export default function BroadcastCard({ broadcast }: BroadcastCardProps) {
+export default function BroadcastCard({ broadcast, onInterest }: BroadcastCardProps) {
   const { user } = useAuthStore();
-  const { expressInterest } = useBroadcastStore();
   const [expressing, setExpressing] = useState(false);
   const router = useRouter();
 
@@ -31,7 +30,7 @@ export default function BroadcastCard({ broadcast }: BroadcastCardProps) {
 
     setExpressing(true);
     try {
-      const result = await expressInterest(broadcast.id);
+      const result = await onInterest(broadcast.id);
 
       if (result.isUnlocked) {
         Alert.alert(
@@ -188,7 +187,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   userName: {
     fontSize: 16,
@@ -201,15 +200,15 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 14,
-    color: '#666666',
+    color: '#444444',
     marginBottom: 16,
-    lineHeight: 20,
   },
   interestButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 8,
   },
   interestButtonDisabled: {
     backgroundColor: '#CCCCCC',
@@ -221,13 +220,15 @@ const styles = StyleSheet.create({
   },
   expiredBadge: {
     backgroundColor: '#FF3B30',
-    paddingVertical: 8,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 8,
   },
   expiredText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

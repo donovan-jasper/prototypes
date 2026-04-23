@@ -11,12 +11,16 @@ import {
 import { useBroadcastStore } from '../../store/broadcastStore';
 import BroadcastCard from '../../components/BroadcastCard';
 import { getCurrentLocation } from '../../lib/location';
+import { fetchNearbyBroadcasts } from '../../lib/supabase';
+import { useAuthStore } from '../../store/authStore';
 
 export default function FeedScreen() {
-  const { broadcasts, loading, userLocation, setUserLocation, fetchBroadcasts } = useBroadcastStore();
+  const { user } = useAuthStore();
+  const { broadcasts, setBroadcasts, loading, setLoading } = useBroadcastStore();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(3);
   const [locationError, setLocationError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const radiusOptions = [0.5, 1, 3, 5];
 
@@ -26,7 +30,7 @@ export default function FeedScreen() {
 
   useEffect(() => {
     if (userLocation && selectedRadius) {
-      fetchBroadcasts(selectedRadius);
+      loadBroadcasts();
     }
   }, [userLocation, selectedRadius]);
 
@@ -40,13 +44,56 @@ export default function FeedScreen() {
     }
   };
 
+  const loadBroadcasts = async () => {
+    if (!userLocation) return;
+
+    setLoading(true);
+    try {
+      const data = await fetchNearbyBroadcasts(
+        userLocation.latitude,
+        userLocation.longitude,
+        selectedRadius
+      );
+      setBroadcasts(data);
+    } catch (error) {
+      console.error('Error loading broadcasts:', error);
+      setLocationError('Failed to load broadcasts. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLocation();
     if (userLocation) {
-      await fetchBroadcasts(selectedRadius);
+      await loadBroadcasts();
     }
     setRefreshing(false);
+  };
+
+  const handleExpressInterest = async (broadcastId: string) => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+      const result = await expressInterest(broadcastId, user.id);
+
+      // Update the broadcasts list to reflect the interest
+      const updatedBroadcasts = broadcasts.map(broadcast =>
+        broadcast.id === broadcastId
+          ? { ...broadcast, interested: true }
+          : broadcast
+      );
+      setBroadcasts(updatedBroadcasts);
+
+      return result;
+    } catch (error) {
+      console.error('Error expressing interest:', error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (locationError) {
@@ -111,7 +158,12 @@ export default function FeedScreen() {
         <FlatList
           data={broadcasts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <BroadcastCard broadcast={item} />}
+          renderItem={({ item }) => (
+            <BroadcastCard
+              broadcast={item}
+              onInterest={handleExpressInterest}
+            />
+          )}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -197,12 +249,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 40,
-    backgroundColor: '#F5F5F5',
+    padding: 20,
   },
   errorText: {
     fontSize: 16,
-    color: '#666666',
+    color: '#FF3B30',
     textAlign: 'center',
     marginBottom: 20,
   },
