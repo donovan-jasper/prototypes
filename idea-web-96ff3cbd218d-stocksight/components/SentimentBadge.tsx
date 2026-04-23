@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface SentimentBadgeProps {
   sentiment: 'bullish' | 'bearish' | 'neutral';
@@ -13,12 +14,14 @@ const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
           backgroundColor: '#e6f7ee',
           color: '#2e7d32',
           text: 'Bullish',
+          icon: 'trending-up',
         };
       case 'bearish':
         return {
           backgroundColor: '#fff0f0',
           color: '#c62828',
           text: 'Bearish',
+          icon: 'trending-down',
         };
       case 'neutral':
       default:
@@ -26,6 +29,7 @@ const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
           backgroundColor: '#f5f5f5',
           color: '#666',
           text: 'Neutral',
+          icon: 'remove',
         };
     }
   };
@@ -34,6 +38,12 @@ const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
 
   return (
     <View style={[styles.badge, { backgroundColor: badgeStyle.backgroundColor }]}>
+      <Ionicons
+        name={badgeStyle.icon}
+        size={12}
+        color={badgeStyle.color}
+        style={styles.icon}
+      />
       <Text style={[styles.badgeText, { color: badgeStyle.color }]}>
         {badgeStyle.text}
       </Text>
@@ -43,6 +53,8 @@ const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
 
 const styles = StyleSheet.create({
   badge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -51,6 +63,10 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 12,
     fontWeight: '600',
+    marginLeft: 4,
+  },
+  icon: {
+    marginRight: 2,
   },
 });
 
