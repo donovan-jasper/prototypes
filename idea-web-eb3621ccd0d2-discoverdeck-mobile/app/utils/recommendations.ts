@@ -1,0 +1,57 @@
+import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { db } from '../../firebase/config';
+
+interface AppRecommendation {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  iconUrl: string;
+  appStoreUrl: string;
+  playStoreUrl: string;
+  rating: number;
+  reviewCount: number;
+  expertRating?: number;
+}
+
+export const getRecommendations = async (
+  searchTerm: string = '',
+  category: string = '',
+  limitCount: number = 10
+): Promise<{ data: AppRecommendation[]; loading: boolean; error: string | null }> => {
+  try {
+    let q = collection(db, 'apps');
+
+    if (searchTerm) {
+      q = query(
+        q,
+        where('name', '>=', searchTerm),
+        where('name', '<=', searchTerm + '\uf8ff'),
+        limit(limitCount)
+      );
+    } else if (category) {
+      q = query(
+        q,
+        where('category', '==', category),
+        limit(limitCount)
+      );
+    } else {
+      q = query(q, limit(limitCount));
+    }
+
+    const querySnapshot = await getDocs(q);
+    const apps: AppRecommendation[] = [];
+
+    querySnapshot.forEach((doc) => {
+      apps.push({
+        id: doc.id,
+        ...doc.data()
+      } as AppRecommendation);
+    });
+
+    return { data: apps, loading: false, error: null };
+  } catch (error) {
+    console.error('Error fetching recommendations:', error);
+    return { data: [], loading: false, error: 'Failed to fetch recommendations' };
+  }
+};
