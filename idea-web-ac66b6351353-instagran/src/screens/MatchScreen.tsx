@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image, Animated, PanResponder } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { getMatchingScore } from '../utils/matching';
@@ -20,6 +20,9 @@ const MatchScreen = ({ navigation }: Props) => {
   const { currentUser } = useUser();
   const [matches, setMatches] = useState<MatchedUser[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [swipe] = useState(new Animated.ValueXY());
+  const [swipeDirection, setSwipeDirection] = useState<'left' | 'right' | null>(null);
 
   const generateMatches = () => {
     if (!currentUser) return;
@@ -36,6 +39,7 @@ const MatchScreen = ({ navigation }: Props) => {
       .slice(0, 10);
 
     setMatches(usersWithScores);
+    setCurrentIndex(0);
   };
 
   useEffect(() => {
@@ -51,6 +55,44 @@ const MatchScreen = ({ navigation }: Props) => {
   const handleMatch = (user: MockUser) => {
     navigation.navigate('EventScreen', { user });
   };
+
+  const handleSwipe = (direction: 'left' | 'right') => {
+    if (matches.length === 0) return;
+
+    setSwipeDirection(direction);
+
+    Animated.timing(swipe, {
+      toValue: direction === 'left' ? { x: -500, y: 0 } : { x: 500, y: 0 },
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      if (direction === 'right') {
+        handleMatch(matches[currentIndex]);
+      }
+      swipe.setValue({ x: 0, y: 0 });
+      setSwipeDirection(null);
+      setCurrentIndex(prev => (prev + 1) % matches.length);
+    });
+  };
+
+  const panResponder = PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onPanResponderMove: (_, gestureState) => {
+      swipe.setValue({ x: gestureState.dx, y: gestureState.dy });
+    },
+    onPanResponderRelease: (_, gestureState) => {
+      if (gestureState.dx > 120) {
+        handleSwipe('right');
+      } else if (gestureState.dx < -120) {
+        handleSwipe('left');
+      } else {
+        Animated.spring(swipe, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+        }).start();
+      }
+    },
+  });
 
   if (!currentUser) {
     return (
@@ -89,6 +131,8 @@ const MatchScreen = ({ navigation }: Props) => {
     );
   }
 
+  const currentUserCard = matches[currentIndex];
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -100,32 +144,66 @@ const MatchScreen = ({ navigation }: Props) => {
           <Text style={styles.refreshButtonText}>↻ Refresh</Text>
         </TouchableOpacity>
       </View>
-      <FlatList
-        data={matches}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-        }
-        renderItem={({ item }) => (
-          <View style={styles.userCard}>
-            <Image
-              source={{ uri: item.avatar }}
-              style={styles.avatar}
-            />
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{item.name}</Text>
-              <Text style={styles.hobbies}>{item.hobbies.join(', ')}</Text>
-              <Text style={styles.score}>Match Score: {item.matchScore}%</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.matchButton}
-              onPress={() => handleMatch(item)}
+
+      <View style={styles.cardContainer}>
+        {matches.map((user, index) => {
+          if (index < currentIndex) return null;
+
+          const isCurrent = index === currentIndex;
+          const rotate = swipe.x.interpolate({
+            inputRange: [-200, 0, 200],
+            outputRange: ['-15deg', '0deg', '15deg'],
+            extrapolate: 'clamp',
+          });
+
+          const animatedStyle = {
+            transform: isCurrent ? [{ rotate }, ...swipe.getTranslateTransform()] : [],
+            opacity: isCurrent ? 1 : 0.5,
+            zIndex: matches.length - index,
+          };
+
+          return (
+            <Animated.View
+              key={user.id}
+              style={[styles.userCard, animatedStyle]}
+              {...(isCurrent ? panResponder.panHandlers : {})}
             >
-              <Text style={styles.matchButtonText}>Connect</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+              <Image
+                source={{ uri: user.avatar }}
+                style={styles.avatar}
+              />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.hobbies}>{user.hobbies.join(', ')}</Text>
+                <Text style={styles.score}>Match Score: {user.matchScore}%</Text>
+              </View>
+
+              {isCurrent && (
+                <View style={styles.actionButtons}>
+                  <TouchableOpacity
+                    style={[styles.swipeButton, styles.rejectButton]}
+                    onPress={() => handleSwipe('left')}
+                  >
+                    <Text style={styles.swipeButtonText}>✕</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.swipeButton, styles.acceptButton]}
+                    onPress={() => handleSwipe('right')}
+                  >
+                    <Text style={styles.swipeButtonText}>✓</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Animated.View>
+          );
+        })}
+      </View>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Swipe left to reject or right to connect
+        </Text>
+      </View>
     </View>
   );
 };
@@ -177,70 +255,97 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 40,
     marginBottom: 15,
-  },
-  secondaryButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
   secondaryButtonText: {
     color: '#007AFF',
   },
+  cardContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   userCard: {
+    position: 'absolute',
+    width: '90%',
+    maxWidth: 400,
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    flexDirection: 'row',
-    alignItems: 'center',
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 5,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginRight: 15,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    alignSelf: 'center',
+    marginBottom: 15,
   },
   userInfo: {
-    flex: 1,
+    marginBottom: 20,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    textAlign: 'center',
     marginBottom: 5,
   },
   hobbies: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
     marginBottom: 5,
   },
   score: {
     fontSize: 14,
     color: '#007AFF',
+    textAlign: 'center',
     fontWeight: '600',
   },
-  matchButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 15,
   },
-  matchButtonText: {
+  swipeButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  rejectButton: {
+    backgroundColor: '#FF3B30',
+  },
+  acceptButton: {
+    backgroundColor: '#34C759',
+  },
+  swipeButtonText: {
     color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  footer: {
+    padding: 15,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#999',
     fontSize: 14,
-    fontWeight: '600',
   },
 });
 
