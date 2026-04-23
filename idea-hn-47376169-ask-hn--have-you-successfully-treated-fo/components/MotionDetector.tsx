@@ -132,18 +132,23 @@ export function MotionDetector({
               <View style={[styles.progressFill, { width: `${calibrationProgress}%` }]} />
             </View>
           )}
-          {!postureDetector.getIsCalibrated() && (
+          {!isCalibrating && (
             <TouchableOpacity style={styles.calibrateButton} onPress={startCalibration}>
-              <Text style={styles.calibrateButtonText}>Calibrate Now</Text>
+              <Text style={styles.calibrateButtonText}>Start Calibration</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
-        <TouchableOpacity style={styles.debugToggle} onPress={() => setShowDebugInfo(!showDebugInfo)}>
-          <Text style={styles.debugToggleText}>
-            {showDebugInfo ? 'Hide Debug Info' : 'Show Debug Info'}
+        <View style={styles.statusContainer}>
+          <Ionicons
+            name={isCorrect ? "checkmark-circle" : "alert-circle"}
+            size={30}
+            color={isCorrect ? "#4CAF50" : "#FF5252"}
+          />
+          <Text style={[styles.statusText, isCorrect ? styles.correctText : styles.incorrectText]}>
+            {isCorrect ? "Posture Correct!" : "Adjust Your Posture"}
           </Text>
-        </TouchableOpacity>
+        </View>
       )}
     </View>
   );
@@ -152,9 +157,9 @@ export function MotionDetector({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
+    width: '100%',
   },
   detectionContainer: {
     alignItems: 'center',
@@ -165,20 +170,27 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     marginBottom: 15,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   correct: {
     backgroundColor: '#4CAF50',
   },
   incorrect: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#FF5252',
   },
   feedbackText: {
     fontSize: 18,
-    color: '#333',
     textAlign: 'center',
     marginBottom: 10,
+  },
+  debugInfo: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+  },
+  debugText: {
+    fontSize: 14,
+    color: '#666',
   },
   calibrationContainer: {
     alignItems: 'center',
@@ -186,16 +198,14 @@ const styles = StyleSheet.create({
   },
   calibrationText: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 10,
   },
   progressBar: {
     width: '80%',
     height: 10,
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 15,
   },
   progressFill: {
     height: '100%',
@@ -203,36 +213,31 @@ const styles = StyleSheet.create({
   },
   calibrateButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
   },
   calibrateButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
   },
-  debugInfo: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 20,
   },
-  debugText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+  statusText: {
+    fontSize: 18,
+    marginLeft: 10,
   },
-  debugToggle: {
-    marginTop: 15,
+  correctText: {
+    color: '#4CAF50',
   },
-  debugToggleText: {
-    color: '#007AFF',
-    fontSize: 14,
+  incorrectText: {
+    color: '#FF5252',
   },
   title: {
     fontSize: 18,
-    color: '#333',
     marginTop: 10,
   },
 });
