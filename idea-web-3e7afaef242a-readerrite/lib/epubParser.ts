@@ -169,10 +169,12 @@ async function extractChapters(opfDoc: Document, zipContent: JSZip): Promise<Epu
     if (!chapterFile) continue;
 
     const content = await chapterFile.async('text');
+    const id = item.getAttribute('id') || href;
+
     chapters.push({
-      id: idref,
+      id,
       href,
-      content,
+      content
     });
   }
 

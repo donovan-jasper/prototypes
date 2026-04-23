@@ -186,58 +186,22 @@ export async function deleteAnnotation(id: number): Promise<void> {
   await db.runAsync('DELETE FROM annotations WHERE id = ?', [id]);
 }
 
-export async function getAnnotationCount(bookId: number): Promise<number> {
+export async function getReadingProgress(bookId: number): Promise<number> {
   if (!db) throw new Error('Database not initialized');
 
-  const result = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM annotations WHERE bookId = ?',
+  const result = await db.getFirstAsync<{ currentPage: number }>(
+    'SELECT currentPage FROM books WHERE id = ?',
     [bookId]
   );
 
-  return result?.count || 0;
+  return result?.currentPage || 0;
 }
 
-export async function exportAnnotations(bookId: number, format: 'markdown' | 'text' = 'markdown'): Promise<string> {
-  const annotations = await getAnnotations(bookId);
-  const book = await getBook(bookId);
+export async function saveReadingProgress(bookId: number, currentPage: number): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
 
-  if (!book) {
-    throw new Error('Book not found');
-  }
-
-  if (format === 'markdown') {
-    let markdown = `# Annotations for "${book.title}" by ${book.author}\n\n`;
-
-    annotations.forEach(annotation => {
-      const date = new Date(annotation.createdAt).toLocaleString();
-      markdown += `## ${annotation.type} (${date})\n\n`;
-      markdown += `**Location:** ${annotation.location}\n\n`;
-      markdown += `**Text:**\n\n${annotation.text}\n\n`;
-
-      if (annotation.note) {
-        markdown += `**Note:**\n\n${annotation.note}\n\n`;
-      }
-
-      markdown += '---\n\n';
-    });
-
-    return markdown;
-  } else {
-    let text = `Annotations for "${book.title}" by ${book.author}\n\n`;
-
-    annotations.forEach(annotation => {
-      const date = new Date(annotation.createdAt).toLocaleString();
-      text += `${annotation.type} (${date})\n`;
-      text += `Location: ${annotation.location}\n\n`;
-      text += `Text:\n${annotation.text}\n\n`;
-
-      if (annotation.note) {
-        text += `Note:\n${annotation.note}\n\n`;
-      }
-
-      text += '----------------------------------------\n\n';
-    });
-
-    return text;
-  }
+  await db.runAsync(
+    'UPDATE books SET currentPage = ?, lastOpened = ? WHERE id = ?',
+    [currentPage, Date.now(), bookId]
+  );
 }
