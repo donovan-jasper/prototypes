@@ -142,7 +142,7 @@ const EstablishmentDetailScreen = () => {
 
       {recalls.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recall Alerts</Text>
+          <Text style={styles.sectionTitle}>Recalls</Text>
           {recalls.map((recall) => (
             <RecallAlert
               key={recall.id}
@@ -155,11 +155,7 @@ const EstablishmentDetailScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inspection History</Text>
-        {inspections.length > 0 ? (
-          <InspectionTimeline inspections={inspections} />
-        ) : (
-          <Text style={styles.noData}>No inspection history available</Text>
-        )}
+        <InspectionTimeline inspections={inspections} />
       </View>
     </ScrollView>
   );
@@ -170,10 +166,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   header: {
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -189,7 +191,7 @@ const styles = StyleSheet.create({
   address: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   scoreContainer: {
     flexDirection: 'row',
@@ -199,32 +201,21 @@ const styles = StyleSheet.create({
   lastInspection: {
     fontSize: 14,
     color: '#666',
-    marginLeft: 8,
+    marginLeft: 12,
   },
   saveButton: {
     padding: 8,
+    marginTop: -4,
   },
   section: {
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
-  },
-  noData: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    padding: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
   },
   errorText: {
     fontSize: 18,

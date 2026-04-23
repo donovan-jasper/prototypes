@@ -243,84 +243,63 @@ const mockInspections: Record<string, Inspection[]> = {
 };
 
 const mockRecalls: Record<string, Recall[]> = {
-  'est-1': [
-    {
-      id: 'recall-1',
-      establishmentId: 'est-1',
-      recallDate: '2023-11-01',
-      description: 'Possible contamination in salad bar',
-      severity: 'medium'
-    }
-  ],
   'est-3': [
     {
-      id: 'recall-2',
+      id: 'recall-1',
       establishmentId: 'est-3',
-      recallDate: '2023-10-20',
-      description: 'Tainted meat detected in inventory',
-      severity: 'high'
+      recallDate: '2023-09-15',
+      description: 'Possible E. coli contamination in batch #42',
+      severity: 'high',
+      affectedProducts: ['Burgers', 'Fries']
     }
   ],
   'est-8': [
     {
-      id: 'recall-3',
+      id: 'recall-2',
       establishmentId: 'est-8',
-      recallDate: '2023-11-05',
-      description: 'Possible cross-contamination in deli meats',
-      severity: 'medium'
+      recallDate: '2023-08-25',
+      description: 'Listeria risk in deli meats',
+      severity: 'medium',
+      affectedProducts: ['Deli sandwiches', 'Salads']
     }
   ]
 };
 
-// Mock API client
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-});
-
-// Mock API endpoints
-export const getNearbyEstablishments = async (latitude: number, longitude: number, radius: number = 2): Promise<Establishment[]> => {
-  // In a real app, this would call the actual API
-  // For now, return mock data filtered by distance
-  return mockEstablishments.filter(est => {
-    const distance = calculateDistance(latitude, longitude, est.latitude, est.longitude);
-    return distance <= radius;
+export const getNearbyEstablishments = async (latitude: number, longitude: number): Promise<Establishment[]> => {
+  // In a real app, this would call the API with the user's location
+  // For now, we'll return our mock data
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockEstablishments);
+    }, 500);
   });
 };
 
 export const getEstablishmentDetails = async (id: string): Promise<Establishment> => {
-  // In a real app, this would call the actual API
-  const establishment = mockEstablishments.find(est => est.id === id);
-  if (!establishment) {
-    throw new Error('Establishment not found');
-  }
-  return establishment;
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const establishment = mockEstablishments.find(est => est.id === id);
+      if (establishment) {
+        resolve(establishment);
+      } else {
+        reject(new Error('Establishment not found'));
+      }
+    }, 300);
+  });
 };
 
 export const getInspections = async (establishmentId: string): Promise<Inspection[]> => {
-  // In a real app, this would call the actual API
-  return mockInspections[establishmentId] || [];
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockInspections[establishmentId] || []);
+    }, 400);
+  });
 };
 
 export const getRecalls = async (establishmentId: string): Promise<Recall[]> => {
-  // In a real app, this would call the actual API
-  return mockRecalls[establishmentId] || [];
-};
-
-// Helper function to calculate distance between two coordinates (in miles)
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 3958.8; // Radius of the Earth in miles
-  const dLat = deg2rad(lat2 - lat1);
-  const dLon = deg2rad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance in miles
-  return distance;
-};
-
-const deg2rad = (deg: number): number => {
-  return deg * (Math.PI / 180);
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(mockRecalls[establishmentId] || []);
+    }, 300);
+  });
 };

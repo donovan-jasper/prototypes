@@ -6,50 +6,59 @@ interface SafetyBadgeProps {
   size?: number;
 }
 
-const SafetyBadge: React.FC<SafetyBadgeProps> = ({ grade, size = 32 }) => {
-  // Determine color based on grade
-  let backgroundColor = '#e0e0e0';
-  let textColor = '#333';
+const SafetyBadge: React.FC<SafetyBadgeProps> = ({ grade, size = 24 }) => {
+  const getColor = () => {
+    switch (grade.toUpperCase()) {
+      case 'A':
+        return '#4CAF50'; // Green
+      case 'B':
+        return '#FFC107'; // Yellow
+      case 'C':
+        return '#FF9800'; // Orange
+      case 'F':
+        return '#F44336'; // Red
+      default:
+        return '#9E9E9E'; // Gray for unknown
+    }
+  };
 
-  switch (grade.toUpperCase()) {
-    case 'A':
-      backgroundColor = '#4CAF50';
-      textColor = 'white';
-      break;
-    case 'B':
-      backgroundColor = '#FFC107';
-      textColor = '#333';
-      break;
-    case 'C':
-      backgroundColor = '#FF9800';
-      textColor = 'white';
-      break;
-    case 'F':
-      backgroundColor = '#F44336';
-      textColor = 'white';
-      break;
-    default:
-      backgroundColor = '#e0e0e0';
-      textColor = '#333';
-  }
+  const getBackgroundColor = () => {
+    switch (grade.toUpperCase()) {
+      case 'A':
+        return 'rgba(76, 175, 80, 0.2)';
+      case 'B':
+        return 'rgba(255, 193, 7, 0.2)';
+      case 'C':
+        return 'rgba(255, 152, 0, 0.2)';
+      case 'F':
+        return 'rgba(244, 67, 54, 0.2)';
+      default:
+        return 'rgba(158, 158, 158, 0.2)';
+    }
+  };
 
   return (
-    <View style={[
-      styles.badge,
-      {
-        width: size,
-        height: size,
-        borderRadius: size / 2,
-        backgroundColor,
-      }
-    ]}>
-      <Text style={[
-        styles.gradeText,
+    <View
+      style={[
+        styles.badge,
         {
-          fontSize: size * 0.6,
-          color: textColor,
-        }
-      ]}>
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: getBackgroundColor(),
+          borderColor: getColor(),
+        },
+      ]}
+    >
+      <Text
+        style={[
+          styles.gradeText,
+          {
+            fontSize: size * 0.6,
+            color: getColor(),
+          },
+        ]}
+      >
         {grade.toUpperCase()}
       </Text>
     </View>
@@ -61,16 +70,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: 'white',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
-    elevation: 3,
   },
   gradeText: {
     fontWeight: 'bold',
-    textAlign: 'center',
   },
 });
 
