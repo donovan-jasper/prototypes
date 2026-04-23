@@ -22,6 +22,12 @@ interface SafetyCheckIn {
   createdAt: Date;
 }
 
+interface OfflineMessage {
+  to: string;
+  body: string;
+  timestamp: string;
+}
+
 export const setupBackgroundTask = async () => {
   try {
     await TaskManager.defineTask(BACKGROUND_TASK_NAME, async ({ data, error }) => {
@@ -184,10 +190,6 @@ const sendSMS = async (to: string, body: string) => {
     const response = await axios.post(TWILIO_BACKEND_URL, {
       to,
       body,
-    }, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     if (response.status !== 200) {
@@ -201,15 +203,11 @@ const sendSMS = async (to: string, body: string) => {
   }
 };
 
-const storeOfflineMessage = async (message: {
-  to: string;
-  body: string;
-  timestamp: string;
-}) => {
+const storeOfflineMessage = async (message: OfflineMessage) => {
   try {
     const db = await initDatabase();
     await db.runAsync(
-      'INSERT INTO offline_messages (to_phone, message_body, timestamp) VALUES (?, ?, ?)',
+      'INSERT INTO offline_messages (to_phone, body, timestamp) VALUES (?, ?, ?)',
       [message.to, message.body, message.timestamp]
     );
   } catch (error) {
@@ -223,19 +221,20 @@ export const retryOfflineMessages = async () => {
 
     // Get all offline messages
     const messages = await db.getAllAsync<{
-      id: string;
+      id: number;
       to_phone: string;
-      message_body: string;
+      body: string;
       timestamp: string;
     }>('SELECT * FROM offline_messages');
 
+    // Try to send each message
     for (const message of messages) {
       try {
-        await sendSMS(message.to_phone, message.message_body);
-        // Delete message if sent successfully
+        await sendSMS(message.to_phone, message.body);
+        // If successful, delete the message
         await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
       } catch (error) {
-        console.error(`Failed to retry message to ${message.to_phone}:`, error);
+        console.error(`Failed to retry message ${message.id}:`, error);
       }
     }
   } catch (error) {

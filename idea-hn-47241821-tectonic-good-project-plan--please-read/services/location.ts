@@ -7,10 +7,17 @@ export const getCurrentLocation = async () => {
       throw new Error('Permission to access location was denied');
     }
 
-    const location = await Location.getCurrentPositionAsync({});
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.High,
+      maximumAge: 10000,
+      timeout: 15000
+    });
+
     return {
       latitude: location.coords.latitude,
-      longitude: location.coords.longitude
+      longitude: location.coords.longitude,
+      accuracy: location.coords.accuracy,
+      timestamp: location.timestamp
     };
   } catch (error) {
     console.error('Error getting location:', error);
@@ -39,4 +46,37 @@ export const calculateDistance = (
 
 const toRad = (value: number) => {
   return value * Math.PI / 180;
+};
+
+export const startBackgroundLocationUpdates = async () => {
+  try {
+    const { status } = await Location.requestBackgroundPermissionsAsync();
+    if (status !== 'granted') {
+      throw new Error('Background location permission denied');
+    }
+
+    await Location.startLocationUpdatesAsync('background-location-task', {
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 60000, // 1 minute
+      distanceInterval: 100, // 100 meters
+      deferredUpdatesInterval: 60000, // 1 minute
+      deferredUpdatesDistance: 100, // 100 meters
+      showsBackgroundLocationIndicator: true,
+    });
+
+    console.log('Background location updates started');
+  } catch (error) {
+    console.error('Error starting background location updates:', error);
+    throw error;
+  }
+};
+
+export const stopBackgroundLocationUpdates = async () => {
+  try {
+    await Location.stopLocationUpdatesAsync('background-location-task');
+    console.log('Background location updates stopped');
+  } catch (error) {
+    console.error('Error stopping background location updates:', error);
+    throw error;
+  }
 };
