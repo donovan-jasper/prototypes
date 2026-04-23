@@ -167,19 +167,20 @@ export default function ScanScreen() {
       <View style={styles.content}>
         <Text style={styles.title}>Scan Your Page</Text>
         <Text style={styles.description}>
-          Point your camera at the page you're reading to automatically track your progress.
+          Point your camera at a book page to automatically track your progress.
         </Text>
 
         {successMessage && (
-          <View style={styles.successContainer}>
+          <View style={styles.successBanner}>
             <Text style={styles.successText}>{successMessage}</Text>
           </View>
         )}
 
         <Button
-          title={scanning ? 'Scanning...' : 'Scan Page'}
+          title={scanning ? "Scanning..." : "Scan Page"}
           onPress={handleScan}
           disabled={scanning}
+          color="#4CAF50"
         />
 
         {scanning && (
@@ -199,80 +200,62 @@ export default function ScanScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {manualEntry ? 'Enter Page Number' : 'Select Your Book'}
+              {manualEntry ? 'Enter Page Details' : 'Select Your Book'}
             </Text>
 
             {manualEntry ? (
-              <View style={styles.manualEntryContainer}>
-                <Text style={styles.label}>Page Number:</Text>
+              <View style={styles.manualEntryForm}>
                 <TextInput
                   style={styles.input}
+                  placeholder="Page Number"
                   keyboardType="numeric"
                   value={manualPage}
                   onChangeText={setManualPage}
-                  placeholder="Enter page number"
-                  autoFocus
+                  autoFocus={true}
                 />
 
-                {matchedBooks.length > 0 && (
-                  <>
-                    <Text style={styles.label}>Select Book:</Text>
-                    <FlatList
-                      data={matchedBooks}
-                      keyExtractor={(item) => item.id}
-                      renderItem={({ item }) => (
-                        <TouchableOpacity
-                          style={[
-                            styles.bookItem,
-                            selectedBookId === item.id && styles.selectedBookItem
-                          ]}
-                          onPress={() => handleSelectBook(item.id)}
-                        >
-                          <Text style={styles.bookTitle}>{item.title}</Text>
-                          {item.author && <Text style={styles.bookAuthor}>{item.author}</Text>}
-                        </TouchableOpacity>
-                      )}
-                      style={styles.bookList}
-                    />
-                  </>
-                )}
+                <Text style={styles.sectionTitle}>Book Information</Text>
 
-                {matchedBooks.length === 0 && (
-                  <>
-                    <Text style={styles.label}>Create New Book:</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={newBookTitle}
-                      onChangeText={setNewBookTitle}
-                      placeholder="Book title"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      value={newBookAuthor}
-                      onChangeText={setNewBookAuthor}
-                      placeholder="Author (optional)"
-                    />
-                    <TextInput
-                      style={styles.input}
-                      value={newBookPages}
-                      onChangeText={setNewBookPages}
-                      placeholder="Total pages (optional)"
-                      keyboardType="numeric"
-                    />
-                  </>
-                )}
+                <TextInput
+                  style={styles.input}
+                  placeholder="Book Title"
+                  value={newBookTitle}
+                  onChangeText={setNewBookTitle}
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Author (optional)"
+                  value={newBookAuthor}
+                  onChangeText={setNewBookAuthor}
+                />
+
+                <TextInput
+                  style={styles.input}
+                  placeholder="Total Pages (optional)"
+                  keyboardType="numeric"
+                  value={newBookPages}
+                  onChangeText={setNewBookPages}
+                />
+
+                <View style={styles.buttonRow}>
+                  <Button
+                    title="Cancel"
+                    onPress={resetModal}
+                    color="#9E9E9E"
+                  />
+                  <Button
+                    title="Create Book"
+                    onPress={handleCreateNewBook}
+                    color="#4CAF50"
+                  />
+                </View>
               </View>
             ) : (
               <>
-                {scanResult?.bookInfo.title && (
-                  <Text style={styles.detectedText}>
-                    Detected: "{scanResult.bookInfo.title}" - Page {scanResult.pageNumber}
-                  </Text>
-                )}
-
                 {matchedBooks.length > 0 ? (
                   <>
-                    <Text style={styles.label}>Select Book:</Text>
+                    <Text style={styles.sectionTitle}>Matching Books</Text>
                     <FlatList
                       data={matchedBooks}
                       keyExtractor={(item) => item.id}
@@ -290,45 +273,42 @@ export default function ScanScreen() {
                       )}
                       style={styles.bookList}
                     />
+
+                    <View style={styles.buttonRow}>
+                      <Button
+                        title="Cancel"
+                        onPress={resetModal}
+                        color="#9E9E9E"
+                      />
+                      <Button
+                        title="Confirm"
+                        onPress={handleConfirm}
+                        color="#4CAF50"
+                        disabled={!selectedBookId}
+                      />
+                    </View>
                   </>
                 ) : (
-                  <View style={styles.noBooksContainer}>
-                    <Text style={styles.noBooksText}>No matching books found</Text>
-                    <Button
-                      title="Create New Book"
-                      onPress={() => setManualEntry(true)}
-                    />
-                  </View>
+                  <>
+                    <Text style={styles.noBooksText}>
+                      No books matched. Would you like to create a new book?
+                    </Text>
+
+                    <View style={styles.buttonRow}>
+                      <Button
+                        title="Cancel"
+                        onPress={resetModal}
+                        color="#9E9E9E"
+                      />
+                      <Button
+                        title="Create New Book"
+                        onPress={handleManualEntry}
+                        color="#4CAF50"
+                      />
+                    </View>
+                  </>
                 )}
               </>
-            )}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={resetModal}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.confirmButton]}
-                onPress={manualEntry ? handleCreateNewBook : handleConfirm}
-                disabled={!selectedBookId && !manualEntry}
-              >
-                <Text style={styles.buttonText}>
-                  {manualEntry ? 'Create & Update' : 'Confirm'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {!manualEntry && (
-              <TouchableOpacity
-                style={styles.manualEntryButton}
-                onPress={handleManualEntry}
-              >
-                <Text style={styles.manualEntryText}>Can't find your book? Enter manually</Text>
-              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -356,11 +336,12 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
+    color: '#666',
     textAlign: 'center',
     marginBottom: 30,
-    color: '#666',
+    paddingHorizontal: 20,
   },
-  successContainer: {
+  successBanner: {
     backgroundColor: '#4CAF50',
     padding: 10,
     borderRadius: 5,
@@ -373,7 +354,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   scanningIndicator: {
-    marginTop: 20,
+    marginTop: 30,
     alignItems: 'center',
   },
   scanningText: {
@@ -399,16 +380,11 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  detectedText: {
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#4CAF50',
-  },
-  label: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginTop: 15,
+    marginBottom: 10,
     color: '#333',
   },
   input: {
@@ -421,7 +397,7 @@ const styles = StyleSheet.create({
   },
   bookList: {
     maxHeight: 200,
-    marginBottom: 15,
+    marginBottom: 20,
   },
   bookItem: {
     padding: 15,
@@ -429,7 +405,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   selectedBookItem: {
-    backgroundColor: '#f0f8ff',
+    backgroundColor: '#e8f5e9',
   },
   bookTitle: {
     fontSize: 16,
@@ -438,47 +414,20 @@ const styles = StyleSheet.create({
   bookAuthor: {
     fontSize: 14,
     color: '#666',
-  },
-  noBooksContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
+    marginTop: 2,
   },
   noBooksText: {
     fontSize: 16,
-    marginBottom: 15,
     color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
   },
-  modalButtons: {
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
   },
-  button: {
-    padding: 12,
-    borderRadius: 5,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  confirmButton: {
-    backgroundColor: '#4CAF50',
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  manualEntryButton: {
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  manualEntryText: {
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  manualEntryContainer: {
-    marginBottom: 20,
+  manualEntryForm: {
+    marginTop: 10,
   },
 });

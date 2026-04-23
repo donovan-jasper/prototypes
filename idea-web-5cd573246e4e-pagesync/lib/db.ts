@@ -22,6 +22,9 @@ export const initDB = () => {
       data TEXT,
       createdAt INTEGER DEFAULT (strftime('%s', 'now'))
     );
+
+    CREATE INDEX IF NOT EXISTS idx_books_title ON books(title);
+    CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
   `);
 };
 
@@ -55,9 +58,28 @@ export const getBook = async (id: string) => {
 };
 
 export const searchBooksByTitle = async (title: string) => {
-  const query = `%${title}%`;
+  const query = `
+    SELECT * FROM books
+    WHERE title LIKE ? OR title LIKE ?
+    ORDER BY
+      CASE
+        WHEN title = ? THEN 1
+        WHEN title LIKE ? THEN 2
+        ELSE 3
+      END,
+      lastSynced DESC
+    LIMIT 10
+  `;
+
+  const exactMatch = title;
+  const partialMatch = `%${title}%`;
+
+  return await db.getAllAsync(query, [exactMatch, partialMatch, exactMatch, partialMatch]);
+};
+
+export const searchBooksByISBN = async (isbn: string) => {
   return await db.getAllAsync(
-    'SELECT * FROM books WHERE title LIKE ? ORDER BY title ASC',
-    [query]
+    'SELECT * FROM books WHERE isbn = ? ORDER BY lastSynced DESC',
+    [isbn]
   );
 };
