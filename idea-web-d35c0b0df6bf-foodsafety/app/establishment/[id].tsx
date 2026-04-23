@@ -6,7 +6,7 @@ import { getRecallAlertsForEstablishment, saveLocation, isLocationSaved, removeL
 import SafetyBadge from '@/components/SafetyBadge';
 import InspectionTimeline from '@/components/InspectionTimeline';
 import RecallAlert from '@/components/RecallAlert';
-import { Establishment, Inspection, RecallAlert as RecallAlertType } from '@/types';
+import { Establishment, Inspection, Recall } from '@/types';
 import { Ionicons } from '@expo/vector-icons';
 
 const EstablishmentDetailScreen = () => {
@@ -14,7 +14,7 @@ const EstablishmentDetailScreen = () => {
   const router = useRouter();
   const [establishment, setEstablishment] = useState<Establishment | null>(null);
   const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [recallAlerts, setRecallAlerts] = useState<RecallAlertType[]>([]);
+  const [recalls, setRecalls] = useState<Recall[]>([]);
   const [isSaved, setIsSaved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -24,19 +24,20 @@ const EstablishmentDetailScreen = () => {
       setLoading(true);
       const establishmentData = await getEstablishmentDetails(id as string);
       const inspectionsData = await getInspections(id as string);
-      const recallAlertsData = await getRecalls(id as string);
+      const recallsData = await getRecalls(id as string);
 
       setEstablishment(establishmentData);
       setInspections(inspectionsData);
-      setRecallAlerts(recallAlertsData);
+      setRecalls(recallsData);
 
       // Check if location is saved
       const saved = await isLocationSaved(id as string);
       setIsSaved(saved);
 
       // Mark all recall alerts as read when viewing the establishment
-      if (recallAlertsData.length > 0) {
-        await Promise.all(recallAlertsData.map(alert => markRecallAlertAsRead(alert.id)));
+      if (recallsData.length > 0) {
+        const alerts = await getRecallAlertsForEstablishment(id as string);
+        await Promise.all(alerts.map(alert => markRecallAlertAsRead(alert.id)));
       }
     } catch (err) {
       setError('Failed to load establishment details');
@@ -74,6 +75,14 @@ const EstablishmentDetailScreen = () => {
       Alert.alert('Error', 'Failed to save location. Please try again.');
       console.error(err);
     }
+  };
+
+  const handleRecallPress = (recall: Recall) => {
+    Alert.alert(
+      'Recall Details',
+      `${recall.description}\n\nSeverity: ${recall.severity}\nDate: ${new Date(recall.recallDate).toLocaleDateString()}`,
+      [{ text: 'OK' }]
+    );
   };
 
   if (loading) {
@@ -131,14 +140,22 @@ const EstablishmentDetailScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {recallAlerts.length > 0 && (
+      {recalls.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recall Alerts</Text>
-          {recallAlerts.map((alert, index) => (
+          {recalls.map((recall, index) => (
             <RecallAlert
-              key={index}
-              recallDate={alert.recallDate}
-              description={alert.description}
+              key={recall.id}
+              alert={{
+                id: index,
+                establishmentId: recall.establishmentId,
+                recallDate: recall.recallDate,
+                description: recall.description,
+                severity: recall.severity,
+                isRead: false,
+                createdAt: recall.recallDate
+              }}
+              onPress={() => handleRecallPress(recall)}
             />
           ))}
         </View>
@@ -181,11 +198,11 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: 'white',
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   headerContent: {
     flex: 1,
@@ -207,27 +224,26 @@ const styles = StyleSheet.create({
   },
   lastInspection: {
     fontSize: 14,
-    color: '#666',
+    color: '#999',
     marginLeft: 12,
   },
   saveButton: {
     padding: 8,
-    marginLeft: 8,
   },
   section: {
-    backgroundColor: 'white',
     padding: 20,
+    backgroundColor: 'white',
     marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
     marginBottom: 16,
   },
   noDataText: {
     fontSize: 16,
-    color: '#666',
+    color: '#999',
     textAlign: 'center',
     padding: 20,
   },

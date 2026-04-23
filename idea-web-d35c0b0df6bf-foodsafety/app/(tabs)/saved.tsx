@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getSavedLocations, removeLocation, getUnreadRecallAlertCount } from '@/services/database';
+import { getSavedLocations, removeLocation, getUnreadRecallAlertCountForLocation } from '@/services/database';
 import { SavedLocation } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,17 +32,6 @@ const SavedLocationsScreen = () => {
       setLoading(false);
     }
   }, []);
-
-  const getUnreadRecallAlertCountForLocation = async (establishmentId: string): Promise<number> => {
-    try {
-      const count = await getUnreadRecallAlertCount();
-      // In a real app, we would filter by establishmentId
-      return count;
-    } catch (error) {
-      console.error('Error getting unread alert count:', error);
-      return 0;
-    }
-  };
 
   useEffect(() => {
     fetchSavedLocations();
@@ -159,6 +148,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -171,7 +161,7 @@ const styles = StyleSheet.create({
   },
   locationName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
@@ -186,7 +176,7 @@ const styles = StyleSheet.create({
   },
   lastInspection: {
     fontSize: 12,
-    color: '#666',
+    color: '#999',
     marginLeft: 8,
   },
   actionsContainer: {
@@ -200,7 +190,7 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   alertBadgeText: {
     color: 'white',

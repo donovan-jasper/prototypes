@@ -1,7 +1,8 @@
 import * as Notifications from 'expo-notifications';
-import { addRecallAlert, getRecallAlertsForEstablishment } from './database';
+import { addRecallAlert, getRecallAlertsForEstablishment, markRecallAlertAsRead } from './database';
 import { getSavedLocations } from './database';
 import { getRecalls } from './api';
+import { router } from 'expo-router';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -11,18 +12,25 @@ Notifications.setNotificationHandler({
   }),
 });
 
-export const scheduleRecallAlert = async (establishmentId: string, establishmentName: string, recallDate: string, description: string) => {
+export const scheduleRecallAlert = async (establishmentId: string, establishmentName: string, recallDate: string, description: string, severity: string) => {
   try {
     // Add to database first
-    await addRecallAlert(establishmentId, recallDate, description);
+    const alertId = await addRecallAlert(establishmentId, recallDate, description, severity);
 
     // Schedule notification
     const trigger = new Date(recallDate);
     const notificationId = await Notifications.scheduleNotificationAsync({
       content: {
         title: 'Food Recall Alert',
-        body: `${establishmentName} has been recalled: ${description}`,
-        data: { establishmentId, type: 'recall' },
+        body: `${establishmentName} has a new violation: ${description}`,
+        data: {
+          establishmentId,
+          alertId,
+          type: 'recall',
+          severity
+        },
+        sound: 'default',
+        priority: Notifications.AndroidNotificationPriority.HIGH,
       },
       trigger,
     });
@@ -54,7 +62,8 @@ export const checkForRecallAlerts = async () => {
             location.establishmentId,
             location.name,
             recall.recallDate,
-            recall.description
+            recall.description,
+            recall.severity || 'medium'
           );
         }
       }
@@ -76,12 +85,19 @@ export const requestNotificationPermissions = async () => {
 export const setupNotificationHandlers = () => {
   // Handle notification taps
   Notifications.addNotificationResponseReceivedListener(response => {
-    const { establishmentId } = response.notification.request.content.data;
+    const { establishmentId, alertId } = response.notification.request.content.data;
 
     if (establishmentId) {
+      // Mark alert as read
+      if (alertId) {
+        markRecallAlertAsRead(alertId);
+      }
+
       // Navigate to establishment detail
-      // In a real app, this would use the navigation service
-      console.log(`Notification tapped for establishment: ${establishmentId}`);
+      router.push({
+        pathname: '/establishment/[id]',
+        params: { id: establishmentId }
+      });
     }
   });
 };

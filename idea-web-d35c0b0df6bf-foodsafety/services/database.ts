@@ -3,15 +3,14 @@ import { SavedLocation, RecallAlert } from '@/types';
 
 const db = SQLite.openDatabase('foodguard.db');
 
-export const initializeDatabase = async () => {
+export const initDatabase = async () => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         // Create tables if they don't exist
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS saved_locations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            establishmentId TEXT UNIQUE,
+            establishmentId TEXT PRIMARY KEY,
             name TEXT,
             address TEXT,
             safetyScore TEXT,
@@ -26,38 +25,31 @@ export const initializeDatabase = async () => {
             establishmentId TEXT,
             recallDate TEXT,
             description TEXT,
-            isRead BOOLEAN DEFAULT 0,
-            FOREIGN KEY (establishmentId) REFERENCES saved_locations (establishmentId)
+            severity TEXT,
+            isRead INTEGER DEFAULT 0,
+            createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(establishmentId) REFERENCES saved_locations(establishmentId)
           );`
         );
       },
       error => {
-        console.error('Database initialization failed:', error);
+        console.error('Error initializing database:', error);
         reject(error);
       },
       () => {
-        console.log('Database initialized successfully');
         resolve(true);
       }
     );
   });
 };
 
-export const saveLocation = async (location: Omit<SavedLocation, 'id'>) => {
+export const saveLocation = async (location: SavedLocation) => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `INSERT INTO saved_locations (establishmentId, name, address, safetyScore, lastInspectionDate, savedDate)
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            location.establishmentId,
-            location.name,
-            location.address,
-            location.safetyScore,
-            location.lastInspectionDate,
-            location.savedDate
-          ],
+          'INSERT OR REPLACE INTO saved_locations (establishmentId, name, address, safetyScore, lastInspectionDate, savedDate) VALUES (?, ?, ?, ?, ?, ?)',
+          [location.establishmentId, location.name, location.address, location.safetyScore, location.lastInspectionDate, location.savedDate],
           (_, result) => resolve(result),
           (_, error) => reject(error)
         );
@@ -71,7 +63,7 @@ export const getSavedLocations = async (): Promise<SavedLocation[]> => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT * FROM saved_locations ORDER BY savedDate DESC`,
+          'SELECT * FROM saved_locations ORDER BY savedDate DESC',
           [],
           (_, { rows }) => {
             const locations: SavedLocation[] = [];
@@ -87,34 +79,12 @@ export const getSavedLocations = async (): Promise<SavedLocation[]> => {
   });
 };
 
-export const removeLocation = async (establishmentId: string) => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      tx => {
-        // First remove any recall alerts for this location
-        tx.executeSql(
-          `DELETE FROM recall_alerts WHERE establishmentId = ?`,
-          [establishmentId]
-        );
-
-        // Then remove the location itself
-        tx.executeSql(
-          `DELETE FROM saved_locations WHERE establishmentId = ?`,
-          [establishmentId],
-          (_, result) => resolve(result),
-          (_, error) => reject(error)
-        );
-      }
-    );
-  });
-};
-
 export const isLocationSaved = async (establishmentId: string): Promise<boolean> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT COUNT(*) as count FROM saved_locations WHERE establishmentId = ?`,
+          'SELECT COUNT(*) as count FROM saved_locations WHERE establishmentId = ?',
           [establishmentId],
           (_, { rows }) => {
             resolve(rows.item(0).count > 0);
@@ -126,15 +96,36 @@ export const isLocationSaved = async (establishmentId: string): Promise<boolean>
   });
 };
 
-export const addRecallAlert = async (establishmentId: string, recallDate: string, description: string) => {
+export const removeLocation = async (establishmentId: string) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        // First delete all related recall alerts
+        tx.executeSql(
+          'DELETE FROM recall_alerts WHERE establishmentId = ?',
+          [establishmentId]
+        );
+
+        // Then delete the location
+        tx.executeSql(
+          'DELETE FROM saved_locations WHERE establishmentId = ?',
+          [establishmentId],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
+      }
+    );
+  });
+};
+
+export const addRecallAlert = async (establishmentId: string, recallDate: string, description: string, severity: string): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `INSERT INTO recall_alerts (establishmentId, recallDate, description)
-           VALUES (?, ?, ?)`,
-          [establishmentId, recallDate, description],
-          (_, result) => resolve(result),
+          'INSERT INTO recall_alerts (establishmentId, recallDate, description, severity) VALUES (?, ?, ?, ?)',
+          [establishmentId, recallDate, description, severity],
+          (_, result) => resolve(result.insertId),
           (_, error) => reject(error)
         );
       }
@@ -147,7 +138,7 @@ export const getRecallAlertsForEstablishment = async (establishmentId: string): 
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT * FROM recall_alerts WHERE establishmentId = ? ORDER BY recallDate DESC`,
+          'SELECT * FROM recall_alerts WHERE establishmentId = ? ORDER BY recallDate DESC',
           [establishmentId],
           (_, { rows }) => {
             const alerts: RecallAlert[] = [];
@@ -163,19 +154,15 @@ export const getRecallAlertsForEstablishment = async (establishmentId: string): 
   });
 };
 
-export const getAllRecallAlerts = async (): Promise<RecallAlert[]> => {
+export const getUnreadRecallAlertCount = async (): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT * FROM recall_alerts ORDER BY recallDate DESC`,
+          'SELECT COUNT(*) as count FROM recall_alerts WHERE isRead = 0',
           [],
           (_, { rows }) => {
-            const alerts: RecallAlert[] = [];
-            for (let i = 0; i < rows.length; i++) {
-              alerts.push(rows.item(i));
-            }
-            resolve(alerts);
+            resolve(rows.item(0).count);
           },
           (_, error) => reject(error)
         );
@@ -189,7 +176,7 @@ export const markRecallAlertAsRead = async (alertId: number) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `UPDATE recall_alerts SET isRead = 1 WHERE id = ?`,
+          'UPDATE recall_alerts SET isRead = 1 WHERE id = ?',
           [alertId],
           (_, result) => resolve(result),
           (_, error) => reject(error)
@@ -199,13 +186,13 @@ export const markRecallAlertAsRead = async (alertId: number) => {
   });
 };
 
-export const getUnreadRecallAlertCount = async (): Promise<number> => {
+export const getUnreadRecallAlertCountForLocation = async (establishmentId: string): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT COUNT(*) as count FROM recall_alerts WHERE isRead = 0`,
-          [],
+          'SELECT COUNT(*) as count FROM recall_alerts WHERE establishmentId = ? AND isRead = 0',
+          [establishmentId],
           (_, { rows }) => {
             resolve(rows.item(0).count);
           },

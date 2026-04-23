@@ -23,7 +23,6 @@ export interface Inspection {
 }
 
 export interface SavedLocation {
-  id: number;
   establishmentId: string;
   name: string;
   address: string;
@@ -37,5 +36,15 @@ export interface RecallAlert {
   establishmentId: string;
   recallDate: string;
   description: string;
+  severity: string;
   isRead: boolean;
+  createdAt: string;
+}
+
+export interface Recall {
+  id: string;
+  establishmentId: string;
+  recallDate: string;
+  description: string;
+  severity: string;
 }

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { Establishment, Inspection } from '@/types';
+import { Establishment, Inspection, Recall } from '@/types';
 
 // Mock API base URL
 const API_BASE_URL = 'https://api.foodguard.example.com';
@@ -130,13 +130,14 @@ const mockInspections: Record<string, Inspection[]> = {
   ]
 };
 
-const mockRecalls: Record<string, any[]> = {
+const mockRecalls: Record<string, Recall[]> = {
   'est-1': [
     {
       id: 'recall-1',
       establishmentId: 'est-1',
       recallDate: '2023-11-01',
-      description: 'Possible contamination in salad bar'
+      description: 'Possible contamination in salad bar',
+      severity: 'medium'
     }
   ],
   'est-3': [
@@ -144,7 +145,8 @@ const mockRecalls: Record<string, any[]> = {
       id: 'recall-2',
       establishmentId: 'est-3',
       recallDate: '2023-10-20',
-      description: 'Tainted meat detected in inventory'
+      description: 'Tainted meat detected in inventory',
+      severity: 'high'
     }
   ]
 };
@@ -179,60 +181,25 @@ export const getInspections = async (establishmentId: string): Promise<Inspectio
   return mockInspections[establishmentId] || [];
 };
 
-export const getRecalls = async (establishmentId: string): Promise<any[]> => {
+export const getRecalls = async (establishmentId: string): Promise<Recall[]> => {
   // In a real app, this would call the actual API
   return mockRecalls[establishmentId] || [];
 };
 
-// Helper function to calculate distance between two coordinates
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+// Helper function to calculate distance between two coordinates (Haversine formula)
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const d = R * c; // Distance in km
-  return d;
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distance = R * c; // Distance in km
+  return distance;
 };
 
 const deg2rad = (deg: number): number => {
-  return deg * (Math.PI/180);
+  return deg * (Math.PI / 180);
 };
-
-// New endpoint for generating random recall alerts
-export const generateRandomRecallAlerts = async (): Promise<void> => {
-  // In a real app, this would call the actual API to generate recalls
-  // For now, we'll simulate it by adding random recalls to our mock data
-
-  // Select a random establishment
-  const randomEstablishment = mockEstablishments[Math.floor(Math.random() * mockEstablishments.length)];
-
-  // Generate a random recall
-  const recallDescriptions = [
-    'Possible contamination in food preparation area',
-    'Equipment not properly sanitized',
-    'Food storage temperature out of compliance',
-    'Cross-contamination risk identified',
-    'Pest activity observed in kitchen'
-  ];
-
-  const recall = {
-    id: `recall-${Date.now()}`,
-    establishmentId: randomEstablishment.id,
-    recallDate: new Date().toISOString(),
-    description: recallDescriptions[Math.floor(Math.random() * recallDescriptions.length)]
-  };
-
-  // Add to mock data
-  if (!mockRecalls[randomEstablishment.id]) {
-    mockRecalls[randomEstablishment.id] = [];
-  }
-  mockRecalls[randomEstablishment.id].push(recall);
-
-  console.log(`Generated recall alert for ${randomEstablishment.name}: ${recall.description}`);
-};
-
-export default api;
