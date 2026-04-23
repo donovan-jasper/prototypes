@@ -186,56 +186,52 @@ const ARTargetPractice = () => {
     // Animation loop
     const animate = () => {
       if (glViewRef.current) {
-        requestAnimationFrame(animate);
+        glViewRef.current.requestAnimationFrame(animate);
         arEngineRef.current.render();
-        gl.endFrameEXP();
       }
     };
     animate();
   };
 
   if (hasPermission === null) {
-    return <View />;
+    return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
   }
-
   if (hasPermission === false) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.text}>No access to camera</Text>
-      </View>
-    );
+    return <View style={styles.container}><Text>No access to camera</Text></View>;
   }
 
   return (
     <View style={styles.container}>
       <Camera
         ref={cameraRef}
-        style={styles.camera}
+        style={StyleSheet.absoluteFill}
         type={Camera.Constants.Type.back}
         onTouchStart={handleTap}
       >
         <GLView
           ref={glViewRef}
-          style={styles.glView}
+          style={StyleSheet.absoluteFill}
           onContextCreate={onContextCreate}
         />
+
+        <ARTargetOverlay
+          hits={hits}
+          misses={misses}
+          timeLeft={timeLeft}
+          score={score}
+        />
+
+        {!gameActive && (
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={startGame}
+            >
+              <Text style={styles.startButtonText}>Start Practice</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </Camera>
-
-      <ARTargetOverlay
-        hits={hits}
-        misses={misses}
-        timeLeft={timeLeft}
-        score={score}
-      />
-
-      {!gameActive && !score && (
-        <TouchableOpacity
-          style={styles.startButton}
-          onPress={startGame}
-        >
-          <Text style={styles.startButtonText}>Start Challenge</Text>
-        </TouchableOpacity>
-      )}
     </View>
   );
 };
@@ -243,18 +239,15 @@ const ARTargetPractice = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
   },
-  camera: {
-    flex: 1,
-  },
-  glView: {
-    flex: 1,
-  },
-  startButton: {
+  buttonContainer: {
     position: 'absolute',
     bottom: 50,
-    alignSelf: 'center',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  startButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 15,
     paddingHorizontal: 30,
