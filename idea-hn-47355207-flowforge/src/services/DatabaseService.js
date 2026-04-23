@@ -2,6 +2,7 @@ import * as SQLite from 'expo-sqlite';
 
 class DatabaseService {
   db;
+  currentSchemaVersion = 1; // Current schema version
 
   constructor() {
     this.db = SQLite.openDatabase('applications.db');
@@ -9,19 +10,69 @@ class DatabaseService {
 
   async initDatabase() {
     return new Promise((resolve, reject) => {
-      this.db.transaction(tx => {
-        tx.executeSql(
-          'CREATE TABLE IF NOT EXISTS applications (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, schema TEXT)',
-          [],
-          () => {
-            resolve();
-          },
-          (tx, error) => {
-            console.error('Error creating table:', error);
-            reject(error);
+      this.db.transaction(async (tx) => {
+        try {
+          // Create schema version table if it doesn't exist
+          await this.executeSql(tx, `
+            CREATE TABLE IF NOT EXISTS schema_version (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              version INTEGER NOT NULL
+            )
+          `);
+
+          // Check if schema version table is empty
+          const versionResult = await this.executeSql(tx, 'SELECT version FROM schema_version ORDER BY id DESC LIMIT 1');
+
+          let dbVersion = 0;
+          if (versionResult.rows.length > 0) {
+            dbVersion = versionResult.rows.item(0).version;
           }
-        );
+
+          // If no version exists or version is older, run migrations
+          if (dbVersion === 0 || dbVersion < this.currentSchemaVersion) {
+            await this.runMigrations(tx, dbVersion);
+          }
+
+          // Create applications table if it doesn't exist
+          await this.executeSql(tx, `
+            CREATE TABLE IF NOT EXISTS applications (
+              id INTEGER PRIMARY KEY AUTOINCREMENT,
+              name TEXT NOT NULL,
+              schema TEXT,
+              version INTEGER NOT NULL,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+
+          resolve();
+        } catch (error) {
+          console.error('Database initialization error:', error);
+          reject(error);
+        }
       });
+    });
+  }
+
+  async runMigrations(tx, currentVersion) {
+    // Migration from version 0 to 1
+    if (currentVersion < 1) {
+      // Create initial schema version
+      await this.executeSql(tx, 'INSERT INTO schema_version (version) VALUES (?)', [this.currentSchemaVersion]);
+    }
+
+    // Add more migration steps here for future versions
+    // if (currentVersion < 2) { ... }
+  }
+
+  async executeSql(tx, sql, params = []) {
+    return new Promise((resolve, reject) => {
+      tx.executeSql(
+        sql,
+        params,
+        (tx, result) => resolve(result),
+        (tx, error) => reject(error)
+      );
     });
   }
 
@@ -29,7 +80,7 @@ class DatabaseService {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
         tx.executeSql(
-          'SELECT * FROM applications ORDER BY id DESC',
+          'SELECT * FROM applications ORDER BY updated_at DESC',
           [],
           (tx, results) => {
             const applications = [];
@@ -37,7 +88,10 @@ class DatabaseService {
               applications.push({
                 id: results.rows.item(i).id,
                 name: results.rows.item(i).name,
-                schema: results.rows.item(i).schema,
+                schema: results.rows.item(i).schema ? JSON.parse(results.rows.item(i).schema) : null,
+                version: results.rows.item(i).version,
+                created_at: results.rows.item(i).created_at,
+                updated_at: results.rows.item(i).updated_at,
               });
             }
             resolve(applications);
@@ -55,13 +109,31 @@ class DatabaseService {
     return new Promise((resolve, reject) => {
       this.db.transaction(tx => {
         tx.executeSql(
-          'INSERT INTO applications (name, schema) VALUES (?, ?)',
-          [applicationName, JSON.stringify(schemaData)],
-          () => {
-            resolve();
+          'INSERT INTO applications (name, schema, version) VALUES (?, ?, ?)',
+          [applicationName, JSON.stringify(schemaData), this.currentSchemaVersion],
+          (tx, result) => {
+            resolve(result.insertId);
           },
           (tx, error) => {
             console.error('Error saving application:', error);
+            reject(error);
+          }
+        );
+      });
+    });
+  }
+
+  async updateApplication(appId, applicationName, schemaData) {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'UPDATE applications SET name = ?, schema = ?, version = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+          [applicationName, JSON.stringify(schemaData), this.currentSchemaVersion, appId],
+          (tx, result) => {
+            resolve(result.rowsAffected > 0);
+          },
+          (tx, error) => {
+            console.error('Error updating application:', error);
             reject(error);
           }
         );
@@ -75,11 +147,33 @@ class DatabaseService {
         tx.executeSql(
           'DELETE FROM applications WHERE id = ?',
           [appId],
-          () => {
-            resolve();
+          (tx, result) => {
+            resolve(result.rowsAffected > 0);
           },
           (tx, error) => {
             console.error('Delete application error:', error);
+            reject(error);
+          }
+        );
+      });
+    });
+  }
+
+  async getCurrentSchemaVersion() {
+    return new Promise((resolve, reject) => {
+      this.db.transaction(tx => {
+        tx.executeSql(
+          'SELECT version FROM schema_version ORDER BY id DESC LIMIT 1',
+          [],
+          (tx, results) => {
+            if (results.rows.length > 0) {
+              resolve(results.rows.item(0).version);
+            } else {
+              resolve(0);
+            }
+          },
+          (tx, error) => {
+            console.error('Error getting schema version:', error);
             reject(error);
           }
         );
