@@ -145,31 +145,34 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
 
       setSuccess(true);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      const errorMessage = err instanceof Error ? err.message :
+        'An unknown error occurred during recovery';
       setError(errorMessage);
-      console.error('Recovery workflow failed:', err);
 
       // Save error alert
-      const db = await openDatabase();
-      await saveAlert(db, {
-        serviceId: serviceId,
-        severity: 'critical',
-        message: `Recovery workflow failed: ${errorMessage}`
-      });
+      const service = services.find(s => s.id === serviceId);
+      if (service) {
+        const db = await openDatabase();
+        await saveAlert(db, {
+          serviceId: service.id,
+          severity: 'critical',
+          message: `Recovery workflow failed: ${errorMessage}`
+        });
 
-      addAlert({
-        id: Date.now(),
-        serviceId: serviceId,
-        severity: 'critical',
-        message: `Recovery workflow failed: ${errorMessage}`,
-        timestamp: Date.now()
-      });
+        addAlert({
+          id: Date.now(),
+          serviceId: service.id,
+          severity: 'critical',
+          message: `Recovery workflow failed: ${errorMessage}`,
+          timestamp: Date.now()
+        });
 
-      await sendLocalNotification(
-        'Recovery Failed',
-        `Failed to recover ${services.find(s => s.id === serviceId)?.name || 'service'}`,
-        'critical'
-      );
+        await sendLocalNotification(
+          'Recovery Failed',
+          `Failed to recover ${service.name}: ${errorMessage}`,
+          'critical'
+        );
+      }
     } finally {
       setIsExecuting(false);
     }
@@ -177,7 +180,7 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
 
   if (!workflow) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.modalContainer}>
         <ActivityIndicator size="large" color="#3B82F6" />
         <Text style={styles.loadingText}>Loading workflow...</Text>
       </View>
@@ -185,133 +188,116 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Execute Recovery Workflow</Text>
-      <Text style={styles.workflowName}>{workflow.name}</Text>
+    <View style={styles.modalContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <Text style={styles.modalTitle}>{workflow.name}</Text>
 
-      <View style={styles.progressContainer}>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, {
-            width: `${((currentStep + 1) / workflow.steps.length) * 100}%`
-          }]} />
-        </View>
-        <Text style={styles.progressText}>
-          Step {currentStep + 1} of {workflow.steps.length}
-        </Text>
-      </View>
-
-      <ScrollView style={styles.stepsContainer}>
-        {workflow.steps.map((step: any, index: number) => (
-          <View key={step.id} style={styles.stepItem}>
-            <View style={styles.stepHeader}>
-              <View style={[
-                styles.stepNumber,
-                stepStatus[step.id] === 'success' && styles.stepSuccess,
-                stepStatus[step.id] === 'error' && styles.stepError
-              ]}>
-                <Text style={styles.stepNumberText}>
-                  {stepStatus[step.id] === 'success' ? '✓' : index + 1}
-                </Text>
-              </View>
-              <Text style={styles.stepTitle}>{step.title}</Text>
-            </View>
-            <Text style={styles.stepDescription}>{step.description}</Text>
+        {error && (
+          <View style={[styles.statusBox, styles.errorBox]}>
+            <Text style={styles.statusText}>Error: {error}</Text>
           </View>
-        ))}
+        )}
+
+        {success && (
+          <View style={[styles.statusBox, styles.successBox]}>
+            <Text style={styles.statusText}>Workflow completed successfully!</Text>
+          </View>
+        )}
+
+        <View style={styles.stepsContainer}>
+          {workflow.steps.map((step: any, index: number) => (
+            <View key={step.id} style={styles.stepContainer}>
+              <View style={styles.stepHeader}>
+                <View style={[
+                  styles.stepNumber,
+                  stepStatus[step.id] === 'success' ? styles.stepSuccess :
+                  stepStatus[step.id] === 'error' ? styles.stepError :
+                  currentStep === index ? styles.stepActive : styles.stepPending
+                ]}>
+                  <Text style={styles.stepNumberText}>{index + 1}</Text>
+                </View>
+                <Text style={styles.stepTitle}>{step.title}</Text>
+              </View>
+              <Text style={styles.stepDescription}>{step.description}</Text>
+
+              {stepStatus[step.id] === 'success' && (
+                <Text style={styles.stepStatus}>✓ Completed</Text>
+              )}
+
+              {stepStatus[step.id] === 'error' && (
+                <Text style={[styles.stepStatus, styles.errorText]}>✗ Failed</Text>
+              )}
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.cancelButton]}
+            onPress={onClose}
+            disabled={isExecuting}
+          >
+            <Text style={styles.buttonText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.executeButton]}
+            onPress={executeWorkflow}
+            disabled={isExecuting || success}
+          >
+            {isExecuting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={[styles.buttonText, styles.executeButtonText]}>
+                {success ? 'Done' : 'Execute Workflow'}
+              </Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error: {error}</Text>
-        </View>
-      )}
-
-      {success && (
-        <View style={styles.successContainer}>
-          <Text style={styles.successText}>✓ Workflow completed successfully!</Text>
-        </View>
-      )}
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={[styles.button, styles.cancelButton]}
-          onPress={onClose}
-          disabled={isExecuting}
-        >
-          <Text style={styles.buttonText}>Cancel</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.executeButton]}
-          onPress={executeWorkflow}
-          disabled={isExecuting || success}
-        >
-          {isExecuting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={[styles.buttonText, styles.executeButtonText]}>
-              {success ? 'Done' : 'Execute Workflow'}
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  modalContainer: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#fff',
+    padding: 16,
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  scrollContent: {
+    paddingBottom: 32,
   },
-  loadingText: {
-    marginTop: 16,
-    color: '#6B7280',
-  },
-  title: {
+  modalTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: 'bold',
+    marginBottom: 24,
     color: '#1F2937',
   },
-  workflowName: {
+  statusBox: {
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#F87171',
+    borderWidth: 1,
+  },
+  successBox: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#34D399',
+    borderWidth: 1,
+  },
+  statusText: {
     fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 24,
-  },
-  progressContainer: {
-    marginBottom: 24,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: '#E5E7EB',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#3B82F6',
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#6B7280',
-    textAlign: 'center',
+    color: '#1F2937',
   },
   stepsContainer: {
-    flex: 1,
+    marginBottom: 24,
   },
-  stepItem: {
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#F9FAFB',
-    borderRadius: 8,
+  stepContainer: {
+    marginBottom: 24,
   },
   stepHeader: {
     flexDirection: 'row',
@@ -319,13 +305,22 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   stepNumber: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#E5E7EB',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
+  },
+  stepNumberText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  stepActive: {
+    backgroundColor: '#3B82F6',
+  },
+  stepPending: {
+    backgroundColor: '#E5E7EB',
   },
   stepSuccess: {
     backgroundColor: '#10B981',
@@ -333,40 +328,25 @@ const styles = StyleSheet.create({
   stepError: {
     backgroundColor: '#EF4444',
   },
-  stepNumberText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   stepTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1F2937',
+    flex: 1,
   },
   stepDescription: {
     fontSize: 14,
     color: '#6B7280',
-    marginLeft: 36,
+    marginLeft: 44,
   },
-  errorContainer: {
-    padding: 12,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-    marginBottom: 16,
+  stepStatus: {
+    fontSize: 14,
+    color: '#10B981',
+    marginLeft: 44,
+    marginTop: 8,
   },
   errorText: {
-    color: '#DC2626',
-    fontSize: 14,
-  },
-  successContainer: {
-    padding: 12,
-    backgroundColor: '#D1FAE5',
-    borderRadius: 8,
-    marginBottom: 16,
-  },
-  successText: {
-    color: '#065F46',
-    fontSize: 14,
-    fontWeight: '500',
+    color: '#EF4444',
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -375,7 +355,7 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    padding: 12,
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 4,
@@ -387,11 +367,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#3B82F6',
   },
   buttonText: {
-    color: '#374151',
     fontSize: 16,
     fontWeight: '500',
+    color: '#1F2937',
   },
   executeButtonText: {
     color: '#fff',
+  },
+  loadingText: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#6B7280',
   },
 });

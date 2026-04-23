@@ -144,37 +144,41 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
             }
             break;
 
-          // Add cases for other providers here
           default:
-            throw new Error(`Unsupported provider: ${service.provider}`);
+            throw new Error('Unsupported provider');
         }
       }
 
       setIsComplete(true);
     } catch (err) {
-      console.error('Step execution failed:', err);
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message :
+        'An unknown error occurred';
+      setError(errorMessage);
+
       // Save error alert
-      const db = await openDatabase();
-      await saveAlert(db, {
-        serviceId: serviceId,
-        severity: 'critical',
-        message: `Recovery step failed: ${err instanceof Error ? err.message : 'Unknown error'}`
-      });
+      const service = services.find(s => s.id === serviceId);
+      if (service) {
+        const db = await openDatabase();
+        await saveAlert(db, {
+          serviceId: service.id,
+          severity: 'critical',
+          message: `Step failed: ${errorMessage}`
+        });
 
-      addAlert({
-        id: Date.now(),
-        serviceId: serviceId,
-        severity: 'critical',
-        message: `Recovery step failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
-        timestamp: Date.now()
-      });
+        addAlert({
+          id: Date.now(),
+          serviceId: service.id,
+          severity: 'critical',
+          message: `Step failed: ${errorMessage}`,
+          timestamp: Date.now()
+        });
 
-      await sendLocalNotification(
-        'Recovery Failed',
-        `Failed to execute step: ${step.title}`,
-        'critical'
-      );
+        await sendLocalNotification(
+          'Recovery Step Failed',
+          `Failed to execute step: ${errorMessage}`,
+          'critical'
+        );
+      }
     } finally {
       setIsExecuting(false);
     }
@@ -183,45 +187,47 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.stepNumberContainer}>
-          <Text style={styles.stepNumber}>{stepNumber}</Text>
+        <View style={[
+          styles.stepNumber,
+          isComplete ? styles.completeStep :
+          isExecuting ? styles.executingStep : styles.pendingStep
+        ]}>
+          <Text style={styles.stepNumberText}>{stepNumber}</Text>
         </View>
         <Text style={styles.title}>{step.title}</Text>
       </View>
-      <Text style={styles.description}>{step.description}</Text>
 
-      {step.action && (
-        <View style={styles.actionContainer}>
-          {step.action.type === 'api' ? (
-            <TouchableOpacity
-              style={[
-                styles.executeButton,
-                (isExecuting || isComplete) && styles.buttonDisabled
-              ]}
-              onPress={executeAction}
-              disabled={isExecuting || isComplete}
-            >
-              {isExecuting ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buttonText}>
-                  {isComplete ? 'Completed' : 'Execute'}
-                </Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.manualStep}>
-              <Text style={styles.manualText}>Manual step - follow instructions above</Text>
-            </View>
-          )}
-        </View>
-      )}
+      <Text style={styles.description}>{step.description}</Text>
 
       {error && (
         <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error: {error}</Text>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
         </View>
       )}
+
+      {step.action && (
+        <TouchableOpacity
+          style={[
+            styles.actionButton,
+            isComplete ? styles.completeButton :
+            isExecuting ? styles.executingButton : styles.pendingButton
+          ]}
+          onPress={executeAction}
+          disabled={isExecuting || isComplete}
+        >
+          {isExecuting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {isComplete ? '✓ Completed' : step.action.type === 'api' ? 'Execute API Action' : 'Manual Step'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      )}
+
+      <View style={styles.progressContainer}>
+        <View style={[styles.progressBar, { width: `${(stepNumber / totalSteps) * 100}%` }]} />
+      </View>
     </View>
   );
 }
@@ -231,7 +237,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -243,22 +249,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  stepNumberContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#3B82F6',
+  stepNumber: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  stepNumber: {
+  stepNumberText: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  pendingStep: {
+    backgroundColor: '#E5E7EB',
+  },
+  executingStep: {
+    backgroundColor: '#3B82F6',
+  },
+  completeStep: {
+    backgroundColor: '#10B981',
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+    color: '#1F2937',
     flex: 1,
   },
   description: {
@@ -266,40 +281,45 @@ const styles = StyleSheet.create({
     color: '#6B7280',
     marginBottom: 12,
   },
-  actionContainer: {
-    marginTop: 8,
-  },
-  executeButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  actionButton: {
+    padding: 12,
     borderRadius: 6,
     alignItems: 'center',
+    marginTop: 8,
   },
-  buttonDisabled: {
-    backgroundColor: '#9CA3AF',
+  pendingButton: {
+    backgroundColor: '#3B82F6',
+  },
+  executingButton: {
+    backgroundColor: '#2563EB',
+  },
+  completeButton: {
+    backgroundColor: '#10B981',
   },
   buttonText: {
     color: '#fff',
-    fontWeight: '600',
-  },
-  manualStep: {
-    backgroundColor: '#F3F4F6',
-    padding: 12,
-    borderRadius: 6,
-  },
-  manualText: {
-    color: '#6B7280',
-    fontSize: 14,
+    fontWeight: '500',
   },
   errorContainer: {
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 6,
     marginTop: 8,
-    padding: 8,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 4,
   },
   errorText: {
     color: '#EF4444',
     fontSize: 14,
+  },
+  progressContainer: {
+    height: 4,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 2,
+    marginTop: 16,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+    borderRadius: 2,
   },
 });

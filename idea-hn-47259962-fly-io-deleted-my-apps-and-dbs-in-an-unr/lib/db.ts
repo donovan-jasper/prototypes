@@ -106,6 +106,37 @@ export async function openDatabase() {
             }
           }
         ])
+      },
+      {
+        id: 'flyio-backup',
+        name: 'Verify Backups',
+        provider: 'flyio',
+        steps: JSON.stringify([
+          {
+            id: 'check-backup-age',
+            title: 'Check Backup Age',
+            description: 'Verify the most recent backup is within the expected time window',
+            action: {
+              type: 'manual'
+            }
+          },
+          {
+            id: 'test-restore',
+            title: 'Test Restore Process',
+            description: 'Simulate restoring from backup to ensure it works',
+            action: {
+              type: 'manual'
+            }
+          },
+          {
+            id: 'document-backup',
+            title: 'Document Backup Details',
+            description: 'Record backup location and restore instructions for future reference',
+            action: {
+              type: 'manual'
+            }
+          }
+        ])
       }
     ];
 
@@ -135,5 +166,19 @@ export async function saveAlert(db: SQLite.SQLiteDatabase, alert: any) {
   await db.runAsync(
     'INSERT INTO alerts (service_id, severity, message, timestamp) VALUES (?, ?, ?, ?)',
     [alert.serviceId, alert.severity, alert.message, Date.now()]
+  );
+}
+
+export async function getAlerts(db: SQLite.SQLiteDatabase, limit: number = 50) {
+  return await db.getAllAsync(
+    'SELECT * FROM alerts ORDER BY timestamp DESC LIMIT ?',
+    [limit]
+  );
+}
+
+export async function resolveAlert(db: SQLite.SQLiteDatabase, alertId: number) {
+  await db.runAsync(
+    'UPDATE alerts SET resolved = 1 WHERE id = ?',
+    [alertId]
   );
 }
