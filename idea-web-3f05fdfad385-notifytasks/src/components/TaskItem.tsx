@@ -1,44 +1,51 @@
 import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { TaskContext } from '../context/TaskContext';
 import { Colors } from '../constants/Colors';
-import { Task } from '../types/TaskTypes';
 import { usePremiumStatus } from '../hooks/usePremiumStatus';
 
 interface TaskItemProps {
-  task: Task;
+  task: {
+    id: number;
+    content: string;
+    type: 'task' | 'note' | 'reminder';
+    isCompleted: boolean;
+    isPinned: boolean;
+    createdAt: string;
+    dueDate?: string;
+  };
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { updateTaskStatus, deleteTask, updateTask } = useContext(TaskContext);
   const { isPremium, maxPinnedTasks } = usePremiumStatus();
 
-  const handleCompleteToggle = () => {
+  const handleToggleComplete = () => {
     updateTaskStatus(task.id, !task.isCompleted);
   };
 
   const handleDelete = () => {
-    Alert.alert(
-      'Delete Task',
-      'Are you sure you want to delete this task?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) },
-      ]
-    );
+    deleteTask(task.id);
   };
 
-  const handlePinToggle = () => {
+  const handleTogglePin = () => {
     if (!isPremium && task.isPinned) {
-      Alert.alert(
-        'Premium Feature',
-        'You need to upgrade to Premium to pin tasks.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => {} }, // Navigation to premium screen would go here
-        ]
-      );
+      // User is trying to unpin, which is always allowed
+      updateTask(task.id, { isPinned: false });
       return;
+    }
+
+    if (!isPremium && !task.isPinned) {
+      // Check if user has reached their limit
+      const pinnedTasks = tasks.filter(t => t.isPinned);
+      if (pinnedTasks.length >= maxPinnedTasks) {
+        Alert.alert(
+          "Premium Feature",
+          "You've reached your limit of pinned tasks. Upgrade to Premium to pin unlimited tasks!",
+          [{ text: "OK" }]
+        );
+        return;
+      }
     }
 
     updateTask(task.id, { isPinned: !task.isPinned });
@@ -48,7 +55,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.checkbox}
-        onPress={handleCompleteToggle}
+        onPress={handleToggleComplete}
       >
         {task.isCompleted && <View style={styles.checkboxInner} />}
       </TouchableOpacity>
@@ -60,31 +67,36 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
             task.isCompleted && styles.completedText
           ]}
           numberOfLines={2}
-          ellipsizeMode="tail"
         >
           {task.content}
         </Text>
 
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handlePinToggle}
-          >
-            <Text style={[
-              styles.actionText,
-              task.isPinned && styles.pinnedText
-            ]}>
-              {task.isPinned ? 'Unpin' : 'Pin'}
-            </Text>
-          </TouchableOpacity>
+        {task.dueDate && (
+          <Text style={styles.dueDate}>
+            Due: {new Date(task.dueDate).toLocaleString()}
+          </Text>
+        )}
+      </View>
 
-          <TouchableOpacity
-            style={[styles.actionButton, styles.deleteButton]}
-            onPress={handleDelete}
-          >
-            <Text style={styles.deleteText}>Delete</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[
+            styles.pinButton,
+            task.isPinned && styles.pinnedButton
+          ]}
+          onPress={handleTogglePin}
+        >
+          <Text style={styles.pinButtonText}>
+            {task.isPinned ? '★' : '☆'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={handleDelete}
+        >
+          <Text style={styles.deleteButtonText}>×</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -121,34 +133,36 @@ const styles = StyleSheet.create({
   content: {
     color: Colors.textPrimary,
     fontSize: 16,
-    marginBottom: 8,
   },
   completedText: {
     color: Colors.textSecondary,
     textDecorationLine: 'line-through',
   },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  actionButton: {
-    padding: 6,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  actionText: {
-    color: Colors.primary,
+  dueDate: {
+    color: Colors.textSecondary,
     fontSize: 12,
+    marginTop: 4,
   },
-  pinnedText: {
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pinButton: {
+    padding: 8,
+    marginRight: 8,
+  },
+  pinnedButton: {
     color: Colors.warningButton,
   },
-  deleteButton: {
-    backgroundColor: Colors.errorBackground,
+  pinButtonText: {
+    fontSize: 18,
   },
-  deleteText: {
+  deleteButton: {
+    padding: 8,
+  },
+  deleteButtonText: {
+    fontSize: 20,
     color: Colors.error,
-    fontSize: 12,
   },
 });
 

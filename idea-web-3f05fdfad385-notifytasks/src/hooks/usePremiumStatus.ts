@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Platform } from 'react-native';
 import * as InAppPurchases from 'expo-in-app-purchases';
 
 export const usePremiumStatus = () => {
@@ -11,27 +10,20 @@ export const usePremiumStatus = () => {
       try {
         await InAppPurchases.connectAsync();
 
-        // For testing purposes, you might want to use a test product ID
-        const productId = Platform.OS === 'ios'
-          ? 'com.yourapp.aura.premium'
-          : 'com.yourapp.aura.premium';
-
+        // Check for active subscriptions
         const purchases = await InAppPurchases.getPurchaseHistoryAsync();
 
-        // Check if user has an active subscription
-        const hasActiveSubscription = purchases.some(purchase =>
-          purchase.productId === productId &&
-          purchase.isCancelled === false &&
-          (purchase.expirationDate === null || new Date(purchase.expirationDate) > new Date())
-        );
+        // In a real app, you would check for a specific premium subscription
+        // For this example, we'll just check if any purchases exist
+        const hasPremium = purchases.length > 0;
 
-        setIsPremium(hasActiveSubscription);
-        setMaxPinnedTasks(hasActiveSubscription ? Infinity : 3);
+        setIsPremium(hasPremium);
+        setMaxPinnedTasks(hasPremium ? Infinity : 3);
 
         await InAppPurchases.disconnectAsync();
       } catch (error) {
         console.error('Error checking subscription:', error);
-        // Fallback to free tier if there's an error
+        // Default to free tier if there's an error
         setIsPremium(false);
         setMaxPinnedTasks(3);
       }
@@ -42,7 +34,13 @@ export const usePremiumStatus = () => {
     // Set up listener for purchase updates
     const subscription = InAppPurchases.setPurchaseListener(({ responseCode, results, error }) => {
       if (responseCode === InAppPurchases.IAPResponseCode.OK) {
-        checkSubscription();
+        // Check if any of the purchases are premium
+        const hasPremium = results.some(purchase =>
+          purchase.productId === 'aura_premium_subscription'
+        );
+
+        setIsPremium(hasPremium);
+        setMaxPinnedTasks(hasPremium ? Infinity : 3);
       }
     });
 

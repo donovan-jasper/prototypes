@@ -188,10 +188,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   listContent: {
-    paddingBottom: 16,
+    paddingBottom: 20,
   },
   emptyState: {
-    padding: 16,
+    padding: 20,
     alignItems: 'center',
   },
   emptyText: {
