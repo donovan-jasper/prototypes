@@ -161,9 +161,6 @@ export class EbayAdapter extends BaseAdapter {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
-          },
-          params: {
-            limit: 200
           }
         }
       );
@@ -175,22 +172,18 @@ export class EbayAdapter extends BaseAdapter {
     }
   }
 
-  async fetchOrders(): Promise<Order[]> {
+  async fetchOrders(limit: number = 20): Promise<Order[]> {
     try {
       if (!this.apiToken) {
         throw new Error('Not authenticated with eBay');
       }
 
       const response = await axios.get(
-        `${EbayAdapter.FULFILLMENT_BASE}/order`,
+        `${EbayAdapter.FULFILLMENT_BASE}/order?limit=${limit}`,
         {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
             'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
-          },
-          params: {
-            filter: 'orderStatus:{CREATED|ACTIVE}',
-            limit: 200
           }
         }
       );
@@ -205,45 +198,35 @@ export class EbayAdapter extends BaseAdapter {
   private mapListingToEbayFormat(listing: Listing): any {
     return {
       sku: listing.id,
-      merchantLocationKey: 'DEFAULT',
-      availableQuantity: listing.quantity,
+      marketplaceId: 'EBAY_US',
       format: 'FIXED_PRICE',
-      availableQuantitySchedule: {
-        eventType: 'NONE'
-      },
-      product: {
-        title: listing.title,
-        description: listing.description,
-        aspects: listing.attributes || {},
-        imageUrls: listing.images || []
-      },
-      listingPolicies: {
-        fulfillmentPolicyId: 'DEFAULT',
-        paymentPolicyId: 'DEFAULT',
-        returnPolicyId: 'DEFAULT'
-      },
+      availableQuantity: listing.quantity,
+      merchantLocationKey: 'default',
       listingDescription: listing.description,
-      quantityLimitPerBuyer: 0,
+      listingPolicies: {
+        fulfillmentPolicyId: 'default',
+        paymentPolicyId: 'default',
+        returnPolicyId: 'default'
+      },
       pricingSummary: {
         price: {
           value: listing.price.toString(),
           currency: 'USD'
         }
-      }
+      },
+      quantityLimitPerBuyer: 1
     };
   }
 
   private mapEbayToListingFormat(ebayOffer: any): Listing {
     return {
-      id: ebayOffer.offerId,
-      title: ebayOffer.product.title,
-      description: ebayOffer.listingDescription,
+      id: ebayOffer.sku,
+      title: ebayOffer.listingDescription.title,
+      description: ebayOffer.listingDescription.description,
       price: parseFloat(ebayOffer.pricingSummary.price.value),
       quantity: ebayOffer.availableQuantity,
-      images: ebayOffer.product.imageUrls || [],
-      platforms: ['ebay'],
-      syncStatus: 'synced',
-      attributes: ebayOffer.product.aspects || {},
+      platform: 'ebay',
+      images: ebayOffer.listingDescription.imageUrls || [],
       createdAt: new Date(ebayOffer.createDate).toISOString(),
       updatedAt: new Date(ebayOffer.updateDate).toISOString()
     };
@@ -253,23 +236,21 @@ export class EbayAdapter extends BaseAdapter {
     return {
       id: ebayOrder.orderId,
       platform: 'ebay',
-      status: ebayOrder.orderStatus,
       items: ebayOrder.lineItems.map((item: any) => ({
         id: item.lineItemId,
-        listingId: item.legacyItemId,
         title: item.title,
         price: parseFloat(item.lineItemCost.value),
-        quantity: item.shippedQuantity,
+        quantity: item.quantity,
         sku: item.sku
       })),
       total: parseFloat(ebayOrder.pricingSummary.total.value),
+      status: ebayOrder.orderFulfillmentStatus,
       createdAt: new Date(ebayOrder.creationDate).toISOString(),
       updatedAt: new Date(ebayOrder.lastModifiedDate).toISOString(),
       buyer: {
-        name: ebayOrder.sellerEmail || 'Unknown',
-        email: ebayOrder.sellerEmail || 'unknown@example.com'
-      },
-      shippingAddress: ebayOrder.shippingAddress || {}
+        name: ebayOrder.buyer.buyerRegistrationAddress.fullName,
+        email: ebayOrder.buyer.buyerRegistrationAddress.email
+      }
     };
   }
 
@@ -277,12 +258,11 @@ export class EbayAdapter extends BaseAdapter {
     if (axios.isAxiosError(error)) {
       console.error('EbayAdapter API error:', error.response?.data || error.message);
       if (error.response?.status === 401) {
-        // Token might be expired, try to refresh
-        console.log('Token might be expired, attempting refresh...');
+        // Token might be expired, trigger refresh
+        console.log('Token expired, need to refresh');
       }
     } else {
       console.error('EbayAdapter error:', error);
     }
-    throw error;
   }
 }
