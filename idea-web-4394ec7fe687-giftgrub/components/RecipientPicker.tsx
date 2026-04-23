@@ -229,7 +229,9 @@ export default function RecipientPicker({
               display="default"
               onChange={(event, date) => {
                 setShowBirthdayPicker(false);
-                if (date) handleDateChange('birthday', date);
+                if (date) {
+                  handleDateChange('birthday', date);
+                }
               }}
             />
           )}
@@ -250,13 +252,15 @@ export default function RecipientPicker({
               display="default"
               onChange={(event, date) => {
                 setShowAnniversaryPicker(false);
-                if (date) handleDateChange('anniversary', date);
+                if (date) {
+                  handleDateChange('anniversary', date);
+                }
               }}
             />
           )}
 
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}>Birthday Reminders</Text>
+          <View style={styles.switchContainer}>
+            <Text style={styles.switchLabel}>Enable Notifications</Text>
             <Switch
               value={newRecipient.preferences.notificationsEnabled}
               onValueChange={(value) =>
@@ -274,26 +278,29 @@ export default function RecipientPicker({
           <View style={styles.modalButtons}>
             <TouchableOpacity
               style={[styles.modalButton, styles.cancelButton]}
-              onPress={() => setShowAddModal(false)}
+              onPress={() => {
+                setShowAddModal(false);
+                resetNewRecipient();
+              }}
             >
               <Text style={styles.modalButtonText}>Cancel</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               style={[styles.modalButton, styles.saveButton]}
               onPress={handleAddRecipient}
               disabled={saving}
             >
               {saving ? (
-                <ActivityIndicator color="white" />
+                <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.modalButtonText}>Save</Text>
+                <Text style={styles.modalButtonText}>Add Recipient</Text>
               )}
             </TouchableOpacity>
           </View>
         </View>
-      </View>
-    </KeyboardAvoidingView>
-  </Modal>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 
   return (
@@ -305,18 +312,11 @@ export default function RecipientPicker({
           placeholder="Search recipients..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
         />
-        {searchQuery ? (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color="#999" />
-          </TouchableOpacity>
-        ) : null}
       </View>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.loading} />
+        <ActivityIndicator size="large" color="#6C63FF" style={styles.loading} />
       ) : filteredRecipients.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -341,10 +341,10 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: 10,
-    margin: 10,
+    backgroundColor: '#fff',
     borderRadius: 8,
+    paddingHorizontal: 12,
+    margin: 16,
     borderWidth: 1,
     borderColor: '#ddd',
   },
@@ -353,8 +353,8 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
+    paddingVertical: 12,
     fontSize: 16,
-    paddingVertical: 5,
   },
   loading: {
     flex: 1,
@@ -374,15 +374,15 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#6C63FF',
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 8,
   },
   addButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   listContent: {
     paddingBottom: 20,
@@ -391,29 +391,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: 'white',
-    marginBottom: 8,
-    borderRadius: 8,
-    marginHorizontal: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   avatarContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
-    color: 'white',
-    fontSize: 18,
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   recipientInfo: {
     flex: 1,
@@ -434,8 +428,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
+    backgroundColor: '#fff',
+    margin: 20,
     borderRadius: 10,
     padding: 20,
   },
@@ -444,6 +438,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   input: {
     borderWidth: 1,
@@ -464,13 +459,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  toggleContainer: {
+  switchContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  toggleLabel: {
+  switchLabel: {
     fontSize: 16,
     color: '#333',
   },
@@ -489,11 +484,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#6C63FF',
   },
   modalButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
