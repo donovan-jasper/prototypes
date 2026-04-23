@@ -8,6 +8,8 @@ export class CueScheduler {
   private currentSession: Session | null = null;
   private intervalId: NodeJS.Timeout | null = null;
   private startTime: number = 0;
+  private pausedTime: number = 0;
+  private totalPausedDuration: number = 0;
 
   constructor() {}
 
@@ -15,13 +17,15 @@ export class CueScheduler {
     this.currentSession = session;
     this.schedule = generateSchedule(session.durationMinutes);
     this.startTime = Date.now();
+    this.pausedTime = 0;
+    this.totalPausedDuration = 0;
   }
 
   start(): void {
     if (!this.currentSession) return;
 
     this.intervalId = setInterval(() => {
-      const elapsedSeconds = (Date.now() - this.startTime) / 1000;
+      const elapsedSeconds = this.getAdjustedElapsedSeconds();
       const cuesToTrigger = this.schedule.filter(cue =>
         Math.abs(cue.timeSeconds - elapsedSeconds) <= 0.5
       );
@@ -36,12 +40,16 @@ export class CueScheduler {
     if (this.intervalId) {
       clearInterval(this.intervalId);
       this.intervalId = null;
+      this.pausedTime = Date.now();
     }
   }
 
   resume(): void {
     if (this.currentSession && !this.intervalId) {
-      this.startTime = Date.now() - (this.getElapsedSeconds() * 1000);
+      if (this.pausedTime > 0) {
+        this.totalPausedDuration += (Date.now() - this.pausedTime);
+        this.pausedTime = 0;
+      }
       this.start();
     }
   }
@@ -50,6 +58,8 @@ export class CueScheduler {
     this.pause();
     this.schedule = [];
     this.currentSession = null;
+    this.pausedTime = 0;
+    this.totalPausedDuration = 0;
   }
 
   private triggerCue(cue: CueEvent): void {
@@ -62,9 +72,11 @@ export class CueScheduler {
     }
   }
 
-  private getElapsedSeconds(): number {
+  private getAdjustedElapsedSeconds(): number {
     if (!this.currentSession) return 0;
-    return (Date.now() - this.startTime) / 1000;
+    const now = Date.now();
+    const elapsed = now - this.startTime - this.totalPausedDuration;
+    return elapsed / 1000;
   }
 }
 
