@@ -187,11 +187,11 @@ export const sendSMS = async (to: string, body: string) => {
       body,
     });
 
-    if (response.status !== 200) {
-      throw new Error('Failed to send SMS');
+    if (response.data.success) {
+      return true;
+    } else {
+      throw new Error(response.data.message || 'Failed to send SMS');
     }
-
-    return response.data;
   } catch (error) {
     console.error('Error sending SMS:', error);
     throw error;
@@ -231,31 +231,9 @@ export const processOfflineMessages = async () => {
         await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
       } catch (error) {
         console.error(`Failed to send offline message to ${message.to_phone}:`, error);
-        // Keep the message for next retry
       }
     }
   } catch (error) {
     console.error('Error processing offline messages:', error);
-    throw error;
-  }
-};
-
-export const setupOfflineMessageProcessing = async () => {
-  try {
-    // Register a background task to process offline messages periodically
-    await TaskManager.defineTask('offline-message-task', async () => {
-      await processOfflineMessages();
-      return BackgroundFetch.BackgroundFetchResult.NewData;
-    });
-
-    await BackgroundFetch.registerTaskAsync('offline-message-task', {
-      minimumInterval: 60 * 15, // 15 minutes
-      stopOnTerminate: false,
-      startOnBoot: true,
-    });
-
-    console.log('Offline message processing task registered successfully');
-  } catch (error) {
-    console.error('Error setting up offline message processing:', error);
   }
 };
