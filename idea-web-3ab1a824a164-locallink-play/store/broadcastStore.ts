@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
-import { calculateDistance } from '../lib/matching';
+import { calculateDistance, getFilteredAndRankedBroadcasts } from '../lib/matching';
 
 interface Broadcast {
   id: string;
@@ -31,6 +31,7 @@ interface BroadcastStore {
     callback: (broadcasts: Broadcast[]) => void
   ) => { unsubscribe: () => void };
   unsubscribeFromBroadcasts: () => void;
+  fetchBroadcasts: (location: { lat: number; lng: number }, radius: number) => Promise<void>;
 }
 
 export const useBroadcastStore = create<BroadcastStore>((set, get) => ({
@@ -41,49 +42,64 @@ export const useBroadcastStore = create<BroadcastStore>((set, get) => ({
   setLoading: (loading) => set({ loading }),
   setError: (error) => set({ error }),
 
+  fetchBroadcasts: async (location, radius) => {
+    try {
+      set({ loading: true, error: null });
+      const { data, error } = await supabase
+        .rpc('get_nearby_broadcasts', {
+          user_lat: location.lat,
+          user_lng: location.lng,
+          search_radius: radius
+        });
+
+      if (error) throw error;
+
+      // Calculate distance for each broadcast
+      const broadcastsWithDistance = data.map(broadcast => ({
+        ...broadcast,
+        distance: calculateDistance(
+          location,
+          { lat: broadcast.lat, lng: broadcast.lng }
+        )
+      }));
+
+      // Sort broadcasts
+      const sortedBroadcasts = getFilteredAndRankedBroadcasts(
+        broadcastsWithDistance,
+        location,
+        radius
+      );
+
+      set({ broadcasts: sortedBroadcasts });
+    } catch (error) {
+      console.error('Error fetching broadcasts:', error);
+      set({ error: 'Failed to load broadcasts' });
+    } finally {
+      set({ loading: false });
+    }
+  },
+
   subscribeToBroadcasts: (location, radius, callback) => {
+    // Initial fetch
+    get().fetchBroadcasts(location, radius);
+
     const channel = supabase
       .channel('broadcasts')
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'broadcasts',
         },
         (payload) => {
-          const newBroadcast = payload.new;
-          const distance = calculateDistance(
-            location,
-            { lat: newBroadcast.lat, lng: newBroadcast.lng }
-          );
-
-          if (distance <= radius) {
-            // Fetch all broadcasts within radius to maintain proper ordering
-            fetchNearbyBroadcasts(location.lat, location.lng, radius)
-              .then(broadcasts => {
-                callback(broadcasts);
-                set({ broadcasts });
-              })
-              .catch(error => {
-                console.error('Error fetching broadcasts:', error);
-                set({ error: 'Failed to load broadcasts' });
-              });
-          }
+          // Refresh all broadcasts when any change occurs
+          get().fetchBroadcasts(location, radius).then(() => {
+            callback(get().broadcasts);
+          });
         }
       )
       .subscribe();
-
-    // Initial fetch
-    fetchNearbyBroadcasts(location.lat, location.lng, radius)
-      .then(broadcasts => {
-        callback(broadcasts);
-        set({ broadcasts });
-      })
-      .catch(error => {
-        console.error('Error fetching broadcasts:', error);
-        set({ error: 'Failed to load broadcasts' });
-      });
 
     return {
       unsubscribe: () => {
@@ -96,37 +112,3 @@ export const useBroadcastStore = create<BroadcastStore>((set, get) => ({
     supabase.removeAllChannels();
   },
 }));
-
-// Helper function to fetch and sort broadcasts
-async function fetchNearbyBroadcasts(latitude: number, longitude: number, radius: number) {
-  try {
-    const { data, error } = await supabase
-      .rpc('get_nearby_broadcasts', {
-        user_lat: latitude,
-        user_lng: longitude,
-        search_radius: radius
-      });
-
-    if (error) throw error;
-
-    // Calculate distance for each broadcast
-    const broadcastsWithDistance = data.map(broadcast => ({
-      ...broadcast,
-      distance: calculateDistance(
-        { lat: latitude, lng: longitude },
-        { lat: broadcast.lat, lng: broadcast.lng }
-      )
-    }));
-
-    // Sort by distance (closest first) and then by recency (newest first)
-    return broadcastsWithDistance.sort((a, b) => {
-      if (a.distance !== b.distance) {
-        return a.distance - b.distance;
-      }
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-  } catch (error) {
-    console.error('Error fetching nearby broadcasts:', error);
-    throw error;
-  }
-}

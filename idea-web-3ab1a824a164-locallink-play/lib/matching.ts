@@ -18,30 +18,44 @@ export function calculateDistance(
   return R * c;
 }
 
-export function getFilteredAndRankedBroadcasts(
+export function filterByRadius(
   broadcasts: any[],
   location: { lat: number; lng: number },
   radius: number
 ): any[] {
-  // Filter by radius
-  const filtered = broadcasts.filter(broadcast => {
+  return broadcasts.filter(broadcast => {
     const distance = calculateDistance(
       location,
       { lat: broadcast.lat, lng: broadcast.lng }
     );
     return distance <= radius;
   });
+}
 
-  // Rank by distance (ascending) and recency (descending)
-  return filtered.sort((a, b) => {
-    // First by distance
+export function rankMatches(broadcasts: any[]): any[] {
+  return [...broadcasts].sort((a, b) => {
+    // Apply premium boost by moving premium broadcasts to the front
+    if (a.isPremium !== b.isPremium) {
+      return a.isPremium ? -1 : 1;
+    }
+
+    // First by distance (ascending)
     if (a.distance !== b.distance) {
       return a.distance - b.distance;
     }
 
-    // Then by recency (newer first)
+    // Then by recency (descending)
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
   });
+}
+
+export function getFilteredAndRankedBroadcasts(
+  broadcasts: any[],
+  location: { lat: number; lng: number },
+  radius: number
+): any[] {
+  const filtered = filterByRadius(broadcasts, location, radius);
+  return rankMatches(filtered);
 }
 
 export async function handleInterest(broadcastId: string, userId: string) {

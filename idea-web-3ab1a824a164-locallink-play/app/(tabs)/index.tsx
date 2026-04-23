@@ -209,9 +209,11 @@ export default function FeedScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color="#ccc" />
+              <Ionicons name="search" size={48} color="#ccc" />
               <Text style={styles.emptyText}>No broadcasts nearby</Text>
-              <Text style={styles.emptySubtext}>Try increasing your radius or create your own broadcast</Text>
+              <Text style={styles.emptySubtext}>
+                Try increasing your radius or create your own broadcast
+              </Text>
               <TouchableOpacity
                 style={styles.createButton}
                 onPress={() => router.push('/(tabs)/create')}
@@ -235,7 +237,7 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 24,
@@ -251,14 +253,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#ddd',
   },
   radiusButtonActive: {
     backgroundColor: '#007AFF',
+    borderColor: '#007AFF',
   },
   radiusButtonText: {
-    color: '#007AFF',
-    fontWeight: '600',
+    color: '#666',
   },
   radiusButtonTextActive: {
     color: 'white',
@@ -274,6 +276,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
+    fontSize: 16,
     color: '#666',
   },
   errorContainer: {
@@ -283,8 +286,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: '#d32f2f',
     fontSize: 16,
+    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -308,13 +311,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginTop: 16,
-    marginBottom: 8,
     color: '#333',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+    marginTop: 8,
     marginBottom: 24,
   },
   createButton: {
