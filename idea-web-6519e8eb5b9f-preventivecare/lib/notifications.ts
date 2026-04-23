@@ -151,3 +151,11 @@ export async function cancelReminder(id: string) {
 export async function cancelAllReminders() {
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
+
+export async function getScheduledPreventiveCareReminders(userId: number) {
+  const db = await getDatabase();
+  return await db.getAllAsync(
+    'SELECT * FROM notifications WHERE user_id = ? AND type = ?',
+    [userId, 'preventive_care']
+  );
+}

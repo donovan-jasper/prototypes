@@ -135,81 +135,56 @@ const ProfileScreen = () => {
     });
 
     if (matchingEvents.length > 0) {
-      // Return the most recent completion date
-      return new Date(Math.max(...matchingEvents.map(e => new Date(e.date).getTime())));
+      // Get the most recent completed date
+      const sorted = matchingEvents.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      return new Date(sorted[0].date);
     }
     return undefined;
   };
 
+  if (!user) {
+    return (
+      <View style={styles.container}>
+        <Text>Please log in to view your profile</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Recommended Screenings</Text>
-        {recommendedScreenings.length > 0 ? (
-          recommendedScreenings.map((screening, index) => {
-            const lastCompleted = getLastCompletedDate(screening.type);
-            const nextDueDate = calculateNextDueDate(screening.frequency, lastCompleted);
-            const isCompleted = isScreeningCompleted(screening.type);
-            const daysUntil = differenceInDays(nextDueDate, new Date());
+        <Text style={styles.sectionTitle}>Preventive Care Recommendations</Text>
 
-            return (
-              <PreventiveCareCard
-                key={index}
-                screening={screening}
-                nextDueDate={nextDueDate}
-                daysUntil={daysUntil}
-                onMarkComplete={() => handleMarkComplete(screening.type)}
-                onSetReminder={() => handleSetReminder(screening.type, nextDueDate)}
-                isCompleted={isCompleted}
-              />
-            );
-          })
-        ) : (
-          <Text style={styles.emptyState}>
-            No recommended screenings found for your age and gender.
-          </Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Upcoming Screenings</Text>
         {upcomingScreenings.length > 0 ? (
           upcomingScreenings.map((screening, index) => (
-            <View key={index} style={styles.upcomingItem}>
-              <Text style={styles.upcomingTitle}>{screening.name}</Text>
-              <Text style={styles.upcomingDate}>
-                Due: {format(screening.nextDueDate, 'MMM d, yyyy')}
-              </Text>
-              <Text style={[
-                styles.upcomingDays,
-                screening.isOverdue ? styles.overdue : null
-              ]}>
-                {screening.isOverdue ? 'Overdue' : `${screening.daysUntil} days`}
-              </Text>
-            </View>
+            <PreventiveCareCard
+              key={index}
+              screening={screening}
+              nextDueDate={screening.nextDueDate}
+              daysUntil={screening.daysUntil}
+              isCompleted={isScreeningCompleted(screening.type)}
+              onMarkComplete={() => handleMarkComplete(screening.type)}
+              onSetReminder={() => handleSetReminder(screening.type, screening.nextDueDate)}
+              showReminderButton={true}
+            />
           ))
         ) : (
-          <Text style={styles.emptyState}>
-            No upcoming screenings in the next 30 days.
-          </Text>
+          <Text style={styles.emptyState}>No upcoming screenings found for your age and gender</Text>
         )}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Completed Screenings</Text>
+
         {completedScreenings.length > 0 ? (
           completedScreenings.map((event, index) => (
             <View key={index} style={styles.completedItem}>
               <Text style={styles.completedTitle}>{event.title}</Text>
-              <Text style={styles.completedDate}>
-                Completed: {format(new Date(event.date), 'MMM d, yyyy')}
-              </Text>
+              <Text style={styles.completedDate}>{format(new Date(event.date), 'MMM d, yyyy')}</Text>
             </View>
           ))
         ) : (
-          <Text style={styles.emptyState}>
-            No completed screenings yet.
-          </Text>
+          <Text style={styles.emptyState}>No completed screenings yet</Text>
         )}
       </View>
     </ScrollView>
@@ -227,54 +202,29 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 12,
   },
   emptyState: {
+    fontSize: 14,
     color: '#666',
-    fontSize: 16,
     textAlign: 'center',
     marginTop: 16,
-  },
-  upcomingItem: {
-    backgroundColor: 'white',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4A89DC',
-  },
-  upcomingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  upcomingDate: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  upcomingDays: {
-    fontSize: 14,
-    color: '#4A89DC',
-    fontWeight: '600',
-  },
-  overdue: {
-    color: '#E74C3C',
   },
   completedItem: {
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 8,
     marginBottom: 8,
-    borderLeftWidth: 4,
-    borderLeftColor: '#2ECC71',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   completedTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '500',
+    color: '#333',
   },
   completedDate: {
     fontSize: 14,
