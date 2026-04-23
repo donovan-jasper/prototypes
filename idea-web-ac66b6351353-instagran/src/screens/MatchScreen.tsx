@@ -159,50 +159,47 @@ const MatchScreen = ({ navigation }: Props) => {
           const animatedStyle = {
             transform: isCurrent ? [{ rotate }, ...swipe.getTranslateTransform()] : [],
             opacity: isCurrent ? 1 : 0.5,
-            zIndex: matches.length - index,
+            zIndex: isCurrent ? 1 : 0,
           };
 
           return (
             <Animated.View
               key={user.id}
-              style={[styles.userCard, animatedStyle]}
+              style={[styles.card, animatedStyle]}
               {...(isCurrent ? panResponder.panHandlers : {})}
             >
               <Image
-                source={{ uri: user.avatar }}
-                style={styles.avatar}
+                source={{ uri: user.photoUrl }}
+                style={styles.userImage}
               />
-              <View style={styles.userInfo}>
+              <View style={styles.cardContent}>
                 <Text style={styles.userName}>{user.name}</Text>
+                <Text style={styles.matchScore}>Match: {user.matchScore}%</Text>
+                <Text style={styles.hobbiesTitle}>Hobbies:</Text>
                 <Text style={styles.hobbies}>{user.hobbies.join(', ')}</Text>
-                <Text style={styles.score}>Match Score: {user.matchScore}%</Text>
+                <Text style={styles.bioTitle}>About:</Text>
+                <Text style={styles.bio}>{user.bio}</Text>
               </View>
 
               {isCurrent && (
                 <View style={styles.actionButtons}>
                   <TouchableOpacity
-                    style={[styles.swipeButton, styles.rejectButton]}
+                    style={[styles.actionButton, styles.dislikeButton]}
                     onPress={() => handleSwipe('left')}
                   >
-                    <Text style={styles.swipeButtonText}>✕</Text>
+                    <Text style={styles.actionButtonText}>✕</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.swipeButton, styles.acceptButton]}
+                    style={[styles.actionButton, styles.likeButton]}
                     onPress={() => handleSwipe('right')}
                   >
-                    <Text style={styles.swipeButtonText}>✓</Text>
+                    <Text style={styles.actionButtonText}>❤️</Text>
                   </TouchableOpacity>
                 </View>
               )}
             </Animated.View>
           );
         })}
-      </View>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Swipe left to reject or right to connect
-        </Text>
       </View>
     </View>
   );
@@ -211,14 +208,14 @@ const MatchScreen = ({ navigation }: Props) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,
@@ -226,126 +223,122 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   refreshButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+    padding: 8,
   },
   refreshButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 50,
-    marginBottom: 10,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginBottom: 30,
-    paddingHorizontal: 20,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  buttonText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#007AFF',
-  },
-  secondaryButtonText: {
-    color: '#007AFF',
+    color: '#6200ee',
   },
   cardContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  userCard: {
-    position: 'absolute',
+  card: {
     width: '90%',
-    maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    height: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 5,
     elevation: 5,
+    position: 'absolute',
+    padding: 16,
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    alignSelf: 'center',
-    marginBottom: 15,
+  userImage: {
+    width: '100%',
+    height: 200,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
   },
-  userInfo: {
-    marginBottom: 20,
+  cardContent: {
+    padding: 16,
   },
   userName: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 8,
+  },
+  matchScore: {
+    fontSize: 16,
+    color: '#6200ee',
+    marginBottom: 12,
+  },
+  hobbiesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 8,
   },
   hobbies: {
     fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 5,
+    marginBottom: 12,
   },
-  score: {
+  bioTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  bio: {
     fontSize: 14,
-    color: '#007AFF',
-    textAlign: 'center',
-    fontWeight: '600',
+    marginBottom: 16,
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 15,
+    marginTop: 'auto',
   },
-  swipeButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+  actionButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 3,
   },
-  rejectButton: {
-    backgroundColor: '#FF3B30',
+  dislikeButton: {
+    backgroundColor: '#ff4444',
   },
-  acceptButton: {
-    backgroundColor: '#34C759',
+  likeButton: {
+    backgroundColor: '#4caf50',
   },
-  swipeButtonText: {
-    color: '#fff',
+  actionButtonText: {
     fontSize: 24,
-    fontWeight: 'bold',
+    color: 'white',
   },
-  footer: {
-    padding: 15,
+  emptyText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 16,
+    color: '#333',
+  },
+  emptySubtext: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 24,
+    color: '#666',
+  },
+  button: {
+    backgroundColor: '#6200ee',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
     alignItems: 'center',
   },
-  footerText: {
-    color: '#999',
-    fontSize: 14,
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#6200ee',
+  },
+  secondaryButtonText: {
+    color: '#6200ee',
   },
 });
 
