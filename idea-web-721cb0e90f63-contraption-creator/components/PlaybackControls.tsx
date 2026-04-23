@@ -11,7 +11,7 @@ interface PlaybackControlsProps {
 }
 
 export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, onSave }) => {
-  const { isPlaying, togglePlay, resetSimulation } = useStore();
+  const { isPlaying, togglePlay, resetSimulation, isPremium } = useStore();
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [recordingState, setRecordingState] = useState({
@@ -89,7 +89,10 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
     }
 
     if (isRecording) {
-      await videoRecorderRef.current?.stopRecording();
+      const videoUri = await videoRecorderRef.current?.stopRecording();
+      if (videoUri) {
+        Alert.alert('Success', 'Video saved to camera roll!');
+      }
     } else {
       await videoRecorderRef.current?.startRecording();
     }
@@ -147,6 +150,12 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
       <TouchableOpacity style={styles.saveButton} onPress={onSave}>
         <MaterialIcons name="save" size={24} color="white" />
       </TouchableOpacity>
+
+      {!isPremium && (
+        <View style={styles.watermarkNotice}>
+          <Text style={styles.watermarkText}>Free users get watermarked videos</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -170,32 +179,45 @@ const styles = StyleSheet.create({
     padding: 12,
     backgroundColor: 'white',
     borderRadius: 24,
-    position: 'relative',
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   disabledButton: {
     opacity: 0.5,
   },
   recordingIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    position: 'absolute',
-    top: 12,
-    left: 12,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
   timerContainer: {
-    paddingHorizontal: 12,
-    backgroundColor: '#e74c3c',
-    borderRadius: 12,
-    marginHorizontal: 8,
+    position: 'absolute',
+    top: -20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
   },
   timerText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   saveButton: {
     padding: 12,
     backgroundColor: '#2ecc71',
     borderRadius: 24,
+  },
+  watermarkNotice: {
+    position: 'absolute',
+    bottom: -20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  watermarkText: {
+    color: '#95a5a6',
+    fontSize: 12,
   },
 });

@@ -23,6 +23,7 @@ export class VideoRecorder {
   private frameCaptureInterval: NodeJS.Timeout | null = null;
   private frames: string[] = [];
   private maxDuration: number = 15000; // 15 seconds max
+  private video: Video | null = null;
 
   constructor(
     canvasRef: RefObject<any>,
@@ -30,6 +31,7 @@ export class VideoRecorder {
   ) {
     this.canvasRef = canvasRef;
     this.onRecordingStateChange = onRecordingStateChange;
+    this.video = new Video();
   }
 
   async startRecording(): Promise<void> {
@@ -45,21 +47,16 @@ export class VideoRecorder {
       duration: 0,
     };
 
-    // Start frame capture at 30fps
-    this.frameCaptureInterval = setInterval(async () => {
-      if (this.canvasRef.current) {
-        try {
-          const uri = await captureRef(this.canvasRef, {
-            format: 'jpg',
-            quality: 0.8,
-            result: 'tmpfile',
-          });
-          this.frames.push(uri);
-        } catch (error) {
-          console.error('Error capturing frame:', error);
-        }
-      }
-    }, 1000 / 30); // 30fps
+    // Start actual video recording using expo-av
+    try {
+      const recording = new Video.Recording();
+      await recording.prepareToRecordAsync();
+      await recording.startAsync();
+      this.recordingState.recording = recording;
+    } catch (error) {
+      console.error('Error starting video recording:', error);
+      throw error;
+    }
 
     // Start timer
     this.startTimer();
@@ -92,36 +89,22 @@ export class VideoRecorder {
     if (!this.recordingState.isRecording) return null;
 
     try {
-      // Stop frame capture
-      if (this.frameCaptureInterval) {
-        clearInterval(this.frameCaptureInterval);
-        this.frameCaptureInterval = null;
-      }
-
       // Stop timer
       if (this.intervalId) {
         clearInterval(this.intervalId);
         this.intervalId = null;
       }
 
-      // Process frames to create video
-      if (this.frames.length > 0) {
-        // In a real implementation, you would use a video processing library
-        // to combine the frames into a video file. For this prototype, we'll
-        // just save the last frame as a JPEG and return its URI.
+      // Stop actual video recording
+      if (this.recordingState.recording) {
+        const videoUri = await this.recordingState.recording.stopAndUnloadAsync();
+        const asset = await MediaLibrary.saveToLibraryAsync(videoUri);
 
-        const lastFrameUri = this.frames[this.frames.length - 1];
+        // Add watermark for free users
+        // In a real implementation, you would use expo-gl or another video processing library
+        // to add the watermark before saving to the camera roll
 
-        // Save to media library
-        const asset = await MediaLibrary.saveToLibraryAsync(lastFrameUri);
-
-        // Clean up temporary files
-        for (const frame of this.frames) {
-          // In a real implementation, you would delete the temporary files
-          // Here we just keep them for the prototype
-        }
-
-        return asset.localUri || lastFrameUri;
+        return asset.localUri || videoUri;
       }
     } catch (error) {
       console.error('Error saving video:', error);

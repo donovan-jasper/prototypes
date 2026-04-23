@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Canvas } from '../../components/Canvas';
 import { PartPalette } from '../../components/PartPalette';
 import { PlaybackControls } from '../../components/PlaybackControls';
@@ -54,6 +54,12 @@ export default function SandboxScreen() {
       <Canvas ref={canvasRef} />
       <PartPalette />
       <PlaybackControls canvasRef={canvasRef} onSave={handleSave} />
+
+      {isSaving && (
+        <View style={styles.savingOverlay}>
+          <ActivityIndicator size="large" color="#ffffff" />
+        </View>
+      )}
     </View>
   );
 }
@@ -62,5 +68,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  savingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
