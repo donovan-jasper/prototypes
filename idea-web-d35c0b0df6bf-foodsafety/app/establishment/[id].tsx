@@ -142,7 +142,7 @@ const EstablishmentDetailScreen = () => {
 
       {recalls.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recalls</Text>
+          <Text style={styles.sectionTitle}>Recall Alerts</Text>
           {recalls.map((recall) => (
             <RecallAlert
               key={recall.id}
@@ -155,7 +155,25 @@ const EstablishmentDetailScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inspection History</Text>
-        <InspectionTimeline inspections={inspections} />
+        {inspections.length > 0 ? (
+          <InspectionTimeline inspections={inspections} />
+        ) : (
+          <Text style={styles.noDataText}>No inspection history available</Text>
+        )}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>About This Location</Text>
+        <View style={styles.infoRow}>
+          <Ionicons name="restaurant-outline" size={20} color="#666" />
+          <Text style={styles.infoText}>{establishment.cuisineType}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="time-outline" size={20} color="#666" />
+          <Text style={styles.infoText}>
+            {establishment.isOpen ? 'Currently open' : 'Currently closed'}
+          </Text>
+        </View>
       </View>
     </ScrollView>
   );
@@ -164,7 +182,7 @@ const EstablishmentDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
   },
   centered: {
     flex: 1,
@@ -172,7 +190,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  errorText: {
+    fontSize: 18,
+    color: '#ff3b30',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  backButton: {
+    fontSize: 16,
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
   header: {
+    backgroundColor: 'white',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
@@ -201,32 +231,36 @@ const styles = StyleSheet.create({
   lastInspection: {
     fontSize: 14,
     color: '#666',
-    marginLeft: 12,
+    marginLeft: 8,
   },
   saveButton: {
     padding: 8,
-    marginTop: -4,
   },
   section: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'white',
+    marginTop: 10,
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 12,
   },
-  errorText: {
-    fontSize: 18,
-    color: '#ff3b30',
-    marginBottom: 20,
+  noDataText: {
+    fontSize: 14,
+    color: '#999',
     textAlign: 'center',
+    padding: 16,
   },
-  backButton: {
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoText: {
     fontSize: 16,
-    color: '#007AFF',
-    textDecorationLine: 'underline',
+    marginLeft: 8,
+    color: '#333',
   },
 });
 

@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { getNearbyEstablishments } from '@/services/api';
 import { Establishment } from '@/types';
-import SafetyBadge from '@/components/SafetyBadge';
+import MapMarker from '@/components/MapMarker';
 import { calculateSafetyScore } from '@/utils/safetyScore';
 import { registerBackgroundService } from '@/services/backgroundService';
 import { requestNotificationPermissions, setupNotificationHandlers } from '@/services/notifications';
@@ -129,7 +129,10 @@ const MapScreen = () => {
               }}
               onPress={() => handleMarkerPress(establishment)}
             >
-              <SafetyBadge grade={establishment.safetyScore} size={32} />
+              <MapMarker
+                grade={establishment.safetyScore}
+                onPress={() => handleMarkerPress(establishment)}
+              />
             </Marker>
           ))}
         </MapView>
