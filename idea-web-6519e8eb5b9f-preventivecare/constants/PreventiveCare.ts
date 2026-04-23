@@ -1,15 +1,4 @@
-export interface PreventiveCareRecommendation {
-  ageRange: [number, number];
-  gender: 'male' | 'female' | 'all';
-  screenings: {
-    type: string;
-    name: string;
-    frequency: 'annual' | 'biennial';
-    description: string;
-  }[];
-}
-
-export const PREVENTIVE_CARE_RECOMMENDATIONS: PreventiveCareRecommendation[] = [
+export const PREVENTIVE_CARE_RECOMMENDATIONS = [
   {
     ageRange: [40, 49],
     gender: 'female',
@@ -18,39 +7,21 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS: PreventiveCareRecommendation[] = [
         type: 'mammogram',
         name: 'Mammogram',
         frequency: 'annual',
-        description: 'Breast cancer screening'
+        description: 'Early detection of breast cancer through X-ray imaging.',
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
         frequency: 'annual',
-        description: 'Cervical cancer screening'
+        description: 'Screening for cervical cancer through cervical cell sampling.',
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         frequency: 'annual',
-        description: 'Hypertension screening'
-      }
-    ]
-  },
-  {
-    ageRange: [40, 49],
-    gender: 'male',
-    screenings: [
-      {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        frequency: 'annual',
-        description: 'Prostate cancer screening'
+        description: 'Monitoring blood pressure to detect hypertension.',
       },
-      {
-        type: 'blood_pressure',
-        name: 'Blood Pressure Check',
-        frequency: 'annual',
-        description: 'Hypertension screening'
-      }
-    ]
+    ],
   },
   {
     ageRange: [50, 59],
@@ -60,51 +31,128 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS: PreventiveCareRecommendation[] = [
         type: 'mammogram',
         name: 'Mammogram',
         frequency: 'annual',
-        description: 'Breast cancer screening'
+        description: 'Early detection of breast cancer through X-ray imaging.',
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
         frequency: 'annual',
-        description: 'Cervical cancer screening'
+        description: 'Screening for cervical cancer through cervical cell sampling.',
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         frequency: 'annual',
-        description: 'Hypertension screening'
+        description: 'Monitoring blood pressure to detect hypertension.',
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         frequency: 'biennial',
-        description: 'Colorectal cancer screening'
-      }
-    ]
+        description: 'Screening for colorectal cancer through visual examination of the colon.',
+      },
+    ],
+  },
+  {
+    ageRange: [60, 69],
+    gender: 'female',
+    screenings: [
+      {
+        type: 'mammogram',
+        name: 'Mammogram',
+        frequency: 'annual',
+        description: 'Early detection of breast cancer through X-ray imaging.',
+      },
+      {
+        type: 'pap_smear',
+        name: 'Pap Smear',
+        frequency: 'annual',
+        description: 'Screening for cervical cancer through cervical cell sampling.',
+      },
+      {
+        type: 'blood_pressure',
+        name: 'Blood Pressure Check',
+        frequency: 'annual',
+        description: 'Monitoring blood pressure to detect hypertension.',
+      },
+      {
+        type: 'colonoscopy',
+        name: 'Colonoscopy',
+        frequency: 'biennial',
+        description: 'Screening for colorectal cancer through visual examination of the colon.',
+      },
+      {
+        type: 'prostate_exam',
+        name: 'Prostate Exam',
+        frequency: 'annual',
+        description: 'Screening for prostate cancer through digital rectal examination.',
+      },
+    ],
+  },
+  {
+    ageRange: [40, 49],
+    gender: 'male',
+    screenings: [
+      {
+        type: 'blood_pressure',
+        name: 'Blood Pressure Check',
+        frequency: 'annual',
+        description: 'Monitoring blood pressure to detect hypertension.',
+      },
+      {
+        type: 'prostate_exam',
+        name: 'Prostate Exam',
+        frequency: 'annual',
+        description: 'Screening for prostate cancer through digital rectal examination.',
+      },
+    ],
   },
   {
     ageRange: [50, 59],
     gender: 'male',
     screenings: [
       {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        frequency: 'annual',
-        description: 'Prostate cancer screening'
-      },
-      {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
         frequency: 'annual',
-        description: 'Hypertension screening'
+        description: 'Monitoring blood pressure to detect hypertension.',
+      },
+      {
+        type: 'prostate_exam',
+        name: 'Prostate Exam',
+        frequency: 'annual',
+        description: 'Screening for prostate cancer through digital rectal examination.',
       },
       {
         type: 'colonoscopy',
         name: 'Colonoscopy',
         frequency: 'biennial',
-        description: 'Colorectal cancer screening'
-      }
-    ]
+        description: 'Screening for colorectal cancer through visual examination of the colon.',
+      },
+    ],
   },
-  // Add more age/gender groups as needed
+  {
+    ageRange: [60, 69],
+    gender: 'male',
+    screenings: [
+      {
+        type: 'blood_pressure',
+        name: 'Blood Pressure Check',
+        frequency: 'annual',
+        description: 'Monitoring blood pressure to detect hypertension.',
+      },
+      {
+        type: 'prostate_exam',
+        name: 'Prostate Exam',
+        frequency: 'annual',
+        description: 'Screening for prostate cancer through digital rectal examination.',
+      },
+      {
+        type: 'colonoscopy',
+        name: 'Colonoscopy',
+        frequency: 'biennial',
+        description: 'Screening for colorectal cancer through visual examination of the colon.',
+      },
+    ],
+  },
 ];
