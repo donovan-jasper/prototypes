@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
+import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
@@ -26,6 +26,8 @@ const categoryColors = {
   other: '#607D8B'
 };
 
+const DEFAULT_RADIUS = 5; // km
+
 const VibeMapScreen = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [userLocation, setUserLocation] = useState<Coordinates | null>(null);
@@ -42,8 +44,8 @@ const VibeMapScreen = () => {
 
   const fetchEvents = useCallback(async (latitude: number, longitude: number) => {
     try {
-      // Get geohash range for 5km radius
-      const geohashes = getGeohashRange(latitude, longitude, 5);
+      // Get geohash range for specified radius
+      const geohashes = getGeohashRange(latitude, longitude, DEFAULT_RADIUS);
 
       // Query Firestore for events in nearby geohashes
       const eventsQuery = query(
@@ -63,7 +65,7 @@ const VibeMapScreen = () => {
           eventData.longitude
         );
 
-        if (distance <= 5) { // Filter events within 5km
+        if (distance <= DEFAULT_RADIUS) { // Filter events within specified radius
           fetchedEvents.push({
             ...eventData,
             id: doc.id,
@@ -92,7 +94,12 @@ const VibeMapScreen = () => {
         return;
       }
 
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Highest,
+        maximumAge: 10000,
+        timeout: 15000
+      });
+
       const { latitude, longitude } = location.coords;
       setUserLocation({ latitude, longitude });
       setMapRegion({
@@ -176,57 +183,64 @@ const VibeMapScreen = () => {
         style={styles.map}
         region={mapRegion}
         showsUserLocation={true}
-        showsMyLocationButton={false}
+        followsUserLocation={true}
+        onRegionChangeComplete={(region) => setMapRegion(region)}
+        provider={PROVIDER_GOOGLE}
         loadingEnabled={true}
         loadingIndicatorColor="#007AFF"
-        loadingBackgroundColor="#ffffff"
+        loadingBackgroundColor="transparent"
       >
-        {events.map((event) => {
-          const markerSize = getMarkerSize(event.participants.length);
-          const markerColor = categoryColors[event.category] || categoryColors.other;
+        {userLocation && (
+          <Marker
+            coordinate={userLocation}
+            title="You are here"
+            pinColor="#007AFF"
+          />
+        )}
 
-          return (
-            <Marker
-              key={event.id}
-              coordinate={{
-                latitude: event.latitude,
-                longitude: event.longitude
-              }}
-              onPress={() => handleMarkerPress(event.id)}
-              tracksViewChanges={false}
-            >
-              <View style={[
-                styles.markerContainer,
-                {
-                  width: markerSize,
-                  height: markerSize,
-                  borderRadius: markerSize / 2,
-                  backgroundColor: markerColor
-                }
-              ]}>
-                <Text style={styles.markerText}>
-                  {event.participants.length}
+        {events.map((event) => (
+          <Marker
+            key={event.id}
+            coordinate={{
+              latitude: event.latitude,
+              longitude: event.longitude,
+            }}
+            onPress={() => handleMarkerPress(event.id)}
+            pinColor={categoryColors[event.category] || categoryColors.other}
+          >
+            <View style={[
+              styles.markerContainer,
+              {
+                width: getMarkerSize(event.participants),
+                height: getMarkerSize(event.participants),
+                borderRadius: getMarkerSize(event.participants) / 2,
+                backgroundColor: categoryColors[event.category] || categoryColors.other,
+              }
+            ]}>
+              <Text style={styles.markerText}>{event.participants}</Text>
+            </View>
+            <Callout tooltip>
+              <View style={styles.calloutContainer}>
+                <Text style={styles.calloutTitle}>{event.title}</Text>
+                <Text style={styles.calloutDistance}>
+                  {event.distance.toFixed(1)} km away
+                </Text>
+                <Text style={styles.calloutParticipants}>
+                  {event.participants} people going
                 </Text>
               </View>
-              <Callout tooltip>
-                <View style={styles.calloutContainer}>
-                  <Text style={styles.calloutTitle}>{event.title}</Text>
-                  <Text style={styles.calloutDistance}>
-                    {event.distance?.toFixed(1)} km away
-                  </Text>
-                </View>
-              </Callout>
-            </Marker>
-          );
-        })}
+            </Callout>
+          </Marker>
+        ))}
       </MapView>
 
       <TouchableOpacity
         style={styles.recenterButton}
         onPress={handleRecenter}
+        accessibilityLabel="Recenter map on your location"
       >
         <Image
-          source={require('../../assets/icons/location.png')}
+          source={require('../../assets/location-arrow.png')}
           style={styles.recenterIcon}
         />
       </TouchableOpacity>
@@ -234,6 +248,7 @@ const VibeMapScreen = () => {
       {events.length === 0 && (
         <View style={styles.noEventsContainer}>
           <Text style={styles.noEventsText}>No events found nearby</Text>
+          <Text style={styles.noEventsSubtext}>Try adjusting your search radius</Text>
         </View>
       )}
     </View>
@@ -252,7 +267,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
   loadingText: {
     marginTop: 10,
@@ -263,12 +277,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
     padding: 20,
   },
   errorText: {
     fontSize: 16,
-    color: '#d32f2f',
+    color: '#FF3B30',
     marginBottom: 20,
     textAlign: 'center',
   },
@@ -279,34 +292,39 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   retryButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
   },
   markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: '#fff',
+    borderColor: 'white',
   },
   markerText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
     fontSize: 12,
   },
   calloutContainer: {
     width: 150,
     padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderColor: '#ddd',
+    backgroundColor: 'white',
+    borderRadius: 5,
     borderWidth: 1,
+    borderColor: '#ddd',
   },
   calloutTitle: {
     fontWeight: 'bold',
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 5,
   },
   calloutDistance: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 3,
+  },
+  calloutParticipants: {
     fontSize: 12,
     color: '#666',
   },
@@ -314,10 +332,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 20,
     right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -327,8 +345,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   recenterIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
   },
   noEventsContainer: {
     position: 'absolute',
@@ -336,13 +354,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 15,
+    borderRadius: 10,
+    marginHorizontal: 20,
   },
   noEventsText: {
-    backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 5,
     fontSize: 16,
     color: '#666',
+    fontWeight: 'bold',
+  },
+  noEventsSubtext: {
+    fontSize: 14,
+    color: '#888',
+    marginTop: 5,
   },
 });
 
