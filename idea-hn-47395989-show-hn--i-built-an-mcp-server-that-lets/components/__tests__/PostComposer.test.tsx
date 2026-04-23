@@ -50,7 +50,7 @@ describe('PostComposer', () => {
     const mockRefinedText = 'This is an enhanced post with better tone and hashtags #example #socialmedia';
     (refinePost as jest.Mock).mockResolvedValue(mockRefinedText);
 
-    const { getByPlaceholderText, getByText } = render(<PostComposer />);
+    const { getByPlaceholderText, getByText, queryByText } = render(<PostComposer />);
     const input = getByPlaceholderText('What do you want to post?');
 
     fireEvent.changeText(input, 'just made a new thing check it out');
@@ -59,6 +59,8 @@ describe('PostComposer', () => {
     await waitFor(() => {
       expect(refinePost).toHaveBeenCalledWith('just made a new thing check it out', 'friendly');
       expect(input.props.value).toBe(mockRefinedText);
+      expect(queryByText('AI Suggested:')).toBeTruthy();
+      expect(queryByText(mockRefinedText)).toBeTruthy();
     });
   });
 
@@ -135,6 +137,49 @@ describe('PostComposer', () => {
     expect(getByText('✨ Enhance with AI')).toBeTruthy();
     await waitFor(() => {
       expect(getByText('Enhanced')).toBeTruthy();
+    });
+  });
+
+  it('should clear content and AI response after successful post', async () => {
+    (publishToThreads as jest.Mock).mockResolvedValue({});
+    (publishToBluesky as jest.Mock).mockResolvedValue({});
+
+    const { getByPlaceholderText, getByText, queryByText } = render(<PostComposer />);
+    const input = getByPlaceholderText('What do you want to post?');
+
+    fireEvent.changeText(input, 'Test post');
+    fireEvent.press(getByText('✨ Enhance with AI'));
+
+    await waitFor(() => {
+      expect(queryByText('AI Suggested:')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('Post Now'));
+
+    await waitFor(() => {
+      expect(input.props.value).toBe('');
+      expect(queryByText('AI Suggested:')).toBeNull();
+    });
+  });
+
+  it('should clear content and AI response after successful schedule', async () => {
+    (saveScheduledPost as jest.Mock).mockResolvedValue({});
+
+    const { getByPlaceholderText, getByText, queryByText } = render(<PostComposer />);
+    const input = getByPlaceholderText('What do you want to post?');
+
+    fireEvent.changeText(input, 'Test post');
+    fireEvent.press(getByText('✨ Enhance with AI'));
+
+    await waitFor(() => {
+      expect(queryByText('AI Suggested:')).toBeTruthy();
+    });
+
+    fireEvent.press(getByText('Schedule'));
+
+    await waitFor(() => {
+      expect(input.props.value).toBe('');
+      expect(queryByText('AI Suggested:')).toBeNull();
     });
   });
 });

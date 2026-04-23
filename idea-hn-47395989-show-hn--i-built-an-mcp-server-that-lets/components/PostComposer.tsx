@@ -13,6 +13,7 @@ export default function PostComposer() {
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [aiResponse, setAiResponse] = useState<string | null>(null);
 
   const handleEnhance = async () => {
     if (!content.trim()) {
@@ -24,6 +25,7 @@ export default function PostComposer() {
     try {
       const enhanced = await refinePost(content, 'friendly');
       setContent(enhanced);
+      setAiResponse(enhanced);
     } catch (error) {
       Alert.alert('Enhancement Failed', 'Could not enhance your post. Please try again.');
     } finally {
@@ -47,6 +49,7 @@ export default function PostComposer() {
       }
       Alert.alert('Success', 'Your post has been published!');
       setContent('');
+      setAiResponse(null);
     } catch (error) {
       Alert.alert('Post Failed', 'Could not publish your post. Please try again.');
     } finally {
@@ -73,6 +76,7 @@ export default function PostComposer() {
 
       Alert.alert('Scheduled', `Your post will be published tomorrow at ${scheduledFor.toLocaleTimeString()}`);
       setContent('');
+      setAiResponse(null);
     } catch (error) {
       Alert.alert('Schedule Failed', 'Could not schedule your post. Please try again.');
     } finally {
@@ -96,6 +100,13 @@ export default function PostComposer() {
       <View style={styles.charCountRow}>
         <Text style={styles.charCount}>{content.length}/500</Text>
       </View>
+
+      {aiResponse && (
+        <View style={styles.aiResponseContainer}>
+          <Text style={styles.aiResponseLabel}>AI Suggested:</Text>
+          <Text style={styles.aiResponseText}>{aiResponse}</Text>
+        </View>
+      )}
 
       <View style={styles.platformSelector}>
         <TouchableOpacity
@@ -187,20 +198,37 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     textAlignVertical: 'top',
-    marginBottom: 8,
   },
   charCountRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginBottom: 16,
+    marginTop: 4,
   },
   charCount: {
     color: '#666',
     fontSize: 12,
   },
+  aiResponseContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#4a90e2',
+  },
+  aiResponseLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#4a90e2',
+    marginBottom: 4,
+  },
+  aiResponseText: {
+    fontSize: 14,
+    color: '#333',
+  },
   platformSelector: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginVertical: 16,
     justifyContent: 'space-between',
   },
   platformChip: {
@@ -211,8 +239,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   platformChipActive: {
-    backgroundColor: '#4a6bff',
-    borderColor: '#4a6bff',
+    backgroundColor: '#4a90e2',
+    borderColor: '#4a90e2',
   },
   platformChipText: {
     color: '#666',
@@ -223,7 +251,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   enhanceButton: {
-    backgroundColor: '#4a6bff',
+    backgroundColor: '#4a90e2',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -240,7 +268,7 @@ const styles = StyleSheet.create({
   },
   postButton: {
     flex: 1,
-    backgroundColor: '#4a6bff',
+    backgroundColor: '#2ecc71',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
@@ -253,7 +281,7 @@ const styles = StyleSheet.create({
   },
   scheduleButton: {
     flex: 1,
-    backgroundColor: '#6c757d',
+    backgroundColor: '#f39c12',
     padding: 14,
     borderRadius: 8,
     alignItems: 'center',
