@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
-import * as Linking from 'expo-linking';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Linking } from 'react-native';
+import { useAppStore } from '../store/appStore';
 
 interface AppIconProps {
   app: {
@@ -8,37 +10,42 @@ interface AppIconProps {
     label: string;
     icon?: string;
   };
-  onPress?: () => void;
+  size?: number;
   onLongPress?: () => void;
 }
 
-export const AppIcon: React.FC<AppIconProps> = ({ app, onPress, onLongPress }) => {
-  const handlePress = () => {
-    if (onPress) {
-      onPress();
-      return;
-    }
+const AppIcon: React.FC<AppIconProps> = ({ app, size = 60, onLongPress }) => {
+  const navigation = useNavigation();
+  const { activeMode } = useAppStore();
 
+  const handlePress = async () => {
     try {
       if (Platform.OS === 'android') {
-        Linking.openURL(`intent:#Intent;package=${app.packageName};end`);
+        // For Android, use package name to launch app
+        await Linking.openURL(`intent://${app.packageName}#Intent;package=${app.packageName};end`);
       } else {
         // For iOS, use URL scheme
-        Linking.openURL(app.packageName);
+        await Linking.openURL(app.packageName);
       }
     } catch (error) {
       console.error('Error launching app:', error);
+      // Fallback to app store if app isn't installed
+      if (Platform.OS === 'android') {
+        Linking.openURL(`market://details?id=${app.packageName}`);
+      } else {
+        Linking.openURL(`itms-apps://itunes.apple.com/app/id${app.packageName}`);
+      }
     }
   };
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={[styles.container, { width: size, height: size }]}
       onPress={handlePress}
       onLongPress={onLongPress}
       activeOpacity={0.7}
     >
-      <View style={styles.iconContainer}>
+      <View style={[styles.iconContainer, { width: size * 0.7, height: size * 0.7 }]}>
         {app.icon ? (
           <Image
             source={{ uri: app.icon }}
@@ -47,9 +54,7 @@ export const AppIcon: React.FC<AppIconProps> = ({ app, onPress, onLongPress }) =
           />
         ) : (
           <View style={styles.placeholderIcon}>
-            <Text style={styles.placeholderText}>
-              {app.label.charAt(0).toUpperCase()}
-            </Text>
+            <Text style={styles.placeholderText}>{app.label.charAt(0)}</Text>
           </View>
         )}
       </View>
@@ -62,45 +67,39 @@ export const AppIcon: React.FC<AppIconProps> = ({ app, onPress, onLongPress }) =
 
 const styles = StyleSheet.create({
   container: {
-    width: 80,
-    margin: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    margin: 8,
   },
   iconContainer: {
-    width: 60,
-    height: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 12,
     backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
     marginBottom: 4,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
   },
   icon: {
     width: '100%',
     height: '100%',
   },
   placeholderIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6200ee',
-    justifyContent: 'center',
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#e0e0e0',
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   placeholderText: {
-    color: 'white',
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#666',
   },
   label: {
     fontSize: 12,
     textAlign: 'center',
     color: '#333',
-    fontWeight: '500',
   },
 });
+
+export default AppIcon;

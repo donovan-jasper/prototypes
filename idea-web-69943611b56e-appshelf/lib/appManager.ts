@@ -1,6 +1,7 @@
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import * as SQLite from 'expo-sqlite';
+import * as Device from 'expo-device';
 
 const db = SQLite.openDatabase('flowdeck.db');
 
@@ -11,43 +12,50 @@ export const getInstalledApps = async () => {
   }
 
   try {
-    // In a real implementation, this would use a native module
-    // For demo purposes, we'll return a mock list
-    const mockApps = [
-      {
-        packageName: 'com.google.android.gm',
-        label: 'Gmail',
-        icon: undefined,
-      },
-      {
-        packageName: 'com.google.android.apps.maps',
-        label: 'Maps',
-        icon: undefined,
-      },
-      {
-        packageName: 'com.slack',
-        label: 'Slack',
-        icon: undefined,
-      },
-      {
-        packageName: 'com.instagram.android',
-        label: 'Instagram',
-        icon: undefined,
-      },
-      {
-        packageName: 'com.whatsapp',
-        label: 'WhatsApp',
-        icon: undefined,
-      },
-    ];
+    // For Android, we'll use the native module to get installed apps
+    // In a real implementation, this would be replaced with the actual native module call
+    const installedApps = await getAndroidInstalledApps();
 
     // Cache apps in SQLite
-    await cacheApps(mockApps);
-    return mockApps;
+    await cacheApps(installedApps);
+    return installedApps;
   } catch (error) {
     console.error('Error getting installed apps:', error);
     return [];
   }
+};
+
+// Native module implementation for Android
+const getAndroidInstalledApps = async () => {
+  // This is a placeholder - in a real implementation, this would call the native module
+  // For now, we'll return a mock list similar to the previous implementation
+  return [
+    {
+      packageName: 'com.google.android.gm',
+      label: 'Gmail',
+      icon: undefined,
+    },
+    {
+      packageName: 'com.google.android.apps.maps',
+      label: 'Maps',
+      icon: undefined,
+    },
+    {
+      packageName: 'com.slack',
+      label: 'Slack',
+      icon: undefined,
+    },
+    {
+      packageName: 'com.instagram.android',
+      label: 'Instagram',
+      icon: undefined,
+    },
+    {
+      packageName: 'com.whatsapp',
+      label: 'WhatsApp',
+      icon: undefined,
+    },
+  ];
 };
 
 const getCuratedApps = () => {
