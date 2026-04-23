@@ -148,26 +148,49 @@ export default function InsightsScreen() {
         </View>
 
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Tension Summary</Text>
+          <Text style={styles.summaryTitle}>Tension Overview</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tension Level:</Text>
+            <Text style={styles.summaryLabel}>Current Score:</Text>
             <Text style={styles.summaryValue}>
-              {tensionScore > 0.7 ? 'High' : tensionScore > 0.4 ? 'Moderate' : 'Low'}
+              {currentLogs.length > 0 ? `${(tensionScore * 100).toFixed(0)}% tense` : 'No data'}
             </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Trend:</Text>
             <Text style={styles.summaryValue}>{getTrendText()}</Text>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Peak Hours:</Text>
-            <Text style={styles.summaryValue}>
-              {patterns.peakHours.length > 0
-                ? patterns.peakHours.map(hour => formatHour(hour)).join(', ')
-                : 'No data'}
-            </Text>
-          </View>
         </View>
+
+        {patterns.peakHours.length > 0 && (
+          <View style={styles.patternCard}>
+            <Text style={styles.patternTitle}>Tension Patterns</Text>
+            <View style={styles.patternSection}>
+              <Text style={styles.patternSectionTitle}>Peak Tension Times:</Text>
+              <View style={styles.patternTags}>
+                {patterns.peakHours.map(hour => (
+                  <View key={hour} style={styles.patternTag}>
+                    <Text style={styles.patternTagText}>{formatHour(hour)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+            {patterns.peakDays.length > 0 && (
+              <View style={styles.patternSection}>
+                <Text style={styles.patternSectionTitle}>Peak Tension Days:</Text>
+                <View style={styles.patternTags}>
+                  {patterns.peakDays.map(day => {
+                    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    return (
+                      <View key={day} style={styles.patternTag}>
+                        <Text style={styles.patternTagText}>{days[day]}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </View>
+        )}
 
         <HeatmapCalendar
           logs={currentLogs}
@@ -177,10 +200,10 @@ export default function InsightsScreen() {
 
         {!isPremium && viewDays === 7 && (
           <PremiumGate
-            title="Unlock 30-Day View"
-            description="See your full month of tension patterns with JawZen Premium"
-            buttonText="Upgrade Now"
-            onPress={handleUpgrade}
+            title="Unlock 30-Day History"
+            description="See your full month of tension patterns and track your progress over time."
+            buttonText="Upgrade to Premium"
+            onPress={purchasePremium}
           />
         )}
       </ScrollView>
@@ -195,7 +218,12 @@ export default function InsightsScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {selectedDate?.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               </Text>
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>Close</Text>
@@ -210,8 +238,8 @@ export default function InsightsScreen() {
                 contentContainerStyle={styles.logList}
               />
             ) : (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>No tension logs for this day</Text>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No tension logs for this day</Text>
               </View>
             )}
           </View>
@@ -226,13 +254,33 @@ export default function InsightsScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <PremiumGate
-              title="Premium Feature"
-              description="The 30-day view is available to JawZen Premium members only."
-              buttonText="Upgrade Now"
-              onPress={handleUpgrade}
-              onClose={() => setShowPremiumGate(false)}
-            />
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Premium Feature</Text>
+              <TouchableOpacity onPress={() => setShowPremiumGate(false)} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.premiumContent}>
+              <Text style={styles.premiumTitle}>Unlock 30-Day History</Text>
+              <Text style={styles.premiumDescription}>
+                See your full month of tension patterns and track your progress over time.
+              </Text>
+
+              <View style={styles.premiumBenefits}>
+                <Text style={styles.premiumBenefit}>• Full 30-day heatmap</Text>
+                <Text style={styles.premiumBenefit}>• Long-term trend analysis</Text>
+                <Text style={styles.premiumBenefit}>• Unlimited reminders</Text>
+                <Text style={styles.premiumBenefit}>• All body zones</Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.premiumButton}
+                onPress={handleUpgrade}
+              >
+                <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -259,30 +307,33 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   toggleButton: {
+    flex: 1,
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    marginHorizontal: 4,
-    backgroundColor: Colors.light.backgroundSecondary,
+    alignItems: 'center',
+    backgroundColor: Colors.light.background,
   },
   toggleButtonActive: {
     backgroundColor: Colors.light.tint,
   },
   toggleText: {
-    color: Colors.light.textSecondary,
-    fontWeight: '600',
+    fontSize: 16,
+    color: Colors.light.text,
   },
   toggleTextActive: {
-    color: Colors.light.background,
+    color: 'white',
+    fontWeight: '600',
   },
   summaryCard: {
-    backgroundColor: Colors.light.backgroundSecondary,
-    borderRadius: 12,
+    backgroundColor: Colors.light.card,
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 24,
+    marginBottom: 16,
   },
   summaryTitle: {
     fontSize: 18,
@@ -296,18 +347,51 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: Colors.light.textSecondary,
   },
   summaryValue: {
-    fontSize: 14,
-    color: Colors.light.text,
+    fontSize: 16,
     fontWeight: '500',
+    color: Colors.light.text,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  patternCard: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+  },
+  patternTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 12,
+  },
+  patternSection: {
+    marginBottom: 12,
+  },
+  patternSectionTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  patternTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  patternTag: {
+    backgroundColor: Colors.light.tint,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  patternTagText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
   },
   modalContainer: {
     flex: 1,
@@ -338,6 +422,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: Colors.light.tint,
     fontSize: 16,
+    fontWeight: '500',
   },
   logList: {
     paddingBottom: 16,
@@ -354,7 +439,8 @@ const styles = StyleSheet.create({
   },
   logTime: {
     fontSize: 14,
-    color: Colors.light.textSecondary,
+    color: Colors.light.text,
+    fontWeight: '500',
   },
   logStatusContainer: {
     flexDirection: 'row',
@@ -376,12 +462,52 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
-  noDataContainer: {
+  emptyState: {
     padding: 24,
     alignItems: 'center',
   },
-  noDataText: {
+  emptyText: {
     fontSize: 16,
     color: Colors.light.textSecondary,
+  },
+  premiumContent: {
+    padding: 16,
+  },
+  premiumTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: Colors.light.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  premiumDescription: {
+    fontSize: 16,
+    color: Colors.light.textSecondary,
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  premiumBenefits: {
+    marginBottom: 24,
+  },
+  premiumBenefit: {
+    fontSize: 16,
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  premiumButton: {
+    backgroundColor: Colors.light.tint,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  premiumButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

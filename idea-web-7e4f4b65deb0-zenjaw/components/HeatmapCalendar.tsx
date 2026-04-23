@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Modal, FlatList } from 'react-native';
 import { TensionLog } from '@/types';
 import { Colors } from '@/constants/colors';
@@ -16,7 +16,7 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [dayLogs, setDayLogs] = useState<TensionLog[]>([]);
 
-  const getDayData = () => {
+  const dayData = useMemo(() => {
     const today = new Date();
     const dayData: { date: Date; tenseCount: number; relaxedCount: number }[] = [];
 
@@ -40,7 +40,7 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
     }
 
     return dayData;
-  };
+  }, [logs, days]);
 
   const getCellColor = (tenseCount: number, relaxedCount: number) => {
     if (tenseCount === 0 && relaxedCount === 0) {
@@ -84,8 +84,6 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
   const closeModal = () => {
     setSelectedDate(null);
   };
-
-  const dayData = getDayData();
 
   const renderDayLogItem = ({ item }: { item: TensionLog }) => {
     const logDate = new Date(item.timestamp);
@@ -151,20 +149,20 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: Colors.light.border }]} />
-          <Text style={styles.legendText}>No data</Text>
-        </View>
-        <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: Colors.light.relaxed }]} />
           <Text style={styles.legendText}>Relaxed</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: '#f59e0b' }]} />
-          <Text style={styles.legendText}>Mixed</Text>
+          <Text style={styles.legendText}>Moderate</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: Colors.light.tense }]} />
           <Text style={styles.legendText}>Tense</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendBox, { backgroundColor: Colors.light.border }]} />
+          <Text style={styles.legendText}>No data</Text>
         </View>
       </View>
 
@@ -178,7 +176,12 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+                {selectedDate?.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
               </Text>
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>Close</Text>
@@ -193,8 +196,8 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
                 contentContainerStyle={styles.logList}
               />
             ) : (
-              <View style={styles.noDataContainer}>
-                <Text style={styles.noDataText}>No tension logs for this day</Text>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No tension logs for this day</Text>
               </View>
             )}
           </View>
@@ -206,12 +209,13 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
-    marginVertical: 16,
+    padding: 16,
+    backgroundColor: Colors.light.background,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   header: {
     marginBottom: 16,
-    alignItems: 'center',
   },
   headerText: {
     fontSize: 18,
@@ -227,17 +231,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   cell: {
     width: cellSize,
     height: cellSize,
-    borderRadius: 8,
+    borderRadius: 4,
+    marginBottom: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    padding: 4,
-    marginRight: 8,
   },
   todayCell: {
     borderWidth: 2,
@@ -245,23 +246,25 @@ const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 10,
-    color: Colors.light.textSecondary,
+    fontWeight: '500',
+    color: 'white',
     marginBottom: 2,
   },
   dayNumber: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: 'white',
   },
   percentage: {
     fontSize: 10,
-    color: Colors.light.textSecondary,
+    color: 'white',
     marginTop: 2,
+    fontWeight: '500',
   },
   legend: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   legendItem: {
     flexDirection: 'row',
@@ -306,6 +309,7 @@ const styles = StyleSheet.create({
   closeButtonText: {
     color: Colors.light.tint,
     fontSize: 16,
+    fontWeight: '500',
   },
   logList: {
     paddingBottom: 16,
@@ -322,7 +326,8 @@ const styles = StyleSheet.create({
   },
   logTime: {
     fontSize: 14,
-    color: Colors.light.textSecondary,
+    color: Colors.light.text,
+    fontWeight: '500',
   },
   logStatusContainer: {
     flexDirection: 'row',
@@ -344,11 +349,11 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
-  noDataContainer: {
+  emptyState: {
     padding: 24,
     alignItems: 'center',
   },
-  noDataText: {
+  emptyText: {
     fontSize: 16,
     color: Colors.light.textSecondary,
   },
