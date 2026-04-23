@@ -10,6 +10,7 @@ import ExpirationPicker from '@/components/ExpirationPicker';
 import PremiumGate from '@/components/PremiumGate';
 import PeerList from '@/components/PeerList';
 import TransferProgress from '@/components/TransferProgress';
+import ShareModal from '@/components/ShareModal';
 import { Colors } from '@/constants/Colors';
 
 export default function ShareScreen() {
@@ -17,9 +18,18 @@ export default function ShareScreen() {
   const [expiration, setExpiration] = useState(24);
   const [showPeerList, setShowPeerList] = useState(false);
   const [selectedPeer, setSelectedPeer] = useState(null);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLink, setShareLink] = useState('');
   const { shareFile, addNewFile } = useFileVault();
   const { canShare, showPremiumGate, incrementShareCount } = useSubscription();
-  const { isTransferring, progress, sendFileP2P, discoverPeers } = useP2PTransfer();
+  const {
+    isTransferring,
+    progress,
+    connectionState,
+    sendFileP2P,
+    receiveFileP2P,
+    discoverPeers
+  } = useP2PTransfer();
 
   const pickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -34,8 +44,8 @@ export default function ShareScreen() {
       const blob = await fileData.blob();
       const reader = new FileReader();
       reader.onload = async () => {
-        await addNewFile(asset.fileName || 'image.jpg', reader.result);
-        setFile({ id: Date.now().toString(), name: asset.fileName || 'image.jpg' });
+        const fileId = await addNewFile(asset.fileName || 'image.jpg', reader.result);
+        setFile({ id: fileId, name: asset.fileName || 'image.jpg' });
       };
       reader.readAsDataURL(blob);
     }
@@ -51,8 +61,8 @@ export default function ShareScreen() {
       const blob = await fileData.blob();
       const reader = new FileReader();
       reader.onload = async () => {
-        await addNewFile(result.name, reader.result);
-        setFile({ id: Date.now().toString(), name: result.name });
+        const fileId = await addNewFile(result.name, reader.result);
+        setFile({ id: fileId, name: result.name });
       };
       reader.readAsDataURL(blob);
     }
@@ -71,7 +81,8 @@ export default function ShareScreen() {
 
     try {
       const link = await shareFile(file, expiration);
-      Alert.alert('Share Link', `Share this link: ${link}`);
+      setShareLink(link);
+      setShowShareModal(true);
       incrementShareCount();
     } catch (error) {
       Alert.alert('Error', error.message);
@@ -154,6 +165,12 @@ export default function ShareScreen() {
           </Button>
         </>
       )}
+      {isTransferring && (
+        <TransferProgress
+          progress={progress}
+          state={connectionState}
+        />
+      )}
       <PremiumGate />
 
       <Portal>
@@ -168,12 +185,11 @@ export default function ShareScreen() {
         </Dialog>
       </Portal>
 
-      {isTransferring && (
-        <TransferProgress
-          progress={progress}
-          isSending={true}
-        />
-      )}
+      <ShareModal
+        visible={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        link={shareLink}
+      />
     </View>
   );
 }
@@ -181,7 +197,7 @@ export default function ShareScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: Colors.light.background,
   },
   title: {
@@ -192,7 +208,7 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginBottom: 20,
   },
   button: {
@@ -200,13 +216,15 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   fileInfo: {
-    marginBottom: 20,
+    fontSize: 16,
+    marginBottom: 10,
     color: Colors.light.text,
   },
   shareButton: {
     marginTop: 20,
+    marginBottom: 10,
   },
   p2pButton: {
-    marginTop: 10,
+    marginBottom: 20,
   },
 });

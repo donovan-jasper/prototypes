@@ -20,14 +20,14 @@ export const useP2PTransfer = () => {
   const [peerConnection, setPeerConnection] = useState(null);
   const [dataChannel, setDataChannel] = useState(null);
   const [peers, setPeers] = useState([]);
+  const [connectionState, setConnectionState] = useState('disconnected');
   const { getFile, addNewFile } = useFileVault();
 
   const discoverPeers = async () => {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (networkState.isConnected && networkState.isInternetReachable) {
-        // In a real implementation, you would use mDNS or similar for local discovery
-        // For this example, we'll simulate finding peers
+        // Simulate peer discovery
         const simulatedPeers = ['device-1', 'device-2'];
         setPeers(simulatedPeers);
         return simulatedPeers;
@@ -42,9 +42,13 @@ export const useP2PTransfer = () => {
   const createPeerConnection = () => {
     const pc = new RTCPeerConnection(configuration);
 
+    pc.oniceconnectionstatechange = () => {
+      setConnectionState(pc.iceConnectionState);
+    };
+
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        // Send the candidate to the remote peer
+        // In a real app, send this to the remote peer
         console.log('ICE candidate:', event.candidate);
       }
     };
@@ -61,11 +65,12 @@ export const useP2PTransfer = () => {
 
   const setupDataChannel = (channel) => {
     let receivedData = [];
-    let fileName = 'Received File';
+    let fileName = '';
     let fileSize = 0;
 
     channel.onopen = () => {
       console.log('Data channel opened');
+      setConnectionState('connected');
     };
 
     channel.onmessage = (event) => {
@@ -77,19 +82,28 @@ export const useP2PTransfer = () => {
       } else {
         // Handle file data
         receivedData.push(event.data);
-        const progress = Math.round((receivedData.length * 16384 / fileSize) * 100);
-        setProgress(progress);
+        const currentProgress = Math.min(
+          Math.round((receivedData.length * 16384 / fileSize) * 100),
+          100
+        );
+        setProgress(currentProgress);
 
         if (receivedData.length * 16384 >= fileSize) {
           // File transfer complete
           const fileData = new Blob(receivedData);
           const reader = new FileReader();
           reader.onload = async () => {
-            await addNewFile(fileName, reader.result);
-            setIsTransferring(false);
-            Alert.alert('Success', 'File received successfully');
+            try {
+              await addNewFile(fileName, reader.result);
+              setIsTransferring(false);
+              setConnectionState('completed');
+              Alert.alert('Success', 'File received successfully');
+            } catch (error) {
+              setConnectionState('failed');
+              Alert.alert('Error', 'Failed to save file');
+            }
           };
-          reader.readAsText(fileData);
+          reader.readAsDataURL(fileData);
         }
       }
     };
@@ -103,6 +117,7 @@ export const useP2PTransfer = () => {
   const sendFileP2P = async (fileId, peerId) => {
     setIsTransferring(true);
     setProgress(0);
+    setConnectionState('connecting');
 
     try {
       const file = await getFile(fileId);
@@ -126,7 +141,7 @@ export const useP2PTransfer = () => {
       };
       channel.send(JSON.stringify(metadata));
 
-      // Simulate transfer progress
+      // Send file in chunks
       const chunkSize = 16384; // 16KB chunks
       const totalChunks = Math.ceil(file.size / chunkSize);
       let sentChunks = 0;
@@ -135,6 +150,7 @@ export const useP2PTransfer = () => {
         if (sentChunks >= totalChunks) {
           setProgress(100);
           setIsTransferring(false);
+          setConnectionState('completed');
           Alert.alert('Success', `File sent to ${peerId}`);
           return;
         }
@@ -156,6 +172,7 @@ export const useP2PTransfer = () => {
 
     } catch (error) {
       console.error('Transfer error:', error);
+      setConnectionState('failed');
       Alert.alert('Error', error.message);
       setIsTransferring(false);
     }
@@ -164,6 +181,7 @@ export const useP2PTransfer = () => {
   const receiveFileP2P = async (peerId) => {
     setIsTransferring(true);
     setProgress(0);
+    setConnectionState('connecting');
 
     try {
       const pc = createPeerConnection();
@@ -171,47 +189,46 @@ export const useP2PTransfer = () => {
       // In a real implementation, you would receive the offer from the peer
       // and set the remote description
 
-      // Simulate receiving file
-      const totalChunks = 100;
-      let receivedChunks = 0;
-
-      const receiveChunk = () => {
-        if (receivedChunks >= totalChunks) {
-          setProgress(100);
-          setIsTransferring(false);
-          Alert.alert('Success', `File received from ${peerId}`);
-          return;
-        }
-
-        receivedChunks++;
-        setProgress(Math.round((receivedChunks / totalChunks) * 100));
-
-        setTimeout(receiveChunk, 100);
-      };
-
-      receiveChunk();
+      // For this example, we'll just wait for the data channel to open
+      return new Promise((resolve) => {
+        const interval = setInterval(() => {
+          if (dataChannel && dataChannel.readyState === 'open') {
+            clearInterval(interval);
+            resolve();
+          }
+        }, 100);
+      });
 
     } catch (error) {
       console.error('Receive error:', error);
+      setConnectionState('failed');
       Alert.alert('Error', error.message);
       setIsTransferring(false);
+      throw error;
     }
   };
 
-  useEffect(() => {
-    return () => {
-      if (peerConnection) {
-        peerConnection.close();
-      }
-    };
-  }, [peerConnection]);
+  const closeConnection = () => {
+    if (peerConnection) {
+      peerConnection.close();
+      setPeerConnection(null);
+    }
+    if (dataChannel) {
+      dataChannel.close();
+      setDataChannel(null);
+    }
+    setIsTransferring(false);
+    setConnectionState('disconnected');
+  };
 
   return {
     isTransferring,
     progress,
     peers,
+    connectionState,
     discoverPeers,
     sendFileP2P,
     receiveFileP2P,
+    closeConnection
   };
 };
