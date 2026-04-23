@@ -9,12 +9,14 @@ interface StoreState {
   currentSession: DrillResult | null;
   userStats: UserStats;
   isPremium: boolean;
+  consecutiveSuccesses: number;
   startDrill: (drillId: string) => void;
   submitResult: (result: DrillResult) => Promise<void>;
   updateStats: () => Promise<void>;
   togglePremium: () => void;
   setDrills: (drills: Drill[]) => void;
   loadDrills: () => Promise<void>;
+  resetConsecutiveSuccesses: () => void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -31,6 +33,7 @@ export const useStore = create<StoreState>((set, get) => ({
     achievements: [],
   },
   isPremium: false,
+  consecutiveSuccesses: 0,
 
   setDrills: (drills) => {
     set({ drills });
@@ -58,9 +61,22 @@ export const useStore = create<StoreState>((set, get) => ({
     // Get all results for this drill
     const allResults = await getDrillResults(result.drillId);
 
+    // Check if this result is a success (80%+ accuracy)
+    const isSuccess = result.accuracy >= 80;
+
+    // Update consecutive successes
+    if (isSuccess) {
+      set(state => ({ consecutiveSuccesses: state.consecutiveSuccesses + 1 }));
+    } else {
+      set({ consecutiveSuccesses: 0 });
+    }
+
+    // Check if we should level up
+    const shouldIncrease = shouldLevelUp(get().consecutiveSuccesses);
+
     // Adjust difficulty if needed
     const currentDrill = get().currentDrill;
-    if (currentDrill) {
+    if (currentDrill && shouldIncrease) {
       const { newDifficulty, shouldAdjust } = adjustDifficulty(currentDrill, allResults);
 
       if (shouldAdjust) {
@@ -78,10 +94,13 @@ export const useStore = create<StoreState>((set, get) => ({
               ? { ...d, difficulty: newDifficulty, difficultyChange }
               : d
           ),
+          consecutiveSuccesses: 0, // Reset after level up
         }));
       } else {
         set({ currentSession: result });
       }
+    } else {
+      set({ currentSession: result });
     }
 
     // Update user stats
@@ -123,5 +142,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
   togglePremium: () => {
     set(state => ({ isPremium: !state.isPremium }));
+  },
+
+  resetConsecutiveSuccesses: () => {
+    set({ consecutiveSuccesses: 0 });
   },
 }));

@@ -1,56 +1,59 @@
 import { Drill, DrillResult } from './types';
 
-interface DifficultyAdjustment {
-  newDifficulty: number;
-  shouldAdjust: boolean;
-}
-
-export const adjustDifficulty = (drill: Drill, results: DrillResult[]): DifficultyAdjustment => {
-  // Only consider the last 5 results for adjustment
-  const recentResults = results.slice(0, 5);
-
-  // Calculate average accuracy of recent results
-  const avgAccuracy = recentResults.reduce((sum, result) => sum + result.accuracy, 0) / recentResults.length;
-
-  // Calculate average score of recent results
-  const avgScore = recentResults.reduce((sum, result) => sum + result.score, 0) / recentResults.length;
-
-  // Determine if we should adjust difficulty
-  let shouldAdjust = false;
-  let adjustmentFactor = 0;
-
-  // If average accuracy is 80% or higher and difficulty is below max
-  if (avgAccuracy >= 80 && drill.difficulty < 0.9) {
-    shouldAdjust = true;
-    adjustmentFactor = 0.15; // Increase by 15%
-  }
-  // If average accuracy is below 60% and difficulty is above min
-  else if (avgAccuracy < 60 && drill.difficulty > 0.1) {
-    shouldAdjust = true;
-    adjustmentFactor = -0.15; // Decrease by 15%
-  }
-  // If average score is significantly higher than best score
-  else if (avgScore > (drill.bestScore || 0) * 1.2 && drill.difficulty < 0.9) {
-    shouldAdjust = true;
-    adjustmentFactor = 0.1; // Increase by 10%
-  }
-
-  // Calculate new difficulty
-  let newDifficulty = drill.difficulty + adjustmentFactor;
-
-  // Clamp between 0 and 1
-  newDifficulty = Math.max(0, Math.min(1, newDifficulty));
-
-  return {
-    newDifficulty,
-    shouldAdjust,
-  };
+export const shouldLevelUp = (consecutiveSuccesses: number): boolean => {
+  return consecutiveSuccesses >= 3;
 };
 
-export const shouldLevelUp = (results: DrillResult[]): boolean => {
-  // Check if the last 3 results are all 80% or higher
-  if (results.length < 3) return false;
+export const adjustDifficulty = (currentDrill: Drill, allResults: DrillResult[]): { newDifficulty: number; shouldAdjust: boolean } => {
+  // If we don't have enough data, don't adjust
+  if (allResults.length < 3) {
+    return { newDifficulty: currentDrill.difficulty, shouldAdjust: false };
+  }
 
-  const lastThree = results.slice(0, 3);
-  return lastThree.every(result => result.accuracy >= 80);
+  // Get the last 3 results
+  const recentResults = allResults.slice(0, 3);
+
+  // Check if all recent results were successful (80%+ accuracy)
+  const allSuccessful = recentResults.every(result => result.accuracy >= 80);
+
+  if (allSuccessful) {
+    // Increase difficulty by 15%
+    const newDifficulty = Math.min(5, currentDrill.difficulty * 1.15);
+    return { newDifficulty, shouldAdjust: true };
+  }
+
+  // If not all successful, check if we should decrease difficulty
+  const avgAccuracy = recentResults.reduce((sum, result) => sum + result.accuracy, 0) / recentResults.length;
+
+  if (avgAccuracy < 60) {
+    // Decrease difficulty by 10%
+    const newDifficulty = Math.max(0.5, currentDrill.difficulty * 0.9);
+    return { newDifficulty, shouldAdjust: true };
+  }
+
+  // No adjustment needed
+  return { newDifficulty: currentDrill.difficulty, shouldAdjust: false };
+};
+
+export const getRecommendedDrill = (drills: Drill[], userStats: any): Drill => {
+  // Find the drill with the lowest average score
+  const drillScores: { [key: string]: number } = {};
+
+  // Calculate average score for each drill
+  drills.forEach(drill => {
+    const results = userStats.drillResults.filter((r: any) => r.drillId === drill.id);
+    if (results.length > 0) {
+      const avgScore = results.reduce((sum: number, r: any) => sum + r.score, 0) / results.length;
+      drillScores[drill.id] = avgScore;
+    } else {
+      drillScores[drill.id] = 0;
+    }
+  });
+
+  // Find the drill with the lowest average score
+  const worstDrillId = Object.keys(drillScores).reduce((a, b) =>
+    drillScores[a] < drillScores[b] ? a : b
+  );
+
+  return drills.find(d => d.id === worstDrillId) || drills[0];
 };
