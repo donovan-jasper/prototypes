@@ -66,3 +66,13 @@ export function calculateStreak(sessions: Array<{ date: Date; accuracy: number }
 
   return streak;
 }
+
+export function calculateThrowDirection(acceleration: { x: number; y: number; z: number }, gyro: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+  // Simple direction calculation from sensor data
+  // In a real app, this would use more sophisticated physics
+  return {
+    x: acceleration.x + gyro.x * 0.5,
+    y: acceleration.y + gyro.y * 0.5,
+    z: -1 // Fixed forward direction for simplicity
+  };
+}

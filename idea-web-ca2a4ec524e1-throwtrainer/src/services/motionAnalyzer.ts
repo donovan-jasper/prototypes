@@ -10,6 +10,7 @@ class MotionAnalyzer {
   private minThrowDuration: number = 200; // ms
   private throwStartTime: number | null = null;
   private throwData: ThrowData | null = null;
+  private calibrationData: { x: number; y: number; z: number } | null = null;
 
   start() {
     if (this.isActive) return;
@@ -47,11 +48,27 @@ class MotionAnalyzer {
     };
   }
 
+  calibrate() {
+    // Get current gravity vector for calibration
+    if (this.lastAcceleration) {
+      this.calibrationData = { ...this.lastAcceleration };
+    }
+  }
+
   private handleAccelerometerData(data: { x: number; y: number; z: number }) {
     if (!this.isActive) return;
 
+    // Apply calibration if available
+    const calibratedData = this.calibrationData
+      ? {
+          x: data.x - this.calibrationData.x,
+          y: data.y - this.calibrationData.y,
+          z: data.z - this.calibrationData.z
+        }
+      : data;
+
     // Calculate acceleration magnitude
-    const magnitude = Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2);
+    const magnitude = Math.sqrt(calibratedData.x ** 2 + calibratedData.y ** 2 + calibratedData.z ** 2);
 
     // Detect throw start (rapid acceleration)
     if (magnitude > this.throwThreshold && !this.throwStartTime) {
@@ -89,16 +106,22 @@ class MotionAnalyzer {
     // Calculate approximate angle from gyroscope data
     this.throwData.angle += Math.sqrt(data.x ** 2 + data.y ** 2 + data.z ** 2) * 0.1;
 
+    // Estimate direction from gyroscope data
+    if (this.throwData) {
+      this.throwData.x = data.x * 0.1;
+      this.throwData.y = data.y * 0.1;
+    }
+
     this.lastGyro = data;
   }
 
   private finalizeThrow() {
     if (!this.throwData) return;
 
-    // Estimate impact position (simplified)
-    if (this.lastAcceleration) {
-      this.throwData.x = this.lastAcceleration.x;
-      this.throwData.y = this.lastAcceleration.y;
+    // Estimate impact position from last gyro data
+    if (this.lastGyro) {
+      this.throwData.x = this.lastGyro.x * 0.5;
+      this.throwData.y = this.lastGyro.y * 0.5;
     }
 
     // Notify listeners

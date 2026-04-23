@@ -50,3 +50,11 @@ export interface ThrowData {
   angle: number;
   timestamp: number;
 }
+
+export interface Target {
+  x: number;
+  y: number;
+  z: number;
+  id: string;
+  radius?: number;
+}
