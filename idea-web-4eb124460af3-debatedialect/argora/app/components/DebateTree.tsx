@@ -6,9 +6,10 @@ interface DebateTreeProps {
   tree: DebateNode;
   onVote: (nodeId: string, delta: number) => void;
   onNodePress: (nodeId: string) => void;
+  onReply: (nodeId: string) => void;
 }
 
-const DebateTree: React.FC<DebateTreeProps> = ({ tree, onVote, onNodePress }) => {
+const DebateTree: React.FC<DebateTreeProps> = ({ tree, onVote, onNodePress, onReply }) => {
   const handleEvidencePress = (url: string) => {
     Linking.openURL(url).catch(err => console.error('Failed to open URL:', err));
   };
@@ -16,30 +17,44 @@ const DebateTree: React.FC<DebateTreeProps> = ({ tree, onVote, onNodePress }) =>
   const renderNode = (node: DebateNode, depth: number = 0) => {
     return (
       <View key={node.id} style={[styles.node, { marginLeft: depth * 20 }]}>
-        <TouchableOpacity 
-          style={styles.nodeContent}
+        <TouchableOpacity
+          style={[
+            styles.nodeContent,
+            node.type === 'root' ? styles.rootNode : node.type === 'pro' ? styles.proNode : styles.conNode
+          ]}
           onPress={() => onNodePress(node.id)}
           activeOpacity={0.7}
         >
           <Text style={[styles.nodeText, styles[node.type]]}>{node.title}</Text>
         </TouchableOpacity>
-        
-        <View style={styles.voteContainer}>
-          <TouchableOpacity 
-            style={styles.voteButton}
-            onPress={() => onVote(node.id, 1)}
-          >
-            <Text style={styles.voteButtonText}>▲</Text>
-          </TouchableOpacity>
-          
-          <Text style={styles.voteCount}>{node.votes}</Text>
-          
-          <TouchableOpacity 
-            style={styles.voteButton}
-            onPress={() => onVote(node.id, -1)}
-          >
-            <Text style={styles.voteButtonText}>▼</Text>
-          </TouchableOpacity>
+
+        <View style={styles.actionContainer}>
+          <View style={styles.voteContainer}>
+            <TouchableOpacity
+              style={styles.voteButton}
+              onPress={() => onVote(node.id, 1)}
+            >
+              <Text style={styles.voteButtonText}>▲</Text>
+            </TouchableOpacity>
+
+            <Text style={styles.voteCount}>{node.votes}</Text>
+
+            <TouchableOpacity
+              style={styles.voteButton}
+              onPress={() => onVote(node.id, -1)}
+            >
+              <Text style={styles.voteButtonText}>▼</Text>
+            </TouchableOpacity>
+          </View>
+
+          {node.type !== 'root' && (
+            <TouchableOpacity
+              style={styles.replyButton}
+              onPress={() => onReply(node.id)}
+            >
+              <Text style={styles.replyButtonText}>Reply</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {node.evidence && node.evidence.length > 0 && (
@@ -76,11 +91,21 @@ const styles = StyleSheet.create({
     marginVertical: 8,
   },
   nodeContent: {
-    backgroundColor: '#f5f5f5',
     padding: 12,
     borderRadius: 8,
     borderLeftWidth: 3,
+  },
+  rootNode: {
+    backgroundColor: '#f5f5f5',
     borderLeftColor: '#ddd',
+  },
+  proNode: {
+    backgroundColor: '#e8f5e9',
+    borderLeftColor: '#2e7d32',
+  },
+  conNode: {
+    backgroundColor: '#ffebee',
+    borderLeftColor: '#c62828',
   },
   nodeText: {
     fontSize: 16,
@@ -98,11 +123,16 @@ const styles = StyleSheet.create({
     color: '#c62828',
     fontWeight: '600',
   },
-  voteContainer: {
+  actionContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 8,
     marginLeft: 12,
+  },
+  voteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   voteButton: {
     padding: 8,
@@ -123,6 +153,17 @@ const styles = StyleSheet.create({
     color: '#333',
     minWidth: 30,
     textAlign: 'center',
+  },
+  replyButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    backgroundColor: '#1976d2',
+    borderRadius: 4,
+  },
+  replyButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
   evidenceContainer: {
     flexDirection: 'row',
