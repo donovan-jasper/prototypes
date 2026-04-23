@@ -160,33 +160,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
     paddingHorizontal: 12,
-    backgroundColor: '#f9f9f9',
-    fontSize: 16,
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: 16,
   },
   loadingText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#666',
+    marginLeft: 8,
+    color: '#6200ee',
   },
   schemaPreview: {
-    backgroundColor: '#f0f8ff',
+    marginVertical: 16,
     padding: 12,
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#e0f0ff',
   },
   schemaTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
   },
   fieldContainer: {
     flexDirection: 'row',
@@ -204,7 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   typeInput: {
-    width: 100,
+    width: 80,
   },
 });
 
