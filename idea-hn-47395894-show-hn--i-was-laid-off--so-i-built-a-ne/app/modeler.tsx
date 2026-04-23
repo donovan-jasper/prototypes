@@ -148,50 +148,65 @@ export default function ScenarioModeler() {
                     />
                   )}
                 />
-
-                <Controller
-                  control={control}
-                  name="annualIncome"
-                  render={({ field: { onChange, value } }) => (
-                    <TextInput
-                      label="Annual Income ($)"
-                      value={value}
-                      onChangeText={onChange}
-                      keyboardType="numeric"
-                      style={styles.input}
-                    />
-                  )}
-                />
               </>
             )}
+
+            <Controller
+              control={control}
+              name="annualIncome"
+              render={({ field: { onChange, value } }) => (
+                <TextInput
+                  label="Annual Income ($)"
+                  value={value}
+                  onChangeText={onChange}
+                  keyboardType="numeric"
+                  style={styles.input}
+                />
+              )}
+            />
+
+            <Button
+              mode="contained"
+              onPress={handleSubmit(onSubmit)}
+              style={styles.button}
+            >
+              Calculate Scenario
+            </Button>
           </Card.Content>
         </Card>
-
-        <Button
-          mode="contained"
-          onPress={handleSubmit(onSubmit)}
-          style={styles.button}
-        >
-          Calculate Scenario
-        </Button>
 
         {results && (
           <>
             <Card style={styles.card}>
               <Card.Content>
                 <Text variant="titleMedium">Results</Text>
+
                 <View style={styles.resultRow}>
-                  <Text>Estimated Equity Value:</Text>
-                  <Text style={styles.resultValue}>${results.equityValue.toLocaleString()}</Text>
+                  <Text variant="bodyMedium">Estimated Equity Value:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
+                    ${results.equityValue.toLocaleString()}
+                  </Text>
                 </View>
+
                 <View style={styles.resultRow}>
-                  <Text>Estimated Tax Impact:</Text>
-                  <Text style={styles.resultValue}>${results.taxImpact.toLocaleString()}</Text>
+                  <Text variant="bodyMedium">Estimated Tax Impact:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
+                    ${results.taxImpact.toLocaleString()}
+                  </Text>
                 </View>
+
                 <View style={styles.resultRow}>
-                  <Text>Estimated AMT Impact:</Text>
-                  <Text style={styles.resultValue}>${results.amtImpact.toLocaleString()}</Text>
+                  <Text variant="bodyMedium">Estimated AMT Impact:</Text>
+                  <Text variant="bodyMedium" style={styles.resultValue}>
+                    ${results.amtImpact.toLocaleString()}
+                  </Text>
                 </View>
+
+                <Divider style={styles.divider} />
+
+                <Text variant="bodyMedium" style={styles.disclaimer}>
+                  Note: These are estimates based on current inputs. Actual results may vary.
+                </Text>
               </Card.Content>
             </Card>
 
@@ -227,7 +242,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   button: {
-    marginVertical: 16,
+    marginTop: 8,
   },
   resultRow: {
     flexDirection: 'row',
@@ -236,5 +251,12 @@ const styles = StyleSheet.create({
   },
   resultValue: {
     fontWeight: 'bold',
+  },
+  divider: {
+    marginVertical: 16,
+  },
+  disclaimer: {
+    fontStyle: 'italic',
+    color: '#666',
   },
 });
