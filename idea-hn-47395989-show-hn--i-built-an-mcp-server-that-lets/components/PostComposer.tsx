@@ -12,6 +12,7 @@ export default function PostComposer() {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>('both');
   const [isEnhancing, setIsEnhancing] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
 
   const handleEnhance = async () => {
     if (!content.trim()) {
@@ -59,6 +60,7 @@ export default function PostComposer() {
       return;
     }
 
+    setIsScheduling(true);
     try {
       const scheduledFor = new Date();
       scheduledFor.setHours(scheduledFor.getHours() + 24);
@@ -73,6 +75,8 @@ export default function PostComposer() {
       setContent('');
     } catch (error) {
       Alert.alert('Schedule Failed', 'Could not schedule your post. Please try again.');
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -86,7 +90,7 @@ export default function PostComposer() {
         value={content}
         onChangeText={setContent}
         maxLength={500}
-        editable={!isEnhancing && !isPosting}
+        editable={!isEnhancing && !isPosting && !isScheduling}
       />
 
       <View style={styles.charCountRow}>
@@ -148,11 +152,15 @@ export default function PostComposer() {
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.scheduleButton, !content.trim() && styles.buttonDisabled]}
+          style={[styles.scheduleButton, (isScheduling || !content.trim()) && styles.buttonDisabled]}
           onPress={handleSchedule}
-          disabled={!content.trim()}
+          disabled={isScheduling || !content.trim()}
         >
-          <Text style={styles.scheduleButtonText}>Schedule for Later</Text>
+          {isScheduling ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.scheduleButtonText}>Schedule</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -193,14 +201,14 @@ const styles = StyleSheet.create({
   platformSelector: {
     flexDirection: 'row',
     marginBottom: 16,
+    justifyContent: 'space-between',
   },
   platformChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginRight: 8,
   },
   platformChipActive: {
     backgroundColor: '#4a6bff',
@@ -212,10 +220,11 @@ const styles = StyleSheet.create({
   },
   platformChipTextActive: {
     color: '#fff',
+    fontWeight: '600',
   },
   enhanceButton: {
     backgroundColor: '#4a6bff',
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 16,
@@ -230,10 +239,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   postButton: {
-    backgroundColor: '#4a6bff',
-    padding: 12,
-    borderRadius: 8,
     flex: 1,
+    backgroundColor: '#4a6bff',
+    padding: 14,
+    borderRadius: 8,
     alignItems: 'center',
     marginRight: 8,
   },
@@ -243,15 +252,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scheduleButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 8,
     flex: 1,
+    backgroundColor: '#6c757d',
+    padding: 14,
+    borderRadius: 8,
     alignItems: 'center',
     marginLeft: 8,
   },
   scheduleButtonText: {
-    color: '#333',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
