@@ -143,18 +143,10 @@ const EstablishmentDetailScreen = () => {
       {recalls.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recall Alerts</Text>
-          {recalls.map((recall, index) => (
+          {recalls.map((recall) => (
             <RecallAlert
               key={recall.id}
-              alert={{
-                id: index,
-                establishmentId: recall.establishmentId,
-                recallDate: recall.recallDate,
-                description: recall.description,
-                severity: recall.severity,
-                isRead: false,
-                createdAt: recall.recallDate
-              }}
+              recall={recall}
               onPress={() => handleRecallPress(recall)}
             />
           ))}
@@ -166,7 +158,7 @@ const EstablishmentDetailScreen = () => {
         {inspections.length > 0 ? (
           <InspectionTimeline inspections={inspections} />
         ) : (
-          <Text style={styles.noDataText}>No inspection history available</Text>
+          <Text style={styles.noData}>No inspection history available</Text>
         )}
       </View>
     </ScrollView>
@@ -176,7 +168,57 @@ const EstablishmentDetailScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
+  },
+  header: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  headerContent: {
+    flex: 1,
+  },
+  name: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  address: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  scoreContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  lastInspection: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 8,
+  },
+  saveButton: {
+    padding: 8,
+  },
+  section: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  noData: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    padding: 16,
   },
   centered: {
     flex: 1,
@@ -194,58 +236,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#007AFF',
     textDecorationLine: 'underline',
-  },
-  header: {
-    backgroundColor: 'white',
-    padding: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  headerContent: {
-    flex: 1,
-  },
-  name: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  address: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 12,
-  },
-  scoreContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lastInspection: {
-    fontSize: 14,
-    color: '#999',
-    marginLeft: 12,
-  },
-  saveButton: {
-    padding: 8,
-  },
-  section: {
-    padding: 20,
-    backgroundColor: 'white',
-    marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  noDataText: {
-    fontSize: 16,
-    color: '#999',
-    textAlign: 'center',
-    padding: 20,
   },
 });
 
