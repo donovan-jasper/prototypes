@@ -1,52 +1,55 @@
-interface ProfitCalculationParams {
+export interface ProfitCalculationParams {
   salePrice: number;
   sourcingCost: number;
   platform: string;
   shippingCost: number;
 }
 
-interface ProfitResult {
+export interface ProfitResult {
   profit: number;
   margin: number;
   fees: number;
 }
 
-export function calculateProfit({
-  salePrice,
-  sourcingCost,
-  platform,
-  shippingCost
-}: ProfitCalculationParams): ProfitResult {
-  const platformFee = calculateFees(salePrice, platform);
-  const totalCost = sourcingCost + platformFee + shippingCost;
+export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
+  const { salePrice, sourcingCost, platform, shippingCost } = params;
+
+  // Platform-specific fee structures
+  const platformFees = {
+    ebay: 0.13, // 13% final value fee
+    poshmark: 0.15, // 15% processing fee
+    mercari: 0.10, // 10% service fee
+    depop: 0.12, // 12% commission
+    default: 0.10 // Default 10% fee
+  };
+
+  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
+  const fees = salePrice * feePercentage;
+  const totalCost = sourcingCost + fees + shippingCost;
   const profit = salePrice - totalCost;
   const margin = (profit / salePrice) * 100;
 
   return {
     profit: Math.max(0, profit), // Ensure profit isn't negative
     margin: isNaN(margin) ? 0 : margin,
-    fees: platformFee
+    fees
   };
 }
 
 export function calculateFees(price: number, platform: string): number {
-  const platformLower = platform.toLowerCase();
+  const platformFees = {
+    ebay: 0.13,
+    poshmark: 0.15,
+    mercari: 0.10,
+    depop: 0.12,
+    default: 0.10
+  };
 
-  switch (platformLower) {
-    case 'ebay':
-      // eBay final value fee (13.5% for most items)
-      return price * 0.135;
-    case 'poshmark':
-      // Poshmark takes 15% + $2.99 per sale
-      return (price * 0.15) + 2.99;
-    case 'mercari':
-      // Mercari takes 10% + $0.30 per sale
-      return (price * 0.10) + 0.30;
-    case 'depop':
-      // Depop takes 10% + $0.25 per sale
-      return (price * 0.10) + 0.25;
-    default:
-      // Default 10% fee for unknown platforms
-      return price * 0.10;
-  }
+  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
+  return price * feePercentage;
+}
+
+export function calculateMargin(profit: number, salePrice: number): number {
+  if (salePrice === 0) return 0;
+  return (profit / salePrice) * 100;
 }

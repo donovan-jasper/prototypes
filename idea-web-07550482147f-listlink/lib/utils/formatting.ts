@@ -1,23 +1,21 @@
-export function formatCurrency(amount: number, withSymbol = true): string {
-  const formatter = new Intl.NumberFormat('en-US', {
+export function formatCurrency(amount: number): string {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
-  return withSymbol ? formatter.format(amount) : amount.toFixed(2);
+    maximumFractionDigits: 2
+  }).format(amount);
 }
 
 export function formatDate(date: Date): string {
   return date.toLocaleDateString('en-US', {
+    year: 'numeric',
     month: 'short',
-    day: 'numeric',
-    year: 'numeric'
+    day: 'numeric'
   });
 }
 
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength - 3) + '...';
+  return text.substring(0, maxLength) + '...';
 }

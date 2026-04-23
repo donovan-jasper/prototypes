@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Modal, Portal, Button, RadioButton } from 'react-native-paper';
+import { Card, Button } from 'react-native-paper';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface DateRangePickerProps {
   dateRange: { start: Date; end: Date };
@@ -8,126 +9,143 @@ interface DateRangePickerProps {
 }
 
 export function DateRangePicker({ dateRange, onChange }: DateRangePickerProps) {
-  const [visible, setVisible] = useState(false);
-  const [selectedRange, setSelectedRange] = useState('custom');
+  const [showPicker, setShowPicker] = useState<'start' | 'end' | null>(null);
+  const [tempRange, setTempRange] = useState(dateRange);
 
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    });
+  const handleDateChange = (event: any, selectedDate?: Date) => {
+    if (selectedDate) {
+      if (showPicker === 'start') {
+        setTempRange({ ...tempRange, start: selectedDate });
+      } else if (showPicker === 'end') {
+        setTempRange({ ...tempRange, end: selectedDate });
+      }
+    }
+    setShowPicker(null);
   };
 
-  const handleRangeSelect = (range: string) => {
-    setSelectedRange(range);
-    const now = new Date();
+  const applyDateRange = () => {
+    onChange(tempRange);
+  };
 
-    switch (range) {
+  const setPresetRange = (preset: 'week' | 'month' | 'year') => {
+    const now = new Date();
+    let startDate = new Date();
+
+    switch (preset) {
       case 'week':
-        onChange({
-          start: new Date(now.setDate(now.getDate() - 7)),
-          end: new Date()
-        });
+        startDate.setDate(now.getDate() - 7);
         break;
       case 'month':
-        onChange({
-          start: new Date(now.setMonth(now.getMonth() - 1)),
-          end: new Date()
-        });
+        startDate.setMonth(now.getMonth() - 1);
         break;
       case 'year':
-        onChange({
-          start: new Date(now.setFullYear(now.getFullYear() - 1)),
-          end: new Date()
-        });
-        break;
-      default:
-        // Custom range will be handled separately
+        startDate.setFullYear(now.getFullYear() - 1);
         break;
     }
 
-    setVisible(false);
+    const newRange = { start: startDate, end: now };
+    setTempRange(newRange);
+    onChange(newRange);
   };
 
   return (
-    <>
-      <TouchableOpacity
-        style={styles.pickerButton}
-        onPress={() => setVisible(true)}
-      >
-        <Text style={styles.pickerText}>
-          {formatDate(dateRange.start)} - {formatDate(dateRange.end)}
-        </Text>
-      </TouchableOpacity>
-
-      <Portal>
-        <Modal
-          visible={visible}
-          onDismiss={() => setVisible(false)}
-          contentContainerStyle={styles.modalContent}
+    <Card style={styles.container} mode="outlined">
+      <View style={styles.presetButtons}>
+        <Button
+          mode="outlined"
+          onPress={() => setPresetRange('week')}
+          style={styles.presetButton}
         >
-          <Text style={styles.modalTitle}>Select Date Range</Text>
+          Week
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => setPresetRange('month')}
+          style={styles.presetButton}
+        >
+          Month
+        </Button>
+        <Button
+          mode="outlined"
+          onPress={() => setPresetRange('year')}
+          style={styles.presetButton}
+        >
+          Year
+        </Button>
+      </View>
 
-          <RadioButton.Group
-            onValueChange={handleRangeSelect}
-            value={selectedRange}
-          >
-            <View style={styles.radioOption}>
-              <RadioButton value="week" />
-              <Text>Last 7 Days</Text>
-            </View>
-            <View style={styles.radioOption}>
-              <RadioButton value="month" />
-              <Text>Last 30 Days</Text>
-            </View>
-            <View style={styles.radioOption}>
-              <RadioButton value="year" />
-              <Text>Last Year</Text>
-            </View>
-            <View style={styles.radioOption}>
-              <RadioButton value="custom" />
-              <Text>Custom Range</Text>
-            </View>
-          </RadioButton.Group>
+      <View style={styles.dateRow}>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowPicker('start')}
+        >
+          <Text style={styles.dateText}>
+            From: {tempRange.start.toLocaleDateString()}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.dateButton}
+          onPress={() => setShowPicker('end')}
+        >
+          <Text style={styles.dateText}>
+            To: {tempRange.end.toLocaleDateString()}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-          <View style={styles.modalActions}>
-            <Button onPress={() => setVisible(false)}>Cancel</Button>
-          </View>
-        </Modal>
-      </Portal>
-    </>
+      {showPicker && (
+        <DateTimePicker
+          value={showPicker === 'start' ? tempRange.start : tempRange.end}
+          mode="date"
+          display="default"
+          onChange={handleDateChange}
+        />
+      )}
+
+      <Button
+        mode="contained"
+        onPress={applyDateRange}
+        style={styles.applyButton}
+      >
+        Apply
+      </Button>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  pickerButton: {
+  container: {
     padding: 12,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 8,
-  },
-  pickerText: {
-    fontSize: 16,
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    margin: 20,
-    borderRadius: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 16,
+    borderRadius: 8,
   },
-  radioOption: {
+  presetButtons: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  presetButton: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  dateButton: {
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    flex: 1,
+    marginHorizontal: 4,
     alignItems: 'center',
-    marginBottom: 8,
   },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
+  dateText: {
+    fontSize: 14,
+  },
+  applyButton: {
+    marginTop: 8,
   },
 });

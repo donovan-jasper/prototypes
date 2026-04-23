@@ -1,26 +1,33 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useListingStore } from '../../lib/stores/listingStore';
 import { calculateProfit } from '../../lib/utils/calculations';
 import { formatCurrency, formatDate } from '../../lib/utils/formatting';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { DateRangePicker } from '../../components/DateRangePicker';
 import { CSVExportButton } from '../../components/CSVExportButton';
-import { Card } from 'react-native-paper';
+import { Card, ActivityIndicator } from 'react-native-paper';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 export default function SalesScreen() {
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
     start: new Date(new Date().setDate(new Date().getDate() - 30)),
     end: new Date()
   });
+  const [isExporting, setIsExporting] = useState(false);
 
-  const soldListings = useListingStore(state =>
-    state.listings.filter(
-      listing =>
-        listing.status === 'sold' &&
-        new Date(listing.createdAt) >= dateRange.start &&
-        new Date(listing.createdAt) <= dateRange.end
-    )
+  const { listings, loadListings, loading, error } = useListingStore();
+
+  useEffect(() => {
+    loadListings({ status: 'sold' });
+  }, []);
+
+  const soldListings = listings.filter(
+    listing =>
+      listing.status === 'sold' &&
+      new Date(listing.createdAt) >= dateRange.start &&
+      new Date(listing.createdAt) <= dateRange.end
   );
 
   const totalSales = soldListings.reduce((sum, listing) => sum + listing.price, 0);
@@ -29,7 +36,7 @@ export default function SalesScreen() {
       salePrice: listing.price,
       sourcingCost: listing.sourcingCost || 0,
       platform: listing.platform,
-      shippingCost: 0 // Assuming shipping is not tracked in basic version
+      shippingCost: 0
     });
     return sum + profit.profit;
   }, 0);
@@ -37,6 +44,55 @@ export default function SalesScreen() {
   const avgMargin = soldListings.length > 0
     ? (totalProfit / totalSales) * 100
     : 0;
+
+  const handleExportCSV = async () => {
+    if (soldListings.length === 0) {
+      Alert.alert('No Data', 'There are no sales to export for the selected period');
+      return;
+    }
+
+    setIsExporting(true);
+
+    try {
+      // Prepare CSV data
+      const header = 'ID,Title,Platform,Sale Price,Sourcing Cost,Profit,Margin,Date\n';
+      const rows = soldListings.map(item => {
+        const profit = calculateProfit({
+          salePrice: item.price,
+          sourcingCost: item.sourcingCost || 0,
+          platform: item.platform,
+          shippingCost: 0
+        });
+
+        return [
+          item.id,
+          `"${item.title.replace(/"/g, '""')}"`,
+          item.platform,
+          item.price,
+          item.sourcingCost || 0,
+          profit.profit,
+          profit.margin,
+          formatDate(new Date(item.createdAt))
+        ].join(',');
+      }).join('\n');
+
+      const csvContent = header + rows;
+      const fileUri = FileSystem.documentDirectory + `sellsync_sales_${formatDate(dateRange.start)}_to_${formatDate(dateRange.end)}.csv`;
+
+      await FileSystem.writeAsStringAsync(fileUri, csvContent);
+
+      await Sharing.shareAsync(fileUri, {
+        mimeType: 'text/csv',
+        dialogTitle: 'Export Sales Data',
+        UTI: 'public.comma-separated-values-text'
+      });
+    } catch (error) {
+      console.error('Export failed:', error);
+      Alert.alert('Export Failed', 'There was an error exporting the sales data');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const renderItem = ({ item }: { item: any }) => {
     const profit = calculateProfit({
@@ -58,6 +114,10 @@ export default function SalesScreen() {
             <Text style={styles.detailValue}>{formatCurrency(item.price)}</Text>
           </View>
           <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Sourcing Cost:</Text>
+            <Text style={styles.detailValue}>{formatCurrency(item.sourcingCost || 0)}</Text>
+          </View>
+          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Profit:</Text>
             <Text style={styles.detailValue}>{formatCurrency(profit.profit)}</Text>
           </View>
@@ -73,6 +133,26 @@ export default function SalesScreen() {
       </Card>
     );
   };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <Text>Loading sales data...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error loading sales data: {error}</Text>
+        <TouchableOpacity onPress={() => loadListings({ status: 'sold' })}>
+          <Text style={styles.retryText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -101,9 +181,9 @@ export default function SalesScreen() {
 
       <View style={styles.exportContainer}>
         <CSVExportButton
-          data={soldListings}
-          dateRange={dateRange}
-          isPremium={false} // Replace with actual premium check
+          onPress={handleExportCSV}
+          isExporting={isExporting}
+          isPremium={true}
         />
       </View>
 
@@ -173,6 +253,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     flex: 1,
+    marginRight: 8,
   },
   saleItemDetails: {
     marginTop: 8,
@@ -200,5 +281,25 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: '#666',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryText: {
+    color: 'blue',
+    textDecorationLine: 'underline',
   },
 });
