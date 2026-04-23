@@ -28,7 +28,7 @@ export function useTensionLog() {
   const loadLogs = async () => {
     try {
       const db = openDatabase();
-      const history = await getTensionHistory(db, 7);
+      const history = await getTensionHistory(db, 30); // Load 30 days for pattern analysis
       setLogs(history);
     } catch (error) {
       console.error('Failed to load tension history:', error);
@@ -67,12 +67,16 @@ export function useTensionLog() {
 
   const identifyPatterns = useCallback((logsList: TensionLog[]) => {
     const hourCounts: { [hour: number]: number } = {};
-    
+    const dayCounts: { [day: number]: number } = {};
+
     logsList.forEach(log => {
       if (log.status === 'tense') {
         const date = new Date(log.timestamp);
         const hour = date.getHours();
+        const day = date.getDay();
+
         hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        dayCounts[day] = (dayCounts[day] || 0) + 1;
       }
     });
 
@@ -81,7 +85,12 @@ export function useTensionLog() {
       .slice(0, 3)
       .map(([hour]) => parseInt(hour));
 
-    return { peakHours };
+    const peakDays = Object.entries(dayCounts)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 2)
+      .map(([day]) => parseInt(day));
+
+    return { peakHours, peakDays };
   }, []);
 
   return {

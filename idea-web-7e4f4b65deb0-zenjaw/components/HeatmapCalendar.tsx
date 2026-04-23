@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { TensionLog } from '@/types';
 import { Colors } from '@/constants/colors';
 
@@ -8,6 +8,9 @@ interface HeatmapCalendarProps {
   days: number;
   onDayPress?: (date: Date) => void;
 }
+
+const screenWidth = Dimensions.get('window').width;
+const cellSize = (screenWidth - 64) / 7;
 
 export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalendarProps) {
   const getDayData = () => {
@@ -53,35 +56,51 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
     }
   };
 
+  const getDayName = (date: Date) => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    return days[date.getDay()];
+  };
+
   const dayData = getDayData();
-  const columns = days === 7 ? 7 : 6;
-  const rows = Math.ceil(days / columns);
 
   return (
     <View style={styles.container}>
-      <View style={styles.grid}>
-        {dayData.map((day, index) => {
-          const color = getCellColor(day.tenseCount, day.relaxedCount);
-          const isToday = day.date.toDateString() === new Date().toDateString();
-
-          return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.cell,
-                { backgroundColor: color },
-                isToday && styles.todayCell,
-                { width: `${100 / columns - 2}%` }
-              ]}
-              onPress={() => onDayPress?.(day.date)}
-            >
-              <Text style={styles.dayNumber}>
-                {day.date.getDate()}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+      <View style={styles.header}>
+        <Text style={styles.headerText}>Tension Heatmap</Text>
+        <Text style={styles.subHeaderText}>
+          {days === 7 ? 'Last 7 days' : 'Last 30 days'}
+        </Text>
       </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <View style={styles.grid}>
+          {dayData.map((day, index) => {
+            const color = getCellColor(day.tenseCount, day.relaxedCount);
+            const isToday = day.date.toDateString() === new Date().toDateString();
+            const total = day.tenseCount + day.relaxedCount;
+            const percentage = total > 0 ? Math.round((day.tenseCount / total) * 100) : 0;
+
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.cell,
+                  { backgroundColor: color },
+                  isToday && styles.todayCell
+                ]}
+                onPress={() => onDayPress?.(day.date)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.dayName}>{getDayName(day.date)}</Text>
+                <Text style={styles.dayNumber}>{day.date.getDate()}</Text>
+                {total > 0 && (
+                  <Text style={styles.percentage}>{percentage}%</Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </ScrollView>
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
@@ -108,47 +127,76 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 const styles = StyleSheet.create({
   container: {
     width: '100%',
+    marginVertical: 16,
+  },
+  header: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  headerText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.light.text,
+  },
+  subHeaderText: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    marginTop: 4,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   cell: {
-    aspectRatio: 1,
+    width: cellSize,
+    height: cellSize,
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 8,
+    padding: 4,
+    marginRight: 8,
   },
   todayCell: {
     borderWidth: 2,
     borderColor: Colors.light.tint,
   },
+  dayName: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#fff',
+    marginBottom: 2,
+  },
   dayNumber: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '600',
     color: '#fff',
   },
+  percentage: {
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#fff',
+    marginTop: 2,
+  },
   legend: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    justifyContent: 'space-between',
+    marginTop: 8,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
   },
   legendBox: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
+    width: 12,
+    height: 12,
+    borderRadius: 2,
+    marginRight: 4,
   },
   legendText: {
     fontSize: 12,
-    color: Colors.light.icon,
+    color: Colors.light.textSecondary,
   },
 });

@@ -1,17 +1,20 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, Text, ScrollView, ActivityIndicator, TouchableOpacity, Modal, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import HeatmapCalendar from '@/components/HeatmapCalendar';
 import PremiumGate from '@/components/PremiumGate';
 import { useTensionLog } from '@/hooks/useTensionLog';
 import { usePremium } from '@/hooks/usePremium';
 import { Colors } from '@/constants/colors';
+import { TensionLog } from '@/types';
 
 export default function InsightsScreen() {
   const { logs, loading, calculateTensionScore, identifyPatterns } = useTensionLog();
   const { isPremium, purchasePremium } = usePremium();
   const [viewDays, setViewDays] = useState<7 | 30>(7);
   const [showPremiumGate, setShowPremiumGate] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dayLogs, setDayLogs] = useState<TensionLog[]>([]);
 
   const handleViewToggle = (days: 7 | 30) => {
     if (days === 30 && !isPremium) {
@@ -25,6 +28,26 @@ export default function InsightsScreen() {
     purchasePremium();
     setShowPremiumGate(false);
     setViewDays(30);
+  };
+
+  const handleDayPress = (date: Date) => {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const logsForDay = logs.filter(log => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= startOfDay && logDate <= endOfDay;
+    });
+
+    setDayLogs(logsForDay);
+    setSelectedDate(date);
+  };
+
+  const closeModal = () => {
+    setSelectedDate(null);
   };
 
   if (loading) {
@@ -76,84 +99,161 @@ export default function InsightsScreen() {
     }
   };
 
+  const renderDayLogItem = ({ item }: { item: TensionLog }) => {
+    const logDate = new Date(item.timestamp);
+    const timeString = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return (
+      <View style={styles.logItem}>
+        <View style={styles.logTimeContainer}>
+          <Text style={styles.logTime}>{timeString}</Text>
+        </View>
+        <View style={styles.logStatusContainer}>
+          <View style={[
+            styles.logStatusDot,
+            { backgroundColor: item.status === 'tense' ? Colors.light.tense : Colors.light.relaxed }
+          ]} />
+          <Text style={styles.logStatusText}>
+            {item.status === 'tense' ? 'Tense' : 'Relaxed'}
+          </Text>
+        </View>
+        <Text style={styles.logBodyZone}>{item.bodyZone}</Text>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Insights</Text>
-        <View style={styles.toggleContainer}>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewDays === 7 && styles.toggleButtonActive]}
-            onPress={() => handleViewToggle(7)}
-          >
-            <Text style={[styles.toggleText, viewDays === 7 && styles.toggleTextActive]}>
-              7 Days
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.toggleButton, viewDays === 30 && styles.toggleButtonActive]}
-            onPress={() => handleViewToggle(30)}
-          >
-            <Text style={[styles.toggleText, viewDays === 30 && styles.toggleTextActive]}>
-              30 Days
-            </Text>
-            {!isPremium && <Text style={styles.premiumBadge}>Premium</Text>}
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Insights</Text>
+          <View style={styles.toggleContainer}>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewDays === 7 && styles.toggleButtonActive]}
+              onPress={() => handleViewToggle(7)}
+            >
+              <Text style={[styles.toggleText, viewDays === 7 && styles.toggleTextActive]}>
+                7 Days
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleButton, viewDays === 30 && styles.toggleButtonActive]}
+              onPress={() => handleViewToggle(30)}
+            >
+              <Text style={[styles.toggleText, viewDays === 30 && styles.toggleTextActive]}>
+                30 Days
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {currentLogs.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>No data yet</Text>
-            <Text style={styles.emptyText}>
-              Start logging your tension to see insights and patterns
+        <HeatmapCalendar
+          logs={currentLogs}
+          days={viewDays}
+          onDayPress={handleDayPress}
+        />
+
+        <View style={styles.summaryContainer}>
+          <Text style={styles.summaryTitle}>Tension Summary</Text>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Tension Level:</Text>
+            <Text style={styles.summaryValue}>
+              {currentLogs.length === 0 ? 'No data' : `${(tensionScore * 100).toFixed(0)}% tense`}
             </Text>
           </View>
-        ) : (
-          <>
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Tension Heatmap</Text>
-              <HeatmapCalendar logs={currentLogs} days={viewDays} />
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Trend:</Text>
+            <Text style={styles.summaryValue}>{getTrendText()}</Text>
+          </View>
+          {patterns.peakHours.length > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Peak Tension Times:</Text>
+              <Text style={styles.summaryValue}>
+                {patterns.peakHours.map(hour => formatHour(hour)).join(', ')}
+              </Text>
             </View>
+          )}
+        </View>
 
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Tension Score</Text>
-              <View style={styles.scoreContainer}>
-                <Text style={styles.scoreValue}>{(tensionScore * 100).toFixed(0)}%</Text>
-                <Text style={styles.scoreLabel}>of logs were tense</Text>
-              </View>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    { width: `${tensionScore * 100}%`, backgroundColor: Colors.light.tense }
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Trend</Text>
-              <Text style={styles.trendText}>{getTrendText()}</Text>
-            </View>
-
-            {patterns.peakHours.length > 0 && (
-              <View style={styles.card}>
-                <Text style={styles.cardTitle}>Peak Tension Hours</Text>
-                <Text style={styles.patternText}>
-                  You're most tense at {patterns.peakHours.map(formatHour).join(', ')}
-                </Text>
-              </View>
-            )}
-          </>
+        {!isPremium && (
+          <PremiumGate
+            title="Unlock Full History"
+            description="See your complete 30-day tension patterns and get deeper insights with JawZen Premium."
+            buttonText="Upgrade Now"
+            onPress={handleUpgrade}
+          />
         )}
       </ScrollView>
 
-      <PremiumGate
+      <Modal
+        visible={selectedDate !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {selectedDate?.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </Text>
+
+            {dayLogs.length > 0 ? (
+              <FlatList
+                data={dayLogs}
+                renderItem={renderDayLogItem}
+                keyExtractor={(item) => item.id.toString()}
+                style={styles.logList}
+              />
+            ) : (
+              <Text style={styles.noLogsText}>No tension logs for this day</Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={closeModal}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={showPremiumGate}
-        onClose={() => setShowPremiumGate(false)}
-        onUpgrade={handleUpgrade}
-      />
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowPremiumGate(false)}
+      >
+        <View style={styles.premiumModalContainer}>
+          <View style={styles.premiumModalContent}>
+            <Text style={styles.premiumModalTitle}>Premium Feature</Text>
+            <Text style={styles.premiumModalText}>
+              The 30-day view is available to Premium members only.
+            </Text>
+            <View style={styles.premiumModalButtons}>
+              <TouchableOpacity
+                style={[styles.premiumModalButton, styles.premiumModalCancel]}
+                onPress={() => setShowPremiumGate(false)}
+              >
+                <Text style={styles.premiumModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.premiumModalButton, styles.premiumModalUpgrade]}
+                onPress={handleUpgrade}
+              >
+                <Text style={[styles.premiumModalButtonText, styles.premiumModalUpgradeText]}>
+                  Upgrade Now
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -163,131 +263,189 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.light.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  scrollContent: {
+    padding: 16,
   },
   header: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 16,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 24,
+    fontWeight: '700',
     color: Colors.light.text,
     marginBottom: 16,
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
+    justifyContent: 'center',
   },
   toggleButton: {
-    flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 6,
+    borderRadius: 20,
+    marginHorizontal: 4,
+    backgroundColor: Colors.light.backgroundSecondary,
   },
   toggleButtonActive: {
     backgroundColor: Colors.light.tint,
   },
   toggleText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.light.icon,
+    color: Colors.light.textSecondary,
+    fontWeight: '500',
   },
   toggleTextActive: {
     color: '#fff',
   },
-  premiumBadge: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: Colors.light.tint,
-    backgroundColor: Colors.light.border,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  content: {
+  loadingContainer: {
     flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-  },
-  emptyState: {
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 64,
-    paddingHorizontal: 32,
+    alignItems: 'center',
   },
-  emptyTitle: {
-    fontSize: 20,
+  summaryContainer: {
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  summaryTitle: {
+    fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  emptyText: {
-    fontSize: 16,
-    color: Colors.light.icon,
-    textAlign: 'center',
-    lineHeight: 22,
+  summaryLabel: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
   },
-  card: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 16,
+  summaryValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: Colors.light.text,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '80%',
     padding: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: Colors.light.border,
   },
-  cardTitle: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
     marginBottom: 16,
+    textAlign: 'center',
   },
-  scoreContainer: {
-    alignItems: 'center',
+  logList: {
     marginBottom: 16,
   },
-  scoreValue: {
-    fontSize: 48,
-    fontWeight: 'bold',
+  logItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  logTimeContainer: {
+    width: 60,
+  },
+  logTime: {
+    fontSize: 14,
     color: Colors.light.text,
   },
-  scoreLabel: {
-    fontSize: 16,
-    color: Colors.light.icon,
-    marginTop: 4,
+  logStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
   },
-  progressBar: {
-    height: 12,
-    backgroundColor: Colors.light.border,
-    borderRadius: 6,
-    overflow: 'hidden',
+  logStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 6,
-  },
-  trendText: {
-    fontSize: 16,
+  logStatusText: {
+    fontSize: 14,
     color: Colors.light.text,
-    lineHeight: 24,
   },
-  patternText: {
-    fontSize: 16,
+  logBodyZone: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textTransform: 'capitalize',
+  },
+  noLogsText: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  closeButton: {
+    backgroundColor: Colors.light.tint,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  premiumModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  premiumModalContent: {
+    backgroundColor: Colors.light.background,
+    borderRadius: 12,
+    width: '85%',
+    padding: 20,
+  },
+  premiumModalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
     color: Colors.light.text,
-    lineHeight: 24,
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  premiumModalText: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  premiumModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  premiumModalButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  premiumModalCancel: {
+    backgroundColor: Colors.light.backgroundSecondary,
+  },
+  premiumModalUpgrade: {
+    backgroundColor: Colors.light.tint,
+  },
+  premiumModalButtonText: {
+    fontWeight: '600',
+  },
+  premiumModalUpgradeText: {
+    color: '#fff',
   },
 });
