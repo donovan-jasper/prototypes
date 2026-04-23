@@ -180,64 +180,62 @@ const ARTargetPractice = () => {
   };
 
   const onContextCreate = async (gl) => {
+    const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
     arEngineRef.current.initialize(gl);
 
     // Animation loop
     const animate = () => {
       if (glViewRef.current) {
-        glViewRef.current.requestAnimationFrame(animate);
+        requestAnimationFrame(animate);
+        arEngineRef.current.render();
+        gl.endFrameEXP();
       }
-
-      // Update camera based on device orientation
-      if (arEngineRef.current.camera) {
-        arEngineRef.current.camera.rotation.x = deviceOrientation.beta * Math.PI / 180;
-        arEngineRef.current.camera.rotation.y = deviceOrientation.alpha * Math.PI / 180;
-        arEngineRef.current.camera.rotation.z = deviceOrientation.gamma * Math.PI / 180;
-      }
-
-      arEngineRef.current.render();
     };
-
     animate();
   };
 
   if (hasPermission === null) {
-    return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
+    return <View />;
   }
 
   if (hasPermission === false) {
-    return <View style={styles.container}><Text>No access to camera</Text></View>;
+    return (
+      <View style={styles.container}>
+        <Text style={styles.text}>No access to camera</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
       <Camera
         ref={cameraRef}
-        style={StyleSheet.absoluteFill}
+        style={styles.camera}
         type={Camera.Constants.Type.back}
         onTouchStart={handleTap}
       >
         <GLView
           ref={glViewRef}
-          style={StyleSheet.absoluteFill}
+          style={styles.glView}
           onContextCreate={onContextCreate}
         />
-
-        <ARTargetOverlay
-          hits={hits}
-          misses={misses}
-          timeLeft={timeLeft}
-          score={score}
-        />
-
-        {!gameActive && (
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.startButton} onPress={startGame}>
-              <Text style={styles.startButtonText}>Start AR Training</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </Camera>
+
+      <ARTargetOverlay
+        hits={hits}
+        misses={misses}
+        timeLeft={timeLeft}
+        score={score}
+      />
+
+      {!gameActive && !score && (
+        <TouchableOpacity
+          style={styles.startButton}
+          onPress={startGame}
+        >
+          <Text style={styles.startButtonText}>Start Challenge</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -245,15 +243,18 @@ const ARTargetPractice = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: 'black',
   },
-  buttonContainer: {
-    position: 'absolute',
-    bottom: 50,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+  camera: {
+    flex: 1,
+  },
+  glView: {
+    flex: 1,
   },
   startButton: {
+    position: 'absolute',
+    bottom: 50,
+    alignSelf: 'center',
     backgroundColor: '#4CAF50',
     paddingVertical: 15,
     paddingHorizontal: 30,
