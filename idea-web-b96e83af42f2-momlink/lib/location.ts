@@ -26,7 +26,7 @@ export function calculateDistance(
   lat2: number,
   lon2: number
 ): number {
-  const R = 3959;
+  const R = 3959; // Earth's radius in miles
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a =

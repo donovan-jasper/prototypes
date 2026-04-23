@@ -1,11 +1,10 @@
 import * as SQLite from 'expo-sqlite';
-import { User, Request } from '../types';
 
 let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
   db = SQLite.openDatabaseSync('parentcircle.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -108,7 +107,8 @@ export async function createRequest(request: Omit<Request, 'id' | 'status' | 'cr
 }
 
 export async function getRequests(userLat: number, userLon: number, radiusMiles: number): Promise<Request[]> {
-  const latDelta = radiusMiles / 69;
+  // Haversine formula approximation for filtering
+  const latDelta = radiusMiles / 69; // 1 degree lat ≈ 69 miles
   const lonDelta = radiusMiles / (69 * Math.cos(userLat * Math.PI / 180));
 
   const results = await db.getAllAsync<any>(
