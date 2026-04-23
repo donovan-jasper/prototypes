@@ -1,135 +1,245 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as SQLite from 'expo-sqlite';
 
 interface QueryBuilderProps {
   tables: string[];
+  initialQuery?: string;
   onQueryChange: (query: string) => void;
 }
 
-const QueryBuilder: React.FC<QueryBuilderProps> = ({ tables, onQueryChange }) => {
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
+const QueryBuilder: React.FC<QueryBuilderProps> = ({ tables, initialQuery = '', onQueryChange }) => {
+  const [selectedTables, setSelectedTables] = useState<string[]>([]);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
-  const [filters, setFilters] = useState<{ field: string; operator: string; value: string }[]>([]);
+  const [whereConditions, setWhereConditions] = useState<string[]>([]);
+  const [orderBy, setOrderBy] = useState<string>('');
+  const [limit, setLimit] = useState<string>('');
+  const [query, setQuery] = useState<string>(initialQuery);
+  const [queryResults, setQueryResults] = useState<any[]>([]);
+  const [db, setDb] = useState<SQLite.SQLiteDatabase | null>(null);
 
-  const tableColumns: Record<string, string[]> = {
-    sales: ['id', 'amount', 'date', 'customer_id', 'product_id'],
-    customers: ['id', 'name', 'email', 'phone', 'join_date'],
-    orders: ['id', 'customer_id', 'order_date', 'status', 'total'],
-    products: ['id', 'name', 'price', 'category', 'stock']
+  useEffect(() => {
+    const initializeDB = async () => {
+      const database = SQLite.openDatabase('querymentor.db');
+      setDb(database);
+
+      // Create sample tables if they don't exist
+      database.transaction(tx => {
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS sales (id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL, date TEXT, product_id INTEGER);',
+          [],
+          () => console.log('Sales table created'),
+          (_, error) => console.log('Error creating sales table:', error)
+        );
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS customers (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, email TEXT);',
+          [],
+          () => console.log('Customers table created'),
+          (_, error) => console.log('Error creating customers table:', error)
+        );
+        tx.executeSql(
+          'CREATE TABLE IF NOT EXISTS orders (id INTEGER PRIMARY KEY AUTOINCREMENT, customer_id INTEGER, order_date TEXT, total REAL);',
+          [],
+          () => console.log('Orders table created'),
+          (_, error) => console.log('Error creating orders table:', error)
+        );
+      });
+    };
+
+    initializeDB();
+  }, []);
+
+  useEffect(() => {
+    // Update the query when initialQuery changes
+    if (initialQuery) {
+      setQuery(initialQuery);
+      onQueryChange(initialQuery);
+    }
+  }, [initialQuery]);
+
+  useEffect(() => {
+    if (!initialQuery) {
+      buildQuery();
+    }
+  }, [selectedTables, selectedColumns, whereConditions, orderBy, limit]);
+
+  const buildQuery = () => {
+    let newQuery = '';
+
+    if (selectedTables.length > 0) {
+      const columns = selectedColumns.length > 0 ? selectedColumns.join(', ') : '*';
+      newQuery = `SELECT ${columns} FROM ${selectedTables.join(', ')}`;
+
+      if (whereConditions.length > 0) {
+        newQuery += ` WHERE ${whereConditions.join(' AND ')}`;
+      }
+
+      if (orderBy) {
+        newQuery += ` ORDER BY ${orderBy}`;
+      }
+
+      if (limit) {
+        newQuery += ` LIMIT ${limit}`;
+      }
+
+      newQuery += ';';
+      setQuery(newQuery);
+      onQueryChange(newQuery);
+    } else {
+      setQuery('');
+      onQueryChange('');
+    }
   };
 
-  const handleTableSelect = (table: string) => {
-    setSelectedTable(table);
-    setSelectedColumns([]);
-    setFilters([]);
+  const toggleTable = (table: string) => {
+    setSelectedTables(prev =>
+      prev.includes(table) ? prev.filter(t => t !== table) : [...prev, table]
+    );
   };
 
   const toggleColumn = (column: string) => {
     setSelectedColumns(prev =>
-      prev.includes(column)
-        ? prev.filter(c => c !== column)
-        : [...prev, column]
+      prev.includes(column) ? prev.filter(c => c !== column) : [...prev, column]
     );
   };
 
-  const buildQuery = () => {
-    if (!selectedTable) return '';
-
-    let query = `SELECT ${selectedColumns.length > 0 ? selectedColumns.join(', ') : '*'} FROM ${selectedTable}`;
-
-    if (filters.length > 0) {
-      const filterConditions = filters.map(filter =>
-        `${filter.field} ${filter.operator} '${filter.value}'`
-      );
-      query += ` WHERE ${filterConditions.join(' AND ')}`;
+  const addWhereCondition = (condition: string) => {
+    if (condition.trim()) {
+      setWhereConditions(prev => [...prev, condition]);
     }
+  };
 
-    query += ';';
-    onQueryChange(query);
-    return query;
+  const removeWhereCondition = (index: number) => {
+    setWhereConditions(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const executeQuery = () => {
+    if (!db || !query) return;
+
+    db.transaction(tx => {
+      tx.executeSql(
+        query,
+        [],
+        (_, { rows }) => {
+          const results = [];
+          for (let i = 0; i < rows.length; i++) {
+            results.push(rows.item(i));
+          }
+          setQueryResults(results);
+        },
+        (_, error) => {
+          console.log('Query execution error:', error);
+          setQueryResults([{ error: error.message }]);
+        }
+      );
+    });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.sectionTitle}>Query Builder</Text>
-
-      <View style={styles.section}>
-        <Text style={styles.label}>Select Table:</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {tables.map(table => (
-            <TouchableOpacity
-              key={table}
-              style={[
-                styles.tableButton,
-                selectedTable === table && styles.tableButtonSelected
-              ]}
-              onPress={() => handleTableSelect(table)}
-            >
-              <Text style={[
-                styles.tableButtonText,
-                selectedTable === table && styles.tableButtonTextSelected
-              ]}>
-                {table}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+      <Text style={styles.sectionTitle}>Tables</Text>
+      <View style={styles.tableContainer}>
+        {tables.map(table => (
+          <TouchableOpacity
+            key={table}
+            style={[
+              styles.tableButton,
+              selectedTables.includes(table) && styles.selectedTable
+            ]}
+            onPress={() => toggleTable(table)}
+          >
+            <Text style={styles.tableText}>{table}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      {selectedTable && (
+      {selectedTables.length > 0 && (
         <>
-          <View style={styles.section}>
-            <Text style={styles.label}>Select Columns:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {tableColumns[selectedTable].map(column => (
-                <TouchableOpacity
-                  key={column}
-                  style={[
-                    styles.columnButton,
-                    selectedColumns.includes(column) && styles.columnButtonSelected
-                  ]}
-                  onPress={() => toggleColumn(column)}
-                >
-                  <Text style={[
-                    styles.columnButtonText,
-                    selectedColumns.includes(column) && styles.columnButtonTextSelected
-                  ]}>
-                    {column}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={styles.section}>
-            <Text style={styles.label}>Filters:</Text>
-            <TouchableOpacity
-              style={styles.addFilterButton}
-              onPress={() => setFilters([...filters, { field: '', operator: '=', value: '' }])}
-            >
-              <Ionicons name="add-circle-outline" size={20} color="#007AFF" />
-              <Text style={styles.addFilterText}>Add Filter</Text>
-            </TouchableOpacity>
-
-            {filters.map((filter, index) => (
-              <View key={index} style={styles.filterRow}>
-                <Text style={styles.filterLabel}>Field:</Text>
-                <Text style={styles.filterValue}>{filter.field || 'Select field'}</Text>
-                <Text style={styles.filterLabel}>Operator:</Text>
-                <Text style={styles.filterValue}>{filter.operator}</Text>
-                <Text style={styles.filterLabel}>Value:</Text>
-                <Text style={styles.filterValue}>{filter.value || 'Enter value'}</Text>
+          <Text style={styles.sectionTitle}>Columns</Text>
+          <View style={styles.columnContainer}>
+            {selectedTables.map(table => (
+              <View key={table} style={styles.tableColumns}>
+                <Text style={styles.tableHeader}>{table}</Text>
+                {['id', 'name', 'amount', 'date', 'email', 'total', 'customer_id', 'product_id'].map(column => (
+                  <TouchableOpacity
+                    key={column}
+                    style={[
+                      styles.columnButton,
+                      selectedColumns.includes(column) && styles.selectedColumn
+                    ]}
+                    onPress={() => toggleColumn(column)}
+                  >
+                    <Text style={styles.columnText}>{column}</Text>
+                  </TouchableOpacity>
+                ))}
               </View>
             ))}
           </View>
 
-          <TouchableOpacity
-            style={styles.buildButton}
-            onPress={buildQuery}
-          >
-            <Text style={styles.buildButtonText}>Build Query</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>WHERE Conditions</Text>
+          <View style={styles.whereContainer}>
+            {whereConditions.map((condition, index) => (
+              <View key={index} style={styles.conditionItem}>
+                <Text style={styles.conditionText}>{condition}</Text>
+                <TouchableOpacity onPress={() => removeWhereCondition(index)}>
+                  <Ionicons name="close-circle" size={20} color="#FF3B30" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            <TextInput
+              style={styles.conditionInput}
+              placeholder="Add condition (e.g., amount > 100)"
+              onSubmitEditing={(e) => addWhereCondition(e.nativeEvent.text)}
+            />
+          </View>
+
+          <Text style={styles.sectionTitle}>Order By</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Column name"
+            value={orderBy}
+            onChangeText={setOrderBy}
+          />
+
+          <Text style={styles.sectionTitle}>Limit</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Number of rows"
+            value={limit}
+            onChangeText={setLimit}
+            keyboardType="numeric"
+          />
+        </>
+      )}
+
+      <Text style={styles.sectionTitle}>Generated Query</Text>
+      <Text style={styles.queryText}>{query || 'No query generated yet'}</Text>
+
+      <TouchableOpacity
+        style={styles.executeButton}
+        onPress={executeQuery}
+        disabled={!query}
+      >
+        <Text style={styles.executeButtonText}>Execute Query</Text>
+      </TouchableOpacity>
+
+      {queryResults.length > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>Results</Text>
+          <ScrollView horizontal style={styles.resultsContainer}>
+            <View>
+              {queryResults.map((row, index) => (
+                <View key={index} style={styles.resultRow}>
+                  {Object.entries(row).map(([key, value]) => (
+                    <Text key={key} style={styles.resultCell}>
+                      {key}: {JSON.stringify(value)}
+                    </Text>
+                  ))}
+                </View>
+              ))}
+            </View>
+          </ScrollView>
         </>
       )}
     </View>
@@ -138,92 +248,128 @@ const QueryBuilder: React.FC<QueryBuilderProps> = ({ tables, onQueryChange }) =>
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 24,
+    marginTop: 20,
     padding: 16,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f9f9f9',
     borderRadius: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 12,
+    color: '#333',
   },
-  section: {
+  tableContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
   },
   tableButton: {
     padding: 8,
     marginRight: 8,
+    marginBottom: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
   },
-  tableButtonSelected: {
+  selectedTable: {
     backgroundColor: '#007AFF',
   },
-  tableButtonText: {
+  tableText: {
     color: '#333',
   },
-  tableButtonTextSelected: {
-    color: 'white',
+  columnContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+  },
+  tableColumns: {
+    marginRight: 16,
+    marginBottom: 16,
+  },
+  tableHeader: {
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
   },
   columnButton: {
-    padding: 8,
-    marginRight: 8,
+    padding: 6,
+    marginBottom: 4,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
   },
-  columnButtonSelected: {
-    backgroundColor: '#4CAF50',
+  selectedColumn: {
+    backgroundColor: '#007AFF',
   },
-  columnButtonText: {
+  columnText: {
     color: '#333',
   },
-  columnButtonTextSelected: {
-    color: 'white',
+  whereContainer: {
+    marginBottom: 16,
   },
-  addFilterButton: {
+  conditionItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 8,
+    marginBottom: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
-    marginBottom: 8,
   },
-  addFilterText: {
-    marginLeft: 4,
-    color: '#007AFF',
+  conditionText: {
+    color: '#333',
   },
-  filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    flexWrap: 'wrap',
-  },
-  filterLabel: {
-    marginRight: 4,
-    fontWeight: '600',
-  },
-  filterValue: {
-    marginRight: 8,
-    padding: 4,
-    backgroundColor: 'white',
+  conditionInput: {
+    padding: 8,
+    backgroundColor: '#fff',
     borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
-  buildButton: {
+  input: {
+    padding: 8,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 16,
+  },
+  queryText: {
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 16,
+    fontFamily: 'monospace',
+  },
+  executeButton: {
     backgroundColor: '#007AFF',
     padding: 12,
     borderRadius: 4,
     alignItems: 'center',
-    marginTop: 16,
+    marginBottom: 16,
   },
-  buildButtonText: {
-    color: 'white',
+  executeButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
+  },
+  resultsContainer: {
+    maxHeight: 200,
+    backgroundColor: '#fff',
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    padding: 8,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  resultCell: {
+    marginRight: 16,
+    fontFamily: 'monospace',
   },
 });
 
