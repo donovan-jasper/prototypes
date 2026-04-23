@@ -9,14 +9,16 @@ import { insertSessionReport } from '../lib/database';
 interface VideoCallProps {
   sessionId: string;
   peerName?: string;
+  onEndCall: () => void;
 }
 
-const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
+const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName, onEndCall }) => {
   const router = useRouter();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
+  const [isConnecting, setIsConnecting] = useState(true);
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -25,6 +27,11 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     })();
+
+    // Simulate connection delay
+    const connectionTimer = setTimeout(() => {
+      setIsConnecting(false);
+    }, 3000);
 
     // Start call duration timer
     timerRef.current = setInterval(() => {
@@ -35,6 +42,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      clearTimeout(connectionTimer);
     };
   }, []);
 
@@ -48,7 +56,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
-    router.back();
+    onEndCall();
   };
 
   const handleReportCall = async () => {
@@ -73,6 +81,14 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
   }
   if (hasPermission === false) {
     return <View style={styles.container}><Text>No access to camera</Text></View>;
+  }
+
+  if (isConnecting) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.connectingText}>Connecting to {peerName || 'peer'}...</Text>
+      </View>
+    );
   }
 
   return (
@@ -184,7 +200,6 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
     padding: 20,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
@@ -201,7 +216,7 @@ const styles = StyleSheet.create({
   },
   durationContainer: {
     position: 'absolute',
-    top: 50,
+    top: 20,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -210,20 +225,26 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
     paddingVertical: 5,
-    borderRadius: 10,
+    borderRadius: 15,
   },
   safetyButton: {
     position: 'absolute',
-    top: 50,
+    bottom: 30,
     right: 20,
-    backgroundColor: '#ff3b30',
     width: 50,
     height: 50,
     borderRadius: 25,
+    backgroundColor: '#ff3b30',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  connectingText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 50,
   },
 });
 

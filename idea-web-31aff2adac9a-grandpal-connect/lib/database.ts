@@ -54,6 +54,7 @@ export async function initDatabase() {
       duration INTEGER NOT NULL,
       type TEXT NOT NULL,
       status TEXT NOT NULL,
+      peerName TEXT,
       FOREIGN KEY (matchId) REFERENCES matches(id)
     );
 
@@ -81,6 +82,26 @@ export async function insertSessionReport(report: {
     `INSERT INTO session_reports (id, sessionId, timestamp, reason, status)
      VALUES (?, ?, ?, ?, ?)`,
     [report.id, report.sessionId, report.timestamp, report.reason, report.status]
+  );
+}
+
+export async function getSessionById(sessionId: string): Promise<any> {
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await db.getFirstAsync(
+    'SELECT * FROM sessions WHERE id = ?',
+    [sessionId]
+  );
+
+  return result;
+}
+
+export async function updateSessionStatus(sessionId: string, status: string): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
+  await db.runAsync(
+    'UPDATE sessions SET status = ? WHERE id = ?',
+    [status, sessionId]
   );
 }
 
