@@ -1,23 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { uploadSyncData, downloadSyncData, getLastSyncTime, initializeSyncDirectory } from '../../lib/sync';
 import { useUserStore } from '../../store/user';
+import SyncStatusIndicator from '../../components/SyncStatusIndicator';
 
 export default function SettingsScreen() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
+  const [syncStatus, setSyncStatus] = useState<{ isSynced: boolean; lastSync: number | null } | null>(null);
   const isPremium = useUserStore(state => state.isPremium);
   const navigation = useNavigation();
 
   useEffect(() => {
     initializeSyncDirectory();
-    loadLastSyncTime();
+    loadSyncStatus();
   }, []);
 
-  const loadLastSyncTime = async () => {
+  const loadSyncStatus = async () => {
     const time = await getLastSyncTime();
     setLastSyncTime(time);
+    setSyncStatus({
+      isSynced: time !== null,
+      lastSync: time
+    });
   };
 
   const handleSync = async (isUpload: boolean) => {
@@ -35,7 +41,7 @@ export default function SettingsScreen() {
       const result = isUpload ? await uploadSyncData() : await downloadSyncData();
 
       if (result.success) {
-        await loadLastSyncTime();
+        await loadSyncStatus();
         Alert.alert(
           'Success',
           isUpload ? 'Library synced to cloud' : 'Library updated from cloud'
@@ -56,11 +62,14 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>Settings</Text>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Cloud Sync</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Cloud Sync</Text>
+          {isPremium && <SyncStatusIndicator />}
+        </View>
 
         {lastSyncTime && (
           <Text style={styles.syncInfo}>
@@ -112,7 +121,17 @@ export default function SettingsScreen() {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Library</Text>
+        <TouchableOpacity style={styles.button}>
+          <Text style={styles.buttonText}>Clear Cache</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.button, styles.dangerButton]}>
+          <Text style={[styles.buttonText, styles.dangerText]}>Delete All Manga</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
   );
 }
 
@@ -130,10 +149,15 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 30,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 15,
   },
   syncInfo: {
     fontSize: 14,
@@ -156,9 +180,16 @@ const styles = StyleSheet.create({
   disabledButton: {
     backgroundColor: '#CCCCCC',
   },
+  dangerButton: {
+    backgroundColor: '#FF3B30',
+    marginTop: 10,
+  },
   buttonText: {
     color: '#fff',
     fontWeight: '600',
+  },
+  dangerText: {
+    color: '#fff',
   },
   premiumNote: {
     color: '#666',

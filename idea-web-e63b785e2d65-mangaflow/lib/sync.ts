@@ -128,3 +128,11 @@ export async function getLastSyncTime(): Promise<number | null> {
     return null;
   }
 }
+
+export async function getSyncStatus(): Promise<{ isSynced: boolean; lastSync: number | null }> {
+  const lastSync = await getLastSyncTime();
+  return {
+    isSynced: lastSync !== null,
+    lastSync: lastSync
+  };
+}
