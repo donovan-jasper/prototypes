@@ -8,15 +8,18 @@ import {
   RefreshControl,
   Image,
 } from 'react-native';
-import { getSavedArticles } from '../services/ContentService';
+import { useNavigation } from '@react-navigation/native';
+import ContentHub from '../components/ContentHub';
+import ContentService from '../services/ContentService';
 
-const Home = ({ navigation }) => {
+const Home = () => {
+  const navigation = useNavigation();
   const [articles, setArticles] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadArticles = async () => {
     try {
-      const savedArticles = await getSavedArticles();
+      const savedArticles = await ContentService.getSavedArticles();
       setArticles(savedArticles);
     } catch (error) {
       console.log('Error loading articles:', error);
@@ -25,7 +28,7 @@ const Home = ({ navigation }) => {
 
   useEffect(() => {
     loadArticles();
-    
+
     const unsubscribe = navigation.addListener('focus', () => {
       loadArticles();
     });
@@ -51,7 +54,7 @@ const Home = ({ navigation }) => {
       if (diffMins < 60) return `${diffMins}m ago`;
       if (diffHours < 24) return `${diffHours}h ago`;
       if (diffDays < 7) return `${diffDays}d ago`;
-      
+
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     } catch {
       return '';
@@ -104,7 +107,7 @@ const Home = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Saved Articles</Text>
+        <Text style={styles.headerTitle}>Librio</Text>
         <TouchableOpacity
           style={styles.addButton}
           onPress={() => navigation.navigate('AddArticle')}
@@ -113,16 +116,21 @@ const Home = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <FlatList
-        data={articles}
-        renderItem={renderArticle}
-        keyExtractor={(item) => item.url}
-        contentContainerStyle={articles.length === 0 ? styles.emptyList : styles.list}
-        ListEmptyComponent={renderEmpty}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-      />
+      <ContentHub />
+
+      <View style={styles.savedSection}>
+        <Text style={styles.sectionHeader}>Saved Articles</Text>
+        <FlatList
+          data={articles}
+          renderItem={renderArticle}
+          keyExtractor={(item) => item.url}
+          contentContainerStyle={articles.length === 0 ? styles.emptyList : styles.list}
+          ListEmptyComponent={renderEmpty}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
+      </View>
     </View>
   );
 };
@@ -159,6 +167,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '300',
     marginTop: -4,
+  },
+  savedSection: {
+    flex: 1,
+    marginTop: 16,
+  },
+  sectionHeader: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+    paddingHorizontal: 16,
   },
   list: {
     padding: 16,
@@ -202,16 +221,17 @@ const styles = StyleSheet.create({
   articlePreview: {
     fontSize: 14,
     color: '#666',
-    lineHeight: 20,
     marginBottom: 12,
+    lineHeight: 20,
   },
   articleMeta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
   },
   articleAuthor: {
     fontSize: 12,
-    color: '#999',
+    color: '#666',
   },
   articleDate: {
     fontSize: 12,
@@ -221,30 +241,30 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 20,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   emptyButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 32,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   emptyButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
