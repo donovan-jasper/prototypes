@@ -156,46 +156,42 @@ export function adaptRoutine(
   });
 
   if (slotsInWindow.length === 0) {
+    // No available slots in preferred window, find closest alternative
+    const allSlots = [...availableSlots].sort((a, b) => {
+      const aDistance = Math.min(
+        Math.abs(a.start.getTime() - windowStart.getTime()),
+        Math.abs(a.end.getTime() - windowEnd.getTime())
+      );
+      const bDistance = Math.min(
+        Math.abs(b.start.getTime() - windowStart.getTime()),
+        Math.abs(b.end.getTime() - windowEnd.getTime())
+      );
+      return aDistance - bDistance;
+    });
+
+    if (allSlots.length > 0) {
+      return allSlots[0].start;
+    }
     return null;
   }
 
-  // Calculate total duration needed for all routine tasks
-  const totalDurationMinutes = routine.tasks.reduce((sum, task) => {
-    return sum + (task.estimatedMinutes || 0);
-  }, 0);
+  // Find the slot that best fits the routine duration
+  const routineDuration = routine.tasks.length * 15 * 60 * 1000; // Assuming 15 min per task
+  const bestSlot = slotsInWindow.find((slot) => {
+    const slotDuration = slot.end.getTime() - slot.start.getTime();
+    return slotDuration >= routineDuration;
+  });
 
-  // Find the first slot that can accommodate all tasks
-  for (const slot of slotsInWindow) {
-    const slotDuration = differenceInMinutes(slot.end, slot.start);
-
-    if (slotDuration >= totalDurationMinutes) {
-      // Return the start time of the slot
-      return slot.start;
-    }
+  if (bestSlot) {
+    return bestSlot.start;
   }
 
-  // If no single slot can fit all tasks, try to find a combination of slots
-  // This is a simplified approach - a more sophisticated algorithm could be implemented
-  let remainingDuration = totalDurationMinutes;
-  let currentTime = windowStart;
+  // If no perfect fit, return the largest available slot
+  const largestSlot = slotsInWindow.reduce((prev, current) => {
+    const prevDuration = prev.end.getTime() - prev.start.getTime();
+    const currentDuration = current.end.getTime() - current.start.getTime();
+    return currentDuration > prevDuration ? current : prev;
+  });
 
-  for (const slot of slotsInWindow) {
-    if (slot.start > currentTime) {
-      // There's a gap between slots - can't fit all tasks
-      break;
-    }
-
-    const availableInSlot = differenceInMinutes(slot.end, currentTime);
-    remainingDuration -= availableInSlot;
-
-    if (remainingDuration <= 0) {
-      // All tasks can fit in this slot
-      return currentTime;
-    }
-
-    currentTime = slot.end;
-  }
-
-  // If we get here, no suitable slot was found
-  return null;
+  return largestSlot.start;
 }
