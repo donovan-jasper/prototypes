@@ -13,7 +13,7 @@ const generateSchema = async (voiceInput: string): Promise<Field[]> => {
       messages: [
         {
           role: 'system',
-          content: 'You are a helpful assistant that converts natural language to database schemas. Return a JSON array of objects with "name", "type", and "description" properties. Supported types are TEXT, INTEGER, REAL, and BLOB.'
+          content: 'You are a helpful assistant that converts natural language to database schemas. Return a JSON array of objects with "name", "type", and "description" properties. Supported types are TEXT, INTEGER, REAL, and BLOB. For dates, use TEXT with format description. For booleans, use INTEGER (0 or 1).'
         },
         {
           role: 'user',
@@ -30,7 +30,16 @@ const generateSchema = async (voiceInput: string): Promise<Field[]> => {
 
     const content = response.data.choices[0].message.content;
     // Parse the JSON response
-    return JSON.parse(content);
+    let schema: Field[] = JSON.parse(content);
+
+    // Validate and clean the schema
+    schema = schema.map(field => ({
+      name: field.name.replace(/\s+/g, '_').toLowerCase(),
+      type: field.type.toUpperCase() as Field['type'],
+      description: field.description || ''
+    }));
+
+    return schema;
   } catch (error) {
     console.error('Error generating schema:', error);
     throw new Error('Failed to generate database schema. Please try again.');

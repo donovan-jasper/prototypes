@@ -25,6 +25,11 @@ const CreateDatabaseScreen = () => {
     try {
       const generatedSchema = await generateSchema(input);
       setSchema(generatedSchema);
+      // Auto-generate database name if empty
+      if (!databaseName.trim()) {
+        const nameFromInput = input.split(' ').slice(0, 3).join(' ');
+        setDatabaseName(nameFromInput.charAt(0).toUpperCase() + nameFromInput.slice(1));
+      }
     } catch (error) {
       Alert.alert('Error', 'Failed to generate schema. Please try again.');
       console.error('Schema generation error:', error);
@@ -58,6 +63,22 @@ const CreateDatabaseScreen = () => {
     }
   };
 
+  const handleAddField = () => {
+    setSchema([...schema, { name: '', type: 'TEXT', description: '' }]);
+  };
+
+  const handleFieldChange = (index: number, field: Partial<Field>) => {
+    const newSchema = [...schema];
+    newSchema[index] = { ...newSchema[index], ...field };
+    setSchema(newSchema);
+  };
+
+  const handleRemoveField = (index: number) => {
+    const newSchema = [...schema];
+    newSchema.splice(index, 1);
+    setSchema(newSchema);
+  };
+
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Create New Database</Text>
@@ -81,12 +102,33 @@ const CreateDatabaseScreen = () => {
 
       {schema.length > 0 && (
         <View style={styles.schemaPreview}>
-          <Text style={styles.schemaTitle}>Generated Schema Preview:</Text>
+          <Text style={styles.schemaTitle}>Schema Preview:</Text>
           {schema.map((field, index) => (
-            <Text key={index} style={styles.schemaField}>
-              • {field.name} ({field.type})
-            </Text>
+            <View key={index} style={styles.fieldContainer}>
+              <TextInput
+                style={styles.fieldInput}
+                placeholder="Field name"
+                value={field.name}
+                onChangeText={(text) => handleFieldChange(index, { name: text })}
+              />
+              <TextInput
+                style={[styles.fieldInput, styles.typeInput]}
+                placeholder="Type"
+                value={field.type}
+                onChangeText={(text) => handleFieldChange(index, { type: text as Field['type'] })}
+              />
+              <Button
+                title="Remove"
+                onPress={() => handleRemoveField(index)}
+                color="#f44336"
+              />
+            </View>
           ))}
+          <Button
+            title="Add Field"
+            onPress={handleAddField}
+            color="#4caf50"
+          />
         </View>
       )}
 
@@ -146,10 +188,23 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     color: '#333',
   },
-  schemaField: {
-    fontSize: 15,
-    marginBottom: 4,
-    color: '#555',
+  fieldContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  fieldInput: {
+    flex: 1,
+    height: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginRight: 8,
+    backgroundColor: '#fff',
+  },
+  typeInput: {
+    width: 100,
   },
 });
 
