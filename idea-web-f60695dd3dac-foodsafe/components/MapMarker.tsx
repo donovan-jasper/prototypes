@@ -1,55 +1,66 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, StyleSheet, Text } from 'react-native';
+import { Colors } from '@/constants/Colors';
 
 interface MapMarkerProps {
   score: number;
-  color: string;
+  isSelected: boolean;
 }
 
-export default function MapMarker({ score, color }: MapMarkerProps) {
+export const MapMarker: React.FC<MapMarkerProps> = ({ score, isSelected }) => {
+  // Determine color based on score
+  let color = Colors.green;
+  if (score < 80) color = Colors.yellow;
+  if (score < 70) color = Colors.red;
+
+  // Scale size based on selection
+  const size = isSelected ? 40 : 30;
+
   return (
-    <View style={styles.container}>
-      <View style={[styles.marker, { backgroundColor: color }]}>
-        <Text style={styles.score}>{score}</Text>
+    <View style={[
+      styles.markerContainer,
+      {
+        width: size,
+        height: size,
+        borderColor: isSelected ? Colors.primary : color,
+      }
+    ]}>
+      <View style={[
+        styles.marker,
+        {
+          backgroundColor: color,
+          width: size * 0.6,
+          height: size * 0.6,
+        }
+      ]}>
+        <Text style={[
+          styles.scoreText,
+          {
+            fontSize: size * 0.3,
+          }
+        ]}>
+          {score}
+        </Text>
       </View>
-      <View style={[styles.triangle, { borderTopColor: color }]} />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-  },
-  marker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 20,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
   },
-  score: {
-    color: '#FFFFFF',
-    fontSize: 14,
+  marker: {
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scoreText: {
+    color: Colors.white,
     fontWeight: 'bold',
-  },
-  triangle: {
-    width: 0,
-    height: 0,
-    backgroundColor: 'transparent',
-    borderStyle: 'solid',
-    borderLeftWidth: 6,
-    borderRightWidth: 6,
-    borderTopWidth: 8,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-    marginTop: -1,
+    textAlign: 'center',
   },
 });

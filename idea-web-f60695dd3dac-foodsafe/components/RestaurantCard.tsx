@@ -1,65 +1,71 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Restaurant } from '@/types';
+import { SafetyScoreBadge } from './SafetyScoreBadge';
 import { Colors } from '@/constants/Colors';
-import SafetyScoreBadge from './SafetyScoreBadge';
 
 interface RestaurantCardProps {
   restaurant: Restaurant;
   onPress: () => void;
+  isPremium: boolean;
 }
 
-export default function RestaurantCard({ restaurant, onPress }: RestaurantCardProps) {
+export const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant, onPress, isPremium }) => {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <View style={styles.header}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      <View style={styles.content}>
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
             {restaurant.name}
           </Text>
-          <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
+          <Text style={styles.cuisine} numberOfLines={1}>
+            {restaurant.cuisine}
+          </Text>
           <Text style={styles.address} numberOfLines={1}>
             {restaurant.address}
           </Text>
         </View>
-        <SafetyScoreBadge
-          score={restaurant.safetyScore}
-          lastInspectionDate={restaurant.lastInspectionDate}
-        />
+
+        <View style={styles.scoreContainer}>
+          <SafetyScoreBadge
+            score={restaurant.safetyScore}
+            lastInspectionDate={restaurant.lastInspectionDate}
+            violationCount={restaurant.violationCount}
+          />
+        </View>
       </View>
-      <View style={styles.footer}>
-        <Text style={styles.violations}>
-          {restaurant.violationCount} {restaurant.violationCount === 1 ? 'violation' : 'violations'}
-        </Text>
-        <Text style={styles.tapHint}>Tap for details →</Text>
-      </View>
+
+      {!isPremium && restaurant.violationCount > 0 && (
+        <View style={styles.premiumBadge}>
+          <Text style={styles.premiumBadgeText}>Pro</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
-}
+};
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: Colors.background,
-    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
     padding: 16,
-    shadowColor: '#000',
+    marginBottom: 12,
+    shadowColor: Colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  header: {
+  content: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
   },
   info: {
     flex: 1,
     marginRight: 12,
   },
   name: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: Colors.text,
     marginBottom: 4,
@@ -73,21 +79,21 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
   },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
+  scoreContainer: {
+    alignItems: 'flex-end',
   },
-  violations: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+  premiumBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
-  tapHint: {
-    fontSize: 12,
-    color: Colors.primary,
-    fontWeight: '600',
+  premiumBadgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

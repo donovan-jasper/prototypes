@@ -1,150 +1,129 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  TextInput,
-  StyleSheet,
-  FlatList,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, TextInput, FlatList, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { useRestaurants } from '@/hooks/useRestaurants';
 import { Restaurant } from '@/types';
+import { useRouter } from 'expo-router';
+import { useSubscription } from '@/hooks/useSubscription';
+import { RestaurantCard } from '@/components/RestaurantCard';
+import { FilterSheet } from '@/components/FilterSheet';
 import { Colors } from '@/constants/Colors';
-import RestaurantCard from '@/components/RestaurantCard';
-import FilterSheet from '@/components/FilterSheet';
-import { searchRestaurants } from '@/services/api';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SearchScreen() {
   const router = useRouter();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const { isPremium } = useSubscription();
+  const { restaurants, isLoading, error, search, refresh } = useRestaurants();
+  const [query, setQuery] = useState('');
+  const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [filters, setFilters] = useState({
     minScore: 0,
     maxScore: 100,
+    recentInspection: false,
+    noViolations: false,
     allergyFriendly: false,
-    recentInspections: false,
-    zeroCriticalViolations: false,
   });
 
-  useEffect(() => {
-    if (searchQuery.trim().length > 0) {
-      performSearch();
-    } else {
-      setRestaurants([]);
-      setFilteredRestaurants([]);
-    }
-  }, [searchQuery]);
+  const handleSearch = useCallback(async () => {
+    await search(query);
+  }, [query, search]);
 
-  useEffect(() => {
-    applyFilters();
-  }, [restaurants, filters]);
-
-  const performSearch = async () => {
-    setLoading(true);
-    try {
-      const results = await searchRestaurants(searchQuery);
-      setRestaurants(results);
-    } catch (error) {
-      console.error('Search error:', error);
-      setRestaurants([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const applyFilters = () => {
-    let filtered = restaurants.filter(
-      (r) => r.safetyScore >= filters.minScore && r.safetyScore <= filters.maxScore
-    );
-    setFilteredRestaurants(filtered);
-  };
-
-  const handleFilterApply = (newFilters: typeof filters) => {
+  const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
-    setFilterSheetVisible(false);
-  };
+    setIsFilterSheetVisible(false);
+  }, []);
 
-  const handleRestaurantPress = (restaurant: Restaurant) => {
-    router.push(`/restaurant/${restaurant.id}`);
-  };
+  const filteredRestaurants = restaurants.filter(restaurant => {
+    if (filters.minScore > 0 && restaurant.safetyScore < filters.minScore) return false;
+    if (filters.maxScore < 100 && restaurant.safetyScore > filters.maxScore) return false;
+    if (filters.recentInspection) {
+      const inspectionDate = new Date(restaurant.lastInspectionDate);
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      if (inspectionDate < thirtyDaysAgo) return false;
+    }
+    if (filters.noViolations && restaurant.violationCount > 0) return false;
+    // Note: allergyFriendly filter would require additional data from API
+    return true;
+  });
 
-  const renderRestaurant = ({ item }: { item: Restaurant }) => (
-    <View style={styles.cardWrapper}>
-      <RestaurantCard restaurant={item} onPress={() => handleRestaurantPress(item)} />
-    </View>
-  );
+  const renderItem = useCallback(({ item }: { item: Restaurant }) => (
+    <RestaurantCard
+      restaurant={item}
+      onPress={() => router.push(`/restaurant/${item.id}`)}
+      isPremium={isPremium}
+    />
+  ), [router, isPremium]);
 
-  const renderEmptyState = () => {
-    if (loading) return null;
-    
-    if (searchQuery.trim().length === 0) {
+  const renderEmptyState = useCallback(() => {
+    if (isLoading) {
       return (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>🔍</Text>
-          <Text style={styles.emptyTitle}>Search for restaurants</Text>
-          <Text style={styles.emptyText}>
-            Enter a restaurant name or cuisine type to get started
-          </Text>
+        <View style={styles.emptyContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.emptyText}>Searching for restaurants...</Text>
+        </View>
+      );
+    }
+
+    if (error) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>😕</Text>
-        <Text style={styles.emptyTitle}>No results found</Text>
-        <Text style={styles.emptyText}>
-          Try adjusting your search or filters
-        </Text>
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No restaurants found. Try a different search.</Text>
       </View>
     );
-  };
+  }, [isLoading, error, refresh]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.searchBar}>
+      <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search restaurants or cuisine..."
+          placeholder="Search restaurants or cuisines"
           placeholderTextColor={Colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          autoCapitalize="none"
-          autoCorrect={false}
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={handleSearch}
+          returnKeyType="search"
         />
         <TouchableOpacity
           style={styles.filterButton}
-          onPress={() => setFilterSheetVisible(true)}
-          activeOpacity={0.7}
+          onPress={() => setIsFilterSheetVisible(true)}
         >
-          <Text style={styles.filterButtonText}>Filters</Text>
+          <Ionicons name="filter" size={24} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      ) : (
+      {filteredRestaurants.length > 0 ? (
         <FlatList
           data={filteredRestaurants}
-          renderItem={renderRestaurant}
+          renderItem={renderItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmptyState}
-          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <Text style={styles.resultsCount}>
+              {filteredRestaurants.length} {filteredRestaurants.length === 1 ? 'result' : 'results'}
+            </Text>
+          }
         />
+      ) : (
+        renderEmptyState()
       )}
 
       <FilterSheet
-        visible={filterSheetVisible}
+        visible={isFilterSheetVisible}
+        onClose={() => setIsFilterSheetVisible(false)}
         filters={filters}
-        onApply={handleFilterApply}
-        onClose={() => setFilterSheetVisible(false)}
+        onFilterChange={handleFilterChange}
+        isPremium={isPremium}
       />
     </View>
   );
@@ -153,71 +132,63 @@ export default function SearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.surface,
+    backgroundColor: Colors.background,
   },
-  searchBar: {
+  searchContainer: {
     flexDirection: 'row',
     padding: 16,
-    backgroundColor: Colors.background,
+    backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   searchInput: {
     flex: 1,
-    height: 48,
-    backgroundColor: Colors.surface,
+    height: 40,
+    backgroundColor: Colors.background,
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     fontSize: 16,
     color: Colors.text,
-    marginRight: 12,
   },
   filterButton: {
-    height: 48,
-    paddingHorizontal: 20,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  filterButtonText: {
-    color: Colors.background,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
+    marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContent: {
     padding: 16,
-    flexGrow: 1,
   },
-  cardWrapper: {
-    marginBottom: 16,
+  resultsCount: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 8,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 8,
-    textAlign: 'center',
+    padding: 20,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
     color: Colors.textSecondary,
     textAlign: 'center',
-    lineHeight: 20,
+    marginTop: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: Colors.white,
+    fontSize: 16,
   },
 });

@@ -5,91 +5,76 @@ import { Colors } from '@/constants/Colors';
 interface SafetyScoreBadgeProps {
   score: number;
   lastInspectionDate: string;
-  size?: 'small' | 'large';
+  violationCount: number;
 }
 
-export default function SafetyScoreBadge({ 
-  score, 
+export const SafetyScoreBadge: React.FC<SafetyScoreBadgeProps> = ({
+  score,
   lastInspectionDate,
-  size = 'small' 
-}: SafetyScoreBadgeProps) {
-  const getScoreColor = () => {
-    if (score >= 90) return Colors.score.high;
-    if (score >= 70) return Colors.score.medium;
-    return Colors.score.low;
-  };
+  violationCount,
+}) => {
+  // Determine color based on score
+  let color = Colors.green;
+  if (score < 80) color = Colors.yellow;
+  if (score < 70) color = Colors.red;
 
-  const getScoreLabel = () => {
-    if (score >= 90) return 'Excellent';
-    if (score >= 70) return 'Good';
-    return 'Fair';
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  };
-
-  const isLarge = size === 'large';
-  const scoreColor = getScoreColor();
+  // Format the date
+  const formattedDate = new Date(lastInspectionDate).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 
   return (
-    <View style={[styles.container, isLarge && styles.containerLarge]}>
-      <View style={[styles.scoreBadge, { backgroundColor: scoreColor }, isLarge && styles.scoreBadgeLarge]}>
-        <Text style={[styles.score, isLarge && styles.scoreLarge]}>{score}</Text>
+    <View style={styles.container}>
+      <View style={[styles.scoreContainer, { backgroundColor: color }]}>
+        <Text style={styles.scoreText}>{score}</Text>
       </View>
-      <Text style={[styles.label, isLarge && styles.labelLarge]}>{getScoreLabel()}</Text>
-      <Text style={[styles.date, isLarge && styles.dateLarge]}>
-        {formatDate(lastInspectionDate)}
-      </Text>
+
+      <View style={styles.infoContainer}>
+        <Text style={styles.label}>Safety Score</Text>
+        <Text style={styles.date}>Last inspected: {formattedDate}</Text>
+        <Text style={styles.violations}>
+          {violationCount} {violationCount === 1 ? 'violation' : 'violations'}
+        </Text>
+      </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  containerLarge: {
-    marginVertical: 8,
-  },
-  scoreBadge: {
+  scoreContainer: {
     width: 50,
     height: 50,
     borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginRight: 12,
   },
-  scoreBadgeLarge: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 8,
-  },
-  score: {
-    color: '#FFFFFF',
+  scoreText: {
+    color: Colors.white,
     fontSize: 20,
     fontWeight: 'bold',
   },
-  scoreLarge: {
-    fontSize: 32,
+  infoContainer: {
+    flex: 1,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    color: Colors.textSecondary,
+    marginBottom: 2,
+  },
+  date: {
+    fontSize: 14,
     color: Colors.text,
     marginBottom: 2,
   },
-  labelLarge: {
-    fontSize: 16,
-    marginBottom: 4,
-  },
-  date: {
-    fontSize: 10,
-    color: Colors.textSecondary,
-  },
-  dateLarge: {
-    fontSize: 12,
+  violations: {
+    fontSize: 14,
+    color: Colors.text,
   },
 });

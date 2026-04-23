@@ -1,19 +1,26 @@
 export const Colors = {
-  primary: '#2E7D32',
-  secondary: '#FFA726',
-  danger: '#D32F2F',
-  background: '#FFFFFF',
-  surface: '#F5F5F5',
-  text: '#212121',
-  textSecondary: '#757575',
-  border: '#E0E0E0',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
-  
-  score: {
-    high: '#4CAF50',
-    medium: '#FF9800',
-    low: '#F44336',
-  },
+  primary: '#4A6FA5', // SafeBite blue
+  primaryLight: '#7B9BCD',
+  primaryDark: '#2E4F7A',
+
+  background: '#F5F7FA',
+  white: '#FFFFFF',
+  text: '#2D3748',
+  textSecondary: '#718096',
+  border: '#E2E8F0',
+  shadow: '#000000',
+
+  // Safety score colors
+  green: '#48BB78', // Safe (90-100)
+  yellow: '#ECC94B', // Caution (70-89)
+  red: '#F56565', // Danger (<70)
+
+  // Status colors
+  success: '#48BB78',
+  warning: '#ECC94B',
+  error: '#F56565',
+  errorBackground: '#FED7D7',
+
+  // Premium colors
+  premium: '#805AD5',
 };

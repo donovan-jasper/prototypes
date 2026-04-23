@@ -1,153 +1,70 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator, Text } from 'react-native';
-import MapView, { Marker, Region } from 'react-native-maps';
-import * as Location from 'expo-location';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import { useRestaurants } from '@/hooks/useRestaurants';
 import { Restaurant } from '@/types';
-import { Colors } from '@/constants/Colors';
-import MapMarker from '@/components/MapMarker';
-import RestaurantCard from '@/components/RestaurantCard';
 import { useRouter } from 'expo-router';
-
-const MOCK_RESTAURANTS: Restaurant[] = [
-  {
-    id: '1',
-    name: 'The Green Leaf Bistro',
-    address: '123 Main St, San Francisco, CA',
-    latitude: 37.7749,
-    longitude: -122.4194,
-    safetyScore: 95,
-    lastInspectionDate: '2024-02-15',
-    violationCount: 1,
-    cuisine: 'American',
-  },
-  {
-    id: '2',
-    name: 'Sushi Paradise',
-    address: '456 Market St, San Francisco, CA',
-    latitude: 37.7849,
-    longitude: -122.4094,
-    safetyScore: 88,
-    lastInspectionDate: '2024-01-20',
-    violationCount: 3,
-    cuisine: 'Japanese',
-  },
-  {
-    id: '3',
-    name: 'Pizza Heaven',
-    address: '789 Valencia St, San Francisco, CA',
-    latitude: 37.7649,
-    longitude: -122.4294,
-    safetyScore: 72,
-    lastInspectionDate: '2024-02-01',
-    violationCount: 5,
-    cuisine: 'Italian',
-  },
-  {
-    id: '4',
-    name: 'Taco Fiesta',
-    address: '321 Mission St, San Francisco, CA',
-    latitude: 37.7949,
-    longitude: -122.3994,
-    safetyScore: 91,
-    lastInspectionDate: '2024-02-10',
-    violationCount: 2,
-    cuisine: 'Mexican',
-  },
-  {
-    id: '5',
-    name: 'Burger Palace',
-    address: '654 Castro St, San Francisco, CA',
-    latitude: 37.7549,
-    longitude: -122.4394,
-    safetyScore: 85,
-    lastInspectionDate: '2024-01-25',
-    violationCount: 4,
-    cuisine: 'American',
-  },
-];
+import { useSubscription } from '@/hooks/useSubscription';
+import { RestaurantCard } from '@/components/RestaurantCard';
+import { MapMarker } from '@/components/MapMarker';
+import { useLocation } from '@/hooks/useLocation';
+import { Colors } from '@/constants/Colors';
 
 export default function MapScreen() {
   const router = useRouter();
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const { isPremium } = useSubscription();
+  const { location, isLoading: isLocationLoading, error: locationError } = useLocation();
+  const { restaurants, isLoading, error, refresh } = useRestaurants();
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [region, setRegion] = useState<Region>({
-    latitude: 37.7749,
-    longitude: -122.4194,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+  const [mapRegion, setMapRegion] = useState({
+    latitude: location?.coords.latitude || 37.7749,
+    longitude: location?.coords.longitude || -122.4194,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
   });
 
+  // Update map region when location changes
   useEffect(() => {
-    requestLocationPermission();
+    if (location) {
+      setMapRegion({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+    }
+  }, [location]);
+
+  const handleMarkerPress = useCallback((restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
   }, []);
 
-  const requestLocationPermission = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission Denied',
-          'Location permission is required to show nearby restaurants.',
-          [{ text: 'OK' }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      const currentLocation = await Location.getCurrentPositionAsync({});
-      setLocation(currentLocation);
-      
-      setRegion({
-        latitude: currentLocation.coords.latitude,
-        longitude: currentLocation.coords.longitude,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
-      });
-
-      await fetchNearbyRestaurants(currentLocation.coords.latitude, currentLocation.coords.longitude);
-    } catch (error) {
-      console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get your location. Using default location.');
-      await fetchNearbyRestaurants(37.7749, -122.4194);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchNearbyRestaurants = async (latitude: number, longitude: number) => {
-    try {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      setRestaurants(MOCK_RESTAURANTS);
-    } catch (error) {
-      console.error('Error fetching restaurants:', error);
-      Alert.alert('Error', 'Failed to load nearby restaurants.');
-    }
-  };
-
-  const getMarkerColor = (score: number): string => {
-    if (score >= 90) return Colors.score.high;
-    if (score >= 70) return Colors.score.medium;
-    return Colors.score.low;
-  };
-
-  const handleMarkerPress = (restaurant: Restaurant) => {
-    setSelectedRestaurant(restaurant);
-  };
-
-  const handleCardPress = () => {
+  const handleCardPress = useCallback(() => {
     if (selectedRestaurant) {
       router.push(`/restaurant/${selectedRestaurant.id}`);
     }
-  };
+  }, [selectedRestaurant, router]);
 
-  if (loading) {
+  const handleMapPress = useCallback(() => {
+    setSelectedRestaurant(null);
+  }, []);
+
+  if (isLocationLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Finding nearby restaurants...</Text>
+        <Text style={styles.loadingText}>Finding your location...</Text>
+      </View>
+    );
+  }
+
+  if (locationError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{locationError}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -156,9 +73,11 @@ export default function MapScreen() {
     <View style={styles.container}>
       <MapView
         style={styles.map}
-        region={region}
-        showsUserLocation
-        showsMyLocationButton
+        provider={PROVIDER_GOOGLE}
+        region={mapRegion}
+        onPress={handleMapPress}
+        showsUserLocation={true}
+        followsUserLocation={true}
       >
         {restaurants.map((restaurant) => (
           <Marker
@@ -171,17 +90,33 @@ export default function MapScreen() {
           >
             <MapMarker
               score={restaurant.safetyScore}
-              color={getMarkerColor(restaurant.safetyScore)}
+              isSelected={selectedRestaurant?.id === restaurant.id}
             />
           </Marker>
         ))}
       </MapView>
+
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      )}
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity onPress={refresh}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {selectedRestaurant && (
         <View style={styles.cardContainer}>
           <RestaurantCard
             restaurant={selectedRestaurant}
             onPress={handleCardPress}
+            isPremium={isPremium}
           />
         </View>
       )}
@@ -205,12 +140,60 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.text,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: Colors.background,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.error,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+  },
+  errorBanner: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: Colors.errorBackground,
+    padding: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  retryText: {
+    color: Colors.primary,
+    fontWeight: 'bold',
   },
   cardContainer: {
     position: 'absolute',
     bottom: 20,
-    left: 16,
-    right: 16,
+    left: 20,
+    right: 20,
   },
 });
