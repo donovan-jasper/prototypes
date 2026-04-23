@@ -79,9 +79,18 @@ export async function getRecommendedDifficulty() {
       return 'easy';
     }
 
-    const recentSessions = history.slice(0, 5);
-    const averageScore = recentSessions.reduce((sum, record) => sum + record.score, 0) / recentSessions.length;
-    const lastDifficulty = recentSessions[0].difficulty;
+    // Calculate weighted average based on recency
+    let totalWeight = 0;
+    let weightedScore = 0;
+
+    history.slice(0, 5).forEach((record, index) => {
+      const weight = 5 - index; // More recent records have higher weight
+      weightedScore += record.score * weight;
+      totalWeight += weight;
+    });
+
+    const averageScore = weightedScore / totalWeight;
+    const lastDifficulty = history[0].difficulty;
 
     return calculateAdaptiveDifficulty(averageScore, lastDifficulty);
   } catch (error) {
@@ -102,7 +111,8 @@ export async function getPerformanceStats() {
           easy: 0,
           medium: 0,
           hard: 0
-        }
+        },
+        recentPerformance: []
       };
     }
 
@@ -115,10 +125,17 @@ export async function getPerformanceStats() {
       return acc;
     }, { easy: 0, medium: 0, hard: 0 });
 
+    // Get recent performance for charting
+    const recentPerformance = history.slice(0, 7).reverse().map(record => ({
+      date: new Date(record.timestamp).toLocaleDateString(),
+      score: record.score
+    }));
+
     return {
       totalSessions,
       averageScore,
-      difficultyDistribution
+      difficultyDistribution,
+      recentPerformance
     };
   } catch (error) {
     console.error('Error calculating performance stats:', error);
@@ -129,7 +146,35 @@ export async function getPerformanceStats() {
         easy: 0,
         medium: 0,
         hard: 0
-      }
+      },
+      recentPerformance: []
     };
+  }
+}
+
+export async function getProblemRecommendations() {
+  try {
+    const stats = await getPerformanceStats();
+    const recommendedDifficulty = await getRecommendedDifficulty();
+
+    // Adjust based on recent performance trends
+    if (stats.recentPerformance.length >= 3) {
+      const lastThreeScores = stats.recentPerformance.slice(-3).map(p => p.score);
+      const isImproving = lastThreeScores[2] < lastThreeScores[1] && lastThreeScores[1] < lastThreeScores[0];
+
+      if (isImproving) {
+        // If user is improving, slightly increase difficulty
+        const difficultyLevels = ['easy', 'medium', 'hard'];
+        const currentIndex = difficultyLevels.indexOf(recommendedDifficulty);
+        if (currentIndex < difficultyLevels.length - 1) {
+          return difficultyLevels[currentIndex + 1];
+        }
+      }
+    }
+
+    return recommendedDifficulty;
+  } catch (error) {
+    console.error('Error getting problem recommendations:', error);
+    return 'medium';
   }
 }

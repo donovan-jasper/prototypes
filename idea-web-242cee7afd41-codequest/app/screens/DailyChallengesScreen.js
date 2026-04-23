@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import ProblemCard from '../components/ProblemCard';
 import { getRandomProblems } from '../data/problems';
-import { getRecommendedDifficulty, savePerformanceRecord } from '../hooks/useAdaptiveLogic';
+import { getProblemRecommendations, savePerformanceRecord } from '../hooks/useAdaptiveLogic';
 
 export default function DailyChallengesScreen({ navigation }) {
   const [problems, setProblems] = useState([]);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
-  const [currentDifficulty, setCurrentDifficulty] = useState('easy');
+  const [currentDifficulty, setCurrentDifficulty] = useState('medium');
   const [loading, setLoading] = useState(true);
+  const [sessionStartTime, setSessionStartTime] = useState(null);
 
   useEffect(() => {
     loadChallenges();
+    setSessionStartTime(Date.now());
   }, []);
 
   const loadChallenges = async () => {
     try {
-      const difficulty = await getRecommendedDifficulty();
+      const difficulty = await getProblemRecommendations();
       setCurrentDifficulty(difficulty);
       setProblems(getRandomProblems(3, difficulty));
     } catch (error) {
@@ -34,7 +36,7 @@ export default function DailyChallengesScreen({ navigation }) {
       correct: score.correct + (isCorrect ? 1 : 0),
       incorrect: score.incorrect + (isCorrect ? 0 : 1)
     };
-    
+
     setScore(newScore);
 
     if (currentProblemIndex < problems.length - 1) {
@@ -44,26 +46,37 @@ export default function DailyChallengesScreen({ navigation }) {
     } else {
       const totalCorrect = newScore.correct;
       const totalProblems = problems.length;
-      
+      const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000);
+
       await savePerformanceRecord(currentDifficulty, totalCorrect, totalProblems);
-      
+
       setTimeout(() => {
         navigation.navigate('Results', {
           score: {
             correct: totalCorrect,
             incorrect: newScore.incorrect,
             total: totalProblems,
-            difficulty: currentDifficulty
+            difficulty: currentDifficulty,
+            duration: sessionDuration
           }
         });
       }, 1000);
     }
   };
 
-  if (loading || problems.length === 0) {
+  if (loading) {
     return (
       <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
         <Text style={styles.loadingText}>Loading challenges...</Text>
+      </View>
+    );
+  }
+
+  if (problems.length === 0) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No problems available. Please try again later.</Text>
       </View>
     );
   }
@@ -71,17 +84,17 @@ export default function DailyChallengesScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
+
       <View style={styles.progressContainer}>
         <View style={styles.difficultyBadge}>
           <Text style={styles.difficultyText}>{currentDifficulty.toUpperCase()}</Text>
         </View>
         <View style={styles.progressBar}>
-          <View 
+          <View
             style={[
-              styles.progressFill, 
+              styles.progressFill,
               { width: `${((currentProblemIndex + 1) / problems.length) * 100}%` }
-            ]} 
+            ]}
           />
         </View>
         <Text style={styles.scoreText}>
@@ -89,7 +102,7 @@ export default function DailyChallengesScreen({ navigation }) {
         </Text>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -119,6 +132,19 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
     color: '#6b7280',
+    marginTop: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f3f4f6',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#ef4444',
+    textAlign: 'center',
   },
   progressContainer: {
     backgroundColor: '#fff',
