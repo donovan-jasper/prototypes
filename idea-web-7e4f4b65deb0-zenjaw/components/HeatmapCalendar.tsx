@@ -149,16 +149,16 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: Colors.light.relaxed }]} />
-          <Text style={styles.legendText}>Relaxed</Text>
+          <View style={[styles.legendBox, { backgroundColor: Colors.light.tense }]} />
+          <Text style={styles.legendText}>Tense (70%+)</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: '#f59e0b' }]} />
-          <Text style={styles.legendText}>Moderate</Text>
+          <Text style={styles.legendText}>Moderate (40-70%)</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: Colors.light.tense }]} />
-          <Text style={styles.legendText}>Tense</Text>
+          <View style={[styles.legendBox, { backgroundColor: Colors.light.relaxed }]} />
+          <Text style={styles.legendText}>Relaxed (<40%)</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: Colors.light.border }]} />
@@ -167,9 +167,9 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
       </View>
 
       <Modal
-        visible={!!selectedDate}
-        animationType="slide"
+        visible={selectedDate !== null}
         transparent={true}
+        animationType="slide"
         onRequestClose={closeModal}
       >
         <View style={styles.modalContainer}>
@@ -178,25 +178,26 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
               <Text style={styles.modalTitle}>
                 {selectedDate?.toLocaleDateString('en-US', {
                   weekday: 'long',
+                  year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}
               </Text>
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>×</Text>
+                <Text style={styles.closeButtonText}>Close</Text>
               </TouchableOpacity>
             </View>
 
             {dayLogs.length > 0 ? (
               <FlatList
-                data={dayLogs.sort((a, b) => b.timestamp - a.timestamp)}
+                data={dayLogs}
                 renderItem={renderDayLogItem}
-                keyExtractor={(item) => item.id.toString()}
+                keyExtractor={(item, index) => `${item.id}-${index}`}
                 contentContainerStyle={styles.logList}
               />
             ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateText}>No tension logs for this day</Text>
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No tension logs for this day</Text>
               </View>
             )}
           </View>
@@ -208,31 +209,31 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 12,
     padding: 16,
+    backgroundColor: Colors.light.background,
   },
   header: {
     marginBottom: 16,
   },
   headerText: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: Colors.light.text,
-    marginBottom: 4,
   },
   subHeaderText: {
     fontSize: 14,
     color: Colors.light.textSecondary,
+    marginTop: 4,
   },
   grid: {
     flexDirection: 'row',
-    marginBottom: 16,
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
   cell: {
     width: cellSize,
     height: cellSize,
-    margin: 2,
+    marginBottom: 8,
     borderRadius: 4,
     justifyContent: 'center',
     alignItems: 'center',
@@ -243,32 +244,35 @@ const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 10,
-    color: Colors.light.background,
-    fontWeight: '500',
+    fontWeight: 'bold',
+    color: Colors.light.text,
   },
   dayNumber: {
     fontSize: 14,
-    color: Colors.light.background,
     fontWeight: 'bold',
+    color: Colors.light.text,
     marginTop: 2,
   },
   percentage: {
     fontSize: 10,
-    color: Colors.light.background,
+    color: Colors.light.text,
     marginTop: 2,
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 16,
+    flexWrap: 'wrap',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
   },
   legendBox: {
-    width: 12,
-    height: 12,
+    width: 16,
+    height: 16,
     borderRadius: 2,
     marginRight: 4,
   },
@@ -303,8 +307,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   closeButtonText: {
-    fontSize: 24,
-    color: Colors.light.text,
+    color: Colors.light.tint,
+    fontWeight: 'bold',
   },
   logList: {
     paddingBottom: 16,
@@ -339,16 +343,16 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   logBodyZone: {
-    fontSize: 14,
+    fontSize: 12,
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
-  emptyState: {
-    padding: 24,
+  noDataContainer: {
+    padding: 16,
     alignItems: 'center',
   },
-  emptyStateText: {
-    fontSize: 16,
+  noDataText: {
+    fontSize: 14,
     color: Colors.light.textSecondary,
   },
 });
