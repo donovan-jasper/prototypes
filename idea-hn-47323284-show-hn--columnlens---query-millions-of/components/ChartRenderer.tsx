@@ -183,12 +183,12 @@ const styles = StyleSheet.create({
   legendContainer: {
     flexDirection: 'row',
     marginTop: 16,
-    paddingHorizontal: 16,
+    maxHeight: 50,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: 12,
   },
   legendColor: {
     width: 12,
@@ -202,10 +202,8 @@ const styles = StyleSheet.create({
   tooltip: {
     position: 'absolute',
     bottom: 20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 8,
     borderRadius: 4,
   },

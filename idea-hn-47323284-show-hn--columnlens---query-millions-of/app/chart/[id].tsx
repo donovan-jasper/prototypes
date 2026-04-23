@@ -25,6 +25,14 @@ const ChartScreen = () => {
 
   useEffect(() => {
     if (data) {
+      // Auto-select first two columns for X and Y axes if not specified
+      if (!xAxisColumn && data.columns.length > 0) {
+        setXAxisColumn(data.columns[0]);
+      }
+      if (!yAxisColumn && data.columns.length > 1) {
+        setYAxisColumn(data.columns[1]);
+      }
+
       const config = generateChartConfig(
         data,
         chartType,
@@ -162,14 +170,12 @@ const ChartScreen = () => {
         </View>
 
         <View style={styles.chartContainer} ref={chartRef}>
-          {chartConfig && (
-            <ChartRenderer
-              data={chartConfig.data}
-              initialType={chartType}
-              onDataPointClick={handleDataPointClick}
-              onTypeChange={handleTypeChange}
-            />
-          )}
+          <ChartRenderer
+            data={data}
+            initialType={chartType}
+            onDataPointClick={handleDataPointClick}
+            onTypeChange={handleTypeChange}
+          />
         </View>
 
         {tooltipData && (
@@ -182,27 +188,27 @@ const ChartScreen = () => {
 
         <View style={styles.buttonContainer}>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.button, styles.regenerateButton]}
             onPress={handleRegenerate}
           >
-            <Text style={styles.actionButtonText}>Regenerate Chart</Text>
+            <Text style={styles.buttonText}>Regenerate</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.button, styles.saveButton]}
             onPress={handleSaveChart}
           >
-            <Text style={styles.actionButtonText}>Save Chart</Text>
+            <Text style={styles.buttonText}>Save Chart</Text>
           </TouchableOpacity>
+
           <TouchableOpacity
-            style={[styles.actionButton, isExporting && styles.disabledButton]}
+            style={[styles.button, styles.exportButton]}
             onPress={handleExport}
             disabled={isExporting}
           >
-            {isExporting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.actionButtonText}>Export as PNG</Text>
-            )}
+            <Text style={styles.buttonText}>
+              {isExporting ? 'Exporting...' : 'Export as PNG'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -213,13 +219,12 @@ const ChartScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   header: {
     padding: 16,
-    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 20,
@@ -231,42 +236,26 @@ const styles = StyleSheet.create({
   },
   axisControls: {
     marginBottom: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
   },
   axisControl: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   axisLabel: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: 16,
     marginBottom: 4,
   },
   axisPicker: {
     height: 50,
+    width: '100%',
   },
   chartContainer: {
-    marginBottom: 24,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginVertical: 16,
   },
   tooltip: {
     position: 'absolute',
     bottom: 20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 8,
     borderRadius: 4,
   },
@@ -279,20 +268,25 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 16,
   },
-  actionButton: {
-    flex: 1,
-    backgroundColor: '#4285F4',
+  button: {
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+    flex: 1,
     marginHorizontal: 4,
   },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: '500',
+  regenerateButton: {
+    backgroundColor: '#6c757d',
   },
-  disabledButton: {
-    opacity: 0.7,
+  saveButton: {
+    backgroundColor: '#28a745',
+  },
+  exportButton: {
+    backgroundColor: '#007bff',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
