@@ -1,69 +1,38 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, StyleSheet } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { getSchema } from '@/lib/storage/cache';
 import SchemaTree from '@/components/SchemaTree';
-import { useNetworkStore } from '@/store/network-store';
-import { Button } from 'react-native-paper';
 import OfflineIndicator from '@/components/OfflineIndicator';
+import { useDatabaseStore } from '@/store/database-store';
+import { useNetworkStore } from '@/store/network-store';
 
 export default function ExploreScreen() {
-  const { databaseId } = useLocalSearchParams();
-  const [schema, setSchema] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { databaseId } = useLocalSearchParams<{ databaseId: string }>();
+  const { loadSchema, databases } = useDatabaseStore();
   const { isOnline } = useNetworkStore();
 
-  const loadSchema = async (forceRefresh = false) => {
-    try {
-      setLoading(true);
-      setError(null);
-      const schemaData = await getSchema(databaseId as string, forceRefresh);
-      setSchema(schemaData);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load schema');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const database = databases.find(db => db.id === databaseId);
 
   useEffect(() => {
-    loadSchema();
+    if (databaseId) {
+      loadSchema(databaseId);
+    }
   }, [databaseId]);
 
-  if (loading) {
-    return (
-      <View style={styles.centered}>
-        <OfflineIndicator />
-        <ActivityIndicator size="large" />
-        <Text>Loading schema...</Text>
-      </View>
-    );
-  }
-
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <OfflineIndicator />
-        <Text style={styles.errorText}>{error}</Text>
-        {!isOnline && (
-          <Text style={styles.offlineText}>You are currently offline</Text>
-        )}
-        <Button
-          mode="contained"
-          onPress={() => loadSchema(true)}
-          style={styles.retryButton}
-        >
-          {isOnline ? 'Retry' : 'Try Offline Cache'}
-        </Button>
-      </View>
-    );
-  }
+  const handleTablePress = (tableName: string) => {
+    // Navigate to table details or show AI explanation
+    console.log('Table pressed:', tableName);
+  };
 
   return (
     <View style={styles.container}>
       <OfflineIndicator />
-      <SchemaTree schema={schema} />
+      {databaseId && (
+        <SchemaTree
+          databaseId={databaseId}
+          onTablePress={handleTablePress}
+        />
+      )}
     </View>
   );
 }
@@ -71,25 +40,6 @@ export default function ExploreScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  offlineText: {
-    color: '#666',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 16,
+    backgroundColor: '#f5f5f5',
   },
 });
