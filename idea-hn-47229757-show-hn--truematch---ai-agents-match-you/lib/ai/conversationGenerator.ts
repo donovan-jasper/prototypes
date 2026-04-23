@@ -1,13 +1,23 @@
 import { generateCompatibilityInsights } from './matchingEngine';
 
-export const generateConversationStarters = (userVector: any, matchVector: any) => {
+interface CompatibilityInsight {
+  title: string;
+  description: string;
+}
+
+export const generateConversationStarters = async (matchId: string): Promise<string> => {
+  // In a real implementation, this would fetch the user's and match's behavior vectors
+  // For this example, we'll simulate the data
+  const userVector = await getUserBehaviorVector();
+  const matchVector = await getMatchBehaviorVector(matchId);
+
   const insights = generateCompatibilityInsights(userVector, matchVector);
 
   // Generate conversation starters based on compatibility insights
   const starters: string[] = [];
 
   // Process each insight to generate relevant conversation starters
-  insights.forEach(insight => {
+  insights.forEach((insight: CompatibilityInsight) => {
     switch (insight.title) {
       case 'Communication Style':
         if (insight.description.includes('deep conversations')) {
@@ -89,48 +99,50 @@ export const generateConversationStarters = (userVector: any, matchVector: any) 
         }
         break;
 
-      case 'Session Duration':
-        if (insight.description.includes('long sessions')) {
-          starters.push('We both enjoy long conversations. What\'s something you\'ve been meaning to talk about?');
-          starters.push('Do you have any complex topics you\'d like to discuss?');
-        } else if (insight.description.includes('short sessions')) {
-          starters.push('We both prefer shorter exchanges. What\'s something you\'re curious about?');
-          starters.push('Do you have any quick questions or thoughts?');
-        }
-        break;
+      default:
+        starters.push('What do you think about our compatibility score?');
+        starters.push('Do you have any interesting hobbies or interests?');
     }
   });
 
-  // Add some generic conversation starters if we don't have enough
-  if (starters.length < 3) {
-    starters.push('What\'s been on your mind lately?');
-    starters.push('Do you have any interesting hobbies or passions?');
-    starters.push('What\'s something you\'re looking forward to this week?');
+  // If no specific starters were generated, add some generic ones
+  if (starters.length === 0) {
+    starters.push('What do you think about our compatibility score?');
+    starters.push('Do you have any interesting hobbies or interests?');
+    starters.push('What\'s something you\'ve been meaning to talk about?');
+    starters.push('Do you have any fun facts to share?');
   }
 
-  // Ensure we have exactly 3-5 starters
-  if (starters.length > 5) {
-    starters = starters.slice(0, 5);
-  } else if (starters.length < 3) {
-    starters.push('What\'s something you\'ve been meaning to try?');
-    starters.push('Do you have any favorite books, movies, or shows?');
-  }
-
-  // Add a random element to make it feel more natural
-  const randomStarters = [
-    'What\'s something you\'re proud of?',
-    'Do you have any travel stories to share?',
-    'What\'s your favorite way to spend a weekend?',
-    'What\'s something that always makes you laugh?',
-    'Do you have any hidden talents?'
-  ];
-
-  if (starters.length < 5 && Math.random() > 0.5) {
-    const randomStarter = randomStarters[Math.floor(Math.random() * randomStarters.length)];
-    if (!starters.includes(randomStarter)) {
-      starters.push(randomStarter);
-    }
-  }
-
-  return starters;
+  // Select a random starter from the generated options
+  const randomIndex = Math.floor(Math.random() * starters.length);
+  return starters[randomIndex];
 };
+
+// Mock functions for behavior vectors - replace with actual implementations
+async function getUserBehaviorVector(): Promise<any> {
+  // In a real app, this would fetch the current user's behavior vector
+  return {
+    communicationStyle: 'deep',
+    energyLevels: 'consistent',
+    interactionPreferences: 'exploring',
+    responsePatterns: 'thoughtful',
+    conversationDepth: 'long',
+    emojiUsage: 'frequent',
+    messageLength: 'long',
+    responseTime: 'slow'
+  };
+}
+
+async function getMatchBehaviorVector(matchId: string): Promise<any> {
+  // In a real app, this would fetch the matched user's behavior vector
+  return {
+    communicationStyle: 'quick',
+    energyLevels: 'bursts',
+    interactionPreferences: 'familiar',
+    responsePatterns: 'quick',
+    conversationDepth: 'short',
+    emojiUsage: 'minimal',
+    messageLength: 'short',
+    responseTime: 'fast'
+  };
+}

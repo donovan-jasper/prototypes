@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMatches } from '../../hooks/useMatches';
 import { useBehaviorTracking } from '../../hooks/useBehaviorTracking';
 import Colors from '../../constants/Colors';
@@ -8,9 +8,11 @@ import { ConversationStarter } from '../../components/ConversationStarter';
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { matches, loading, sendMessage } = useMatches();
+  const router = useRouter();
+  const { matches, loading, sendMessage, fetchMatchDetails } = useMatches();
   const { trackInteraction } = useBehaviorTracking();
-  const [showStarters, setShowStarters] = useState(false);
+  const [matchDetails, setMatchDetails] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(true);
 
   const match = matches.find(m => m.id === id);
 
@@ -20,6 +22,19 @@ export default function MatchDetailScreen() {
         matchId: match.id,
         compatibilityScore: match.compatibilityScore
       });
+
+      const loadDetails = async () => {
+        try {
+          const details = await fetchMatchDetails(match.id);
+          setMatchDetails(details);
+        } catch (error) {
+          console.error('Error loading match details:', error);
+        } finally {
+          setDetailsLoading(false);
+        }
+      };
+
+      loadDetails();
     }
   }, [match]);
 
@@ -33,7 +48,14 @@ export default function MatchDetailScreen() {
     }
   };
 
-  if (loading) {
+  const handleMessagePress = () => {
+    if (match) {
+      trackInteraction('navigate_to_chat', { matchId: match.id });
+      router.push(`/chat/${match.id}`);
+    }
+  };
+
+  if (loading || detailsLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
@@ -61,7 +83,7 @@ export default function MatchDetailScreen() {
 
         <View style={styles.insightsContainer}>
           <Text style={styles.sectionTitle}>Compatibility Insights</Text>
-          {match.insights?.map((insight, index) => (
+          {matchDetails?.insights?.map((insight: any, index: number) => (
             <View key={index} style={styles.insightItem}>
               <Text style={styles.insightTitle}>{insight.title}</Text>
               <Text style={styles.insightDescription}>{insight.description}</Text>
@@ -81,10 +103,8 @@ export default function MatchDetailScreen() {
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={styles.messageButton}
-            onPress={() => {
-              // Navigate to chat screen
-              trackInteraction('navigate_to_chat', { matchId: match.id });
-            }}
+            onPress={handleMessagePress}
+            accessibilityLabel="Start messaging this match"
           >
             <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
@@ -117,11 +137,13 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: Colors.text,
     marginBottom: 8,
+    fontFamily: 'System',
   },
   compatibilityScore: {
     fontSize: 18,
     color: Colors.primary,
     fontWeight: '600',
+    fontFamily: 'System',
   },
   insightsContainer: {
     marginBottom: 24,
@@ -131,22 +153,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.text,
     marginBottom: 12,
+    fontFamily: 'System',
   },
   insightItem: {
     backgroundColor: Colors.card,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   insightTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: Colors.text,
     marginBottom: 4,
+    fontFamily: 'System',
   },
   insightDescription: {
     fontSize: 14,
     color: Colors.textSecondary,
+    fontFamily: 'System',
   },
   starterContainer: {
     marginBottom: 24,
@@ -159,16 +189,23 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
   },
   messageButtonText: {
     color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: 'System',
   },
   errorText: {
     color: Colors.error,
     fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
+    fontFamily: 'System',
   },
 });
