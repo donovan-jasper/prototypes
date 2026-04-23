@@ -1,104 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
-import { Button, Text, ActivityIndicator } from 'react-native-paper';
-import { useLocalSearchParams, router } from 'expo-router';
-import { usePayment } from '../../hooks/usePayment';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ActivityIndicator, Text } from 'react-native-paper';
 import PaymentSplitView from '../../components/PaymentSplitView';
-import { calculateSplit } from '../../lib/stripe';
-import { updateOrderPaymentStatus } from '../../lib/database';
+import { processPayments, confirmPayment } from '../../lib/stripe';
+import { useOrder } from '../../hooks/useOrder';
+import { usePayment } from '../../hooks/usePayment';
 
 export default function PaymentSplitScreen() {
-  const { orderId } = useLocalSearchParams();
-  const { processPayment, confirmPayment, loading, error } = usePayment();
-  const [split, setSplit] = useState(null);
-  const [paymentStatus, setPaymentStatus] = useState('pending');
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const { order, loading, error } = useOrder(id);
+  const { paymentMethods, loading: paymentLoading } = usePayment();
+  const [splitType, setSplitType] = useState('equal');
+  const [customRules, setCustomRules] = useState([]);
+  const [paymentIntent, setPaymentIntent] = useState(null);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
-    // In a real app, you would fetch the order details from the database
-    // For this example, we'll use mock data
-    const mockOrder = {
-      id: orderId,
-      restaurant: 'Mock Restaurant',
-      items: [
-        { id: 1, name: 'Burger', price: 10, quantity: 2, participantId: 1 },
-        { id: 2, name: 'Fries', price: 3, quantity: 1, participantId: 2 },
-      ],
-      participants: [
-        { id: 1, name: 'Alice', paymentStatus: 'pending' },
-        { id: 2, name: 'Bob', paymentStatus: 'pending' },
-      ],
-    };
+    if (order && order.splitType) {
+      setSplitType(order.splitType);
+    }
+    if (order && order.customRules) {
+      setCustomRules(order.customRules);
+    }
+  }, [order]);
 
-    const calculatedSplit = calculateSplit(mockOrder, 'equal');
-    setSplit(calculatedSplit);
-  }, [orderId]);
+  const handlePay = async () => {
+    if (!paymentMethods || paymentMethods.length === 0) {
+      Alert.alert('No payment method', 'Please add a payment method first');
+      router.push('/payment/setup');
+      return;
+    }
 
-  const handlePayNow = async () => {
+    setIsProcessing(true);
     try {
-      // In a real app, you would use the actual payment method ID from the user's profile
-      const mockPaymentMethodId = 'pm_card_visa';
+      const result = await processPayments(order, splitType, customRules);
+      setPaymentIntent(result);
 
-      // Process the payment
-      const paymentResult = await processPayment({
-        id: orderId,
-        participants: split.participants,
-      });
-
-      // Confirm the payment
-      const paymentIntent = await confirmPayment(
-        paymentResult.paymentIntent,
-        mockPaymentMethodId
+      // For demo purposes, we'll simulate payment confirmation
+      // In a real app, you would use Stripe's payment sheet
+      const paymentResult = await confirmPayment(
+        result.paymentIntent,
+        paymentMethods[0].id
       );
 
-      if (paymentIntent.status === 'succeeded') {
-        setPaymentStatus('completed');
-        updateOrderPaymentStatus(orderId, 'completed', () => {
-          Alert.alert('Payment Successful', 'Your payment has been processed successfully.');
-          router.push(`/order/${orderId}`);
-        });
+      if (paymentResult.status === 'succeeded') {
+        Alert.alert('Payment successful', 'Your payment has been processed');
+        router.push(`/order/${id}`);
       } else {
-        setPaymentStatus('failed');
-        Alert.alert('Payment Failed', 'There was an issue processing your payment.');
+        throw new Error('Payment failed');
       }
-    } catch (err) {
-      console.error('Payment error:', err);
-      Alert.alert('Error', 'An error occurred while processing your payment.');
+    } catch (error) {
+      console.error('Payment error:', error);
+      Alert.alert('Payment failed', error.message || 'An error occurred during payment processing');
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  if (!split) {
+  if (loading || paymentLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        <Text>Calculating split...</Text>
+        <Text>Loading payment details...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text>Error loading order: {error.message}</Text>
+      </View>
+    );
+  }
+
+  if (!order) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text>Order not found</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <Text variant="headlineSmall" style={styles.title}>
-        Payment Split
-      </Text>
-
-      <PaymentSplitView split={split} />
-
-      <View style={styles.buttonContainer}>
-        <Button
-          mode="contained"
-          onPress={handlePayNow}
-          loading={loading}
-          disabled={loading || paymentStatus === 'completed'}
-          style={styles.payButton}
-        >
-          {paymentStatus === 'completed' ? 'Payment Complete' : 'Pay Now'}
-        </Button>
-      </View>
-
-      {error && (
-        <Text style={styles.errorText} variant="bodyMedium">
-          Error: {error}
-        </Text>
+      <PaymentSplitView
+        order={order}
+        splitType={splitType}
+        customRules={customRules}
+        onPay={handlePay}
+      />
+      {isProcessing && (
+        <View style={styles.processingOverlay}>
+          <ActivityIndicator size="large" color="#fff" />
+          <Text style={styles.processingText}>Processing payment...</Text>
+        </View>
       )}
     </View>
   );
@@ -108,26 +106,31 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  title: {
-    marginBottom: 24,
-    textAlign: 'center',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  buttonContainer: {
-    marginTop: 24,
+  processingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  payButton: {
-    paddingVertical: 8,
-  },
-  errorText: {
-    color: 'red',
+  processingText: {
+    color: '#fff',
     marginTop: 16,
-    textAlign: 'center',
+    fontSize: 18,
   },
 });
