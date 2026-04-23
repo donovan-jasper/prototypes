@@ -149,7 +149,7 @@ export default function ActiveRoutineScreen() {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.title}>Preparing Motion Detector...</Text>
+        <Text style={styles.loadingText}>Loading motion detector...</Text>
       </View>
     );
   }
@@ -157,54 +157,60 @@ export default function ActiveRoutineScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.progressText}>
+        <Text style={styles.exerciseCount}>
           Exercise {currentExerciseIndex + 1} of {exercises.length}
         </Text>
-        <ProgressBarAndroid
-          styleAttr="Horizontal"
-          indeterminate={false}
-          progress={(currentExerciseIndex + 1) / exercises.length}
-          style={styles.progressBar}
-          color="#007AFF"
-        />
+        <Text style={styles.exerciseName}>{currentExercise.name}</Text>
       </View>
 
-      <View style={styles.exerciseContainer}>
-        <Text style={styles.exerciseTitle}>{currentExercise.name}</Text>
-        <Text style={styles.instructions}>{currentExercise.instructions}</Text>
+      <View style={styles.progressContainer}>
+        {Platform.OS === 'ios' ? (
+          <ProgressViewIOS
+            progress={(currentExerciseIndex + 1) / exercises.length}
+            progressTintColor="#4CAF50"
+            trackTintColor="#E0E0E0"
+            style={styles.progressBar}
+          />
+        ) : (
+          <ProgressBarAndroid
+            styleAttr="Horizontal"
+            indeterminate={false}
+            progress={(currentExerciseIndex + 1) / exercises.length}
+            color="#4CAF50"
+            style={styles.progressBar}
+          />
+        )}
+      </View>
 
+      <View style={styles.timerContainer}>
+        <Text style={styles.timerText}>{formatTime(holdTimer)}</Text>
+        <Text style={styles.timerLabel}>Hold Time</Text>
+      </View>
+
+      <View style={styles.motionDetectorContainer}>
         <MotionDetector
           exerciseId={currentExercise.id}
           onCalibrationComplete={handleCalibrationComplete}
           onPostureCorrect={handlePostureCorrect}
           onInitialCalibrationStatusLoaded={handleInitialCalibrationStatusLoaded}
         />
-
-        {hasCalibratedForSession && (
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerText}>
-              {formatTime(holdTimer)} / {formatTime(currentExercise.duration)}
-            </Text>
-            <View style={styles.progressBarContainer}>
-              <View style={[
-                styles.progressBarFill,
-                { width: `${(holdTimer / currentExercise.duration) * 100}%` }
-              ]} />
-            </View>
-          </View>
-        )}
-
-        {isExerciseComplete && (
-          <TouchableOpacity
-            style={styles.nextButton}
-            onPress={handleNextExercise}
-          >
-            <Text style={styles.nextButtonText}>
-              {currentExerciseIndex < exercises.length - 1 ? 'Next Exercise' : 'Complete Routine'}
-            </Text>
-          </TouchableOpacity>
-        )}
       </View>
+
+      <View style={styles.instructionsContainer}>
+        <Text style={styles.instructionsTitle}>Instructions:</Text>
+        <Text style={styles.instructionsText}>{currentExercise.instructions}</Text>
+      </View>
+
+      {isExerciseComplete && (
+        <TouchableOpacity
+          style={[styles.button, styles.nextButton]}
+          onPress={handleNextExercise}
+        >
+          <Text style={styles.buttonText}>
+            {currentExerciseIndex < exercises.length - 1 ? 'Next Exercise' : 'Finish Routine'}
+          </Text>
+        </TouchableOpacity>
+      )}
 
       <Modal
         visible={showCalibrationModal}
@@ -219,10 +225,7 @@ export default function ActiveRoutineScreen() {
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => {
-                setShowCalibrationModal(false);
-                setHasCalibratedForSession(true);
-              }}
+              onPress={handleCalibrationComplete}
             >
               <Text style={styles.modalButtonText}>Start Calibration</Text>
             </TouchableOpacity>
@@ -236,70 +239,74 @@ export default function ActiveRoutineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     padding: 20,
+    backgroundColor: '#fff',
   },
   header: {
     marginBottom: 20,
   },
-  progressText: {
+  exerciseCount: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 5,
+  },
+  exerciseName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  progressContainer: {
+    marginBottom: 20,
   },
   progressBar: {
     height: 10,
     borderRadius: 5,
   },
-  exerciseContainer: {
-    flex: 1,
+  timerContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  timerText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  timerLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  motionDetectorContainer: {
+    height: 200,
+    marginBottom: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  exerciseTitle: {
-    fontSize: 24,
+  instructionsContainer: {
+    marginBottom: 20,
+  },
+  instructionsTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    textAlign: 'center',
+    color: '#333',
   },
-  instructions: {
+  instructionsText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
+    lineHeight: 22,
   },
-  timerContainer: {
-    marginVertical: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  timerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  progressBarContainer: {
-    height: 10,
-    width: '80%',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#4CAF50',
-  },
-  nextButton: {
+  button: {
     backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
+    padding: 15,
     borderRadius: 10,
+    alignItems: 'center',
     marginTop: 20,
   },
-  nextButtonText: {
-    color: 'white',
+  nextButton: {
+    backgroundColor: '#4CAF50',
+  },
+  buttonText: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -311,8 +318,9 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginVertical: 10,
-    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
@@ -323,28 +331,23 @@ const styles = StyleSheet.create({
   streakText: {
     fontSize: 18,
     color: '#4CAF50',
+    fontWeight: 'bold',
     marginBottom: 30,
-    fontWeight: 'bold',
   },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 10,
-  },
-  buttonText: {
-    color: 'white',
+  loadingText: {
     fontSize: 18,
-    fontWeight: 'bold',
+    color: '#666',
+    marginTop: 20,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     padding: 20,
     borderRadius: 10,
     width: '80%',
@@ -353,22 +356,24 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
+    color: '#333',
   },
   modalText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
     marginBottom: 20,
+    textAlign: 'center',
   },
   modalButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
   },
   modalButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
