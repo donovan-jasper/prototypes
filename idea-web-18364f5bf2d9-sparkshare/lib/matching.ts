@@ -1,7 +1,7 @@
 import { getDatabase } from './database';
 import { UserProfile, Match, Message, Skill, Preference } from './types';
 
-export const getPotentialCollaborators = async (userId: number): Promise<UserProfile[]> => {
+export const getPotentialCollaborators = async (userId: number, ideaId?: number): Promise<UserProfile[]> => {
   const db = await getDatabase();
 
   return new Promise((resolve, reject) => {
@@ -96,7 +96,7 @@ export const getUserProfile = async (userId: number): Promise<UserProfile> => {
                 `SELECT * FROM preferences WHERE user_id = ?`,
                 [userId],
                 (_, { rows: { _array: preferences } }) => {
-                  // Calculate Spark Score (simplified for MVP)
+                  // Calculate Spark Score
                   const sparkScore = calculateSparkScore(skills, preferences);
 
                   resolve({
@@ -155,7 +155,7 @@ export const createMatch = async (user1Id: number, user2Id: number, ideaId?: num
               tx.executeSql(
                 `INSERT INTO matches (user1_id, user2_id, idea_id, match_score, status)
                  VALUES (?, ?, ?, ?, 'pending')`,
-                [user1Id, user2Id, ideaId || null, matchScore],
+                [user1Id, user2Id, ideaId, matchScore],
                 (_, { insertId }) => {
                   resolve({
                     id: insertId,
@@ -172,44 +172,6 @@ export const createMatch = async (user1Id: number, user2Id: number, ideaId?: num
             },
             (_, error) => reject(error)
           );
-        },
-        (_, error) => reject(error)
-      );
-    });
-  });
-};
-
-export const getUserMatches = async (userId: number): Promise<Match[]> => {
-  const db = await getDatabase();
-
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT * FROM matches
-         WHERE user1_id = ? OR user2_id = ?
-         ORDER BY created_at DESC`,
-        [userId, userId],
-        (_, { rows: { _array: matches } }) => {
-          resolve(matches);
-        },
-        (_, error) => reject(error)
-      );
-    });
-  });
-};
-
-export const getMessages = async (matchId: number): Promise<Message[]> => {
-  const db = await getDatabase();
-
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `SELECT * FROM messages
-         WHERE match_id = ?
-         ORDER BY created_at ASC`,
-        [matchId],
-        (_, { rows: { _array: messages } }) => {
-          resolve(messages);
         },
         (_, error) => reject(error)
       );
@@ -236,6 +198,40 @@ export const sendMessage = async (matchId: number, senderId: number, content: st
             created_at: new Date().toISOString()
           });
         },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getMessagesForMatch = async (matchId: number): Promise<Message[]> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM messages WHERE match_id = ? ORDER BY created_at ASC`,
+        [matchId],
+        (_, { rows: { _array: messages } }) => {
+          resolve(messages);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const markMessagesAsRead = async (matchId: number, userId: number): Promise<void> => {
+  const db = await getDatabase();
+
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE messages
+         SET read_status = 1
+         WHERE match_id = ? AND sender_id != ? AND read_status = 0`,
+        [matchId, userId],
+        () => resolve(),
         (_, error) => reject(error)
       );
     });

@@ -1,137 +1,96 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Avatar, Button, Chip, ProgressBar } from 'react-native-paper';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import { Text, Avatar, Chip, Button } from 'react-native-paper';
 import { UserProfile } from '../lib/types';
+import { useRouter } from 'expo-router';
 
 interface CollaboratorCardProps {
   profile: UserProfile;
-  onPress?: () => void;
   onMessage?: () => void;
 }
 
-const CollaboratorCard: React.FC<CollaboratorCardProps> = ({
-  profile,
-  onPress,
-  onMessage
-}) => {
-  const { user, skills, sparkScore } = profile;
+const CollaboratorCard = ({ profile, onMessage }: CollaboratorCardProps) => {
+  const router = useRouter();
+
+  const handleViewProfile = () => {
+    router.push(`/profile/${profile.user.id}`);
+  };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Avatar.Text
-          size={48}
-          label={user.username.substring(0, 2).toUpperCase()}
-          style={styles.avatar}
-        />
+        <Avatar.Text size={40} label={profile.user.username.substring(0, 2).toUpperCase()} />
         <View style={styles.userInfo}>
-          <Text style={styles.username}>{user.username}</Text>
-          <Text style={styles.location}>{user.location || 'Location not specified'}</Text>
+          <Text variant="titleMedium">{profile.user.username}</Text>
+          <Text variant="bodySmall">Spark Score: {profile.sparkScore}</Text>
+          {profile.matchScore !== undefined && (
+            <Text variant="bodySmall">Match Score: {profile.matchScore}</Text>
+          )}
         </View>
       </View>
 
       <View style={styles.skillsContainer}>
-        {skills.slice(0, 3).map((skill, index) => (
-          <Chip key={index} style={styles.skillChip}>
+        {profile.skills.slice(0, 3).map(skill => (
+          <Chip key={skill.id} style={styles.skillChip}>
             {skill.skill_name}
           </Chip>
         ))}
-        {skills.length > 3 && (
-          <Text style={styles.moreSkills}>+{skills.length - 3} more</Text>
+        {profile.skills.length > 3 && (
+          <Text variant="bodySmall" style={styles.moreSkills}>
+            +{profile.skills.length - 3} more
+          </Text>
         )}
       </View>
 
-      <View style={styles.scoreContainer}>
-        <Text style={styles.scoreLabel}>Match Score:</Text>
-        <ProgressBar
-          progress={sparkScore / 100}
-          color="#4CAF50"
-          style={styles.progressBar}
-        />
-        <Text style={styles.scoreValue}>{Math.round(sparkScore)}%</Text>
-      </View>
-
-      {onMessage && (
-        <Button
-          mode="contained"
-          onPress={onMessage}
-          style={styles.messageButton}
-          icon="message"
-        >
-          Message
+      <View style={styles.actionsContainer}>
+        <Button mode="outlined" onPress={handleViewProfile} style={styles.actionButton}>
+          View Profile
         </Button>
-      )}
-    </TouchableOpacity>
+        {onMessage && (
+          <Button mode="contained" onPress={onMessage} style={styles.actionButton}>
+            Message
+          </Button>
+        )}
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: 'white',
+  container: {
+    backgroundColor: '#f5f5f5',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 12,
   },
-  avatar: {
-    marginRight: 12,
-  },
   userInfo: {
+    marginLeft: 12,
     flex: 1,
-  },
-  username: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  location: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
   },
   skillsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
     marginBottom: 12,
   },
   skillChip: {
-    marginRight: 8,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   moreSkills: {
-    fontSize: 12,
-    color: '#666',
-    alignSelf: 'center',
-    marginBottom: 8,
+    marginTop: 4,
   },
-  scoreContainer: {
-    marginBottom: 12,
+  actionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
-  scoreLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 4,
-  },
-  scoreValue: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    textAlign: 'right',
-  },
-  messageButton: {
-    marginTop: 8,
+  actionButton: {
+    flex: 1,
   },
 });
 
