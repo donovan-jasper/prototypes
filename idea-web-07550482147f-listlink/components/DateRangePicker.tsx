@@ -1,88 +1,84 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Button, Dialog, Portal, useTheme } from 'react-native-paper';
+import { Button, Menu, Divider, useTheme } from 'react-native-paper';
 import { formatDate } from '../lib/utils/formatting';
 
 interface DateRangePickerProps {
-  startDate: Date;
-  endDate: Date;
-  onChange: (range: { start: Date; end: Date }) => void;
+  initialRange: { start: Date; end: Date };
+  onRangeSelected: (range: { start: Date; end: Date }) => void;
 }
 
-export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+export function DateRangePicker({ initialRange, onRangeSelected }: DateRangePickerProps) {
   const theme = useTheme();
   const [visible, setVisible] = useState(false);
-  const [tempStart, setTempStart] = useState(startDate);
-  const [tempEnd, setTempEnd] = useState(endDate);
+  const [range, setRange] = useState(initialRange);
 
-  const showDialog = () => setVisible(true);
-  const hideDialog = () => setVisible(false);
+  const openMenu = () => setVisible(true);
+  const closeMenu = () => setVisible(false);
 
-  const handleApply = () => {
-    onChange({ start: tempStart, end: tempEnd });
-    hideDialog();
-  };
-
-  const handlePreset = (days: number) => {
+  const selectRange = (days: number) => {
     const end = new Date();
     const start = new Date();
     start.setDate(end.getDate() - days);
-    setTempStart(start);
-    setTempEnd(end);
+
+    const newRange = { start, end };
+    setRange(newRange);
+    onRangeSelected(newRange);
+    closeMenu();
   };
 
   return (
-    <>
-      <TouchableOpacity onPress={showDialog} style={styles.pickerButton}>
-        <Text style={styles.pickerText}>
-          {formatDate(startDate)} - {formatDate(endDate)}
-        </Text>
-      </TouchableOpacity>
-
-      <Portal>
-        <Dialog visible={visible} onDismiss={hideDialog}>
-          <Dialog.Title>Select Date Range</Dialog.Title>
-          <Dialog.Content>
-            <View style={styles.presetButtons}>
-              <Button mode="outlined" onPress={() => handlePreset(7)}>Last 7 days</Button>
-              <Button mode="outlined" onPress={() => handlePreset(30)}>Last 30 days</Button>
-              <Button mode="outlined" onPress={() => handlePreset(90)}>Last 90 days</Button>
-            </View>
-            <View style={styles.dateRange}>
-              <Text style={styles.dateLabel}>From: {formatDate(tempStart)}</Text>
-              <Text style={styles.dateLabel}>To: {formatDate(tempEnd)}</Text>
-            </View>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={hideDialog}>Cancel</Button>
-            <Button onPress={handleApply}>Apply</Button>
-          </Dialog.Actions>
-        </Dialog>
-      </Portal>
-    </>
+    <View style={styles.container}>
+      <Text style={styles.label}>Date Range:</Text>
+      <Menu
+        visible={visible}
+        onDismiss={closeMenu}
+        anchor={
+          <Button
+            mode="outlined"
+            onPress={openMenu}
+            style={styles.button}
+            contentStyle={styles.buttonContent}
+          >
+            {formatDate(range.start)} - {formatDate(range.end)}
+          </Button>
+        }
+      >
+        <Menu.Item
+          onPress={() => selectRange(7)}
+          title="Last 7 days"
+        />
+        <Menu.Item
+          onPress={() => selectRange(30)}
+          title="Last 30 days"
+        />
+        <Menu.Item
+          onPress={() => selectRange(90)}
+          title="Last 90 days"
+        />
+        <Menu.Item
+          onPress={() => selectRange(365)}
+          title="Last year"
+        />
+      </Menu>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  pickerButton: {
-    padding: 8,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 4,
-  },
-  pickerText: {
-    fontSize: 14,
-  },
-  presetButtons: {
+  container: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  dateRange: {
-    marginTop: 16,
-  },
-  dateLabel: {
-    fontSize: 14,
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  label: {
+    fontSize: 14,
+    marginRight: 8,
+  },
+  button: {
+    borderColor: '#ccc',
+  },
+  buttonContent: {
+    height: 36,
   },
 });

@@ -17,20 +17,21 @@ export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
   // Platform-specific fee structures
   const platformFees = {
     ebay: 0.13, // 13% final value fee
-    poshmark: 0.15, // 15% processing fee
+    poshmark: 0.15, // 15% service fee
     mercari: 0.1, // 10% service fee
-    depop: 0.12, // 12% commission
-    default: 0.1 // default 10% fee
+    depop: 0.12, // 12% service fee
+    stockx: 0.1, // 10% service fee
+    default: 0.1 // Default 10% fee
   };
 
   const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
-  const fees = (salePrice * feePercentage) + shippingCost;
-  const profit = salePrice - sourcingCost - fees;
+  const fees = salePrice * feePercentage;
+  const profit = salePrice - sourcingCost - fees - shippingCost;
   const margin = (profit / salePrice) * 100;
 
   return {
     profit: Math.max(0, profit), // Ensure profit isn't negative
-    margin: isNaN(margin) ? 0 : margin,
+    margin: Math.max(0, margin), // Ensure margin isn't negative
     fees
   };
 }
@@ -41,6 +42,7 @@ export function calculateFees(price: number, platform: string): number {
     poshmark: 0.15,
     mercari: 0.1,
     depop: 0.12,
+    stockx: 0.1,
     default: 0.1
   };
 

@@ -147,7 +147,7 @@ export default function SalesScreen() {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load sales data</Text>
+        <Text style={styles.errorText}>Error loading sales: {error}</Text>
         <Button mode="contained" onPress={() => loadListings({ status: 'sold' })}>
           Retry
         </Button>
@@ -160,32 +160,23 @@ export default function SalesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Sales Tracker</Text>
         <DateRangePicker
-          startDate={dateRange.start}
-          endDate={dateRange.end}
-          onChange={setDateRange}
+          initialRange={dateRange}
+          onRangeSelected={setDateRange}
         />
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryContainer}>
-        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.primaryContainer }]}>
+        <Card style={styles.summaryCard} mode="outlined">
           <Text style={styles.summaryLabel}>Total Sales</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.primary }]}>
-            {formatCurrency(totalSales)}
-          </Text>
+          <Text style={styles.summaryValue}>{formatCurrency(totalSales)}</Text>
         </Card>
-
-        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+        <Card style={styles.summaryCard} mode="outlined">
           <Text style={styles.summaryLabel}>Total Profit</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.secondary }]}>
-            {formatCurrency(totalProfit)}
-          </Text>
+          <Text style={styles.summaryValue}>{formatCurrency(totalProfit)}</Text>
         </Card>
-
-        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.tertiaryContainer }]}>
+        <Card style={styles.summaryCard} mode="outlined">
           <Text style={styles.summaryLabel}>Avg Margin</Text>
-          <Text style={[styles.summaryValue, { color: theme.colors.tertiary }]}>
-            {avgMargin.toFixed(1)}%
-          </Text>
+          <Text style={styles.summaryValue}>{avgMargin.toFixed(1)}%</Text>
         </Card>
       </ScrollView>
 
@@ -198,7 +189,7 @@ export default function SalesScreen() {
       </View>
 
       {soldListings.length === 0 ? (
-        <View style={styles.emptyState}>
+        <View style={styles.emptyContainer}>
           <Text style={styles.emptyText}>No sales found for the selected period</Text>
         </View>
       ) : (
@@ -234,15 +225,14 @@ const styles = StyleSheet.create({
     width: 150,
     padding: 16,
     marginRight: 8,
-    borderRadius: 8,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     marginBottom: 4,
   },
   summaryValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   exportContainer: {
@@ -263,7 +253,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     flex: 1,
-    marginRight: 8,
   },
   saleItemDetails: {
     marginTop: 8,
@@ -287,9 +276,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 8,
     fontSize: 16,
-    color: '#666',
   },
   errorContainer: {
     flex: 1,
@@ -299,20 +287,18 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#d32f2f',
+    color: 'red',
     marginBottom: 16,
     textAlign: 'center',
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
-    textAlign: 'center',
   },
   listContent: {
     paddingBottom: 16,
