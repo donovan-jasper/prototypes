@@ -1,9 +1,11 @@
 import { Accelerometer } from 'expo-sensors';
 import { Audio } from 'expo-av';
 import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
 import { db } from './database';
 
 const SLEEP_DETECTION_TASK = 'sleep-detection-task';
+const BACKGROUND_SLEEP_TASK = 'background-sleep-detection-task';
 const SAMPLE_RATE = 10; // Hz
 const STILLNESS_THRESHOLD = 0.05; // m/s²
 const STILLNESS_DURATION = 3 * 60 * 1000; // 3 minutes in ms
@@ -31,6 +33,7 @@ class SleepDetector {
     audioConfidence: 0
   };
   private sleepStateChangeCallback: ((isSleeping: boolean) => void) | null = null;
+  private backgroundTaskRegistered: boolean = false;
 
   constructor() {
     this.setupBackgroundTask();
@@ -38,17 +41,32 @@ class SleepDetector {
 
   private async setupBackgroundTask() {
     try {
-      await TaskManager.defineTask(SLEEP_DETECTION_TASK, async ({ data, error }) => {
+      // Define the background task
+      await TaskManager.defineTask(BACKGROUND_SLEEP_TASK, async ({ data, error }) => {
         if (error) {
           console.error('Background task error:', error);
-          return;
+          return BackgroundFetch.BackgroundFetchResult.Failed;
         }
 
-        if (data) {
-          const { accelerometerData, audioData } = data;
-          this.processSensorData(accelerometerData, audioData);
-        }
+        // Process sensor data in background
+        const accelerometerData = await this.getAccelerometerData();
+        const audioData = await this.analyzeAudio();
+
+        this.processSensorData(accelerometerData, audioData);
+
+        // Return the status of the task
+        return BackgroundFetch.BackgroundFetchResult.NewData;
       });
+
+      // Register the task
+      await BackgroundFetch.registerTaskAsync(BACKGROUND_SLEEP_TASK, {
+        minimumInterval: 15, // 15 minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+
+      this.backgroundTaskRegistered = true;
+      console.log('Background sleep detection task registered');
     } catch (error) {
       console.error('Failed to define background task:', error);
     }
@@ -67,18 +85,6 @@ class SleepDetector {
 
       // Start audio monitoring
       await this.startAudioRecording();
-
-      // Start background task
-      await TaskManager.isTaskRegisteredAsync(SLEEP_DETECTION_TASK)
-        .then(async (isRegistered) => {
-          if (!isRegistered) {
-            await TaskManager.registerTaskAsync(SLEEP_DETECTION_TASK, {
-              minInterval: 1000, // Run every second
-              stopOnTerminate: false,
-              startOnBoot: true,
-            });
-          }
-        });
 
       console.log('Sleep detection started');
     } catch (error) {
@@ -161,15 +167,23 @@ class SleepDetector {
   }
 
   private async analyzeAudio(): Promise<{ frequency: number; amplitude: number }> {
-    // Simulate breathing pattern detection (2-8 Hz)
-    // In a real implementation, this would use FFT to analyze frequency spectrum
-    const randomFrequency = BREATHING_FREQUENCY_RANGE.min +
-      Math.random() * (BREATHING_FREQUENCY_RANGE.max - BREATHING_FREQUENCY_RANGE.min);
-    const randomAmplitude = Math.random() * 0.5; // Simulate amplitude
+    // In a real implementation, this would use FFT to analyze the audio spectrum
+    // For this example, we'll simulate breathing pattern detection (2-8 Hz)
 
+    // Generate random breathing pattern for simulation
+    const frequency = Math.random() * (BREATHING_FREQUENCY_RANGE.max - BREATHING_FREQUENCY_RANGE.min) + BREATHING_FREQUENCY_RANGE.min;
+    const amplitude = Math.random() * 0.5 + 0.5; // 0.5-1.0
+
+    return { frequency, amplitude };
+  }
+
+  private async getAccelerometerData(): Promise<{ x: number; y: number; z: number }> {
+    // In a real implementation, this would get the latest accelerometer data
+    // For simulation, we'll return random data
     return {
-      frequency: randomFrequency,
-      amplitude: randomAmplitude
+      x: (Math.random() - 0.5) * 0.1,
+      y: (Math.random() - 0.5) * 0.1,
+      z: (Math.random() - 0.5) * 0.1
     };
   }
 
@@ -180,40 +194,60 @@ class SleepDetector {
     const magnitudes = this.lastMotionData.map(data =>
       Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z)
     );
+
     const avgMagnitude = magnitudes.reduce((sum, val) => sum + val, 0) / magnitudes.length;
 
-    // Check if stillness threshold is met
     if (avgMagnitude < STILLNESS_THRESHOLD) {
-      if (this.stillnessStartTime === null) {
+      // Device is still
+      if (!this.stillnessStartTime) {
         this.stillnessStartTime = Date.now();
       }
 
-      // Calculate motion confidence (higher if still for longer periods)
+      // Calculate stillness duration
       const stillnessDuration = Date.now() - this.stillnessStartTime;
-      const motionConfidence = Math.min(100, (stillnessDuration / STILLNESS_DURATION) * 100);
 
+      // Update motion confidence (0-100%)
+      const confidence = Math.min(100, (stillnessDuration / STILLNESS_DURATION) * 100);
+
+      // Update sleep state
       this.currentSleepState = {
         ...this.currentSleepState,
-        motionConfidence,
-        lastUpdated: new Date()
+        isSleeping: confidence >= 70,
+        confidence: Math.max(this.currentSleepState.confidence, confidence),
+        lastUpdated: new Date(),
+        motionConfidence: confidence
       };
 
-      // Check if stillness duration meets threshold
-      if (stillnessDuration >= STILLNESS_DURATION) {
-        this.updateSleepState(true);
+      // Notify if sleep state changed
+      if (this.currentSleepState.isSleeping && this.sleepStateChangeCallback) {
+        this.sleepStateChangeCallback(true);
       }
     } else {
+      // Device is moving
       this.stillnessStartTime = null;
-      this.currentSleepState = {
-        ...this.currentSleepState,
-        motionConfidence: 0,
-        lastUpdated: new Date()
-      };
-      this.updateSleepState(false);
+
+      // Reset motion confidence if we were previously sleeping
+      if (this.currentSleepState.isSleeping) {
+        this.currentSleepState = {
+          ...this.currentSleepState,
+          isSleeping: false,
+          confidence: 0,
+          lastUpdated: new Date(),
+          motionConfidence: 0
+        };
+
+        if (this.sleepStateChangeCallback) {
+          this.sleepStateChangeCallback(false);
+        }
+      }
     }
   }
 
-  private processSensorData(accelerometerData: any, audioData: any) {
+  private processSensorData(
+    accelerometerData: { x: number; y: number; z: number } | null,
+    audioData: { frequency: number; amplitude: number } | null
+  ) {
+    // Process accelerometer data if available
     if (accelerometerData) {
       this.lastMotionData.push({ ...accelerometerData, timestamp: Date.now() });
       if (this.lastMotionData.length > SAMPLE_RATE * 5) {
@@ -222,84 +256,29 @@ class SleepDetector {
       this.checkStillness();
     }
 
+    // Process audio data if available
     if (audioData) {
-      // Calculate audio confidence based on breathing pattern detection
-      const audioConfidence = this.calculateAudioConfidence(audioData);
+      // Check if audio matches breathing pattern
+      const isBreathing = audioData.frequency >= BREATHING_FREQUENCY_RANGE.min &&
+                          audioData.frequency <= BREATHING_FREQUENCY_RANGE.max &&
+                          audioData.amplitude > 0.3;
+
+      // Update audio confidence (0-100%)
+      const audioConfidence = isBreathing ? Math.min(100, audioData.amplitude * 100) : 0;
+
+      // Update sleep state
       this.currentSleepState = {
         ...this.currentSleepState,
-        audioConfidence,
-        lastUpdated: new Date()
+        isSleeping: this.currentSleepState.isSleeping || (audioConfidence >= 70 && this.currentSleepState.motionConfidence >= 70),
+        confidence: Math.max(this.currentSleepState.confidence, Math.min(audioConfidence, this.currentSleepState.motionConfidence)),
+        lastUpdated: new Date(),
+        audioConfidence
       };
 
-      // Update overall sleep state
-      this.updateSleepState();
-    }
-  }
-
-  private calculateAudioConfidence(audioData: { frequency: number; amplitude: number }): number {
-    // Check if frequency is within breathing range
-    const inBreathingRange = audioData.frequency >= BREATHING_FREQUENCY_RANGE.min &&
-                             audioData.frequency <= BREATHING_FREQUENCY_RANGE.max;
-
-    // Calculate confidence based on amplitude and frequency
-    let confidence = 0;
-    if (inBreathingRange) {
-      // Higher amplitude = higher confidence (capped at 100)
-      confidence = Math.min(100, audioData.amplitude * 200);
-    }
-
-    return confidence;
-  }
-
-  private updateSleepState(forceState?: boolean) {
-    const { motionConfidence, audioConfidence } = this.currentSleepState;
-
-    // Calculate combined confidence
-    const combinedConfidence = (motionConfidence * 0.6) + (audioConfidence * 0.4);
-
-    // Determine sleep state
-    let isSleeping = combinedConfidence >= 70; // 70% confidence threshold
-
-    if (forceState !== undefined) {
-      isSleeping = forceState;
-    }
-
-    // Only update if state changed
-    if (this.currentSleepState.isSleeping !== isSleeping) {
-      this.currentSleepState = {
-        ...this.currentSleepState,
-        isSleeping,
-        confidence: combinedConfidence,
-        lastUpdated: new Date()
-      };
-
-      // Log to database
-      this.logSleepState();
-
-      // Notify callback if registered
-      if (this.sleepStateChangeCallback) {
-        this.sleepStateChangeCallback(isSleeping);
+      // Notify if sleep state changed
+      if (this.currentSleepState.isSleeping && this.sleepStateChangeCallback) {
+        this.sleepStateChangeCallback(true);
       }
-    }
-  }
-
-  private async logSleepState() {
-    try {
-      await db.transactionAsync(async (tx) => {
-        await tx.executeSql(
-          `INSERT INTO sleep_sessions (timestamp, is_sleeping, confidence, motion_confidence, audio_confidence)
-           VALUES (?, ?, ?, ?, ?)`,
-          [
-            this.currentSleepState.lastUpdated.toISOString(),
-            this.currentSleepState.isSleeping ? 1 : 0,
-            this.currentSleepState.confidence,
-            this.currentSleepState.motionConfidence,
-            this.currentSleepState.audioConfidence
-          ]
-        );
-      });
-    } catch (error) {
-      console.error('Failed to log sleep state:', error);
     }
   }
 
@@ -309,6 +288,15 @@ class SleepDetector {
 
   public getCurrentState(): SleepState {
     return this.currentSleepState;
+  }
+
+  public async checkBackgroundTaskStatus() {
+    if (this.backgroundTaskRegistered) {
+      const status = await BackgroundFetch.getStatusAsync();
+      console.log('Background task status:', status);
+      return status;
+    }
+    return null;
   }
 }
 

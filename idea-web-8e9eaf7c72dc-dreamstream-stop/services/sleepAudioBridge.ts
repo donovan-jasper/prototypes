@@ -1,14 +1,20 @@
 import { sleepDetector } from './sleepDetection';
 import { audioController } from './audioControl';
+import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
+
+const BACKGROUND_TASK_NAME = 'sleep-audio-bridge-task';
 
 class SleepAudioBridge {
   private isActive: boolean = false;
   private sleepDetectionTimeout: NodeJS.Timeout | null = null;
   private lastPauseTime: number | null = null;
   private rewindAmount: number = 2; // minutes
+  private backgroundTaskRegistered: boolean = false;
 
   constructor() {
     this.setupSleepDetectionListener();
+    this.registerBackgroundTask();
   }
 
   private setupSleepDetectionListener() {
@@ -19,6 +25,34 @@ class SleepAudioBridge {
         this.handleWakeDetected();
       }
     });
+  }
+
+  private async registerBackgroundTask() {
+    try {
+      // Define the background task
+      await TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
+        const state = sleepDetector.getCurrentState();
+
+        if (state.isSleeping && state.confidence >= 70) {
+          this.handleSleepDetected();
+        }
+
+        // Return the status of the task
+        return BackgroundFetch.BackgroundFetchResult.NewData;
+      });
+
+      // Register the task
+      await BackgroundFetch.registerTaskAsync(BACKGROUND_TASK_NAME, {
+        minimumInterval: 15, // 15 minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+      });
+
+      this.backgroundTaskRegistered = true;
+      console.log('Background task registered successfully');
+    } catch (error) {
+      console.error('Failed to register background task:', error);
+    }
   }
 
   private handleSleepDetected() {
@@ -107,6 +141,15 @@ class SleepAudioBridge {
       isSleeping: state.isSleeping,
       confidence: state.confidence
     };
+  }
+
+  public async checkBackgroundTaskStatus() {
+    if (this.backgroundTaskRegistered) {
+      const status = await BackgroundFetch.getStatusAsync();
+      console.log('Background task status:', status);
+      return status;
+    }
+    return null;
   }
 }
 

@@ -1,14 +1,17 @@
 import { Audio } from 'expo-av';
 import { MediaControl } from 'expo-media-library';
+import * as Notifications from 'expo-notifications';
 
 class AudioController {
   private currentPlaybackObject: Audio.Sound | null = null;
   private isPlaying: boolean = false;
   private playbackPosition: number = 0;
   private fadeDuration: number = 3000; // 3 seconds
+  private notificationId: string | null = null;
 
   constructor() {
     this.setupMediaControls();
+    this.setupNotifications();
   }
 
   private setupMediaControls() {
@@ -30,6 +33,31 @@ class AudioController {
     MediaControl.onNextPress(() => this.fastForward(30000)); // 30 seconds
   }
 
+  private setupNotifications() {
+    // Request notification permissions
+    Notifications.requestPermissionsAsync();
+
+    // Configure notification handler
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      }),
+    });
+  }
+
+  private async showNotification(title: string, body: string) {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: false,
+      },
+      trigger: null,
+    });
+  }
+
   public async pausePlayback() {
     if (this.currentPlaybackObject && this.isPlaying) {
       // Fade out before pausing
@@ -41,6 +69,12 @@ class AudioController {
       MediaControl.setNowPlaying({
         isPlaying: false,
       });
+
+      // Show notification
+      this.notificationId = await this.showNotification(
+        'SleepCue',
+        'Audio paused because you fell asleep. Tap to resume.'
+      );
 
       console.log('Playback paused');
     }
@@ -66,6 +100,12 @@ class AudioController {
       MediaControl.setNowPlaying({
         isPlaying: true,
       });
+
+      // Cancel any existing notification
+      if (this.notificationId) {
+        await Notifications.dismissNotificationAsync(this.notificationId);
+        this.notificationId = null;
+      }
 
       console.log('Playback resumed');
     }
@@ -105,6 +145,12 @@ class AudioController {
   public async setPlaybackObject(sound: Audio.Sound) {
     this.currentPlaybackObject = sound;
     this.isPlaying = true;
+  }
+
+  public async handleNotificationResponse(response: Notifications.NotificationResponse) {
+    if (response.notification.request.identifier === this.notificationId) {
+      await this.resumePlayback();
+    }
   }
 }
 
