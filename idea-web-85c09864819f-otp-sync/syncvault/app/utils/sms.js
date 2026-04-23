@@ -1,24 +1,26 @@
-import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db, auth } from '../../App';
 
 export const getSMSS = async () => {
   try {
     const user = auth.currentUser;
-    if (!user) {
-      return [];
-    }
+    if (!user) throw new Error('User not authenticated');
 
     const q = query(
       collection(db, 'users', user.uid, 'smsMessages'),
       orderBy('timestamp', 'desc')
     );
 
-    const snapshot = await getDocs(q);
-    const messages = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      timestamp: doc.data().timestamp?.toDate(),
-    }));
+    const querySnapshot = await getDocs(q);
+    const messages = [];
+
+    querySnapshot.forEach((doc) => {
+      messages.push({
+        id: doc.id,
+        ...doc.data(),
+        timestamp: doc.data().timestamp?.toDate()
+      });
+    });
 
     return messages;
   } catch (error) {

@@ -1,48 +1,46 @@
 import * as SMS from 'expo-sms';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../App';
-import * as Device from 'expo-device';
-
-let smsSubscription = null;
 
 export const startSMSListener = async () => {
   try {
-    const hasPermission = await SMS.isAvailableAsync();
-    if (!hasPermission) {
-      console.log('SMS not available on this device');
+    const { status } = await SMS.requestPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('SMS permissions not granted');
       return;
     }
 
-    // Note: expo-sms doesn't have a direct listener API
-    // This is a placeholder for the actual implementation
-    // In a real app, you'd need to use native modules or a different approach
-    console.log('SMS listener started');
+    const subscription = SMS.addListener((event) => {
+      if (event.data && event.data.messages) {
+        handleIncomingSMS(event.data.messages);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   } catch (error) {
-    console.error('Error starting SMS listener:', error);
+    console.error('Error setting up SMS listener:', error);
   }
 };
 
-export const stopSMSListener = () => {
-  if (smsSubscription) {
-    smsSubscription.remove();
-    smsSubscription = null;
-  }
-};
-
-export const saveSMSToFirestore = async (sender, body) => {
+const handleIncomingSMS = async (messages) => {
   try {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) {
+      console.log('User not authenticated');
+      return;
+    }
 
-    const deviceId = Device.modelName || 'unknown';
-
-    await addDoc(collection(db, 'users', user.uid, 'smsMessages'), {
-      sender,
-      body,
-      timestamp: new Date(),
-      deviceId,
-    });
+    for (const message of messages) {
+      await addDoc(collection(db, 'users', user.uid, 'smsMessages'), {
+        sender: message.originatingAddress || 'Unknown',
+        body: message.body,
+        timestamp: serverTimestamp(),
+        isRead: false
+      });
+    }
   } catch (error) {
-    console.error('Error saving SMS to Firestore:', error);
+    console.error('Error processing incoming SMS:', error);
   }
 };

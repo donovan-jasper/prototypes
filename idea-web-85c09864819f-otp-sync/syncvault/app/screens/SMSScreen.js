@@ -1,73 +1,109 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { auth, db } from '../../App';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { db, auth } from '../../App';
+import SMSList from '../components/SMSList';
+import { startSMSListener } from '../utils/smsListener';
 
 const SMSScreen = () => {
   const [smsMessages, setSmsMessages] = useState([]);
+  const [replyText, setReplyText] = useState('');
+  const [selectedMessage, setSelectedMessage] = useState(null);
 
   useEffect(() => {
     const user = auth.currentUser;
     if (!user) return;
 
+    // Start SMS listener
+    const unsubscribeListener = startSMSListener();
+
+    // Set up Firestore listener for messages
     const q = query(
       collection(db, 'users', user.uid, 'smsMessages'),
       orderBy('timestamp', 'desc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        timestamp: doc.data().timestamp?.toDate(),
-      }));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const messages = [];
+      querySnapshot.forEach((doc) => {
+        messages.push({
+          id: doc.id,
+          ...doc.data(),
+          timestamp: doc.data().timestamp?.toDate()
+        });
+      });
       setSmsMessages(messages);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      if (unsubscribeListener) unsubscribeListener();
+    };
   }, []);
 
-  const formatTimestamp = (timestamp) => {
-    if (!timestamp) return '';
-    const now = new Date();
-    const diff = now - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  const handleReply = async () => {
+    if (!selectedMessage || !replyText.trim()) {
+      Alert.alert('Error', 'Please select a message and enter a reply');
+      return;
+    }
 
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('User not authenticated');
+
+      await addDoc(collection(db, 'users', user.uid, 'smsReplies'), {
+        originalMessageId: selectedMessage.id,
+        sender: selectedMessage.sender,
+        body: replyText,
+        timestamp: serverTimestamp(),
+        status: 'pending'
+      });
+
+      setReplyText('');
+      setSelectedMessage(null);
+      Alert.alert('Success', 'Reply sent successfully');
+    } catch (error) {
+      console.error('Error sending reply:', error);
+      Alert.alert('Error', 'Failed to send reply');
+    }
   };
-
-  const renderSMSItem = ({ item }) => (
-    <View style={styles.smsItem}>
-      <View style={styles.smsHeader}>
-        <Text style={styles.smsSender}>{item.sender}</Text>
-        <Text style={styles.smsTime}>{formatTimestamp(item.timestamp)}</Text>
-      </View>
-      <Text style={styles.smsBody}>{item.body}</Text>
-      <Text style={styles.smsDevice}>From: {item.deviceId}</Text>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Forwarded SMS Messages</Text>
+
       {smsMessages.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No SMS messages yet</Text>
-          <Text style={styles.emptySubtext}>
-            SMS messages from all your devices will appear here
-          </Text>
+          <Text style={styles.emptyText}>No forwarded SMS messages yet</Text>
+          <Text style={styles.emptySubtext}>Messages from your phone will appear here</Text>
         </View>
       ) : (
-        <FlatList
-          data={smsMessages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderSMSItem}
-          contentContainerStyle={styles.listContent}
-        />
+        <>
+          <SMSList
+            smss={smsMessages}
+            onSelectMessage={(message) => setSelectedMessage(message)}
+            selectedMessage={selectedMessage}
+          />
+
+          {selectedMessage && (
+            <View style={styles.replyContainer}>
+              <Text style={styles.replyTitle}>Reply to {selectedMessage.sender}</Text>
+              <TextInput
+                style={styles.replyInput}
+                value={replyText}
+                onChangeText={setReplyText}
+                placeholder="Type your reply..."
+                multiline
+              />
+              <TouchableOpacity
+                style={styles.replyButton}
+                onPress={handleReply}
+              >
+                <Text style={styles.replyButtonText}>Send Reply</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </View>
   );
@@ -76,44 +112,12 @@ const SMSScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  listContent: {
     padding: 16,
   },
-  smsItem: {
-    backgroundColor: '#f9f9f9',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-  },
-  smsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  smsSender: {
-    fontSize: 16,
+  title: {
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  smsTime: {
-    fontSize: 12,
-    color: '#666',
-  },
-  smsBody: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  smsDevice: {
-    fontSize: 12,
-    color: '#999',
-    fontStyle: 'italic',
+    marginBottom: 16,
   },
   emptyState: {
     flex: 1,
@@ -126,11 +130,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
     textAlign: 'center',
+  },
+  replyContainer: {
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  replyTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  replyInput: {
+    height: 100,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 8,
+    backgroundColor: '#fff',
+  },
+  replyButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+  },
+  replyButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
