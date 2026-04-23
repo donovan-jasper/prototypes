@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, RefreshControl, Dimensions } from 'react-native';
 import { generatePersonalizedInsights, getCategoryBreakdown, getSpendingTrends } from '../../services/coaching';
 
+const { width } = Dimensions.get('window');
+
 export default function CoachingScreen() {
   const [insights, setInsights] = useState([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
@@ -18,8 +20,8 @@ export default function CoachingScreen() {
       getCategoryBreakdown(),
       getSpendingTrends()
     ]);
-    
-    setInsights(insightsData);
+
+    setInsights(insightsData.sort((a, b) => a.priority - b.priority));
     setCategoryBreakdown(categoryData);
     setSpendingTrends(trendsData);
   }
@@ -48,21 +50,33 @@ export default function CoachingScreen() {
     }
   }
 
+  function getPriorityLabel(priority) {
+    switch (priority) {
+      case 1: return 'High Priority';
+      case 2: return 'Medium Priority';
+      case 3: return 'Low Priority';
+      default: return 'Priority';
+    }
+  }
+
   return (
-    <ScrollView 
+    <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <Text style={styles.title}>Financial Coaching</Text>
-      
+      <View style={styles.header}>
+        <Text style={styles.title}>Financial Coaching</Text>
+        <Text style={styles.subtitle}>Personalized insights to help you manage your money better</Text>
+      </View>
+
       {insights.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Personalized Insights</Text>
           {insights.map((insight, index) => (
-            <View 
-              key={index} 
+            <View
+              key={index}
               style={[
                 styles.insightCard,
                 { borderLeftColor: getInsightColor(insight.type) }
@@ -76,6 +90,11 @@ export default function CoachingScreen() {
                 </View>
               </View>
               <Text style={styles.insightMessage}>{insight.message}</Text>
+              <View style={styles.insightFooter}>
+                <Text style={[styles.priorityBadge, { backgroundColor: getInsightColor(insight.type) }]}>
+                  {getPriorityLabel(insight.priority)}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
@@ -108,15 +127,15 @@ export default function CoachingScreen() {
             {spendingTrends.map((trend, index) => {
               const maxAmount = Math.max(...spendingTrends.map(t => t.total));
               const barHeight = maxAmount > 0 ? (trend.total / maxAmount) * 100 : 0;
-              
+
               return (
                 <View key={index} style={styles.trendBar}>
                   <View style={styles.trendBarContainer}>
-                    <View 
+                    <View
                       style={[
                         styles.trendBarFill,
                         { height: `${barHeight}%` }
-                      ]} 
+                      ]}
                     />
                   </View>
                   <Text style={styles.trendAmount}>${trend.total.toFixed(0)}</Text>
@@ -135,6 +154,9 @@ export default function CoachingScreen() {
           <Text style={styles.emptyStateMessage}>
             Start tracking your expenses and income to receive personalized financial insights and recommendations.
           </Text>
+          <TouchableOpacity style={styles.emptyStateButton}>
+            <Text style={styles.emptyStateButtonText}>Start Tracking</Text>
+          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -142,179 +164,200 @@ export default function CoachingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: '#f5f5f5' 
+  container: {
+    flex: 1,
+    backgroundColor: '#f8f8f8',
   },
-  title: { 
-    fontSize: 28, 
-    fontWeight: 'bold', 
-    margin: 20,
-    marginBottom: 10
+  header: {
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
   },
   section: {
-    marginBottom: 20
+    marginBottom: 20,
+    paddingHorizontal: 15,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginHorizontal: 20,
-    marginBottom: 10,
-    color: '#333'
-  },
-  insightCard: { 
-    backgroundColor: 'white', 
-    padding: 16,
-    marginHorizontal: 20,
+    color: '#333',
     marginBottom: 12,
-    borderRadius: 12,
+    paddingHorizontal: 5,
+  },
+  insightCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
+    marginBottom: 10,
     borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2
+    elevation: 2,
   },
   insightHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 8
+    alignItems: 'center',
+    marginBottom: 8,
   },
   insightIcon: {
-    fontSize: 24,
-    marginRight: 12
+    fontSize: 20,
+    marginRight: 10,
   },
   insightHeaderText: {
-    flex: 1
+    flex: 1,
   },
-  insightCategory: { 
-    fontSize: 11, 
-    color: '#8E8E93',
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    marginBottom: 2
+  insightCategory: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
   },
   insightTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 4
+    color: '#333',
   },
-  insightMessage: { 
-    fontSize: 14, 
+  insightMessage: {
+    fontSize: 14,
+    color: '#444',
     lineHeight: 20,
-    color: '#333'
+    marginBottom: 10,
+  },
+  insightFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
   },
   categoryCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2
+    elevation: 2,
   },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0'
+    borderBottomColor: '#f0f0f0',
   },
   categoryInfo: {
-    flex: 1
+    flex: 1,
   },
   categoryName: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#000',
-    marginBottom: 2
+    color: '#333',
+    marginBottom: 2,
   },
   categoryCount: {
     fontSize: 12,
-    color: '#8E8E93'
+    color: '#666',
   },
   categoryAmounts: {
-    alignItems: 'flex-end'
+    alignItems: 'flex-end',
   },
   categoryAmount: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 2
+    color: '#333',
   },
   categoryPercent: {
-    fontSize: 12,
-    color: '#8E8E93'
+    fontSize: 14,
+    color: '#666',
   },
   trendCard: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    padding: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 200,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2
+    elevation: 2,
   },
   trendBar: {
-    flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginHorizontal: 2
+    width: (width - 60) / 6,
   },
   trendBarContainer: {
-    width: '100%',
-    height: 120,
+    height: 150,
     justifyContent: 'flex-end',
-    alignItems: 'center'
+    width: '100%',
   },
   trendBarFill: {
-    width: '80%',
     backgroundColor: '#007AFF',
     borderRadius: 4,
-    minHeight: 2
+    width: '100%',
   },
   trendAmount: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#000',
-    marginTop: 4
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#333',
+    marginTop: 4,
   },
   trendMonth: {
-    fontSize: 9,
-    color: '#8E8E93',
-    marginTop: 2
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    marginTop: 60
+    padding: 30,
+    marginTop: 50,
   },
   emptyStateIcon: {
-    fontSize: 64,
-    marginBottom: 16
+    fontSize: 48,
+    marginBottom: 20,
   },
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 8
+    color: '#333',
+    marginBottom: 10,
   },
   emptyStateMessage: {
-    fontSize: 14,
-    color: '#8E8E93',
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 20
-  }
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  emptyStateButton: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  emptyStateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
 });
