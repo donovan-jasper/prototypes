@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Modal, StyleSheet, ActivityIndicator, TouchableOpacity, ProgressBarAndroid, Platform, Alert } from 'react-native';
+import { View, Text, Modal, StyleSheet, ActivityIndicator, TouchableOpacity, ProgressBarAndroid, Platform, Alert, FlatList } from 'react-native';
 import { useP2PTransfer } from '@/hooks/useP2PTransfer';
 import { Colors } from '@/constants/Colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,26 +23,20 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
     isTransferring,
     progress,
     connectionState,
+    peers,
+    discoverPeers,
     sendFileP2P,
     receiveFileP2P,
-    cancelTransfer,
-    discoverPeers
+    cancelTransfer
   } = useP2PTransfer();
-  const [availablePeers, setAvailablePeers] = useState<string[]>([]);
   const [selectedPeer, setSelectedPeer] = useState<string | null>(null);
+  const [isDiscovering, setIsDiscovering] = useState(false);
 
   useEffect(() => {
-    if (visible) {
-      const discover = async () => {
-        const peers = await discoverPeers();
-        setAvailablePeers(peers);
-        if (peers.length > 0) {
-          setSelectedPeer(peers[0]);
-        }
-      };
-      discover();
+    if (visible && isSender) {
+      discoverPeers();
     }
-  }, [visible, discoverPeers]);
+  }, [visible, isSender, discoverPeers]);
 
   useEffect(() => {
     if (visible && fileId && peerId) {
@@ -53,6 +47,12 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
       }
     }
   }, [visible, fileId, peerId, isSender, sendFileP2P, receiveFileP2P]);
+
+  const handleDiscoverPeers = async () => {
+    setIsDiscovering(true);
+    await discoverPeers();
+    setIsDiscovering(false);
+  };
 
   const getStatusMessage = () => {
     switch (connectionState) {
@@ -119,38 +119,120 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
     setSelectedPeer(peerId);
   };
 
+  const renderPeerItem = ({ item }: { item: string }) => (
+    <TouchableOpacity
+      style={[
+        styles.peerItem,
+        selectedPeer === item && styles.selectedPeerItem
+      ]}
+      onPress={() => handlePeerSelection(item)}
+    >
+      <Ionicons
+        name="phone-portrait-outline"
+        size={20}
+        color={selectedPeer === item ? Colors.white : Colors.primary}
+      />
+      <Text style={[
+        styles.peerItemText,
+        selectedPeer === item && styles.selectedPeerItemText
+      ]}>
+        {item}
+      </Text>
+    </TouchableOpacity>
+  );
+
   const renderPeerSelection = () => {
-    if (availablePeers.length === 0) {
+    if (peers.length === 0) {
       return (
-        <View style={styles.peerSelection}>
-          <Text style={styles.peerSelectionText}>No peers found on your network</Text>
-          <Text style={styles.peerSelectionSubtext}>Make sure both devices are on the same WiFi</Text>
+        <View style={styles.emptyPeersContainer}>
+          <Ionicons name="search-outline" size={48} color={Colors.gray} />
+          <Text style={styles.emptyPeersText}>No devices found</Text>
+          <Text style={styles.emptyPeersSubtext}>
+            Make sure both devices are on the same WiFi network
+          </Text>
+          <TouchableOpacity
+            style={styles.refreshButton}
+            onPress={handleDiscoverPeers}
+            disabled={isDiscovering}
+          >
+            {isDiscovering ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <>
+                <Ionicons name="refresh" size={16} color={Colors.white} />
+                <Text style={styles.refreshButtonText}>Refresh</Text>
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       );
     }
 
     return (
-      <View style={styles.peerSelection}>
-        <Text style={styles.peerSelectionTitle}>Select a device:</Text>
-        {availablePeers.map(peer => (
-          <TouchableOpacity
-            key={peer}
-            style={[
-              styles.peerButton,
-              selectedPeer === peer && styles.selectedPeerButton
-            ]}
-            onPress={() => handlePeerSelection(peer)}
-          >
-            <Text style={[
-              styles.peerButtonText,
-              selectedPeer === peer && styles.selectedPeerButtonText
-            ]}>
-              {peer}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.peerListContainer}>
+        <Text style={styles.peerListTitle}>Available Devices:</Text>
+        <FlatList
+          data={peers}
+          renderItem={renderPeerItem}
+          keyExtractor={(item) => item}
+          contentContainerStyle={styles.peerList}
+        />
       </View>
     );
+  };
+
+  const renderTransferControls = () => {
+    if (connectionState === 'completed') {
+      return (
+        <TouchableOpacity
+          style={[styles.controlButton, styles.completeButton]}
+          onPress={handleClose}
+        >
+          <Text style={styles.controlButtonText}>Done</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    if (connectionState === 'failed') {
+      return (
+        <TouchableOpacity
+          style={[styles.controlButton, styles.retryButton]}
+          onPress={() => {
+            if (isSender && selectedPeer) {
+              sendFileP2P(fileId!, selectedPeer);
+            } else if (!isSender && peerId) {
+              receiveFileP2P(peerId);
+            }
+          }}
+        >
+          <Text style={styles.controlButtonText}>Retry</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isTransferring) {
+      return (
+        <TouchableOpacity
+          style={[styles.controlButton, styles.cancelButton]}
+          onPress={cancelTransfer}
+        >
+          <Text style={styles.controlButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    if (isSender && selectedPeer) {
+      return (
+        <TouchableOpacity
+          style={[styles.controlButton, styles.sendButton]}
+          onPress={() => sendFileP2P(fileId!, selectedPeer!)}
+        >
+          <Text style={styles.controlButtonText}>Send File</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -164,58 +246,23 @@ export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
         <View style={styles.modalContent}>
           <View style={styles.header}>
             <Text style={styles.title}>
-              {isSender ? 'Send File' : 'Receive File'}
+              {isSender ? 'Send File via P2P' : 'Receive File via P2P'}
             </Text>
-            {getStatusIcon()}
-          </View>
-
-          {isSender && renderPeerSelection()}
-
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>{progress}%</Text>
-            {getProgressBar()}
+            <TouchableOpacity onPress={handleClose}>
+              <Ionicons name="close" size={24} color={Colors.gray} />
+            </TouchableOpacity>
           </View>
 
           <View style={styles.statusContainer}>
+            {getStatusIcon()}
             <Text style={styles.statusText}>{getStatusMessage()}</Text>
-            <Text style={styles.connectionText}>
-              Connection: {connectionState}
-            </Text>
           </View>
 
-          {connectionState === 'completed' && (
-            <Text style={styles.successText}>
-              File transferred successfully!
-            </Text>
-          )}
+          {getProgressBar()}
 
-          {connectionState === 'failed' && (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>
-                Transfer failed. Please try again.
-              </Text>
-              <TouchableOpacity
-                style={styles.fallbackButton}
-                onPress={() => Alert.alert('Fallback', 'HTTP transfer would be initiated here')}
-              >
-                <Text style={styles.fallbackButtonText}>Use HTTP Transfer</Text>
-              </TouchableOpacity>
-            </View>
-          )}
+          {isSender && renderPeerSelection()}
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[
-                styles.closeButton,
-                isTransferring && connectionState !== 'completed' && styles.cancelButton
-              ]}
-              onPress={handleClose}
-            >
-              <Text style={styles.closeButtonText}>
-                {isTransferring && connectionState !== 'completed' ? 'Cancel' : 'Close'}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          {renderTransferControls()}
         </View>
       </View>
     </Modal>
@@ -232,150 +279,132 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '90%',
     maxWidth: 400,
-    backgroundColor: 'white',
+    backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 20,
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
     marginBottom: 20,
   },
   title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginRight: 10,
-  },
-  peerSelection: {
-    width: '100%',
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: Colors.lightBackground,
-    borderRadius: 8,
-  },
-  peerSelectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: Colors.text,
-  },
-  peerSelectionText: {
-    fontSize: 16,
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  peerSelectionSubtext: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    textAlign: 'center',
-    marginTop: 5,
-  },
-  peerButton: {
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.lightBackground,
-    marginBottom: 8,
-  },
-  selectedPeerButton: {
-    backgroundColor: Colors.primary,
-  },
-  peerButtonText: {
-    color: Colors.text,
-    textAlign: 'center',
-  },
-  selectedPeerButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  progressContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  progressText: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: Colors.primary,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 10,
   },
+  statusText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: Colors.text,
+  },
   iosProgressContainer: {
+    height: 5,
     width: '100%',
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
+    backgroundColor: Colors.lightGray,
+    borderRadius: 5,
     overflow: 'hidden',
     marginVertical: 20,
   },
   iosProgressBar: {
     height: '100%',
     backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-  statusContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  statusText: {
-    fontSize: 18,
-    color: Colors.text,
-    marginBottom: 5,
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  connectionText: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-  },
-  successText: {
-    fontSize: 16,
-    color: Colors.success,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: Colors.error,
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  fallbackButton: {
-    backgroundColor: Colors.warning,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     borderRadius: 5,
   },
-  fallbackButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  peerListContainer: {
+    marginVertical: 20,
   },
-  buttonContainer: {
-    width: '100%',
-    marginTop: 10,
+  peerListTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: Colors.text,
   },
-  closeButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    width: '100%',
+  peerList: {
+    paddingVertical: 10,
+  },
+  peerItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    backgroundColor: Colors.lightGray,
+  },
+  selectedPeerItem: {
+    backgroundColor: Colors.primary,
+  },
+  peerItemText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: Colors.text,
+  },
+  selectedPeerItemText: {
+    color: Colors.white,
+  },
+  emptyPeersContainer: {
+    alignItems: 'center',
+    padding: 20,
+    marginVertical: 20,
+  },
+  emptyPeersText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 10,
+    color: Colors.text,
+  },
+  emptyPeersSubtext: {
+    fontSize: 14,
+    color: Colors.gray,
+    textAlign: 'center',
+    marginTop: 5,
+  },
+  refreshButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginTop: 15,
+  },
+  refreshButtonText: {
+    color: Colors.white,
+    marginLeft: 5,
+    fontSize: 14,
+  },
+  controlButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  sendButton: {
+    backgroundColor: Colors.primary,
   },
   cancelButton: {
+    backgroundColor: Colors.warning,
+  },
+  retryButton: {
     backgroundColor: Colors.error,
   },
-  closeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  completeButton: {
+    backgroundColor: Colors.success,
+  },
+  controlButtonText: {
+    color: Colors.white,
     fontSize: 16,
+    fontWeight: '600',
   },
 });

@@ -1,60 +1,116 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
+import { EncryptionBadge } from './EncryptionBadge';
 
-export const FileCard = ({ file, onShare, onDelete }) => {
-  const getFileIcon = () => {
-    if (file.mimeType?.startsWith('image/')) {
-      return 'image-outline';
-    } else if (file.mimeType?.startsWith('video/')) {
-      return 'videocam-outline';
-    } else if (file.mimeType?.startsWith('audio/')) {
-      return 'musical-notes-outline';
-    } else if (file.name?.endsWith('.pdf')) {
-      return 'document-text-outline';
-    } else if (file.name?.endsWith('.doc') || file.name?.endsWith('.docx')) {
-      return 'document-outline';
-    } else if (file.name?.endsWith('.xls') || file.name?.endsWith('.xlsx')) {
-      return 'grid-outline';
+interface FileCardProps {
+  file: {
+    id: string;
+    name: string;
+    size: number;
+    createdAt: number;
+    expiresAt?: number;
+    encrypted: boolean;
+  };
+  onDelete: () => void;
+  onShare: () => void;
+  onP2PTransfer: () => void;
+}
+
+export const FileCard: React.FC<FileCardProps> = ({
+  file,
+  onDelete,
+  onShare,
+  onP2PTransfer
+}) => {
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString();
+  };
+
+  const getExpirationText = () => {
+    if (!file.expiresAt) return 'Never expires';
+
+    const now = Date.now();
+    const diff = file.expiresAt - now;
+
+    if (diff <= 0) return 'Expired';
+
+    const hours = Math.floor(diff / (1000 * 60 * 60));
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `Expires in ${days} day${days > 1 ? 's' : ''}`;
+    } else if (hours > 0) {
+      return `Expires in ${hours} hour${hours > 1 ? 's' : ''}`;
     } else {
-      return 'document-outline';
+      return 'Expires soon';
     }
   };
 
-  const confirmDelete = () => {
+  const handleDelete = () => {
     Alert.alert(
       'Delete File',
-      'Are you sure you want to delete this file?',
+      'Are you sure you want to delete this file? This action cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: onDelete },
+        { text: 'Delete', style: 'destructive', onPress: onDelete }
       ]
     );
   };
 
   return (
-    <View style={styles.card}>
-      <View style={styles.iconContainer}>
-        <Ionicons name={getFileIcon()} size={32} color={Colors.primary} />
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <View style={styles.fileIcon}>
+          <Ionicons
+            name="document-outline"
+            size={24}
+            color={Colors.primary}
+          />
+        </View>
+        <View style={styles.fileInfo}>
+          <Text style={styles.fileName} numberOfLines={1}>{file.name}</Text>
+          <Text style={styles.fileSize}>{formatFileSize(file.size)}</Text>
+        </View>
+        <EncryptionBadge encrypted={file.encrypted} />
       </View>
 
-      <View style={styles.infoContainer}>
-        <Text style={styles.fileName} numberOfLines={1}>
-          {file.name}
-        </Text>
-        <Text style={styles.fileSize}>
-          {Math.round(file.size / 1024)} KB
-        </Text>
+      <View style={styles.details}>
+        <View style={styles.detailItem}>
+          <Ionicons name="calendar-outline" size={16} color={Colors.gray} />
+          <Text style={styles.detailText}>Added: {formatDate(file.createdAt)}</Text>
+        </View>
+
+        <View style={styles.detailItem}>
+          <Ionicons name="time-outline" size={16} color={Colors.gray} />
+          <Text style={styles.detailText}>{getExpirationText()}</Text>
+        </View>
       </View>
 
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity onPress={onShare} style={styles.actionButton}>
-          <Ionicons name="share-outline" size={24} color={Colors.primary} />
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.actionButton} onPress={onP2PTransfer}>
+          <Ionicons name="wifi-outline" size={20} color={Colors.success} />
+          <Text style={[styles.actionText, { color: Colors.success }]}>P2P</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={confirmDelete} style={styles.actionButton}>
-          <Ionicons name="trash-outline" size={24} color={Colors.danger} />
+        <TouchableOpacity style={styles.actionButton} onPress={onShare}>
+          <Ionicons name="share-outline" size={20} color={Colors.primary} />
+          <Text style={[styles.actionText, { color: Colors.primary }]}>Share</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
+          <Ionicons name="trash-outline" size={20} color={Colors.error} />
+          <Text style={[styles.actionText, { color: Colors.error }]}>Delete</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -62,40 +118,71 @@ export const FileCard = ({ file, onShare, onDelete }) => {
 };
 
 const styles = StyleSheet.create({
-  card: {
+  container: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
-    borderRadius: 8,
-    padding: 15,
     marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
   },
-  iconContainer: {
-    marginRight: 15,
+  fileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: Colors.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
   },
-  infoContainer: {
+  fileInfo: {
     flex: 1,
   },
   fileName: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: Colors.text,
-    marginBottom: 5,
   },
   fileSize: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: Colors.gray,
+    marginTop: 2,
   },
-  actionsContainer: {
+  details: {
+    marginBottom: 15,
+  },
+  detailItem: {
     flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
+  detailText: {
+    marginLeft: 5,
+    fontSize: 14,
+    color: Colors.gray,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   actionButton: {
-    padding: 5,
-    marginLeft: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.lightGray,
+  },
+  actionText: {
+    marginLeft: 5,
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
