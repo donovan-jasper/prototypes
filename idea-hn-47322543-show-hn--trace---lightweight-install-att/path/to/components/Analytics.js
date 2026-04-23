@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { getInstallCount, getDeepLinkCount, getInstallTrendData, getInstallsBySource } from '../services/AnalyticsService';
 
 const Analytics = () => {
@@ -8,10 +8,12 @@ const Analytics = () => {
   const [trendData, setTrendData] = useState({ today: 0, yesterday: 0 });
   const [installSources, setInstallSources] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchAnalytics = async () => {
       try {
+        setLoading(true);
         const [count, deepLinkCount, trendData, sources] = await Promise.all([
           getInstallCount(),
           getDeepLinkCount(),
@@ -23,8 +25,10 @@ const Analytics = () => {
         setDeepLinkCount(deepLinkCount);
         setTrendData(trendData);
         setInstallSources(sources);
+        setError(null);
       } catch (error) {
         console.error('Error fetching analytics:', error);
+        setError('Failed to load analytics data. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -35,17 +39,28 @@ const Analytics = () => {
 
   const renderTrendIndicator = () => {
     if (trendData.today > trendData.yesterday) {
-      return <Text style={styles.trendUp}>↑ {Math.round((trendData.today / trendData.yesterday) * 100 - 100)}%</Text>;
+      const percentage = Math.round((trendData.today / trendData.yesterday) * 100 - 100);
+      return <Text style={styles.trendUp}>↑ {percentage}%</Text>;
     } else if (trendData.today < trendData.yesterday) {
-      return <Text style={styles.trendDown}>↓ {Math.round(100 - (trendData.today / trendData.yesterday) * 100)}%</Text>;
+      const percentage = Math.round(100 - (trendData.today / trendData.yesterday) * 100);
+      return <Text style={styles.trendDown}>↓ {percentage}%</Text>;
     }
     return <Text style={styles.trendNeutral}>→ 0%</Text>;
   };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading analytics...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2c3e50" />
+        <Text style={styles.loadingText}>Loading analytics data...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
@@ -89,7 +104,7 @@ const Analytics = () => {
         {installSources.length > 0 ? (
           installSources.map((source, index) => (
             <View key={index} style={styles.sourceRow}>
-              <Text style={styles.sourceName}>{source.source || 'Unknown'}</Text>
+              <Text style={styles.sourceName}>{source.source}</Text>
               <Text style={styles.sourceCount}>{source.count}</Text>
             </View>
           ))
@@ -106,6 +121,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
     padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: '#e74c3c',
+    fontSize: 16,
+    textAlign: 'center',
   },
   card: {
     backgroundColor: 'white',
@@ -192,15 +229,9 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    padding: 16,
-  },
-  loadingText: {
-    fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginTop: 20,
+    padding: 16,
   },
 });
 
