@@ -167,7 +167,7 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
       </View>
 
       <Modal
-        visible={selectedDate !== null}
+        visible={!!selectedDate}
         animationType="slide"
         transparent={true}
         onRequestClose={closeModal}
@@ -178,26 +178,25 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
               <Text style={styles.modalTitle}>
                 {selectedDate?.toLocaleDateString('en-US', {
                   weekday: 'long',
-                  year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}
               </Text>
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text style={styles.closeButtonText}>×</Text>
               </TouchableOpacity>
             </View>
 
             {dayLogs.length > 0 ? (
               <FlatList
-                data={dayLogs}
+                data={dayLogs.sort((a, b) => b.timestamp - a.timestamp)}
                 renderItem={renderDayLogItem}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.logList}
               />
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No tension logs for this day</Text>
+                <Text style={styles.emptyStateText}>No tension logs for this day</Text>
               </View>
             )}
           </View>
@@ -209,10 +208,9 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 12,
     padding: 16,
-    backgroundColor: Colors.light.background,
-    borderRadius: 8,
-    marginBottom: 16,
   },
   header: {
     marginBottom: 16,
@@ -221,22 +219,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
+    marginBottom: 4,
   },
   subHeaderText: {
     fontSize: 14,
     color: Colors.light.textSecondary,
-    marginTop: 4,
   },
   grid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   cell: {
     width: cellSize,
     height: cellSize,
+    margin: 2,
     borderRadius: 4,
-    marginBottom: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -246,25 +243,24 @@ const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 10,
+    color: Colors.light.background,
     fontWeight: '500',
-    color: 'white',
-    marginBottom: 2,
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
+    color: Colors.light.background,
+    fontWeight: 'bold',
+    marginTop: 2,
   },
   percentage: {
     fontSize: 10,
-    color: 'white',
+    color: Colors.light.background,
     marginTop: 2,
-    fontWeight: '500',
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 8,
   },
   legendItem: {
     flexDirection: 'row',
@@ -300,16 +296,15 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: Colors.light.text,
   },
   closeButton: {
     padding: 8,
   },
   closeButtonText: {
-    color: Colors.light.tint,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 24,
+    color: Colors.light.text,
   },
   logList: {
     paddingBottom: 16,
@@ -327,7 +322,6 @@ const styles = StyleSheet.create({
   logTime: {
     fontSize: 14,
     color: Colors.light.text,
-    fontWeight: '500',
   },
   logStatusContainer: {
     flexDirection: 'row',
@@ -335,9 +329,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logStatusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 8,
   },
   logStatusText: {
@@ -345,7 +339,7 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   logBodyZone: {
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
@@ -353,7 +347,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  emptyText: {
+  emptyStateText: {
     fontSize: 16,
     color: Colors.light.textSecondary,
   },

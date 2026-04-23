@@ -147,25 +147,26 @@ export default function InsightsScreen() {
           </View>
         </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Tension Overview</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Current Score:</Text>
-            <Text style={styles.summaryValue}>
-              {currentLogs.length > 0 ? `${(tensionScore * 100).toFixed(0)}% tense` : 'No data'}
-            </Text>
+        <View style={styles.summaryContainer}>
+          <Text style={styles.summaryTitle}>Tension Summary</Text>
+          <View style={styles.summaryStats}>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{(tensionScore * 100).toFixed(0)}%</Text>
+              <Text style={styles.statLabel}>Tense</Text>
+            </View>
+            <View style={styles.statBox}>
+              <Text style={styles.statValue}>{((1 - tensionScore) * 100).toFixed(0)}%</Text>
+              <Text style={styles.statLabel}>Relaxed</Text>
+            </View>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Trend:</Text>
-            <Text style={styles.summaryValue}>{getTrendText()}</Text>
-          </View>
+          <Text style={styles.trendText}>{getTrendText()}</Text>
         </View>
 
-        {patterns.peakHours.length > 0 && (
-          <View style={styles.patternCard}>
-            <Text style={styles.patternTitle}>Tension Patterns</Text>
+        <View style={styles.patternsContainer}>
+          <Text style={styles.patternsTitle}>Tension Patterns</Text>
+          {patterns.peakHours.length > 0 && (
             <View style={styles.patternSection}>
-              <Text style={styles.patternSectionTitle}>Peak Tension Times:</Text>
+              <Text style={styles.patternSectionTitle}>Peak Tension Times</Text>
               <View style={styles.patternTags}>
                 {patterns.peakHours.map(hour => (
                   <View key={hour} style={styles.patternTag}>
@@ -174,42 +175,47 @@ export default function InsightsScreen() {
                 ))}
               </View>
             </View>
-            {patterns.peakDays.length > 0 && (
-              <View style={styles.patternSection}>
-                <Text style={styles.patternSectionTitle}>Peak Tension Days:</Text>
-                <View style={styles.patternTags}>
-                  {patterns.peakDays.map(day => {
-                    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    return (
-                      <View key={day} style={styles.patternTag}>
-                        <Text style={styles.patternTagText}>{days[day]}</Text>
-                      </View>
-                    );
-                  })}
-                </View>
+          )}
+          {patterns.peakDays.length > 0 && (
+            <View style={styles.patternSection}>
+              <Text style={styles.patternSectionTitle}>Peak Tension Days</Text>
+              <View style={styles.patternTags}>
+                {patterns.peakDays.map(day => {
+                  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                  return (
+                    <View key={day} style={styles.patternTag}>
+                      <Text style={styles.patternTagText}>{days[day]}</Text>
+                    </View>
+                  );
+                })}
               </View>
-            )}
-          </View>
-        )}
+            </View>
+          )}
+        </View>
 
-        <HeatmapCalendar
-          logs={currentLogs}
-          days={viewDays}
-          onDayPress={handleDayPress}
-        />
-
-        {!isPremium && viewDays === 7 && (
-          <PremiumGate
-            title="Unlock 30-Day History"
-            description="See your full month of tension patterns and track your progress over time."
-            buttonText="Upgrade to Premium"
-            onPress={purchasePremium}
+        <View style={styles.heatmapContainer}>
+          <HeatmapCalendar
+            logs={currentLogs}
+            days={viewDays}
+            onDayPress={handleDayPress}
           />
+        </View>
+
+        {!isPremium && (
+          <View style={styles.premiumBanner}>
+            <Text style={styles.premiumText}>Unlock 30-day history with Premium</Text>
+            <TouchableOpacity
+              style={styles.premiumButton}
+              onPress={() => purchasePremium()}
+            >
+              <Text style={styles.premiumButtonText}>Upgrade</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
       <Modal
-        visible={selectedDate !== null}
+        visible={!!selectedDate}
         animationType="slide"
         transparent={true}
         onRequestClose={closeModal}
@@ -220,70 +226,36 @@ export default function InsightsScreen() {
               <Text style={styles.modalTitle}>
                 {selectedDate?.toLocaleDateString('en-US', {
                   weekday: 'long',
-                  year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}
               </Text>
               <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
+                <Text style={styles.closeButtonText}>×</Text>
               </TouchableOpacity>
             </View>
 
             {dayLogs.length > 0 ? (
               <FlatList
-                data={dayLogs}
+                data={dayLogs.sort((a, b) => b.timestamp - a.timestamp)}
                 renderItem={renderDayLogItem}
                 keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.logList}
               />
             ) : (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No tension logs for this day</Text>
+                <Text style={styles.emptyStateText}>No tension logs for this day</Text>
               </View>
             )}
           </View>
         </View>
       </Modal>
 
-      <Modal
+      <PremiumGate
         visible={showPremiumGate}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowPremiumGate(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Premium Feature</Text>
-              <TouchableOpacity onPress={() => setShowPremiumGate(false)} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.premiumContent}>
-              <Text style={styles.premiumTitle}>Unlock 30-Day History</Text>
-              <Text style={styles.premiumDescription}>
-                See your full month of tension patterns and track your progress over time.
-              </Text>
-
-              <View style={styles.premiumBenefits}>
-                <Text style={styles.premiumBenefit}>• Full 30-day heatmap</Text>
-                <Text style={styles.premiumBenefit}>• Long-term trend analysis</Text>
-                <Text style={styles.premiumBenefit}>• Unlimited reminders</Text>
-                <Text style={styles.premiumBenefit}>• All body zones</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.premiumButton}
-                onPress={handleUpgrade}
-              >
-                <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowPremiumGate(false)}
+        onUpgrade={handleUpgrade}
+      />
     </SafeAreaView>
   );
 }
@@ -296,12 +268,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 16,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   header: {
     marginBottom: 24,
   },
   title: {
     fontSize: 24,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: Colors.light.text,
     marginBottom: 16,
   },
@@ -322,53 +299,62 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.tint,
   },
   toggleText: {
-    fontSize: 16,
     color: Colors.light.text,
+    fontWeight: '500',
   },
   toggleTextActive: {
-    color: 'white',
-    fontWeight: '600',
+    color: Colors.light.background,
   },
-  summaryCard: {
+  summaryContainer: {
     backgroundColor: Colors.light.card,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: Colors.light.textSecondary,
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: Colors.light.text,
-  },
-  patternCard: {
-    backgroundColor: Colors.light.card,
-    borderRadius: 8,
-    padding: 16,
     marginBottom: 16,
   },
-  patternTitle: {
+  summaryStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  statBox: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 8,
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: Colors.light.tint,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+  },
+  trendText: {
+    fontSize: 16,
+    color: Colors.light.text,
+    textAlign: 'center',
+  },
+  patternsContainer: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+  patternsTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   patternSection: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   patternSectionTitle: {
     fontSize: 16,
@@ -379,19 +365,46 @@ const styles = StyleSheet.create({
   patternTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    gap: 8,
   },
   patternTag: {
-    backgroundColor: Colors.light.tint,
+    backgroundColor: Colors.light.background,
     borderRadius: 16,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
   patternTagText: {
-    color: 'white',
+    color: Colors.light.text,
     fontSize: 14,
-    fontWeight: '500',
+  },
+  heatmapContainer: {
+    marginBottom: 24,
+  },
+  premiumBanner: {
+    backgroundColor: Colors.light.card,
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  premiumText: {
+    fontSize: 16,
+    color: Colors.light.text,
+    flex: 1,
+  },
+  premiumButton: {
+    backgroundColor: Colors.light.tint,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  premiumButtonText: {
+    color: Colors.light.background,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -413,16 +426,15 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: Colors.light.text,
   },
   closeButton: {
     padding: 8,
   },
   closeButtonText: {
-    color: Colors.light.tint,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 24,
+    color: Colors.light.text,
   },
   logList: {
     paddingBottom: 16,
@@ -440,7 +452,6 @@ const styles = StyleSheet.create({
   logTime: {
     fontSize: 14,
     color: Colors.light.text,
-    fontWeight: '500',
   },
   logStatusContainer: {
     flexDirection: 'row',
@@ -448,9 +459,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logStatusDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
     marginRight: 8,
   },
   logStatusText: {
@@ -458,7 +469,7 @@ const styles = StyleSheet.create({
     color: Colors.light.text,
   },
   logBodyZone: {
-    fontSize: 12,
+    fontSize: 14,
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
@@ -466,48 +477,8 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
   },
-  emptyText: {
+  emptyStateText: {
     fontSize: 16,
     color: Colors.light.textSecondary,
-  },
-  premiumContent: {
-    padding: 16,
-  },
-  premiumTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.light.text,
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  premiumDescription: {
-    fontSize: 16,
-    color: Colors.light.textSecondary,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  premiumBenefits: {
-    marginBottom: 24,
-  },
-  premiumBenefit: {
-    fontSize: 16,
-    color: Colors.light.text,
-    marginBottom: 8,
-  },
-  premiumButton: {
-    backgroundColor: Colors.light.tint,
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  premiumButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
