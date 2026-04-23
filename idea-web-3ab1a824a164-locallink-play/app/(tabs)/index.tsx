@@ -13,7 +13,7 @@ import BroadcastCard from '../../components/BroadcastCard';
 import { getCurrentLocation } from '../../lib/location';
 
 export default function FeedScreen() {
-  const { broadcasts, loading, fetchBroadcasts, setUserLocation } = useBroadcastStore();
+  const { broadcasts, loading, userLocation, setUserLocation, fetchBroadcasts } = useBroadcastStore();
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRadius, setSelectedRadius] = useState(3);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -25,17 +25,16 @@ export default function FeedScreen() {
   }, []);
 
   useEffect(() => {
-    if (selectedRadius) {
+    if (userLocation && selectedRadius) {
       fetchBroadcasts(selectedRadius);
     }
-  }, [selectedRadius]);
+  }, [userLocation, selectedRadius]);
 
   const loadLocation = async () => {
     try {
       const location = await getCurrentLocation();
       setUserLocation(location);
       setLocationError(null);
-      fetchBroadcasts(selectedRadius);
     } catch (error) {
       setLocationError('Unable to get location. Please enable location services.');
     }
@@ -44,11 +43,10 @@ export default function FeedScreen() {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadLocation();
+    if (userLocation) {
+      await fetchBroadcasts(selectedRadius);
+    }
     setRefreshing(false);
-  };
-
-  const handleInterest = async (broadcastId: string) => {
-    // Interest handling is done in BroadcastCard
   };
 
   if (locationError) {
@@ -58,6 +56,15 @@ export default function FeedScreen() {
         <TouchableOpacity style={styles.retryButton} onPress={loadLocation}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!userLocation) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Getting your location...</Text>
       </View>
     );
   }
@@ -104,9 +111,7 @@ export default function FeedScreen() {
         <FlatList
           data={broadcasts}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <BroadcastCard broadcast={item} onInterest={handleInterest} />
-          )}
+          renderItem={({ item }) => <BroadcastCard broadcast={item} />}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -166,6 +171,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666666',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -198,8 +208,8 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
   },
   retryButtonText: {

@@ -10,46 +10,26 @@ import { Broadcast } from '../types';
 import { formatDistance } from '../lib/location';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
+import { useBroadcastStore } from '../store/broadcastStore';
 
 interface BroadcastCardProps {
   broadcast: Broadcast;
-  onInterest: (broadcastId: string) => void;
 }
 
-export default function BroadcastCard({ broadcast, onInterest }: BroadcastCardProps) {
+export default function BroadcastCard({ broadcast }: BroadcastCardProps) {
   const { user } = useAuthStore();
+  const { expressInterest } = useBroadcastStore();
   const [expressing, setExpressing] = useState(false);
-  const [interested, setInterested] = useState(false);
 
   const isExpired = new Date(broadcast.expiresAt) < new Date();
   const timeLeft = getTimeLeft(broadcast.expiresAt);
 
   const handleInterest = async () => {
-    if (!user || expressing || interested) return;
+    if (!user || expressing || broadcast.interested) return;
 
     setExpressing(true);
     try {
-      // Create chat room entry
-      const { data: existingChat } = await supabase
-        .from('chats')
-        .select('id')
-        .eq('broadcast_id', broadcast.id)
-        .eq('interested_user_id', user.id)
-        .single();
-
-      if (!existingChat) {
-        const { error } = await supabase.from('chats').insert({
-          broadcast_id: broadcast.id,
-          creator_user_id: broadcast.userId,
-          interested_user_id: user.id,
-          created_at: new Date().toISOString(),
-        });
-
-        if (error) throw error;
-      }
-
-      setInterested(true);
-      onInterest(broadcast.id);
+      await expressInterest(broadcast.id);
     } catch (error) {
       console.error('Error expressing interest:', error);
     } finally {
@@ -66,7 +46,14 @@ export default function BroadcastCard({ broadcast, onInterest }: BroadcastCardPr
             <Text style={styles.groupSize}>Group of {broadcast.groupSize}</Text>
           )}
         </View>
-        <Text style={styles.timeLeft}>{isExpired ? 'Expired' : timeLeft}</Text>
+        <View style={styles.timeContainer}>
+          {broadcast.isPremium && (
+            <View style={styles.premiumBadge}>
+              <Text style={styles.premiumText}>Premium</Text>
+            </View>
+          )}
+          <Text style={styles.timeLeft}>{isExpired ? 'Expired' : timeLeft}</Text>
+        </View>
       </View>
 
       <View style={styles.userInfo}>
@@ -82,16 +69,16 @@ export default function BroadcastCard({ broadcast, onInterest }: BroadcastCardPr
         <TouchableOpacity
           style={[
             styles.interestButton,
-            (expressing || interested) && styles.interestButtonDisabled,
+            (expressing || broadcast.interested) && styles.interestButtonDisabled,
           ]}
           onPress={handleInterest}
-          disabled={expressing || interested}
+          disabled={expressing || broadcast.interested}
         >
           {expressing ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
           ) : (
             <Text style={styles.interestButtonText}>
-              {interested ? 'Interest Sent' : 'Interested'}
+              {broadcast.interested ? 'Interest Sent' : 'Interested'}
             </Text>
           )}
         </TouchableOpacity>
@@ -114,7 +101,7 @@ function getTimeLeft(expiresAt: string): string {
 
   if (diffMins < 0) return 'Expired';
   if (diffMins < 60) return `${diffMins}m left`;
-  
+
   const hours = Math.floor(diffMins / 60);
   const mins = diffMins % 60;
   return `${hours}h ${mins}m left`;
@@ -152,6 +139,21 @@ const styles = StyleSheet.create({
   groupSize: {
     fontSize: 14,
     color: '#666666',
+  },
+  timeContainer: {
+    alignItems: 'flex-end',
+  },
+  premiumBadge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 4,
+  },
+  premiumText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000000',
   },
   timeLeft: {
     fontSize: 14,
@@ -194,14 +196,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   expiredBadge: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#FF3B30',
     paddingVertical: 8,
     borderRadius: 8,
     alignItems: 'center',
   },
   expiredText: {
-    color: '#999999',
-    fontSize: 14,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
