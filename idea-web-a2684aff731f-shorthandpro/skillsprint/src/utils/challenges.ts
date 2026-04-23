@@ -8,11 +8,14 @@ export const completeChallenge = async (
 ): Promise<{ xp: number; unlocked: string; totalXP: number }> => {
   let xp = 0;
   if (challengeType === 'typing') {
+    // Typing challenges earn more XP based on score (WPM + accuracy)
     xp = Math.floor(score * 0.5);
   } else if (challengeType === 'memory') {
-    xp = Math.floor(score * 0.3);
+    // Memory challenges earn XP based on correct digits
+    xp = Math.floor(score * 10);
   } else if (challengeType === 'math') {
-    xp = Math.floor(score * 0.4);
+    // Math challenges earn XP based on correct answers
+    xp = Math.floor(score * 20);
   }
 
   const currentXP = await getUserXP();
@@ -48,4 +51,20 @@ export const calculateLevel = (xp: number): { level: number; progress: number } 
   const level = Math.floor(xp / xpPerLevel) + 1;
   const progress = (xp % xpPerLevel) / xpPerLevel;
   return { level, progress };
+};
+
+export const calculateTypingStats = (typedText: string, targetText: string): { wpm: number; accuracy: number } => {
+  const wordsTyped = typedText.trim().split(/\s+/).length;
+  const wpm = Math.round((wordsTyped / 1) * 60);
+
+  let errors = 0;
+  for (let i = 0; i < typedText.length; i++) {
+    if (typedText[i] !== targetText[i]) {
+      errors++;
+    }
+  }
+
+  const accuracy = Math.round(((targetText.length - errors) / targetText.length) * 100);
+
+  return { wpm, accuracy };
 };
