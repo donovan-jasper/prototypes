@@ -1,147 +1,214 @@
-import React, { useContext, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, FlatList, TouchableOpacity } from 'react-native';
-import { useVoiceLibrary } from '../../hooks/useVoiceLibrary';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { useSubscription } from '../../hooks/useSubscription';
+import { getVoiceClipsByCategory, getClipsByCategoryAndMood } from '../../services/voiceLibrary';
 import VoicePlayer from '../../components/VoicePlayer';
-import { SubscriptionContext } from '../../context/SubscriptionContext';
-import { useAudio } from '../../hooks/useAudio';
+import { VoiceClip } from '../../types';
 
-export default function LibraryScreen() {
-  const { voiceClips } = useVoiceLibrary();
-  const { isPremium } = useContext(SubscriptionContext);
-  const { playAudio, stopAudio, isLoading, error } = useAudio();
-  const [currentClip, setCurrentClip] = useState<string | null>(null);
+const categories = ['all', 'morning', 'focus', 'energy', 'calm', 'celebrate'];
+const moods = ['struggling', 'neutral', 'crushing'];
 
-  const handlePlayClip = async (clipId: string) => {
-    try {
-      if (currentClip === clipId) {
-        await stopAudio();
-        setCurrentClip(null);
-      } else {
-        await stopAudio();
-        const clip = voiceClips.find(c => c.id === clipId);
-        if (clip) {
-          await playAudio(clip.audioFile);
-          setCurrentClip(clipId);
-        }
-      }
-    } catch (err) {
-      console.error('Error playing clip:', err);
+const LibraryScreen = () => {
+  const { isPremiumUser } = useSubscription();
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedMood, setSelectedMood] = useState('neutral');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [voiceClips, setVoiceClips] = useState<VoiceClip[]>([]);
+
+  useEffect(() => {
+    loadVoiceClips();
+  }, [selectedCategory, selectedMood, searchQuery]);
+
+  const loadVoiceClips = () => {
+    let clips = getClipsByCategoryAndMood(selectedCategory, selectedMood);
+
+    if (searchQuery) {
+      clips = clips.filter(clip =>
+        clip.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        clip.category.toLowerCase().includes(searchQuery.toLowerCase())
+      );
     }
+
+    setVoiceClips(clips);
   };
 
-  const renderItem = ({ item }) => (
-    <VoicePlayer
-      clip={item}
-      onPlay={() => handlePlayClip(item.id)}
-      isLocked={item.isPremium && !isPremium}
-    />
+  const renderCategoryButton = (category: string) => (
+    <TouchableOpacity
+      key={category}
+      style={[
+        styles.categoryButton,
+        selectedCategory === category && styles.selectedCategoryButton
+      ]}
+      onPress={() => setSelectedCategory(category)}
+    >
+      <Text style={[
+        styles.categoryButtonText,
+        selectedCategory === category && styles.selectedCategoryButtonText
+      ]}>
+        {category === 'all' ? 'All' : category.charAt(0).toUpperCase() + category.slice(1)}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderMoodButton = (mood: string) => (
+    <TouchableOpacity
+      key={mood}
+      style={[
+        styles.moodButton,
+        selectedMood === mood && styles.selectedMoodButton
+      ]}
+      onPress={() => setSelectedMood(mood)}
+    >
+      <Text style={[
+        styles.moodButtonText,
+        selectedMood === mood && styles.selectedMoodButtonText
+      ]}>
+        {mood.charAt(0).toUpperCase() + mood.slice(1)}
+      </Text>
+    </TouchableOpacity>
   );
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Voice Library</Text>
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Morning Boost</Text>
-        <FlatList
-          data={voiceClips.filter((clip) => clip.category === 'morning')}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
+    <View style={styles.container}>
+      <Text style={styles.title}>Voice Library</Text>
+
+      <View style={styles.searchContainer}>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search clips..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Focus</Text>
-        <FlatList
-          data={voiceClips.filter((clip) => clip.category === 'focus')}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
+
+      <View style={styles.filtersContainer}>
+        <View style={styles.filterSection}>
+          <Text style={styles.filterTitle}>Categories</Text>
+          <View style={styles.categoryButtons}>
+            {categories.map(renderCategoryButton)}
+          </View>
+        </View>
+
+        <View style={styles.filterSection}>
+          <Text style={styles.filterTitle}>Mood</Text>
+          <View style={styles.moodButtons}>
+            {moods.map(renderMoodButton)}
+          </View>
+        </View>
       </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Energy</Text>
-        <FlatList
-          data={voiceClips.filter((clip) => clip.category === 'energy')}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Calm</Text>
-        <FlatList
-          data={voiceClips.filter((clip) => clip.category === 'calm')}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Celebrate</Text>
-        <FlatList
-          data={voiceClips.filter((clip) => clip.category === 'celebrate')}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-        />
-      </View>
-      {isLoading && <Text style={styles.loadingText}>Loading audio...</Text>}
-      {error && <Text style={styles.errorText}>{error}</Text>}
-      {currentClip && (
-        <TouchableOpacity style={styles.stopAllButton} onPress={stopAudio}>
-          <Text style={styles.stopAllButtonText}>Stop All</Text>
-        </TouchableOpacity>
-      )}
-    </ScrollView>
+
+      <FlatList
+        data={voiceClips}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <VoicePlayer
+            clip={item}
+            isPremiumUser={isPremiumUser}
+          />
+        )}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No clips found matching your criteria</Text>
+          </View>
+        }
+      />
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  header: {
+    backgroundColor: '#f5f5f5',
     padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 16,
   },
-  section: {
-    padding: 16,
+  searchContainer: {
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  searchInput: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    fontSize: 16,
+  },
+  filtersContainer: {
+    marginBottom: 16,
+  },
+  filterSection: {
+    marginBottom: 16,
+  },
+  filterTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 8,
   },
-  loadingText: {
-    textAlign: 'center',
-    color: '#673ab7',
-    marginTop: 8,
+  categoryButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
   },
-  errorText: {
-    textAlign: 'center',
-    color: '#e53935',
-    marginTop: 8,
+  categoryButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
   },
-  stopAllButton: {
-    backgroundColor: '#673ab7',
-    padding: 12,
-    margin: 16,
-    borderRadius: 4,
+  selectedCategoryButton: {
+    backgroundColor: '#4CAF50',
+  },
+  categoryButtonText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  selectedCategoryButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  moodButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  moodButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    flex: 1,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
-  stopAllButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  selectedMoodButton: {
+    backgroundColor: '#4CAF50',
+  },
+  moodButtonText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  selectedMoodButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
+
+export default LibraryScreen;

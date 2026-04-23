@@ -1,29 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import { Ionicons } from '@expo/vector-icons';
+import { VoiceClip } from '../types';
+import { SubscriptionContext } from '../context/SubscriptionContext';
+import { PremiumGate } from './PremiumGate';
 
 interface VoicePlayerProps {
-  clip: {
-    id: string;
-    title: string;
-    category: string;
-    audioFile: string;
-    duration: number;
-    intensity: string;
-    isPremium: boolean;
-  };
-  onPlay: () => void;
-  isLocked?: boolean;
+  clip: VoiceClip;
+  onPlaybackStatusUpdate?: (status: any) => void;
 }
 
-export default function VoicePlayer({ clip, onPlay, isLocked = false }: VoicePlayerProps) {
+const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate }) => {
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [playbackPosition, setPlaybackPosition] = useState(0);
-  const [playbackDuration, setPlaybackDuration] = useState(clip.duration);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
 
   useEffect(() => {
     return () => {
@@ -33,70 +27,49 @@ export default function VoicePlayer({ clip, onPlay, isLocked = false }: VoicePla
     };
   }, [sound]);
 
-  const loadAndPlayAudio = async () => {
-    if (isLocked) return;
+  const loadSound = async () => {
+    if (!isFeatureUnlocked('fullLibrary') && clip.isPremium) {
+      return;
+    }
 
     setIsLoading(true);
-    setError(null);
-
     try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
       const { sound: newSound } = await Audio.Sound.createAsync(
-        require(`../assets/voices/${clip.audioFile}`),
-        {
-          shouldPlay: true,
-          progressUpdateIntervalMillis: 500,
-        }
+        { uri: `../assets/voices/${clip.audioFile}` },
+        { shouldPlay: true },
+        onPlaybackStatusUpdate || handlePlaybackStatusUpdate
       );
-
       setSound(newSound);
       setIsPlaying(true);
-      onPlay();
-
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          setPlaybackPosition(status.positionMillis);
-          setPlaybackDuration(status.durationMillis || clip.duration * 1000);
-
-          if (status.didJustFinish) {
-            setIsPlaying(false);
-          }
-        }
-      });
-    } catch (err) {
-      console.error('Error loading audio:', err);
-      setError('Failed to load audio file');
-      setIsPlaying(false);
+    } catch (error) {
+      console.error('Error loading sound', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handlePlayPause = async () => {
-    if (isLocked) return;
-
-    if (isPlaying) {
-      await sound?.pauseAsync();
-      setIsPlaying(false);
-    } else {
-      if (!sound) {
-        await loadAndPlayAudio();
-      } else {
-        await sound.playAsync();
-        setIsPlaying(true);
+  const handlePlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPlaybackPosition(status.positionMillis);
+      setPlaybackDuration(status.durationMillis || 0);
+      if (status.didJustFinish) {
+        setIsPlaying(false);
       }
     }
   };
 
-  const handleStop = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      setIsPlaying(false);
-      setPlaybackPosition(0);
+  const togglePlayback = async () => {
+    if (!sound) {
+      await loadSound();
+      return;
     }
+
+    if (isPlaying) {
+      await sound.pauseAsync();
+    } else {
+      await sound.playAsync();
+    }
+    setIsPlaying(!isPlaying);
   };
 
   const formatTime = (millis: number) => {
@@ -105,101 +78,134 @@ export default function VoicePlayer({ clip, onPlay, isLocked = false }: VoicePla
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  return (
+  const renderPlayer = () => (
     <View style={styles.container}>
-      <View style={styles.infoContainer}>
-        <Text style={styles.title}>{clip.title}</Text>
-        <Text style={styles.category}>{clip.category}</Text>
-        {error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
+      <Text style={styles.title}>{clip.title}</Text>
+      <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
 
-      <View style={styles.controlsContainer}>
-        {isLocked ? (
-          <Ionicons name="lock-closed" size={24} color="#9e9e9e" />
-        ) : isLoading ? (
-          <ActivityIndicator size="small" color="#673ab7" />
-        ) : (
-          <>
-            <TouchableOpacity onPress={handlePlayPause}>
-              <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={24}
-                color="#673ab7"
-              />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleStop}>
-              <Ionicons name="stop" size={24} color="#673ab7" />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+      <View style={styles.controls}>
+        <TouchableOpacity onPress={togglePlayback} disabled={isLoading}>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#4CAF50" />
+          ) : (
+            <Ionicons
+              name={isPlaying ? 'pause-circle' : 'play-circle'}
+              size={48}
+              color="#4CAF50"
+            />
+          )}
+        </TouchableOpacity>
 
-      {!isLocked && (
         <View style={styles.progressContainer}>
           <Text style={styles.timeText}>{formatTime(playbackPosition)}</Text>
           <View style={styles.progressBar}>
             <View
               style={[
                 styles.progressFill,
-                { width: `${(playbackPosition / playbackDuration) * 100}%` },
+                { width: `${(playbackPosition / (playbackDuration || 1)) * 100}%` }
               ]}
             />
           </View>
           <Text style={styles.timeText}>{formatTime(playbackDuration)}</Text>
         </View>
-      )}
+      </View>
     </View>
   );
-}
+
+  return (
+    <PremiumGate
+      feature="fullLibrary"
+      renderLocked={() => (
+        <View style={styles.lockedContainer}>
+          <Text style={styles.title}>{clip.title}</Text>
+          <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
+          <Text style={styles.lockedText}>Premium Content</Text>
+          <TouchableOpacity style={styles.upgradeButton}>
+            <Text style={styles.upgradeButtonText}>Upgrade to Unlock</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    >
+      {renderPlayer()}
+    </PremiumGate>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 8,
     marginBottom: 12,
-  },
-  infoContainer: {
-    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginBottom: 4,
   },
   category: {
     fontSize: 14,
-    color: '#9e9e9e',
+    color: '#666',
+    marginBottom: 12,
+    textTransform: 'capitalize',
   },
-  errorText: {
-    fontSize: 14,
-    color: '#e53935',
-    marginTop: 4,
-  },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  progressContainer: {
+  controls: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  progressBar: {
+  progressContainer: {
     flex: 1,
+    marginLeft: 12,
+  },
+  progressBar: {
     height: 4,
     backgroundColor: '#e0e0e0',
     borderRadius: 2,
-    marginHorizontal: 8,
+    marginVertical: 8,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#673ab7',
+    backgroundColor: '#4CAF50',
     borderRadius: 2,
   },
   timeText: {
     fontSize: 12,
-    color: '#9e9e9e',
+    color: '#666',
+    textAlign: 'right',
+  },
+  lockedContainer: {
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  lockedText: {
+    fontSize: 14,
+    color: '#FF9800',
+    marginBottom: 8,
+  },
+  upgradeButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  upgradeButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
+
+export default VoicePlayer;

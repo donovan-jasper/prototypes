@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useGoals } from '../hooks/useGoals';
+import { SubscriptionContext } from '../context/SubscriptionContext';
 
 interface GoalCardProps {
   goal: {
@@ -16,6 +17,7 @@ export default function GoalCard({ goal }: GoalCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(goal.title);
   const { updateGoal, deleteGoal, toggleGoalCompletion } = useGoals();
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
 
   const handleSave = () => {
     updateGoal(goal.id, { title });

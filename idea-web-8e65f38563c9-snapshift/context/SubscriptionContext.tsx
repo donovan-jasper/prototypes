@@ -1,25 +1,40 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { useSubscription } from '../hooks/useSubscription';
+import { checkSubscriptionStatus } from '../services/subscription';
 
 interface SubscriptionContextType {
   isPremium: boolean;
-  upgradeToPremium: () => void;
+  setIsPremium: (value: boolean) => void;
+  isFeatureUnlocked: (feature: string) => boolean;
 }
 
 export const SubscriptionContext = createContext<SubscriptionContextType>({
   isPremium: false,
-  upgradeToPremium: () => {},
+  setIsPremium: () => {},
+  isFeatureUnlocked: () => false,
 });
 
 export const SubscriptionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isPremium, purchaseSubscription } = useSubscription();
+  const [isPremium, setIsPremium] = useState(false);
 
-  const upgradeToPremium = async () => {
-    await purchaseSubscription();
+  useEffect(() => {
+    const initializeSubscription = async () => {
+      const status = await checkSubscriptionStatus();
+      setIsPremium(status);
+    };
+
+    initializeSubscription();
+  }, []);
+
+  const isFeatureUnlocked = (feature: string) => {
+    if (feature === 'unlimitedPrompts') return isPremium;
+    if (feature === 'multipleGoals') return isPremium;
+    if (feature === 'fullLibrary') return isPremium;
+    if (feature === 'personalizedTTS') return isPremium;
+    return true; // Default to unlocked for other features
   };
 
   return (
-    <SubscriptionContext.Provider value={{ isPremium, upgradeToPremium }}>
+    <SubscriptionContext.Provider value={{ isPremium, setIsPremium, isFeatureUnlocked }}>
       {children}
     </SubscriptionContext.Provider>
   );

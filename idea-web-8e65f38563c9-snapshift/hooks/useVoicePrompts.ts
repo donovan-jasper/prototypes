@@ -1,55 +1,47 @@
-import { useState, useEffect } from 'react';
-import { scheduleVoicePrompt, cancelAllPrompts, getScheduledPrompts, updatePromptSchedule as updateSchedule } from '../services/notifications';
-import { useAudio } from './useAudio';
-
-interface Prompt {
-  id: string;
-  title: string;
-  time: { hour: number; minute: number };
-  enabled: boolean;
-  clip: {
-    id: string;
-    title: string;
-    category: string;
-    audioFile: string;
-    duration: number;
-    intensity: string;
-    isPremium: boolean;
-  };
-}
+import { useState, useEffect, useContext } from 'react';
+import { getRandomClip, getClipsByMood } from '../services/voiceLibrary';
+import { playVoiceClip } from '../services/audio';
+import { SubscriptionContext } from '../context/SubscriptionContext';
 
 export const useVoicePrompts = () => {
-  const [scheduledPrompts, setScheduledPrompts] = useState<Prompt[]>([]);
-  const { playAudio } = useAudio();
+  const [promptsToday, setPromptsToday] = useState(0);
+  const [promptLimitReached, setPromptLimitReached] = useState(false);
+  const [usedClips, setUsedClips] = useState<string[]>([]);
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
 
   useEffect(() => {
-    const loadScheduledPrompts = async () => {
-      const prompts = await getScheduledPrompts();
-      setScheduledPrompts(prompts);
+    // Load today's prompt count from storage
+    // This would be implemented with AsyncStorage or similar
+    const loadPromptCount = async () => {
+      // Mock implementation
+      setPromptsToday(0);
     };
 
-    loadScheduledPrompts();
+    loadPromptCount();
   }, []);
 
-  const schedulePrompt = async (prompt: Omit<Prompt, 'id'>) => {
-    const promptId = await scheduleVoicePrompt(prompt);
-    setScheduledPrompts([...scheduledPrompts, { ...prompt, id: promptId }]);
-  };
+  const playRandomPrompt = async (mood?: string) => {
+    if (!isFeatureUnlocked('unlimitedPrompts') && promptsToday >= 3) {
+      setPromptLimitReached(true);
+      return;
+    }
 
-  const updatePromptSchedule = async (promptId: string, updates: Partial<Prompt>) => {
-    const updatedPrompts = scheduledPrompts.map((prompt) =>
-      prompt.id === promptId ? { ...prompt, ...updates } : prompt
-    );
-    setScheduledPrompts(updatedPrompts);
-    await updateSchedule(promptId, updates);
-  };
+    const clips = mood ? getClipsByMood(mood) : getRandomClip();
+    const clip = clips.find(c => !usedClips.includes(c.id)) || clips[0];
 
-  const playPrompt = async (promptId: string) => {
-    const prompt = scheduledPrompts.find((p) => p.id === promptId);
-    if (prompt) {
-      await playAudio(prompt.clip.audioFile);
+    if (clip) {
+      await playVoiceClip(clip.audioFile);
+      setPromptsToday(prev => prev + 1);
+      setUsedClips(prev => [...prev, clip.id]);
+
+      // Save to storage
+      // await AsyncStorage.setItem('promptsToday', (promptsToday + 1).toString());
     }
   };
 
-  return { scheduledPrompts, schedulePrompt, updatePromptSchedule, playPrompt };
+  return {
+    promptsToday,
+    promptLimitReached,
+    playRandomPrompt,
+  };
 };

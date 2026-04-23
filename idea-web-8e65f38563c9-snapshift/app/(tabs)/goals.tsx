@@ -3,13 +3,14 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { useGoals } from '../../hooks/useGoals';
 import GoalCard from '../../components/GoalCard';
 import { SubscriptionContext } from '../../context/SubscriptionContext';
+import { PremiumGate } from '../../components/PremiumGate';
 
 export default function GoalsScreen() {
   const { goals, addGoal } = useGoals();
-  const { isPremium } = useContext(SubscriptionContext);
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
 
   const handleAddGoal = () => {
-    if (!isPremium && goals.length >= 1) {
+    if (!isFeatureUnlocked('multipleGoals') && goals.length >= 1) {
       // Show premium upgrade modal
       return;
     }
@@ -29,6 +30,26 @@ export default function GoalsScreen() {
           <GoalCard key={goal.id} goal={goal} />
         ))}
       </View>
+
+      <PremiumGate
+        feature="multipleGoals"
+        renderLocked={() => (
+          <View style={styles.premiumNotice}>
+            <Text style={styles.premiumNoticeText}>
+              Free users can only create 1 goal. Upgrade to create up to 5 goals!
+            </Text>
+            <TouchableOpacity style={styles.upgradeButton}>
+              <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      >
+        <View style={styles.premiumNotice}>
+          <Text style={styles.premiumNoticeText}>
+            You're using {goals.length} of your {isFeatureUnlocked('multipleGoals') ? '5' : '1'} available goals.
+          </Text>
+        </View>
+      </PremiumGate>
     </ScrollView>
   );
 }
@@ -59,5 +80,27 @@ const styles = StyleSheet.create({
   },
   section: {
     padding: 16,
+  },
+  premiumNotice: {
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    margin: 16,
+    borderRadius: 8,
+  },
+  premiumNoticeText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  upgradeButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  upgradeButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });

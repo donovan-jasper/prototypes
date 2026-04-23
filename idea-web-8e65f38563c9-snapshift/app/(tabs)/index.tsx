@@ -1,76 +1,84 @@
-import React, { useContext, useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useContext, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useGoals } from '../../hooks/useGoals';
 import { useStreak } from '../../hooks/useStreak';
 import { useVoicePrompts } from '../../hooks/useVoicePrompts';
 import GoalCard from '../../components/GoalCard';
 import StreakBadge from '../../components/StreakBadge';
 import MoodSelector from '../../components/MoodSelector';
-import VoicePlayer from '../../components/VoicePlayer';
 import { SubscriptionContext } from '../../context/SubscriptionContext';
-import { useAudio } from '../../hooks/useAudio';
+import { PremiumGate } from '../../components/PremiumGate';
 
 export default function HomeScreen() {
-  const { goals } = useGoals();
+  const { goals, addGoal } = useGoals();
   const { currentStreak, recordCheckIn } = useStreak();
-  const { scheduledPrompts } = useVoicePrompts();
-  const { isPremium } = useContext(SubscriptionContext);
-  const { playAudio, stopAudio, isLoading, error } = useAudio();
-  const [currentClip, setCurrentClip] = useState<string | null>(null);
+  const { promptsToday, promptLimitReached, playRandomPrompt } = useVoicePrompts();
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
 
   useEffect(() => {
     recordCheckIn();
   }, []);
 
-  const handlePlayClip = async (clipId: string) => {
-    try {
-      if (currentClip === clipId) {
-        await stopAudio();
-        setCurrentClip(null);
-      } else {
-        await stopAudio();
-        const clip = scheduledPrompts.find(p => p.clip.id === clipId)?.clip;
-        if (clip) {
-          await playAudio(clip.audioFile);
-          setCurrentClip(clipId);
-        }
-      }
-    } catch (err) {
-      console.error('Error playing clip:', err);
+  const handlePlayNow = () => {
+    if (promptLimitReached && !isFeatureUnlocked('unlimitedPrompts')) {
+      // Show premium upgrade modal
+      return;
     }
+    playRandomPrompt();
   };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Today</Text>
+        <Text style={styles.title}>Today's Motivation</Text>
         <StreakBadge streak={currentStreak} />
       </View>
+
       <MoodSelector />
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Goals</Text>
-        {goals.map((goal) => (
-          <GoalCard key={goal.id} goal={goal} />
-        ))}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Your Goals</Text>
+          <TouchableOpacity onPress={addGoal}>
+            <Text style={styles.addButton}>Add Goal</Text>
+          </TouchableOpacity>
+        </View>
+
+        {goals.length > 0 ? (
+          goals.map((goal) => (
+            <GoalCard key={goal.id} goal={goal} />
+          ))
+        ) : (
+          <Text style={styles.emptyText}>Add your first goal to get started!</Text>
+        )}
       </View>
+
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Today's Prompts</Text>
-        {scheduledPrompts.map((prompt) => (
-          <VoicePlayer
-            key={prompt.id}
-            clip={prompt.clip}
-            onPlay={() => handlePlayClip(prompt.clip.id)}
-            isLocked={prompt.clip.isPremium && !isPremium}
-          />
-        ))}
-        {isLoading && <Text style={styles.loadingText}>Loading audio...</Text>}
-        {error && <Text style={styles.errorText}>{error}</Text>}
-      </View>
-      {currentClip && (
-        <TouchableOpacity style={styles.stopAllButton} onPress={stopAudio}>
-          <Text style={styles.stopAllButtonText}>Stop All</Text>
+        <Text style={styles.sectionTitle}>Quick Motivation</Text>
+        <TouchableOpacity style={styles.playButton} onPress={handlePlayNow}>
+          <Text style={styles.playButtonText}>Play Now</Text>
         </TouchableOpacity>
-      )}
+
+        <PremiumGate
+          feature="unlimitedPrompts"
+          renderLocked={() => (
+            <View style={styles.promptLimit}>
+              <Text style={styles.promptLimitText}>
+                You've used {promptsToday} of your 3 daily prompts. Upgrade for unlimited!
+              </Text>
+              <TouchableOpacity style={styles.upgradeButton}>
+                <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        >
+          <View style={styles.promptLimit}>
+            <Text style={styles.promptLimitText}>
+              You've used {promptsToday} of your {isFeatureUnlocked('unlimitedPrompts') ? 'unlimited' : '3'} daily prompts.
+            </Text>
+          </View>
+        </PremiumGate>
+      </View>
     </ScrollView>
   );
 }
@@ -92,31 +100,58 @@ const styles = StyleSheet.create({
   },
   section: {
     padding: 16,
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
+    fontWeight: '600',
+  },
+  addButton: {
+    color: '#673ab7',
+    fontWeight: '600',
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  playButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  playButtonText: {
+    color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
+  },
+  promptLimit: {
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  promptLimitText: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 8,
   },
-  loadingText: {
-    textAlign: 'center',
-    color: '#673ab7',
-    marginTop: 8,
-  },
-  errorText: {
-    textAlign: 'center',
-    color: '#e53935',
-    marginTop: 8,
-  },
-  stopAllButton: {
-    backgroundColor: '#673ab7',
-    padding: 12,
-    margin: 16,
+  upgradeButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 4,
-    alignItems: 'center',
+    alignSelf: 'flex-start',
   },
-  stopAllButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  upgradeButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });

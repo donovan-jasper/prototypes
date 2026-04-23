@@ -1,179 +1,144 @@
 import { VoiceClip } from '../types';
 
 const voiceClips: VoiceClip[] = [
+  // Morning clips
   {
-    id: 'morning-boost-01',
-    title: 'Morning Boost 1',
+    id: 'morning-1',
+    title: 'Morning Boost',
     category: 'morning',
     audioFile: 'morning-boost-01.mp3',
-    duration: 30,
+    duration: 45,
     intensity: 'moderate',
     isPremium: false,
   },
   {
-    id: 'morning-boost-02',
-    title: 'Morning Boost 2',
+    id: 'morning-2',
+    title: 'Sunrise Energy',
     category: 'morning',
-    audioFile: 'morning-boost-02.mp3',
-    duration: 30,
-    intensity: 'moderate',
-    isPremium: false,
+    audioFile: 'morning-energy-01.mp3',
+    duration: 50,
+    intensity: 'energetic',
+    isPremium: true,
   },
+  // Focus clips
   {
-    id: 'focus-deep-01',
-    title: 'Deep Focus 1',
+    id: 'focus-1',
+    title: 'Deep Focus',
     category: 'focus',
     audioFile: 'focus-deep-01.mp3',
-    duration: 45,
+    duration: 40,
     intensity: 'moderate',
     isPremium: false,
   },
   {
-    id: 'focus-deep-02',
-    title: 'Deep Focus 2',
+    id: 'focus-2',
+    title: 'Productivity Push',
     category: 'focus',
-    audioFile: 'focus-deep-02.mp3',
+    audioFile: 'focus-productivity-01.mp3',
     duration: 45,
-    intensity: 'moderate',
-    isPremium: false,
+    intensity: 'energetic',
+    isPremium: true,
   },
+  // Energy clips
   {
-    id: 'energy-burst-01',
-    title: 'Energy Burst 1',
+    id: 'energy-1',
+    title: 'Energy Surge',
     category: 'energy',
-    audioFile: 'energy-burst-01.mp3',
-    duration: 30,
+    audioFile: 'energy-surge-01.mp3',
+    duration: 35,
     intensity: 'energetic',
     isPremium: false,
   },
   {
-    id: 'energy-burst-02',
-    title: 'Energy Burst 2',
+    id: 'energy-2',
+    title: 'Power Hour',
     category: 'energy',
-    audioFile: 'energy-burst-02.mp3',
-    duration: 30,
+    audioFile: 'energy-power-01.mp3',
+    duration: 50,
     intensity: 'energetic',
-    isPremium: false,
+    isPremium: true,
   },
+  // Calm clips
   {
-    id: 'calm-down-01',
-    title: 'Calm Down 1',
+    id: 'calm-1',
+    title: 'Calm Mind',
     category: 'calm',
-    audioFile: 'calm-down-01.mp3',
-    duration: 60,
+    audioFile: 'calm-mind-01.mp3',
+    duration: 40,
     intensity: 'gentle',
     isPremium: false,
   },
   {
-    id: 'calm-down-02',
-    title: 'Calm Down 2',
+    id: 'calm-2',
+    title: 'Peaceful Moment',
     category: 'calm',
-    audioFile: 'calm-down-02.mp3',
-    duration: 60,
+    audioFile: 'calm-peaceful-01.mp3',
+    duration: 45,
     intensity: 'gentle',
-    isPremium: false,
+    isPremium: true,
   },
+  // Celebrate clips
   {
-    id: 'celebrate-win-01',
-    title: 'Celebrate Win 1',
+    id: 'celebrate-1',
+    title: 'Small Win',
     category: 'celebrate',
     audioFile: 'celebrate-win-01.mp3',
-    duration: 45,
-    intensity: 'energetic',
+    duration: 30,
+    intensity: 'moderate',
     isPremium: false,
   },
   {
-    id: 'celebrate-win-02',
-    title: 'Celebrate Win 2',
+    id: 'celebrate-2',
+    title: 'Big Achievement',
     category: 'celebrate',
-    audioFile: 'celebrate-win-02.mp3',
-    duration: 45,
-    intensity: 'energetic',
-    isPremium: false,
-  },
-  // Premium clips
-  {
-    id: 'premium-morning-01',
-    title: 'Premium Morning Boost',
-    category: 'morning',
-    audioFile: 'premium-morning-01.mp3',
-    duration: 45,
-    intensity: 'moderate',
-    isPremium: true,
-  },
-  {
-    id: 'premium-focus-01',
-    title: 'Premium Deep Focus',
-    category: 'focus',
-    audioFile: 'premium-focus-01.mp3',
-    duration: 60,
-    intensity: 'moderate',
-    isPremium: true,
-  },
-  {
-    id: 'premium-energy-01',
-    title: 'Premium Energy Burst',
-    category: 'energy',
-    audioFile: 'premium-energy-01.mp3',
-    duration: 45,
-    intensity: 'energetic',
-    isPremium: true,
-  },
-  {
-    id: 'premium-calm-01',
-    title: 'Premium Calm Down',
-    category: 'calm',
-    audioFile: 'premium-calm-01.mp3',
-    duration: 90,
-    intensity: 'gentle',
-    isPremium: true,
-  },
-  {
-    id: 'premium-celebrate-01',
-    title: 'Premium Celebration',
-    category: 'celebrate',
-    audioFile: 'premium-celebrate-01.mp3',
-    duration: 60,
+    audioFile: 'celebrate-big-01.mp3',
+    duration: 40,
     intensity: 'energetic',
     isPremium: true,
   },
 ];
 
-export const getVoiceClipsByCategory = (category: string) => {
-  if (category === 'all') {
-    return voiceClips;
-  }
-  return voiceClips.filter((clip) => clip.category === category);
+export const getVoiceClipsByCategory = (category: string): VoiceClip[] => {
+  if (category === 'all') return voiceClips;
+  return voiceClips.filter(clip => clip.category === category);
 };
 
-export const getRandomClip = (category: string, excludeIds: string[] = []) => {
-  const filteredClips = voiceClips.filter(
-    (clip) => clip.category === category && !excludeIds.includes(clip.id)
-  );
+export const getClipsByMood = (mood: string): VoiceClip[] => {
+  const intensityMap: Record<string, string> = {
+    struggling: 'gentle',
+    neutral: 'moderate',
+    crushing: 'energetic',
+  };
+
+  return voiceClips.filter(clip => clip.intensity === intensityMap[mood]);
+};
+
+export const getRandomClip = (category?: string, excludeIds: string[] = []): VoiceClip => {
+  const filteredClips = category
+    ? getVoiceClipsByCategory(category).filter(clip => !excludeIds.includes(clip.id))
+    : voiceClips.filter(clip => !excludeIds.includes(clip.id));
+
+  if (filteredClips.length === 0) {
+    return voiceClips[0]; // Fallback
+  }
+
   const randomIndex = Math.floor(Math.random() * filteredClips.length);
   return filteredClips[randomIndex];
 };
 
-export const filterByMood = (mood: string) => {
-  let intensity: 'gentle' | 'moderate' | 'energetic' = 'moderate';
+export const getClipsByCategoryAndMood = (category: string, mood: string): VoiceClip[] => {
+  const categoryClips = getVoiceClipsByCategory(category);
+  const moodClips = getClipsByMood(mood);
 
-  if (mood === 'struggling') {
-    intensity = 'gentle';
-  } else if (mood === 'crushing') {
-    intensity = 'energetic';
-  }
-
-  return voiceClips.filter((clip) => clip.intensity === intensity);
+  return categoryClips.filter(clip =>
+    moodClips.some(moodClip => moodClip.id === clip.id)
+  );
 };
 
-export const getClipById = (id: string) => {
-  return voiceClips.find((clip) => clip.id === id);
+export const getFreeClips = (): VoiceClip[] => {
+  return voiceClips.filter(clip => !clip.isPremium);
 };
 
-export const getFreeClips = () => {
-  return voiceClips.filter((clip) => !clip.isPremium);
-};
-
-export const getPremiumClips = () => {
-  return voiceClips.filter((clip) => clip.isPremium);
+export const getPremiumClips = (): VoiceClip[] => {
+  return voiceClips.filter(clip => clip.isPremium);
 };
