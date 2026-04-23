@@ -171,21 +171,21 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
             <Text style={styles.voiceNoteDuration}>{formatDuration(voiceNoteDuration)}</Text>
           </View>
 
-          <View style={styles.voiceNoteControls}>
+          <View style={styles.voiceNoteActions}>
             <TouchableOpacity
-              style={styles.voiceNoteButton}
+              style={styles.voiceNoteActionButton}
               onPress={playVoiceNote}
             >
               <Ionicons name="play" size={20} color="#FF6B6B" />
-              <Text style={styles.voiceNoteButtonText}>Play</Text>
+              <Text style={styles.voiceNoteActionText}>Play</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.voiceNoteButton, styles.deleteButton]}
+              style={styles.voiceNoteActionButton}
               onPress={deleteVoiceNote}
             >
               <Ionicons name="trash" size={20} color="#FF6B6B" />
-              <Text style={[styles.voiceNoteButtonText, styles.deleteButtonText]}>Delete</Text>
+              <Text style={styles.voiceNoteActionText}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -200,25 +200,24 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    fontWeight: '600',
+    marginBottom: 16,
     color: '#333',
   },
   textInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 15,
+    padding: 12,
     fontSize: 16,
-    minHeight: 150,
+    minHeight: 120,
     textAlignVertical: 'top',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
   },
   charCount: {
     fontSize: 14,
@@ -227,8 +226,8 @@ const styles = StyleSheet.create({
   voiceButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
     paddingVertical: 8,
-    paddingHorizontal: 15,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: '#FF6B6B',
@@ -238,9 +237,9 @@ const styles = StyleSheet.create({
     borderColor: '#FF6B6B',
   },
   voiceButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
     color: '#FF6B6B',
+    fontSize: 14,
+    marginLeft: 8,
   },
   recordingButtonText: {
     color: '#fff',
@@ -248,7 +247,10 @@ const styles = StyleSheet.create({
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: '#FF6B6B10',
+    borderRadius: 8,
   },
   recordingDot: {
     width: 10,
@@ -258,53 +260,49 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   recordingText: {
-    fontSize: 14,
     color: '#FF6B6B',
+    fontSize: 14,
   },
   voiceNoteContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    marginTop: 24,
+    padding: 16,
     borderRadius: 8,
-    padding: 15,
-    marginTop: 20,
+    backgroundColor: '#f8f8f8',
   },
   voiceNoteHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: 12,
   },
   voiceNoteTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '500',
     color: '#333',
   },
   voiceNoteDuration: {
     fontSize: 14,
     color: '#666',
   },
-  voiceNoteControls: {
+  voiceNoteActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  voiceNoteButton: {
+  voiceNoteActionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#FF6B6B',
+    flex: 1,
+    marginHorizontal: 4,
+    justifyContent: 'center',
   },
-  deleteButton: {
-    borderColor: '#FF6B6B',
-  },
-  voiceNoteButtonText: {
-    marginLeft: 8,
+  voiceNoteActionText: {
+    color: '#FF6B6B',
     fontSize: 14,
-    color: '#FF6B6B',
-  },
-  deleteButtonText: {
-    color: '#FF6B6B',
+    marginLeft: 4,
   },
 });
 
