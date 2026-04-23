@@ -1,37 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Clipboard, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Clipboard, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { generateConversationStarters } from '../../lib/ai/conversationGenerator';
 import { useMatches } from '../../hooks/useMatches';
 import { useBehaviorTracking } from '../../hooks/useBehaviorTracking';
 import Colors from '../../constants/Colors';
+import { ConversationStarter } from '../../components/ConversationStarter';
 
-const ConversationStarter = ({ starter, onSend, onCopy }) => {
-  const [copied, setCopied] = useState(false);
-
-  const handleCopy = () => {
-    Clipboard.setString(starter);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    onCopy();
-  };
-
-  return (
-    <View style={styles.starterContainer}>
-      <Text style={styles.starterText}>{starter}</Text>
-      <View style={styles.starterActions}>
-        <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
-          <Text style={styles.actionButtonText}>{copied ? 'Copied!' : 'Copy'}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionButton, styles.sendButton]} onPress={() => onSend(starter)}>
-          <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
-
-const ConversationStarterModal = ({ visible, onClose, starters, onRefresh, onSend }) => {
+const ConversationStarterModal = ({ visible, onClose, starters, onRefresh, onSend, isGenerating }) => {
   return (
     <Modal
       visible={visible}
@@ -44,19 +20,33 @@ const ConversationStarterModal = ({ visible, onClose, starters, onRefresh, onSen
           <Text style={styles.modalTitle}>Conversation Starters</Text>
 
           <ScrollView style={styles.startersList}>
-            {starters.map((starter, index) => (
-              <ConversationStarter
-                key={index}
-                starter={starter}
-                onSend={onSend}
-                onCopy={() => {}}
-              />
-            ))}
+            {starters.length > 0 ? (
+              starters.map((starter, index) => (
+                <ConversationStarter
+                  key={index}
+                  starter={starter}
+                  onSend={onSend}
+                  onCopy={() => {}}
+                />
+              ))
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>No conversation starters available</Text>
+              </View>
+            )}
           </ScrollView>
 
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
-              <Text style={styles.refreshButtonText}>Refresh Starters</Text>
+            <TouchableOpacity
+              style={[styles.refreshButton, isGenerating && styles.disabledButton]}
+              onPress={onRefresh}
+              disabled={isGenerating}
+            >
+              {isGenerating ? (
+                <ActivityIndicator size="small" color={Colors.white} />
+              ) : (
+                <Text style={styles.refreshButtonText}>Refresh Starters</Text>
+              )}
             </TouchableOpacity>
             <TouchableOpacity style={styles.closeButton} onPress={onClose}>
               <Text style={styles.closeButtonText}>Close</Text>
@@ -92,7 +82,7 @@ export default function MatchDetailScreen() {
       const userVector = match.userBehaviorVector || new Array(128).fill(0.5);
       const matchVector = match.matchBehaviorVector || new Array(128).fill(0.5);
 
-      const starters = generateConversationStarters(userVector, matchVector);
+      const starters = await generateConversationStarters(userVector, matchVector);
       setConversationStarters(starters);
 
       trackInteraction('view_conversation_starters', {
@@ -101,6 +91,7 @@ export default function MatchDetailScreen() {
       });
     } catch (error) {
       console.error('Error generating conversation starters:', error);
+      setConversationStarters([]);
     } finally {
       setIsGenerating(false);
     }
@@ -119,48 +110,49 @@ export default function MatchDetailScreen() {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (!match) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         <Text style={styles.errorText}>Match not found</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.matchName}>{match.name}</Text>
-        <Text style={styles.compatibilityScore}>
-          Compatibility: {Math.round(match.compatibilityScore)}%
-        </Text>
-      </View>
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.matchName}>{match.name}</Text>
+          <Text style={styles.compatibilityScore}>
+            Compatibility: {Math.round(match.compatibilityScore)}%
+          </Text>
+        </View>
 
-      <View style={styles.insightsContainer}>
-        <Text style={styles.sectionTitle}>Compatibility Insights</Text>
-        {match.insights?.map((insight, index) => (
-          <View key={index} style={styles.insightItem}>
-            <Text style={styles.insightTitle}>{insight.title}</Text>
-            <Text style={styles.insightDescription}>{insight.description}</Text>
-          </View>
-        ))}
-      </View>
+        <View style={styles.insightsContainer}>
+          <Text style={styles.sectionTitle}>Compatibility Insights</Text>
+          {match.insights?.map((insight, index) => (
+            <View key={index} style={styles.insightItem}>
+              <Text style={styles.insightTitle}>{insight.title}</Text>
+              <Text style={styles.insightDescription}>{insight.description}</Text>
+            </View>
+          ))}
+        </View>
 
-      <TouchableOpacity
-        style={styles.startersButton}
-        onPress={() => setShowStartersModal(true)}
-        disabled={isGenerating}
-      >
-        <Text style={styles.startersButtonText}>
-          {isGenerating ? 'Generating...' : 'View Conversation Starters'}
-        </Text>
-      </TouchableOpacity>
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={styles.startersButton}
+            onPress={() => setShowStartersModal(true)}
+          >
+            <Text style={styles.startersButtonText}>Get Conversation Starters</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       <ConversationStarterModal
         visible={showStartersModal}
@@ -168,32 +160,22 @@ export default function MatchDetailScreen() {
         starters={conversationStarters}
         onRefresh={generateStarters}
         onSend={handleSendStarter}
+        isGenerating={isGenerating}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: Colors.background,
+  },
+  scrollContent: {
     padding: 16,
-    backgroundColor: Colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-  },
-  errorText: {
-    color: Colors.error,
-    fontSize: 18,
-    textAlign: 'center',
-    marginTop: 20,
   },
   header: {
     marginBottom: 24,
-    alignItems: 'center',
   },
   matchName: {
     fontSize: 24,
@@ -204,12 +186,13 @@ const styles = StyleSheet.create({
   compatibilityScore: {
     fontSize: 18,
     color: Colors.primary,
+    fontWeight: '600',
   },
   insightsContainer: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: Colors.text,
     marginBottom: 16,
@@ -230,12 +213,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
   },
+  actionsContainer: {
+    marginTop: 24,
+  },
   startersButton: {
     backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 16,
   },
   startersButtonText: {
     color: Colors.white,
@@ -245,15 +230,14 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: Colors.background,
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
+    marginHorizontal: 20,
+    borderRadius: 8,
     padding: 20,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
@@ -265,40 +249,13 @@ const styles = StyleSheet.create({
   startersList: {
     maxHeight: '70%',
   },
-  starterContainer: {
-    backgroundColor: Colors.card,
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
-  },
-  starterText: {
-    fontSize: 16,
-    color: Colors.text,
-    marginBottom: 12,
-  },
-  starterActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    padding: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.secondary,
-    flex: 1,
-    marginRight: 8,
+  emptyState: {
+    padding: 20,
     alignItems: 'center',
   },
-  sendButton: {
-    backgroundColor: Colors.primary,
-    marginRight: 0,
-  },
-  actionButtonText: {
-    color: Colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sendButtonText: {
-    color: Colors.white,
+  emptyText: {
+    color: Colors.textSecondary,
+    fontSize: 16,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -306,12 +263,15 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   refreshButton: {
-    backgroundColor: Colors.secondary,
+    backgroundColor: Colors.primary,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 4,
     flex: 1,
     marginRight: 8,
     alignItems: 'center',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   refreshButtonText: {
     color: Colors.white,
@@ -319,9 +279,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   closeButton: {
-    backgroundColor: Colors.error,
+    backgroundColor: Colors.secondary,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 4,
     flex: 1,
     marginLeft: 8,
     alignItems: 'center',
@@ -330,5 +290,17 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  errorText: {
+    color: Colors.error,
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });

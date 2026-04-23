@@ -1,14 +1,20 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Clipboard } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Clipboard, ActivityIndicator } from 'react-native';
 import Colors from '../constants/Colors';
 
 interface ConversationStarterProps {
   starter: string;
   onSend: (message: string) => void;
   onCopy?: () => void;
+  isGenerating?: boolean;
 }
 
-export const ConversationStarter: React.FC<ConversationStarterProps> = ({ starter, onSend, onCopy }) => {
+export const ConversationStarter: React.FC<ConversationStarterProps> = ({
+  starter,
+  onSend,
+  onCopy,
+  isGenerating = false
+}) => {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -17,6 +23,15 @@ export const ConversationStarter: React.FC<ConversationStarterProps> = ({ starte
     setTimeout(() => setCopied(false), 2000);
     if (onCopy) onCopy();
   };
+
+  if (isGenerating) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="small" color={Colors.primary} />
+        <Text style={styles.loadingText}>Generating conversation starters...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -44,13 +59,15 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.text,
     marginBottom: 12,
+    lineHeight: 22,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   actionButton: {
-    padding: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 4,
     backgroundColor: Colors.secondary,
     flex: 1,
@@ -68,5 +85,16 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: Colors.white,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  loadingText: {
+    marginLeft: 8,
+    color: Colors.textSecondary,
+    fontSize: 14,
   },
 });
