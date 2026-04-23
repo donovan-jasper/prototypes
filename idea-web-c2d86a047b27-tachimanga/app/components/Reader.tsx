@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, PanResponder, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, PanResponder, StatusBar } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getContent, saveReadingProgress, getReadingProgress } from '../utils/offlineLibrary';
+import Slider from '@react-native-community/slider';
 
 const { width, height } = Dimensions.get('window');
 
@@ -133,74 +134,96 @@ const Reader = ({ route }: any) => {
 
   const toggleControls = useCallback(() => {
     setShowControls(prev => !prev);
-  }, []);
-
-  const increaseFontSize = useCallback(() => {
-    setFontSize(prev => Math.min(32, prev + 2));
-  }, []);
-
-  const decreaseFontSize = useCallback(() => {
-    setFontSize(prev => Math.max(12, prev - 2));
-  }, []);
-
-  const changeFontFamily = useCallback(() => {
-    setFontFamily(prev => prev === 'System' ? 'serif' : 'System');
-  }, []);
+    if (!showControls) {
+      resetControlsTimeout();
+    }
+  }, [showControls, resetControlsTimeout]);
 
   if (!content) {
-    return <View style={styles.container}><Text>Loading...</Text></View>;
+    return (
+      <View style={styles.loadingContainer}>
+        <Text>Loading...</Text>
+      </View>
+    );
   }
 
-  const currentPercentage = calculatePercentage(scrollPosition);
-
   return (
-    <View style={[styles.container, { backgroundColor: `rgba(0, 0, 0, ${brightness / 100})` }]} {...panResponder.panHandlers}>
+    <View style={[styles.container, { backgroundColor: `rgba(0, 0, 0, ${1 - brightness/100})` }]}>
+      <StatusBar hidden={!showControls} />
+
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
         onScroll={handleScroll}
         scrollEventThrottle={16}
-        onContentSizeChange={(w, h) => setContentHeight(h)}
-        onLayout={(event) => setScrollViewHeight(event.nativeEvent.layout.height)}
+        {...panResponder.panHandlers}
       >
         <View style={styles.contentContainer}>
-          <Text style={[styles.title, { fontSize: fontSize + 4, fontFamily }]}>{content.title}</Text>
-          <Text style={[styles.text, { fontSize, fontFamily }]}>{content.text}</Text>
+          {content.pages.map((page: any, index: number) => (
+            <View key={index} style={styles.pageContainer}>
+              <Text style={[styles.pageText, { fontSize, fontFamily }]}>
+                {page.text}
+              </Text>
+            </View>
+          ))}
         </View>
       </ScrollView>
 
       {showControls && (
-        <Animated.View style={styles.controlsContainer}>
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>{Math.round(currentPercentage)}%</Text>
-          </View>
-
-          <View style={styles.fontControls}>
-            <TouchableOpacity style={styles.controlButton} onPress={decreaseFontSize}>
-              <Text style={styles.controlButtonText}>A-</Text>
+        <View style={styles.controlsContainer}>
+          <View style={styles.topControls}>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+              <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton} onPress={increaseFontSize}>
-              <Text style={styles.controlButtonText}>A+</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.controlButton} onPress={changeFontFamily}>
-              <Text style={styles.controlButtonText}>Font</Text>
+            <Text style={styles.title}>{content.title}</Text>
+            <TouchableOpacity onPress={handleShareProgress} style={styles.shareButton}>
+              <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
 
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.actionButton} onPress={handleShareProgress}>
-              <Text style={styles.actionButtonText}>Share</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.actionButton} onPress={() => navigation.goBack()}>
-              <Text style={styles.actionButtonText}>Close</Text>
-            </TouchableOpacity>
+          <View style={styles.bottomControls}>
+            <View style={styles.fontControls}>
+              <Text style={styles.controlLabel}>Font Size</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={12}
+                maximumValue={24}
+                step={1}
+                value={fontSize}
+                onValueChange={setFontSize}
+                minimumTrackTintColor="#FFFFFF"
+                maximumTrackTintColor="#000000"
+              />
+            </View>
+
+            <View style={styles.brightnessControls}>
+              <Text style={styles.controlLabel}>Brightness</Text>
+              <Slider
+                style={styles.slider}
+                minimumValue={20}
+                maximumValue={100}
+                step={1}
+                value={brightness}
+                onValueChange={handleBrightnessChange}
+                minimumTrackTintColor="#FFFFFF"
+                maximumTrackTintColor="#000000"
+              />
+            </View>
+
+            <View style={styles.progressContainer}>
+              <Text style={styles.progressText}>
+                {Math.round(calculatePercentage(scrollPosition))}% complete
+              </Text>
+            </View>
           </View>
-        </Animated.View>
+        </View>
       )}
 
-      {!showControls && (
-        <TouchableOpacity style={styles.tapArea} onPress={toggleControls} activeOpacity={1} />
-      )}
+      <TouchableOpacity
+        style={styles.tapArea}
+        onPress={toggleControls}
+        activeOpacity={1}
+      />
     </View>
   );
 };
@@ -209,66 +232,82 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   scrollView: {
     flex: 1,
   },
   contentContainer: {
     padding: 20,
   },
-  title: {
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#fff',
+  pageContainer: {
+    marginBottom: 30,
   },
-  text: {
-    color: '#fff',
+  pageText: {
+    color: '#FFFFFF',
     lineHeight: 24,
   },
   controlsContainer: {
     position: 'absolute',
-    bottom: 0,
+    top: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    padding: 15,
+    bottom: 0,
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  topControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 40,
+  },
+  backButton: {
+    padding: 10,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  title: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  shareButton: {
+    padding: 10,
+  },
+  shareButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  bottomControls: {
+    paddingBottom: 20,
+  },
+  fontControls: {
+    marginBottom: 20,
+  },
+  brightnessControls: {
+    marginBottom: 20,
+  },
+  controlLabel: {
+    color: '#FFFFFF',
+    marginBottom: 5,
+    fontSize: 14,
+  },
+  slider: {
+    width: '100%',
+    height: 40,
   },
   progressContainer: {
     alignItems: 'center',
-    marginBottom: 10,
   },
   progressText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  fontControls: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 15,
-  },
-  controlButton: {
-    backgroundColor: '#333',
-    padding: 10,
-    borderRadius: 5,
-    marginHorizontal: 5,
-  },
-  controlButtonText: {
-    color: '#fff',
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  actionButton: {
-    backgroundColor: '#4a90e2',
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 14,
   },
   tapArea: {
     position: 'absolute',
