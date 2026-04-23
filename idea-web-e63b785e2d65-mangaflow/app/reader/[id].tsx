@@ -6,15 +6,19 @@ import GestureReader from '../../components/GestureReader';
 import { getMangaById, updateMangaProgress } from '../../lib/db';
 import { getAllPages } from '../../lib/storage';
 import { Manga } from '../../types';
+import { uploadSyncData } from '../../lib/sync';
+import { useUserStore } from '../../store/user';
 
 export default function ReaderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { isPremium } = useUserStore();
   const [manga, setManga] = useState<Manga | null>(null);
   const [pages, setPages] = useState<string[]>([]);
   const [currentPage, setCurrentPage] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(true);
 
   useEffect(() => {
     loadManga();
@@ -43,12 +47,21 @@ export default function ReaderScreen() {
     setCurrentPage(newPage);
     if (manga) {
       await updateMangaProgress(manga.id, newPage);
+
+      // Auto-sync progress if enabled and user is premium
+      if (isPremium && autoSyncEnabled) {
+        try {
+          await uploadSyncData();
+        } catch (error) {
+          console.error('Auto-sync failed:', error);
+        }
+      }
     }
   };
 
   const handleReadingModeChange = async (mode: 'ltr' | 'rtl' | 'vertical') => {
     if (!manga) return;
-    
+
     const db = await import('../../lib/db');
     await db.initDB();
     const database = await import('expo-sqlite').then(m => m.openDatabaseAsync('pageturn.db'));
@@ -56,7 +69,7 @@ export default function ReaderScreen() {
       'UPDATE manga SET readingMode = ? WHERE id = ?',
       [mode, manga.id]
     );
-    
+
     setManga({ ...manga, readingMode: mode });
     setShowSettings(false);
   };
@@ -77,7 +90,7 @@ export default function ReaderScreen() {
         }}
       />
       <StatusBar hidden />
-      
+
       <GestureReader
         pages={pages.map((uri) => ({ uri }))}
         currentPage={currentPage}
@@ -118,7 +131,7 @@ export default function ReaderScreen() {
         >
           <View style={styles.settingsModal}>
             <Text style={styles.settingsTitle}>Reading Mode</Text>
-            
+
             <TouchableOpacity
               style={[
                 styles.modeButton,
@@ -158,12 +171,24 @@ export default function ReaderScreen() {
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setShowSettings(false)}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
+            {isPremium && (
+              <>
+                <Text style={styles.settingsTitle}>Cloud Sync</Text>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modeButton,
+                    autoSyncEnabled && styles.modeButtonActive,
+                  ]}
+                  onPress={() => setAutoSyncEnabled(!autoSyncEnabled)}
+                >
+                  <Text style={styles.modeButtonText}>Auto-sync progress</Text>
+                  {autoSyncEnabled && (
+                    <Text style={styles.checkmark}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </TouchableOpacity>
       </Modal>
@@ -174,115 +199,103 @@ export default function ReaderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: 'black',
   },
   loadingContainer: {
     flex: 1,
-    backgroundColor: '#000',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'black',
   },
   loadingText: {
-    color: '#fff',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 18,
   },
   backButton: {
     position: 'absolute',
-    top: 50,
-    left: 16,
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 22,
+    top: 40,
+    left: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 24,
-    fontWeight: '600',
   },
   settingsButton: {
     position: 'absolute',
-    top: 50,
-    right: 16,
-    width: 44,
-    height: 44,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    borderRadius: 22,
+    top: 40,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   settingsButtonText: {
-    color: '#fff',
-    fontSize: 24,
+    color: 'white',
+    fontSize: 20,
   },
   pageCounter: {
     position: 'absolute',
-    bottom: 40,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    bottom: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
   },
   pageCounterText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   settingsModal: {
-    backgroundColor: '#1c1c1e',
-    borderRadius: 16,
-    padding: 24,
     width: '80%',
-    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
   },
   settingsTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 20,
-    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
   },
   modeButton: {
-    backgroundColor: '#2c2c2e',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    marginBottom: 8,
   },
   modeButtonActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#e3f2fd',
   },
   modeButtonText: {
-    color: '#fff',
     fontSize: 16,
-    fontWeight: '500',
+    color: '#333',
   },
   checkmark: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  closeButton: {
-    backgroundColor: '#2c2c2e',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
+    color: '#2196F3',
+    fontWeight: 'bold',
   },
 });
