@@ -6,6 +6,7 @@ import { AlertService } from '../services/AlertService';
 import { ActivityProfile } from '../types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { EventEmitter } from 'events';
+import { AppState } from 'react-native';
 
 interface AppContextType {
   isMonitoring: boolean;
@@ -67,7 +68,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       backgroundTaskManagerRef.current = backgroundTaskManager;
 
       // Initialize detection engine
-      const detectionEngine = new DetectionEngine();
+      const detectionEngine = new DetectionEngine('study'); // Default profile
       detectionEngineRef.current = detectionEngine;
 
       // Initialize alert service
@@ -79,8 +80,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         detectionEngine,
         alertService,
         {
+          isMonitoring,
           activeProfile,
+          currentSession,
+          uiState,
+          startSession,
+          stopSession,
           recordDrowsinessEvent,
+          setActiveProfile,
+          startBackgroundTask,
+          stopBackgroundTask,
+          saveSessionState,
+          restoreSessionState,
           updateUIState,
           on: eventEmitterRef.current.on.bind(eventEmitterRef.current),
           off: eventEmitterRef.current.off.bind(eventEmitterRef.current),
@@ -146,15 +157,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const savedState = await AsyncStorage.getItem('sessionState');
       if (savedState) {
         const state = JSON.parse(savedState);
-        setIsMonitoring(state.isMonitoring);
-        setActiveProfile(state.activeProfile);
-        setCurrentSession(state.currentSession);
-        setUiState(state.uiState);
+        setIsMonitoring(state.isMonitoring || false);
+        setActiveProfile(state.activeProfile || null);
+        setCurrentSession(state.currentSession || {
+          startTime: null,
+          drowsinessEvents: 0,
+          elapsedTime: 0,
+        });
+        setUiState(state.uiState || {
+          isAlertActive: false,
+          alertLevel: 0,
+          isSnoozed: false,
+          snoozeEndTime: null,
+        });
 
-        // If session was active, restart monitoring
-        if (state.isMonitoring && state.currentSession.startTime) {
-          await startBackgroundTask();
-          startTimer();
+        // Restore detection engine profile if available
+        if (state.activeProfile && detectionEngineRef.current) {
+          detectionEngineRef.current.setProfile(state.activeProfile.type);
         }
       }
     } catch (error) {
@@ -162,7 +181,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const startTimer = () => {
+  const startSession = (profile: ActivityProfile) => {
+    setActiveProfile(profile);
+    setIsMonitoring(true);
+    setCurrentSession({
+      startTime: Date.now(),
+      drowsinessEvents: 0,
+      elapsedTime: 0,
+    });
+
+    // Update detection engine profile
+    if (detectionEngineRef.current) {
+      detectionEngineRef.current.setProfile(profile.type);
+    }
+
+    // Start background task
+    startBackgroundTask();
+
+    // Start timer for elapsed time
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
@@ -170,61 +206,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timerRef.current = setInterval(() => {
       setCurrentSession(prev => ({
         ...prev,
-        elapsedTime: prev.startTime ? Math.floor((Date.now() - prev.startTime) / 1000) : 0,
+        elapsedTime: prev.startTime ? Date.now() - prev.startTime : 0,
       }));
     }, 1000);
   };
 
-  const startBackgroundTask = async () => {
-    if (backgroundTaskManagerRef.current) {
-      await backgroundTaskManagerRef.current.registerBackgroundTask();
-    }
-  };
-
-  const stopBackgroundTask = async () => {
-    if (backgroundTaskManagerRef.current) {
-      await backgroundTaskManagerRef.current.unregisterBackgroundTask();
-    }
-  };
-
-  const startSession = async (profile: ActivityProfile) => {
-    if (isMonitoring) return;
-
-    setActiveProfile(profile);
-    setCurrentSession({
-      startTime: Date.now(),
-      drowsinessEvents: 0,
-      elapsedTime: 0,
-    });
-    setIsMonitoring(true);
-
-    // Start background monitoring
-    if (backgroundTaskManagerRef.current) {
-      await backgroundTaskManagerRef.current.startMonitoring();
-    }
-
-    // Start background task
-    await startBackgroundTask();
-
-    // Start timer
-    startTimer();
-
-    // Save state immediately
-    await saveSessionState();
-  };
-
-  const stopSession = async () => {
-    if (!isMonitoring) return;
-
+  const stopSession = () => {
     setIsMonitoring(false);
 
-    // Stop background monitoring
-    if (backgroundTaskManagerRef.current) {
-      await backgroundTaskManagerRef.current.stopMonitoring();
-    }
-
     // Stop background task
-    await stopBackgroundTask();
+    stopBackgroundTask();
 
     // Clear timer
     if (timerRef.current) {
@@ -232,8 +223,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timerRef.current = null;
     }
 
-    // Save final session state
-    await saveSessionState();
+    // Reset UI state
+    setUiState({
+      isAlertActive: false,
+      alertLevel: 0,
+      isSnoozed: false,
+      snoozeEndTime: null,
+    });
+
+    // Reset detection engine
+    if (detectionEngineRef.current) {
+      detectionEngineRef.current.reset();
+    }
   };
 
   const recordDrowsinessEvent = () => {
@@ -243,6 +244,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
+  const startBackgroundTask = async () => {
+    if (backgroundTaskManagerRef.current) {
+      await backgroundTaskManagerRef.current.startTask();
+    }
+  };
+
+  const stopBackgroundTask = async () => {
+    if (backgroundTaskManagerRef.current) {
+      await backgroundTaskManagerRef.current.stopTask();
+    }
+  };
+
   const updateUIState = (newState: Partial<AppContextType['uiState']>) => {
     setUiState(prev => ({
       ...prev,
@@ -250,26 +263,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
 
-  const contextValue: AppContextType = {
-    isMonitoring,
-    activeProfile,
-    currentSession,
-    uiState,
-    startSession,
-    stopSession,
-    recordDrowsinessEvent,
-    setActiveProfile,
-    startBackgroundTask,
-    stopBackgroundTask,
-    saveSessionState,
-    restoreSessionState,
-    updateUIState,
-    on: eventEmitterRef.current.on.bind(eventEmitterRef.current),
-    off: eventEmitterRef.current.off.bind(eventEmitterRef.current),
+  const on = (event: string, listener: (...args: any[]) => void) => {
+    eventEmitterRef.current.on(event, listener);
+  };
+
+  const off = (event: string, listener: (...args: any[]) => void) => {
+    eventEmitterRef.current.off(event, listener);
   };
 
   return (
-    <AppContext.Provider value={contextValue}>
+    <AppContext.Provider
+      value={{
+        isMonitoring,
+        activeProfile,
+        currentSession,
+        uiState,
+        startSession,
+        stopSession,
+        recordDrowsinessEvent,
+        setActiveProfile,
+        startBackgroundTask,
+        stopBackgroundTask,
+        saveSessionState,
+        restoreSessionState,
+        updateUIState,
+        on,
+        off,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

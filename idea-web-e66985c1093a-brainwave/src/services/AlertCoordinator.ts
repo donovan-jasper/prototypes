@@ -9,6 +9,7 @@ export class AlertCoordinator {
   private appContext: AppContextType;
   private isSnoozed: boolean = false;
   private snoozeTimeout: NodeJS.Timeout | null = null;
+  private drowsinessListener: () => void;
 
   constructor(
     detectionEngine: DetectionEngine,
@@ -25,7 +26,8 @@ export class AlertCoordinator {
 
   private setupListeners(): void {
     // Listen for drowsiness events from DetectionEngine
-    this.detectionEngine.on('drowsinessDetected', this.handleDrowsinessEvent.bind(this));
+    this.drowsinessListener = this.handleDrowsinessEvent.bind(this);
+    this.detectionEngine.on('drowsinessDetected', this.drowsinessListener);
 
     // Listen for snooze/reset actions from UI
     this.appContext.on('snoozeAlert', this.handleSnooze.bind(this));
@@ -112,7 +114,7 @@ export class AlertCoordinator {
 
   public cleanup(): void {
     // Remove event listeners
-    this.detectionEngine.off('drowsinessDetected', this.handleDrowsinessEvent.bind(this));
+    this.detectionEngine.off('drowsinessDetected', this.drowsinessListener);
     this.appContext.off('snoozeAlert', this.handleSnooze.bind(this));
     this.appContext.off('resetAlert', this.handleReset.bind(this));
 

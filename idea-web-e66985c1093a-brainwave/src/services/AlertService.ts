@@ -66,6 +66,18 @@ export class AlertService {
     }
   }
 
+  async clearAlerts(): Promise<void> {
+    // Stop any currently playing sound
+    if (this.currentSound) {
+      await this.currentSound.stopAsync();
+      this.currentSound.unloadAsync();
+      this.currentSound = null;
+    }
+
+    // Cancel any pending vibrations
+    Vibration.cancel();
+  }
+
   async cleanup(): Promise<void> {
     // Unload all sound objects
     for (const level in this.soundObjects) {
@@ -73,5 +85,15 @@ export class AlertService {
         await this.soundObjects[level].unloadAsync();
       }
     }
+
+    // Stop any currently playing sound
+    if (this.currentSound) {
+      await this.currentSound.stopAsync();
+      this.currentSound.unloadAsync();
+      this.currentSound = null;
+    }
+
+    // Cancel any pending vibrations
+    Vibration.cancel();
   }
 }

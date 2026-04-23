@@ -1,4 +1,5 @@
 import { SensorData } from '../types';
+import { EventEmitter } from 'events';
 
 type ProfileType = 'study' | 'work' | 'audiobook' | 'meditation' | 'driving';
 
@@ -42,15 +43,17 @@ const PROFILE_CONFIGS: Record<ProfileType, ProfileConfig> = {
   }
 };
 
-export class DetectionEngine {
+export class DetectionEngine extends EventEmitter {
   private profile: ProfileType;
   private dataBuffer: SensorData[] = [];
   private isDrowsyState = false;
   private alertLevel = 0;
   private lastAlertTime = 0;
   private sensitivityMultiplier = 1.0;
+  private consecutiveDrowsinessEvents = 0;
 
   constructor(profile: ProfileType) {
+    super();
     this.profile = profile;
   }
 
@@ -90,9 +93,11 @@ export class DetectionEngine {
     // Determine drowsiness state
     if (avgVariance < adjustedStillness) {
       this.isDrowsyState = true;
+      this.consecutiveDrowsinessEvents++;
       this.escalateAlert();
     } else if (avgVariance > adjustedMovement) {
       this.isDrowsyState = false;
+      this.consecutiveDrowsinessEvents = 0;
       this.resetAlert();
     }
   }
@@ -104,9 +109,11 @@ export class DetectionEngine {
     if (this.alertLevel === 0) {
       this.alertLevel = 1;
       this.lastAlertTime = now;
+      this.emit('drowsinessDetected');
     } else if (now - this.lastAlertTime > config.escalationTime) {
       this.alertLevel = Math.min(this.alertLevel + 1, config.maxAlertLevel);
       this.lastAlertTime = now;
+      this.emit('drowsinessDetected');
     }
   }
 
@@ -118,6 +125,14 @@ export class DetectionEngine {
     return this.alertLevel;
   }
 
+  getConsecutiveDrowsinessEvents(): number {
+    return this.consecutiveDrowsinessEvents;
+  }
+
+  getTimeSinceLastAlert(): number {
+    return Date.now() - this.lastAlertTime;
+  }
+
   resetAlert(): void {
     this.alertLevel = 0;
     this.isDrowsyState = false;
@@ -125,6 +140,7 @@ export class DetectionEngine {
 
   reset(): void {
     this.dataBuffer = [];
+    this.consecutiveDrowsinessEvents = 0;
     this.resetAlert();
   }
 
@@ -143,5 +159,9 @@ export class DetectionEngine {
   setProfile(profile: ProfileType): void {
     this.profile = profile;
     this.reset();
+  }
+
+  cleanup(): void {
+    this.removeAllListeners();
   }
 }
