@@ -4,12 +4,14 @@ import { TaskContext } from '../context/TaskContext';
 import TaskItem from '../components/TaskItem';
 import { usePremiumStatus } from '../hooks/usePremiumStatus';
 import { Colors } from '../constants/Colors';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
   const { tasks, addTask, loading, error } = useContext(TaskContext);
   const { isPremium, maxPinnedTasks } = usePremiumStatus();
   const [newTaskContent, setNewTaskContent] = useState('');
   const [showPremiumPrompt, setShowPremiumPrompt] = useState(false);
+  const navigation = useNavigation();
 
   useEffect(() => {
     if (!isPremium) {
@@ -34,6 +36,10 @@ const HomeScreen = () => {
     });
 
     setNewTaskContent('');
+  };
+
+  const handleUpgradePress = () => {
+    navigation.navigate('PremiumScreen');
   };
 
   const renderItem = ({ item }) => (
@@ -68,7 +74,7 @@ const HomeScreen = () => {
           <Text style={styles.premiumText}>
             You've reached your limit of pinned tasks. Upgrade to Premium to pin unlimited tasks!
           </Text>
-          <TouchableOpacity style={styles.upgradeButton} onPress={() => {}}>
+          <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgradePress}>
             <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
           </TouchableOpacity>
         </View>
