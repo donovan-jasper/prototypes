@@ -69,6 +69,9 @@ export default function CoachingScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Financial Coaching</Text>
         <Text style={styles.subtitle}>Personalized insights to help you manage your money better</Text>
+        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
+          <Text style={styles.refreshButtonText}>Refresh Insights</Text>
+        </TouchableOpacity>
       </View>
 
       {insights.length > 0 && (
@@ -157,17 +160,31 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#333',
     marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: '#666',
+    marginBottom: 15,
+  },
+  refreshButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+  },
+  refreshButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   section: {
     marginBottom: 20,
@@ -175,26 +192,22 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
+    fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
+    marginTop: 15,
   },
   insightCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
     marginBottom: 10,
     borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   insightIcon: {
     fontSize: 20,
@@ -204,8 +217,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   insightCategory: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
+    textTransform: 'uppercase',
     marginBottom: 2,
   },
   insightTitle: {
@@ -216,37 +230,32 @@ const styles = StyleSheet.create({
   insightMessage: {
     fontSize: 14,
     color: '#444',
-    lineHeight: 20,
     marginBottom: 10,
+    lineHeight: 20,
   },
   insightFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   priorityBadge: {
+    paddingVertical: 3,
     paddingHorizontal: 8,
-    paddingVertical: 4,
     borderRadius: 12,
     fontSize: 12,
-    color: 'white',
-    fontWeight: '500',
+    color: '#fff',
+    fontWeight: '600',
   },
   categoryCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
   },
   categoryInfo: {
     flex: 1,
@@ -255,6 +264,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
+    marginBottom: 2,
   },
   categoryCount: {
     fontSize: 12,
@@ -265,52 +275,44 @@ const styles = StyleSheet.create({
   },
   categoryAmount: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
   },
   categoryPercent: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   trendCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
   trendBar: {
     flex: 1,
     alignItems: 'center',
-    marginHorizontal: 2,
   },
   trendBarContainer: {
     height: 150,
     justifyContent: 'flex-end',
-    width: '100%',
+    alignItems: 'center',
   },
   trendBarFill: {
+    width: 20,
     backgroundColor: '#007AFF',
-    borderRadius: 4,
-    width: '100%',
-    alignSelf: 'center',
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
   },
   trendMonth: {
     fontSize: 12,
     color: '#666',
     marginTop: 5,
-    textAlign: 'center',
   },
   trendAmount: {
     fontSize: 12,
     fontWeight: '500',
     color: '#333',
     marginTop: 2,
-    textAlign: 'center',
   },
 });
