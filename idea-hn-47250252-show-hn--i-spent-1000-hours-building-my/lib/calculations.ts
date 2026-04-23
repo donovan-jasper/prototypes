@@ -57,3 +57,30 @@ export const calculateHoldingDetails = (holding: Holding): Holding => {
     percentGain
   };
 };
+
+/**
+ * Updates holdings with current prices
+ * @param holdings Array of holdings to update
+ * @param priceService Price service instance
+ * @returns Promise that resolves with updated holdings
+ */
+export const updateHoldingsWithPrices = async (
+  holdings: Holding[],
+  priceService: PriceService
+): Promise<Holding[]> => {
+  return Promise.all(
+    holdings.map(async (holding) => {
+      try {
+        const currentPrice = await priceService.getPrice(holding.symbol);
+        return {
+          ...holding,
+          currentPrice,
+          ...calculateHoldingDetails({ ...holding, currentPrice })
+        };
+      } catch (error) {
+        console.error(`Failed to update price for ${holding.symbol}:`, error);
+        return holding; // Return original holding if price update fails
+      }
+    })
+  );
+};

@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getHoldings } from '../lib/database';
-import { PriceService } from '../lib/priceService';
+import { getHoldings, updateHolding } from '../lib/database';
+import { priceService } from '../lib/priceService';
 import { Holding, PortfolioSummary } from '../lib/types';
-import { calculatePortfolioGains } from '../lib/calculations';
-
-const priceService = new PriceService(false); // Default to free tier
+import { calculatePortfolioGains, updateHoldingsWithPrices } from '../lib/calculations';
 
 export const usePortfolio = () => {
   const [portfolio, setPortfolio] = useState<PortfolioSummary>({
@@ -24,48 +22,27 @@ export const usePortfolio = () => {
       // Get holdings from database
       const holdingsData = await getHoldings();
 
-      // Fetch current prices for each holding
-      const updatedHoldings = await Promise.all(
-        holdingsData.map(async (holding) => {
-          try {
-            const currentPrice = await priceService.getPrice(holding.symbol);
-            return {
-              ...holding,
-              currentPrice,
-            };
-          } catch (err) {
-            console.error(`Failed to fetch price for ${holding.symbol}:`, err);
-            return {
-              ...holding,
-              currentPrice: undefined,
-            };
-          }
-        })
+      // Update holdings with current prices
+      const updatedHoldings = await updateHoldingsWithPrices(holdingsData, priceService);
+
+      // Save updated prices to database
+      await Promise.all(
+        updatedHoldings.map(holding =>
+          updateHolding({
+            ...holding,
+            currentPrice: holding.currentPrice || 0
+          })
+        )
       );
 
       // Calculate portfolio metrics
       const portfolioMetrics = calculatePortfolioGains(updatedHoldings);
 
-      // Add calculated values to each holding
-      const holdingsWithCalculations = updatedHoldings.map((holding) => {
-        const costBasis = holding.shares * holding.costBasis;
-        const currentValue = holding.shares * (holding.currentPrice || 0);
-        const gain = currentValue - costBasis;
-        const percentGain = costBasis > 0 ? (gain / costBasis) * 100 : 0;
-
-        return {
-          ...holding,
-          currentValue,
-          gain,
-          percentGain,
-        };
-      });
-
       setPortfolio({
         totalValue: portfolioMetrics.totalValue,
         totalGain: portfolioMetrics.totalGain,
         totalPercentGain: portfolioMetrics.totalPercentGain,
-        holdings: holdingsWithCalculations,
+        holdings: updatedHoldings,
       });
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load portfolio'));
@@ -80,8 +57,23 @@ export const usePortfolio = () => {
     await fetchPortfolioData();
   }, [fetchPortfolioData]);
 
+  // Start periodic updates when component mounts
   useEffect(() => {
+    // Set up periodic updates (every 5 minutes for premium, every hour for free)
+    const updateInterval = priceService.isPremium ? 5 * 60 * 1000 : 60 * 60 * 1000;
+
+    priceService.startPeriodicUpdates(updateInterval, () => {
+      // When prices are updated, refresh the portfolio data
+      fetchPortfolioData();
+    });
+
+    // Initial fetch
     fetchPortfolioData();
+
+    // Clean up on unmount
+    return () => {
+      priceService.stopPeriodicUpdates();
+    };
   }, [fetchPortfolioData]);
 
   return { portfolio, loading, error, refreshPortfolio };

@@ -39,6 +39,8 @@ export class PriceService {
   private isPremium: boolean;
   private cache: Map<string, CachedPrice>;
   private fetchApi: (symbol: string) => Promise<number>; // Injected fetch function for flexibility and testing
+  private updateInterval: NodeJS.Timeout | null = null;
+  private updateCallback: (() => void) | null = null;
 
   // Cache durations:
   // Free tier: daily updates (24 hours)
@@ -93,6 +95,53 @@ export class PriceService {
       }
       throw error;
     }
+  }
+
+  /**
+   * Starts periodic price updates
+   * @param intervalMs Update interval in milliseconds
+   * @param callback Function to call after each update
+   */
+  public startPeriodicUpdates(intervalMs: number, callback: () => void): void {
+    this.stopPeriodicUpdates(); // Clear any existing interval
+    this.updateCallback = callback;
+
+    this.updateInterval = setInterval(async () => {
+      try {
+        // Get all cached symbols
+        const symbols = Array.from(this.cache.keys());
+
+        // Update prices for all cached symbols
+        await Promise.all(
+          symbols.map(async (symbol) => {
+            try {
+              const price = await this.fetchApi(symbol);
+              this.cache.set(symbol, { price, timestamp: Date.now() });
+            } catch (error) {
+              console.error(`[PriceService] Failed to update price for ${symbol}:`, error);
+            }
+          })
+        );
+
+        // Notify that updates are complete
+        if (this.updateCallback) {
+          this.updateCallback();
+        }
+      } catch (error) {
+        console.error('[PriceService] Error during periodic updates:', error);
+      }
+    }, intervalMs);
+  }
+
+  /**
+   * Stops periodic price updates
+   */
+  public stopPeriodicUpdates(): void {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+      this.updateInterval = null;
+    }
+    this.updateCallback = null;
   }
 
   /**

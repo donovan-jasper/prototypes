@@ -162,6 +162,22 @@ export const getHoldings = async (): Promise<Holding[]> => {
   });
 };
 
+export const updateHolding = async (holding: Holding): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'UPDATE holdings SET symbol = ?, shares = ?, costBasis = ?, purchaseDate = ?, currentPrice = ? WHERE id = ?',
+          [holding.symbol, holding.shares, holding.costBasis, holding.purchaseDate, holding.currentPrice || null, holding.id],
+          () => resolve(),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
 // Asset and liability functions
 export const addAsset = async (asset: Omit<Asset, 'id'>) => {
   return new Promise((resolve, reject) => {
