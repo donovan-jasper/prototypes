@@ -2,6 +2,7 @@ import db from './database';
 import { Document } from '../types';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
+import * as ImagePicker from 'expo-image-picker';
 
 export const addDocument = async (familyMemberId: number, title: string, type: string, fileUri: string, appointmentId?: number): Promise<Document> => {
   const result = await db.runAsync(
@@ -30,6 +31,19 @@ export const pickDocument = async (): Promise<DocumentPicker.DocumentPickerResul
   return await DocumentPicker.getDocumentAsync({
     type: ['image/*', 'application/pdf'],
     copyToCacheDirectory: true,
+  });
+};
+
+export const takePhoto = async (): Promise<ImagePicker.ImagePickerResult> => {
+  const { status } = await ImagePicker.requestCameraPermissionsAsync();
+  if (status !== 'granted') {
+    throw new Error('Camera permission not granted');
+  }
+
+  return await ImagePicker.launchCameraAsync({
+    allowsEditing: true,
+    quality: 0.8,
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
   });
 };
 
