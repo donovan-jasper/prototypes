@@ -35,7 +35,7 @@ export async function getDatabase() {
 
 export async function createActivity(input: CreateActivityInput): Promise<number> {
   const database = await getDatabase();
-  
+
   const result = await database.runAsync(
     `INSERT INTO activities (title, description, category, latitude, longitude, startTime, organizerId, maxAttendees, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -62,27 +62,27 @@ export async function getActivitiesNearby(
   category?: string
 ): Promise<Activity[]> {
   const database = await getDatabase();
-  
+
   let query = `
     SELECT * FROM activities
     WHERE datetime(startTime) > datetime('now')
     AND datetime(startTime) < datetime('now', '+24 hours')
   `;
-  
+
   const params: any[] = [];
-  
+
   if (category) {
     query += ` AND category = ?`;
     params.push(category);
   }
-  
+
   query += ` ORDER BY startTime ASC`;
-  
+
   const allActivities = await database.getAllAsync<Activity>(query, params);
-  
+
   // Filter by distance using Haversine formula
   const { calculateDistance } = await import('./distance');
-  
+
   return allActivities.filter(activity => {
     const distance = calculateDistance(
       latitude,
@@ -96,12 +96,12 @@ export async function getActivitiesNearby(
 
 export async function getActivityById(id: number): Promise<Activity | null> {
   const database = await getDatabase();
-  
+
   const activity = await database.getFirstAsync<Activity>(
     'SELECT * FROM activities WHERE id = ?',
     [id]
   );
-  
+
   return activity || null;
 }
 
@@ -111,7 +111,7 @@ export async function updateRSVP(
   status: 'going' | 'interested' | 'cancelled'
 ): Promise<void> {
   const database = await getDatabase();
-  
+
   if (status === 'cancelled') {
     await database.runAsync(
       'DELETE FROM rsvps WHERE activityId = ? AND userId = ?',
@@ -128,12 +128,12 @@ export async function updateRSVP(
 
 export async function getRSVPCount(activityId: number): Promise<number> {
   const database = await getDatabase();
-  
+
   const result = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM rsvps WHERE activityId = ? AND status = "going"',
     [activityId]
   );
-  
+
   return result?.count || 0;
 }
 
@@ -142,11 +142,11 @@ export async function getUserRSVPStatus(
   userId: number
 ): Promise<'going' | 'interested' | null> {
   const database = await getDatabase();
-  
+
   const result = await database.getFirstAsync<{ status: 'going' | 'interested' }>(
     'SELECT status FROM rsvps WHERE activityId = ? AND userId = ?',
     [activityId, userId]
   );
-  
+
   return result?.status || null;
 }
