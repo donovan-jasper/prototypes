@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { RootTabParamList } from '../types/navigation';
@@ -20,7 +20,7 @@ const MATH_PROBLEMS = [
 const ChallengeScreen: React.FC = () => {
   const route = useRoute<ChallengeScreenRouteProp>();
   const navigation = useNavigation<ChallengeScreenNavigationProp>();
-  
+
   const challengeData = route.params || {
     id: '1',
     title: 'Typing Challenge',
@@ -120,52 +120,160 @@ const ChallengeScreen: React.FC = () => {
   };
 
   const handleTypingComplete = async () => {
-    const accuracy = typedText.length > 0 
-      ? ((typedText.length - typingErrors.length) / typedText.length) * 100 
+    const accuracy = typedText.length > 0
+      ? ((typedText.length - typingErrors.length) / typedText.length) * 100
       : 0;
     const wpm = Math.floor((typedText.length / 5) / ((60 - typingTimer) / 60));
     const score = Math.min(Math.floor((accuracy + wpm) / 2), 100);
-    
-    setFinalScore(score);
-    const result = await completeChallenge(
-      challengeData.id,
-      challengeType,
-      challengeData.title,
-      score
-    );
+
+    const result = await completeChallenge(challengeType, score);
     setEarnedXP(result.xp);
+    setFinalScore(score);
     setIsCompleted(true);
   };
 
-  const handleMemorySubmit = async () => {
-    const userSequence = memoryInput.trim().split('').filter(c => c !== ' ');
-    let correct = 0;
+  const handleMathTimeout = () => {
+    if (currentProblemIndex < MATH_PROBLEMS.length - 1) {
+      setCurrentProblemIndex(currentProblemIndex + 1);
+      setMathTimer(30);
+      setSelectedAnswer(null);
+      setAnswerFeedback(null);
+    } else {
+      const score = Math.floor((mathScore / MATH_PROBLEMS.length) * 100);
+      setFinalScore(score);
+      setIsCompleted(true);
+    }
+  };
+
+  const handleMemorySubmit = () => {
+    const userSequence = memoryInput.split(',').map(item => item.trim());
+    let correctCount = 0;
+
     for (let i = 0; i < Math.min(userSequence.length, MEMORY_SEQUENCE.length); i++) {
       if (userSequence[i] === MEMORY_SEQUENCE[i]) {
-        correct++;
+        correctCount++;
       }
     }
-    const score = Math.floor((correct / MEMORY_SEQUENCE.length) * 100);
+
+    const score = Math.floor((correctCount / MEMORY_SEQUENCE.length) * 100);
     setMemoryScore(score);
-    setFinalScore(score);
-    
-    const result = await completeChallenge(
-      challengeData.id,
-      challengeType,
-      challengeData.title,
-      score
-    );
-    setEarnedXP(result.xp);
     setMemoryPhase('result');
-    setIsCompleted(true);
+  };
+
+  const renderTypingChallenge = () => {
+    return (
+      <View style={styles.challengeContainer}>
+        <Text style={styles.challengeTitle}>{challengeData.title}</Text>
+        <Text style={styles.timer}>Time: {typingTimer}s</Text>
+        <Text style={styles.targetText}>{TYPING_TARGET_TEXT}</Text>
+        <TextInput
+          style={styles.typingInput}
+          multiline
+          value={typedText}
+          onChangeText={handleTypingChange}
+          autoFocus
+        />
+        <Text style={styles.accuracyText}>
+          Accuracy: {typedText.length > 0
+            ? `${Math.floor(((typedText.length - typingErrors.length) / typedText.length) * 100)}%`
+            : '0%'}
+        </Text>
+      </View>
+    );
+  };
+
+  const renderMemoryChallenge = () => {
+    if (memoryPhase === 'show') {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.challengeTitle}>{challengeData.title}</Text>
+          <Text style={styles.memorySequence}>
+            Memorize: {MEMORY_SEQUENCE.join(', ')}
+          </Text>
+          <Text style={styles.timer}>Time: {memoryTimer}s</Text>
+        </View>
+      );
+    } else if (memoryPhase === 'recall') {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.challengeTitle}>{challengeData.title}</Text>
+          <Text style={styles.memoryPrompt}>
+            Enter the sequence you memorized (comma separated):
+          </Text>
+          <TextInput
+            style={styles.memoryInput}
+            value={memoryInput}
+            onChangeText={setMemoryInput}
+            keyboardType="numeric"
+          />
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handleMemorySubmit}
+          >
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.challengeTitle}>{challengeData.title}</Text>
+          <Text style={styles.resultText}>Your score: {memoryScore}%</Text>
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={() => setIsCompleted(true)}
+          >
+            <Text style={styles.submitButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  };
+
+  const renderMathChallenge = () => {
+    const currentProblem = MATH_PROBLEMS[currentProblemIndex];
+
+    return (
+      <View style={styles.challengeContainer}>
+        <Text style={styles.challengeTitle}>{challengeData.title}</Text>
+        <Text style={styles.timer}>Time: {mathTimer}s</Text>
+        <Text style={styles.mathQuestion}>{currentProblem.question}</Text>
+        <View style={styles.optionsContainer}>
+          {currentProblem.options.map((option, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.optionButton,
+                selectedAnswer === option && styles.selectedOption,
+                answerFeedback === 'correct' && option === currentProblem.answer && styles.correctOption,
+                answerFeedback === 'incorrect' && selectedAnswer === option && styles.incorrectOption
+              ]}
+              onPress={() => handleMathAnswer(option)}
+              disabled={selectedAnswer !== null}
+            >
+              <Text style={styles.optionText}>{option}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {answerFeedback && (
+          <Text style={[
+            styles.feedbackText,
+            answerFeedback === 'correct' ? styles.correctFeedback : styles.incorrectFeedback
+          ]}>
+            {answerFeedback === 'correct' ? 'Correct!' : 'Incorrect!'}
+          </Text>
+        )}
+      </View>
+    );
   };
 
   const handleMathAnswer = (answer: number) => {
-    setSelectedAnswer(answer);
     const currentProblem = MATH_PROBLEMS[currentProblemIndex];
     const isCorrect = answer === currentProblem.answer;
+
+    setSelectedAnswer(answer);
     setAnswerFeedback(isCorrect ? 'correct' : 'incorrect');
-    
+
     if (isCorrect) {
       setMathScore(mathScore + 1);
     }
@@ -177,556 +285,203 @@ const ChallengeScreen: React.FC = () => {
         setSelectedAnswer(null);
         setAnswerFeedback(null);
       } else {
-        handleMathComplete();
+        const score = Math.floor((mathScore / MATH_PROBLEMS.length) * 100);
+        setFinalScore(score);
+        setIsCompleted(true);
       }
     }, 1000);
   };
 
-  const handleMathTimeout = () => {
-    setAnswerFeedback('incorrect');
-    setTimeout(() => {
-      if (currentProblemIndex < MATH_PROBLEMS.length - 1) {
-        setCurrentProblemIndex(currentProblemIndex + 1);
-        setMathTimer(30);
-        setSelectedAnswer(null);
-        setAnswerFeedback(null);
-      } else {
-        handleMathComplete();
-      }
-    }, 1000);
-  };
-
-  const handleMathComplete = async () => {
-    const score = Math.floor((mathScore / MATH_PROBLEMS.length) * 100);
-    setFinalScore(score);
-    
-    const result = await completeChallenge(
-      challengeData.id,
-      challengeType,
-      challengeData.title,
-      score
-    );
-    setEarnedXP(result.xp);
-    setIsCompleted(true);
-  };
-
-  const handleReset = () => {
-    setTypedText('');
-    setTypingTimer(60);
-    setTypingStarted(false);
-    setTypingErrors([]);
-    setMemoryPhase('show');
-    setMemoryTimer(10);
-    setMemoryInput('');
-    setMemoryScore(0);
-    setCurrentProblemIndex(0);
-    setMathTimer(30);
-    setMathScore(0);
-    setSelectedAnswer(null);
-    setAnswerFeedback(null);
-    setIsCompleted(false);
-    setEarnedXP(0);
-    setFinalScore(0);
-  };
-
-  const handleBackToHome = () => {
-    navigation.navigate('Home');
-  };
-
-  const renderTypingChallenge = () => (
-    <View style={styles.challengeContent}>
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerLabel}>Time Remaining</Text>
-        <Text style={styles.timerText}>{typingTimer}s</Text>
-      </View>
-
-      <View style={styles.targetTextContainer}>
-        <Text style={styles.targetTextLabel}>Type this text:</Text>
-        <Text style={styles.targetText}>{TYPING_TARGET_TEXT}</Text>
-      </View>
-
-      <View style={styles.typingInputContainer}>
-        <Text style={styles.inputLabel}>Your typing:</Text>
-        <ScrollView style={styles.typingScrollView}>
-          <Text style={styles.typedText}>
-            {typedText.split('').map((char, index) => (
-              <Text
-                key={index}
-                style={typingErrors.includes(index) ? styles.errorChar : styles.correctChar}
-              >
-                {char}
-              </Text>
-            ))}
-          </Text>
-        </ScrollView>
-        <TextInput
-          style={styles.hiddenInput}
-          onChangeText={handleTypingChange}
-          value={typedText}
-          multiline
-          autoFocus
-          editable={!isCompleted}
-        />
-      </View>
-
-      <View style={styles.statsContainer}>
-        <Text style={styles.statText}>Characters: {typedText.length}</Text>
-        <Text style={styles.statText}>Errors: {typingErrors.length}</Text>
-      </View>
-
-      {!isCompleted && (
-        <TouchableOpacity 
-          style={[styles.button, styles.submitButton]} 
-          onPress={handleTypingComplete}
-        >
-          <Text style={styles.buttonText}>Finish Early</Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
-
-  const renderMemoryChallenge = () => {
-    if (memoryPhase === 'show') {
-      return (
-        <View style={styles.challengeContent}>
-          <View style={styles.timerContainer}>
-            <Text style={styles.timerLabel}>Memorize in</Text>
-            <Text style={styles.timerText}>{memoryTimer}s</Text>
-          </View>
-
-          <View style={styles.memorySequenceContainer}>
-            <Text style={styles.memoryInstruction}>Remember this sequence:</Text>
-            <View style={styles.sequenceRow}>
-              {MEMORY_SEQUENCE.map((num, index) => (
-                <View key={index} style={styles.sequenceBox}>
-                  <Text style={styles.sequenceNumber}>{num}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-      );
-    }
-
-    if (memoryPhase === 'recall') {
-      return (
-        <View style={styles.challengeContent}>
-          <Text style={styles.memoryInstruction}>Enter the sequence you saw:</Text>
-          <TextInput
-            style={styles.memoryInput}
-            onChangeText={setMemoryInput}
-            value={memoryInput}
-            placeholder="e.g., 739281546"
-            keyboardType="number-pad"
-            autoFocus
-          />
-          <TouchableOpacity 
-            style={[styles.button, styles.submitButton]} 
-            onPress={handleMemorySubmit}
+  const renderCompletionScreen = () => {
+    return (
+      <Modal
+        visible={isCompleted}
+        animationType="slide"
+        transparent={false}
+      >
+        <View style={styles.completionContainer}>
+          <Text style={styles.completionTitle}>Challenge Complete!</Text>
+          <Text style={styles.completionScore}>Final Score: {finalScore}</Text>
+          <Text style={styles.completionXP}>XP Earned: {earnedXP}</Text>
+          <TouchableOpacity
+            style={styles.completionButton}
+            onPress={() => navigation.navigate('Home')}
           >
-            <Text style={styles.buttonText}>Submit</Text>
+            <Text style={styles.completionButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
-      );
-    }
-
-    return null;
-  };
-
-  const renderMathChallenge = () => {
-    const currentProblem = MATH_PROBLEMS[currentProblemIndex];
-
-    return (
-      <View style={styles.challengeContent}>
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerLabel}>Time Remaining</Text>
-          <Text style={styles.timerText}>{mathTimer}s</Text>
-        </View>
-
-        <View style={styles.mathProblemContainer}>
-          <Text style={styles.mathProblemLabel}>
-            Problem {currentProblemIndex + 1} of {MATH_PROBLEMS.length}
-          </Text>
-          <Text style={styles.mathQuestion}>{currentProblem.question} = ?</Text>
-        </View>
-
-        <View style={styles.mathOptionsContainer}>
-          {currentProblem.options.map((option, index) => {
-            let buttonStyle = styles.mathOptionButton;
-            if (selectedAnswer === option) {
-              buttonStyle = answerFeedback === 'correct' 
-                ? styles.mathOptionButtonCorrect 
-                : styles.mathOptionButtonIncorrect;
-            }
-
-            return (
-              <TouchableOpacity
-                key={index}
-                style={buttonStyle}
-                onPress={() => handleMathAnswer(option)}
-                disabled={selectedAnswer !== null}
-              >
-                <Text style={styles.mathOptionText}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        <View style={styles.mathScoreContainer}>
-          <Text style={styles.mathScoreText}>
-            Score: {mathScore} / {MATH_PROBLEMS.length}
-          </Text>
-        </View>
-      </View>
+      </Modal>
     );
   };
 
-  const renderResults = () => (
-    <View style={styles.resultContainer}>
-      <Text style={styles.resultTitle}>Challenge Complete!</Text>
-      <Text style={styles.resultScore}>Score: {finalScore}/100</Text>
-      <Text style={styles.resultXP}>+{earnedXP} XP</Text>
-      
-      <View style={styles.buttonRow}>
-        <TouchableOpacity 
-          style={[styles.button, styles.resetButton]} 
-          onPress={handleReset}
-        >
-          <Text style={styles.buttonText}>Try Again</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.button, styles.homeButton]} 
-          onPress={handleBackToHome}
-        >
-          <Text style={styles.buttonText}>Back to Home</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackToHome} style={styles.backButton}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>{challengeData.title}</Text>
-        <Text style={styles.description}>{challengeData.description}</Text>
-      </View>
-
-      <ScrollView style={styles.content}>
-        {!isCompleted && challengeType === 'typing' && renderTypingChallenge()}
-        {!isCompleted && challengeType === 'memory' && renderMemoryChallenge()}
-        {!isCompleted && challengeType === 'math' && renderMathChallenge()}
-        {isCompleted && renderResults()}
-      </ScrollView>
-    </View>
+    <ScrollView contentContainerStyle={styles.container}>
+      {challengeType === 'typing' && renderTypingChallenge()}
+      {challengeType === 'memory' && renderMemoryChallenge()}
+      {challengeType === 'math' && renderMathChallenge()}
+      {isCompleted && renderCompletionScreen()}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
+    padding: 20,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  backButton: {
-    marginBottom: 12,
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#000',
-  },
-  description: {
-    fontSize: 16,
-    color: '#666',
-  },
-  content: {
+  challengeContainer: {
     flex: 1,
-  },
-  challengeContent: {
-    padding: 16,
-  },
-  timerContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 20,
   },
-  timerLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  timerText: {
-    fontSize: 48,
+  challengeTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  targetTextContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  targetTextLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#000',
-  },
-  targetText: {
-    fontSize: 18,
-    lineHeight: 28,
+    marginBottom: 20,
     color: '#333',
   },
-  typingInputContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    minHeight: 150,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  timer: {
+    fontSize: 20,
+    marginBottom: 20,
+    color: '#666',
   },
-  inputLabel: {
+  targetText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#000',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#444',
   },
-  typingScrollView: {
-    maxHeight: 120,
+  typingInput: {
+    width: '100%',
+    height: 150,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
+    fontSize: 16,
+    textAlignVertical: 'top',
   },
-  typedText: {
-    fontSize: 18,
-    lineHeight: 28,
-  },
-  correctChar: {
-    color: '#34C759',
-  },
-  errorChar: {
-    color: '#FF3B30',
-    backgroundColor: '#FFE5E5',
-  },
-  hiddenInput: {
-    position: 'absolute',
-    opacity: 0,
-    height: 0,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statText: {
+  accuracyText: {
     fontSize: 16,
     color: '#666',
   },
-  memorySequenceContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  memoryInstruction: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 24,
-    color: '#000',
-    textAlign: 'center',
-  },
-  sequenceRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 12,
-  },
-  sequenceBox: {
-    width: 60,
-    height: 60,
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sequenceNumber: {
-    fontSize: 28,
+  memorySequence: {
+    fontSize: 20,
+    marginBottom: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#333',
+  },
+  memoryPrompt: {
+    fontSize: 16,
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#444',
   },
   memoryInput: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: 24,
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  mathProblemContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 32,
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  mathProblemLabel: {
+    width: '80%',
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
     fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
-  },
-  mathQuestion: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#000',
-  },
-  mathOptionsContainer: {
-    gap: 12,
-    marginBottom: 24,
-  },
-  mathOptionButton: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#007AFF',
-  },
-  mathOptionButtonCorrect: {
-    backgroundColor: '#34C759',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#34C759',
-  },
-  mathOptionButtonIncorrect: {
-    backgroundColor: '#FF3B30',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FF3B30',
-  },
-  mathOptionText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  mathScoreContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  mathScoreText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#666',
-  },
-  button: {
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    textAlign: 'center',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    marginTop: 20,
   },
-  resetButton: {
-    backgroundColor: '#FF9500',
-    flex: 1,
-    marginRight: 8,
-  },
-  homeButton: {
-    backgroundColor: '#34C759',
-    flex: 1,
-    marginLeft: 8,
-  },
-  buttonText: {
-    color: '#fff',
+  submitButtonText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  resultContainer: {
-    padding: 16,
+  resultText: {
+    fontSize: 20,
+    marginBottom: 20,
+    color: '#333',
+  },
+  mathQuestion: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    color: '#333',
+  },
+  optionsContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  optionButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 10,
     alignItems: 'center',
   },
-  resultTitle: {
-    fontSize: 32,
+  selectedOption: {
+    backgroundColor: '#2196F3',
+  },
+  correctOption: {
+    backgroundColor: '#4CAF50',
+  },
+  incorrectOption: {
+    backgroundColor: '#F44336',
+  },
+  optionText: {
+    fontSize: 18,
+    color: 'white',
+  },
+  feedbackText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#000',
-    marginBottom: 16,
+    marginTop: 10,
   },
-  resultScore: {
-    fontSize: 48,
+  correctFeedback: {
+    color: '#4CAF50',
+  },
+  incorrectFeedback: {
+    color: '#F44336',
+  },
+  completionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: 'white',
+  },
+  completionTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 8,
+    marginBottom: 30,
+    color: '#333',
   },
-  resultXP: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#34C759',
-    marginBottom: 32,
+  completionScore: {
+    fontSize: 22,
+    marginBottom: 15,
+    color: '#4CAF50',
   },
-  buttonRow: {
-    flexDirection: 'row',
-    width: '100%',
+  completionXP: {
+    fontSize: 22,
+    marginBottom: 30,
+    color: '#FF9800',
+  },
+  completionButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    width: '80%',
+    alignItems: 'center',
+  },
+  completionButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
