@@ -138,8 +138,8 @@ export default function SalesScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text>Loading sales data...</Text>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={styles.loadingText}>Loading sales data...</Text>
       </View>
     );
   }
@@ -147,7 +147,7 @@ export default function SalesScreen() {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error loading sales: {error}</Text>
+        <Text style={styles.errorText}>Failed to load sales data</Text>
         <Button mode="contained" onPress={() => loadListings({ status: 'sold' })}>
           Retry
         </Button>
@@ -157,33 +157,39 @@ export default function SalesScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.summaryContainer}>
-        <Card style={styles.summaryCard}>
-          <Card.Content>
-            <Text style={styles.summaryTitle}>Total Sales</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(totalSales)}</Text>
-          </Card.Content>
-        </Card>
-        <Card style={styles.summaryCard}>
-          <Card.Content>
-            <Text style={styles.summaryTitle}>Total Profit</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(totalProfit)}</Text>
-          </Card.Content>
-        </Card>
-        <Card style={styles.summaryCard}>
-          <Card.Content>
-            <Text style={styles.summaryTitle}>Avg Margin</Text>
-            <Text style={styles.summaryValue}>{avgMargin.toFixed(1)}%</Text>
-          </Card.Content>
-        </Card>
-      </View>
-
-      <View style={styles.controlsContainer}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Sales Tracker</Text>
         <DateRangePicker
           startDate={dateRange.start}
           endDate={dateRange.end}
-          onChange={(start, end) => setDateRange({ start, end })}
+          onChange={setDateRange}
         />
+      </View>
+
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.summaryContainer}>
+        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.primaryContainer }]}>
+          <Text style={styles.summaryLabel}>Total Sales</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.primary }]}>
+            {formatCurrency(totalSales)}
+          </Text>
+        </Card>
+
+        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.secondaryContainer }]}>
+          <Text style={styles.summaryLabel}>Total Profit</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.secondary }]}>
+            {formatCurrency(totalProfit)}
+          </Text>
+        </Card>
+
+        <Card style={[styles.summaryCard, { backgroundColor: theme.colors.tertiaryContainer }]}>
+          <Text style={styles.summaryLabel}>Avg Margin</Text>
+          <Text style={[styles.summaryValue, { color: theme.colors.tertiary }]}>
+            {avgMargin.toFixed(1)}%
+          </Text>
+        </Card>
+      </ScrollView>
+
+      <View style={styles.exportContainer}>
         <CSVExportButton
           onPress={handleExportCSV}
           disabled={isExporting}
@@ -192,7 +198,7 @@ export default function SalesScreen() {
       </View>
 
       {soldListings.length === 0 ? (
-        <View style={styles.emptyContainer}>
+        <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No sales found for the selected period</Text>
         </View>
       ) : (
@@ -213,48 +219,39 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  errorText: {
+  header: {
     marginBottom: 16,
-    textAlign: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
   },
   summaryContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 16,
   },
   summaryCard: {
-    flex: 1,
-    marginHorizontal: 4,
+    width: 150,
+    padding: 16,
+    marginRight: 8,
+    borderRadius: 8,
   },
-  summaryTitle: {
-    fontSize: 12,
+  summaryLabel: {
+    fontSize: 14,
     color: '#666',
     marginBottom: 4,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
   },
-  controlsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  exportContainer: {
     marginBottom: 16,
+    alignItems: 'flex-end',
   },
   saleItem: {
     marginBottom: 8,
-    padding: 8,
+    padding: 12,
   },
   saleItemHeader: {
     flexDirection: 'row',
@@ -284,16 +281,40 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  listContent: {
-    paddingBottom: 16,
-  },
-  emptyContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyText: {
-    color: '#666',
+  loadingText: {
+    marginTop: 16,
     fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  listContent: {
+    paddingBottom: 16,
   },
 });

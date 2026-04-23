@@ -1,109 +1,88 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Button, Dialog, Portal, RadioButton } from 'react-native-paper';
+import { Button, Dialog, Portal, useTheme } from 'react-native-paper';
 import { formatDate } from '../lib/utils/formatting';
 
 interface DateRangePickerProps {
   startDate: Date;
   endDate: Date;
-  onChange: (start: Date, end: Date) => void;
+  onChange: (range: { start: Date; end: Date }) => void;
 }
 
 export function DateRangePicker({ startDate, endDate, onChange }: DateRangePickerProps) {
+  const theme = useTheme();
   const [visible, setVisible] = useState(false);
-  const [selectedRange, setSelectedRange] = useState('30days');
+  const [tempStart, setTempStart] = useState(startDate);
+  const [tempEnd, setTempEnd] = useState(endDate);
 
-  const ranges = [
-    { label: 'Last 7 days', value: '7days' },
-    { label: 'Last 30 days', value: '30days' },
-    { label: 'Last 90 days', value: '90days' },
-    { label: 'This month', value: 'thisMonth' },
-    { label: 'Last month', value: 'lastMonth' },
-    { label: 'This year', value: 'thisYear' },
-  ];
+  const showDialog = () => setVisible(true);
+  const hideDialog = () => setVisible(false);
 
-  const applyRange = (range: string) => {
-    const now = new Date();
-    let start: Date;
+  const handleApply = () => {
+    onChange({ start: tempStart, end: tempEnd });
+    hideDialog();
+  };
 
-    switch (range) {
-      case '7days':
-        start = new Date(now.setDate(now.getDate() - 7));
-        break;
-      case '30days':
-        start = new Date(now.setDate(now.getDate() - 30));
-        break;
-      case '90days':
-        start = new Date(now.setDate(now.getDate() - 90));
-        break;
-      case 'thisMonth':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        break;
-      case 'lastMonth':
-        start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        end = new Date(now.getFullYear(), now.getMonth(), 0);
-        break;
-      case 'thisYear':
-        start = new Date(now.getFullYear(), 0, 1);
-        break;
-      default:
-        start = new Date(now.setDate(now.getDate() - 30));
-    }
-
-    if (!end) {
-      end = new Date();
-    }
-
-    onChange(start, end);
-    setSelectedRange(range);
-    setVisible(false);
+  const handlePreset = (days: number) => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - days);
+    setTempStart(start);
+    setTempEnd(end);
   };
 
   return (
-    <View>
-      <TouchableOpacity onPress={() => setVisible(true)} style={styles.button}>
-        <Text style={styles.buttonText}>
+    <>
+      <TouchableOpacity onPress={showDialog} style={styles.pickerButton}>
+        <Text style={styles.pickerText}>
           {formatDate(startDate)} - {formatDate(endDate)}
         </Text>
       </TouchableOpacity>
 
       <Portal>
-        <Dialog visible={visible} onDismiss={() => setVisible(false)}>
+        <Dialog visible={visible} onDismiss={hideDialog}>
           <Dialog.Title>Select Date Range</Dialog.Title>
           <Dialog.Content>
-            <RadioButton.Group
-              value={selectedRange}
-              onValueChange={value => setSelectedRange(value)}
-            >
-              {ranges.map(range => (
-                <RadioButton.Item
-                  key={range.value}
-                  label={range.label}
-                  value={range.value}
-                />
-              ))}
-            </RadioButton.Group>
+            <View style={styles.presetButtons}>
+              <Button mode="outlined" onPress={() => handlePreset(7)}>Last 7 days</Button>
+              <Button mode="outlined" onPress={() => handlePreset(30)}>Last 30 days</Button>
+              <Button mode="outlined" onPress={() => handlePreset(90)}>Last 90 days</Button>
+            </View>
+            <View style={styles.dateRange}>
+              <Text style={styles.dateLabel}>From: {formatDate(tempStart)}</Text>
+              <Text style={styles.dateLabel}>To: {formatDate(tempEnd)}</Text>
+            </View>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setVisible(false)}>Cancel</Button>
-            <Button onPress={() => applyRange(selectedRange)}>Apply</Button>
+            <Button onPress={hideDialog}>Cancel</Button>
+            <Button onPress={handleApply}>Apply</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  button: {
+  pickerButton: {
     padding: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ccc',
     borderRadius: 4,
-    minWidth: 150,
   },
-  buttonText: {
+  pickerText: {
     fontSize: 14,
-    textAlign: 'center',
+  },
+  presetButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  dateRange: {
+    marginTop: 16,
+  },
+  dateLabel: {
+    fontSize: 14,
+    marginBottom: 8,
   },
 });
