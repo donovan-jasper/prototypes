@@ -137,19 +137,19 @@ export default function PostComposer() {
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity
-        style={[styles.enhanceButton, (isEnhancing || !content.trim()) && styles.buttonDisabled]}
-        onPress={handleEnhance}
-        disabled={isEnhancing || !content.trim()}
-      >
-        {isEnhancing ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.enhanceButtonText}>✨ Enhance with AI</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.enhanceButton, (isEnhancing || !content.trim()) && styles.buttonDisabled]}
+          onPress={handleEnhance}
+          disabled={isEnhancing || !content.trim()}
+        >
+          {isEnhancing ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.enhanceButtonText}>✨ Enhance with AI</Text>
+          )}
+        </TouchableOpacity>
 
-      <View style={styles.actionButtons}>
         <TouchableOpacity
           style={[styles.postButton, (isPosting || !content.trim()) && styles.buttonDisabled]}
           onPress={handlePostNow}
@@ -191,36 +191,33 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   input: {
-    height: 120,
+    fontSize: 16,
+    minHeight: 100,
+    padding: 12,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    textAlignVertical: 'top',
+    marginBottom: 8,
   },
   charCountRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 4,
+    marginBottom: 16,
   },
   charCount: {
     color: '#666',
     fontSize: 12,
   },
   aiResponseContainer: {
-    marginTop: 12,
     padding: 12,
     backgroundColor: '#f0f8ff',
     borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#4a90e2',
+    marginBottom: 16,
   },
   aiResponseLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4a90e2',
+    fontWeight: 'bold',
     marginBottom: 4,
+    color: '#1e90ff',
   },
   aiResponseText: {
     fontSize: 14,
@@ -228,8 +225,8 @@ const styles = StyleSheet.create({
   },
   platformSelector: {
     flexDirection: 'row',
-    marginVertical: 16,
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   platformChip: {
     paddingVertical: 8,
@@ -239,8 +236,8 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
   },
   platformChipActive: {
-    backgroundColor: '#4a90e2',
-    borderColor: '#4a90e2',
+    backgroundColor: '#1e90ff',
+    borderColor: '#1e90ff',
   },
   platformChipText: {
     color: '#666',
@@ -248,51 +245,52 @@ const styles = StyleSheet.create({
   },
   platformChipTextActive: {
     color: '#fff',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  enhanceButton: {
-    backgroundColor: '#4a90e2',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  enhanceButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  actionButtons: {
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  postButton: {
-    flex: 1,
-    backgroundColor: '#2ecc71',
-    padding: 14,
+  enhanceButton: {
+    backgroundColor: '#1e90ff',
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    flex: 1,
     marginRight: 8,
+    alignItems: 'center',
   },
-  postButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  postButton: {
+    backgroundColor: '#28a745',
+    padding: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
   },
   scheduleButton: {
-    flex: 1,
-    backgroundColor: '#f39c12',
-    padding: 14,
+    backgroundColor: '#ffc107',
+    padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    flex: 1,
     marginLeft: 8,
-  },
-  scheduleButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    alignItems: 'center',
   },
   buttonDisabled: {
     opacity: 0.5,
+  },
+  enhanceButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  postButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  scheduleButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: 14,
   },
 });
