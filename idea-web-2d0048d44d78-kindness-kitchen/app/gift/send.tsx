@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, FlatList } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, FlatList, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGiftStore } from '../../store/giftStore';
 import { getRestaurants } from '../../services/api';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { Ionicons } from '@expo/vector-icons';
+import RestaurantPicker from '../../components/RestaurantPicker';
+import MessageComposer from '../../components/MessageComposer';
 
 const SendGiftScreen = () => {
   const router = useRouter();
@@ -16,18 +19,8 @@ const SendGiftScreen = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [restaurants, setRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
-
-  const fetchRestaurants = async () => {
-    setLoading(true);
-    try {
-      const data = await getRestaurants();
-      setRestaurants(data);
-    } catch (error) {
-      console.error('Error fetching restaurants:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [deliveryOption, setDeliveryOption] = useState('now');
+  const [recurringOption, setRecurringOption] = useState(null);
 
   const handleNext = () => {
     if (step === 1 && !recipientName) {
@@ -43,15 +36,16 @@ const SendGiftScreen = () => {
       return;
     }
 
-    if (step === 4) {
+    if (step === 5) {
       // Create the gift
       const newGift = {
         restaurant: selectedRestaurant,
         recipientName,
         message,
-        amount: 25, // Default amount, could be calculated based on restaurant
+        amount: selectedRestaurant?.price || 25,
         status: 'pending',
-        scheduledFor: deliveryDate,
+        scheduledFor: deliveryOption === 'now' ? new Date() : deliveryDate,
+        recurring: recurringOption,
       };
 
       addGift(newGift);
@@ -85,80 +79,147 @@ const SendGiftScreen = () => {
               value={recipientName}
               onChangeText={setRecipientName}
             />
+            <TouchableOpacity style={styles.contactButton}>
+              <Ionicons name="people" size={20} color="#FF6B6B" />
+              <Text style={styles.contactButtonText}>Choose from contacts</Text>
+            </TouchableOpacity>
           </View>
         );
       case 2:
-        if (restaurants.length === 0 && !loading) {
-          fetchRestaurants();
-        }
-
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>Choose a restaurant</Text>
-            {loading ? (
-              <Text>Loading restaurants...</Text>
-            ) : (
-              <FlatList
-                data={restaurants}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={[
-                      styles.restaurantItem,
-                      selectedRestaurant?.id === item.id && styles.selectedRestaurant,
-                    ]}
-                    onPress={() => setSelectedRestaurant(item)}
-                  >
-                    <Image source={{ uri: item.image }} style={styles.restaurantImage} />
-                    <View style={styles.restaurantInfo}>
-                      <Text style={styles.restaurantName}>{item.name}</Text>
-                      <Text style={styles.restaurantDetails}>
-                        {item.cuisine} • {item.rating} ★ • {item.deliveryTime} min
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                )}
-              />
-            )}
+            <RestaurantPicker onSelectRestaurant={setSelectedRestaurant} />
           </View>
         );
       case 3:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Add a personal message</Text>
-            <TextInput
-              style={[styles.input, styles.messageInput]}
-              placeholder="Write your message..."
-              value={message}
-              onChangeText={setMessage}
-              multiline
-              numberOfLines={4}
-            />
-            <TouchableOpacity style={styles.voiceNoteButton}>
-              <Text style={styles.voiceNoteText}>+ Add Voice Note</Text>
-            </TouchableOpacity>
+            <MessageComposer onMessageChange={setMessage} />
           </View>
         );
       case 4:
         return (
           <View style={styles.stepContainer}>
             <Text style={styles.stepTitle}>When should we deliver?</Text>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.datePickerText}>
-                {deliveryDate.toLocaleString()}
-              </Text>
-            </TouchableOpacity>
+
+            <View style={styles.deliveryOptions}>
+              <TouchableOpacity
+                style={[styles.deliveryOption, deliveryOption === 'now' && styles.selectedOption]}
+                onPress={() => setDeliveryOption('now')}
+              >
+                <Text style={styles.deliveryOptionText}>Now</Text>
+                <Text style={styles.deliveryOptionSubtext}>Delivers in 30-45 min</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deliveryOption, deliveryOption === 'later' && styles.selectedOption]}
+                onPress={() => {
+                  setDeliveryOption('later');
+                  setShowDatePicker(true);
+                }}
+              >
+                <Text style={styles.deliveryOptionText}>Later today</Text>
+                <Text style={styles.deliveryOptionSubtext}>
+                  {deliveryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.deliveryOption, deliveryOption === 'schedule' && styles.selectedOption]}
+                onPress={() => {
+                  setDeliveryOption('schedule');
+                  setShowDatePicker(true);
+                }}
+              >
+                <Text style={styles.deliveryOptionText}>Schedule for later</Text>
+                <Text style={styles.deliveryOptionSubtext}>
+                  {deliveryDate.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {showDatePicker && (
               <DateTimePicker
                 value={deliveryDate}
-                mode="datetime"
+                mode={deliveryOption === 'later' ? 'time' : 'datetime'}
                 display="default"
                 onChange={handleDateChange}
               />
             )}
+
+            <View style={styles.recurringContainer}>
+              <Text style={styles.recurringTitle}>Make this recurring?</Text>
+              <View style={styles.recurringOptions}>
+                <TouchableOpacity
+                  style={[styles.recurringOption, recurringOption === 'weekly' && styles.selectedRecurring]}
+                  onPress={() => setRecurringOption(recurringOption === 'weekly' ? null : 'weekly')}
+                >
+                  <Text style={styles.recurringOptionText}>Weekly</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recurringOption, recurringOption === 'monthly' && styles.selectedRecurring]}
+                  onPress={() => setRecurringOption(recurringOption === 'monthly' ? null : 'monthly')}
+                >
+                  <Text style={styles.recurringOptionText}>Monthly</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.recurringOption, recurringOption === 'yearly' && styles.selectedRecurring]}
+                  onPress={() => setRecurringOption(recurringOption === 'yearly' ? null : 'yearly')}
+                >
+                  <Text style={styles.recurringOptionText}>Yearly</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        );
+      case 5:
+        return (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Review your gift</Text>
+
+            <View style={styles.reviewCard}>
+              <View style={styles.reviewHeader}>
+                <Text style={styles.reviewTitle}>To: {recipientName}</Text>
+                <Text style={styles.reviewSubtitle}>From: You</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Ionicons name="restaurant" size={20} color="#FF6B6B" />
+                <Text style={styles.reviewText}>{selectedRestaurant?.name}</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Ionicons name="chatbubble" size={20} color="#FF6B6B" />
+                <Text style={styles.reviewText}>{message.substring(0, 30)}...</Text>
+              </View>
+
+              <View style={styles.reviewItem}>
+                <Ionicons name="calendar" size={20} color="#FF6B6B" />
+                <Text style={styles.reviewText}>
+                  {deliveryOption === 'now' ? 'Now' :
+                   deliveryOption === 'later' ? 'Later today' :
+                   deliveryDate.toLocaleString()}
+                </Text>
+              </View>
+
+              {recurringOption && (
+                <View style={styles.reviewItem}>
+                  <Ionicons name="repeat" size={20} color="#FF6B6B" />
+                  <Text style={styles.reviewText}>Recurring: {recurringOption}</Text>
+                </View>
+              )}
+
+              <View style={styles.reviewTotal}>
+                <Text style={styles.reviewTotalText}>Total</Text>
+                <Text style={styles.reviewTotalAmount}>${selectedRestaurant?.price || 25.00}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.paymentButton}>
+              <Ionicons name="card" size={20} color="#fff" />
+              <Text style={styles.paymentButtonText}>Pay with Stripe</Text>
+            </TouchableOpacity>
           </View>
         );
       default:
@@ -167,68 +228,78 @@ const SendGiftScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.progressContainer}>
-        {[1, 2, 3, 4].map((s) => (
-          <View
-            key={s}
-            style={[
-              styles.progressStep,
-              step >= s && styles.activeProgressStep,
-            ]}
-          />
-        ))}
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Send a Gift</Text>
+        <View style={styles.stepIndicator}>
+          <Text style={styles.stepText}>Step {step} of 5</Text>
+        </View>
       </View>
 
-      {renderStepContent()}
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {renderStepContent()}
+      </ScrollView>
 
-      <View style={styles.buttonContainer}>
+      <View style={styles.footer}>
         {step > 1 && (
-          <TouchableOpacity
-            style={[styles.button, styles.previousButton]}
-            onPress={handlePrevious}
-          >
-            <Text style={styles.buttonText}>Back</Text>
+          <TouchableOpacity style={styles.previousButton} onPress={handlePrevious}>
+            <Text style={styles.previousButtonText}>Previous</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={[styles.button, styles.nextButton]}
-          onPress={handleNext}
-        >
-          <Text style={styles.buttonText}>
-            {step === 4 ? 'Confirm & Pay' : 'Next'}
+        <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
+          <Text style={styles.nextButtonText}>
+            {step === 5 ? 'Confirm & Pay' : 'Next'}
           </Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#f8f8f8',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
     backgroundColor: '#fff',
   },
-  progressContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 30,
+  backButton: {
+    padding: 5,
   },
-  progressStep: {
-    width: 60,
-    height: 5,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
   },
-  activeProgressStep: {
+  stepIndicator: {
     backgroundColor: '#FF6B6B',
+    borderRadius: 15,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  stepText: {
+    color: '#fff',
+    fontSize: 12,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingBottom: 100,
   },
   stepContainer: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   stepTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
@@ -239,88 +310,173 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     fontSize: 16,
-    marginBottom: 15,
+    marginBottom: 20,
+    backgroundColor: '#fff',
   },
-  messageInput: {
-    height: 120,
-    textAlignVertical: 'top',
-  },
-  voiceNoteButton: {
+  contactButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
   },
-  voiceNoteText: {
+  contactButtonText: {
+    marginLeft: 10,
+    fontSize: 16,
     color: '#FF6B6B',
-    fontWeight: 'bold',
   },
-  restaurantItem: {
-    flexDirection: 'row',
+  deliveryOptions: {
+    marginBottom: 20,
+  },
+  deliveryOption: {
     padding: 15,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     marginBottom: 10,
-    alignItems: 'center',
+    backgroundColor: '#fff',
   },
-  selectedRestaurant: {
+  selectedOption: {
     borderColor: '#FF6B6B',
     backgroundColor: '#fff5f5',
   },
-  restaurantImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 15,
-  },
-  restaurantInfo: {
-    flex: 1,
-  },
-  restaurantName: {
+  deliveryOptionText: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
   },
-  restaurantDetails: {
-    color: '#666',
+  deliveryOptionSubtext: {
     fontSize: 14,
+    color: '#666',
   },
-  datePickerButton: {
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  datePickerText: {
-    fontSize: 16,
-    color: '#333',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  recurringContainer: {
     marginTop: 20,
   },
-  button: {
-    padding: 15,
-    borderRadius: 8,
+  recurringTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  recurringOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  recurringOption: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 20,
     flex: 1,
     marginHorizontal: 5,
     alignItems: 'center',
   },
+  selectedRecurring: {
+    borderColor: '#FF6B6B',
+    backgroundColor: '#fff5f5',
+  },
+  recurringOptionText: {
+    fontSize: 14,
+  },
+  reviewCard: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  reviewHeader: {
+    marginBottom: 20,
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  reviewSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  reviewItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  reviewText: {
+    marginLeft: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  reviewTotal: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  reviewTotalText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  reviewTotalAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  paymentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FF6B6B',
+    padding: 15,
+    borderRadius: 8,
+  },
+  paymentButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    backgroundColor: '#fff',
+  },
   previousButton: {
-    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
+  },
+  previousButtonText: {
+    color: '#333',
+    fontSize: 16,
   },
   nextButton: {
+    padding: 15,
+    borderRadius: 8,
     backgroundColor: '#FF6B6B',
+    flex: 1,
+    alignItems: 'center',
   },
-  buttonText: {
+  nextButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

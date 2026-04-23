@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { getRestaurants } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
 
 const RestaurantPicker = ({ onSelectRestaurant }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -8,6 +9,7 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
   const [restaurants, setRestaurants] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -47,14 +49,22 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
 
   const cuisines = [...new Set(restaurants.map(r => r.cuisine))];
 
+  const handleSelectRestaurant = (restaurant) => {
+    setSelectedRestaurant(restaurant);
+    onSelectRestaurant(restaurant);
+  };
+
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search restaurants or cuisines..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search restaurants or cuisines..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
 
       <View style={styles.cuisineFilterContainer}>
         <Text style={styles.filterTitle}>Filter by cuisine:</Text>
@@ -80,15 +90,21 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
       </View>
 
       {loading ? (
-        <Text style={styles.loadingText}>Loading restaurants...</Text>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FF6B6B" />
+          <Text style={styles.loadingText}>Loading restaurants...</Text>
+        </View>
       ) : (
         <FlatList
           data={filteredRestaurants}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={styles.restaurantItem}
-              onPress={() => onSelectRestaurant(item)}
+              style={[
+                styles.restaurantItem,
+                selectedRestaurant?.id === item.id && styles.selectedRestaurant
+              ]}
+              onPress={() => handleSelectRestaurant(item)}
             >
               <Image source={{ uri: item.image }} style={styles.restaurantImage} />
               <View style={styles.restaurantInfo}>
@@ -96,10 +112,19 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
                 <Text style={styles.restaurantDetails}>
                   {item.cuisine} • {item.rating} ★ • {item.deliveryTime} min
                 </Text>
+                <Text style={styles.restaurantPrice}>${item.price.toFixed(2)}</Text>
               </View>
+              {selectedRestaurant?.id === item.id && (
+                <Ionicons name="checkmark-circle" size={24} color="#FF6B6B" style={styles.selectedIcon} />
+              )}
             </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No restaurants found</Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -110,13 +135,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  searchInput: {
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 15,
-    fontSize: 16,
+    paddingHorizontal: 15,
     marginBottom: 20,
+    backgroundColor: '#fff',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    paddingVertical: 15,
+    fontSize: 16,
   },
   cuisineFilterContainer: {
     marginBottom: 20,
@@ -148,9 +183,14 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   loadingText: {
-    textAlign: 'center',
-    marginTop: 20,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
@@ -165,6 +205,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 10,
     alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  selectedRestaurant: {
+    borderColor: '#FF6B6B',
+    backgroundColor: '#fff5f5',
   },
   restaurantImage: {
     width: 60,
@@ -183,6 +228,25 @@ const styles = StyleSheet.create({
   restaurantDetails: {
     color: '#666',
     fontSize: 14,
+    marginBottom: 5,
+  },
+  restaurantPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  selectedIcon: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
   },
 });
 
