@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, FlatList, SafeAreaView, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, FlatList, SafeAreaView, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useGiftStore } from '../../store/giftStore';
 import { getRestaurants } from '../../services/api';
@@ -146,123 +146,124 @@ const SendGiftScreen = () => {
 
             <View style={styles.deliveryOptions}>
               <TouchableOpacity
-                style={[styles.deliveryOption, deliveryOption === 'now' && styles.selectedOption]}
+                style={[
+                  styles.deliveryOption,
+                  deliveryOption === 'now' && styles.selectedDeliveryOption
+                ]}
                 onPress={() => setDeliveryOption('now')}
               >
                 <Text style={styles.deliveryOptionText}>Now</Text>
-                <Text style={styles.deliveryOptionSubtext}>Delivers in 30-45 min</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.deliveryOption, deliveryOption === 'later' && styles.selectedOption]}
+                style={[
+                  styles.deliveryOption,
+                  deliveryOption === 'later' && styles.selectedDeliveryOption
+                ]}
                 onPress={() => {
                   setDeliveryOption('later');
                   setShowDatePicker(true);
                 }}
               >
-                <Text style={styles.deliveryOptionText}>Later today</Text>
-                <Text style={styles.deliveryOptionSubtext}>
-                  {deliveryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.deliveryOption, deliveryOption === 'schedule' && styles.selectedOption]}
-                onPress={() => {
-                  setDeliveryOption('schedule');
-                  setShowDatePicker(true);
-                }}
-              >
-                <Text style={styles.deliveryOptionText}>Schedule for later</Text>
-                <Text style={styles.deliveryOptionSubtext}>
-                  {deliveryDate.toLocaleDateString()} at {deliveryDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </Text>
+                <Text style={styles.deliveryOptionText}>Later</Text>
               </TouchableOpacity>
             </View>
 
-            {showDatePicker && (
-              <DateTimePicker
-                value={deliveryDate}
-                mode="datetime"
-                display="default"
-                onChange={handleDateChange}
-                minimumDate={new Date()}
-              />
+            {deliveryOption === 'later' && (
+              <View style={styles.datePickerContainer}>
+                <Text style={styles.dateLabel}>Delivery Date:</Text>
+                <Text style={styles.selectedDate}>
+                  {deliveryDate.toLocaleDateString()} at {deliveryDate.toLocaleTimeString()}
+                </Text>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={deliveryDate}
+                    mode="datetime"
+                    display="default"
+                    onChange={handleDateChange}
+                  />
+                )}
+              </View>
             )}
 
-            <Text style={[styles.stepTitle, { marginTop: 30 }]}>Recurring Delivery</Text>
-            <View style={styles.recurringOptions}>
-              <TouchableOpacity
-                style={[styles.recurringOption, !recurringOption && styles.selectedOption]}
-                onPress={() => setRecurringOption(null)}
-              >
-                <Text style={styles.recurringOptionText}>One-time</Text>
-              </TouchableOpacity>
+            <View style={styles.recurringContainer}>
+              <Text style={styles.recurringTitle}>Recurring Gift</Text>
+              <View style={styles.recurringOptions}>
+                <TouchableOpacity
+                  style={[
+                    styles.recurringOption,
+                    recurringOption === 'weekly' && styles.selectedRecurringOption
+                  ]}
+                  onPress={() => setRecurringOption(recurringOption === 'weekly' ? null : 'weekly')}
+                >
+                  <Text style={styles.recurringOptionText}>Weekly</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.recurringOption, recurringOption === 'weekly' && styles.selectedOption]}
-                onPress={() => setRecurringOption('weekly')}
-              >
-                <Text style={styles.recurringOptionText}>Weekly</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.recurringOption,
+                    recurringOption === 'monthly' && styles.selectedRecurringOption
+                  ]}
+                  onPress={() => setRecurringOption(recurringOption === 'monthly' ? null : 'monthly')}
+                >
+                  <Text style={styles.recurringOptionText}>Monthly</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.recurringOption, recurringOption === 'monthly' && styles.selectedOption]}
-                onPress={() => setRecurringOption('monthly')}
-              >
-                <Text style={styles.recurringOptionText}>Monthly</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.recurringOption,
+                    recurringOption === 'annually' && styles.selectedRecurringOption
+                  ]}
+                  onPress={() => setRecurringOption(recurringOption === 'annually' ? null : 'annually')}
+                >
+                  <Text style={styles.recurringOptionText}>Annually</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         );
       case 5:
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Payment Details</Text>
-            <View style={styles.paymentContainer}>
-              <CardField
-                postalCodeEnabled={false}
-                placeholders={{
-                  number: '4242 4242 4242 4242',
-                }}
-                cardStyle={{
-                  backgroundColor: '#FFFFFF',
-                  textColor: '#000000',
-                }}
-                style={{
-                  width: '100%',
-                  height: 50,
-                  marginVertical: 30,
-                }}
-                onCardChange={(cardDetails) => {
-                  setPaymentMethod(cardDetails);
-                }}
-              />
-            </View>
+            <Text style={styles.stepTitle}>Payment Information</Text>
+            <Text style={styles.paymentAmount}>
+              Amount: ${selectedRestaurant?.price?.toFixed(2) || '0.00'}
+            </Text>
 
-            <View style={styles.orderSummary}>
+            <CardField
+              postalCodeEnabled={false}
+              placeholder={{
+                number: '4242 4242 4242 4242',
+              }}
+              cardStyle={styles.cardField}
+              style={styles.cardFieldContainer}
+              onCardChange={(cardDetails) => {
+                setPaymentMethod(cardDetails);
+              }}
+            />
+
+            <View style={styles.paymentSummary}>
               <Text style={styles.summaryTitle}>Order Summary</Text>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Restaurant:</Text>
                 <Text style={styles.summaryValue}>{selectedRestaurant?.name || 'Not selected'}</Text>
               </View>
               <View style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>Recipient:</Text>
+                <Text style={styles.summaryValue}>{recipientName}</Text>
+              </View>
+              <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Delivery:</Text>
                 <Text style={styles.summaryValue}>
-                  {deliveryOption === 'now' ? 'Now' :
-                   deliveryOption === 'later' ? 'Later today' : 'Scheduled'}
+                  {deliveryOption === 'now' ? 'Immediately' : `On ${deliveryDate.toLocaleString()}`}
                 </Text>
               </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Recurring:</Text>
-                <Text style={styles.summaryValue}>
-                  {recurringOption ? recurringOption.charAt(0).toUpperCase() + recurringOption.slice(1) : 'One-time'}
-                </Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total:</Text>
-                <Text style={styles.summaryValue}>${selectedRestaurant?.price?.toFixed(2) || '0.00'}</Text>
-              </View>
+              {recurringOption && (
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Recurring:</Text>
+                  <Text style={styles.summaryValue}>{recurringOption}</Text>
+                </View>
+              )}
             </View>
           </View>
         );
@@ -273,37 +274,27 @@ const SendGiftScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <Ionicons name="chevron-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Send a Gift</Text>
-        </View>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color="#333" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Send a Gift</Text>
+      </View>
 
-        <View style={styles.progressContainer}>
-          {[1, 2, 3, 4, 5].map((item) => (
-            <View
-              key={item}
-              style={[
-                styles.progressStep,
-                step >= item && styles.activeStep
-              ]}
-            />
-          ))}
-        </View>
-
-        {renderStepContent()}
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={deliveryDate}
-            mode="datetime"
-            display="default"
-            onChange={handleDateChange}
-            minimumDate={new Date()}
+      <View style={styles.progressContainer}>
+        {[1, 2, 3, 4, 5].map((item) => (
+          <View
+            key={item}
+            style={[
+              styles.progressStep,
+              step >= item && styles.activeProgressStep
+            ]}
           />
-        )}
+        ))}
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content}>
+        {renderStepContent()}
       </ScrollView>
 
       <View style={styles.footer}>
@@ -320,9 +311,13 @@ const SendGiftScreen = () => {
           onPress={handleNext}
           disabled={loading}
         >
-          <Text style={styles.buttonText}>
-            {step === 5 ? 'Confirm & Pay' : 'Next'}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>
+              {step === 5 ? 'Confirm Payment' : 'Next'}
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -332,38 +327,43 @@ const SendGiftScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
-  },
-  scrollContainer: {
-    padding: 20,
-    paddingBottom: 100,
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   backButton: {
-    marginRight: 10,
+    padding: 8,
+    marginRight: 8,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 30,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: '#f8f8f8',
   },
   progressStep: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: 40,
+    height: 4,
     backgroundColor: '#ddd',
+    borderRadius: 2,
   },
-  activeStep: {
+  activeProgressStep: {
     backgroundColor: '#FF6B6B',
+  },
+  content: {
+    flexGrow: 1,
+    padding: 20,
   },
   stepContainer: {
     marginBottom: 20,
@@ -380,17 +380,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     marginBottom: 15,
-    backgroundColor: '#fff',
     fontSize: 16,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 15,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    marginBottom: 20,
   },
   contactButtonText: {
     marginLeft: 10,
@@ -398,100 +396,123 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
   },
   deliveryOptions: {
+    flexDirection: 'row',
     marginBottom: 20,
   },
   deliveryOption: {
+    flex: 1,
     padding: 15,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginBottom: 10,
-    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginRight: 10,
+    alignItems: 'center',
   },
-  selectedOption: {
+  selectedDeliveryOption: {
     borderColor: '#FF6B6B',
-    backgroundColor: '#FFF0F0',
+    backgroundColor: '#FF6B6B10',
   },
   deliveryOptionText: {
     fontSize: 16,
-    fontWeight: 'bold',
     color: '#333',
   },
-  deliveryOptionSubtext: {
-    fontSize: 14,
+  datePickerContainer: {
+    marginBottom: 20,
+  },
+  dateLabel: {
+    fontSize: 16,
+    marginBottom: 10,
     color: '#666',
-    marginTop: 5,
+  },
+  selectedDate: {
+    fontSize: 16,
+    color: '#333',
+    padding: 15,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+  },
+  recurringContainer: {
+    marginBottom: 20,
+  },
+  recurringTitle: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#666',
   },
   recurringOptions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    flexWrap: 'wrap',
   },
   recurringOption: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginHorizontal: 5,
-    alignItems: 'center',
-    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  selectedRecurringOption: {
+    borderColor: '#FF6B6B',
+    backgroundColor: '#FF6B6B10',
   },
   recurringOptionText: {
     fontSize: 14,
     color: '#333',
   },
-  paymentContainer: {
-    marginBottom: 20,
-  },
-  orderSummary: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    marginTop: 20,
-  },
-  summaryTitle: {
+  paymentAmount: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 20,
+    color: '#333',
+  },
+  cardFieldContainer: {
+    height: 50,
+    marginBottom: 20,
+  },
+  cardField: {
+    backgroundColor: '#FFFFFF',
+    textColor: '#000000',
+  },
+  paymentSummary: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
+    padding: 15,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
   },
   summaryValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
     color: '#333',
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 20,
-    backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+    borderTopColor: '#eee',
   },
   button: {
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-    marginHorizontal: 5,
+    minWidth: 120,
   },
   previousButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f8f8f8',
   },
   nextButton: {
     backgroundColor: '#FF6B6B',

@@ -13,6 +13,8 @@ const RestaurantPicker = ({ onSelectRestaurant, location }) => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!location) return;
+
       setLoading(true);
       try {
         const data = await getRestaurants(location);
@@ -151,7 +153,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 15,
+    paddingVertical: 12,
     fontSize: 16,
   },
   cuisineFilterContainer: {
@@ -159,9 +161,8 @@ const styles = StyleSheet.create({
   },
   filterTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: '#666',
   },
   cuisineButtons: {
     flexDirection: 'row',
@@ -180,7 +181,7 @@ const styles = StyleSheet.create({
   },
   cuisineButtonText: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
   },
   selectedCuisineButtonText: {
     color: '#fff',
@@ -201,24 +202,26 @@ const styles = StyleSheet.create({
   },
   restaurantItem: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
+    padding: 15,
     borderRadius: 8,
-    marginBottom: 15,
-    overflow: 'hidden',
+    backgroundColor: '#fff',
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#eee',
   },
   selectedRestaurant: {
     borderColor: '#FF6B6B',
     borderWidth: 2,
   },
   restaurantImage: {
-    width: 100,
-    height: 100,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 15,
   },
   restaurantInfo: {
     flex: 1,
-    padding: 15,
+    justifyContent: 'center',
   },
   restaurantName: {
     fontSize: 16,
@@ -238,8 +241,8 @@ const styles = StyleSheet.create({
   },
   selectedIcon: {
     position: 'absolute',
+    top: 10,
     right: 10,
-    bottom: 10,
   },
   emptyContainer: {
     padding: 20,
@@ -248,8 +251,8 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 5,
+    color: '#333',
   },
   emptySubtext: {
     fontSize: 14,

@@ -166,15 +166,28 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
 
       {voiceNoteUri && (
         <View style={styles.voiceNoteContainer}>
-          <TouchableOpacity onPress={playVoiceNote} style={styles.playButton}>
-            <Ionicons name="play-circle" size={24} color="#FF6B6B" />
-          </TouchableOpacity>
-          <Text style={styles.voiceNoteDuration}>
-            Voice Note: {formatDuration(voiceNoteDuration)}
-          </Text>
-          <TouchableOpacity onPress={deleteVoiceNote} style={styles.deleteButton}>
-            <Ionicons name="trash" size={20} color="#FF6B6B" />
-          </TouchableOpacity>
+          <View style={styles.voiceNoteHeader}>
+            <Text style={styles.voiceNoteTitle}>Voice Note</Text>
+            <Text style={styles.voiceNoteDuration}>{formatDuration(voiceNoteDuration)}</Text>
+          </View>
+
+          <View style={styles.voiceNoteControls}>
+            <TouchableOpacity
+              style={styles.voiceNoteButton}
+              onPress={playVoiceNote}
+            >
+              <Ionicons name="play" size={20} color="#FF6B6B" />
+              <Text style={styles.voiceNoteButtonText}>Play</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.voiceNoteButton, styles.deleteButton]}
+              onPress={deleteVoiceNote}
+            >
+              <Ionicons name="trash" size={20} color="#FF6B6B" />
+              <Text style={[styles.voiceNoteButtonText, styles.deleteButtonText]}>Delete</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -183,19 +196,12 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    flex: 1,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 20,
     color: '#333',
   },
   textInput: {
@@ -204,7 +210,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 15,
     fontSize: 16,
-    minHeight: 120,
+    minHeight: 150,
     textAlignVertical: 'top',
     marginBottom: 10,
   },
@@ -212,10 +218,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 20,
   },
   charCount: {
-    color: '#666',
     fontSize: 14,
+    color: '#666',
   },
   voiceButton: {
     flexDirection: 'row',
@@ -223,7 +230,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
-    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#FF6B6B',
   },
@@ -233,8 +239,8 @@ const styles = StyleSheet.create({
   },
   voiceButtonText: {
     marginLeft: 8,
-    color: '#FF6B6B',
     fontSize: 14,
+    color: '#FF6B6B',
   },
   recordingButtonText: {
     color: '#fff',
@@ -242,37 +248,63 @@ const styles = StyleSheet.create({
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginBottom: 20,
   },
   recordingDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#FF6B6B',
-    marginRight: 5,
+    marginRight: 8,
   },
   recordingText: {
-    color: '#FF6B6B',
     fontSize: 14,
+    color: '#FF6B6B',
   },
   voiceNoteContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#f8f8f8',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
+    padding: 15,
+    marginTop: 20,
   },
-  playButton: {
-    marginRight: 15,
+  voiceNoteHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
   },
-  voiceNoteDuration: {
-    flex: 1,
+  voiceNoteTitle: {
     fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
   },
+  voiceNoteDuration: {
+    fontSize: 14,
+    color: '#666',
+  },
+  voiceNoteControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  voiceNoteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
+  },
   deleteButton: {
-    padding: 5,
+    borderColor: '#FF6B6B',
+  },
+  voiceNoteButtonText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#FF6B6B',
+  },
+  deleteButtonText: {
+    color: '#FF6B6B',
   },
 });
 
