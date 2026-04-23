@@ -83,7 +83,8 @@ export default function PhotoDetailScreen() {
   if (!photo) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading photo...</Text>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Loading photo...</Text>
       </View>
     );
   }
@@ -173,20 +174,32 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   imageContainer: {
-    height: 300,
+    aspectRatio: 1,
     backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+    margin: 16,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   image: {
     width: '100%',
     height: '100%',
   },
   infoContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   dateText: {
     fontSize: 14,
@@ -196,12 +209,12 @@ const styles = StyleSheet.create({
   },
   analyzeButton: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#4CAF50',
     padding: 16,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
+    marginBottom: 16,
   },
   disabledButton: {
     backgroundColor: '#cccccc',
@@ -216,21 +229,18 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
     marginLeft: 8,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
+    fontStyle: 'italic',
   },
   viewResultsButton: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: 'white',
     padding: 16,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
     borderWidth: 1,
     borderColor: '#4CAF50',
+    marginBottom: 16,
   },
   viewResultsText: {
     color: '#4CAF50',
@@ -241,25 +251,17 @@ const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: 'white',
+    marginHorizontal: 20,
     borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
     padding: 20,
+    maxHeight: '80%',
   },
   closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 1,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
+    alignSelf: 'flex-end',
+    padding: 8,
   },
 });
