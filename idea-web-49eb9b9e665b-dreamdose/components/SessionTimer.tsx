@@ -1,105 +1,85 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Svg, Circle } from 'react-native-svg';
 
 interface SessionTimerProps {
   remainingSeconds: number;
   totalSeconds: number;
-  progress: number;
+  isPaused: boolean;
 }
 
-export default function SessionTimer({
+const SessionTimer: React.FC<SessionTimerProps> = ({
   remainingSeconds,
   totalSeconds,
-  progress,
-}: SessionTimerProps) {
+  isPaused,
+}) => {
+  const progress = remainingSeconds / totalSeconds;
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
+  const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-  const circumference = 2 * Math.PI * 120;
+  const radius = 120;
+  const strokeWidth = 12;
+  const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - progress);
 
   return (
     <View style={styles.container}>
-      <View style={styles.circleContainer}>
-        <View style={styles.progressBackground} />
-        <View
-          style={[
-            styles.progressForeground,
-            {
-              transform: [{ rotate: '-90deg' }],
-            },
-          ]}
-        >
-          <View
-            style={[
-              styles.progressBar,
-              {
-                borderColor: '#667eea',
-                borderWidth: 8,
-                borderRadius: 120,
-                width: 240,
-                height: 240,
-                borderTopColor: 'transparent',
-                borderRightColor: 'transparent',
-                borderBottomColor: 'transparent',
-                transform: [{ rotate: `${progress * 360}deg` }],
-              },
-            ]}
-          />
-        </View>
-        <View style={styles.timeContainer}>
-          <Text style={styles.timeText}>
-            {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
-          </Text>
-          <Text style={styles.timeLabel}>remaining</Text>
-        </View>
+      <Svg width={radius * 2} height={radius * 2} viewBox={`0 0 ${radius * 2} ${radius * 2}`}>
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius - strokeWidth / 2}
+          stroke="#3A3A3A"
+          strokeWidth={strokeWidth}
+          fill="none"
+        />
+        <Circle
+          cx={radius}
+          cy={radius}
+          r={radius - strokeWidth / 2}
+          stroke="#007AFF"
+          strokeWidth={strokeWidth}
+          fill="none"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="round"
+          rotation="-90"
+          originX={radius}
+          originY={radius}
+        />
+      </Svg>
+
+      <View style={styles.timeContainer}>
+        <Text style={styles.timeText}>{formattedTime}</Text>
+        {isPaused && (
+          <Text style={styles.statusText}>Paused</Text>
+        )}
       </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  circleContainer: {
-    width: 280,
-    height: 280,
     alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
-  progressBackground: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-    borderRadius: 120,
-    borderWidth: 8,
-    borderColor: '#2a2a3e',
-  },
-  progressForeground: {
-    position: 'absolute',
-    width: 240,
-    height: 240,
-  },
-  progressBar: {
-    position: 'absolute',
   },
   timeContainer: {
-    alignItems: 'center',
+    position: 'absolute',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   timeText: {
-    fontSize: 56,
-    fontWeight: '700',
-    color: '#ffffff',
-    fontVariant: ['tabular-nums'],
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: 'white',
   },
-  timeLabel: {
-    fontSize: 14,
-    color: '#a0a0b0',
-    marginTop: 4,
+  statusText: {
+    fontSize: 16,
+    color: '#999',
+    marginTop: 8,
   },
 });
+
+export default SessionTimer;
