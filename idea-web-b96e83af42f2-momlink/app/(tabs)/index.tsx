@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../hooks/useAuth';
 import { useRequests } from '../../hooks/useRequests';
-import { getCurrentLocation } from '../../lib/location';
+import { getCurrentLocation, requestLocationPermission } from '../../lib/location';
 import RequestCard from '../../components/RequestCard';
 
 export default function RequestBoard() {
@@ -11,29 +11,76 @@ export default function RequestBoard() {
   const { user } = useAuth();
   const [location, setLocation] = useState({ latitude: 0, longitude: 0 });
   const [radius, setRadius] = useState(5);
+  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
   const { requests, loading, refresh } = useRequests({ ...location, radius });
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    loadLocation();
+    checkLocationPermission();
   }, []);
 
-  async function loadLocation() {
-    const loc = await getCurrentLocation();
-    if (loc) setLocation(loc);
+  async function checkLocationPermission() {
+    const hasPermission = await requestLocationPermission();
+    setLocationPermission(hasPermission);
+
+    if (hasPermission) {
+      const loc = await getCurrentLocation();
+      if (loc) setLocation(loc);
+    }
   }
 
   async function handleRefresh() {
     setRefreshing(true);
-    await loadLocation();
+    if (locationPermission) {
+      const loc = await getCurrentLocation();
+      if (loc) setLocation(loc);
+    }
     await refresh();
     setRefreshing(false);
+  }
+
+  function handleCreateRequest() {
+    if (!user) {
+      Alert.alert('Login Required', 'Please log in to create a request');
+      return;
+    }
+    router.push('/request/create');
+  }
+
+  if (locationPermission === null) {
+    return (
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
+        <Text style={styles.loadingText}>Checking location permissions...</Text>
+      </View>
+    );
+  }
+
+  if (!locationPermission) {
+    return (
+      <View style={styles.centerContainer}>
+        <Text style={styles.emptyText}>Location access required</Text>
+        <Text style={styles.emptySubtext}>Please enable location services to see nearby requests</Text>
+        <TouchableOpacity
+          style={styles.permissionButton}
+          onPress={checkLocationPermission}
+        >
+          <Text style={styles.permissionButtonText}>Retry Permission</Text>
+        </TouchableOpacity>
+      </View>
+    );
   }
 
   if (!user) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.emptyText}>Please log in to view requests</Text>
+        <TouchableOpacity
+          style={styles.loginButton}
+          onPress={() => router.push('/auth/login')}
+        >
+          <Text style={styles.loginButtonText}>Log In</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -42,6 +89,7 @@ export default function RequestBoard() {
     return (
       <View style={styles.centerContainer}>
         <ActivityIndicator size="large" color="#6366f1" />
+        <Text style={styles.loadingText}>Loading nearby requests...</Text>
       </View>
     );
   }
@@ -55,7 +103,7 @@ export default function RequestBoard() {
         </View>
         <TouchableOpacity
           style={styles.createButton}
-          onPress={() => router.push('/request/create')}
+          onPress={handleCreateRequest}
         >
           <Text style={styles.createButtonText}>+ New</Text>
         </TouchableOpacity>
@@ -110,6 +158,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f9fafb',
+    padding: 24,
   },
   header: {
     flexDirection: 'row',
@@ -182,10 +231,42 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6b7280',
     marginBottom: 8,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#9ca3af',
     textAlign: 'center',
+    marginBottom: 16,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  permissionButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginButton: {
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  loginButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
