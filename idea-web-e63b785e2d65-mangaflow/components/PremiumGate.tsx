@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import { useUserStore } from '../store/user';
+import { validateSubscription } from '../lib/premium';
 
 interface PremiumGateProps {
   visible: boolean;
@@ -9,7 +10,25 @@ interface PremiumGateProps {
 }
 
 const PremiumGate: React.FC<PremiumGateProps> = ({ visible, onClose, onUpgrade }) => {
-  const { isPremium } = useUserStore();
+  const { isPremium, setPremiumStatus } = useUserStore();
+
+  const handleUpgrade = async () => {
+    try {
+      // In a real app, this would trigger the purchase flow
+      // For now, we'll simulate a successful purchase
+      const success = await validateSubscription('valid_receipt_123');
+
+      if (success) {
+        setPremiumStatus(true, Date.now() + (30 * 24 * 60 * 60 * 1000));
+        Alert.alert('Success', 'Your premium subscription is active!');
+        onClose();
+      } else {
+        Alert.alert('Error', 'Failed to validate subscription. Please try again.');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'An error occurred during purchase. Please try again.');
+    }
+  };
 
   if (isPremium) {
     return null;
@@ -45,7 +64,7 @@ const PremiumGate: React.FC<PremiumGateProps> = ({ visible, onClose, onUpgrade }
             </View>
           </View>
 
-          <TouchableOpacity style={styles.upgradeButton} onPress={onUpgrade}>
+          <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
             <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
           </TouchableOpacity>
 

@@ -1,200 +1,124 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert, ScrollView } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { uploadSyncData, downloadSyncData, getLastSyncTime, initializeSyncDirectory } from '../../lib/sync';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import { useUserStore } from '../../store/user';
-import SyncStatusIndicator from '../../components/SyncStatusIndicator';
+import { clearPremiumStatus } from '../../lib/premium';
 
-export default function SettingsScreen() {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncTime, setLastSyncTime] = useState<number | null>(null);
-  const [syncStatus, setSyncStatus] = useState<{ isSynced: boolean; lastSync: number | null } | null>(null);
-  const isPremium = useUserStore(state => state.isPremium);
-  const navigation = useNavigation();
+const SettingsScreen = () => {
+  const { isPremium, expirationDate, initializePremiumStatus } = useUserStore();
 
   useEffect(() => {
-    initializeSyncDirectory();
-    loadSyncStatus();
+    initializePremiumStatus();
   }, []);
 
-  const loadSyncStatus = async () => {
-    const time = await getLastSyncTime();
-    setLastSyncTime(time);
-    setSyncStatus({
-      isSynced: time !== null,
-      lastSync: time
-    });
+  const formatExpirationDate = () => {
+    if (!expirationDate) return 'No expiration date';
+
+    const date = new Date(expirationDate);
+    return date.toLocaleDateString();
   };
 
-  const handleSync = async (isUpload: boolean) => {
-    if (!isPremium) {
-      Alert.alert(
-        'Premium Feature',
-        'Cloud sync is available to premium users only.',
-        [{ text: 'OK' }]
-      );
-      return;
-    }
-
-    setIsSyncing(true);
+  const handleResetPremium = async () => {
     try {
-      const result = isUpload ? await uploadSyncData() : await downloadSyncData();
-
-      if (result.success) {
-        await loadSyncStatus();
-        Alert.alert(
-          'Success',
-          isUpload ? 'Library synced to cloud' : 'Library updated from cloud'
-        );
-      } else {
-        Alert.alert('Error', result.error || 'Sync failed');
-      }
+      await clearPremiumStatus();
+      await initializePremiumStatus();
+      Alert.alert('Success', 'Premium status reset');
     } catch (error) {
-      Alert.alert('Error', 'An unexpected error occurred');
-    } finally {
-      setIsSyncing(false);
+      Alert.alert('Error', 'Failed to reset premium status');
     }
-  };
-
-  const formatSyncTime = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString();
   };
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Settings</Text>
-
-      <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Cloud Sync</Text>
-          {isPremium && <SyncStatusIndicator />}
-        </View>
-
-        {lastSyncTime && (
-          <Text style={styles.syncInfo}>
-            Last sync: {formatSyncTime(lastSyncTime)}
-          </Text>
-        )}
-
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[styles.button, !isPremium && styles.disabledButton]}
-            onPress={() => handleSync(true)}
-            disabled={isSyncing || !isPremium}
-          >
-            {isSyncing ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Upload to Cloud</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, !isPremium && styles.disabledButton]}
-            onPress={() => handleSync(false)}
-            disabled={isSyncing || !isPremium}
-          >
-            {isSyncing ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Download from Cloud</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {!isPremium && (
-          <Text style={styles.premiumNote}>
-            Cloud sync requires premium subscription
-          </Text>
-        )}
-      </View>
-
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account</Text>
+
+        <View style={styles.settingItem}>
+          <Text style={styles.settingLabel}>Premium Status</Text>
+          <Text style={[styles.settingValue, isPremium ? styles.premiumActive : styles.premiumInactive]}>
+            {isPremium ? 'Active' : 'Inactive'}
+          </Text>
+        </View>
+
+        {isPremium && (
+          <View style={styles.settingItem}>
+            <Text style={styles.settingLabel}>Expires</Text>
+            <Text style={styles.settingValue}>{formatExpirationDate()}</Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={styles.button}
-          onPress={() => navigation.navigate('premium')}
+          onPress={handleResetPremium}
         >
-          <Text style={styles.buttonText}>
-            {isPremium ? 'Manage Subscription' : 'Go Premium'}
-          </Text>
+          <Text style={styles.buttonText}>Reset Premium Status (Debug)</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Library</Text>
-        <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>Clear Cache</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.button, styles.dangerButton]}>
-          <Text style={[styles.buttonText, styles.dangerText]}>Delete All Manga</Text>
-        </TouchableOpacity>
+        <Text style={styles.sectionTitle}>Reading Preferences</Text>
+        {/* Add reading preference settings here */}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Library Management</Text>
+        {/* Add library management options here */}
       </View>
     </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    backgroundColor: '#f5f5f5',
   },
   section: {
-    marginBottom: 30,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
+    backgroundColor: 'white',
+    marginBottom: 16,
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
   },
-  syncInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
-  },
-  buttonRow: {
+  settingItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  settingLabel: {
+    fontSize: 16,
+    color: '#444',
+  },
+  settingValue: {
+    fontSize: 16,
+  },
+  premiumActive: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  premiumInactive: {
+    color: '#9E9E9E',
   },
   button: {
     backgroundColor: '#007AFF',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 5,
     alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#CCCCCC',
-  },
-  dangerButton: {
-    backgroundColor: '#FF3B30',
-    marginTop: 10,
+    justifyContent: 'center',
+    marginTop: 16,
   },
   buttonText: {
-    color: '#fff',
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
   },
-  dangerText: {
-    color: '#fff',
-  },
-  premiumNote: {
-    color: '#666',
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 5,
-  },
 });
+
+export default SettingsScreen;
