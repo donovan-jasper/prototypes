@@ -7,6 +7,7 @@ export class EbayAdapter extends BaseAdapter {
   private static readonly API_BASE = 'https://api.ebay.com/sell/inventory/v1';
   private static readonly AUTH_BASE = 'https://api.ebay.com/identity/v1/oauth2';
   private static readonly FULFILLMENT_BASE = 'https://api.ebay.com/sell/fulfillment/v1';
+  private static readonly MARKETPLACE_ID = 'EBAY_US';
 
   constructor() {
     super('ebay');
@@ -90,7 +91,7 @@ export class EbayAdapter extends BaseAdapter {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
             'Content-Type': 'application/json',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+            'X-EBAY-C-MARKETPLACE-ID': EbayAdapter.MARKETPLACE_ID
           }
         }
       );
@@ -116,7 +117,7 @@ export class EbayAdapter extends BaseAdapter {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
             'Content-Type': 'application/json',
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+            'X-EBAY-C-MARKETPLACE-ID': EbayAdapter.MARKETPLACE_ID
           }
         }
       );
@@ -139,7 +140,7 @@ export class EbayAdapter extends BaseAdapter {
         {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+            'X-EBAY-C-MARKETPLACE-ID': EbayAdapter.MARKETPLACE_ID
           }
         }
       );
@@ -160,7 +161,10 @@ export class EbayAdapter extends BaseAdapter {
         {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+            'X-EBAY-C-MARKETPLACE-ID': EbayAdapter.MARKETPLACE_ID
+          },
+          params: {
+            limit: 200 // Max allowed by eBay API
           }
         }
       );
@@ -172,18 +176,22 @@ export class EbayAdapter extends BaseAdapter {
     }
   }
 
-  async fetchOrders(limit: number = 20): Promise<Order[]> {
+  async fetchOrders(): Promise<Order[]> {
     try {
       if (!this.apiToken) {
         throw new Error('Not authenticated with eBay');
       }
 
       const response = await axios.get(
-        `${EbayAdapter.FULFILLMENT_BASE}/order?limit=${limit}`,
+        `${EbayAdapter.FULFILLMENT_BASE}/order`,
         {
           headers: {
             'Authorization': `Bearer ${this.apiToken}`,
-            'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US'
+            'X-EBAY-C-MARKETPLACE-ID': EbayAdapter.MARKETPLACE_ID
+          },
+          params: {
+            filter: 'orderStatus:{CREATED|ACTIVE}',
+            limit: 100
           }
         }
       );
@@ -198,37 +206,49 @@ export class EbayAdapter extends BaseAdapter {
   private mapListingToEbayFormat(listing: Listing): any {
     return {
       sku: listing.id,
-      marketplaceId: 'EBAY_US',
-      format: 'FIXED_PRICE',
-      availableQuantity: listing.quantity,
       merchantLocationKey: 'default',
+      availableQuantity: listing.quantity,
+      format: 'FIXED_PRICE',
+      availableQuantitySchedule: {
+        eventType: 'NONE'
+      },
+      categoryTypes: [
+        {
+          categoryId: listing.attributes?.categoryId || '123456'
+        }
+      ],
+      product: {
+        title: listing.title,
+        description: listing.description,
+        aspects: listing.attributes || {},
+        imageUrls: listing.images || []
+      },
       listingDescription: listing.description,
       listingPolicies: {
-        fulfillmentPolicyId: 'default',
-        paymentPolicyId: 'default',
-        returnPolicyId: 'default'
+        fulfillmentPolicyId: '123456789',
+        paymentPolicyId: '987654321',
+        returnPolicyId: '456789123'
       },
       pricingSummary: {
         price: {
           value: listing.price.toString(),
           currency: 'USD'
         }
-      },
-      quantityLimitPerBuyer: 1
+      }
     };
   }
 
   private mapEbayToListingFormat(ebayOffer: any): Listing {
     return {
       id: ebayOffer.sku,
-      title: ebayOffer.listingDescription.title,
-      description: ebayOffer.listingDescription.description,
+      title: ebayOffer.product.title,
+      description: ebayOffer.product.description,
       price: parseFloat(ebayOffer.pricingSummary.price.value),
       quantity: ebayOffer.availableQuantity,
-      platform: 'ebay',
-      images: ebayOffer.listingDescription.imageUrls || [],
-      createdAt: new Date(ebayOffer.createDate).toISOString(),
-      updatedAt: new Date(ebayOffer.updateDate).toISOString()
+      images: ebayOffer.product.imageUrls || [],
+      platforms: ['ebay'],
+      syncStatus: 'synced',
+      attributes: ebayOffer.product.aspects || {}
     };
   }
 
@@ -236,33 +256,30 @@ export class EbayAdapter extends BaseAdapter {
     return {
       id: ebayOrder.orderId,
       platform: 'ebay',
+      status: ebayOrder.orderStatus,
       items: ebayOrder.lineItems.map((item: any) => ({
         id: item.lineItemId,
         title: item.title,
-        price: parseFloat(item.lineItemCost.value),
         quantity: item.quantity,
-        sku: item.sku
+        price: parseFloat(item.lineItemCost.value)
       })),
       total: parseFloat(ebayOrder.pricingSummary.total.value),
-      status: ebayOrder.orderFulfillmentStatus,
-      createdAt: new Date(ebayOrder.creationDate).toISOString(),
-      updatedAt: new Date(ebayOrder.lastModifiedDate).toISOString(),
-      buyer: {
-        name: ebayOrder.buyer.buyerRegistrationAddress.fullName,
-        email: ebayOrder.buyer.buyerRegistrationAddress.email
-      }
+      createdAt: new Date(ebayOrder.creationDate),
+      updatedAt: new Date(ebayOrder.lastModifiedDate)
     };
   }
 
-  private handleError(error: any): void {
-    if (axios.isAxiosError(error)) {
-      console.error('EbayAdapter API error:', error.response?.data || error.message);
-      if (error.response?.status === 401) {
+  private handleError(error: any) {
+    if (error.response) {
+      console.error('EbayAdapter API error:', error.response.status, error.response.data);
+      if (error.response.status === 401) {
         // Token might be expired, trigger refresh
-        console.log('Token expired, need to refresh');
+        throw new Error('Authentication required');
       }
+    } else if (error.request) {
+      console.error('EbayAdapter network error:', error.request);
     } else {
-      console.error('EbayAdapter error:', error);
+      console.error('EbayAdapter error:', error.message);
     }
   }
 }

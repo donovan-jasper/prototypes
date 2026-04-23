@@ -1,6 +1,6 @@
 import { PlatformAdapter } from './platform-adapters/base-adapter';
-import { initDatabase, addListing, updateListing, getListings, addSyncQueueItem, getSyncQueue, clearSyncQueue } from './database';
-import { Listing, SyncQueueItem } from '../types';
+import { initDatabase, addListing, updateListing, getListings, addSyncQueueItem, getSyncQueue, clearSyncQueue, updatePlatformSyncStatus } from './database';
+import { Listing, SyncQueueItem, Order } from '../types';
 import { useAppStore } from '../store/app-store';
 
 export class SyncEngine {
@@ -37,32 +37,49 @@ export class SyncEngine {
         const adapter = this.adapters.get(platform.name);
         if (!adapter) continue;
 
-        // Fetch latest listings from platform
-        const remoteListings = await adapter.fetchListings();
+        try {
+          // Fetch latest listings from platform
+          const remoteListings = await adapter.fetchListings();
 
-        // Update local listings with remote data
-        for (const remoteListing of remoteListings) {
-          const localListing = allListings.find(l => l.id === remoteListing.id);
-          if (localListing) {
-            await updateListing({
-              ...localListing,
-              ...remoteListing,
-              syncStatus: 'synced'
-            });
-          } else {
-            await addListing({
-              ...remoteListing,
-              platforms: [platform.name],
-              syncStatus: 'synced'
-            });
+          // Update local listings with remote data
+          for (const remoteListing of remoteListings) {
+            const localListing = allListings.find(l => l.id === remoteListing.id);
+            if (localListing) {
+              await updateListing({
+                ...localListing,
+                ...remoteListing,
+                syncStatus: 'synced'
+              });
+            } else {
+              await addListing({
+                ...remoteListing,
+                platforms: [platform.name],
+                syncStatus: 'synced'
+              });
+            }
           }
+
+          // Fetch orders from platform
+          const orders = await adapter.fetchOrders();
+          // Process orders (in a real app, you would store them in the database)
+          console.log(`Fetched ${orders.length} orders from ${platform.name}`);
+
+          // Update platform sync status
+          await updatePlatformSyncStatus(platform.name, new Date());
+        } catch (platformError) {
+          console.error(`Error syncing ${platform.name}:`, platformError);
+          await updatePlatformSyncStatus(platform.name, new Date(), 'error');
         }
       }
 
       // Check for conflicts
       await this.detectConflicts();
+
+      // Update UI state
+      store.setSyncStatus('synced');
     } catch (error) {
       console.error('Sync failed:', error);
+      store.setSyncStatus('error');
     } finally {
       this.isSyncing = false;
     }
@@ -77,6 +94,10 @@ export class SyncEngine {
   private async processQueue() {
     const queue = await getSyncQueue();
     const store = useAppStore.getState();
+
+    if (queue.length === 0) return;
+
+    store.setSyncStatus('syncing');
 
     for (const item of queue) {
       try {
@@ -107,10 +128,12 @@ export class SyncEngine {
         await clearSyncQueue(item.id);
       } catch (error) {
         console.error(`Failed to process queue item ${item.id}:`, error);
-        await updateListing({
-          ...item.listing,
-          syncStatus: 'error'
-        });
+        if (item.listingId) {
+          await updateListing({
+            ...item.listing,
+            syncStatus: 'error'
+          });
+        }
       }
     }
 
@@ -140,6 +163,53 @@ export class SyncEngine {
           // In a real app, you would notify the user here
         }
       }
+    }
+  }
+
+  async syncPlatform(platformName: string) {
+    const adapter = this.adapters.get(platformName);
+    if (!adapter) return;
+
+    try {
+      const store = useAppStore.getState();
+      store.setSyncStatus('syncing');
+
+      // Fetch listings
+      const remoteListings = await adapter.fetchListings();
+      const localListings = await getListings();
+
+      // Update local listings
+      for (const remoteListing of remoteListings) {
+        const localListing = localListings.find(l => l.id === remoteListing.id);
+        if (localListing) {
+          await updateListing({
+            ...localListing,
+            ...remoteListing,
+            syncStatus: 'synced'
+          });
+        } else {
+          await addListing({
+            ...remoteListing,
+            platforms: [platformName],
+            syncStatus: 'synced'
+          });
+        }
+      }
+
+      // Fetch orders
+      const orders = await adapter.fetchOrders();
+      // Process orders (in a real app, you would store them in the database)
+      console.log(`Fetched ${orders.length} orders from ${platformName}`);
+
+      // Update platform sync status
+      await updatePlatformSyncStatus(platformName, new Date());
+
+      store.setSyncStatus('synced');
+    } catch (error) {
+      console.error(`Error syncing ${platformName}:`, error);
+      await updatePlatformSyncStatus(platformName, new Date(), 'error');
+      const store = useAppStore.getState();
+      store.setSyncStatus('error');
     }
   }
 }
