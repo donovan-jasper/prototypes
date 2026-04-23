@@ -36,7 +36,7 @@ export const addBook = async (book: {
     'INSERT INTO books (id, title, author, isbn, totalPages) VALUES (?, ?, ?, ?, ?)',
     [id, book.title, book.author || '', book.isbn || '', book.totalPages || 0]
   );
-  return { id, ...book, currentPage: 0, lastSynced: Date.now() };
+  return { id, ...book, currentPage: 0 };
 };
 
 export const updateProgress = async (bookId: string, page: number) => {
@@ -47,18 +47,17 @@ export const updateProgress = async (bookId: string, page: number) => {
 };
 
 export const getBooks = async () => {
-  const result = await db.getAllAsync('SELECT * FROM books ORDER BY lastSynced DESC');
-  return result as any[];
+  return await db.getAllAsync('SELECT * FROM books ORDER BY lastSynced DESC');
 };
 
 export const getBook = async (id: string) => {
   return await db.getFirstAsync('SELECT * FROM books WHERE id = ?', [id]);
 };
 
-export const searchBooksByTitle = async (searchTerm: string) => {
-  const result = await db.getAllAsync(
-    'SELECT * FROM books WHERE title LIKE ? ORDER BY title',
-    [`%${searchTerm}%`]
+export const searchBooksByTitle = async (title: string) => {
+  const query = `%${title}%`;
+  return await db.getAllAsync(
+    'SELECT * FROM books WHERE title LIKE ? ORDER BY title ASC',
+    [query]
   );
-  return result as any[];
 };
