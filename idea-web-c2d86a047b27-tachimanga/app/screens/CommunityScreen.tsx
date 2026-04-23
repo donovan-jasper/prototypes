@@ -1,27 +1,40 @@
 import React, { useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { getAllContent } from '../utils/offlineLibrary';
+import { db } from '../../firebase';
+import { collection, query, getDocs, orderBy } from 'firebase/firestore';
 
-interface ContentItem {
-  id: number;
+interface Discussion {
+  id: string;
+  contentId: number;
   title: string;
   commentCount: number;
   lastActivity: number;
 }
 
 const CommunityScreen = () => {
-  const [content, setContent] = useState<ContentItem[]>([]);
+  const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const navigation = useNavigation<any>();
 
-  const loadContent = useCallback(async () => {
+  const fetchDiscussions = useCallback(async () => {
     setIsLoading(true);
     try {
-      const result = await getAllContent();
-      setContent(result);
+      const discussionsRef = collection(db, 'discussions');
+      const q = query(discussionsRef, orderBy('lastActivity', 'desc'));
+      const querySnapshot = await getDocs(q);
+
+      const fetchedDiscussions: Discussion[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedDiscussions.push({
+          id: doc.id,
+          ...doc.data()
+        } as Discussion);
+      });
+
+      setDiscussions(fetchedDiscussions);
     } catch (error) {
-      console.error('Error loading content:', error);
+      console.error('Error fetching discussions:', error);
     } finally {
       setIsLoading(false);
     }
@@ -29,8 +42,8 @@ const CommunityScreen = () => {
 
   useFocusEffect(
     useCallback(() => {
-      loadContent();
-    }, [loadContent])
+      fetchDiscussions();
+    }, [fetchDiscussions])
   );
 
   const formatActivityTime = (timestamp: number) => {
@@ -50,14 +63,15 @@ const CommunityScreen = () => {
     return date.toLocaleDateString();
   };
 
-  const handlePress = (id: number, title: string) => {
-    navigation.navigate('Thread', { contentId: id, contentTitle: title });
+  const handlePress = (id: string, title: string, contentId: number) => {
+    navigation.navigate('Thread', { discussionId: id, contentId, contentTitle: title });
   };
 
-  const renderItem = ({ item }: { item: ContentItem }) => (
+  const renderItem = ({ item }: { item: Discussion }) => (
     <TouchableOpacity
-      onPress={() => handlePress(item.id, item.title)}
+      onPress={() => handlePress(item.id, item.title, item.contentId)}
       style={styles.itemContainer}
+      activeOpacity={0.7}
     >
       <View style={styles.itemHeader}>
         <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
@@ -81,17 +95,18 @@ const CommunityScreen = () => {
 
   return (
     <View style={styles.container}>
-      {content.length === 0 ? (
+      {discussions.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={styles.emptyText}>No discussions yet</Text>
           <Text style={styles.emptySubtext}>Download content to start discussing</Text>
         </View>
       ) : (
         <FlatList
-          data={content}
-          keyExtractor={(item) => item.id.toString()}
+          data={discussions}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
         />
       )}
     </View>
@@ -173,6 +188,7 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#999',
+    textAlign: 'center',
   },
 });
 
