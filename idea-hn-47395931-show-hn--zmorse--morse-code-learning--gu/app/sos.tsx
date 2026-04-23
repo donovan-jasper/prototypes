@@ -171,13 +171,13 @@ export default function SOSScreen() {
               placeholder="Enter your message"
               value={newMessage}
               onChangeText={setNewMessage}
-              maxLength={20}
+              autoFocus={true}
             />
-            <View style={styles.modalButtons}>
+            <View style={styles.buttonRow}>
               <Button
                 title="Cancel"
                 onPress={() => setShowCustomModal(false)}
-                color="#999"
+                color="#666"
               />
               <Button
                 title="Save"
@@ -199,11 +199,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -219,7 +214,7 @@ const styles = StyleSheet.create({
     marginTop: 40,
     textAlign: 'center',
     color: '#666',
-    paddingHorizontal: 20,
+    marginBottom: 20,
   },
   premiumSection: {
     marginTop: 30,
@@ -228,6 +223,12 @@ const styles = StyleSheet.create({
   premiumText: {
     fontSize: 16,
     marginBottom: 10,
+    color: '#333',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -240,11 +241,13 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 10,
     width: '80%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
+    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
@@ -254,8 +257,8 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 16,
   },
-  modalButtons: {
+  buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
 });
