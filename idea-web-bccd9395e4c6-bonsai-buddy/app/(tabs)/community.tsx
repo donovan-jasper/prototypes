@@ -1,21 +1,40 @@
-import React, { useEffect } from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import React, { useEffect, useState } from 'react';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
+import { Text, Button, Portal, Modal, useTheme } from 'react-native-paper';
 import { useCommunity } from '../../hooks/useCommunity';
 import CommunityPost from '../../components/CommunityPost';
+import { useAppContext } from '../../contexts/AppContext';
 
 export default function CommunityScreen() {
-  const { posts, loading, loadPosts } = useCommunity();
+  const { posts, loading, loadPosts, refreshPosts } = useCommunity();
+  const { isPremium } = useAppContext();
+  const [refreshing, setRefreshing] = useState(false);
+  const [showPaywall, setShowPaywall] = useState(false);
+  const theme = useTheme();
 
   useEffect(() => {
     loadPosts();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await refreshPosts();
+    setRefreshing(false);
+  };
+
+  const handleUpgrade = () => {
+    setShowPaywall(false);
+    // Navigate to upgrade screen or show purchase modal
+  };
+
   return (
     <View style={styles.container}>
-      {posts.length === 0 && !loading ? (
+      {loading && !refreshing ? (
+        <ActivityIndicator size="large" style={styles.loader} />
+      ) : posts.length === 0 ? (
         <View style={styles.emptyState}>
           <Text variant="headlineMedium">No posts yet!</Text>
+          <Text variant="bodyMedium">Be the first to share your plant journey</Text>
         </View>
       ) : (
         <FlatList
@@ -23,7 +42,48 @@ export default function CommunityScreen() {
           renderItem={({ item }) => <CommunityPost post={item} />}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[theme.colors.primary]}
+              tintColor={theme.colors.primary}
+            />
+          }
         />
+      )}
+
+      {!isPremium && (
+        <Portal>
+          <Modal
+            visible={!isPremium}
+            onDismiss={() => setShowPaywall(false)}
+            contentContainerStyle={styles.paywallModal}
+          >
+            <View style={styles.paywallContent}>
+              <Text variant="headlineMedium" style={styles.paywallTitle}>
+                Unlock Full Community Access
+              </Text>
+              <Text variant="bodyMedium" style={styles.paywallText}>
+                Share your plant journey, comment on posts, and connect with other plant lovers.
+              </Text>
+              <Button
+                mode="contained"
+                onPress={handleUpgrade}
+                style={styles.upgradeButton}
+              >
+                Upgrade to Premium
+              </Button>
+              <Button
+                mode="text"
+                onPress={() => setShowPaywall(false)}
+                style={styles.dismissButton}
+              >
+                Continue Browsing
+              </Button>
+            </View>
+          </Modal>
+        </Portal>
       )}
     </View>
   );
@@ -38,8 +98,38 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
   list: {
     padding: 16,
+  },
+  loader: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paywallModal: {
+    backgroundColor: 'white',
+    padding: 24,
+    margin: 20,
+    borderRadius: 8,
+  },
+  paywallContent: {
+    alignItems: 'center',
+  },
+  paywallTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  paywallText: {
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  upgradeButton: {
+    marginBottom: 12,
+    width: '100%',
+  },
+  dismissButton: {
+    width: '100%',
   },
 });

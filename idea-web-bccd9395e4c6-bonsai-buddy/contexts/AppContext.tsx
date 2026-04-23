@@ -1,20 +1,40 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getUserSettings } from '../lib/database';
 
 interface AppContextType {
   isPremium: boolean;
-  theme: 'light' | 'dark';
-  setIsPremium: (value: boolean) => void;
-  setTheme: (value: 'light' | 'dark') => void;
+  setPremiumStatus: (status: boolean) => void;
+  userId: string;
+  streak: number;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-export const AppProvider = ({ children }: { children: ReactNode }) => {
+export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPremium, setIsPremium] = useState(false);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [userId, setUserId] = useState('currentUser');
+  const [streak, setStreak] = useState(0);
+
+  useEffect(() => {
+    const loadSettings = async () => {
+      const settings = await getUserSettings();
+      if (settings) {
+        setIsPremium(settings.premiumStatus === 1);
+        setUserId(settings.userId || 'currentUser');
+        setStreak(settings.streak || 0);
+      }
+    };
+
+    loadSettings();
+  }, []);
+
+  const setPremiumStatus = (status: boolean) => {
+    setIsPremium(status);
+    // Update in database
+  };
 
   return (
-    <AppContext.Provider value={{ isPremium, theme, setIsPremium, setTheme }}>
+    <AppContext.Provider value={{ isPremium, setPremiumStatus, userId, streak }}>
       {children}
     </AppContext.Provider>
   );
@@ -22,8 +42,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAppContext = () => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useAppContext must be used within AppProvider');
+  if (context === undefined) {
+    throw new Error('useAppContext must be used within an AppProvider');
   }
   return context;
 };
