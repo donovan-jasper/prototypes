@@ -164,11 +164,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   summaryContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     padding: 20,
     marginBottom: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   summaryTitle: {
     fontSize: 16,
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   summaryValue: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -190,11 +190,8 @@ const styles = StyleSheet.create({
   negative: {
     color: '#d32f2f',
   },
-  listContent: {
-    paddingBottom: 80,
-  },
   holdingItem: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     marginBottom: 10,
     padding: 15,
     borderRadius: 8,
@@ -216,7 +213,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   shares: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
   },
   holdingDetails: {
@@ -230,11 +227,14 @@ const styles = StyleSheet.create({
   detailLabel: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   detailValue: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  listContent: {
+    paddingBottom: 20,
   },
   emptyState: {
     flex: 1,
@@ -257,9 +257,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 20,
     bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: 'white',
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 'bold',
   },
 });
