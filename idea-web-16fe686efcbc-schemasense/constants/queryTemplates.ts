@@ -1,34 +1,42 @@
 export const queryTemplates = [
   {
-    natural: "Show all customers",
+    natural: "show all customers",
     sql: "SELECT * FROM customers;"
   },
   {
-    natural: "List all products",
+    natural: "list all products",
     sql: "SELECT * FROM products;"
   },
   {
-    natural: "Count orders",
+    natural: "how many orders",
     sql: "SELECT COUNT(*) FROM orders;"
   },
   {
-    natural: "Average order value",
+    natural: "average order value",
     sql: "SELECT AVG(total) FROM orders;"
   },
   {
-    natural: "Top 5 customers",
-    sql: "SELECT * FROM customers ORDER BY total_spent DESC LIMIT 5;"
+    natural: "total sales",
+    sql: "SELECT SUM(total) FROM orders;"
   },
   {
-    natural: "Recent orders",
+    natural: "top customers",
+    sql: "SELECT customer_id, SUM(total) as total_spent FROM orders GROUP BY customer_id ORDER BY total_spent DESC LIMIT 5;"
+  },
+  {
+    natural: "recent orders",
     sql: "SELECT * FROM orders ORDER BY order_date DESC LIMIT 10;"
   },
   {
-    natural: "Low stock items",
-    sql: "SELECT * FROM products WHERE stock_quantity < 10;"
+    natural: "products out of stock",
+    sql: "SELECT * FROM products WHERE stock_quantity = 0;"
   },
   {
-    natural: "Sales by month",
-    sql: "SELECT strftime('%Y-%m', order_date) as month, SUM(total) as total_sales FROM orders GROUP BY month;"
+    natural: "high value customers",
+    sql: "SELECT customer_id, SUM(total) as total_spent FROM orders GROUP BY customer_id HAVING total_spent > 1000;"
+  },
+  {
+    natural: "monthly sales",
+    sql: "SELECT strftime('%Y-%m', order_date) as month, SUM(total) as monthly_sales FROM orders GROUP BY month ORDER BY month;"
   }
 ];

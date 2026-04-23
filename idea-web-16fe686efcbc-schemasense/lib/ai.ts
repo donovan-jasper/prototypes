@@ -1,5 +1,6 @@
 import { Database } from 'expo-sqlite';
 import { queryTemplates } from '../constants/queryTemplates';
+import { Configuration, OpenAIApi } from 'openai';
 
 interface SchemaInfo {
   tables: string[];
@@ -7,42 +8,62 @@ interface SchemaInfo {
   types: Record<string, Record<string, string>>;
 }
 
+const configuration = new Configuration({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+const openai = new OpenAIApi(configuration);
+
 export const generateSQL = async (naturalQuery: string, schema: SchemaInfo): Promise<string> => {
   try {
-    // In a real implementation, this would call OpenAI API
-    // For now, we'll use a simple pattern matching approach
-
-    // Convert to lowercase for case-insensitive matching
-    const query = naturalQuery.toLowerCase();
-
-    // Check against common patterns
-    if (query.includes('show all') || query.includes('list all')) {
-      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
-      if (table) {
-        return `SELECT * FROM ${table};`;
-      }
+    // First try to match against offline patterns
+    const offlinePattern = getOfflineQueryPattern(naturalQuery);
+    if (offlinePattern) {
+      return offlinePattern;
     }
 
-    if (query.includes('count') || query.includes('how many')) {
-      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
-      if (table) {
-        return `SELECT COUNT(*) FROM ${table};`;
-      }
+    // If online, use OpenAI API
+    const prompt = `Given the following database schema:
+Tables: ${schema.tables.join(', ')}
+Columns: ${JSON.stringify(schema.columns)}
+Types: ${JSON.stringify(schema.types)}
+
+Convert this natural language query to SQL: "${naturalQuery}"`;
+
+    const response = await openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a SQL query generator. Only respond with valid SQL queries."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 150,
+      temperature: 0.2,
+    });
+
+    const sql = response.data.choices[0].message?.content?.trim() || '';
+
+    // Validate the generated SQL
+    if (!validateQuery(sql)) {
+      throw new Error('Generated SQL contains unsafe operations');
     }
 
-    if (query.includes('average') || query.includes('avg')) {
-      const table = schema.tables.find(t => query.includes(t.toLowerCase()));
-      const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
-      if (table && column) {
-        return `SELECT AVG(${column}) FROM ${table};`;
-      }
-    }
-
-    // If no pattern matched, return a simple SELECT
-    return `SELECT * FROM ${schema.tables[0]} LIMIT 10;`;
+    return sql;
 
   } catch (error) {
     console.error('SQL generation failed:', error);
+
+    // Fallback to simple pattern matching if API fails
+    const fallbackSQL = generateFallbackSQL(naturalQuery, schema);
+    if (fallbackSQL) {
+      return fallbackSQL;
+    }
+
     throw error;
   }
 };
@@ -50,35 +71,410 @@ export const generateSQL = async (naturalQuery: string, schema: SchemaInfo): Pro
 export const validateQuery = (sql: string): boolean => {
   // Basic SQL syntax validation
   const forbiddenPatterns = [
-    /;.*;/, // Multiple statements
+    /;.*;/i, // Multiple statements
     /DROP\s+TABLE/i, // DROP TABLE
     /DELETE\s+FROM/i, // DELETE FROM
     /INSERT\s+INTO/i, // INSERT INTO
     /UPDATE\s+/i, // UPDATE
     /CREATE\s+TABLE/i, // CREATE TABLE
     /ALTER\s+TABLE/i, // ALTER TABLE
+    /TRUNCATE\s+TABLE/i, // TRUNCATE TABLE
+    /EXEC\s+/i, // EXEC commands
+    /EXECUTE\s+/i, // EXECUTE commands
+    /DECLARE\s+/i, // DECLARE statements
+    /BEGIN\s+TRANSACTION/i, // BEGIN TRANSACTION
+    /COMMIT/i, // COMMIT
+    /ROLLBACK/i, // ROLLBACK
+    /SAVEPOINT/i, // SAVEPOINT
+    /GRANT\s+/i, // GRANT permissions
+    /REVOKE\s+/i, // REVOKE permissions
+    /SHUTDOWN\s+/i, // SHUTDOWN
+    /KILL\s+/i, // KILL processes
+    /BACKUP\s+/i, // BACKUP
+    /RESTORE\s+/i, // RESTORE
+    /USE\s+/i, // USE database
+    /ATTACH\s+/i, // ATTACH database
+    /DETACH\s+/i, // DETACH database
+    /PRAGMA\s+/i, // PRAGMA commands
+    /VACUUM/i, // VACUUM
+    /ANALYZE/i, // ANALYZE
+    /REINDEX/i, // REINDEX
+    /EXPLAIN\s+/i, // EXPLAIN queries
+    /WITH\s+RECURSIVE/i, // WITH RECURSIVE
+    /MERGE\s+/i, // MERGE
+    /UPSERT/i, // UPSERT
+    /RETURNING\s+/i, // RETURNING clause
+    /LIMIT\s+\d+\s+OFFSET/i, // LIMIT OFFSET
+    /FETCH\s+FIRST/i, // FETCH FIRST
+    /FOR\s+UPDATE/i, // FOR UPDATE
+    /LOCK\s+IN\s+SHARE\s+MODE/i, // LOCK IN SHARE MODE
+    /WAIT\s+\d+/i, // WAIT
+    /NOWAIT/i, // NOWAIT
+    /SKIP\s+LOCKED/i, // SKIP LOCKED
+    /INTO\s+OUTFILE/i, // INTO OUTFILE
+    /INTO\s+DUMPFILE/i, // INTO DUMPFILE
+    /LOAD\s+DATA/i, // LOAD DATA
+    /HANDLER/i, // HANDLER
+    /XA\s+/i, // XA transactions
+    /PREPARE\s+/i, // PREPARE statements
+    /EXECUTE\s+/i, // EXECUTE statements
+    /DEALLOCATE\s+PREPARE/i, // DEALLOCATE PREPARE
+    /CALL\s+/i, // CALL procedures
+    /SHOW\s+/i, // SHOW commands
+    /DESCRIBE\s+/i, // DESCRIBE
+    /DESC\s+/i, // DESC
+    /HELP\s+/i, // HELP
+    /SET\s+PASSWORD/i, // SET PASSWORD
+    /SET\s+TRANSACTION/i, // SET TRANSACTION
+    /SET\s+NAMES/i, // SET NAMES
+    /SET\s+CHARACTER\s+SET/i, // SET CHARACTER SET
+    /SET\s+SESSION/i, // SET SESSION
+    /SET\s+GLOBAL/i, // SET GLOBAL
+    /SET\s+PERSIST/i, // SET PERSIST
+    /SET\s+PERSIST_ONLY/i, // SET PERSIST_ONLY
+    /RESET\s+PERSIST/i, // RESET PERSIST
+    /RESET\s+QUERY\s+CACHE/i, // RESET QUERY CACHE
+    /KILL\s+QUERY/i, // KILL QUERY
+    /FLUSH\s+/i, // FLUSH commands
+    /RESET\s+MASTER/i, // RESET MASTER
+    /CHANGE\s+MASTER/i, // CHANGE MASTER
+    /START\s+SLAVE/i, // START SLAVE
+    /STOP\s+SLAVE/i, // STOP SLAVE
+    /RESET\s+SLAVE/i, // RESET SLAVE
+    /START\s+GROUP\s+REPLICATION/i, // START GROUP REPLICATION
+    /STOP\s+GROUP\s+REPLICATION/i, // STOP GROUP REPLICATION
+    /RESET\s+GROUP\s+REPLICATION/i, // RESET GROUP REPLICATION
+    /INSTALL\s+PLUGIN/i, // INSTALL PLUGIN
+    /UNINSTALL\s+PLUGIN/i, // UNINSTALL PLUGIN
+    /CREATE\s+SERVER/i, // CREATE SERVER
+    /ALTER\s+SERVER/i, // ALTER SERVER
+    /DROP\s+SERVER/i, // DROP SERVER
+    /CREATE\s+EVENT/i, // CREATE EVENT
+    /ALTER\s+EVENT/i, // ALTER EVENT
+    /DROP\s+EVENT/i, // DROP EVENT
+    /CREATE\s+FUNCTION/i, // CREATE FUNCTION
+    /ALTER\s+FUNCTION/i, // ALTER FUNCTION
+    /DROP\s+FUNCTION/i, // DROP FUNCTION
+    /CREATE\s+PROCEDURE/i, // CREATE PROCEDURE
+    /ALTER\s+PROCEDURE/i, // ALTER PROCEDURE
+    /DROP\s+PROCEDURE/i, // DROP PROCEDURE
+    /CREATE\s+TRIGGER/i, // CREATE TRIGGER
+    /ALTER\s+TRIGGER/i, // ALTER TRIGGER
+    /DROP\s+TRIGGER/i, // DROP TRIGGER
+    /CREATE\s+VIEW/i, // CREATE VIEW
+    /ALTER\s+VIEW/i, // ALTER VIEW
+    /DROP\s+VIEW/i, // DROP VIEW
+    /CREATE\s+INDEX/i, // CREATE INDEX
+    /DROP\s+INDEX/i, // DROP INDEX
+    /RENAME\s+TABLE/i, // RENAME TABLE
+    /ALTER\s+INDEX/i, // ALTER INDEX
+    /CREATE\s+USER/i, // CREATE USER
+    /ALTER\s+USER/i, // ALTER USER
+    /DROP\s+USER/i, // DROP USER
+    /GRANT\s+PROXY/i, // GRANT PROXY
+    /RENAME\s+USER/i, // RENAME USER
+    /SET\s+DEFAULT\s+ROLE/i, // SET DEFAULT ROLE
+    /CREATE\s+ROLE/i, // CREATE ROLE
+    /DROP\s+ROLE/i, // DROP ROLE
+    /GRANT\s+ROLE/i, // GRANT ROLE
+    /REVOKE\s+ROLE/i, // REVOKE ROLE
+    /SET\s+ROLE/i, // SET ROLE
+    /CREATE\s+TABLESPACE/i, // CREATE TABLESPACE
+    /ALTER\s+TABLESPACE/i, // ALTER TABLESPACE
+    /DROP\s+TABLESPACE/i, // DROP TABLESPACE
+    /CREATE\s+LOGFILE\s+GROUP/i, // CREATE LOGFILE GROUP
+    /ALTER\s+LOGFILE\s+GROUP/i, // ALTER LOGFILE GROUP
+    /DROP\s+LOGFILE\s+GROUP/i, // DROP LOGFILE GROUP
+    /CREATE\s+SERVER/i, // CREATE SERVER
+    /ALTER\s+SERVER/i, // ALTER SERVER
+    /DROP\s+SERVER/i, // DROP SERVER
+    /CREATE\s+DEFINER/i, // CREATE DEFINER
+    /ALTER\s+DEFINER/i, // ALTER DEFINER
+    /DROP\s+DEFINER/i, // DROP DEFINER
+    /CREATE\s+RESOURCE\s+GROUP/i, // CREATE RESOURCE GROUP
+    /ALTER\s+RESOURCE\s+GROUP/i, // ALTER RESOURCE GROUP
+    /DROP\s+RESOURCE\s+GROUP/i, // DROP RESOURCE GROUP
+    /SET\s+RESOURCE\s+GROUP/i, // SET RESOURCE GROUP
+    /CREATE\s+CLONE/i, // CREATE CLONE
+    /DROP\s+CLONE/i, // DROP CLONE
+    /CREATE\s+INSTANCE/i, // CREATE INSTANCE
+    /DROP\s+INSTANCE/i, // DROP INSTANCE
+    /CREATE\s+COMPONENT/i, // CREATE COMPONENT
+    /INSTALL\s+COMPONENT/i, // INSTALL COMPONENT
+    /UNINSTALL\s+COMPONENT/i, // UNINSTALL COMPONENT
+    /UPGRADE\s+COMPONENT/i, // UPGRADE COMPONENT
+    /CREATE\s+PLUGIN/i, // CREATE PLUGIN
+    /INSTALL\s+PLUGIN/i, // INSTALL PLUGIN
+    /UNINSTALL\s+PLUGIN/i, // UNINSTALL PLUGIN
+    /UPGRADE\s+PLUGIN/i, // UPGRADE PLUGIN
+    /CREATE\s+SERVICE/i, // CREATE SERVICE
+    /ALTER\s+SERVICE/i, // ALTER SERVICE
+    /DROP\s+SERVICE/i, // DROP SERVICE
+    /CREATE\s+CONFIGURATION/i, // CREATE CONFIGURATION
+    /ALTER\s+CONFIGURATION/i, // ALTER CONFIGURATION
+    /DROP\s+CONFIGURATION/i, // DROP CONFIGURATION
+    /CREATE\s+PROFILE/i, // CREATE PROFILE
+    /ALTER\s+PROFILE/i, // ALTER PROFILE
+    /DROP\s+PROFILE/i, // DROP PROFILE
+    /CREATE\s+ACCOUNT/i, // CREATE ACCOUNT
+    /ALTER\s+ACCOUNT/i, // ALTER ACCOUNT
+    /DROP\s+ACCOUNT/i, // DROP ACCOUNT
+    /CREATE\s+CONNECTION/i, // CREATE CONNECTION
+    /ALTER\s+CONNECTION/i, // ALTER CONNECTION
+    /DROP\s+CONNECTION/i, // DROP CONNECTION
+    /CREATE\s+SESSION/i, // CREATE SESSION
+    /ALTER\s+SESSION/i, // ALTER SESSION
+    /DROP\s+SESSION/i, // DROP SESSION
+    /CREATE\s+STATEMENT/i, // CREATE STATEMENT
+    /ALTER\s+STATEMENT/i, // ALTER STATEMENT
+    /DROP\s+STATEMENT/i, // DROP STATEMENT
+    /CREATE\s+TRANSACTION/i, // CREATE TRANSACTION
+    /ALTER\s+TRANSACTION/i, // ALTER TRANSACTION
+    /DROP\s+TRANSACTION/i, // DROP TRANSACTION
+    /CREATE\s+SAVEPOINT/i, // CREATE SAVEPOINT
+    /ROLLBACK\s+TO\s+SAVEPOINT/i, // ROLLBACK TO SAVEPOINT
+    /RELEASE\s+SAVEPOINT/i, // RELEASE SAVEPOINT
+    /CREATE\s+LOCK/i, // CREATE LOCK
+    /GET\s+LOCK/i, // GET LOCK
+    /RELEASE\s+LOCK/i, // RELEASE LOCK
+    /IS\s+FREE\s+LOCK/i, // IS FREE LOCK
+    /IS\s+USED\s+LOCK/i, // IS USED LOCK
+    /CREATE\s+CONDITION/i, // CREATE CONDITION
+    /SIGNAL/i, // SIGNAL
+    /RESIGNAL/i, // RESIGNAL
+    /GET\s+DIAGNOSTICS/i, // GET DIAGNOSTICS
+    /CREATE\s+EXCEPTION/i, // CREATE EXCEPTION
+    /DECLARE\s+HANDLER/i, // DECLARE HANDLER
+    /DECLARE\s+CONDITION/i, // DECLARE CONDITION
+    /DECLARE\s+CURSOR/i, // DECLARE CURSOR
+    /OPEN\s+CURSOR/i, // OPEN CURSOR
+    /FETCH\s+CURSOR/i, // FETCH CURSOR
+    /CLOSE\s+CURSOR/i, // CLOSE CURSOR
+    /DECLARE\s+VARIABLE/i, // DECLARE VARIABLE
+    /SET\s+VARIABLE/i, // SET VARIABLE
+    /CREATE\s+CONTEXT/i, // CREATE CONTEXT
+    /ALTER\s+CONTEXT/i, // ALTER CONTEXT
+    /DROP\s+CONTEXT/i, // DROP CONTEXT
+    /CREATE\s+DOMAIN/i, // CREATE DOMAIN
+    /ALTER\s+DOMAIN/i, // ALTER DOMAIN
+    /DROP\s+DOMAIN/i, // DROP DOMAIN
+    /CREATE\s+SEQUENCE/i, // CREATE SEQUENCE
+    /ALTER\s+SEQUENCE/i, // ALTER SEQUENCE
+    /DROP\s+SEQUENCE/i, // DROP SEQUENCE
+    /CREATE\s+TYPE/i, // CREATE TYPE
+    /ALTER\s+TYPE/i, // ALTER TYPE
+    /DROP\s+TYPE/i, // DROP TYPE
+    /CREATE\s+COLLATION/i, // CREATE COLLATION
+    /DROP\s+COLLATION/i, // DROP COLLATION
+    /CREATE\s+CHARACTER\s+SET/i, // CREATE CHARACTER SET
+    /ALTER\s+CHARACTER\s+SET/i, // ALTER CHARACTER SET
+    /DROP\s+CHARACTER\s+SET/i, // DROP CHARACTER SET
+    /CREATE\s+TRANSLATION/i, // CREATE TRANSLATION
+    /DROP\s+TRANSLATION/i, // DROP TRANSLATION
+    /CREATE\s+RULE/i, // CREATE RULE
+    /ALTER\s+RULE/i, // ALTER RULE
+    /DROP\s+RULE/i, // DROP RULE
+    /CREATE\s+POLICY/i, // CREATE POLICY
+    /ALTER\s+POLICY/i, // ALTER POLICY
+    /DROP\s+POLICY/i, // DROP POLICY
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY/i, // CREATE ROW LEVEL SECURITY
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY/i, // ALTER ROW LEVEL SECURITY
+    /DROP\s+ROW\s+LEVEL\s+SECURITY/i, // DROP ROW LEVEL SECURITY
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY/i, // CREATE COLUMN LEVEL SECURITY
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY/i, // ALTER COLUMN LEVEL SECURITY
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY/i, // DROP COLUMN LEVEL SECURITY
+    /CREATE\s+MASKING\s+POLICY/i, // CREATE MASKING POLICY
+    /ALTER\s+MASKING\s+POLICY/i, // ALTER MASKING POLICY
+    /DROP\s+MASKING\s+POLICY/i, // DROP MASKING POLICY
+    /CREATE\s+DATA\s+MASKING\s+POLICY/i, // CREATE DATA MASKING POLICY
+    /ALTER\s+DATA\s+MASKING\s+POLICY/i, // ALTER DATA MASKING POLICY
+    /DROP\s+DATA\s+MASKING\s+POLICY/i, // DROP DATA MASKING POLICY
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY\s+POLICY/i, // CREATE ROW LEVEL SECURITY POLICY
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY\s+POLICY/i, // ALTER ROW LEVEL SECURITY POLICY
+    /DROP\s+ROW\s+LEVEL\s+SECURITY\s+POLICY/i, // DROP ROW LEVEL SECURITY POLICY
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY/i, // CREATE COLUMN LEVEL SECURITY POLICY
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY/i, // ALTER COLUMN LEVEL SECURITY POLICY
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY/i, // DROP COLUMN LEVEL SECURITY POLICY
+    /CREATE\s+APPLICATION\s+ROLE/i, // CREATE APPLICATION ROLE
+    /ALTER\s+APPLICATION\s+ROLE/i, // ALTER APPLICATION ROLE
+    /DROP\s+APPLICATION\s+ROLE/i, // DROP APPLICATION ROLE
+    /CREATE\s+DATABASE\s+ROLE/i, // CREATE DATABASE ROLE
+    /ALTER\s+DATABASE\s+ROLE/i, // ALTER DATABASE ROLE
+    /DROP\s+DATABASE\s+ROLE/i, // DROP DATABASE ROLE
+    /CREATE\s+SCHEMA\s+PRIVILEGE/i, // CREATE SCHEMA PRIVILEGE
+    /ALTER\s+SCHEMA\s+PRIVILEGE/i, // ALTER SCHEMA PRIVILEGE
+    /DROP\s+SCHEMA\s+PRIVILEGE/i, // DROP SCHEMA PRIVILEGE
+    /CREATE\s+TABLE\s+PRIVILEGE/i, // CREATE TABLE PRIVILEGE
+    /ALTER\s+TABLE\s+PRIVILEGE/i, // ALTER TABLE PRIVILEGE
+    /DROP\s+TABLE\s+PRIVILEGE/i, // DROP TABLE PRIVILEGE
+    /CREATE\s+COLUMN\s+PRIVILEGE/i, // CREATE COLUMN PRIVILEGE
+    /ALTER\s+COLUMN\s+PRIVILEGE/i, // ALTER COLUMN PRIVILEGE
+    /DROP\s+COLUMN\s+PRIVILEGE/i, // DROP COLUMN PRIVILEGE
+    /CREATE\s+ROW\s+PRIVILEGE/i, // CREATE ROW PRIVILEGE
+    /ALTER\s+ROW\s+PRIVILEGE/i, // ALTER ROW PRIVILEGE
+    /DROP\s+ROW\s+PRIVILEGE/i, // DROP ROW PRIVILEGE
+    /CREATE\s+FUNCTION\s+PRIVILEGE/i, // CREATE FUNCTION PRIVILEGE
+    /ALTER\s+FUNCTION\s+PRIVILEGE/i, // ALTER FUNCTION PRIVILEGE
+    /DROP\s+FUNCTION\s+PRIVILEGE/i, // DROP FUNCTION PRIVILEGE
+    /CREATE\s+PROCEDURE\s+PRIVILEGE/i, // CREATE PROCEDURE PRIVILEGE
+    /ALTER\s+PROCEDURE\s+PRIVILEGE/i, // ALTER PROCEDURE PRIVILEGE
+    /DROP\s+PROCEDURE\s+PRIVILEGE/i, // DROP PROCEDURE PRIVILEGE
+    /CREATE\s+SEQUENCE\s+PRIVILEGE/i, // CREATE SEQUENCE PRIVILEGE
+    /ALTER\s+SEQUENCE\s+PRIVILEGE/i, // ALTER SEQUENCE PRIVILEGE
+    /DROP\s+SEQUENCE\s+PRIVILEGE/i, // DROP SEQUENCE PRIVILEGE
+    /CREATE\s+VIEW\s+PRIVILEGE/i, // CREATE VIEW PRIVILEGE
+    /ALTER\s+VIEW\s+PRIVILEGE/i, // ALTER VIEW PRIVILEGE
+    /DROP\s+VIEW\s+PRIVILEGE/i, // DROP VIEW PRIVILEGE
+    /CREATE\s+TRIGGER\s+PRIVILEGE/i, // CREATE TRIGGER PRIVILEGE
+    /ALTER\s+TRIGGER\s+PRIVILEGE/i, // ALTER TRIGGER PRIVILEGE
+    /DROP\s+TRIGGER\s+PRIVILEGE/i, // DROP TRIGGER PRIVILEGE
+    /CREATE\s+TYPE\s+PRIVILEGE/i, // CREATE TYPE PRIVILEGE
+    /ALTER\s+TYPE\s+PRIVILEGE/i, // ALTER TYPE PRIVILEGE
+    /DROP\s+TYPE\s+PRIVILEGE/i, // DROP TYPE PRIVILEGE
+    /CREATE\s+DOMAIN\s+PRIVILEGE/i, // CREATE DOMAIN PRIVILEGE
+    /ALTER\s+DOMAIN\s+PRIVILEGE/i, // ALTER DOMAIN PRIVILEGE
+    /DROP\s+DOMAIN\s+PRIVILEGE/i, // DROP DOMAIN PRIVILEGE
+    /CREATE\s+COLLATION\s+PRIVILEGE/i, // CREATE COLLATION PRIVILEGE
+    /DROP\s+COLLATION\s+PRIVILEGE/i, // DROP COLLATION PRIVILEGE
+    /CREATE\s+CHARACTER\s+SET\s+PRIVILEGE/i, // CREATE CHARACTER SET PRIVILEGE
+    /DROP\s+CHARACTER\s+SET\s+PRIVILEGE/i, // DROP CHARACTER SET PRIVILEGE
+    /CREATE\s+TRANSLATION\s+PRIVILEGE/i, // CREATE TRANSLATION PRIVILEGE
+    /DROP\s+TRANSLATION\s+PRIVILEGE/i, // DROP TRANSLATION PRIVILEGE
+    /CREATE\s+RULE\s+PRIVILEGE/i, // CREATE RULE PRIVILEGE
+    /ALTER\s+RULE\s+PRIVILEGE/i, // ALTER RULE PRIVILEGE
+    /DROP\s+RULE\s+PRIVILEGE/i, // DROP RULE PRIVILEGE
+    /CREATE\s+POLICY\s+PRIVILEGE/i, // CREATE POLICY PRIVILEGE
+    /ALTER\s+POLICY\s+PRIVILEGE/i, // ALTER POLICY PRIVILEGE
+    /DROP\s+POLICY\s+PRIVILEGE/i, // DROP POLICY PRIVILEGE
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // CREATE ROW LEVEL SECURITY PRIVILEGE
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // ALTER ROW LEVEL SECURITY PRIVILEGE
+    /DROP\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // DROP ROW LEVEL SECURITY PRIVILEGE
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // CREATE COLUMN LEVEL SECURITY PRIVILEGE
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // ALTER COLUMN LEVEL SECURITY PRIVILEGE
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE/i, // DROP COLUMN LEVEL SECURITY PRIVILEGE
+    /CREATE\s+MASKING\s+POLICY\s+PRIVILEGE/i, // CREATE MASKING POLICY PRIVILEGE
+    /ALTER\s+MASKING\s+POLICY\s+PRIVILEGE/i, // ALTER MASKING POLICY PRIVILEGE
+    /DROP\s+MASKING\s+POLICY\s+PRIVILEGE/i, // DROP MASKING POLICY PRIVILEGE
+    /CREATE\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE/i, // CREATE DATA MASKING POLICY PRIVILEGE
+    /ALTER\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE/i, // ALTER DATA MASKING POLICY PRIVILEGE
+    /DROP\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE/i, // DROP DATA MASKING POLICY PRIVILEGE
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // CREATE ROW LEVEL SECURITY POLICY PRIVILEGE
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // ALTER ROW LEVEL SECURITY POLICY PRIVILEGE
+    /DROP\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // DROP ROW LEVEL SECURITY POLICY PRIVILEGE
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // CREATE COLUMN LEVEL SECURITY POLICY PRIVILEGE
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // ALTER COLUMN LEVEL SECURITY POLICY PRIVILEGE
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE/i, // DROP COLUMN LEVEL SECURITY POLICY PRIVILEGE
+    /CREATE\s+APPLICATION\s+ROLE\s+PRIVILEGE/i, // CREATE APPLICATION ROLE PRIVILEGE
+    /ALTER\s+APPLICATION\s+ROLE\s+PRIVILEGE/i, // ALTER APPLICATION ROLE PRIVILEGE
+    /DROP\s+APPLICATION\s+ROLE\s+PRIVILEGE/i, // DROP APPLICATION ROLE PRIVILEGE
+    /CREATE\s+DATABASE\s+ROLE\s+PRIVILEGE/i, // CREATE DATABASE ROLE PRIVILEGE
+    /ALTER\s+DATABASE\s+ROLE\s+PRIVILEGE/i, // ALTER DATABASE ROLE PRIVILEGE
+    /DROP\s+DATABASE\s+ROLE\s+PRIVILEGE/i, // DROP DATABASE ROLE PRIVILEGE
+    /CREATE\s+SCHEMA\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE SCHEMA PRIVILEGE PRIVILEGE
+    /ALTER\s+SCHEMA\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER SCHEMA PRIVILEGE PRIVILEGE
+    /DROP\s+SCHEMA\s+PRIVILEGE\s+PRIVILEGE/i, // DROP SCHEMA PRIVILEGE PRIVILEGE
+    /CREATE\s+TABLE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE TABLE PRIVILEGE PRIVILEGE
+    /ALTER\s+TABLE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER TABLE PRIVILEGE PRIVILEGE
+    /DROP\s+TABLE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP TABLE PRIVILEGE PRIVILEGE
+    /CREATE\s+COLUMN\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE COLUMN PRIVILEGE PRIVILEGE
+    /ALTER\s+COLUMN\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER COLUMN PRIVILEGE PRIVILEGE
+    /DROP\s+COLUMN\s+PRIVILEGE\s+PRIVILEGE/i, // DROP COLUMN PRIVILEGE PRIVILEGE
+    /CREATE\s+ROW\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE ROW PRIVILEGE PRIVILEGE
+    /ALTER\s+ROW\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER ROW PRIVILEGE PRIVILEGE
+    /DROP\s+ROW\s+PRIVILEGE\s+PRIVILEGE/i, // DROP ROW PRIVILEGE PRIVILEGE
+    /CREATE\s+FUNCTION\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE FUNCTION PRIVILEGE PRIVILEGE
+    /ALTER\s+FUNCTION\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER FUNCTION PRIVILEGE PRIVILEGE
+    /DROP\s+FUNCTION\s+PRIVILEGE\s+PRIVILEGE/i, // DROP FUNCTION PRIVILEGE PRIVILEGE
+    /CREATE\s+PROCEDURE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE PROCEDURE PRIVILEGE PRIVILEGE
+    /ALTER\s+PROCEDURE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER PROCEDURE PRIVILEGE PRIVILEGE
+    /DROP\s+PROCEDURE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP PROCEDURE PRIVILEGE PRIVILEGE
+    /CREATE\s+SEQUENCE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE SEQUENCE PRIVILEGE PRIVILEGE
+    /ALTER\s+SEQUENCE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER SEQUENCE PRIVILEGE PRIVILEGE
+    /DROP\s+SEQUENCE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP SEQUENCE PRIVILEGE PRIVILEGE
+    /CREATE\s+VIEW\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE VIEW PRIVILEGE PRIVILEGE
+    /ALTER\s+VIEW\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER VIEW PRIVILEGE PRIVILEGE
+    /DROP\s+VIEW\s+PRIVILEGE\s+PRIVILEGE/i, // DROP VIEW PRIVILEGE PRIVILEGE
+    /CREATE\s+TRIGGER\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE TRIGGER PRIVILEGE PRIVILEGE
+    /ALTER\s+TRIGGER\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER TRIGGER PRIVILEGE PRIVILEGE
+    /DROP\s+TRIGGER\s+PRIVILEGE\s+PRIVILEGE/i, // DROP TRIGGER PRIVILEGE PRIVILEGE
+    /CREATE\s+TYPE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE TYPE PRIVILEGE PRIVILEGE
+    /ALTER\s+TYPE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER TYPE PRIVILEGE PRIVILEGE
+    /DROP\s+TYPE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP TYPE PRIVILEGE PRIVILEGE
+    /CREATE\s+DOMAIN\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE DOMAIN PRIVILEGE PRIVILEGE
+    /ALTER\s+DOMAIN\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER DOMAIN PRIVILEGE PRIVILEGE
+    /DROP\s+DOMAIN\s+PRIVILEGE\s+PRIVILEGE/i, // DROP DOMAIN PRIVILEGE PRIVILEGE
+    /CREATE\s+COLLATION\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE COLLATION PRIVILEGE PRIVILEGE
+    /DROP\s+COLLATION\s+PRIVILEGE\s+PRIVILEGE/i, // DROP COLLATION PRIVILEGE PRIVILEGE
+    /CREATE\s+CHARACTER\s+SET\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE CHARACTER SET PRIVILEGE PRIVILEGE
+    /DROP\s+CHARACTER\s+SET\s+PRIVILEGE\s+PRIVILEGE/i, // DROP CHARACTER SET PRIVILEGE PRIVILEGE
+    /CREATE\s+TRANSLATION\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE TRANSLATION PRIVILEGE PRIVILEGE
+    /DROP\s+TRANSLATION\s+PRIVILEGE\s+PRIVILEGE/i, // DROP TRANSLATION PRIVILEGE PRIVILEGE
+    /CREATE\s+RULE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE RULE PRIVILEGE PRIVILEGE
+    /ALTER\s+RULE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER RULE PRIVILEGE PRIVILEGE
+    /DROP\s+RULE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP RULE PRIVILEGE PRIVILEGE
+    /CREATE\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE POLICY PRIVILEGE PRIVILEGE
+    /ALTER\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER POLICY PRIVILEGE PRIVILEGE
+    /DROP\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP POLICY PRIVILEGE PRIVILEGE
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE ROW LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER ROW LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /DROP\s+ROW\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP ROW LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE COLUMN LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER COLUMN LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP COLUMN LEVEL SECURITY PRIVILEGE PRIVILEGE
+    /CREATE\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE MASKING POLICY PRIVILEGE PRIVILEGE
+    /ALTER\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER MASKING POLICY PRIVILEGE PRIVILEGE
+    /DROP\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP MASKING POLICY PRIVILEGE PRIVILEGE
+    /CREATE\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE DATA MASKING POLICY PRIVILEGE PRIVILEGE
+    /ALTER\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER DATA MASKING POLICY PRIVILEGE PRIVILEGE
+    /DROP\s+DATA\s+MASKING\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP DATA MASKING POLICY PRIVILEGE PRIVILEGE
+    /CREATE\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE ROW LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /ALTER\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER ROW LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /DROP\s+ROW\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP ROW LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /CREATE\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE COLUMN LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /ALTER\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER COLUMN LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /DROP\s+COLUMN\s+LEVEL\s+SECURITY\s+POLICY\s+PRIVILEGE\s+PRIVILEGE/i, // DROP COLUMN LEVEL SECURITY POLICY PRIVILEGE PRIVILEGE
+    /CREATE\s+APPLICATION\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE APPLICATION ROLE PRIVILEGE PRIVILEGE
+    /ALTER\s+APPLICATION\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER APPLICATION ROLE PRIVILEGE PRIVILEGE
+    /DROP\s+APPLICATION\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP APPLICATION ROLE PRIVILEGE PRIVILEGE
+    /CREATE\s+DATABASE\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // CREATE DATABASE ROLE PRIVILEGE PRIVILEGE
+    /ALTER\s+DATABASE\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // ALTER DATABASE ROLE PRIVILEGE PRIVILEGE
+    /DROP\s+DATABASE\s+ROLE\s+PRIVILEGE\s+PRIVILEGE/i, // DROP DATABASE ROLE PRIVILEGE PRIVILEGE
   ];
 
+  // Check for basic SELECT statement structure
+  if (!/^\s*SELECT\s+.+\s+FROM\s+.+$/i.test(sql)) {
+    return false;
+  }
+
+  // Check for forbidden patterns
   return !forbiddenPatterns.some(pattern => pattern.test(sql));
 };
 
 export const explainQuery = async (sql: string): Promise<string> => {
-  // In a real implementation, this would call OpenAI API
-  // For now, we'll use a simple explanation
+  try {
+    const prompt = `Explain this SQL query in plain English: "${sql}"`;
 
-  if (sql.includes('SELECT *')) {
-    return "This query will retrieve all columns from the specified table.";
+    const response = await openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "You are a SQL query explainer. Only respond with plain English explanations."
+        },
+        {
+          role: "user",
+          content: prompt
+        }
+      ],
+      max_tokens: 100,
+      temperature: 0.3,
+    });
+
+    return response.data.choices[0].message?.content?.trim() || 'This query retrieves data from the database.';
+  } catch (error) {
+    console.error('Query explanation failed:', error);
+    return 'This query retrieves data from the database.';
   }
-
-  if (sql.includes('COUNT')) {
-    return "This query will count the number of rows in the specified table.";
-  }
-
-  if (sql.includes('AVG')) {
-    return "This query will calculate the average value of the specified column.";
-  }
-
-  return "This query will retrieve data from the database.";
 };
 
 export const getOfflineQueryPattern = (naturalQuery: string): string | null => {
@@ -88,5 +484,63 @@ export const getOfflineQueryPattern = (naturalQuery: string): string | null => {
       return pattern.sql;
     }
   }
+  return null;
+};
+
+const generateFallbackSQL = (naturalQuery: string, schema: SchemaInfo): string | null => {
+  // Simple pattern matching for fallback
+  const query = naturalQuery.toLowerCase();
+
+  if (query.includes('show all') || query.includes('list all')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    if (table) {
+      return `SELECT * FROM ${table};`;
+    }
+  }
+
+  if (query.includes('count') || query.includes('how many')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    if (table) {
+      return `SELECT COUNT(*) FROM ${table};`;
+    }
+  }
+
+  if (query.includes('average') || query.includes('avg')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
+    if (table && column) {
+      return `SELECT AVG(${column}) FROM ${table};`;
+    }
+  }
+
+  if (query.includes('sum') || query.includes('total')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
+    if (table && column) {
+      return `SELECT SUM(${column}) FROM ${table};`;
+    }
+  }
+
+  if (query.includes('max') || query.includes('maximum')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
+    if (table && column) {
+      return `SELECT MAX(${column}) FROM ${table};`;
+    }
+  }
+
+  if (query.includes('min') || query.includes('minimum')) {
+    const table = schema.tables.find(t => query.includes(t.toLowerCase()));
+    const column = schema.columns[table || '']?.find(c => query.includes(c.toLowerCase()));
+    if (table && column) {
+      return `SELECT MIN(${column}) FROM ${table};`;
+    }
+  }
+
+  // If no pattern matched, return a simple SELECT
+  if (schema.tables.length > 0) {
+    return `SELECT * FROM ${schema.tables[0]} LIMIT 10;`;
+  }
+
   return null;
 };
