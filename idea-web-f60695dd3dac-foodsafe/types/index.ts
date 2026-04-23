@@ -9,6 +9,7 @@ export interface Restaurant {
   violationCount: number;
   cuisine: string;
   isPremium?: boolean; // Flag for premium restaurants
+  city?: string; // City identifier (nyc, chicago, san_francisco)
 }
 
 export interface Inspection {
@@ -69,4 +70,12 @@ export interface FilterOptions {
   hasNoViolations?: boolean;
   isAllergyFriendly?: boolean;
   isKidFriendly?: boolean;
+}
+
+export interface CityConfig {
+  id: string;
+  name: string;
+  apiBaseUrl: string;
+  transformRestaurant: (data: any) => Restaurant;
+  transformInspection: (data: any) => Inspection;
 }

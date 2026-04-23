@@ -1,44 +1,30 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, Switch } from 'react-native';
-import { Colors } from '@/constants/Colors';
-import Slider from '@react-native-community/slider';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, ScrollView, TextInput, Switch } from 'react-native';
+import { FilterOptions } from '@/types';
 
 interface FilterSheetProps {
   visible: boolean;
   onClose: () => void;
-  filters: {
-    minScore: number;
-    maxScore: number;
-    recentInspection: boolean;
-    noViolations: boolean;
-    allergyFriendly: boolean;
-  };
-  onFilterChange: (filters: FilterSheetProps['filters']) => void;
+  onApply: (filters: FilterOptions) => void;
+  initialFilters: FilterOptions;
   isPremium: boolean;
 }
 
-export const FilterSheet: React.FC<FilterSheetProps> = ({
+const FilterSheet: React.FC<FilterSheetProps> = ({
   visible,
   onClose,
-  filters,
-  onFilterChange,
+  onApply,
+  initialFilters,
   isPremium,
 }) => {
-  const [localFilters, setLocalFilters] = useState(filters);
+  const [filters, setFilters] = useState<FilterOptions>(initialFilters);
 
-  const handleApplyFilters = () => {
-    onFilterChange(localFilters);
+  const handleApply = () => {
+    onApply(filters);
   };
 
-  const handleResetFilters = () => {
-    setLocalFilters({
-      minScore: 0,
-      maxScore: 100,
-      recentInspection: false,
-      noViolations: false,
-      allergyFriendly: false,
-    });
+  const handleReset = () => {
+    setFilters({});
   };
 
   return (
@@ -51,90 +37,94 @@ export const FilterSheet: React.FC<FilterSheetProps> = ({
       <View style={styles.modalContainer}>
         <View style={styles.sheet}>
           <View style={styles.header}>
-            <Text style={styles.headerTitle}>Filters</Text>
+            <Text style={styles.headerText}>Filters</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={Colors.text} />
+              <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView contentContainerStyle={styles.content}>
+          <ScrollView style={styles.content}>
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Safety Score Range</Text>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.sliderLabel}>Min: {localFilters.minScore}</Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={100}
-                  step={5}
-                  value={localFilters.minScore}
-                  onValueChange={(value) => setLocalFilters({ ...localFilters, minScore: value })}
-                  minimumTrackTintColor={Colors.primary}
-                  maximumTrackTintColor={Colors.border}
-                  thumbTintColor={Colors.primary}
+              <Text style={styles.sectionTitle}>Safety Score</Text>
+              <View style={styles.rangeContainer}>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Min"
+                  keyboardType="numeric"
+                  value={filters.minScore?.toString() || ''}
+                  onChangeText={(text) => setFilters({ ...filters, minScore: text ? parseInt(text) : undefined })}
                 />
-              </View>
-              <View style={styles.sliderContainer}>
-                <Text style={styles.sliderLabel}>Max: {localFilters.maxScore}</Text>
-                <Slider
-                  style={styles.slider}
-                  minimumValue={0}
-                  maximumValue={100}
-                  step={5}
-                  value={localFilters.maxScore}
-                  onValueChange={(value) => setLocalFilters({ ...localFilters, maxScore: value })}
-                  minimumTrackTintColor={Colors.primary}
-                  maximumTrackTintColor={Colors.border}
-                  thumbTintColor={Colors.primary}
+                <Text style={styles.rangeSeparator}>-</Text>
+                <TextInput
+                  style={styles.rangeInput}
+                  placeholder="Max"
+                  keyboardType="numeric"
+                  value={filters.maxScore?.toString() || ''}
+                  onChangeText={(text) => setFilters({ ...filters, maxScore: text ? parseInt(text) : undefined })}
                 />
               </View>
             </View>
 
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Inspection Filters</Text>
-              <View style={styles.filterOption}>
-                <Text style={styles.filterLabel}>Recent Inspection (last 30 days)</Text>
+              <Text style={styles.sectionTitle}>Cuisine</Text>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Search cuisine"
+                value={filters.cuisine || ''}
+                onChangeText={(text) => setFilters({ ...filters, cuisine: text })}
+              />
+            </View>
+
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Inspection Status</Text>
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>Recent inspection (last 30 days)</Text>
                 <Switch
-                  value={localFilters.recentInspection}
-                  onValueChange={(value) => setLocalFilters({ ...localFilters, recentInspection: value })}
-                  trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                  thumbColor={localFilters.recentInspection ? Colors.primary : Colors.white}
+                  value={!!filters.hasRecentInspection}
+                  onValueChange={(value) => setFilters({ ...filters, hasRecentInspection: value })}
                 />
               </View>
 
-              <View style={styles.filterOption}>
-                <Text style={styles.filterLabel}>No Violations</Text>
+              <View style={styles.switchRow}>
+                <Text style={styles.switchLabel}>No violations</Text>
                 <Switch
-                  value={localFilters.noViolations}
-                  onValueChange={(value) => setLocalFilters({ ...localFilters, noViolations: value })}
-                  trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                  thumbColor={localFilters.noViolations ? Colors.primary : Colors.white}
+                  value={!!filters.hasNoViolations}
+                  onValueChange={(value) => setFilters({ ...filters, hasNoViolations: value })}
+                  disabled={!isPremium}
                 />
-              </View>
-
-              <View style={styles.filterOption}>
-                <Text style={styles.filterLabel}>Allergy-Friendly</Text>
-                {!isPremium ? (
-                  <View style={styles.premiumBadge}>
-                    <Text style={styles.premiumBadgeText}>Premium</Text>
-                  </View>
-                ) : (
-                  <Switch
-                    value={localFilters.allergyFriendly}
-                    onValueChange={(value) => setLocalFilters({ ...localFilters, allergyFriendly: value })}
-                    trackColor={{ false: Colors.border, true: Colors.primaryLight }}
-                    thumbColor={localFilters.allergyFriendly ? Colors.primary : Colors.white}
-                  />
+                {!isPremium && (
+                  <Text style={styles.premiumBadge}>Premium</Text>
                 )}
               </View>
             </View>
+
+            {isPremium && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Special Filters</Text>
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchLabel}>Allergy-friendly</Text>
+                  <Switch
+                    value={!!filters.isAllergyFriendly}
+                    onValueChange={(value) => setFilters({ ...filters, isAllergyFriendly: value })}
+                  />
+                </View>
+
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchLabel}>Kid-friendly</Text>
+                  <Switch
+                    value={!!filters.isKidFriendly}
+                    onValueChange={(value) => setFilters({ ...filters, isKidFriendly: value })}
+                  />
+                </View>
+              </View>
+            )}
           </ScrollView>
 
           <View style={styles.footer}>
-            <TouchableOpacity style={styles.resetButton} onPress={handleResetFilters}>
+            <TouchableOpacity style={styles.resetButton} onPress={handleReset}>
               <Text style={styles.resetButtonText}>Reset</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.applyButton} onPress={handleApplyFilters}>
+            <TouchableOpacity style={styles.applyButton} onPress={handleApply}>
               <Text style={styles.applyButtonText}>Apply Filters</Text>
             </TouchableOpacity>
           </View>
@@ -151,7 +141,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   sheet: {
-    backgroundColor: Colors.white,
+    backgroundColor: 'white',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     maxHeight: '80%',
@@ -162,84 +152,103 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#e0e0e0',
   },
-  headerTitle: {
+  headerText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: Colors.text,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
   content: {
     padding: 16,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: Colors.text,
-    marginBottom: 12,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
   },
-  sliderContainer: {
-    marginBottom: 16,
+  rangeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  sliderLabel: {
-    fontSize: 14,
-    color: Colors.textSecondary,
-    marginBottom: 8,
-  },
-  slider: {
-    width: '100%',
+  rangeInput: {
+    flex: 1,
     height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+    marginHorizontal: 5,
   },
-  filterOption: {
+  rangeSeparator: {
+    fontSize: 16,
+    color: '#666',
+  },
+  textInput: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    paddingHorizontal: 10,
+  },
+  switchRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 10,
   },
-  filterLabel: {
-    fontSize: 16,
-    color: Colors.text,
+  switchLabel: {
+    fontSize: 14,
+    color: '#333',
   },
   premiumBadge: {
-    backgroundColor: Colors.primaryLight,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
-  },
-  premiumBadgeText: {
-    fontSize: 12,
-    color: Colors.primary,
+    marginLeft: 8,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     padding: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
+    borderTopColor: '#e0e0e0',
   },
   resetButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    flex: 1,
+    marginRight: 8,
+    padding: 12,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
   },
   resetButtonText: {
-    fontSize: 16,
-    color: Colors.textSecondary,
+    color: '#333',
+    fontWeight: 'bold',
   },
   applyButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    backgroundColor: Colors.primary,
+    flex: 1,
+    marginLeft: 8,
+    padding: 12,
+    borderRadius: 4,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
   },
   applyButtonText: {
-    fontSize: 16,
-    color: Colors.white,
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
+
+export default FilterSheet;

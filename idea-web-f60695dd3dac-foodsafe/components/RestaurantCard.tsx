@@ -6,23 +6,70 @@ import SafetyScoreBadge from './SafetyScoreBadge';
 interface RestaurantCardProps {
   restaurant: Restaurant;
   onPress: () => void;
+  showDistance?: boolean;
+  userLocation?: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
-const RestaurantCard: React.FC<RestaurantCardProps> = ({ restaurant, onPress }) => {
+const RestaurantCard: React.FC<RestaurantCardProps> = ({
+  restaurant,
+  onPress,
+  showDistance = false,
+  userLocation,
+}) => {
+  // Calculate distance if user location is provided
+  const calculateDistance = () => {
+    if (!userLocation || !restaurant.latitude || !restaurant.longitude) return null;
+
+    const R = 6371; // Radius of the Earth in km
+    const dLat = (restaurant.latitude - userLocation.latitude) * Math.PI / 180;
+    const dLon = (restaurant.longitude - userLocation.longitude) * Math.PI / 180;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(userLocation.latitude * Math.PI / 180) *
+      Math.cos(restaurant.latitude * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in km
+
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)} m`;
+    }
+    return `${distance.toFixed(1)} km`;
+  };
+
+  const distance = showDistance ? calculateDistance() : null;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
-      <View style={styles.infoContainer}>
-        <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
-        <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
-        <Text style={styles.address} numberOfLines={1}>{restaurant.address}</Text>
+    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      <View style={styles.header}>
+        <Text style={styles.name} numberOfLines={1}>
+          {restaurant.name}
+        </Text>
+        {distance && (
+          <Text style={styles.distance}>
+            {distance}
+          </Text>
+        )}
       </View>
 
-      <View style={styles.scoreContainer}>
-        <SafetyScoreBadge
-          score={restaurant.safetyScore}
-          lastInspectionDate={restaurant.lastInspectionDate}
-        />
-      </View>
+      <Text style={styles.cuisine} numberOfLines={1}>
+        {restaurant.cuisine}
+      </Text>
+
+      <Text style={styles.address} numberOfLines={2}>
+        {restaurant.address}
+      </Text>
+
+      <SafetyScoreBadge restaurant={restaurant} size="small" />
+
+      {restaurant.isPremium && (
+        <View style={styles.premiumBadge}>
+          <Text style={styles.premiumText}>Premium</Text>
+        </View>
+      )}
     </TouchableOpacity>
   );
 };
@@ -31,37 +78,54 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 15,
+    padding: 12,
     marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
+  },
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  infoContainer: {
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 4,
   },
   name: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 2,
+    color: '#333',
+    flex: 1,
+    marginRight: 8,
+  },
+  distance: {
+    fontSize: 12,
+    color: '#666',
   },
   cuisine: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   address: {
-    fontSize: 12,
-    color: '#888',
+    fontSize: 13,
+    color: '#666',
+    marginBottom: 8,
   },
-  scoreContainer: {
-    alignItems: 'flex-end',
+  premiumBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  premiumText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

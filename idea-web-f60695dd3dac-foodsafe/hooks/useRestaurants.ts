@@ -10,6 +10,7 @@ export const useRestaurants = () => {
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<Location.LocationObject | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  const [currentCity, setCurrentCity] = useState<string>('san_francisco');
   const { isPremium } = useSubscription();
 
   const fetchRestaurantsByLocation = useCallback(async () => {
@@ -54,13 +55,22 @@ export const useRestaurants = () => {
   }, []);
 
   const searchRestaurants = useCallback(async (query: string) => {
+    if (!location) {
+      setError('Location not available. Please enable location services.');
+      return;
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
       // Try to fetch from API
       try {
-        const results = await api.searchRestaurants(query);
+        const results = await api.searchRestaurants(
+          query,
+          location.coords.latitude,
+          location.coords.longitude
+        );
         setRestaurants(results);
         setIsOffline(false);
       } catch (apiError) {
@@ -86,16 +96,24 @@ export const useRestaurants = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [location]);
 
   const getRestaurantDetails = useCallback(async (restaurantId: string) => {
+    if (!location) {
+      throw new Error('Location not available. Please enable location services.');
+    }
+
     try {
       setIsLoading(true);
       setError(null);
 
       // Try to fetch from API
       try {
-        const restaurant = await api.getRestaurantDetails(restaurantId);
+        const restaurant = await api.getRestaurantDetails(
+          restaurantId,
+          location.coords.latitude,
+          location.coords.longitude
+        );
         setIsOffline(false);
         return restaurant;
       } catch (apiError) {
@@ -116,7 +134,7 @@ export const useRestaurants = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [location]);
 
   const refreshData = useCallback(async () => {
     if (location) {
@@ -125,60 +143,67 @@ export const useRestaurants = () => {
   }, [location, fetchRestaurantsByLocation]);
 
   // Apply premium filters if available
-  const applyPremiumFilters = useCallback((restaurants: Restaurant[]) => {
+  const applyPremiumFilters = useCallback((restaurants: Restaurant[], filters: any) => {
     if (isPremium) {
       // Premium users get access to all filters
-      return restaurants;
+      return restaurants.filter(restaurant => {
+        if (filters.minScore && restaurant.safetyScore < filters.minScore) return false;
+        if (filters.maxScore && restaurant.safetyScore > filters.maxScore) return false;
+        if (filters.cuisine && !restaurant.cuisine.toLowerCase().includes(filters.cuisine.toLowerCase())) return false;
+        if (filters.hasRecentInspection) {
+          const inspectionDate = new Date(restaurant.lastInspectionDate);
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          if (inspectionDate < thirtyDaysAgo) return false;
+        }
+        if (filters.hasNoViolations && restaurant.violationCount > 0) return false;
+        return true;
+      });
     } else {
       // Free users get limited data
-      return restaurants.map(restaurant => ({
-        ...restaurant,
-        // Hide violation details for free users
-        violationCount: 0,
-        // Show only basic inspection info
-        lastInspectionDate: restaurant.lastInspectionDate ? 'Recent inspection' : 'No inspection data',
-      }));
+      return restaurants
+        .filter(restaurant => {
+          if (filters.minScore && restaurant.safetyScore < filters.minScore) return false;
+          if (filters.maxScore && restaurant.safetyScore > filters.maxScore) return false;
+          return true;
+        })
+        .map(restaurant => ({
+          ...restaurant,
+          // Hide violation details for free users
+          violationCount: 0,
+          // Show only basic inspection info
+          lastInspectionDate: restaurant.lastInspectionDate ? 'Recent inspection' : 'No inspection data available',
+        }));
     }
   }, [isPremium]);
 
-  // Apply filters to current restaurants
-  const filteredRestaurants = useCallback((filters: {
-    minScore?: number;
-    maxScore?: number;
-    cuisine?: string;
-    hasRecentInspection?: boolean;
-  }) => {
-    let filtered = [...restaurants];
+  // Detect city based on location
+  useEffect(() => {
+    if (location) {
+      const detectCity = async () => {
+        try {
+          // In a real app, you would use a reverse geocoding API here
+          // For demo purposes, we'll use simple coordinate ranges
+          const { latitude, longitude } = location.coords;
 
-    if (filters.minScore !== undefined) {
-      filtered = filtered.filter(r => r.safetyScore >= filters.minScore!);
+          if (latitude >= 40.5 && latitude <= 40.9 && longitude >= -74.3 && longitude <= -73.7) {
+            setCurrentCity('nyc');
+          } else if (latitude >= 41.6 && latitude <= 42.1 && longitude >= -88.0 && longitude <= -87.5) {
+            setCurrentCity('chicago');
+          } else if (latitude >= 37.6 && latitude <= 37.9 && longitude >= -122.6 && longitude <= -122.3) {
+            setCurrentCity('san_francisco');
+          } else {
+            setCurrentCity('san_francisco'); // Default to San Francisco
+          }
+        } catch (error) {
+          console.error('Error detecting city:', error);
+          setCurrentCity('san_francisco'); // Fallback
+        }
+      };
+
+      detectCity();
     }
-
-    if (filters.maxScore !== undefined) {
-      filtered = filtered.filter(r => r.safetyScore <= filters.maxScore!);
-    }
-
-    if (filters.cuisine) {
-      filtered = filtered.filter(r =>
-        r.cuisine.toLowerCase().includes(filters.cuisine!.toLowerCase())
-      );
-    }
-
-    if (filters.hasRecentInspection) {
-      filtered = filtered.filter(r => {
-        if (!r.lastInspectionDate || r.lastInspectionDate === 'No inspections') return false;
-
-        const inspectionDate = new Date(r.lastInspectionDate);
-        const now = new Date();
-        const diffTime = Math.abs(now.getTime() - inspectionDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        return diffDays <= 30; // Within last 30 days
-      });
-    }
-
-    return applyPremiumFilters(filtered);
-  }, [restaurants, applyPremiumFilters]);
+  }, [location]);
 
   return {
     restaurants,
@@ -186,10 +211,11 @@ export const useRestaurants = () => {
     error,
     location,
     isOffline,
+    currentCity,
     fetchRestaurantsByLocation,
     searchRestaurants,
     getRestaurantDetails,
     refreshData,
-    filteredRestaurants,
+    applyPremiumFilters,
   };
 };

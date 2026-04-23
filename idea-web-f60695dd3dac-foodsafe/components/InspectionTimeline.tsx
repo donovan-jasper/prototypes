@@ -1,60 +1,84 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Inspection } from '@/types';
-import { Ionicons } from '@expo/vector-icons';
 
 interface InspectionTimelineProps {
   inspections: Inspection[];
+  isPremium: boolean;
 }
 
-const InspectionTimeline: React.FC<InspectionTimelineProps> = ({ inspections }) => {
-  if (inspections.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No inspection history available</Text>
-      </View>
-    );
-  }
+const InspectionTimeline: React.FC<InspectionTimelineProps> = ({ inspections, isPremium }) => {
+  // Sort inspections by date (newest first)
+  const sortedInspections = [...inspections].sort((a, b) =>
+    new Date(b.date).getTime() - new Date(a.date).getTime()
+  );
+
+  // Show only the last 3 inspections for free users
+  const visibleInspections = isPremium ? sortedInspections : sortedInspections.slice(0, 3);
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Get violation summary
+  const getViolationSummary = (inspection: Inspection) => {
+    if (inspection.violations.length === 0) {
+      return 'No violations';
+    }
+
+    const criticalCount = inspection.violations.filter(v => v.severity === 'critical').length;
+    const highCount = inspection.violations.filter(v => v.severity === 'high').length;
+    const mediumCount = inspection.violations.filter(v => v.severity === 'medium').length;
+
+    let summary = '';
+    if (criticalCount > 0) summary += `${criticalCount} critical, `;
+    if (highCount > 0) summary += `${highCount} high, `;
+    if (mediumCount > 0) summary += `${mediumCount} medium, `;
+
+    return summary.slice(0, -2); // Remove trailing comma and space
+  };
+
+  // Get score color
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return '#4CAF50'; // Green
+    if (score >= 70) return '#FFC107'; // Yellow
+    return '#F44336'; // Red
+  };
 
   return (
     <View style={styles.container}>
-      {inspections.map((inspection, index) => (
+      {visibleInspections.map((inspection, index) => (
         <View key={inspection.id} style={styles.inspectionItem}>
           <View style={styles.timelineDotContainer}>
             <View style={styles.timelineDot} />
-            {index < inspections.length - 1 && <View style={styles.timelineLine} />}
+            {index < visibleInspections.length - 1 && <View style={styles.timelineLine} />}
           </View>
 
           <View style={styles.inspectionContent}>
             <View style={styles.header}>
-              <Text style={styles.date}>{new Date(inspection.date).toLocaleDateString()}</Text>
-              <View style={styles.scoreContainer}>
-                <Ionicons
-                  name="star"
-                  size={16}
-                  color={inspection.score >= 90 ? '#4CAF50' : inspection.score >= 70 ? '#FFC107' : '#F44336'}
-                />
-                <Text style={styles.score}>{inspection.score}</Text>
+              <Text style={styles.date}>{formatDate(inspection.date)}</Text>
+              <View style={[styles.scoreBadge, { backgroundColor: getScoreColor(inspection.score) }]}>
+                <Text style={styles.scoreText}>{inspection.score}</Text>
               </View>
             </View>
 
-            <Text style={styles.violationCount}>
-              {inspection.violations.length} violation{inspection.violations.length !== 1 ? 's' : ''}
+            <Text style={styles.violationSummary}>
+              {getViolationSummary(inspection)}
             </Text>
 
-            {inspection.violations.length > 0 && (
+            {inspection.violations.length > 0 && isPremium && (
               <View style={styles.violationsContainer}>
-                {inspection.violations.map((violation) => (
+                {inspection.violations.map(violation => (
                   <View key={violation.id} style={styles.violationItem}>
-                    <Ionicons
-                      name="alert-circle-outline"
-                      size={16}
-                      color={
-                        violation.severity === 'high' ? '#F44336' :
-                        violation.severity === 'medium' ? '#FFC107' : '#4CAF50'
-                      }
-                    />
-                    <Text style={styles.violationText}>{violation.description}</Text>
+                    <Text style={styles.violationText}>
+                      {violation.description} ({violation.severity})
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -62,6 +86,17 @@ const InspectionTimeline: React.FC<InspectionTimelineProps> = ({ inspections }) 
           </View>
         </View>
       ))}
+
+      {!isPremium && inspections.length > 3 && (
+        <View style={styles.premiumPrompt}>
+          <Text style={styles.premiumText}>
+            See full inspection history with SafeBite Pro
+          </Text>
+          <TouchableOpacity style={styles.upgradeButton}>
+            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -70,20 +105,12 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 10,
   },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 14,
-  },
   inspectionItem: {
     flexDirection: 'row',
     marginBottom: 20,
   },
   timelineDotContainer: {
-    width: 30,
+    width: 24,
     alignItems: 'center',
   },
   timelineDot: {
@@ -96,48 +123,74 @@ const styles = StyleSheet.create({
   timelineLine: {
     flex: 1,
     width: 2,
-    backgroundColor: '#eee',
+    backgroundColor: '#e0e0e0',
   },
   inspectionContent: {
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 12,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   date: {
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '500',
+    color: '#333',
   },
-  scoreContainer: {
-    flexDirection: 'row',
+  scoreBadge: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  score: {
-    marginLeft: 5,
-    fontSize: 14,
+  scoreText: {
+    color: 'white',
     fontWeight: 'bold',
   },
-  violationCount: {
-    fontSize: 12,
+  violationSummary: {
+    fontSize: 13,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   violationsContainer: {
-    marginTop: 5,
+    marginTop: 8,
   },
   violationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 5,
+    backgroundColor: '#f9f9f9',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 4,
   },
   violationText: {
-    marginLeft: 5,
     fontSize: 12,
-    color: '#444',
-    flex: 1,
+    color: '#333',
+  },
+  premiumPrompt: {
+    marginTop: 20,
+    padding: 16,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  premiumText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  upgradeButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 4,
+  },
+  upgradeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

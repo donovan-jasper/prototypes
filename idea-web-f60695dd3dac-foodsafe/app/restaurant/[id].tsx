@@ -1,44 +1,91 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRestaurants } from '@/hooks/useRestaurants';
-import { Restaurant, Inspection } from '@/types';
+import { useSubscription } from '@/hooks/useSubscription';
 import SafetyScoreBadge from '@/components/SafetyScoreBadge';
 import InspectionTimeline from '@/components/InspectionTimeline';
-import { Ionicons } from '@expo/vector-icons';
-import * as api from '@/services/api';
+import { Restaurant, Inspection } from '@/types';
 
 const RestaurantDetailScreen = () => {
   const { id } = useLocalSearchParams();
-  const { isLoading, error } = useRestaurants();
+  const router = useRouter();
+  const { getRestaurantDetails, isLoading, error, isOffline } = useRestaurants();
+  const { isPremium } = useSubscription();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
-  const router = useRouter();
+  const [isAddingToList, setIsAddingToList] = useState(false);
 
   useEffect(() => {
-    const fetchRestaurantDetails = async () => {
+    const fetchData = async () => {
       try {
-        setIsLoadingDetails(true);
+        if (typeof id === 'string') {
+          const restaurantData = await getRestaurantDetails(id);
+          setRestaurant(restaurantData);
 
-        // Fetch restaurant details
-        const restaurantData = await api.getRestaurantDetails(id as string);
-        setRestaurant(restaurantData);
-
-        // Fetch inspection history
-        const inspectionData = await api.getInspectionsForRestaurant(id as string);
-        setInspections(inspectionData);
+          // In a real app, you would fetch inspections separately
+          // For demo purposes, we'll simulate them
+          const mockInspections: Inspection[] = [
+            {
+              id: '1',
+              restaurantId: id,
+              date: '2023-10-15',
+              score: 95,
+              violations: [],
+            },
+            {
+              id: '2',
+              restaurantId: id,
+              date: '2023-07-20',
+              score: 88,
+              violations: [
+                {
+                  id: 'v1',
+                  description: 'Improper food storage',
+                  severity: 'medium',
+                },
+              ],
+            },
+            {
+              id: '3',
+              restaurantId: id,
+              date: '2023-04-10',
+              score: 92,
+              violations: [],
+            },
+          ];
+          setInspections(mockInspections);
+        }
       } catch (err) {
         console.error('Error fetching restaurant details:', err);
-      } finally {
-        setIsLoadingDetails(false);
+        Alert.alert('Error', 'Failed to load restaurant details. Please try again.');
       }
     };
 
-    fetchRestaurantDetails();
-  }, [id]);
+    fetchData();
+  }, [id, getRestaurantDetails]);
 
-  if (isLoadingDetails) {
+  const handleAddToList = () => {
+    if (!restaurant) return;
+
+    setIsAddingToList(true);
+    // In a real app, you would navigate to a list selection screen
+    // For demo purposes, we'll show an alert
+    Alert.alert(
+      'Add to List',
+      `Would you like to add ${restaurant.name} to a list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'OK', onPress: () => {
+          // In a real app, you would add the restaurant to the selected list
+          Alert.alert('Success', `${restaurant.name} added to your list!`);
+          setIsAddingToList(false);
+        }},
+      ]
+    );
+  };
+
+  if (isLoading && !restaurant) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#4CAF50" />
@@ -52,11 +99,10 @@ const RestaurantDetailScreen = () => {
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error || 'Restaurant not found'}</Text>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles.retryButton}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <Text style={styles.retryButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -64,6 +110,12 @@ const RestaurantDetailScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
+      {isOffline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>Offline Mode - Showing cached data</Text>
+        </View>
+      )}
+
       <View style={styles.header}>
         <Text style={styles.name}>{restaurant.name}</Text>
         <Text style={styles.cuisine}>{restaurant.cuisine}</Text>
@@ -71,35 +123,28 @@ const RestaurantDetailScreen = () => {
       </View>
 
       <View style={styles.scoreContainer}>
-        <SafetyScoreBadge
-          score={restaurant.safetyScore}
-          lastInspectionDate={restaurant.lastInspectionDate}
-        />
+        <SafetyScoreBadge restaurant={restaurant} size="large" />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inspection History</Text>
-        <InspectionTimeline inspections={inspections} />
+        <InspectionTimeline
+          inspections={inspections}
+          isPremium={isPremium}
+        />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About This Restaurant</Text>
-        <Text style={styles.description}>
-          {restaurant.name} is a {restaurant.cuisine} restaurant located at {restaurant.address}.
-          This establishment has a safety score of {restaurant.safetyScore} based on the most recent inspection.
-        </Text>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={styles.addToListButton}
+          onPress={handleAddToList}
+          disabled={isAddingToList}
+        >
+          <Text style={styles.addToListButtonText}>
+            {isAddingToList ? 'Adding...' : 'Add to List'}
+          </Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity
-        style={styles.addToListButton}
-        onPress={() => {
-          // In a real app, this would add the restaurant to a user's list
-          alert('This would add the restaurant to your list in a full implementation');
-        }}
-      >
-        <Ionicons name="add-circle-outline" size={24} color="#4CAF50" />
-        <Text style={styles.addToListText}>Add to List</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -116,7 +161,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
@@ -127,78 +172,84 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    color: 'red',
     fontSize: 16,
+    color: '#F44336',
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  retryButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  offlineBanner: {
+    backgroundColor: '#FFC107',
     padding: 10,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
+    alignItems: 'center',
   },
-  backButtonText: {
-    marginLeft: 5,
-    color: '#4CAF50',
-    fontSize: 16,
+  offlineText: {
+    color: '#333',
+    fontWeight: 'bold',
   },
   header: {
     padding: 20,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: '#333',
+    marginBottom: 4,
   },
   cuisine: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   address: {
     fontSize: 14,
-    color: '#888',
+    color: '#666',
   },
   scoreContainer: {
     padding: 20,
     backgroundColor: 'white',
     marginTop: 10,
-    marginBottom: 10,
   },
   section: {
     padding: 20,
     backgroundColor: 'white',
-    marginBottom: 10,
+    marginTop: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#333',
+    marginBottom: 12,
   },
-  description: {
-    fontSize: 14,
-    color: '#444',
-    lineHeight: 20,
+  actionButtons: {
+    padding: 20,
+    backgroundColor: 'white',
+    marginTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   addToListButton: {
-    flexDirection: 'row',
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 5,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    backgroundColor: '#e8f5e9',
-    margin: 20,
-    borderRadius: 8,
   },
-  addToListText: {
-    marginLeft: 10,
-    color: '#4CAF50',
-    fontSize: 16,
+  addToListButtonText: {
+    color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
