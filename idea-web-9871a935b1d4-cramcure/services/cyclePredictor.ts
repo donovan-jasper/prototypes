@@ -1,4 +1,4 @@
-import { format, parseISO, differenceInDays, addDays } from 'date-fns';
+import { format, parseISO, differenceInDays, addDays, subDays } from 'date-fns';
 
 interface Cycle {
   startDate: string;
@@ -87,5 +87,69 @@ export const identifyPatterns = (cycles: Cycle[]): { isIrregular: boolean; avera
   return {
     isIrregular,
     averageLength: avgLength,
+  };
+};
+
+export const calculateAverageLutealPhase = (cycles: Cycle[]): number => {
+  if (cycles.length < 2) {
+    return 14; // Default luteal phase length
+  }
+
+  const lutealLengths = [];
+  for (let i = 0; i < cycles.length; i++) {
+    const cycle = cycles[i];
+    if (cycle.startDate && cycle.endDate) {
+      const start = parseISO(cycle.startDate);
+      const end = parseISO(cycle.endDate);
+      const cycleLength = differenceInDays(end, start);
+
+      // Luteal phase is typically 11-16 days, but we'll calculate it as cycle length - 14
+      // (assuming follicular phase is ~14 days)
+      const lutealLength = cycleLength - 14;
+      if (lutealLength > 0 && lutealLength < 20) { // Reasonable range for luteal phase
+        lutealLengths.push(lutealLength);
+      }
+    }
+  }
+
+  if (lutealLengths.length === 0) {
+    return 14;
+  }
+
+  return Math.round(
+    lutealLengths.reduce((sum, length) => sum + length, 0) / lutealLengths.length
+  );
+};
+
+export const calculateOvulationDate = (cycles: Cycle[], currentCycleStart: string): Date | null => {
+  if (cycles.length === 0 || !currentCycleStart) {
+    return null;
+  }
+
+  const avgLutealPhase = calculateAverageLutealPhase(cycles);
+  const cycleStartDate = parseISO(currentCycleStart);
+
+  // Ovulation typically occurs 14 days before the next period
+  // So we subtract the luteal phase length from the average cycle length
+  const ovulationDate = subDays(cycleStartDate, avgLutealPhase);
+
+  return ovulationDate;
+};
+
+export const predictNextPeriodWithOvulation = (cycles: Cycle[]): { predictedStart: Date | null; ovulationDate: Date | null } => {
+  const predictedStart = predictNextPeriod(cycles);
+
+  if (!predictedStart || cycles.length === 0) {
+    return {
+      predictedStart: null,
+      ovulationDate: null
+    };
+  }
+
+  const ovulationDate = calculateOvulationDate(cycles, predictedStart.toISOString());
+
+  return {
+    predictedStart,
+    ovulationDate
   };
 };
