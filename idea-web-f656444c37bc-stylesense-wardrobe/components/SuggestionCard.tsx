@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions, Animated, PanResponder } from 'react-native';
-import { OutfitSuggestion, WardrobeItem } from '@/types';
-import { getItemById, updateItem, addWearLogEntry } from '@/lib/database';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, Image, TouchableOpacity, Dimensions } from 'react-native';
+import { useWardrobeStore } from '@/store/wardrobeStore';
+import { addWearLogEntry } from '@/lib/database';
+import { WardrobeItem, OutfitSuggestion } from '@/types';
 
 const { width } = Dimensions.get('window');
-const SWIPE_THRESHOLD = 0.3 * width;
 
 interface SuggestionCardProps {
   suggestion: OutfitSuggestion;
@@ -12,160 +12,103 @@ interface SuggestionCardProps {
 }
 
 const SuggestionCard: React.FC<SuggestionCardProps> = ({ suggestion, onRefresh }) => {
-  const [items, setItems] = useState<WardrobeItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [pan] = useState(new Animated.ValueXY());
-  const [opacity] = useState(new Animated.Value(1));
+  const { items: allItems } = useWardrobeStore();
+  const [outfitItems, setOutfitItems] = useState<WardrobeItem[]>([]);
+  const [isAccepted, setIsAccepted] = useState(false);
 
-  // Load item details when component mounts
-  React.useEffect(() => {
-    async function loadItems() {
-      try {
-        const loadedItems = await Promise.all(
-          suggestion.items.map(itemId => getItemById(itemId))
-        );
-        setItems(loadedItems.filter(item => item !== null) as WardrobeItem[]);
-      } catch (error) {
-        console.error('Error loading items:', error);
-      } finally {
-        setIsLoading(false);
-      }
+  useEffect(() => {
+    const items = allItems.filter(item => suggestion.items.includes(item.id));
+    setOutfitItems(items);
+  }, [suggestion, allItems]);
+
+  const handleAccept = async () => {
+    try {
+      // Log the outfit to wear_log
+      await addWearLogEntry({
+        itemIds: suggestion.items,
+        wornDate: new Date().toISOString(),
+        weather: suggestion.context.weather,
+        event: suggestion.context.events.join(', ')
+      });
+
+      // Update local state
+      setIsAccepted(true);
+
+      // Refresh suggestions after a delay
+      setTimeout(() => {
+        onRefresh();
+      }, 1000);
+    } catch (error) {
+      console.error('Error accepting outfit:', error);
     }
+  };
 
-    loadItems();
-  }, [suggestion.items]);
+  const handleReject = () => {
+    // Just refresh suggestions
+    onRefresh();
+  };
 
-  // Handle swipe gestures
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, gestureState) => {
-      pan.setValue({ x: gestureState.dx, y: 0 });
-    },
-    onPanResponderRelease: async (_, gestureState) => {
-      if (gestureState.dx > SWIPE_THRESHOLD) {
-        // Swiped right (accept)
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(async () => {
-          try {
-            // Update wear count for each item
-            for (const itemId of suggestion.items) {
-              const item = await getItemById(itemId);
-              if (item) {
-                await updateItem(itemId, { wearCount: item.wearCount + 1 });
-              }
-            }
-
-            // Log the outfit as worn
-            await addWearLogEntry({
-              itemIds: suggestion.items,
-              wornDate: new Date().toISOString(),
-              weather: suggestion.context.weather,
-              event: suggestion.context.events.join(', ')
-            });
-
-            // Refresh suggestions
-            onRefresh();
-          } catch (error) {
-            console.error('Error accepting outfit:', error);
-          }
-        });
-      } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-        // Swiped left (reject)
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 300,
-          useNativeDriver: true,
-        }).start(onRefresh);
-      } else {
-        // Reset position
-        Animated.spring(pan, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: true,
-        }).start();
-      }
-    },
-  });
-
-  if (isLoading) {
+  if (isAccepted) {
     return (
-      <View style={styles.card}>
-        <Text>Loading outfit...</Text>
+      <View style={styles.acceptedContainer}>
+        <Text style={styles.acceptedText}>✅ Outfit accepted!</Text>
+        <Text style={styles.acceptedSubtext}>You'll see new suggestions tomorrow</Text>
       </View>
     );
   }
 
-  const rotate = pan.x.interpolate({
-    inputRange: [-width / 2, 0, width / 2],
-    outputRange: ['-10deg', '0deg', '10deg'],
-  });
-
-  const animatedStyle = {
-    transform: [
-      { translateX: pan.x },
-      { rotate },
-    ],
-    opacity,
-  };
-
   return (
-    <Animated.View
-      style={[styles.card, animatedStyle]}
-      {...panResponder.panHandlers}
-    >
+    <View style={styles.container}>
       <View style={styles.itemsContainer}>
-        {items.map((item) => (
+        {outfitItems.map((item) => (
           <View key={item.id} style={styles.itemContainer}>
             <Image
               source={{ uri: item.imageUri }}
               style={styles.itemImage}
               resizeMode="cover"
             />
-            <View style={styles.itemInfo}>
-              <Text style={styles.itemCategory}>{item.category}</Text>
-              <View style={styles.colorDots}>
-                {item.colors.map((color, index) => (
-                  <View
-                    key={index}
-                    style={[styles.colorDot, { backgroundColor: color }]}
-                  />
-                ))}
-              </View>
+            <View style={styles.colorPalette}>
+              {item.colors.map((color, index) => (
+                <View
+                  key={index}
+                  style={[styles.colorDot, { backgroundColor: color }]}
+                />
+              ))}
             </View>
           </View>
         ))}
       </View>
 
-      <View style={styles.footer}>
-        <Text style={styles.scoreText}>Match Score: {Math.round(suggestion.score * 100)}%</Text>
-        <Text style={styles.contextText}>
-          {suggestion.context.weather} • {suggestion.context.events.join(', ')}
-        </Text>
-      </View>
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.button, styles.rejectButton]}
+          onPress={handleReject}
+        >
+          <Text style={styles.buttonText}>✕ Skip</Text>
+        </TouchableOpacity>
 
-      <View style={styles.swipeIndicators}>
-        <Text style={[styles.swipeText, styles.rejectText]}>Reject</Text>
-        <Text style={[styles.swipeText, styles.acceptText]}>Accept</Text>
+        <TouchableOpacity
+          style={[styles.button, styles.acceptButton]}
+          onPress={handleAccept}
+        >
+          <Text style={styles.buttonText}>✓ Wear This</Text>
+        </TouchableOpacity>
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
+  container: {
+    backgroundColor: 'white',
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    overflow: 'hidden',
+    shadowRadius: 4,
+    elevation: 3,
   },
   itemsContainer: {
     flexDirection: 'row',
@@ -174,73 +117,66 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   itemContainer: {
-    width: (width - 80) / 2,
     margin: 4,
-    borderRadius: 8,
-    overflow: 'hidden',
+    width: (width - 64) / 3,
+    aspectRatio: 0.7,
   },
   itemImage: {
     width: '100%',
-    aspectRatio: 0.75,
+    height: '80%',
+    borderRadius: 8,
   },
-  itemInfo: {
-    padding: 8,
-    backgroundColor: '#f8fafc',
-  },
-  itemCategory: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#475569',
-    marginBottom: 4,
-    textTransform: 'capitalize',
-  },
-  colorDots: {
+  colorPalette: {
     flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 4,
   },
   colorDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: 4,
+    marginHorizontal: 2,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: '#ddd',
   },
-  footer: {
-    paddingHorizontal: 8,
-    paddingBottom: 8,
-  },
-  scoreText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0f766e',
-    marginBottom: 4,
-  },
-  contextText: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  swipeIndicators: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+  },
+  button: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    flex: 1,
+    marginHorizontal: 4,
     alignItems: 'center',
-    paddingHorizontal: 20,
-    pointerEvents: 'none',
   },
-  swipeText: {
-    fontSize: 24,
+  acceptButton: {
+    backgroundColor: '#4CAF50',
+  },
+  rejectButton: {
+    backgroundColor: '#F44336',
+  },
+  buttonText: {
+    color: 'white',
     fontWeight: 'bold',
-    opacity: 0.2,
   },
-  rejectText: {
-    color: '#ef4444',
+  acceptedContainer: {
+    backgroundColor: '#E8F5E9',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    alignItems: 'center',
   },
-  acceptText: {
-    color: '#10b981',
+  acceptedText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  acceptedSubtext: {
+    fontSize: 14,
+    color: '#388E3C',
   },
 });
 

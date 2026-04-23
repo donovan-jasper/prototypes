@@ -13,6 +13,7 @@ interface OutfitCombination {
   context: GenerationContext;
 }
 
+// Color harmony definitions
 const COMPLEMENTARY_COLORS: Record<string, string[]> = {
   '#FF0000': ['#00FFFF', '#0000FF'], // Red with cyan/blue
   '#00FF00': ['#FF00FF', '#0000FF'], // Green with magenta/blue
@@ -163,12 +164,11 @@ function filterByWeather(
     // Cold weather (below 50°F)
     else if (context.temp < 50) {
       return !item.tags.includes('summer') &&
-             !item.tags.includes('light');
+             !item.tags.includes('light') &&
+             !item.tags.includes('casual');
     }
     // Mild weather
-    else {
-      return !item.tags.includes('extreme');
-    }
+    return true;
   });
 }
 
@@ -182,9 +182,11 @@ function groupByCategory(items: WardrobeItem[]): Record<Category, WardrobeItem[]
     accessory: []
   };
 
-  for (const item of items) {
-    grouped[item.category].push(item);
-  }
+  items.forEach(item => {
+    if (grouped[item.category]) {
+      grouped[item.category].push(item);
+    }
+  });
 
   return grouped;
 }
@@ -194,138 +196,178 @@ function calculateOutfitScore(
   allItems: WardrobeItem[],
   context: GenerationContext
 ): number {
-  const items = allItems.filter(item => itemIds.includes(item.id));
   let score = 0;
+  const items = allItems.filter(item => itemIds.includes(item.id));
 
   // Base score based on number of items
-  score += items.length * 0.2;
+  score += items.length * 2;
 
-  // Check for complete outfit (top + bottom OR dress)
-  const hasTop = items.some(item => item.category === 'top');
-  const hasBottom = items.some(item => item.category === 'bottom');
-  const hasDress = items.some(item => item.category === 'dress');
+  // Color harmony score
+  const colorScore = calculateColorHarmonyScore(items);
+  score += colorScore * 3;
 
-  if ((hasTop && hasBottom) || hasDress) {
-    score += 0.3;
-  }
+  // Style coherence score
+  const styleScore = calculateStyleCoherenceScore(items, context);
+  score += styleScore * 2;
 
-  // Check color harmony
-  const colorScore = calculateColorScore(items, context);
-  score += colorScore * 0.4;
+  // Weather appropriateness score
+  const weatherScore = calculateWeatherAppropriatenessScore(items, context);
+  score += weatherScore * 2;
 
-  // Check for appropriate accessories
-  const accessoryScore = calculateAccessoryScore(items, context);
-  score += accessoryScore * 0.2;
+  // Occasion appropriateness score
+  const occasionScore = calculateOccasionAppropriatenessScore(items, context);
+  score += occasionScore * 2;
 
-  // Check for weather appropriateness
-  const weatherScore = calculateWeatherScore(items, context);
-  score += weatherScore * 0.2;
-
-  // Normalize score to 0-1 range
-  return Math.min(Math.max(score, 0), 1);
+  return score;
 }
 
-function calculateColorScore(
+function calculateColorHarmonyScore(items: WardrobeItem[]): number {
+  if (items.length < 2) return 0;
+
+  // Check for monochrome (all items same color)
+  const firstColors = items[0].colors;
+  const isMonochrome = items.every(item =>
+    item.colors.some(color => firstColors.includes(color))
+  );
+
+  if (isMonochrome) return 5;
+
+  // Check for complementary colors
+  let hasComplementary = false;
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const item1Colors = items[i].colors;
+      const item2Colors = items[j].colors;
+
+      for (const color1 of item1Colors) {
+        if (COMPLEMENTARY_COLORS[color1]?.some(color =>
+          item2Colors.includes(color)
+        )) {
+          hasComplementary = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (hasComplementary) return 4;
+
+  // Check for analogous colors
+  let hasAnalogous = false;
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const item1Colors = items[i].colors;
+      const item2Colors = items[j].colors;
+
+      for (const color1 of item1Colors) {
+        if (ANALOGOUS_COLORS[color1]?.some(color =>
+          item2Colors.includes(color)
+        )) {
+          hasAnalogous = true;
+          break;
+        }
+      }
+    }
+  }
+
+  if (hasAnalogous) return 3;
+
+  // Default score for mixed colors
+  return 2;
+}
+
+function calculateStyleCoherenceScore(
   items: WardrobeItem[],
   context: GenerationContext
 ): number {
-  if (items.length === 0) return 0;
-
-  // For formal occasions, prefer complementary colors
   const isFormal = context.events.some(event =>
     event.toLowerCase().includes('meeting') ||
     event.toLowerCase().includes('interview') ||
     event.toLowerCase().includes('dinner')
   );
 
-  if (isFormal) {
-    // Check if any two items have complementary colors
-    for (let i = 0; i < items.length; i++) {
-      for (let j = i + 1; j < items.length; j++) {
-        const item1 = items[i];
-        const item2 = items[j];
-
-        for (const color1 of item1.colors) {
-          for (const color2 of item2.colors) {
-            if (COMPLEMENTARY_COLORS[color1]?.includes(color2) ||
-                COMPLEMENTARY_COLORS[color2]?.includes(color1)) {
-              return 1; // Perfect complementary colors
-            }
-          }
-        }
-      }
-    }
-
-    // If no complementary colors, check for monochrome
-    const firstColor = items[0].colors[0];
-    const isMonochrome = items.every(item =>
-      item.colors.includes(firstColor)
-    );
-
-    return isMonochrome ? 0.7 : 0.3;
-  }
-  // For casual occasions, prefer analogous colors
-  else {
-    // Check if all items have analogous colors
-    for (let i = 0; i < items.length; i++) {
-      for (let j = i + 1; j < items.length; j++) {
-        const item1 = items[i];
-        const item2 = items[j];
-
-        let hasAnalogous = false;
-
-        for (const color1 of item1.colors) {
-          for (const color2 of item2.colors) {
-            if (ANALOGOUS_COLORS[color1]?.includes(color2) ||
-                ANALOGOUS_COLORS[color2]?.includes(color1)) {
-              hasAnalogous = true;
-              break;
-            }
-          }
-          if (hasAnalogous) break;
-        }
-
-        if (!hasAnalogous) {
-          return 0.3; // Not all items have analogous colors
-        }
-      }
-    }
-
-    return 1; // All items have analogous colors
-  }
-}
-
-function calculateAccessoryScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  const hasAccessory = items.some(item => item.category === 'accessory');
-  const hasShoes = items.some(item => item.category === 'shoes');
-
-  // For formal occasions, accessories are important
-  const isFormal = context.events.some(event =>
-    event.toLowerCase().includes('meeting') ||
-    event.toLowerCase().includes('interview') ||
-    event.toLowerCase().includes('dinner')
+  const isCasual = context.events.some(event =>
+    event.toLowerCase().includes('brunch') ||
+    event.toLowerCase().includes('coffee') ||
+    event.toLowerCase().includes('lunch')
   );
 
-  if (isFormal) {
-    return hasAccessory ? 1 : 0.3;
-  }
-  // For casual occasions, accessories are nice but not required
-  else {
-    return hasAccessory ? 0.7 : 0.5;
-  }
+  // Check if all items match the occasion
+  const allFormal = items.every(item =>
+    item.tags.includes('formal') ||
+    item.tags.includes('work') ||
+    item.tags.includes('business')
+  );
 
-  // Shoes are always good
-  return hasShoes ? 1 : 0.5;
+  const allCasual = items.every(item =>
+    item.tags.includes('casual') ||
+    item.tags.includes('athleisure') ||
+    item.tags.includes('streetwear')
+  );
+
+  if (isFormal && allFormal) return 5;
+  if (isCasual && allCasual) return 5;
+
+  // Mixed styles get lower score
+  return 3;
 }
 
-function calculateWeatherScore(
+function calculateWeatherAppropriatenessScore(
   items: WardrobeItem[],
   context: GenerationContext
 ): number {
   // Check if all items are appropriate for the weather
-  const weatherFiltered = filterByWeather(items, context);
-  return weatherFiltered.length === items.length ? 1 : 0.5;
+  const allAppropriate = items.every(item => {
+    if (context.temp > 75) {
+      return !item.tags.includes('winter') &&
+             !item.tags.includes('heavy') &&
+             !item.tags.includes('formal');
+    } else if (context.temp < 50) {
+      return !item.tags.includes('summer') &&
+             !item.tags.includes('light') &&
+             !item.tags.includes('casual');
+    }
+    return true;
+  });
+
+  return allAppropriate ? 5 : 3;
+}
+
+function calculateOccasionAppropriatenessScore(
+  items: WardrobeItem[],
+  context: GenerationContext
+): number {
+  const isFormal = context.events.some(event =>
+    event.toLowerCase().includes('meeting') ||
+    event.toLowerCase().includes('interview') ||
+    event.toLowerCase().includes('dinner')
+  );
+
+  const isCasual = context.events.some(event =>
+    event.toLowerCase().includes('brunch') ||
+    event.toLowerCase().includes('coffee') ||
+    event.toLowerCase().includes('lunch')
+  );
+
+  // Check if items match the occasion
+  if (isFormal) {
+    const hasFormal = items.some(item =>
+      item.tags.includes('formal') ||
+      item.tags.includes('work') ||
+      item.tags.includes('business')
+    );
+    return hasFormal ? 5 : 3;
+  }
+
+  if (isCasual) {
+    const hasCasual = items.some(item =>
+      item.tags.includes('casual') ||
+      item.tags.includes('athleisure') ||
+      item.tags.includes('streetwear')
+    );
+    return hasCasual ? 5 : 3;
+  }
+
+  // Neutral occasions get higher score
+  return 4;
 }
