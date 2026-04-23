@@ -184,12 +184,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   button: {
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
     flex: 1,
-    marginHorizontal: 4,
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   keepOneButton: {
     backgroundColor: '#4CAF50',
