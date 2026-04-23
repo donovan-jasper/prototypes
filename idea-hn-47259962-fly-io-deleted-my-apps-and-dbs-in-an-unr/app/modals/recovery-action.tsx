@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, ScrollView } from 'react-native';
 import { useState, useEffect } from 'react';
 import { FlyioClient } from '@/lib/cloudProviders/flyio';
 import { useStore } from '@/lib/store';
@@ -17,6 +17,8 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [workflow, setWorkflow] = useState<any>(null);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [stepStatus, setStepStatus] = useState<Record<string, 'pending' | 'success' | 'error'>>({});
   const services = useStore((state) => state.services);
   const updateServiceStatus = useStore((state) => state.updateServiceStatus);
   const addAlert = useStore((state) => state.addAlert);
@@ -26,17 +28,30 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
   }, []);
 
   async function loadWorkflow() {
-    const db = await openDatabase();
-    const workflowData = await db.getFirstAsync(
-      'SELECT * FROM recovery_workflows WHERE id = ?',
-      [workflowId]
-    );
+    try {
+      const db = await openDatabase();
+      const workflowData = await db.getFirstAsync(
+        'SELECT * FROM recovery_workflows WHERE id = ?',
+        [workflowId]
+      );
 
-    if (workflowData) {
-      setWorkflow({
-        ...workflowData,
-        steps: JSON.parse(workflowData.steps)
-      });
+      if (workflowData) {
+        const parsedWorkflow = {
+          ...workflowData,
+          steps: JSON.parse(workflowData.steps)
+        };
+        setWorkflow(parsedWorkflow);
+
+        // Initialize step status
+        const initialStatus: Record<string, 'pending' | 'success' | 'error'> = {};
+        parsedWorkflow.steps.forEach((step: any) => {
+          initialStatus[step.id] = 'pending';
+        });
+        setStepStatus(initialStatus);
+      }
+    } catch (err) {
+      console.error('Failed to load workflow:', err);
+      setError('Failed to load recovery workflow');
     }
   }
 
@@ -45,6 +60,7 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
 
     setIsExecuting(true);
     setError(null);
+    setSuccess(false);
 
     try {
       const service = services.find(s => s.id === serviceId);
@@ -56,43 +72,63 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
       const db = await openDatabase();
 
       // Execute each step in sequence
-      for (const step of workflow.steps) {
-        if (step.action?.type === 'api') {
-          switch (service.provider) {
-            case 'flyio':
-              const flyioClient = new FlyioClient(token);
-              if (step.action.endpoint === 'restart') {
-                await flyioClient.restartApp(service.id);
-                // Update service status in Zustand
-                updateServiceStatus(service.id, 'healthy');
-                // Update in database
-                await db.runAsync(
-                  'UPDATE services SET status = ?, last_check = ? WHERE id = ?',
-                  ['healthy', Date.now(), service.id]
-                );
-              } else if (step.action.endpoint === 'rollback') {
-                await flyioClient.rollbackDeployment(service.id);
-                updateServiceStatus(service.id, 'healthy');
-                await db.runAsync(
-                  'UPDATE services SET status = ?, last_check = ? WHERE id = ?',
-                  ['healthy', Date.now(), service.id]
-                );
-              }
-              break;
-            default:
-              throw new Error('Unsupported provider');
+      for (let i = 0; i < workflow.steps.length; i++) {
+        const step = workflow.steps[i];
+        setCurrentStep(i);
+
+        try {
+          if (step.action?.type === 'api') {
+            switch (service.provider) {
+              case 'flyio':
+                const flyioClient = new FlyioClient(token);
+                if (step.action.endpoint === 'restart') {
+                  await flyioClient.restartApp(service.id);
+                } else if (step.action.endpoint === 'rollback') {
+                  await flyioClient.rollbackDeployment(service.id);
+                }
+
+                // Update step status
+                setStepStatus(prev => ({
+                  ...prev,
+                  [step.id]: 'success'
+                }));
+
+                // If this is the last step, update service status
+                if (i === workflow.steps.length - 1) {
+                  updateServiceStatus(service.id, 'healthy');
+                  await db.runAsync(
+                    'UPDATE services SET status = ?, last_check = ? WHERE id = ?',
+                    ['healthy', Date.now(), service.id]
+                  );
+                }
+                break;
+              default:
+                throw new Error('Unsupported provider');
+            }
+          } else {
+            // For manual steps, just mark as complete
+            setStepStatus(prev => ({
+              ...prev,
+              [step.id]: 'success'
+            }));
           }
+        } catch (stepError) {
+          console.error(`Step ${i + 1} failed:`, stepError);
+          setStepStatus(prev => ({
+            ...prev,
+            [step.id]: 'error'
+          }));
+          throw stepError; // Stop execution on error
         }
       }
 
-      // Save alert to database
+      // Save success alert
       await saveAlert(db, {
         serviceId: service.id,
         severity: 'info',
         message: `Successfully executed recovery workflow: ${workflow.name}`
       });
 
-      // Add to Zustand store
       addAlert({
         id: Date.now(),
         serviceId: service.id,
@@ -101,7 +137,6 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
         timestamp: Date.now()
       });
 
-      // Send notification
       await sendLocalNotification(
         'Recovery Successful',
         `Your ${service.name} service has been recovered using ${workflow.name}`,
@@ -110,7 +145,8 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
 
       setSuccess(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+      setError(errorMessage);
       console.error('Recovery workflow failed:', err);
 
       // Save error alert
@@ -118,14 +154,14 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
       await saveAlert(db, {
         serviceId: serviceId,
         severity: 'critical',
-        message: `Recovery workflow failed: ${err instanceof Error ? err.message : 'Unknown error'}`
+        message: `Recovery workflow failed: ${errorMessage}`
       });
 
       addAlert({
         id: Date.now(),
         serviceId: serviceId,
         severity: 'critical',
-        message: `Recovery workflow failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        message: `Recovery workflow failed: ${errorMessage}`,
         timestamp: Date.now()
       });
 
@@ -143,6 +179,7 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading workflow...</Text>
       </View>
     );
   }
@@ -152,15 +189,36 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
       <Text style={styles.title}>Execute Recovery Workflow</Text>
       <Text style={styles.workflowName}>{workflow.name}</Text>
 
-      <View style={styles.stepsContainer}>
-        <Text style={styles.stepsHeader}>Steps:</Text>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, {
+            width: `${((currentStep + 1) / workflow.steps.length) * 100}%`
+          }]} />
+        </View>
+        <Text style={styles.progressText}>
+          Step {currentStep + 1} of {workflow.steps.length}
+        </Text>
+      </View>
+
+      <ScrollView style={styles.stepsContainer}>
         {workflow.steps.map((step: any, index: number) => (
           <View key={step.id} style={styles.stepItem}>
-            <Text style={styles.stepNumber}>{index + 1}.</Text>
-            <Text style={styles.stepText}>{step.title}</Text>
+            <View style={styles.stepHeader}>
+              <View style={[
+                styles.stepNumber,
+                stepStatus[step.id] === 'success' && styles.stepSuccess,
+                stepStatus[step.id] === 'error' && styles.stepError
+              ]}>
+                <Text style={styles.stepNumberText}>
+                  {stepStatus[step.id] === 'success' ? '✓' : index + 1}
+                </Text>
+              </View>
+              <Text style={styles.stepTitle}>{step.title}</Text>
+            </View>
+            <Text style={styles.stepDescription}>{step.description}</Text>
           </View>
         ))}
-      </View>
+      </ScrollView>
 
       {error && (
         <View style={styles.errorContainer}>
@@ -168,31 +226,35 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
         </View>
       )}
 
-      {success ? (
+      {success && (
         <View style={styles.successContainer}>
           <Text style={styles.successText}>✓ Workflow completed successfully!</Text>
-          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Text style={styles.closeButtonText}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.executeButton, isExecuting && styles.disabledButton]}
-            onPress={executeWorkflow}
-            disabled={isExecuting}
-          >
-            {isExecuting ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Execute Workflow</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
         </View>
       )}
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton]}
+          onPress={onClose}
+          disabled={isExecuting}
+        >
+          <Text style={styles.buttonText}>Cancel</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.executeButton]}
+          onPress={executeWorkflow}
+          disabled={isExecuting || success}
+        >
+          {isExecuting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={[styles.buttonText, styles.executeButtonText]}>
+              {success ? 'Done' : 'Execute Workflow'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -200,7 +262,7 @@ export default function RecoveryActionModal({ serviceId, workflowId, onClose }: 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#fff',
   },
   centered: {
@@ -208,97 +270,128 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingText: {
+    marginTop: 16,
+    color: '#6B7280',
+  },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontWeight: '600',
+    marginBottom: 4,
     color: '#1F2937',
   },
   workflowName: {
     fontSize: 16,
     color: '#6B7280',
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  progressContainer: {
+    marginBottom: 24,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: '#E5E7EB',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#3B82F6',
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
   stepsContainer: {
-    marginBottom: 20,
-  },
-  stepsHeader: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#374151',
+    flex: 1,
   },
   stepItem: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 8,
+  },
+  stepHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
   },
   stepNumber: {
-    fontWeight: 'bold',
-    marginRight: 8,
-    color: '#3B82F6',
-  },
-  stepText: {
-    flex: 1,
-    color: '#4B5563',
-  },
-  buttonContainer: {
-    marginTop: 20,
-  },
-  executeButton: {
-    backgroundColor: '#3B82F6',
-    padding: 12,
-    borderRadius: 8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginRight: 12,
   },
-  disabledButton: {
-    opacity: 0.7,
+  stepSuccess: {
+    backgroundColor: '#10B981',
   },
-  buttonText: {
+  stepError: {
+    backgroundColor: '#EF4444',
+  },
+  stepNumberText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 16,
   },
-  cancelButton: {
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#D1D5DB',
-  },
-  cancelButtonText: {
-    color: '#374151',
-    fontWeight: '600',
+  stepTitle: {
     fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+  },
+  stepDescription: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginLeft: 36,
   },
   errorContainer: {
     padding: 12,
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#FEE2E2',
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   errorText: {
-    color: '#EF4444',
+    color: '#DC2626',
+    fontSize: 14,
   },
   successContainer: {
     padding: 12,
-    backgroundColor: '#ECFDF5',
+    backgroundColor: '#D1FAE5',
     borderRadius: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   successText: {
-    color: '#059669',
-    fontWeight: '600',
-    marginBottom: 12,
+    color: '#065F46',
+    fontSize: 14,
+    fontWeight: '500',
   },
-  closeButton: {
-    backgroundColor: '#3B82F6',
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  button: {
+    flex: 1,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
-  closeButtonText: {
+  cancelButton: {
+    backgroundColor: '#F3F4F6',
+  },
+  executeButton: {
+    backgroundColor: '#3B82F6',
+  },
+  buttonText: {
+    color: '#374151',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  executeButtonText: {
     color: '#fff',
-    fontWeight: '600',
   },
 });

@@ -4,6 +4,8 @@ import axios from 'axios';
 import { FlyioClient } from '@/lib/cloudProviders/flyio';
 import { useStore } from '@/lib/store';
 import * as SecureStore from 'expo-secure-store';
+import { openDatabase, saveAlert } from '@/lib/db';
+import { sendLocalNotification } from '@/lib/notifications';
 
 interface RecoveryStepProps {
   step: {
@@ -28,6 +30,7 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
   const [error, setError] = useState<string | null>(null);
   const services = useStore((state) => state.services);
   const updateServiceStatus = useStore((state) => state.updateServiceStatus);
+  const addAlert = useStore((state) => state.addAlert);
 
   async function getAuthToken(provider: string): Promise<string> {
     try {
@@ -72,12 +75,72 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
               await flyioClient.restartApp(service.id);
               // Update service status after restart
               updateServiceStatus(service.id, 'healthy');
+
+              // Save alert
+              const db = await openDatabase();
+              await saveAlert(db, {
+                serviceId: service.id,
+                severity: 'info',
+                message: 'Service restarted successfully'
+              });
+
+              addAlert({
+                id: Date.now(),
+                serviceId: service.id,
+                severity: 'info',
+                message: 'Service restarted successfully',
+                timestamp: Date.now()
+              });
+
+              await sendLocalNotification(
+                'Service Restarted',
+                `Your ${service.name} service has been restarted`,
+                'info'
+              );
             } else if (step.action.endpoint === 'rollback') {
               await flyioClient.rollbackDeployment(service.id);
               updateServiceStatus(service.id, 'healthy');
+
+              // Save alert
+              const db = await openDatabase();
+              await saveAlert(db, {
+                serviceId: service.id,
+                severity: 'info',
+                message: 'Deployment rolled back successfully'
+              });
+
+              addAlert({
+                id: Date.now(),
+                serviceId: service.id,
+                severity: 'info',
+                message: 'Deployment rolled back successfully',
+                timestamp: Date.now()
+              });
+
+              await sendLocalNotification(
+                'Rollback Complete',
+                `Your ${service.name} service has been rolled back`,
+                'info'
+              );
             } else if (step.action.endpoint === 'status') {
               const status = await flyioClient.getAppStatus(service.id);
               updateServiceStatus(service.id, status);
+
+              // Save alert
+              const db = await openDatabase();
+              await saveAlert(db, {
+                serviceId: service.id,
+                severity: 'info',
+                message: `Service status updated to ${status}`
+              });
+
+              addAlert({
+                id: Date.now(),
+                serviceId: service.id,
+                severity: 'info',
+                message: `Service status updated to ${status}`,
+                timestamp: Date.now()
+              });
             }
             break;
           case 'aws':
@@ -91,8 +154,29 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
       setIsComplete(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error');
-      // Log the error for debugging
       console.error('Recovery action failed:', err);
+
+      // Save error alert
+      const db = await openDatabase();
+      await saveAlert(db, {
+        serviceId: serviceId,
+        severity: 'critical',
+        message: `Recovery action failed: ${err instanceof Error ? err.message : 'Unknown error'}`
+      });
+
+      addAlert({
+        id: Date.now(),
+        serviceId: serviceId,
+        severity: 'critical',
+        message: `Recovery action failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        timestamp: Date.now()
+      });
+
+      await sendLocalNotification(
+        'Recovery Action Failed',
+        `Failed to execute recovery action for ${services.find(s => s.id === serviceId)?.name || 'service'}`,
+        'critical'
+      );
     } finally {
       setIsExecuting(false);
     }
@@ -171,19 +255,20 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#3B82F6',
+    backgroundColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   stepNumber: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: '#374151',
+    fontWeight: '600',
   },
   stepTitle: {
     fontSize: 16,
     fontWeight: '500',
     color: '#1F2937',
+    flex: 1,
   },
   stepDescription: {
     fontSize: 14,
@@ -192,10 +277,9 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     backgroundColor: '#3B82F6',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   completedButton: {
     backgroundColor: '#10B981',
@@ -205,28 +289,29 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
+    fontSize: 14,
     fontWeight: '500',
   },
   errorContainer: {
-    marginTop: 8,
+    marginTop: 12,
     padding: 12,
-    backgroundColor: '#FEF2F2',
-    borderRadius: 6,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 8,
   },
   errorText: {
-    color: '#EF4444',
+    color: '#DC2626',
     fontSize: 14,
-    marginBottom: 8,
   },
   reauthButton: {
-    backgroundColor: '#3B82F6',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 6,
+    alignItems: 'center',
   },
   reauthText: {
-    color: '#fff',
+    color: '#3B82F6',
     fontSize: 14,
+    fontWeight: '500',
   },
 });

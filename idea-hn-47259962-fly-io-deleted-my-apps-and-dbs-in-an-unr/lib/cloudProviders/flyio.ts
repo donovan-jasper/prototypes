@@ -103,4 +103,27 @@ export class FlyioClient {
       { headers: { Authorization: `Bearer ${this.token}` } }
     );
   }
+
+  async getDeploymentHistory(appId: string) {
+    const query = `
+      query($appId: String!) {
+        app(name: $appId) {
+          deployments {
+            id
+            status
+            createdAt
+            version
+          }
+        }
+      }
+    `;
+
+    const response = await axios.post(
+      this.baseUrl,
+      { query, variables: { appId } },
+      { headers: { Authorization: `Bearer ${this.token}` } }
+    );
+
+    return response.data.data.app.deployments;
+  }
 }

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useState, useEffect } from 'react';
 import { openDatabase } from '@/lib/db';
 import { useStore } from '@/lib/store';
@@ -25,6 +25,7 @@ export default function RecoveryScreen() {
   const [workflows, setWorkflows] = useState<RecoveryWorkflow[]>([]);
   const [selectedWorkflow, setSelectedWorkflow] = useState<RecoveryWorkflow | null>(null);
   const [selectedServiceId, setSelectedServiceId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const services = useStore((state) => state.services);
 
   useEffect(() => {
@@ -32,13 +33,20 @@ export default function RecoveryScreen() {
   }, []);
 
   async function loadWorkflows() {
-    const db = await openDatabase();
-    const dbWorkflows = await db.getAllAsync('SELECT * FROM recovery_workflows');
-    const parsedWorkflows = dbWorkflows.map((w: any) => ({
-      ...w,
-      steps: JSON.parse(w.steps)
-    }));
-    setWorkflows(parsedWorkflows);
+    setIsLoading(true);
+    try {
+      const db = await openDatabase();
+      const dbWorkflows = await db.getAllAsync('SELECT * FROM recovery_workflows');
+      const parsedWorkflows = dbWorkflows.map((w: any) => ({
+        ...w,
+        steps: JSON.parse(w.steps)
+      }));
+      setWorkflows(parsedWorkflows);
+    } catch (error) {
+      console.error('Failed to load workflows:', error);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   function getWorkflowsForService(serviceId: string) {
@@ -56,6 +64,15 @@ export default function RecoveryScreen() {
     return service ? service.name : 'Unknown Service';
   }
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3B82F6" />
+        <Text style={styles.loadingText}>Loading recovery workflows...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {!selectedWorkflow ? (
@@ -67,19 +84,25 @@ export default function RecoveryScreen() {
             renderItem={({ item }) => (
               <View style={styles.serviceSection}>
                 <Text style={styles.serviceName}>{item.name}</Text>
-                {getWorkflowsForService(item.id).map((workflow) => (
-                  <TouchableOpacity
-                    key={workflow.id}
-                    style={styles.workflowItem}
-                    onPress={() => {
-                      setSelectedWorkflow(workflow);
-                      setSelectedServiceId(item.id);
-                    }}
-                  >
-                    <Text style={styles.workflowTitle}>{workflow.name}</Text>
-                    <Text style={styles.workflowSteps}>{workflow.steps.length} steps</Text>
-                  </TouchableOpacity>
-                ))}
+                {getWorkflowsForService(item.id).length > 0 ? (
+                  getWorkflowsForService(item.id).map((workflow) => (
+                    <TouchableOpacity
+                      key={workflow.id}
+                      style={styles.workflowItem}
+                      onPress={() => {
+                        setSelectedWorkflow(workflow);
+                        setSelectedServiceId(item.id);
+                      }}
+                    >
+                      <Text style={styles.workflowTitle}>{workflow.name}</Text>
+                      <Text style={styles.workflowSteps}>{workflow.steps.length} steps</Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.noWorkflows}>
+                    <Text style={styles.noWorkflowsText}>No recovery workflows available for this service</Text>
+                  </View>
+                )}
               </View>
             )}
             ListEmptyComponent={
@@ -114,6 +137,13 @@ export default function RecoveryScreen() {
                 serviceId={selectedServiceId || ''}
               />
             )}
+            ListFooterComponent={
+              <View style={styles.footer}>
+                <Text style={styles.footerText}>
+                  {selectedWorkflow.steps.length} steps to complete this workflow
+                </Text>
+              </View>
+            }
           />
         </View>
       )}
@@ -125,6 +155,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F9FAFB',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F9FAFB',
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#6B7280',
+    fontSize: 16,
   },
   workflowList: {
     padding: 16,
@@ -164,6 +205,30 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
   },
+  noWorkflows: {
+    backgroundColor: '#F3F4F6',
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 8,
+  },
+  noWorkflowsText: {
+    color: '#6B7280',
+    fontSize: 14,
+  },
+  emptyState: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#10B981',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#6B7280',
+  },
   workflowDetail: {
     flex: 1,
     padding: 16,
@@ -172,34 +237,27 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   backButtonText: {
-    fontSize: 16,
     color: '#3B82F6',
+    fontSize: 16,
+    fontWeight: '500',
   },
   workflowHeader: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 4,
     color: '#1F2937',
   },
   serviceInfo: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#6B7280',
-    marginBottom: 16,
+    marginBottom: 24,
   },
-  emptyState: {
+  footer: {
+    paddingVertical: 24,
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
   },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
+  footerText: {
     color: '#6B7280',
-    textAlign: 'center',
+    fontSize: 14,
   },
 });
