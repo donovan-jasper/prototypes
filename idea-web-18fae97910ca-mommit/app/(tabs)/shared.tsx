@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, TextInput, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useMemoryStore } from '../../store/memoryStore';
 import { Space } from '../../lib/types';
@@ -10,7 +10,9 @@ export default function SharedSpacesScreen() {
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceMembers, setNewSpaceMembers] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [joinSpaceId, setJoinSpaceId] = useState('');
   const router = useRouter();
   const { userId, fetchSpaces } = useMemoryStore();
 
@@ -61,8 +63,8 @@ export default function SharedSpacesScreen() {
   };
 
   const handleJoinSpace = async () => {
-    if (!newSpaceName.trim()) {
-      Alert.alert('Error', 'Please enter a space name');
+    if (!joinSpaceId.trim()) {
+      Alert.alert('Error', 'Please enter a space ID');
       return;
     }
 
@@ -73,11 +75,10 @@ export default function SharedSpacesScreen() {
 
     setIsLoading(true);
     try {
-      // In a real app, you would have a way to find the space ID by name
-      // For this example, we'll just use a mock ID
-      const spaceId = Date.now().toString();
-      await addMemberToSpace(spaceId, userId);
+      await addMemberToSpace(joinSpaceId, userId);
       Alert.alert('Success', 'Joined space successfully');
+      setIsJoining(false);
+      setJoinSpaceId('');
       await loadSpaces();
     } catch (error) {
       Alert.alert('Error', 'Failed to join space');
@@ -106,7 +107,7 @@ export default function SharedSpacesScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>Shared Spaces</Text>
 
       {isCreating ? (
@@ -138,6 +139,29 @@ export default function SharedSpacesScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      ) : isJoining ? (
+        <View style={styles.createForm}>
+          <TextInput
+            style={styles.input}
+            placeholder="Space ID"
+            value={joinSpaceId}
+            onChangeText={setJoinSpaceId}
+          />
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={() => setIsJoining(false)}
+            >
+              <Text style={styles.buttonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.joinButton]}
+              onPress={handleJoinSpace}
+            >
+              <Text style={styles.buttonText}>Join</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       ) : (
         <View style={styles.buttonContainer}>
           <TouchableOpacity
@@ -148,10 +172,7 @@ export default function SharedSpacesScreen() {
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.joinButton]}
-            onPress={() => {
-              setNewSpaceName('');
-              setIsCreating(true);
-            }}
+            onPress={() => setIsJoining(true)}
           >
             <Text style={styles.buttonText}>Join Space</Text>
           </TouchableOpacity>
@@ -160,66 +181,42 @@ export default function SharedSpacesScreen() {
 
       {spaces.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No shared spaces yet</Text>
-          <Text style={styles.emptySubtext}>Create or join a space to share memories with others</Text>
+          <Text style={styles.emptyText}>No spaces yet. Create or join one to get started!</Text>
         </View>
       ) : (
         <FlatList
           data={spaces}
           renderItem={renderSpaceItem}
-          keyExtractor={item => item.id}
-          style={styles.list}
+          keyExtractor={(item) => item.id}
+          style={styles.spaceList}
         />
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 24,
     color: '#333',
-  },
-  createForm: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   button: {
     padding: 12,
-    borderRadius: 4,
+    borderRadius: 8,
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
   createButton: {
@@ -235,24 +232,36 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  list: {
-    flex: 1,
+  createForm: {
+    marginBottom: 24,
+  },
+  input: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  spaceList: {
+    marginTop: 16,
   },
   spaceItem: {
     backgroundColor: 'white',
-    padding: 15,
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   spaceName: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   spaceMembers: {
     color: '#666',
@@ -263,20 +272,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 24,
     alignItems: 'center',
-    padding: 20,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
     color: '#666',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 16,
     textAlign: 'center',
   },
 });

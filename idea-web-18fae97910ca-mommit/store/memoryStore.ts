@@ -16,6 +16,8 @@ interface MemoryState {
   snoozeMemory: (memoryId: string) => void;
   setUserId: (userId: string) => Promise<void>;
   clearUser: () => Promise<void>;
+  addSpace: (space: Space) => void;
+  updateSpace: (space: Space) => void;
 }
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
@@ -81,6 +83,20 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   clearUser: async () => {
     await SecureStore.deleteItemAsync('userId');
     set({ userId: null, memories: [], spaces: [] });
+  },
+
+  addSpace: (space: Space) => {
+    set(state => ({
+      spaces: [...state.spaces, space]
+    }));
+  },
+
+  updateSpace: (updatedSpace: Space) => {
+    set(state => ({
+      spaces: state.spaces.map(space =>
+        space.id === updatedSpace.id ? updatedSpace : space
+      )
+    }));
   },
 }));
 

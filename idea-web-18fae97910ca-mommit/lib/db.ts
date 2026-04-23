@@ -294,3 +294,18 @@ export const getMemoriesForSpace = async (spaceId: string): Promise<Memory[]> =>
     });
   });
 };
+
+export const addMemoryToSpace = async (spaceId: string, memoryId: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `INSERT INTO space_memories (space_id, memory_id) VALUES (?, ?);`,
+        [spaceId, memoryId],
+        () => {
+          resolve();
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};

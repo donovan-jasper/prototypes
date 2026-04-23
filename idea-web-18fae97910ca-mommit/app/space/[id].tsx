@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemoryStore } from '../../store/memoryStore';
 import { Memory, Space } from '../../lib/types';
-import { getSpaceById, addMemberToSpace, removeMemberFromSpace, getMemoriesForSpace, createMemory } from '../../lib/db';
+import { getSpaceById, addMemberToSpace, removeMemberFromSpace, getMemoriesForSpace, createMemory, addMemoryToSpace } from '../../lib/db';
 import MemoryCard from '../../components/MemoryCard';
 import { parseNaturalLanguage } from '../../lib/ai';
 
@@ -13,6 +13,7 @@ export default function SpaceDetailScreen() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [isAddingMemory, setIsAddingMemory] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [newMemoryText, setNewMemoryText] = useState('');
   const router = useRouter();
@@ -105,10 +106,12 @@ export default function SpaceDetailScreen() {
       );
 
       // Add to the space
-      // In a real app, you would have a separate function to add memory to space
-      // For this example, we'll just add it to our local state
+      await addMemoryToSpace(id, memory.id);
+
+      // Update local state
       setMemories([memory, ...memories]);
       setNewMemoryText('');
+      setIsAddingMemory(false);
 
       // Update the global state
       addMemory(memory);
@@ -133,6 +136,20 @@ export default function SpaceDetailScreen() {
     />
   );
 
+  const renderMemberItem = ({ item }: { item: string }) => (
+    <View style={styles.memberItem}>
+      <Text style={styles.memberEmail}>{item}</Text>
+      {space?.owner_id === userId && (
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => handleRemoveMember(item)}
+        >
+          <Text style={styles.removeButtonText}>Remove</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -151,13 +168,23 @@ export default function SpaceDetailScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>{space.name}</Text>
 
-      <View style={styles.membersSection}>
-        <Text style={styles.sectionTitle}>Members ({space.members.length})</Text>
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Members ({space.members.length})</Text>
+          {space.owner_id === userId && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setIsAddingMember(true)}
+            >
+              <Text style={styles.addButtonText}>Add Member</Text>
+            </TouchableOpacity>
+          )}
+        </View>
 
-        {isAddingMember ? (
+        {isAddingMember && (
           <View style={styles.addMemberForm}>
             <TextInput
               style={styles.input}
@@ -182,114 +209,143 @@ export default function SpaceDetailScreen() {
               </TouchableOpacity>
             </View>
           </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setIsAddingMember(true)}
-          >
-            <Text style={styles.buttonText}>Add Member</Text>
-          </TouchableOpacity>
         )}
 
         <FlatList
           data={space.members}
-          renderItem={({ item }) => (
-            <View style={styles.memberItem}>
-              <Text style={styles.memberEmail}>{item}</Text>
-              {item !== userId && (
-                <TouchableOpacity
-                  style={styles.removeButton}
-                  onPress={() => handleRemoveMember(item)}
-                >
-                  <Text style={styles.removeButtonText}>Remove</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )}
-          keyExtractor={item => item}
-          style={styles.membersList}
+          renderItem={renderMemberItem}
+          keyExtractor={(item) => item}
+          scrollEnabled={false}
         />
       </View>
 
-      <View style={styles.memoriesSection}>
-        <Text style={styles.sectionTitle}>Memories in this space</Text>
-
-        <View style={styles.addMemoryForm}>
-          <TextInput
-            style={styles.input}
-            placeholder="Add a new memory (e.g., 'Remind me to call mom every Sunday at 5 PM')"
-            value={newMemoryText}
-            onChangeText={setNewMemoryText}
-            multiline
-          />
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Memories ({memories.length})</Text>
           <TouchableOpacity
-            style={styles.addMemoryButton}
-            onPress={handleAddMemory}
+            style={styles.addButton}
+            onPress={() => setIsAddingMemory(true)}
           >
-            <Text style={styles.buttonText}>Add Memory</Text>
+            <Text style={styles.addButtonText}>Add Memory</Text>
           </TouchableOpacity>
         </View>
 
+        {isAddingMemory && (
+          <View style={styles.addMemoryForm}>
+            <TextInput
+              style={styles.input}
+              placeholder="Describe the memory..."
+              value={newMemoryText}
+              onChangeText={setNewMemoryText}
+              multiline
+              numberOfLines={3}
+            />
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => setIsAddingMemory(false)}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.addButton]}
+                onPress={handleAddMemory}
+              >
+                <Text style={styles.buttonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {memories.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No memories in this space yet</Text>
-            <Text style={styles.emptySubtext}>Add a memory to share with your space members</Text>
+            <Text style={styles.emptyText}>No memories in this space yet. Add one to get started!</Text>
           </View>
         ) : (
           <FlatList
             data={memories}
             renderItem={renderMemoryItem}
-            keyExtractor={item => item.id}
-            style={styles.memoriesList}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
           />
         )}
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    margin: 16,
     color: '#333',
   },
-  membersSection: {
-    marginBottom: 20,
+  section: {
+    backgroundColor: 'white',
+    margin: 16,
+    padding: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
-  memoriesSection: {
-    flex: 1,
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
     color: '#333',
   },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    padding: 8,
+    borderRadius: 4,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  memberItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  memberEmail: {
+    fontSize: 16,
+  },
+  removeButton: {
+    backgroundColor: '#f44336',
+    padding: 6,
+    borderRadius: 4,
+  },
+  removeButtonText: {
+    color: 'white',
+    fontSize: 12,
+  },
   addMemberForm: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 16,
+  },
+  addMemoryForm: {
+    marginBottom: 16,
   },
   input: {
-    height: 40,
-    borderColor: '#ddd',
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
     borderWidth: 1,
-    borderRadius: 4,
-    paddingHorizontal: 10,
-    marginBottom: 10,
+    borderColor: '#ddd',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -299,84 +355,31 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 4,
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     alignItems: 'center',
-  },
-  addButton: {
-    backgroundColor: '#2196F3',
   },
   cancelButton: {
     backgroundColor: '#f44336',
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  memberItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyState: {
+    padding: 16,
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: 'white',
-    borderRadius: 4,
-    marginBottom: 5,
   },
-  memberEmail: {
+  emptyText: {
+    color: '#666',
     fontSize: 16,
-  },
-  removeButton: {
-    backgroundColor: '#f44336',
-    padding: 5,
-    borderRadius: 4,
-  },
-  removeButtonText: {
-    color: 'white',
-    fontSize: 12,
-  },
-  membersList: {
-    maxHeight: 150,
-    marginBottom: 10,
-  },
-  addMemoryForm: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  addMemoryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 4,
-    alignItems: 'center',
-  },
-  memoriesList: {
-    flex: 1,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#666',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
   },
 });
