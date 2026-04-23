@@ -6,26 +6,32 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
       {
         type: 'mammogram',
         name: 'Mammogram',
-        description: 'Breast cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'heart'
+        description: 'Breast cancer screening'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
-        description: 'Cervical cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'female'
+        description: 'Cervical cancer screening'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
+      },
+      {
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
       }
     ]
   },
@@ -36,34 +42,38 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
       {
         type: 'mammogram',
         name: 'Mammogram',
-        description: 'Breast cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'heart'
+        description: 'Breast cancer screening'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
-        description: 'Cervical cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'female'
+        description: 'Cervical cancer screening'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
       },
       {
-        type: 'colonoscopy',
-        name: 'Colonoscopy',
-        description: 'Colorectal cancer screening',
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
+      },
+      {
+        type: 'bone_density',
+        name: 'Bone Density Scan',
         frequency: 'every 10 years',
-        importance: 'high',
-        icon: 'toilet'
+        description: 'Osteoporosis screening'
       }
     ]
   },
@@ -74,42 +84,44 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
       {
         type: 'mammogram',
         name: 'Mammogram',
-        description: 'Breast cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'heart'
+        description: 'Breast cancer screening'
       },
       {
         type: 'pap_smear',
         name: 'Pap Smear',
-        description: 'Cervical cancer screening',
         frequency: 'annual',
-        importance: 'high',
-        icon: 'female'
+        description: 'Cervical cancer screening'
       },
       {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
       },
       {
-        type: 'colonoscopy',
-        name: 'Colonoscopy',
-        description: 'Colorectal cancer screening',
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
+      },
+      {
+        type: 'bone_density',
+        name: 'Bone Density Scan',
         frequency: 'every 10 years',
-        importance: 'high',
-        icon: 'toilet'
+        description: 'Osteoporosis screening'
       },
       {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        description: 'Prostate cancer screening',
+        type: 'prostate_cancer',
+        name: 'Prostate Cancer Screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'male'
+        description: 'PSA test'
       }
     ]
   },
@@ -118,20 +130,28 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
     gender: 'male',
     screenings: [
       {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        description: 'Prostate cancer screening',
-        frequency: 'annual',
-        importance: 'medium',
-        icon: 'male'
-      },
-      {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
+      },
+      {
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
+      },
+      {
+        type: 'prostate_cancer',
+        name: 'Prostate Cancer Screening',
+        frequency: 'annual',
+        description: 'PSA test'
       }
     ]
   },
@@ -140,28 +160,34 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
     gender: 'male',
     screenings: [
       {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        description: 'Prostate cancer screening',
-        frequency: 'annual',
-        importance: 'medium',
-        icon: 'male'
-      },
-      {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
       },
       {
-        type: 'colonoscopy',
-        name: 'Colonoscopy',
-        description: 'Colorectal cancer screening',
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
+      },
+      {
+        type: 'prostate_cancer',
+        name: 'Prostate Cancer Screening',
+        frequency: 'annual',
+        description: 'PSA test'
+      },
+      {
+        type: 'bone_density',
+        name: 'Bone Density Scan',
         frequency: 'every 10 years',
-        importance: 'high',
-        icon: 'toilet'
+        description: 'Osteoporosis screening'
       }
     ]
   },
@@ -170,28 +196,34 @@ export const PREVENTIVE_CARE_RECOMMENDATIONS = [
     gender: 'male',
     screenings: [
       {
-        type: 'prostate_exam',
-        name: 'Prostate Exam',
-        description: 'Prostate cancer screening',
-        frequency: 'annual',
-        importance: 'medium',
-        icon: 'male'
-      },
-      {
         type: 'blood_pressure',
         name: 'Blood Pressure Check',
-        description: 'Hypertension screening',
         frequency: 'annual',
-        importance: 'medium',
-        icon: 'stethoscope'
+        description: 'Hypertension screening'
       },
       {
-        type: 'colonoscopy',
-        name: 'Colonoscopy',
-        description: 'Colorectal cancer screening',
+        type: 'cholesterol',
+        name: 'Cholesterol Test',
+        frequency: 'annual',
+        description: 'Heart health screening'
+      },
+      {
+        type: 'colorectal',
+        name: 'Colorectal Cancer Screening',
+        frequency: 'biennial',
+        description: 'Colonoscopy or stool test'
+      },
+      {
+        type: 'prostate_cancer',
+        name: 'Prostate Cancer Screening',
+        frequency: 'annual',
+        description: 'PSA test'
+      },
+      {
+        type: 'bone_density',
+        name: 'Bone Density Scan',
         frequency: 'every 10 years',
-        importance: 'high',
-        icon: 'toilet'
+        description: 'Osteoporosis screening'
       }
     ]
   }

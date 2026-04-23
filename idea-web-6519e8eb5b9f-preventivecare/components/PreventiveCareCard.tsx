@@ -1,82 +1,54 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { format, differenceInDays } from 'date-fns';
+import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
 
 interface PreventiveCareCardProps {
   screening: {
-    type: string;
     name: string;
-    description: string;
-    frequency: string;
-    importance: string;
-    icon: string;
+    type: string;
+    nextDueDate: Date;
+    daysUntil: number;
+    isOverdue: boolean;
   };
-  nextDueDate: Date;
-  daysUntil?: number;
-  onMarkComplete?: () => void;
-  onSetReminder?: () => void;
-  isCompleted?: boolean;
-  showReminderButton?: boolean;
+  onSnooze: (type: string) => void;
+  onDismiss: (type: string) => void;
 }
 
-const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
-  screening,
-  nextDueDate,
-  daysUntil,
-  onMarkComplete,
-  onSetReminder,
-  isCompleted = false,
-  showReminderButton = false,
-}) => {
-  const days = daysUntil !== undefined ? daysUntil : differenceInDays(nextDueDate, new Date());
-  const isOverdue = days < 0;
-
+const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({ screening, onSnooze, onDismiss }) => {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
+        <Ionicons
+          name={screening.isOverdue ? "alert-circle" : "calendar"}
+          size={24}
+          color={screening.isOverdue ? "#E74C3C" : "#4A89DC"}
+        />
         <Text style={styles.title}>{screening.name}</Text>
-        {isCompleted && (
-          <Text style={styles.completedBadge}>Completed</Text>
-        )}
       </View>
 
-      <Text style={styles.description}>{screening.description}</Text>
-
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Frequency:</Text>
-        <Text style={styles.detailValue}>{screening.frequency}</Text>
-      </View>
-
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Next Due:</Text>
-        <Text style={styles.detailValue}>{format(nextDueDate, 'MMM d, yyyy')}</Text>
-      </View>
-
-      <View style={styles.detailsRow}>
-        <Text style={styles.detailLabel}>Days Until:</Text>
-        <Text style={[styles.detailValue, isOverdue ? styles.overdue : null]}>
-          {isOverdue ? 'Overdue!' : days}
-        </Text>
-      </View>
+      <Text style={styles.date}>
+        {screening.isOverdue
+          ? `Overdue by ${Math.abs(screening.daysUntil)} days`
+          : `Due in ${screening.daysUntil} days (${format(screening.nextDueDate, 'MMM d, yyyy')})`}
+      </Text>
 
       <View style={styles.actions}>
-        {onMarkComplete && (
-          <TouchableOpacity
-            style={[styles.button, styles.completeButton]}
-            onPress={onMarkComplete}
-          >
-            <Text style={styles.buttonText}>Mark Complete</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.snoozeButton]}
+          onPress={() => onSnooze(screening.type)}
+        >
+          <Ionicons name="alarm" size={16} color="#34495E" />
+          <Text style={styles.actionButtonText}>Snooze</Text>
+        </TouchableOpacity>
 
-        {(onSetReminder || showReminderButton) && (
-          <TouchableOpacity
-            style={[styles.button, styles.reminderButton]}
-            onPress={onSetReminder}
-          >
-            <Text style={styles.buttonText}>Remind Me</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.dismissButton]}
+          onPress={() => onDismiss(screening.type)}
+        >
+          <Ionicons name="checkmark" size={16} color="#27AE60" />
+          <Text style={styles.actionButtonText}>Done</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -85,9 +57,9 @@ const PreventiveCareCard: React.FC<PreventiveCareCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -96,67 +68,46 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  completedBadge: {
-    backgroundColor: '#2ECC71',
-    color: 'white',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 4,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  description: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-  },
-  detailsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  detailValue: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#4A89DC',
+    color: '#2C3E50',
+    marginLeft: 10,
   },
-  overdue: {
-    color: '#E74C3C',
+  date: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    marginBottom: 10,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 12,
   },
-  button: {
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 4,
-    marginLeft: 8,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginLeft: 10,
   },
-  completeButton: {
-    backgroundColor: '#2ECC71',
+  snoozeButton: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#BDC3C7',
   },
-  reminderButton: {
-    backgroundColor: '#4A89DC',
+  dismissButton: {
+    backgroundColor: '#E8F8F5',
+    borderWidth: 1,
+    borderColor: '#A3E4D7',
   },
-  buttonText: {
-    color: 'white',
+  actionButtonText: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '500',
+    marginLeft: 5,
   },
 });
 

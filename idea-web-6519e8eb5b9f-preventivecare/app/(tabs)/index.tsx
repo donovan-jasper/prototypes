@@ -1,18 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { useAppStore } from '../../store/appStore';
 import HabitCard from '../../components/HabitCard';
 import HealthScore from '../../components/HealthScore';
-import PreventiveCareCard from '../../components/PreventiveCareCard';
 import { PREVENTIVE_CARE_RECOMMENDATIONS } from '../../constants/PreventiveCare';
 import { getDatabase } from '../../lib/database';
 import { scheduleAllPreventiveCareReminders } from '../../lib/notifications';
 import { differenceInDays, format } from 'date-fns';
+import { Ionicons } from '@expo/vector-icons';
 
 const TodayScreen = () => {
   const { habits, user, loadHabits } = useAppStore();
   const [preventiveCareItems, setPreventiveCareItems] = useState<any[]>([]);
-  const [nextScreening, setNextScreening] = useState<any>(null);
+  const [nextScreenings, setNextScreenings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -95,10 +95,9 @@ const TodayScreen = () => {
       };
     }));
 
-    // Find the screening with the soonest due date
+    // Sort by soonest due date and take top 3
     const sortedItems = [...itemsWithDates].sort((a, b) => a.daysUntil - b.daysUntil);
-    setNextScreening(sortedItems[0] || null);
-
+    setNextScreenings(sortedItems.slice(0, 3));
     setPreventiveCareItems(itemsWithDates);
   };
 
@@ -109,6 +108,38 @@ const TodayScreen = () => {
       await loadPreventiveCareItems();
     }
     setRefreshing(false);
+  };
+
+  const handleSnooze = async (screeningType: string) => {
+    const db = await getDatabase();
+    const today = new Date();
+
+    // Find the screening in our list
+    const screening = nextScreenings.find(s => s.type === screeningType);
+    if (!screening) return;
+
+    // Calculate new date (7 days from now)
+    const newDate = new Date(today);
+    newDate.setDate(today.getDate() + 7);
+
+    // Update the notification
+    await scheduleAllPreventiveCareReminders(user.id);
+
+    // Refresh the data
+    await loadPreventiveCareItems();
+  };
+
+  const handleDismiss = async (screeningType: string) => {
+    const db = await getDatabase();
+
+    // Mark as completed in timeline
+    await db.runAsync(
+      'INSERT INTO timeline_events (user_id, type, title, date, completed) VALUES (?, ?, ?, ?, ?)',
+      [user.id, 'preventive_care', screeningType, new Date().toISOString(), 1]
+    );
+
+    // Refresh the data
+    await loadPreventiveCareItems();
   };
 
   if (isLoading) {
@@ -146,37 +177,44 @@ const TodayScreen = () => {
         <HealthScore />
       </View>
 
-      {nextScreening && (
+      {nextScreenings.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Next Screening</Text>
-          <View style={styles.nextScreeningCard}>
-            <Text style={styles.nextScreeningTitle}>{nextScreening.name}</Text>
-            <Text style={styles.nextScreeningDate}>
-              Due: {format(nextScreening.nextDueDate, 'MMMM d, yyyy')}
-            </Text>
-            <Text style={[
-              styles.nextScreeningDays,
-              nextScreening.isOverdue ? styles.overdue : null
-            ]}>
-              {nextScreening.isOverdue
-                ? 'Overdue!'
-                : `${nextScreening.daysUntil} days remaining`}
-            </Text>
-          </View>
-        </View>
-      )}
+          <Text style={styles.sectionTitle}>Upcoming Screenings</Text>
+          {nextScreenings.map((screening, index) => (
+            <View key={index} style={styles.screeningCard}>
+              <View style={styles.screeningHeader}>
+                <Ionicons
+                  name={screening.isOverdue ? "alert-circle" : "calendar"}
+                  size={24}
+                  color={screening.isOverdue ? "#E74C3C" : "#4A89DC"}
+                />
+                <Text style={styles.screeningTitle}>{screening.name}</Text>
+              </View>
 
-      {preventiveCareItems.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preventive Care Reminders</Text>
-          {preventiveCareItems.map((item, index) => (
-            <PreventiveCareCard
-              key={index}
-              screening={item}
-              nextDueDate={item.nextDueDate}
-              daysUntil={item.daysUntil}
-              showReminderButton={true}
-            />
+              <Text style={styles.screeningDate}>
+                {screening.isOverdue
+                  ? `Overdue by ${Math.abs(screening.daysUntil)} days`
+                  : `Due in ${screening.daysUntil} days (${format(screening.nextDueDate, 'MMM d, yyyy')})`}
+              </Text>
+
+              <View style={styles.screeningActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.snoozeButton]}
+                  onPress={() => handleSnooze(screening.type)}
+                >
+                  <Ionicons name="alarm" size={16} color="#34495E" />
+                  <Text style={styles.actionButtonText}>Snooze</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.dismissButton]}
+                  onPress={() => handleDismiss(screening.type)}
+                >
+                  <Ionicons name="checkmark" size={16} color="#27AE60" />
+                  <Text style={styles.actionButtonText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           ))}
         </View>
       )}
@@ -187,7 +225,7 @@ const TodayScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F7FA',
   },
   loadingContainer: {
     flex: 1,
@@ -195,48 +233,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   section: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    marginBottom: 20,
+    paddingHorizontal: 15,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginBottom: 10,
   },
   emptyText: {
-    color: '#666',
-    fontSize: 16,
+    color: '#7F8C8D',
+    fontSize: 14,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 10,
   },
-  nextScreeningCard: {
+  screeningCard: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  nextScreeningTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
+  screeningHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 5,
   },
-  nextScreeningDate: {
+  screeningTitle: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
+    fontWeight: '500',
+    color: '#2C3E50',
+    marginLeft: 10,
   },
-  nextScreeningDays: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4A89DC',
+  screeningDate: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    marginBottom: 10,
   },
-  overdue: {
-    color: '#E74C3C',
+  screeningActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginLeft: 10,
+  },
+  snoozeButton: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: '#BDC3C7',
+  },
+  dismissButton: {
+    backgroundColor: '#E8F8F5',
+    borderWidth: 1,
+    borderColor: '#A3E4D7',
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginLeft: 5,
   },
 });
 
