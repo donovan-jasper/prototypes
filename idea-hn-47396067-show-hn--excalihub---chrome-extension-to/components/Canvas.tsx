@@ -1,6 +1,6 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Canvas as SkiaCanvas, Path, Group, Skia } from '@shopify/react-native-skia';
+import { Canvas as SkiaCanvas, Path, Group, Skia, SkPath } from '@shopify/react-native-skia';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useDrawingStore } from '../store/useDrawingStore';
 import { CanvasElement } from '../types/drawing';
@@ -32,17 +32,19 @@ const Canvas = ({
     currentTool,
     currentColor,
     currentStrokeWidth,
+    setElements,
   } = useDrawingStore();
 
   const pathRef = useRef<Path>(new Path());
   const currentPathRef = useRef<CanvasElement | null>(null);
+  const lastCursorPosition = useRef({ x: 0, y: 0 });
 
   // Initialize with initial elements
   useEffect(() => {
     if (initialElements.length > 0) {
-      initialElements.forEach(el => addElement(el));
+      setElements(initialElements);
     }
-  }, [initialElements, addElement]);
+  }, [initialElements, setElements]);
 
   // Handle drawing
   const panGesture = Gesture.Pan()
@@ -79,8 +81,12 @@ const Canvas = ({
         });
       }
 
-      // Broadcast cursor position
-      onCursorMove?.(e.x, e.y);
+      // Throttle cursor updates to avoid too many broadcasts
+      if (Math.abs(e.x - lastCursorPosition.current.x) > 5 ||
+          Math.abs(e.y - lastCursorPosition.current.y) > 5) {
+        onCursorMove?.(e.x, e.y);
+        lastCursorPosition.current = { x: e.x, y: e.y };
+      }
     })
     .onEnd(() => {
       if (currentTool === 'pen' && currentPathRef.current) {
@@ -89,7 +95,7 @@ const Canvas = ({
     });
 
   // Render elements
-  const renderElement = (element: CanvasElement) => {
+  const renderElement = useCallback((element: CanvasElement) => {
     switch (element.type) {
       case 'path':
         return (
@@ -105,10 +111,10 @@ const Canvas = ({
       default:
         return null;
     }
-  };
+  }, []);
 
   // Render cursors
-  const renderCursors = () => {
+  const renderCursors = useCallback(() => {
     return cursors.map((cursor) => {
       const user = activeUsers.find(u => u.id === cursor.userId);
       if (!user) return null;
@@ -135,7 +141,7 @@ const Canvas = ({
         </Group>
       );
     });
-  };
+  }, [cursors, activeUsers]);
 
   return (
     <View style={styles.container}>

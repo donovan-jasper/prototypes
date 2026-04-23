@@ -1,175 +1,177 @@
-import { useEffect, useState } from 'react';
-import { useDrawingStore } from '../store/useDrawingStore';
-import { CanvasElement } from '../types/drawing';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
+import { serializeCanvas } from '../lib/drawing';
 
-type User = {
-  id: string;
-  name: string;
-  color: string;
-};
+const COLORS = [
+  '#FF5733', '#33FF57', '#3357FF', '#F033FF',
+  '#FF33F0', '#33FFF0', '#FF8C33', '#8C33FF'
+];
 
-type CursorPosition = {
-  x: number;
-  y: number;
-  userId: string;
-};
-
-export const useCollaboration = (drawingId: string) => {
-  const [activeUsers, setActiveUsers] = useState<User[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [cursors, setCursors] = useState<CursorPosition[]>([]);
-  const { addElements, updateElement, removeElement } = useDrawingStore();
+export const useCollaboration = (shareId: string) => {
+  const [activeUsers, setActiveUsers] = useState<Array<{
+    id: string;
+    name: string;
+    color: string;
+  }>>([]);
+  const [currentUser, setCurrentUser] = useState<{
+    id: string;
+    name: string;
+    color: string;
+  } | null>(null);
+  const [cursors, setCursors] = useState<Array<{
+    x: number;
+    y: number;
+    userId: string;
+  }>>([]);
+  const channelRef = useRef<any>(null);
+  const userIdRef = useRef<string>(Math.random().toString(36).substring(2, 9));
+  const userColorRef = useRef<string>(COLORS[Math.floor(Math.random() * COLORS.length)]);
 
   // Initialize current user
   useEffect(() => {
-    const userId = Math.random().toString(36).substring(2, 9);
-    const colors = ['#FF5733', '#33FF57', '#3357FF', '#F033FF', '#FF33F0'];
-    const randomColor = colors[Math.floor(Math.random() * colors.length)];
-
+    const userName = `User ${Math.floor(Math.random() * 1000)}`;
     const user = {
-      id: userId,
-      name: `User ${userId.substring(0, 4)}`,
-      color: randomColor,
+      id: userIdRef.current,
+      name: userName,
+      color: userColorRef.current,
     };
-
     setCurrentUser(user);
-    setActiveUsers([user]);
+  }, []);
 
-    // Notify others about new user
-    supabase.channel(`collab:${drawingId}`)
-      .send({
-        type: 'broadcast',
-        event: 'user_joined',
-        payload: user,
-      });
+  // Connect to collaboration channel
+  const connectToCollaboration = useCallback(() => {
+    if (!shareId) return;
 
-    return () => {
-      // Notify others about user leaving
-      supabase.channel(`collab:${drawingId}`)
-        .send({
-          type: 'broadcast',
-          event: 'user_left',
-          payload: { id: userId },
-        });
-    };
-  }, [drawingId]);
+    // Create a unique channel name for this drawing
+    const channelName = `drawing:${shareId}`;
 
-  // Listen for real-time updates
-  useEffect(() => {
-    const channel = supabase.channel(`collab:${drawingId}`);
-
-    // Listen for new elements
-    channel.on(
-      'broadcast',
-      { event: 'element_added' },
-      ({ payload }: { payload: CanvasElement }) => {
-        addElements([payload]);
-      }
-    );
-
-    // Listen for element updates
-    channel.on(
-      'broadcast',
-      { event: 'element_updated' },
-      ({ payload }: { payload: { id: string; updates: Partial<CanvasElement> } }) => {
-        updateElement(payload.id, payload.updates);
-      }
-    );
-
-    // Listen for element deletions
-    channel.on(
-      'broadcast',
-      { event: 'element_removed' },
-      ({ payload }: { payload: { id: string } }) => {
-        removeElement(payload.id);
-      }
-    );
-
-    // Listen for cursor movements
-    channel.on(
-      'broadcast',
-      { event: 'cursor_moved' },
-      ({ payload }: { payload: CursorPosition }) => {
-        setCursors(prev => {
-          const existingIndex = prev.findIndex(c => c.userId === payload.userId);
-          if (existingIndex >= 0) {
-            const newCursors = [...prev];
-            newCursors[existingIndex] = payload;
-            return newCursors;
-          }
-          return [...prev, payload];
-        });
-      }
-    );
-
-    // Listen for user joins
-    channel.on(
-      'broadcast',
-      { event: 'user_joined' },
-      ({ payload }: { payload: User }) => {
-        setActiveUsers(prev => {
-          if (prev.some(u => u.id === payload.id)) return prev;
-          return [...prev, payload];
-        });
-      }
-    );
-
-    // Listen for user leaves
-    channel.on(
-      'broadcast',
-      { event: 'user_left' },
-      ({ payload }: { payload: { id: string } }) => {
-        setActiveUsers(prev => prev.filter(u => u.id !== payload.id));
-        setCursors(prev => prev.filter(c => c.userId !== payload.id));
-      }
-    );
-
-    channel.subscribe();
-
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [drawingId, addElements, updateElement, removeElement]);
-
-  // Broadcast element changes
-  const broadcastElementChange = (event: string, payload: any) => {
-    supabase.channel(`collab:${drawingId}`)
-      .send({
-        type: 'broadcast',
-        event,
-        payload,
-      });
-  };
-
-  // Broadcast cursor movements
-  const broadcastCursorMove = (x: number, y: number) => {
-    if (!currentUser) return;
-
-    const cursorPosition = { x, y, userId: currentUser.id };
-    setCursors(prev => {
-      const existingIndex = prev.findIndex(c => c.userId === currentUser.id);
-      if (existingIndex >= 0) {
-        const newCursors = [...prev];
-        newCursors[existingIndex] = cursorPosition;
-        return newCursors;
-      }
-      return [...prev, cursorPosition];
+    // Subscribe to the channel
+    const channel = supabase.channel(channelName, {
+      config: {
+        presence: {
+          key: userIdRef.current,
+        },
+      },
     });
 
-    supabase.channel(`collab:${drawingId}`)
-      .send({
+    // Track presence state
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users = Object.values(state).flat() as Array<{
+        id: string;
+        name: string;
+        color: string;
+      }>;
+      setActiveUsers(users);
+    });
+
+    // Track element changes
+    channel.on('broadcast', { event: 'element_change' }, ({ payload }) => {
+      if (payload.userId !== userIdRef.current) {
+        handleRemoteElementChange(payload.type, payload.data);
+      }
+    });
+
+    // Track cursor movements
+    channel.on('broadcast', { event: 'cursor_move' }, ({ payload }) => {
+      if (payload.userId !== userIdRef.current) {
+        handleRemoteCursorMove(payload.x, payload.y, payload.userId);
+      }
+    });
+
+    // Subscribe to the channel
+    channel.subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        // Join presence
+        await channel.track({
+          id: userIdRef.current,
+          name: currentUser?.name || 'Anonymous',
+          color: userColorRef.current,
+        });
+      }
+    });
+
+    channelRef.current = channel;
+  }, [shareId, currentUser]);
+
+  // Disconnect from collaboration
+  const disconnectFromCollaboration = useCallback(() => {
+    if (channelRef.current) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+    }
+  }, []);
+
+  // Broadcast element changes
+  const broadcastElementChange = useCallback((type: string, data: any) => {
+    if (channelRef.current && currentUser) {
+      channelRef.current.send({
         type: 'broadcast',
-        event: 'cursor_moved',
-        payload: cursorPosition,
+        event: 'element_change',
+        payload: {
+          type,
+          data,
+          userId: userIdRef.current,
+        },
       });
-  };
+    }
+  }, [currentUser]);
+
+  // Broadcast cursor movements
+  const broadcastCursorMove = useCallback((x: number, y: number) => {
+    if (channelRef.current && currentUser) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'cursor_move',
+        payload: {
+          x,
+          y,
+          userId: userIdRef.current,
+        },
+      });
+    }
+  }, [currentUser]);
+
+  // Handle remote element changes
+  const handleRemoteElementChange = useCallback((type: string, data: any) => {
+    // Implement conflict resolution logic here
+    // For now, just apply the changes directly
+    switch (type) {
+      case 'element_added':
+        // Add the new element to the canvas
+        break;
+      case 'element_updated':
+        // Update the specified element
+        break;
+      case 'element_removed':
+        // Remove the specified element
+        break;
+    }
+  }, []);
+
+  // Handle remote cursor movements
+  const handleRemoteCursorMove = useCallback((x: number, y: number, userId: string) => {
+    setCursors(prev => {
+      // Update or add the cursor position
+      const existingIndex = prev.findIndex(c => c.userId === userId);
+      if (existingIndex >= 0) {
+        const newCursors = [...prev];
+        newCursors[existingIndex] = { x, y, userId };
+        return newCursors;
+      }
+      return [...prev, { x, y, userId }];
+    });
+  }, []);
 
   return {
     activeUsers,
     currentUser,
     cursors,
+    connectToCollaboration,
+    disconnectFromCollaboration,
     broadcastElementChange,
     broadcastCursorMove,
+    handleRemoteElementChange,
+    handleRemoteCursorMove,
   };
 };

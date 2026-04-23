@@ -5,6 +5,10 @@ import { useCollaboration } from '../hooks/useCollaboration';
 const CollaborationBar = () => {
   const { activeUsers, currentUser } = useCollaboration();
 
+  if (!activeUsers || activeUsers.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.userList}>
@@ -16,7 +20,7 @@ const CollaborationBar = () => {
               user.id === currentUser?.id && styles.currentUserAvatar
             ]}>
               <Text style={styles.avatarText}>
-                {user.name.charAt(0).toUpperCase()}
+                {user.name ? user.name.charAt(0).toUpperCase() : '?'}
               </Text>
             </View>
             {user.id === currentUser?.id && (
@@ -41,6 +45,9 @@ const styles = StyleSheet.create({
   userList: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 20,
+    padding: 8,
   },
   user: {
     marginRight: 8,
