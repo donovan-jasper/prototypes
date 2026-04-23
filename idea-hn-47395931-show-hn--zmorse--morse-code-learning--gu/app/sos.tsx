@@ -168,19 +168,11 @@ export default function SOSScreen() {
               placeholder="Enter your message"
               value={newMessage}
               onChangeText={setNewMessage}
-              autoFocus={true}
+              maxLength={20}
             />
             <View style={styles.buttonRow}>
-              <Button
-                title="Cancel"
-                onPress={() => setShowCustomModal(false)}
-                color="#999"
-              />
-              <Button
-                title="Save"
-                onPress={handleSaveMessage}
-                color="#007AFF"
-              />
+              <Button title="Cancel" onPress={() => setShowCustomModal(false)} />
+              <Button title="Save" onPress={handleSaveMessage} />
             </View>
           </View>
         </View>
@@ -196,11 +188,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
@@ -210,21 +197,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FF3B30',
     marginBottom: 40,
-    textAlign: 'center',
   },
   info: {
     marginTop: 40,
     textAlign: 'center',
     color: '#666',
-    paddingHorizontal: 20,
   },
   premiumSection: {
     marginTop: 30,
+    width: '100%',
     alignItems: 'center',
   },
   premiumText: {
     fontSize: 16,
     marginBottom: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -242,17 +233,18 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
+    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 5,
     padding: 10,
-    marginBottom: 20,
+    marginBottom: 15,
     fontSize: 16,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
   },
 });
