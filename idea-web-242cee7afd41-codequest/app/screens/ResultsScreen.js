@@ -22,8 +22,8 @@ export default function ResultsScreen({ route, navigation }) {
 
   const getDifficultyMessage = () => {
     if (percentage >= 80) {
-      return score.difficulty === 'hard' 
-        ? 'You\'re mastering the hardest challenges!' 
+      return score.difficulty === 'hard'
+        ? 'You\'re mastering the hardest challenges!'
         : 'Next time, try harder problems!';
     }
     if (percentage < 40) {
@@ -34,18 +34,39 @@ export default function ResultsScreen({ route, navigation }) {
     return 'You\'re progressing well!';
   };
 
+  const getDomainColor = () => {
+    switch (score.domain) {
+      case 'logic':
+        return '#4f46e5';
+      case 'math':
+        return '#0369a1';
+      case 'verbal':
+        return '#15803d';
+      default:
+        return '#6b7280';
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
-      
+
       <View style={styles.content}>
         <Text style={styles.title}>{getMessage()}</Text>
-        
+
         <View style={[styles.scoreCircle, { borderColor: getColor() }]}>
           <Text style={[styles.scorePercentage, { color: getColor() }]}>
             {percentage}%
           </Text>
           <Text style={styles.scoreLabel}>Score</Text>
+        </View>
+
+        <View style={styles.domainContainer}>
+          <View style={[styles.domainBadge, { backgroundColor: `${getDomainColor()}20` }]}>
+            <Text style={[styles.domainText, { color: getDomainColor() }]}>
+              {score.domain.toUpperCase()}
+            </Text>
+          </View>
         </View>
 
         <View style={styles.difficultyContainer}>
@@ -58,16 +79,16 @@ export default function ResultsScreen({ route, navigation }) {
             <Text style={styles.statNumber}>{score.correct}</Text>
             <Text style={styles.statLabel}>Correct</Text>
           </View>
-          
+
           <View style={styles.statDivider} />
-          
+
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>{score.incorrect}</Text>
             <Text style={styles.statLabel}>Incorrect</Text>
           </View>
-          
+
           <View style={styles.statDivider} />
-          
+
           <View style={styles.statBox}>
             <Text style={styles.statNumber}>{score.total}</Text>
             <Text style={styles.statLabel}>Total</Text>
@@ -125,6 +146,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#6b7280',
     marginTop: 4,
+  },
+  domainContainer: {
+    marginBottom: 16,
+  },
+  domainBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  domainText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   difficultyContainer: {
     alignItems: 'center',

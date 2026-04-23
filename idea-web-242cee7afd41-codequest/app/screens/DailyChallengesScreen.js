@@ -10,6 +10,7 @@ export default function DailyChallengesScreen({ navigation }) {
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
   const [currentDifficulty, setCurrentDifficulty] = useState('medium');
+  const [currentDomain, setCurrentDomain] = useState('logic');
   const [loading, setLoading] = useState(true);
   const [sessionStartTime, setSessionStartTime] = useState(null);
 
@@ -20,9 +21,10 @@ export default function DailyChallengesScreen({ navigation }) {
 
   const loadChallenges = async () => {
     try {
-      const difficulty = await getProblemRecommendations();
+      const { domain, difficulty } = await getProblemRecommendations();
+      setCurrentDomain(domain);
       setCurrentDifficulty(difficulty);
-      setProblems(getRandomProblems(3, difficulty));
+      setProblems(getRandomProblems(3, difficulty, domain));
     } catch (error) {
       console.error('Error loading challenges:', error);
       setProblems(getRandomProblems(3));
@@ -48,7 +50,7 @@ export default function DailyChallengesScreen({ navigation }) {
       const totalProblems = problems.length;
       const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-      await savePerformanceRecord(currentDifficulty, totalCorrect, totalProblems);
+      await savePerformanceRecord(currentDifficulty, totalCorrect, totalProblems, currentDomain);
 
       setTimeout(() => {
         navigation.navigate('Results', {
@@ -57,6 +59,7 @@ export default function DailyChallengesScreen({ navigation }) {
             incorrect: newScore.incorrect,
             total: totalProblems,
             difficulty: currentDifficulty,
+            domain: currentDomain,
             duration: sessionDuration
           }
         });
@@ -86,6 +89,9 @@ export default function DailyChallengesScreen({ navigation }) {
       <StatusBar style="light" />
 
       <View style={styles.progressContainer}>
+        <View style={styles.domainBadge}>
+          <Text style={styles.domainText}>{currentDomain.toUpperCase()}</Text>
+        </View>
         <View style={styles.difficultyBadge}>
           <Text style={styles.difficultyText}>{currentDifficulty.toUpperCase()}</Text>
         </View>
@@ -152,6 +158,19 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+  },
+  domainBadge: {
+    alignSelf: 'center',
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  domainText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0369a1',
   },
   difficultyBadge: {
     alignSelf: 'center',

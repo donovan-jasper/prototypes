@@ -1,371 +1,274 @@
-const problems = [
-  // Logic - Easy
-  {
-    id: 1,
-    question: "If all roses are flowers and some flowers fade quickly, which statement must be true?",
-    options: [
-      "All roses fade quickly",
-      "Some roses are flowers",
-      "No flowers are roses",
-      "All flowers fade quickly"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "easy"
-  },
-  {
-    id: 2,
-    question: "Which number comes next in the sequence: 2, 4, 6, 8, ?",
-    options: ["9", "10", "11", "12"],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "easy"
-  },
-  {
-    id: 3,
-    question: "If A is taller than B, and B is taller than C, who is the shortest?",
-    options: ["A", "B", "C", "Cannot determine"],
-    correctAnswer: 2,
-    domain: "logic",
-    difficulty: "easy"
-  },
-  {
-    id: 4,
-    question: "All cats are mammals. Felix is a cat. Therefore:",
-    options: [
-      "Felix is not a mammal",
-      "Felix is a mammal",
-      "Some cats are not mammals",
-      "Felix might be a mammal"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "easy"
-  },
+import { shuffleArray } from '../utils/helpers';
 
-  // Logic - Medium
-  {
-    id: 5,
-    question: "If it rains, the ground gets wet. The ground is wet. What can we conclude?",
-    options: [
-      "It must have rained",
-      "It might have rained",
-      "It did not rain",
-      "The ground is always wet"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  {
-    id: 6,
-    question: "In a group of 5 people, everyone shakes hands with everyone else exactly once. How many handshakes occur?",
-    options: ["5", "10", "15", "20"],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  {
-    id: 7,
-    question: "Which word does NOT belong: Apple, Banana, Carrot, Orange?",
-    options: ["Apple", "Banana", "Carrot", "Orange"],
-    correctAnswer: 2,
-    domain: "logic",
-    difficulty: "medium"
-  },
-  {
-    id: 8,
-    question: "If some doctors are teachers and all teachers are patient, which must be true?",
-    options: [
-      "All doctors are patient",
-      "Some doctors are patient",
-      "No doctors are patient",
-      "All patient people are doctors"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "medium"
-  },
+// Problem structure:
+// {
+//   id: string,
+//   domain: 'logic' | 'math' | 'verbal',
+//   difficulty: 'easy' | 'medium' | 'hard',
+//   question: string,
+//   options: string[],
+//   correctAnswer: number,
+//   explanation?: string
+// }
 
-  // Logic - Hard
+const logicProblems = [
+  // Easy
   {
-    id: 9,
-    question: "Three switches outside a room control three bulbs inside. You can flip switches but enter only once. How do you determine which switch controls which bulb?",
+    id: 'logic-easy-1',
+    domain: 'logic',
+    difficulty: 'easy',
+    question: 'If all Bloops are Razzies and all Razzies are Lazzies, then all Bloops are definitely Lazzies.',
+    options: ['True', 'False', 'Sometimes', 'Never'],
+    correctAnswer: 0,
+    explanation: 'This follows from the transitive property of "all".'
+  },
+  {
+    id: 'logic-easy-2',
+    domain: 'logic',
+    difficulty: 'easy',
+    question: 'Which of the following is a valid syllogism?',
     options: [
-      "Flip all switches and check",
-      "Flip one switch, wait, flip another, then check temperature and light",
-      "Flip switches randomly",
-      "It's impossible"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "hard"
-  },
-  {
-    id: 10,
-    question: "A bat and ball cost $1.10 total. The bat costs $1 more than the ball. How much does the ball cost?",
-    options: ["$0.10", "$0.05", "$0.15", "$0.20"],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "hard"
-  },
-  {
-    id: 11,
-    question: "You have 12 balls, one is slightly heavier. Using a balance scale only 3 times, how can you find the heavy ball?",
-    options: [
-      "Weigh them all individually",
-      "Divide into groups of 4, then narrow down",
-      "Divide into groups of 6",
-      "It cannot be done in 3 weighings"
-    ],
-    correctAnswer: 1,
-    domain: "logic",
-    difficulty: "hard"
-  },
-
-  // Math - Easy
-  {
-    id: 12,
-    question: "What is 15 + 27?",
-    options: ["40", "42", "43", "45"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    id: 13,
-    question: "What is 8 × 7?",
-    options: ["54", "56", "58", "60"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    id: 14,
-    question: "What is 50% of 80?",
-    options: ["30", "35", "40", "45"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "easy"
-  },
-  {
-    id: 15,
-    question: "If a rectangle has length 6 and width 4, what is its area?",
-    options: ["20", "22", "24", "26"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "easy"
-  },
-
-  // Math - Medium
-  {
-    id: 16,
-    question: "What is the value of x in: 3x + 5 = 20?",
-    options: ["3", "4", "5", "6"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    id: 17,
-    question: "A train travels 120 miles in 2 hours. What is its average speed?",
-    options: ["50 mph", "55 mph", "60 mph", "65 mph"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    id: 18,
-    question: "What is 25% of 200?",
-    options: ["40", "45", "50", "55"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-  {
-    id: 19,
-    question: "If a shirt costs $40 after a 20% discount, what was the original price?",
-    options: ["$45", "$48", "$50", "$52"],
-    correctAnswer: 2,
-    domain: "math",
-    difficulty: "medium"
-  },
-
-  // Math - Hard
-  {
-    id: 20,
-    question: "What is the sum of the first 10 prime numbers?",
-    options: ["127", "129", "131", "133"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "hard"
-  },
-  {
-    id: 21,
-    question: "If f(x) = 2x² - 3x + 1, what is f(3)?",
-    options: ["8", "10", "12", "14"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "hard"
-  },
-  {
-    id: 22,
-    question: "What is the derivative of x³ + 2x - 5?",
-    options: ["3x² + 2", "x² + 2x", "3x² + 2x", "x² - 5"],
-    correctAnswer: 1,
-    domain: "math",
-    difficulty: "hard"
-  },
-
-  // Verbal - Easy
-  {
-    id: 23,
-    question: "What is the antonym of 'happy'?",
-    options: ["Joyful", "Sad", "Angry", "Excited"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "easy"
-  },
-  {
-    id: 24,
-    question: "Which word is a synonym for 'quickly'?",
-    options: ["Slowly", "Rapidly", "Quietly", "Loudly"],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "easy"
-  },
-  {
-    id: 25,
-    question: "What is the plural of 'child'?",
-    options: ["Childs", "Childes", "Children", "Childrens"],
-    correctAnswer: 2,
-    domain: "verbal",
-    difficulty: "easy"
-  },
-  {
-    id: 26,
-    question: "Which sentence is grammatically correct?",
-    options: [
-      "She don't like apples",
-      "She doesn't like apples",
-      "She don't likes apples",
-      "She doesn't likes apples"
-    ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "easy"
-  },
-
-  // Verbal - Medium
-  {
-    id: 27,
-    question: "Identify the sentence with correct subject-verb agreement:",
-    options: [
-      "The team of scientists is studying the phenomenon",
-      "The team of scientists are studying the phenomenon",
-      "The team of scientists is studying the phenomenons",
-      "The team of scientists are studying the phenomenons"
-    ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    id: 28,
-    question: "Which sentence uses the correct idiom?",
-    options: [
-      "She's in the mood for a challenge",
-      "She's in the mood for a fight",
-      "She's in the mood for a walk",
-      "She's in the mood for a nap"
-    ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    id: 29,
-    question: "What is the correct form of the verb in: 'If I were you, I would...'",
-    options: ["go", "goes", "going", "gone"],
-    correctAnswer: 2,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-  {
-    id: 30,
-    question: "Which sentence is written in passive voice?",
-    options: [
-      "The chef cooked the meal",
-      "The meal was cooked by the chef",
-      "The chef will cook the meal",
-      "The meal is being cooked by the chef"
-    ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "medium"
-  },
-
-  // Verbal - Hard
-  {
-    id: 31,
-    question: "Identify the sentence with correct parallel structure:",
-    options: [
-      "She enjoys reading, to write, and writing poetry",
-      "She enjoys reading, writing, and to write poetry",
-      "She enjoys to read, writing, and writing poetry",
-      "She enjoys reading, writing, and writing poetry"
+      'All cats are mammals. Some mammals are dogs. Therefore, some cats are dogs.',
+      'All birds can fly. Penguins are birds. Therefore, penguins can fly.',
+      'No vegetables are fruits. All tomatoes are fruits. Therefore, no tomatoes are vegetables.',
+      'Some fish are cold-blooded. All sharks are fish. Therefore, some sharks are cold-blooded.'
     ],
     correctAnswer: 3,
-    domain: "verbal",
-    difficulty: "hard"
+    explanation: 'This is a valid syllogism because it follows the structure of a categorical syllogism.'
+  },
+
+  // Medium
+  {
+    id: 'logic-medium-1',
+    domain: 'logic',
+    difficulty: 'medium',
+    question: 'If P → Q is true and Q → R is true, then which of the following must be true?',
+    options: [
+      'P → R',
+      'R → P',
+      'P ↔ R',
+      'None of the above'
+    ],
+    correctAnswer: 3,
+    explanation: 'The truth of P → R depends on the truth values of P and R, which aren\'t specified.'
   },
   {
-    id: 32,
-    question: "Which sentence contains a dangling modifier?",
+    id: 'logic-medium-2',
+    domain: 'logic',
+    difficulty: 'medium',
+    question: 'Which of the following is logically equivalent to (P ∧ Q) ∨ (¬P ∧ R)?',
     options: [
-      "While walking in the park, the dog chased a squirrel",
-      "Walking in the park, the dog chased a squirrel",
-      "The dog, while walking in the park, chased a squirrel",
-      "The dog chased a squirrel while walking in the park"
+      'P ↔ Q',
+      'P ∨ (Q ∧ R)',
+      '(P ∨ R) ∧ (¬P ∨ Q)',
+      '¬(P ↔ Q)'
     ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "hard"
+    correctAnswer: 2,
+    explanation: 'This is the distributive property of logical OR over AND.'
+  },
+
+  // Hard
+  {
+    id: 'logic-hard-1',
+    domain: 'logic',
+    difficulty: 'hard',
+    question: 'Which of the following is a tautology?',
+    options: [
+      '(P ∨ Q) → (P ∧ Q)',
+      '(P ∧ Q) ∨ (¬P ∧ ¬Q)',
+      'P ∨ (¬P ∧ Q)',
+      '¬(P ↔ Q) ↔ (P ↔ ¬Q)'
+    ],
+    correctAnswer: 3,
+    explanation: 'This is a tautology because it\'s always true regardless of the truth values of P and Q.'
   },
   {
-    id: 33,
-    question: "What is the correct punctuation for this sentence: 'The report due tomorrow is critical'?",
+    id: 'logic-hard-2',
+    domain: 'logic',
+    difficulty: 'hard',
+    question: 'If the premises "All humans are mortal" and "Socrates is human" are true, what conclusion can be logically drawn?',
     options: [
-      "The report due tomorrow is critical",
-      "The report, due tomorrow, is critical",
-      "The report due tomorrow, is critical",
-      "The report due tomorrow is, critical"
+      'Socrates is mortal',
+      'All mortals are humans',
+      'There exists a human who is mortal',
+      'Socrates is the only mortal human'
     ],
-    correctAnswer: 1,
-    domain: "verbal",
-    difficulty: "hard"
+    correctAnswer: 0,
+    explanation: 'This follows directly from the premises using the law of detachment.'
   }
 ];
 
-export function getRandomProblems(count = 3, difficulty = 'medium', domain = null) {
-  // Filter problems by difficulty and domain if specified
-  let filtered = problems.filter(problem => {
-    return (!difficulty || problem.difficulty === difficulty) &&
-           (!domain || problem.domain === domain);
-  });
+const mathProblems = [
+  // Easy
+  {
+    id: 'math-easy-1',
+    domain: 'math',
+    difficulty: 'easy',
+    question: 'What is 5 + 7 × 2?',
+    options: ['19', '24', '14', '26'],
+    correctAnswer: 1,
+    explanation: 'Multiplication comes before addition in the order of operations.'
+  },
+  {
+    id: 'math-easy-2',
+    domain: 'math',
+    difficulty: 'easy',
+    question: 'What is the value of x in the equation 3x + 5 = 20?',
+    options: ['5', '3', '7', '15'],
+    correctAnswer: 1,
+    explanation: 'Subtract 5 from both sides, then divide by 3.'
+  },
 
-  // If no problems match, fall back to all problems
-  if (filtered.length === 0) {
-    filtered = problems;
+  // Medium
+  {
+    id: 'math-medium-1',
+    domain: 'math',
+    difficulty: 'medium',
+    question: 'What is the derivative of f(x) = 3x² + 2x - 5?',
+    options: [
+      '6x + 2',
+      '3x + 2',
+      '6x² + 2x',
+      '6x + 2 - 5'
+    ],
+    correctAnswer: 0,
+    explanation: 'Apply the power rule to each term.'
+  },
+  {
+    id: 'math-medium-2',
+    domain: 'math',
+    difficulty: 'medium',
+    question: 'What is the solution to the system of equations: y = 2x + 3 and 3x - y = 5?',
+    options: [
+      'x = 1, y = 5',
+      'x = 2, y = 7',
+      'x = 1, y = 7',
+      'x = 2, y = 5'
+    ],
+    correctAnswer: 0,
+    explanation: 'Substitute y from the first equation into the second equation.'
+  },
+
+  // Hard
+  {
+    id: 'math-hard-1',
+    domain: 'math',
+    difficulty: 'hard',
+    question: 'What is the limit as x approaches infinity of (3x² + 2x + 1)/(2x² - x + 4)?',
+    options: ['1.5', '0.5', '1', 'Infinity'],
+    correctAnswer: 0,
+    explanation: 'Divide numerator and denominator by x² and take the limit.'
+  },
+  {
+    id: 'math-hard-2',
+    domain: 'math',
+    difficulty: 'hard',
+    question: 'What is the value of the integral ∫ from 0 to π of sin(x) dx?',
+    options: ['0', '1', '2', '-1'],
+    correctAnswer: 1,
+    explanation: 'The antiderivative of sin(x) is -cos(x).'
+  }
+];
+
+const verbalProblems = [
+  // Easy
+  {
+    id: 'verbal-easy-1',
+    domain: 'verbal',
+    difficulty: 'easy',
+    question: 'Which word is most similar in meaning to "ubiquitous"?',
+    options: ['Rare', 'Common', 'Unique', 'Scarce'],
+    correctAnswer: 1,
+    explanation: '"Ubiquitous" means present everywhere, so "common" is the closest synonym.'
+  },
+  {
+    id: 'verbal-easy-2',
+    domain: 'verbal',
+    difficulty: 'easy',
+    question: 'Which sentence is grammatically correct?',
+    options: [
+      'She don\'t like apples.',
+      'She doesn\'t like apples.',
+      'She don\'t likes apples.',
+      'She doesn\'t likes apples.'
+    ],
+    correctAnswer: 1,
+    explanation: 'The correct contraction is "doesn\'t" for the third person singular.'
+  },
+
+  // Medium
+  {
+    id: 'verbal-medium-1',
+    domain: 'verbal',
+    difficulty: 'medium',
+    question: 'Which of the following is an example of a metaphor?',
+    options: [
+      'The room was filled with a thick fog.',
+      'The room was filled with a thick mist.',
+      'The room was filled with a thick cloud.',
+      'The room was filled with a thick smoke.'
+    ],
+    correctAnswer: 0,
+    explanation: 'A metaphor compares two unlike things without using "like" or "as".'
+  },
+  {
+    id: 'verbal-medium-2',
+    domain: 'verbal',
+    difficulty: 'medium',
+    question: 'Which word is most opposite in meaning to "benevolent"?',
+    options: ['Kind', 'Generous', 'Malevolent', 'Charitable'],
+    correctAnswer: 2,
+    explanation: '"Benevolent" means well-meaning, so "malevolent" means having or showing a wish to do harm.'
+  },
+
+  // Hard
+  {
+    id: 'verbal-hard-1',
+    domain: 'verbal',
+    difficulty: 'hard',
+    question: 'Which of the following is an example of a pun?',
+    options: [
+      'Time flies like an arrow.',
+      'The pen is mightier than the sword.',
+      'A picture is worth a thousand words.',
+      'Actions speak louder than words.'
+    ],
+    correctAnswer: 0,
+    explanation: 'A pun plays on multiple meanings of a word.'
+  },
+  {
+    id: 'verbal-hard-2',
+    domain: 'verbal',
+    difficulty: 'hard',
+    question: 'Which of the following is an example of a paradox?',
+    options: [
+      'The grass is always greener on the other side.',
+      'You can\'t have your cake and eat it too.',
+      'A bird in the hand is worth two in the bush.',
+      'The early bird catches the worm.'
+    ],
+    correctAnswer: 1,
+    explanation: 'A paradox is a statement that seems contradictory but may be true when examined closely.'
+  }
+];
+
+const allProblems = [...logicProblems, ...mathProblems, ...verbalProblems];
+
+export function getRandomProblems(count = 3, difficulty = 'medium', domain = null) {
+  let filteredProblems = allProblems.filter(problem => problem.difficulty === difficulty);
+
+  if (domain) {
+    filteredProblems = filteredProblems.filter(problem => problem.domain === domain);
   }
 
-  // Shuffle and pick random problems
-  const shuffled = [...filtered].sort(() => 0.5 - Math.random());
-  return shuffled.slice(0, count);
+  return shuffleArray(filteredProblems).slice(0, count);
 }
 
 export function getProblemById(id) {
-  return problems.find(problem => problem.id === id);
+  return allProblems.find(problem => problem.id === id);
 }
 
-export default problems;
+export function getProblemsByDomain(domain, count = 3) {
+  const filteredProblems = allProblems.filter(problem => problem.domain === domain);
+  return shuffleArray(filteredProblems).slice(0, count);
+}
