@@ -43,8 +43,16 @@ export async function generateOutfits(
   // Filter items that haven't been worn recently
   const availableItems = items.filter(item => !wornItemIds.has(item.id));
 
+  if (availableItems.length === 0) {
+    return []; // Return empty array if no items available
+  }
+
   // Generate possible outfit combinations
   const combinations = generateCombinations(availableItems, context);
+
+  if (combinations.length === 0) {
+    return []; // Return empty array if no combinations found
+  }
 
   // Score and sort combinations
   const scoredCombinations = combinations.map(combination => ({
@@ -55,8 +63,9 @@ export async function generateOutfits(
   // Sort by score (highest first)
   scoredCombinations.sort((a, b) => b.score - a.score);
 
-  // Return top 5 suggestions
-  return scoredCombinations.slice(0, 5).map(combination => ({
+  // Return top 3-5 suggestions (whichever is smaller)
+  const maxSuggestions = Math.min(5, scoredCombinations.length);
+  return scoredCombinations.slice(0, maxSuggestions).map(combination => ({
     items: combination.items,
     score: combination.score,
     context: combination.context
@@ -167,7 +176,7 @@ function filterByWeather(
              !item.tags.includes('light') &&
              !item.tags.includes('casual');
     }
-    // Mild weather
+    // Mild weather (50-75°F)
     return true;
   });
 }
@@ -200,174 +209,72 @@ function calculateOutfitScore(
   const items = allItems.filter(item => itemIds.includes(item.id));
 
   // Base score based on number of items
-  score += items.length * 2;
+  score += items.length * 10;
 
-  // Color harmony score
-  const colorScore = calculateColorHarmonyScore(items);
-  score += colorScore * 3;
+  // Check for complete outfit (top + bottom OR dress)
+  const hasTop = items.some(item => item.category === 'top');
+  const hasBottom = items.some(item => item.category === 'bottom');
+  const hasDress = items.some(item => item.category === 'dress');
 
-  // Style coherence score
-  const styleScore = calculateStyleCoherenceScore(items, context);
-  score += styleScore * 2;
+  if ((hasTop && hasBottom) || hasDress) {
+    score += 30;
+  }
 
-  // Weather appropriateness score
-  const weatherScore = calculateWeatherAppropriatenessScore(items, context);
-  score += weatherScore * 2;
+  // Color harmony bonus
+  const dominantColors = items.flatMap(item => item.colors);
+  if (dominantColors.length > 0) {
+    const colorGroups = groupColors(dominantColors);
 
-  // Occasion appropriateness score
-  const occasionScore = calculateOccasionAppropriatenessScore(items, context);
-  score += occasionScore * 2;
+    // Monochrome (all same color)
+    if (colorGroups.length === 1) {
+      score += 20;
+    }
+    // Complementary colors
+    else if (colorGroups.length === 2 &&
+             COMPLEMENTARY_COLORS[colorGroups[0]]?.includes(colorGroups[1])) {
+      score += 15;
+    }
+    // Analogous colors
+    else if (colorGroups.length <= 3 &&
+             colorGroups.every((color, i, arr) =>
+               i === 0 || ANALOGOUS_COLORS[arr[i-1]]?.includes(color))) {
+      score += 10;
+    }
+  }
+
+  // Weather appropriateness
+  if (context.temp > 70 && !items.some(item => item.tags.includes('heavy'))) {
+    score += 5;
+  } else if (context.temp < 50 && items.some(item => item.tags.includes('winter'))) {
+    score += 5;
+  }
+
+  // Occasion appropriateness
+  const isFormal = context.events.some(event =>
+    event.toLowerCase().includes('meeting') ||
+    event.toLowerCase().includes('interview') ||
+    event.toLowerCase().includes('dinner')
+  );
+
+  if (isFormal && items.some(item => item.tags.includes('formal'))) {
+    score += 10;
+  } else if (!isFormal && items.some(item => item.tags.includes('casual'))) {
+    score += 5;
+  }
 
   return score;
 }
 
-function calculateColorHarmonyScore(items: WardrobeItem[]): number {
-  if (items.length < 2) return 0;
+function groupColors(colors: string[]): string[] {
+  const colorGroups: string[] = [];
+  const seenColors = new Set<string>();
 
-  // Check for monochrome (all items same color)
-  const firstColors = items[0].colors;
-  const isMonochrome = items.every(item =>
-    item.colors.some(color => firstColors.includes(color))
-  );
-
-  if (isMonochrome) return 5;
-
-  // Check for complementary colors
-  let hasComplementary = false;
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const item1Colors = items[i].colors;
-      const item2Colors = items[j].colors;
-
-      for (const color1 of item1Colors) {
-        if (COMPLEMENTARY_COLORS[color1]?.some(color =>
-          item2Colors.includes(color)
-        )) {
-          hasComplementary = true;
-          break;
-        }
-      }
+  colors.forEach(color => {
+    if (!seenColors.has(color)) {
+      seenColors.add(color);
+      colorGroups.push(color);
     }
-  }
-
-  if (hasComplementary) return 4;
-
-  // Check for analogous colors
-  let hasAnalogous = false;
-  for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) {
-      const item1Colors = items[i].colors;
-      const item2Colors = items[j].colors;
-
-      for (const color1 of item1Colors) {
-        if (ANALOGOUS_COLORS[color1]?.some(color =>
-          item2Colors.includes(color)
-        )) {
-          hasAnalogous = true;
-          break;
-        }
-      }
-    }
-  }
-
-  if (hasAnalogous) return 3;
-
-  // Default score for mixed colors
-  return 2;
-}
-
-function calculateStyleCoherenceScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  const isFormal = context.events.some(event =>
-    event.toLowerCase().includes('meeting') ||
-    event.toLowerCase().includes('interview') ||
-    event.toLowerCase().includes('dinner')
-  );
-
-  const isCasual = context.events.some(event =>
-    event.toLowerCase().includes('brunch') ||
-    event.toLowerCase().includes('coffee') ||
-    event.toLowerCase().includes('lunch')
-  );
-
-  // Check if all items match the occasion
-  const allFormal = items.every(item =>
-    item.tags.includes('formal') ||
-    item.tags.includes('work') ||
-    item.tags.includes('business')
-  );
-
-  const allCasual = items.every(item =>
-    item.tags.includes('casual') ||
-    item.tags.includes('athleisure') ||
-    item.tags.includes('streetwear')
-  );
-
-  if (isFormal && allFormal) return 5;
-  if (isCasual && allCasual) return 5;
-
-  // Mixed styles get lower score
-  return 3;
-}
-
-function calculateWeatherAppropriatenessScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  // Check if all items are appropriate for the weather
-  const allAppropriate = items.every(item => {
-    if (context.temp > 75) {
-      return !item.tags.includes('winter') &&
-             !item.tags.includes('heavy') &&
-             !item.tags.includes('formal');
-    } else if (context.temp < 50) {
-      return !item.tags.includes('summer') &&
-             !item.tags.includes('light') &&
-             !item.tags.includes('casual');
-    }
-    return true;
   });
 
-  return allAppropriate ? 5 : 3;
-}
-
-function calculateOccasionAppropriatenessScore(
-  items: WardrobeItem[],
-  context: GenerationContext
-): number {
-  const isFormal = context.events.some(event =>
-    event.toLowerCase().includes('meeting') ||
-    event.toLowerCase().includes('interview') ||
-    event.toLowerCase().includes('dinner')
-  );
-
-  const isCasual = context.events.some(event =>
-    event.toLowerCase().includes('brunch') ||
-    event.toLowerCase().includes('coffee') ||
-    event.toLowerCase().includes('lunch')
-  );
-
-  // Check if items match the occasion
-  if (isFormal) {
-    const hasFormal = items.some(item =>
-      item.tags.includes('formal') ||
-      item.tags.includes('work') ||
-      item.tags.includes('business')
-    );
-    return hasFormal ? 5 : 3;
-  }
-
-  if (isCasual) {
-    const hasCasual = items.some(item =>
-      item.tags.includes('casual') ||
-      item.tags.includes('athleisure') ||
-      item.tags.includes('streetwear')
-    );
-    return hasCasual ? 5 : 3;
-  }
-
-  // Neutral occasions get higher score
-  return 4;
+  return colorGroups;
 }
