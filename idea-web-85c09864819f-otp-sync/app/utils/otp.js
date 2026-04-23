@@ -7,6 +7,9 @@ import { generateTotp, verifyTotp } from 'react-native-totp';
  */
 export const generateOTP = (secret) => {
   try {
+    if (!secret || typeof secret !== 'string') {
+      throw new Error('Invalid secret key');
+    }
     return generateTotp(secret, {
       digits: 6,
       period: 30,
@@ -26,6 +29,13 @@ export const generateOTP = (secret) => {
  */
 export const validateOTP = (secret, token) => {
   try {
+    if (!secret || typeof secret !== 'string') {
+      throw new Error('Invalid secret key');
+    }
+    if (!token || typeof token !== 'string' || token.length !== 6) {
+      throw new Error('Invalid token format');
+    }
+
     return verifyTotp(token, secret, {
       digits: 6,
       period: 30,
