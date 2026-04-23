@@ -2,6 +2,7 @@ import { generateSchedule, CueEvent } from '../audio/cueEngine';
 import { playCue } from '../audio/soundscapeManager';
 import { playPattern } from '../haptics/patternEngine';
 import { Session } from './sessionManager';
+import { calculateNextCueTime, getCueIntensity } from './adaptiveAlgorithm';
 
 export class CueScheduler {
   private schedule: CueEvent[] = [];
@@ -10,6 +11,7 @@ export class CueScheduler {
   private startTime: number = 0;
   private pausedTime: number = 0;
   private totalPausedDuration: number = 0;
+  private lastCueTime: number = 0;
 
   constructor() {}
 
@@ -19,6 +21,7 @@ export class CueScheduler {
     this.startTime = Date.now();
     this.pausedTime = 0;
     this.totalPausedDuration = 0;
+    this.lastCueTime = 0;
   }
 
   start(): void {
@@ -26,13 +29,14 @@ export class CueScheduler {
 
     this.intervalId = setInterval(() => {
       const elapsedSeconds = this.getAdjustedElapsedSeconds();
-      const cuesToTrigger = this.schedule.filter(cue =>
-        Math.abs(cue.timeSeconds - elapsedSeconds) <= 0.5
-      );
+      const elapsedMinutes = elapsedSeconds / 60;
 
-      cuesToTrigger.forEach(cue => {
-        this.triggerCue(cue);
-      });
+      // Calculate adaptive timing
+      if (this.lastCueTime === 0 || elapsedSeconds - this.lastCueTime >= calculateNextCueTime(elapsedMinutes, this.currentSession.durationMinutes)) {
+        const intensity = getCueIntensity(elapsedMinutes, this.currentSession.durationMinutes);
+        this.triggerAdaptiveCue(intensity);
+        this.lastCueTime = elapsedSeconds;
+      }
     }, 100);
   }
 
@@ -60,15 +64,27 @@ export class CueScheduler {
     this.currentSession = null;
     this.pausedTime = 0;
     this.totalPausedDuration = 0;
+    this.lastCueTime = 0;
   }
 
-  private triggerCue(cue: CueEvent): void {
-    if (cue.type === 'audio' || cue.type === 'both') {
-      playCue(cue.intensity);
+  private triggerAdaptiveCue(intensity: number): void {
+    // Determine cue type based on intensity
+    let cueType: 'audio' | 'haptic' | 'both';
+
+    if (intensity < 0.5) {
+      cueType = 'audio';
+    } else if (intensity < 0.8) {
+      cueType = 'haptic';
+    } else {
+      cueType = 'both';
     }
 
-    if (cue.type === 'haptic' || cue.type === 'both') {
-      playPattern(cue.intensity);
+    if (cueType === 'audio' || cueType === 'both') {
+      playCue(intensity);
+    }
+
+    if (cueType === 'haptic' || cueType === 'both') {
+      playPattern(intensity);
     }
   }
 
