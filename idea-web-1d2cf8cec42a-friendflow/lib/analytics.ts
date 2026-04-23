@@ -1,5 +1,5 @@
 import { Contact, Interaction } from '../types';
-import { differenceInDays, isWithinInterval, subDays, subMonths } from 'date-fns';
+import { differenceInDays, isWithinInterval, subDays, subMonths, format } from 'date-fns';
 
 export const calculateRelationshipScore = (contact: Contact, interactions: Interaction[], currentDate: Date): number => {
   // 1. Adherence to check-in frequency (80% weight)
@@ -37,7 +37,7 @@ export const getTopContactsByScore = (contacts: Contact[], interactionsMap: Reco
       ...contact,
       score: calculateRelationshipScore(contact, interactionsMap[contact.id] || [], currentDate)
     }))
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => (b.score || 0) - (a.score || 0))
     .slice(0, 3);
 };
 
@@ -47,7 +47,7 @@ export const getMonthlyCheckIns = (interactions: Interaction[], currentDate: Dat
 
   for (let i = 0; i < months; i++) {
     const monthStart = subMonths(currentDate, i);
-    const monthKey = `${monthStart.getFullYear()}-${monthStart.getMonth() + 1}`;
+    const monthKey = format(monthStart, 'yyyy-MM');
 
     const monthInteractions = interactions.filter(interaction =>
       isWithinInterval(interaction.date, {
@@ -81,4 +81,37 @@ export const getImprovementScore = (interactions: Interaction[], currentDate: Da
 
   const improvement = (last30Days.length - previous30Days.length) / previous30Days.length * 100;
   return Math.max(0, Math.min(100, 50 + improvement)); // Base 50% + improvement percentage
+};
+
+export const getOverdueContacts = (contacts: Contact[], currentDate: Date): Contact[] => {
+  return contacts.filter(contact => {
+    const daysSinceLastContact = differenceInDays(currentDate, contact.lastContact);
+    return daysSinceLastContact > contact.frequency;
+  });
+};
+
+export const getStreakDays = (interactions: Interaction[], currentDate: Date): number => {
+  if (interactions.length === 0) return 0;
+
+  // Sort interactions by date (newest first)
+  const sortedInteractions = [...interactions].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  let streak = 0;
+  let previousDate = currentDate;
+
+  for (const interaction of sortedInteractions) {
+    const daysDiff = differenceInDays(previousDate, interaction.date);
+
+    if (daysDiff === 1) {
+      streak++;
+      previousDate = interaction.date;
+    } else if (daysDiff === 0) {
+      // Same day, skip
+      continue;
+    } else {
+      break;
+    }
+  }
+
+  return streak;
 };

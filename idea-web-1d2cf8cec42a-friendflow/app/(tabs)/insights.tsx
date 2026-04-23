@@ -4,7 +4,7 @@ import { useContactStore } from '../../store/contactStore';
 import { getMonthlyCheckIns, getTopContactsByScore, getImprovementScore } from '../../lib/analytics';
 import { Contact, Interaction } from '../../types';
 import { format } from 'date-fns';
-import { Card, ProgressBar, Title, Subheading, Divider } from 'react-native-paper';
+import { Card, ProgressBar, Title, Subheading, Divider, useTheme } from 'react-native-paper';
 import InsightChart from '../../components/InsightChart';
 
 const InsightsScreen = () => {
@@ -13,6 +13,7 @@ const InsightsScreen = () => {
   const [topContacts, setTopContacts] = useState<Contact[]>([]);
   const [improvementScore, setImprovementScore] = useState(0);
   const [loading, setLoading] = useState(true);
+  const theme = useTheme();
 
   useEffect(() => {
     const currentDate = new Date();
@@ -44,8 +45,8 @@ const InsightsScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4285F4" />
-        <Text style={styles.loadingText}>Loading insights...</Text>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[styles.loadingText, { color: theme.colors.onSurface }]}>Loading insights...</Text>
       </View>
     );
   }
@@ -64,8 +65,8 @@ const InsightsScreen = () => {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Title style={styles.pageTitle}>Your Relationship Insights</Title>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Title style={[styles.pageTitle, { color: theme.colors.onSurface }]}>Your Relationship Insights</Title>
 
       <InsightChart
         data={chartData}
@@ -73,48 +74,48 @@ const InsightsScreen = () => {
         yAxisSuffix=" interactions"
       />
 
-      <Card style={styles.sectionCard}>
+      <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
         <Card.Content>
-          <Title style={styles.sectionTitle}>Top Relationships</Title>
+          <Title style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Top Relationships</Title>
           {topContacts.length > 0 ? (
             topContacts.map((contact, index) => (
               <View key={contact.id}>
                 <View style={styles.contactCard}>
                   <View style={styles.contactHeader}>
-                    <Text style={styles.contactName}>{contact.name}</Text>
-                    <Text style={styles.contactScore}>{contact.score?.toFixed(0) || 'N/A'}</Text>
+                    <Text style={[styles.contactName, { color: theme.colors.onSurface }]}>{contact.name}</Text>
+                    <Text style={[styles.contactScore, { color: theme.colors.primary }]}>{contact.score?.toFixed(0) || 'N/A'}</Text>
                   </View>
                   <ProgressBar
                     progress={((contact.score || 0) / 100)}
                     color={contact.score && contact.score > 70 ? '#4CAF50' : contact.score && contact.score > 40 ? '#FFC107' : '#F44336'}
                     style={styles.progressBar}
                   />
-                  <Subheading style={styles.contactFrequency}>
+                  <Subheading style={[styles.contactFrequency, { color: theme.colors.onSurface }]}>
                     Check-in frequency: every {contact.frequency} days
                   </Subheading>
                 </View>
-                {index < topContacts.length - 1 && <Divider style={styles.divider} />}
+                {index < topContacts.length - 1 && <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />}
               </View>
             ))
           ) : (
-            <Text style={styles.noDataText}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
+            <Text style={[styles.noDataText, { color: theme.colors.onSurface }]}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
           )}
         </Card.Content>
       </Card>
 
-      <Card style={styles.sectionCard}>
+      <Card style={[styles.sectionCard, { backgroundColor: theme.colors.surface }]}>
         <Card.Content>
-          <Title style={styles.sectionTitle}>Your Improvement</Title>
+          <Title style={[styles.sectionTitle, { color: theme.colors.onSurface }]}>Your Improvement</Title>
           <View style={styles.improvementHeader}>
-            <Text style={styles.improvementLabel}>Last 30 Days</Text>
-            <Text style={styles.improvementScore}>{improvementScore.toFixed(0)}%</Text>
+            <Text style={[styles.improvementLabel, { color: theme.colors.onSurface }]}>Last 30 Days</Text>
+            <Text style={[styles.improvementScore, { color: theme.colors.primary }]}>{improvementScore.toFixed(0)}%</Text>
           </View>
           <ProgressBar
             progress={improvementScore / 100}
             color={improvementScore > 50 ? '#4CAF50' : improvementScore > 30 ? '#FFC107' : '#F44336'}
             style={styles.progressBar}
           />
-          <Subheading style={styles.improvementText}>
+          <Subheading style={[styles.improvementText, { color: theme.colors.onSurface }]}>
             {improvementScore > 50
               ? 'Great job! You\'re improving your relationship maintenance.'
               : improvementScore > 30
@@ -131,23 +132,20 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#666',
   },
   pageTitle: {
+    fontSize: 24,
     marginBottom: 24,
     textAlign: 'center',
-    fontSize: 24,
   },
   sectionCard: {
     marginBottom: 24,
@@ -157,7 +155,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   contactCard: {
-    paddingVertical: 12,
+    marginBottom: 16,
   },
   contactHeader: {
     flexDirection: 'row',
@@ -171,19 +169,16 @@ const styles = StyleSheet.create({
   contactScore: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4285F4',
   },
   contactFrequency: {
     marginTop: 8,
-    color: '#666',
+    fontSize: 14,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
   },
-  noDataText: {
-    textAlign: 'center',
-    color: '#666',
+  divider: {
     marginVertical: 16,
   },
   improvementHeader: {
@@ -193,19 +188,19 @@ const styles = StyleSheet.create({
   },
   improvementLabel: {
     fontSize: 16,
-    color: '#666',
   },
   improvementScore: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4285F4',
   },
   improvementText: {
-    marginTop: 16,
-    color: '#666',
+    marginTop: 8,
+    fontSize: 14,
   },
-  divider: {
-    marginVertical: 12,
+  noDataText: {
+    textAlign: 'center',
+    marginTop: 16,
+    fontSize: 16,
   },
 });
 
