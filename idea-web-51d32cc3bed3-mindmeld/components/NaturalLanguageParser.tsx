@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { parse } from 'chrono-node';
+import { View, TextInput, StyleSheet, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { parse, isValid, addDays, addWeeks, addMonths } from 'date-fns';
+import * as chrono from 'chrono-node';
 
-interface ParsedData {
+interface ParsedReminder {
   title: string;
   date: Date;
   time: Date;
@@ -13,95 +14,87 @@ interface ParsedData {
 }
 
 interface NaturalLanguageParserProps {
-  onParsed: (data: ParsedData) => void;
+  onParsed: (parsedData: ParsedReminder) => void;
+  initialText?: string;
 }
 
-const NaturalLanguageParser: React.FC<NaturalLanguageParserProps> = ({ onParsed }) => {
+const NaturalLanguageParser: React.FC<NaturalLanguageParserProps> = ({ onParsed, initialText = '' }) => {
+  const [inputText, setInputText] = useState(initialText);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const parseNaturalLanguage = (text: string) => {
+  const parseNaturalLanguage = (text: string): ParsedReminder => {
+    // Default values
+    const now = new Date();
+    let parsedDate = now;
+    let parsedTime = now;
+    let title = text;
+    let location: string | undefined;
+    let category: string | undefined;
+    let recurrence: 'none' | 'daily' | 'weekly' | 'monthly' = 'none';
+
+    // Extract date and time using chrono
+    const parsedDates = chrono.parse(text);
+    if (parsedDates.length > 0) {
+      const firstDate = parsedDates[0];
+      parsedDate = firstDate.start.date() || now;
+      parsedTime = firstDate.start.date() || now;
+
+      // Remove the date/time part from the title
+      title = text.replace(firstDate.text, '').trim();
+    }
+
+    // Check for recurrence patterns
+    const recurrenceKeywords = {
+      daily: ['every day', 'daily', 'each day'],
+      weekly: ['every week', 'weekly', 'each week'],
+      monthly: ['every month', 'monthly', 'each month']
+    };
+
+    for (const [recurrenceType, keywords] of Object.entries(recurrenceKeywords)) {
+      if (keywords.some(keyword => text.toLowerCase().includes(keyword))) {
+        recurrence = recurrenceType as 'none' | 'daily' | 'weekly' | 'monthly';
+        break;
+      }
+    }
+
+    // Check for location (simple pattern matching)
+    const locationMatch = text.match(/(near|at|in|around)\s+(.+?)(?=\s|$)/i);
+    if (locationMatch) {
+      location = locationMatch[2];
+      title = title.replace(locationMatch[0], '').trim();
+    }
+
+    // Check for category (simple pattern matching)
+    const categoryKeywords = {
+      work: ['work', 'job', 'office', 'meeting', 'project'],
+      personal: ['personal', 'family', 'home', 'mom', 'dad', 'friend'],
+      health: ['health', 'exercise', 'workout', 'medication', 'doctor'],
+      finance: ['finance', 'money', 'bill', 'payment', 'bank']
+    };
+
+    for (const [cat, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(keyword => text.toLowerCase().includes(keyword))) {
+        category = cat;
+        break;
+      }
+    }
+
+    return {
+      title,
+      date: parsedDate,
+      time: parsedTime,
+      location,
+      category,
+      recurrence
+    };
+  };
+
+  const handleParse = () => {
+    if (!inputText.trim()) return;
+
     setIsProcessing(true);
-
     try {
-      // Basic parsing logic
-      const lowerText = text.toLowerCase();
-      let title = text;
-      let date = new Date();
-      let time = new Date();
-      let location: string | undefined;
-      let category: string | undefined;
-      let recurrence: 'none' | 'daily' | 'weekly' | 'monthly' = 'none';
-
-      // Extract date and time using chrono-node
-      const parsedDates = parse(text);
-      if (parsedDates.length > 0) {
-        const firstDate = parsedDates[0];
-        date = firstDate.start.date() || new Date();
-        time = firstDate.start.date() || new Date();
-      }
-
-      // Extract location if mentioned
-      const locationKeywords = ['near', 'at', 'in', 'around'];
-      const locationRegex = new RegExp(`(${locationKeywords.join('|')})\\s+(.+?)(?=\\s|$)`, 'i');
-      const locationMatch = text.match(locationRegex);
-      if (locationMatch && locationMatch[2]) {
-        location = locationMatch[2];
-      }
-
-      // Extract category based on keywords
-      const categoryKeywords = {
-        personal: ['family', 'mom', 'dad', 'friend', 'social', 'personal'],
-        work: ['meeting', 'project', 'deadline', 'work', 'office'],
-        health: ['exercise', 'medication', 'doctor', 'health', 'gym'],
-        finance: ['bill', 'payment', 'bank', 'finance', 'money'],
-        other: ['other', 'miscellaneous']
-      };
-
-      for (const [cat, keywords] of Object.entries(categoryKeywords)) {
-        if (keywords.some(keyword => lowerText.includes(keyword))) {
-          category = cat;
-          break;
-        }
-      }
-
-      // Extract recurrence
-      const recurrenceKeywords = {
-        daily: ['every day', 'daily', 'day'],
-        weekly: ['every week', 'weekly', 'week'],
-        monthly: ['every month', 'monthly', 'month']
-      };
-
-      for (const [recur, keywords] of Object.entries(recurrenceKeywords)) {
-        if (keywords.some(keyword => lowerText.includes(keyword))) {
-          recurrence = recur as 'none' | 'daily' | 'weekly' | 'monthly';
-          break;
-        }
-      }
-
-      // Clean up the title by removing parsed components
-      let cleanedTitle = text;
-      if (parsedDates.length > 0) {
-        cleanedTitle = cleanedTitle.replace(parsedDates[0].text, '').trim();
-      }
-      if (location) {
-        cleanedTitle = cleanedTitle.replace(locationRegex, '').trim();
-      }
-
-      // Remove "remind me to" if present
-      cleanedTitle = cleanedTitle.replace(/^remind me to\s+/i, '').trim();
-
-      // Capitalize first letter
-      cleanedTitle = cleanedTitle.charAt(0).toUpperCase() + cleanedTitle.slice(1);
-
-      const parsedData: ParsedData = {
-        title: cleanedTitle,
-        date,
-        time,
-        location,
-        category,
-        recurrence
-      };
-
+      const parsedData = parseNaturalLanguage(inputText);
       onParsed(parsedData);
     } catch (error) {
       console.error('Error parsing natural language:', error);
@@ -110,37 +103,68 @@ const NaturalLanguageParser: React.FC<NaturalLanguageParserProps> = ({ onParsed 
     }
   };
 
-  // Example usage with a sample input
   useEffect(() => {
-    // This would normally be triggered by the parent component when text changes
-    // For demo purposes, we'll parse a sample input
-    parseNaturalLanguage('Remind me to call mom tomorrow at 3pm');
-  }, []);
+    if (initialText) {
+      setInputText(initialText);
+      handleParse();
+    }
+  }, [initialText]);
 
-  if (isProcessing) {
-    return (
-      <View style={styles.processingContainer}>
-        <MaterialIcons name="autorenew" size={20} color="#666" />
-        <Text style={styles.processingText}>Processing...</Text>
+  return (
+    <View style={styles.container}>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Type your reminder (e.g., 'Remind me to call mom tomorrow at 3pm')"
+          value={inputText}
+          onChangeText={setInputText}
+          onSubmitEditing={handleParse}
+          multiline
+        />
+        <TouchableOpacity
+          style={styles.parseButton}
+          onPress={handleParse}
+          disabled={isProcessing || !inputText.trim()}
+        >
+          <MaterialIcons
+            name="send"
+            size={24}
+            color={inputText.trim() ? '#4CAF50' : '#CCCCCC'}
+          />
+        </TouchableOpacity>
       </View>
-    );
-  }
-
-  return null;
+      {isProcessing && <Text style={styles.processingText}>Processing...</Text>}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-  processingContainer: {
+  container: {
+    marginBottom: 16,
+  },
+  inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     borderRadius: 8,
-    marginBottom: 15,
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+  },
+  input: {
+    flex: 1,
+    minHeight: 40,
+    padding: 8,
+    fontSize: 16,
+  },
+  parseButton: {
+    padding: 8,
   },
   processingText: {
-    marginLeft: 8,
-    color: '#666',
+    marginTop: 8,
+    color: '#666666',
+    fontSize: 14,
+    textAlign: 'center',
   },
 });
 

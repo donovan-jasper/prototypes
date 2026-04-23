@@ -155,80 +155,63 @@ export default function AddReminderScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <Text style={styles.title}>Add Reminder</Text>
-          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
-            <MaterialIcons name="close" size={24} color="#666" />
+          <TouchableOpacity onPress={handleVoiceInput} style={styles.voiceButton}>
+            <MaterialIcons name="mic" size={24} color="#4CAF50" />
           </TouchableOpacity>
         </View>
 
-        <NaturalLanguageParser onParsed={handleNaturalLanguageParsed} />
+        <NaturalLanguageParser
+          onParsed={handleNaturalLanguageParsed}
+          initialText={title}
+        />
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Reminder Title</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="What do you need to remember?"
-            value={title}
-            onChangeText={setTitle}
-            autoFocus
-          />
+        <TextInput
+          style={styles.input}
+          placeholder="Reminder title"
+          value={title}
+          onChangeText={setTitle}
+          autoFocus
+        />
+
+        <View style={styles.dateTimeContainer}>
+          <TouchableOpacity
+            style={styles.dateTimeButton}
+            onPress={() => setShowDatePicker(true)}
+          >
+            <MaterialIcons name="calendar-today" size={20} color="#666" />
+            <Text style={styles.dateTimeText}>{format(date, 'MMM dd, yyyy')}</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.microphoneButton}
-            onPress={handleVoiceInput}
-            disabled={isProcessing}
+            style={styles.dateTimeButton}
+            onPress={() => setShowTimePicker(true)}
           >
-            <MaterialIcons
-              name="mic"
-              size={24}
-              color={isProcessing ? '#ccc' : '#4CAF50'}
-            />
+            <MaterialIcons name="access-time" size={20} color="#666" />
+            <Text style={styles.dateTimeText}>{format(time, 'h:mm a')}</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.formGroup}>
-          <Text style={styles.label}>Date & Time</Text>
-          <View style={styles.dateTimeContainer}>
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateTimeText}>
-                {format(date, 'MMM d, yyyy')}
-              </Text>
-            </TouchableOpacity>
+        {showDatePicker && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display="default"
+            onChange={onDateChange}
+          />
+        )}
 
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={styles.dateTimeText}>
-                {format(time, 'h:mm a')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {showTimePicker && (
+          <DateTimePicker
+            value={time}
+            mode="time"
+            display="default"
+            onChange={onTimeChange}
+          />
+        )}
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={date}
-              mode="date"
-              display="default"
-              onChange={onDateChange}
-            />
-          )}
-
-          {showTimePicker && (
-            <DateTimePicker
-              value={time}
-              mode="time"
-              display="default"
-              onChange={onTimeChange}
-            />
-          )}
-        </View>
-
-        <View style={styles.formGroup}>
+        <View style={styles.categoryContainer}>
           <Text style={styles.label}>Category</Text>
-          <View style={styles.categoryContainer}>
+          <View style={styles.categoryButtons}>
             {categories.map((cat) => (
               <TouchableOpacity
                 key={cat}
@@ -239,8 +222,8 @@ export default function AddReminderScreen() {
                 onPress={() => setCategory(cat)}
               >
                 <Text style={[
-                  styles.categoryText,
-                  category === cat && styles.categoryTextActive
+                  styles.categoryButtonText,
+                  category === cat && styles.categoryButtonTextActive
                 ]}>
                   {cat.charAt(0).toUpperCase() + cat.slice(1)}
                 </Text>
@@ -265,19 +248,19 @@ export default function AddReminderScreen() {
 
         {showAdvancedOptions && (
           <View style={styles.advancedOptions}>
-            <View style={styles.formGroup}>
+            <View style={styles.locationContainer}>
               <Text style={styles.label}>Location</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Add a location (optional)"
+                placeholder="e.g., Home, Office, Gym"
                 value={location || ''}
                 onChangeText={setLocation}
               />
             </View>
 
-            <View style={styles.formGroup}>
+            <View style={styles.recurrenceContainer}>
               <Text style={styles.label}>Recurrence</Text>
-              <View style={styles.recurrenceContainer}>
+              <View style={styles.recurrenceButtons}>
                 {recurrenceOptions.map((option) => (
                   <TouchableOpacity
                     key={option}
@@ -288,8 +271,8 @@ export default function AddReminderScreen() {
                     onPress={() => setRecurrence(option as any)}
                   >
                     <Text style={[
-                      styles.recurrenceText,
-                      recurrence === option && styles.recurrenceTextActive
+                      styles.recurrenceButtonText,
+                      recurrence === option && styles.recurrenceButtonTextActive
                     ]}>
                       {option.charAt(0).toUpperCase() + option.slice(1)}
                     </Text>
@@ -305,8 +288,9 @@ export default function AddReminderScreen() {
                     onPress={() => setShowRecurrenceEndPicker(true)}
                   >
                     <Text style={styles.recurrenceEndText}>
-                      {recurrenceEnd ? format(recurrenceEnd, 'MMM d, yyyy') : 'Never'}
+                      {recurrenceEnd ? format(recurrenceEnd, 'MMM dd, yyyy') : 'Never'}
                     </Text>
+                    <MaterialIcons name="calendar-today" size={20} color="#666" />
                   </TouchableOpacity>
 
                   {showRecurrenceEndPicker && (
@@ -341,7 +325,7 @@ export default function AddReminderScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <MaterialIcons name="check-circle" size={50} color="#4CAF50" />
+            <MaterialIcons name="check-circle" size={60} color="#4CAF50" />
             <Text style={styles.modalText}>Reminder saved!</Text>
           </View>
         </View>
@@ -353,73 +337,73 @@ export default function AddReminderScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
   scrollContainer: {
-    padding: 20,
-    paddingBottom: 40,
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 8,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
     color: '#333',
   },
+  voiceButton: {
+    padding: 8,
+  },
   input: {
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-  },
-  microphoneButton: {
-    position: 'absolute',
-    right: 10,
-    top: 35,
-    padding: 8,
+    marginBottom: 16,
   },
   dateTimeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   dateTimeButton: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
-    marginHorizontal: 5,
-    alignItems: 'center',
+    marginHorizontal: 4,
   },
   dateTimeText: {
+    marginLeft: 8,
     fontSize: 16,
+    color: '#333',
   },
   categoryContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  categoryButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 10,
   },
   categoryButton: {
-    paddingVertical: 8,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     marginRight: 8,
     marginBottom: 8,
   },
@@ -427,76 +411,85 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
   },
-  categoryText: {
+  categoryButtonText: {
     color: '#666',
+    fontSize: 14,
   },
-  categoryTextActive: {
-    color: 'white',
+  categoryButtonTextActive: {
+    color: '#FFFFFF',
   },
   advancedToggle: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
-    borderTopWidth: 1,
+    marginBottom: 16,
     borderBottomWidth: 1,
-    borderColor: '#eee',
-    marginVertical: 20,
+    borderBottomColor: '#E0E0E0',
   },
   advancedToggleText: {
     fontSize: 16,
     color: '#666',
   },
   advancedOptions: {
-    marginTop: 10,
+    marginBottom: 16,
+  },
+  locationContainer: {
+    marginBottom: 16,
   },
   recurrenceContainer: {
+    marginBottom: 16,
+  },
+  recurrenceButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginTop: 10,
   },
   recurrenceButton: {
-    paddingVertical: 8,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     marginRight: 8,
     marginBottom: 8,
   },
   recurrenceButtonActive: {
-    backgroundColor: '#2196F3',
-    borderColor: '#2196F3',
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
   },
-  recurrenceText: {
+  recurrenceButtonText: {
     color: '#666',
+    fontSize: 14,
   },
-  recurrenceTextActive: {
-    color: 'white',
+  recurrenceButtonTextActive: {
+    color: '#FFFFFF',
   },
   recurrenceEndContainer: {
-    marginTop: 15,
+    marginTop: 16,
   },
   recurrenceEndButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     padding: 12,
-    marginTop: 5,
   },
   recurrenceEndText: {
+    flex: 1,
     fontSize: 16,
     color: '#333',
   },
   saveButton: {
     backgroundColor: '#4CAF50',
-    padding: 15,
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
   },
   saveButtonText: {
-    color: 'white',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
@@ -504,17 +497,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
-    padding: 30,
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 32,
     alignItems: 'center',
   },
   modalText: {
-    marginTop: 15,
+    marginTop: 16,
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
 });
