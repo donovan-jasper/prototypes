@@ -161,49 +161,56 @@ const WorkflowBuilder = ({ workflowId }) => {
         <Path
           key={conn.id}
           d={path}
-          stroke="#666"
+          stroke="#999"
           strokeWidth="2"
           fill="none"
+          markerEnd="url(#arrowhead)"
         />
       );
     });
   };
 
   const renderNodes = () => {
-    return nodes.map(node => (
-      <G key={node.id}>
-        <Circle
-          cx={node.x}
-          cy={node.y}
-          r="20"
-          fill={availableActions.find(a => a.id === node.type)?.color || '#ccc'}
-          onPress={() => openNodeConfig(node.id)}
-        />
-        <SvgText
-          x={node.x}
-          y={node.y + 5}
-          fontSize="10"
-          textAnchor="middle"
-          fill="white"
-        >
-          {node.label}
-        </SvgText>
-        <Circle
-          cx={node.x + 25}
-          cy={node.y}
-          r="8"
-          fill="#4CAF50"
-          onPress={() => startConnection(node.id)}
-        />
-        <Circle
-          cx={node.x - 25}
-          cy={node.y}
-          r="8"
-          fill="#F44336"
-          onPress={() => completeConnection(node.id)}
-        />
-      </G>
-    ));
+    return nodes.map(node => {
+      const action = availableActions.find(a => a.id === node.type);
+      const color = action ? action.color : '#666';
+
+      return (
+        <G key={node.id}>
+          <Circle
+            cx={node.x}
+            cy={node.y}
+            r="20"
+            fill={color}
+            onPress={() => openNodeConfig(node.id)}
+            {...panResponder.panHandlers}
+          />
+          <SvgText
+            x={node.x}
+            y={node.y + 5}
+            fontSize="10"
+            fill="white"
+            textAnchor="middle"
+          >
+            {node.label}
+          </SvgText>
+          <Circle
+            cx={node.x + 25}
+            cy={node.y}
+            r="8"
+            fill="#4CAF50"
+            onPress={() => startConnection(node.id)}
+          />
+          <Circle
+            cx={node.x - 25}
+            cy={node.y}
+            r="8"
+            fill="#4CAF50"
+            onPress={() => completeConnection(node.id)}
+          />
+        </G>
+      );
+    });
   };
 
   return (
@@ -216,29 +223,33 @@ const WorkflowBuilder = ({ workflowId }) => {
               style={[styles.actionButton, { backgroundColor: action.color }]}
               onPress={() => addNode(action.id)}
             >
-              <Text style={styles.actionText}>{action.label}</Text>
+              <Text style={styles.actionButtonText}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
 
-      <View style={styles.canvas} {...panResponder.panHandlers}>
+      <View style={styles.canvasContainer} {...panResponder.panHandlers}>
         <Svg
           ref={svgRef}
           width={width}
           height={height}
-          style={styles.svg}
+          style={styles.canvas}
         >
+          <defs>
+            <marker
+              id="arrowhead"
+              markerWidth="10"
+              markerHeight="7"
+              refX="9"
+              refY="3.5"
+              orient="auto"
+            >
+              <polygon points="0 0, 10 3.5, 0 7" fill="#999" />
+            </marker>
+          </defs>
           {renderConnections()}
           {renderNodes()}
-          {isConnecting && connectionStart && (
-            <Path
-              d={`M${connectionStart.x},${connectionStart.y} L${connectionStart.x + 50},${connectionStart.y}`}
-              stroke="#666"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-            />
-          )}
         </Svg>
       </View>
 
@@ -260,9 +271,9 @@ const WorkflowBuilder = ({ workflowId }) => {
 
             <TextInput
               style={styles.input}
-              placeholder="Configuration value"
+              placeholder="Enter configuration..."
               value={nodeConfig.value || ''}
-              onChangeText={(text) => setNodeConfig({...nodeConfig, value: text})}
+              onChangeText={(text) => setNodeConfig({ ...nodeConfig, value: text })}
             />
 
             <View style={styles.modalButtons}>
@@ -303,17 +314,18 @@ const styles = StyleSheet.create({
   actionButton: {
     paddingHorizontal: 15,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 5,
     marginRight: 10,
   },
-  actionText: {
+  actionButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  canvas: {
+  canvasContainer: {
     flex: 1,
+    backgroundColor: '#fff',
   },
-  svg: {
+  canvas: {
     flex: 1,
   },
   bottomBar: {
@@ -322,14 +334,14 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#ddd',
     paddingHorizontal: 20,
-    paddingVertical: 10,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   saveButton: {
     backgroundColor: '#4CAF50',
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
-    alignItems: 'center',
   },
   saveButtonText: {
     color: 'white',
@@ -342,10 +354,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
     width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
   },
   modalTitle: {
     fontSize: 18,
@@ -355,8 +367,8 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    padding: 10,
     borderRadius: 5,
+    padding: 10,
     marginBottom: 15,
   },
   modalButtons: {
@@ -364,7 +376,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalButton: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderRadius: 5,
     marginLeft: 10,
   },
