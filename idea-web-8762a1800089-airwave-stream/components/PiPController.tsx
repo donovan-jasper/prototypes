@@ -15,10 +15,16 @@ export default function PiPController({ channelNumber }: Props) {
 
   useEffect(() => {
     const setupPiP = async () => {
-      if (videoRef.current && Platform.OS === 'ios') {
+      if (videoRef.current) {
         try {
-          await videoRef.current.presentPictureInPictureAsync();
-          setIsPiPActive(true);
+          if (Platform.OS === 'ios') {
+            await videoRef.current.presentPictureInPictureAsync();
+          } else if (Platform.OS === 'android') {
+            // For Android, we'll use the native PiP implementation
+            // This would require additional setup with react-native-pip-android
+            // For now, we'll just show the mini player
+            setIsPiPActive(true);
+          }
         } catch (error) {
           console.error('Failed to enter PiP mode:', error);
         }
@@ -42,11 +48,13 @@ export default function PiPController({ channelNumber }: Props) {
     if (videoRef.current) {
       try {
         if (Platform.OS === 'android') {
-          await videoRef.current.dismissFullscreenPlayer();
+          // For Android, we would use the native PiP API to exit
+          // This is a simplified version
+          setIsPiPActive(false);
         } else if (Platform.OS === 'ios') {
           await videoRef.current.stopPictureInPictureAsync();
+          setIsPiPActive(false);
         }
-        setIsPiPActive(false);
       } catch (error) {
         console.error('Failed to exit PiP mode:', error);
       }

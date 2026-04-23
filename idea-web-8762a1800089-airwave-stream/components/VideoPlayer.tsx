@@ -7,15 +7,16 @@ import PiPController from './PiPController';
 
 interface Props {
   channelNumber: string;
+  isLocal: boolean;
 }
 
-export default function VideoPlayer({ channelNumber }: Props) {
+export default function VideoPlayer({ channelNumber, isLocal }: Props) {
   const [status, setStatus] = useState<AVPlaybackStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
   const [isPiPActive, setIsPiPActive] = useState(false);
-  const { streamUrl, isLocal, isConnecting, connectionError, showPaywall } = useStreamUrl(channelNumber);
+  const { streamUrl, isConnecting, connectionError, showPaywall } = useStreamUrl(channelNumber);
   const navigation = useNavigation();
   const videoRef = useRef<Video>(null);
 
@@ -43,20 +44,28 @@ export default function VideoPlayer({ channelNumber }: Props) {
     setShowControls(!showControls);
   };
 
+  const togglePiPMode = async () => {
+    if (isPiPActive) {
+      await exitPiPMode();
+    } else {
+      await enterPiPMode();
+    }
+  };
+
   const enterPiPMode = async () => {
-    if (Platform.OS === 'android' && videoRef.current) {
+    if (videoRef.current) {
       try {
-        await videoRef.current.presentFullscreenPlayer();
-        setIsPiPActive(true);
+        if (Platform.OS === 'ios') {
+          await videoRef.current.presentPictureInPictureAsync();
+          setIsPiPActive(true);
+        } else if (Platform.OS === 'android') {
+          // For Android, we would use react-native-pip-android
+          // This is a simplified version
+          setIsPiPActive(true);
+        }
       } catch (error) {
         console.error('Failed to enter PiP mode:', error);
-      }
-    } else if (Platform.OS === 'ios' && videoRef.current) {
-      try {
-        await videoRef.current.presentPictureInPictureAsync();
-        setIsPiPActive(true);
-      } catch (error) {
-        console.error('Failed to enter PiP mode:', error);
+        Alert.alert('Error', 'Could not enter Picture-in-Picture mode');
       }
     }
   };
@@ -64,9 +73,7 @@ export default function VideoPlayer({ channelNumber }: Props) {
   const exitPiPMode = async () => {
     if (videoRef.current) {
       try {
-        if (Platform.OS === 'android') {
-          await videoRef.current.dismissFullscreenPlayer();
-        } else if (Platform.OS === 'ios') {
+        if (Platform.OS === 'ios') {
           await videoRef.current.stopPictureInPictureAsync();
         }
         setIsPiPActive(false);
@@ -165,9 +172,11 @@ export default function VideoPlayer({ channelNumber }: Props) {
 
           <TouchableOpacity
             style={styles.pipButton}
-            onPress={enterPiPMode}
+            onPress={togglePiPMode}
           >
-            <Text style={styles.controlButtonText}>PiP</Text>
+            <Text style={styles.controlButtonText}>
+              {isPiPActive ? 'Exit PiP' : 'Enter PiP'}
+            </Text>
           </TouchableOpacity>
         </View>
       )}
@@ -175,25 +184,17 @@ export default function VideoPlayer({ channelNumber }: Props) {
   );
 }
 
-const { width, height } = Dimensions.get('window');
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'black',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: '#000',
   },
   video: {
-    width: width,
-    height: height * 0.6,
+    width: '100%',
+    height: '100%',
   },
   loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -201,48 +202,45 @@ const styles = StyleSheet.create({
   loadingText: {
     color: 'white',
     marginTop: 10,
-    fontSize: 16,
-  },
-  errorText: {
-    color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  upgradeButton: {
-    backgroundColor: '#FF9500',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  upgradeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   controlsOverlay: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 0,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   controlButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 10,
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 5,
+  },
+  pipButton: {
+    padding: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 5,
   },
   controlButtonText: {
     color: 'white',
-    fontSize: 16,
   },
-  pipButton: {
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 10,
+  errorText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
+    margin: 20,
+  },
+  upgradeButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    margin: 20,
+  },
+  upgradeButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
 });

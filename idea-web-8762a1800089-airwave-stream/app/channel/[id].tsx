@@ -6,8 +6,7 @@ import { useStreamUrl } from '../../hooks/useStreamUrl';
 
 export default function ChannelScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { streamUrl, isLocal } = useStreamUrl(id);
-  const [isPiPActive, setIsPiPActive] = useState(false);
+  const { isLocal } = useStreamUrl(id);
 
   if (!id) {
     return (
