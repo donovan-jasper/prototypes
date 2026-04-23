@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Alert } from 'react-native';
 import * as Network from 'expo-network';
+import * as FileSystem from 'expo-file-system';
 import { useFileVault } from '@/hooks/useFileVault';
-import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
+import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, RTCDataChannel } from 'react-native-webrtc';
 
 const configuration = {
   iceServers: [
@@ -14,19 +15,21 @@ const configuration = {
   ]
 };
 
+const CHUNK_SIZE = 16384; // 16KB chunks
+
 export const useP2PTransfer = () => {
   const [isTransferring, setIsTransferring] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [peerConnection, setPeerConnection] = useState(null);
-  const [dataChannel, setDataChannel] = useState(null);
-  const [peers, setPeers] = useState([]);
-  const [connectionState, setConnectionState] = useState('disconnected');
-  const [signalingServer, setSignalingServer] = useState(null);
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
+  const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+  const [peers, setPeers] = useState<string[]>([]);
+  const [connectionState, setConnectionState] = useState<'disconnected' | 'connecting' | 'connected' | 'completed' | 'failed'>('disconnected');
+  const [signalingServer, setSignalingServer] = useState<WebSocket | null>(null);
   const { getFile, addNewFile } = useFileVault();
 
   // Initialize signaling server connection
   useEffect(() => {
-    const ws = new WebSocket('ws://your-signaling-server.com');
+    const ws = new WebSocket('wss://your-signaling-server.com');
     setSignalingServer(ws);
 
     ws.onopen = () => {
@@ -40,10 +43,12 @@ export const useP2PTransfer = () => {
 
     ws.onerror = (error) => {
       console.error('Signaling server error:', error);
+      setConnectionState('failed');
     };
 
     ws.onclose = () => {
       console.log('Disconnected from signaling server');
+      setConnectionState('disconnected');
     };
 
     return () => {
@@ -51,7 +56,7 @@ export const useP2PTransfer = () => {
     };
   }, []);
 
-  const handleSignalingMessage = async (message) => {
+  const handleSignalingMessage = useCallback(async (message: any) => {
     if (!peerConnection) return;
 
     try {
@@ -60,7 +65,7 @@ export const useP2PTransfer = () => {
           await peerConnection.setRemoteDescription(new RTCSessionDescription(message));
           const answer = await peerConnection.createAnswer();
           await peerConnection.setLocalDescription(answer);
-          signalingServer.send(JSON.stringify({
+          signalingServer?.send(JSON.stringify({
             type: 'answer',
             sdp: answer.sdp,
             to: message.from
@@ -77,10 +82,11 @@ export const useP2PTransfer = () => {
       }
     } catch (error) {
       console.error('Signaling message error:', error);
+      setConnectionState('failed');
     }
-  };
+  }, [peerConnection, signalingServer]);
 
-  const discoverPeers = async () => {
+  const discoverPeers = useCallback(async (): Promise<string[]> => {
     try {
       const networkState = await Network.getNetworkStateAsync();
       if (networkState.isConnected && networkState.isInternetReachable) {
@@ -95,13 +101,13 @@ export const useP2PTransfer = () => {
       console.error('Discovery error:', error);
       return [];
     }
-  };
+  }, []);
 
-  const createPeerConnection = () => {
+  const createPeerConnection = useCallback(() => {
     const pc = new RTCPeerConnection(configuration);
 
     pc.oniceconnectionstatechange = () => {
-      setConnectionState(pc.iceConnectionState);
+      setConnectionState(pc.iceConnectionState as any);
       if (pc.iceConnectionState === 'failed') {
         Alert.alert('Connection Failed', 'Could not establish connection with peer');
       }
@@ -125,12 +131,13 @@ export const useP2PTransfer = () => {
 
     setPeerConnection(pc);
     return pc;
-  };
+  }, [signalingServer]);
 
-  const setupDataChannel = (channel) => {
-    let receivedData = [];
+  const setupDataChannel = useCallback((channel: RTCDataChannel) => {
+    let receivedData: ArrayBuffer[] = [];
     let fileName = '';
     let fileSize = 0;
+    let receivedBytes = 0;
 
     channel.onopen = () => {
       console.log('Data channel opened');
@@ -143,28 +150,35 @@ export const useP2PTransfer = () => {
         const metadata = JSON.parse(event.data);
         fileName = metadata.name;
         fileSize = metadata.size;
+        receivedData = [];
+        receivedBytes = 0;
       } else {
         // Handle file data
         receivedData.push(event.data);
+        receivedBytes += event.data.byteLength;
+
         const currentProgress = Math.min(
-          Math.round((receivedData.length * 16384 / fileSize) * 100),
+          Math.round((receivedBytes / fileSize) * 100),
           100
         );
         setProgress(currentProgress);
 
-        if (receivedData.length * 16384 >= fileSize) {
+        if (receivedBytes >= fileSize) {
           // File transfer complete
           const fileData = new Blob(receivedData);
           const reader = new FileReader();
           reader.onload = async () => {
             try {
-              await addNewFile(fileName, reader.result);
-              setIsTransferring(false);
+              const fileUri = `${FileSystem.documentDirectory}${fileName}`;
+              await FileSystem.writeAsStringAsync(fileUri, reader.result as string, {
+                encoding: FileSystem.EncodingType.Base64
+              });
+              await addNewFile(fileName, fileUri);
               setConnectionState('completed');
-              Alert.alert('Success', 'File received successfully');
+              setIsTransferring(false);
             } catch (error) {
+              console.error('File save error:', error);
               setConnectionState('failed');
-              Alert.alert('Error', 'Failed to save file');
             }
           };
           reader.readAsDataURL(fileData);
@@ -174,28 +188,72 @@ export const useP2PTransfer = () => {
 
     channel.onclose = () => {
       console.log('Data channel closed');
-      setIsTransferring(false);
+      setConnectionState('disconnected');
     };
-  };
+  }, [addNewFile]);
 
-  const sendFileP2P = async (fileId, peerId) => {
-    setIsTransferring(true);
-    setProgress(0);
-    setConnectionState('connecting');
+  const sendFileP2P = useCallback(async (fileId: string, peerId: string) => {
+    if (!peerId) {
+      Alert.alert('Error', 'No peer selected');
+      return;
+    }
 
     try {
+      setIsTransferring(true);
+      setConnectionState('connecting');
+      setProgress(0);
+
       const file = await getFile(fileId);
+      if (!file) {
+        throw new Error('File not found');
+      }
+
       const pc = createPeerConnection();
       const channel = pc.createDataChannel('fileTransfer');
-
-      setupDataChannel(channel);
       setDataChannel(channel);
+
+      // Send metadata first
+      channel.onopen = () => {
+        channel.send(JSON.stringify({
+          name: file.name,
+          size: file.size,
+          mimeType: file.mimeType
+        }));
+
+        // Read file in chunks and send
+        const readChunk = async (offset: number) => {
+          const chunk = await FileSystem.readAsStringAsync(file.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+            length: CHUNK_SIZE,
+            position: offset
+          });
+
+          if (chunk) {
+            const buffer = Buffer.from(chunk, 'base64');
+            channel.send(buffer);
+
+            const currentProgress = Math.min(
+              Math.round(((offset + CHUNK_SIZE) / file.size) * 100),
+              100
+            );
+            setProgress(currentProgress);
+
+            if (offset + CHUNK_SIZE < file.size) {
+              setTimeout(() => readChunk(offset + CHUNK_SIZE), 0);
+            } else {
+              setConnectionState('completed');
+              setIsTransferring(false);
+            }
+          }
+        };
+
+        readChunk(0);
+      };
 
       // Create offer
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Send offer to signaling server
       if (signalingServer) {
         signalingServer.send(JSON.stringify({
           type: 'offer',
@@ -203,77 +261,36 @@ export const useP2PTransfer = () => {
           to: peerId
         }));
       }
-
-      // Send metadata first
-      const metadata = {
-        name: file.name,
-        size: file.size
-      };
-      channel.send(JSON.stringify(metadata));
-
-      // Send file in chunks
-      const chunkSize = 16384; // 16KB chunks
-      const totalChunks = Math.ceil(file.size / chunkSize);
-      let sentChunks = 0;
-
-      const sendChunk = () => {
-        if (sentChunks >= totalChunks) {
-          setProgress(100);
-          setIsTransferring(false);
-          setConnectionState('completed');
-          Alert.alert('Success', `File sent to ${peerId}`);
-          return;
-        }
-
-        const start = sentChunks * chunkSize;
-        const end = Math.min(start + chunkSize, file.size);
-        const chunk = file.data.slice(start, end);
-
-        if (channel.readyState === 'open') {
-          channel.send(chunk);
-          sentChunks++;
-
-          // Update progress
-          const currentProgress = Math.min(
-            Math.round((sentChunks / totalChunks) * 100),
-            100
-          );
-          setProgress(currentProgress);
-
-          // Continue sending next chunk after a small delay
-          setTimeout(sendChunk, 10);
-        } else {
-          setTimeout(sendChunk, 100);
-        }
-      };
-
-      // Start sending chunks
-      sendChunk();
-
     } catch (error) {
-      console.error('P2P transfer error:', error);
-      setIsTransferring(false);
+      console.error('Send file error:', error);
       setConnectionState('failed');
+      setIsTransferring(false);
       Alert.alert('Error', 'Failed to send file');
     }
-  };
+  }, [createPeerConnection, getFile, signalingServer]);
 
-  const receiveFileP2P = async (peerId) => {
-    setIsTransferring(true);
-    setProgress(0);
-    setConnectionState('connecting');
+  const receiveFileP2P = useCallback(async (peerId: string) => {
+    if (!peerId) {
+      Alert.alert('Error', 'No peer selected');
+      return;
+    }
 
     try {
+      setIsTransferring(true);
+      setConnectionState('connecting');
+      setProgress(0);
+
       const pc = createPeerConnection();
-      // The data channel will be created by the remote peer
-      // We'll handle it in the ondatachannel callback
+      setPeerConnection(pc);
+
+      // Data channel will be created by the sender
     } catch (error) {
-      console.error('P2P receive error:', error);
-      setIsTransferring(false);
+      console.error('Receive file error:', error);
       setConnectionState('failed');
+      setIsTransferring(false);
       Alert.alert('Error', 'Failed to receive file');
     }
-  };
+  }, [createPeerConnection]);
 
   return {
     isTransferring,

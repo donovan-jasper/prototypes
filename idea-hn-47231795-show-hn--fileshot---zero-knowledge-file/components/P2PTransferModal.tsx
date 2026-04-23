@@ -1,9 +1,23 @@
-import React from 'react';
-import { View, Text, Modal, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, Modal, StyleSheet, ActivityIndicator, TouchableOpacity, ProgressBarAndroid, Platform } from 'react-native';
 import { useP2PTransfer } from '@/hooks/useP2PTransfer';
 import { Colors } from '@/constants/Colors';
 
-export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender }) => {
+interface P2PTransferModalProps {
+  visible: boolean;
+  onClose: () => void;
+  fileId?: string;
+  peerId?: string;
+  isSender: boolean;
+}
+
+export const P2PTransferModal: React.FC<P2PTransferModalProps> = ({
+  visible,
+  onClose,
+  fileId,
+  peerId,
+  isSender
+}) => {
   const {
     isTransferring,
     progress,
@@ -12,7 +26,7 @@ export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender })
     receiveFileP2P
   } = useP2PTransfer();
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible && fileId && peerId) {
       if (isSender) {
         sendFileP2P(fileId, peerId);
@@ -20,7 +34,7 @@ export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender })
         receiveFileP2P(peerId);
       }
     }
-  }, [visible, fileId, peerId, isSender]);
+  }, [visible, fileId, peerId, isSender, sendFileP2P, receiveFileP2P]);
 
   const getStatusMessage = () => {
     switch (connectionState) {
@@ -34,6 +48,26 @@ export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender })
         return 'Transfer failed';
       default:
         return 'Preparing transfer...';
+    }
+  };
+
+  const getProgressBar = () => {
+    if (Platform.OS === 'android') {
+      return (
+        <ProgressBarAndroid
+          styleAttr="Horizontal"
+          indeterminate={connectionState === 'connecting'}
+          progress={progress / 100}
+          color={Colors.primary}
+          style={{ width: '100%', marginVertical: 20 }}
+        />
+      );
+    } else {
+      return (
+        <View style={styles.iosProgressContainer}>
+          <View style={[styles.iosProgressBar, { width: `${progress}%` }]} />
+        </View>
+      );
     }
   };
 
@@ -52,11 +86,7 @@ export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender })
 
           <View style={styles.progressContainer}>
             <Text style={styles.progressText}>{progress}%</Text>
-            <ActivityIndicator
-              size="large"
-              color={Colors.primary}
-              style={styles.activityIndicator}
-            />
+            {getProgressBar()}
           </View>
 
           <Text style={styles.statusText}>{getStatusMessage()}</Text>
@@ -66,12 +96,15 @@ export const P2PTransferModal = ({ visible, onClose, fileId, peerId, isSender })
           </Text>
 
           <TouchableOpacity
-            style={styles.closeButton}
+            style={[
+              styles.closeButton,
+              (isTransferring && connectionState !== 'completed') && styles.disabledButton
+            ]}
             onPress={onClose}
-            disabled={isTransferring}
+            disabled={isTransferring && connectionState !== 'completed'}
           >
             <Text style={styles.closeButtonText}>
-              {isTransferring ? 'Please wait...' : 'Close'}
+              {isTransferring && connectionState !== 'completed' ? 'Please wait...' : 'Close'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -111,8 +144,18 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     marginBottom: 10,
   },
-  activityIndicator: {
-    marginBottom: 10,
+  iosProgressContainer: {
+    width: '100%',
+    height: 4,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginVertical: 20,
+  },
+  iosProgressBar: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 2,
   },
   statusText: {
     fontSize: 16,
@@ -132,6 +175,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     width: '100%',
     alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: Colors.disabled,
   },
   closeButtonText: {
     color: 'white',
