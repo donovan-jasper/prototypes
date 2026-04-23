@@ -1,46 +1,20 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useContext } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import MatchCard from '../../components/MatchCard';
-import { getMatchSuggestions } from '../../services/matching';
-import { fetchMatches } from '../../services/api';
+import { useMatches } from '../../hooks/useMatches';
 import { AuthContext } from '../../contexts/AuthContext';
 
 export default function MatchesScreen() {
-  const [matches, setMatches] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  const { matches, loading, error, refreshMatches } = useMatches();
   const router = useRouter();
   const { user } = useContext(AuthContext);
-
-  useEffect(() => {
-    loadMatches();
-  }, []);
-
-  const loadMatches = async () => {
-    try {
-      setLoading(true);
-      const allUsers = await fetchMatches(user.id);
-      const suggestedMatches = getMatchSuggestions(user, allUsers, 20);
-      setMatches(suggestedMatches);
-    } catch (error) {
-      console.error('Error loading matches:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    loadMatches();
-  };
 
   const handleMatchPress = (match) => {
     router.push(`/match/${match.id}`);
   };
 
-  if (loading && !refreshing) {
+  if (loading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#6C63FF" />
@@ -48,7 +22,16 @@ export default function MatchesScreen() {
     );
   }
 
-  if (matches.length === 0 && !loading) {
+  if (error) {
+    return (
+      <View style={styles.centered}>
+        <Text style={styles.errorText}>Failed to load matches</Text>
+        <Text style={styles.errorDetail}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (matches.length === 0) {
     return (
       <View style={styles.centered}>
         <Text style={styles.emptyText}>No matches found nearby</Text>
@@ -71,8 +54,8 @@ export default function MatchesScreen() {
         contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={loading}
+            onRefresh={refreshMatches}
             colors={['#6C63FF']}
             tintColor="#6C63FF"
           />
@@ -102,6 +85,18 @@ const styles = StyleSheet.create({
   suggestionText: {
     fontSize: 14,
     color: '#666',
+  },
+  errorText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#E74C3C',
+    marginBottom: 8,
+  },
+  errorDetail: {
+    fontSize: 14,
+    color: '#7F8C8D',
+    textAlign: 'center',
+    paddingHorizontal: 20,
   },
   listContent: {
     padding: 16,

@@ -20,31 +20,21 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
     <TouchableOpacity
       style={styles.card}
       onPress={() => onPress(match)}
-      activeOpacity={0.8}
       testID="match-card"
     >
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: match.photo }}
-          style={styles.image}
-          resizeMode="cover"
-        />
-      </View>
+      <Image
+        source={{ uri: match.photo }}
+        style={styles.photo}
+        resizeMode="cover"
+      />
 
       <View style={styles.infoContainer}>
         <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={1}>
-            {match.name}, <Text style={styles.age}>{match.age}</Text>
-          </Text>
-          <View style={styles.scoreContainer}>
-            <Ionicons name="heart" size={16} color="#FF6B6B" />
-            <Text style={styles.score}>{match.compatibilityScore}%</Text>
-          </View>
+          <Text style={styles.name}>{match.name}</Text>
+          <Text style={styles.age}>{match.age}</Text>
         </View>
 
-        <Text style={styles.distance}>
-          {match.distance.toFixed(1)} miles away
-        </Text>
+        <Text style={styles.distance}>{match.distance} miles away</Text>
 
         <View style={styles.interestsContainer}>
           {match.interests.slice(0, 3).map((interest, index) => (
@@ -52,6 +42,13 @@ const MatchCard: React.FC<MatchCardProps> = ({ match, onPress }) => {
               <Text style={styles.interestText}>{interest}</Text>
             </View>
           ))}
+        </View>
+
+        <View style={styles.compatibilityContainer}>
+          <Ionicons name="heart" size={16} color="#FF6B6B" />
+          <Text style={styles.compatibilityText}>
+            {match.compatibilityScore}% match
+          </Text>
         </View>
       </View>
     </TouchableOpacity>
@@ -70,45 +67,27 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  imageContainer: {
+  photo: {
+    width: '100%',
     height: 200,
-    width: '100%',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
   },
   infoContainer: {
     padding: 16,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   name: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#333',
-    flex: 1,
+    marginRight: 8,
   },
   age: {
-    fontWeight: '400',
+    fontSize: 18,
     color: '#666',
-  },
-  scoreContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFEBEE',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  score: {
-    color: '#FF6B6B',
-    fontWeight: '600',
-    marginLeft: 4,
   },
   distance: {
     fontSize: 14,
@@ -118,17 +97,29 @@ const styles = StyleSheet.create({
   interestsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    marginBottom: 12,
   },
   interestTag: {
     backgroundColor: '#F0F0F0',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
     borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
   },
   interestText: {
     fontSize: 12,
-    color: '#444',
+    color: '#555',
+  },
+  compatibilityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  compatibilityText: {
+    fontSize: 14,
+    color: '#FF6B6B',
+    marginLeft: 4,
+    fontWeight: '600',
   },
 });
 
