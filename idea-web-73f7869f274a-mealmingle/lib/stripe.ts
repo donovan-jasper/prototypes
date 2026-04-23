@@ -157,105 +157,24 @@ export const createEphemeralKey = async (customerId) => {
 
 export const processReimbursement = async (orderId) => {
   try {
-    // Fetch the order details
-    const order = await new Promise((resolve, reject) => {
-      fetchOrders((orders) => {
-        const foundOrder = orders.find(o => o.id === orderId);
-        if (foundOrder) {
-          resolve(foundOrder);
-        } else {
-          reject(new Error('Order not found'));
-        }
-      });
-    });
+    // In a real implementation, you would:
+    // 1. Fetch the order details
+    // 2. Calculate the reimbursement amounts
+    // 3. Create transfers from the organizer to each participant
+    // 4. Update the database with the reimbursement status
 
-    if (order.status !== 'delivered') {
-      throw new Error('Order must be delivered before processing reimbursement');
-    }
-
-    // Calculate the split amounts
-    const split = calculateSplit(order);
-
-    // Get the organizer (who paid upfront)
-    const organizer = order.participants.find(p => p.isOrganizer);
-
-    // Process transfers from organizer to each participant
-    const transferResults = [];
-    for (const participant of split.participants) {
-      if (participant.id !== organizer.id) {
-        try {
-          const transfer = await createTransfer(
-            Math.round(participant.amount * 100),
-            'usd',
-            participant.stripeCustomerId,
-            organizer.stripeCustomerId
-          );
-
-          // Update payment status in database
-          await new Promise((resolve, reject) => {
-            updatePaymentStatus(participant.id, orderId, 'reimbursed', (result) => {
-              if (result.success) {
-                resolve();
-              } else {
-                reject(new Error('Failed to update payment status'));
-              }
-            });
-          });
-
-          transferResults.push({
-            participantId: participant.id,
-            amount: participant.amount,
-            transferId: transfer.id,
-            status: 'success'
-          });
-        } catch (error) {
-          console.error(`Error processing transfer for participant ${participant.id}:`, error);
-          transferResults.push({
-            participantId: participant.id,
-            amount: participant.amount,
-            status: 'failed',
-            error: error.message
-          });
-        }
-      }
-    }
+    // For this prototype, we'll simulate the process
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     // Update order status to completed
-    await new Promise((resolve, reject) => {
-      updateOrderStatus(orderId, 'completed', (result) => {
-        if (result.success) {
-          resolve();
-        } else {
-          reject(new Error('Failed to update order status'));
-        }
-      });
-    });
-
-    // Send push notifications to participants
-    await sendReimbursementNotifications(order.participants, orderId);
+    await updateOrderStatus(orderId, 'completed');
 
     return {
       success: true,
-      message: 'Reimbursement processed successfully',
-      transfers: transferResults
+      message: 'Reimbursements processed successfully'
     };
   } catch (error) {
     console.error('Error processing reimbursement:', error);
-    throw error;
-  }
-};
-
-const sendReimbursementNotifications = async (participants, orderId) => {
-  try {
-    // In a real app, this would use Expo's push notification service
-    console.log(`Sending reimbursement notifications for order ${orderId} to participants:`, participants.map(p => p.id));
-
-    // Simulate sending notifications
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    return { success: true };
-  } catch (error) {
-    console.error('Error sending notifications:', error);
     throw error;
   }
 };

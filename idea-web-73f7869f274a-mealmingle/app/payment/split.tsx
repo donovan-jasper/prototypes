@@ -3,10 +3,10 @@ import { View, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Text, Button } from 'react-native-paper';
 import PaymentSplitView from '../../components/PaymentSplitView';
-import { processPayments, confirmPayment } from '../../lib/stripe';
+import { processPayments, confirmPayment, calculateSplit } from '../../lib/stripe';
 import { useOrder } from '../../hooks/useOrder';
 import { usePayment } from '../../hooks/usePayment';
-import { updateOrderPaymentStatus } from '../../lib/database';
+import { updateOrderPaymentStatus, updatePaymentStatus } from '../../lib/database';
 
 export default function PaymentSplitScreen() {
   const { id } = useLocalSearchParams();
@@ -49,11 +49,7 @@ export default function PaymentSplitScreen() {
 
       if (paymentResult.status === 'succeeded') {
         // Update order status to paid
-        await updateOrderPaymentStatus(order.id, 'paid', (response) => {
-          if (!response.success) {
-            throw new Error('Failed to update order status');
-          }
-        });
+        await updateOrderPaymentStatus(order.id, 'paid');
 
         // Process reimbursements
         setReimbursementStatus('processing');
@@ -81,15 +77,11 @@ export default function PaymentSplitScreen() {
       for (const participant of split.participants) {
         if (!participant.isOrganizer) {
           // In a real app, this would call Stripe's transfer API
-          // For demo purposes, we'll simulate the transfer
+          // For this prototype, we'll simulate the transfer
           await new Promise(resolve => setTimeout(resolve, 1000));
 
           // Update payment status in database
-          await updatePaymentStatus(participant.id, order.id, 'paid', (response) => {
-            if (!response.success) {
-              console.error('Failed to update payment status for participant', participant.id);
-            }
-          });
+          await updatePaymentStatus(participant.id, order.id, 'paid');
         }
       }
 
@@ -99,31 +91,6 @@ export default function PaymentSplitScreen() {
       setReimbursementStatus('failed');
       throw error;
     }
-  };
-
-  const calculateSplit = (order, splitType, customRules) => {
-    // Implementation of split calculation
-    // This is a simplified version - in a real app, this would be in lib/stripe.ts
-    const total = order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
-    const tax = total * 0.08;
-    const tip = total * 0.15;
-    const deliveryFee = 5.00;
-    const grandTotal = total + tax + tip + deliveryFee;
-
-    if (splitType === 'equal') {
-      const perPerson = grandTotal / order.participants.length;
-      return {
-        total: grandTotal,
-        perPerson,
-        participants: order.participants.map(participant => ({
-          ...participant,
-          amount: perPerson,
-        })),
-      };
-    }
-
-    // Add custom split logic here if needed
-    return null;
   };
 
   if (loading || paymentLoading) {
@@ -153,12 +120,25 @@ export default function PaymentSplitScreen() {
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Payment Split</Text>
+
       <PaymentSplitView
         order={order}
         splitType={splitType}
         customRules={customRules}
-        onPay={handlePay}
+        onSplitTypeChange={setSplitType}
+        onCustomRulesChange={setCustomRules}
       />
+
+      <Button
+        mode="contained"
+        onPress={handlePay}
+        loading={isProcessing}
+        disabled={isProcessing}
+        style={styles.payButton}
+      >
+        Pay ${order.total.toFixed(2)}
+      </Button>
 
       {reimbursementStatus === 'processing' && (
         <View style={styles.reimbursementStatus}>
@@ -168,25 +148,7 @@ export default function PaymentSplitScreen() {
       )}
 
       {reimbursementStatus === 'completed' && (
-        <View style={styles.reimbursementStatus}>
-          <Text style={styles.successText}>Reimbursements completed successfully</Text>
-        </View>
-      )}
-
-      {reimbursementStatus === 'failed' && (
-        <View style={styles.reimbursementStatus}>
-          <Text style={styles.errorText}>Reimbursement processing failed</Text>
-          <Button mode="outlined" onPress={() => processReimbursements(order, splitType, customRules)}>
-            Retry
-          </Button>
-        </View>
-      )}
-
-      {isProcessing && (
-        <View style={styles.processingOverlay}>
-          <ActivityIndicator size="large" color="#fff" />
-          <Text style={styles.processingText}>Processing payment...</Text>
-        </View>
+        <Text style={styles.successText}>Reimbursements completed successfully</Text>
       )}
     </View>
   );
@@ -208,34 +170,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
   },
-  processingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
   },
-  processingText: {
-    color: '#fff',
-    marginTop: 16,
-    fontSize: 18,
+  payButton: {
+    marginTop: 24,
   },
   reimbursementStatus: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 16,
   },
   successText: {
     color: 'green',
-    fontWeight: 'bold',
-  },
-  errorText: {
-    color: 'red',
+    marginTop: 16,
     fontWeight: 'bold',
   },
 });

@@ -178,10 +178,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   statusText: {
-    color: '#0d47a1',
-  },
-  deliveryCard: {
-    marginTop: 16,
+    color: '#1976d2',
   },
   completedContainer: {
     marginTop: 16,
@@ -196,5 +193,8 @@ const styles = StyleSheet.create({
   },
   receiptButton: {
     marginTop: 8,
+  },
+  deliveryCard: {
+    marginTop: 16,
   },
 });
