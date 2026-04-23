@@ -149,6 +149,7 @@ export const useRelationships = () => {
     }
   }, []);
 
+  // Fetch relationships on initial load
   useEffect(() => {
     fetchRelationships();
   }, [fetchRelationships]);

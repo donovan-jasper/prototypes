@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -207,16 +207,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#2196F3',
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 4,
   },
   fabText: {
-    fontSize: 32,
     color: '#FFFFFF',
-    fontWeight: '300',
-    marginTop: -2,
+    fontSize: 24,
+    fontWeight: '600',
   },
 });
