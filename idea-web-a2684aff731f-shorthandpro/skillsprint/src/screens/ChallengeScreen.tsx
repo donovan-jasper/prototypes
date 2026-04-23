@@ -130,199 +130,112 @@ const ChallengeScreen: React.FC = () => {
 
     // Calculate WPM
     const wordsTyped = typedText.trim().split(/\s+/).length;
-    const wpm = Math.round((wordsTyped / 1) * 60);
+    const timeInMinutes = (60 - typingTimer) / 60;
+    const wpm = Math.round(wordsTyped / timeInMinutes);
 
     // Calculate accuracy
-    const totalChars = TYPING_TARGET_TEXT.length;
-    const correctChars = totalChars - typingErrors.length;
-    const accuracy = Math.round((correctChars / totalChars) * 100);
+    const correctChars = TYPING_TARGET_TEXT.split('').filter((char, i) =>
+      typedText[i] === char && i < typedText.length
+    ).length;
+    const accuracy = Math.round((correctChars / TYPING_TARGET_TEXT.length) * 100);
 
     // Calculate final score (weighted average of WPM and accuracy)
-    const finalScore = Math.round((wpm * 0.7) + (accuracy * 0.3));
+    const score = Math.round((wpm * 0.7) + (accuracy * 0.3));
 
-    setFinalScore(finalScore);
+    // Get XP and completion result
+    const result = completeChallenge('typing', score);
+    setEarnedXP(result.xp);
+    setFinalScore(score);
 
+    // Show results modal
+    setShowResults(true);
+
+    // Save to Firebase if user is logged in
     if (user) {
       try {
         setIsSaving(true);
-
-        // Save to Firestore
-        const challengeRef = doc(db, 'users', user.uid, 'challenges', challengeData.id);
-        await setDoc(challengeRef, {
-          type: 'typing',
-          title: challengeData.title,
-          wpm,
-          accuracy,
-          score: finalScore,
-          timestamp: serverTimestamp(),
+        await setDoc(doc(db, 'users', user.uid, 'challenges', challengeData.id), {
+          type: challengeType,
+          score: score,
+          xp: result.xp,
+          completedAt: serverTimestamp(),
+          accuracy: accuracy,
+          wpm: wpm
         }, { merge: true });
-
-        // Calculate XP and update user stats
-        const result = await completeChallenge(
-          challengeData.id,
-          'typing',
-          challengeData.title,
-          finalScore
-        );
-
-        setEarnedXP(result.xp);
-        setShowResults(true);
       } catch (error) {
         console.error('Error saving challenge:', error);
       } finally {
         setIsSaving(false);
       }
-    } else {
-      setShowResults(true);
-    }
-  };
-
-  const handleMemorySubmit = async () => {
-    setMemoryPhase('result');
-
-    // Calculate score (number of correct digits in correct order)
-    const userSequence = memoryInput.split('').filter(d => MEMORY_SEQUENCE.includes(d));
-    let score = 0;
-
-    for (let i = 0; i < userSequence.length; i++) {
-      if (userSequence[i] === MEMORY_SEQUENCE[i]) {
-        score++;
-      } else {
-        break;
-      }
-    }
-
-    setMemoryScore(score);
-
-    if (user) {
-      try {
-        setIsSaving(true);
-
-        // Save to Firestore
-        const challengeRef = doc(db, 'users', user.uid, 'challenges', challengeData.id);
-        await setDoc(challengeRef, {
-          type: 'memory',
-          title: challengeData.title,
-          score,
-          timestamp: serverTimestamp(),
-        }, { merge: true });
-
-        // Calculate XP and update user stats
-        const result = await completeChallenge(
-          challengeData.id,
-          'memory',
-          challengeData.title,
-          score
-        );
-
-        setEarnedXP(result.xp);
-        setShowResults(true);
-      } catch (error) {
-        console.error('Error saving challenge:', error);
-      } finally {
-        setIsSaving(false);
-      }
-    } else {
-      setShowResults(true);
-    }
-  };
-
-  const handleMathAnswer = (answer: number) => {
-    setSelectedAnswer(answer);
-
-    const isCorrect = answer === MATH_PROBLEMS[currentProblemIndex].answer;
-    setAnswerFeedback(isCorrect ? 'correct' : 'incorrect');
-
-    if (isCorrect) {
-      setMathScore(mathScore + 1);
-    }
-
-    // Move to next problem or complete challenge
-    if (currentProblemIndex < MATH_PROBLEMS.length - 1) {
-      setTimeout(() => {
-        setCurrentProblemIndex(currentProblemIndex + 1);
-        setSelectedAnswer(null);
-        setAnswerFeedback(null);
-        setMathTimer(30);
-      }, 1000);
-    } else {
-      setIsCompleted(true);
-      handleMathComplete();
     }
   };
 
   const handleMathTimeout = () => {
-    setAnswerFeedback('incorrect');
-
-    // Move to next problem or complete challenge
     if (currentProblemIndex < MATH_PROBLEMS.length - 1) {
-      setTimeout(() => {
-        setCurrentProblemIndex(currentProblemIndex + 1);
-        setSelectedAnswer(null);
-        setAnswerFeedback(null);
-        setMathTimer(30);
-      }, 1000);
+      setCurrentProblemIndex(currentProblemIndex + 1);
+      setMathTimer(30);
+      setSelectedAnswer(null);
+      setAnswerFeedback(null);
     } else {
       setIsCompleted(true);
-      handleMathComplete();
+      const score = mathScore;
+      const result = completeChallenge('math', score);
+      setEarnedXP(result.xp);
+      setFinalScore(score);
+      setShowResults(true);
     }
   };
 
-  const handleMathComplete = async () => {
-    const finalScore = mathScore;
+  const handleMemorySubmit = () => {
+    const userSequence = memoryInput.split('').filter(n => n.trim() !== '');
+    const correctCount = userSequence.filter((num, i) => num === MEMORY_SEQUENCE[i]).length;
+    const score = Math.round((correctCount / MEMORY_SEQUENCE.length) * 100);
 
-    if (user) {
-      try {
-        setIsSaving(true);
+    setMemoryScore(score);
+    setMemoryPhase('result');
 
-        // Save to Firestore
-        const challengeRef = doc(db, 'users', user.uid, 'challenges', challengeData.id);
-        await setDoc(challengeRef, {
-          type: 'math',
-          title: challengeData.title,
-          score: finalScore,
-          timestamp: serverTimestamp(),
-        }, { merge: true });
+    const result = completeChallenge('memory', score);
+    setEarnedXP(result.xp);
+    setFinalScore(score);
+    setShowResults(true);
+  };
 
-        // Calculate XP and update user stats
-        const result = await completeChallenge(
-          challengeData.id,
-          'math',
-          challengeData.title,
-          finalScore
-        );
+  const handleSaveProgress = async () => {
+    if (!user) return;
 
-        setEarnedXP(result.xp);
-        setShowResults(true);
-      } catch (error) {
-        console.error('Error saving challenge:', error);
-      } finally {
-        setIsSaving(false);
-      }
-    } else {
-      setShowResults(true);
+    try {
+      setIsSaving(true);
+      await setDoc(doc(db, 'users', user.uid, 'challenges', challengeData.id), {
+        type: challengeType,
+        score: finalScore,
+        xp: earnedXP,
+        completedAt: serverTimestamp(),
+        accuracy: challengeType === 'typing' ? Math.round((typedText.split('').filter((char, i) =>
+          char === TYPING_TARGET_TEXT[i] && i < typedText.length).length / TYPING_TARGET_TEXT.length) * 100) : undefined,
+        wpm: challengeType === 'typing' ? Math.round(typedText.trim().split(/\s+/).length / ((60 - typingTimer) / 60)) : undefined,
+        sequenceScore: challengeType === 'memory' ? memoryScore : undefined,
+        mathScore: challengeType === 'math' ? mathScore : undefined
+      }, { merge: true });
+    } catch (error) {
+      console.error('Error saving progress:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const renderTypingChallenge = () => {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>{challengeData.title}</Text>
-        <Text style={styles.description}>{challengeData.description}</Text>
-
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>{typingTimer}s</Text>
-        </View>
-
+      <View style={styles.challengeContainer}>
+        <Text style={styles.timerText}>{typingTimer}s</Text>
         <ScrollView style={styles.textContainer}>
           <Text style={styles.targetText}>
             {TYPING_TARGET_TEXT.split('').map((char, index) => (
               <Text
                 key={index}
                 style={[
-                  styles.char,
-                  typedText[index] !== undefined && typedText[index] !== char && styles.errorChar,
-                  typedText[index] === char && styles.correctChar
+                  styles.targetChar,
+                  typedText[index] !== char && typedText[index] !== undefined ? styles.errorChar : null,
+                  typedText[index] === char ? styles.correctChar : null
                 ]}
               >
                 {char}
@@ -330,151 +243,198 @@ const ChallengeScreen: React.FC = () => {
             ))}
           </Text>
         </ScrollView>
-
         <TextInput
           style={styles.input}
           value={typedText}
           onChangeText={handleTypingChange}
-          autoFocus
           multiline
-          placeholder="Start typing here..."
+          autoFocus
           editable={!isCompleted}
         />
-
-        {isCompleted && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Challenge Complete!</Text>
-            <Text style={styles.resultsText}>WPM: {Math.round((typedText.trim().split(/\s+/).length / 1) * 60)}</Text>
-            <Text style={styles.resultsText}>Accuracy: {Math.round(((TYPING_TARGET_TEXT.length - typingErrors.length) / TYPING_TARGET_TEXT.length) * 100)}%</Text>
-            <Text style={styles.resultsText}>Final Score: {finalScore}</Text>
-            <Text style={styles.resultsText}>XP Earned: {earnedXP}</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Text style={styles.buttonText}>Back to Home</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     );
   };
 
   const renderMemoryChallenge = () => {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.title}>{challengeData.title}</Text>
-        <Text style={styles.description}>{challengeData.description}</Text>
-
-        {memoryPhase === 'show' && (
-          <>
-            <Text style={styles.memorySequence}>
-              {MEMORY_SEQUENCE.join(' ')}
-            </Text>
-            <Text style={styles.memoryTimer}>{memoryTimer}s</Text>
-          </>
-        )}
-
-        {memoryPhase === 'recall' && (
-          <>
-            <Text style={styles.memoryPrompt}>Enter the sequence you remember:</Text>
-            <TextInput
-              style={styles.memoryInput}
-              value={memoryInput}
-              onChangeText={setMemoryInput}
-              keyboardType="numeric"
-              maxLength={MEMORY_SEQUENCE.length}
-              autoFocus
-            />
-            <TouchableOpacity
-              style={styles.button}
-              onPress={handleMemorySubmit}
-            >
-              <Text style={styles.buttonText}>Submit</Text>
-            </TouchableOpacity>
-          </>
-        )}
-
-        {memoryPhase === 'result' && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Challenge Complete!</Text>
-            <Text style={styles.resultsText}>Correct Digits: {memoryScore}/{MEMORY_SEQUENCE.length}</Text>
-            <Text style={styles.resultsText}>XP Earned: {earnedXP}</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Text style={styles.buttonText}>Back to Home</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
+    if (memoryPhase === 'show') {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.memoryTitle}>Memorize this sequence:</Text>
+          <Text style={styles.memorySequence}>{MEMORY_SEQUENCE.join(' ')}</Text>
+          <Text style={styles.memoryTimer}>{memoryTimer}s remaining</Text>
+        </View>
+      );
+    } else if (memoryPhase === 'recall') {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.memoryTitle}>Enter the sequence:</Text>
+          <TextInput
+            style={styles.memoryInput}
+            value={memoryInput}
+            onChangeText={setMemoryInput}
+            keyboardType="numeric"
+            maxLength={MEMORY_SEQUENCE.length}
+          />
+          <TouchableOpacity style={styles.button} onPress={handleMemorySubmit}>
+            <Text style={styles.buttonText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    } else {
+      return (
+        <View style={styles.challengeContainer}>
+          <Text style={styles.memoryTitle}>Your score: {memoryScore}%</Text>
+          <Text style={styles.memorySequence}>Correct sequence: {MEMORY_SEQUENCE.join(' ')}</Text>
+        </View>
+      );
+    }
   };
 
   const renderMathChallenge = () => {
     const currentProblem = MATH_PROBLEMS[currentProblemIndex];
-
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>{challengeData.title}</Text>
-        <Text style={styles.description}>{challengeData.description}</Text>
-
-        <View style={styles.mathProgress}>
-          <Text style={styles.mathProgressText}>
-            Problem {currentProblemIndex + 1} of {MATH_PROBLEMS.length}
-          </Text>
-          <Text style={styles.mathTimer}>{mathTimer}s</Text>
-        </View>
-
+      <View style={styles.challengeContainer}>
         <Text style={styles.mathQuestion}>{currentProblem.question}</Text>
-
-        <View style={styles.mathOptions}>
+        <Text style={styles.mathTimer}>{mathTimer}s remaining</Text>
+        <View style={styles.optionsContainer}>
           {currentProblem.options.map((option, index) => (
             <TouchableOpacity
               key={index}
               style={[
-                styles.mathOption,
-                selectedAnswer === option && answerFeedback === 'correct' && styles.correctOption,
-                selectedAnswer === option && answerFeedback === 'incorrect' && styles.incorrectOption,
-                selectedAnswer !== null && option === currentProblem.answer && styles.correctOption
+                styles.optionButton,
+                selectedAnswer === option ? styles.selectedOption : null,
+                answerFeedback === 'correct' && selectedAnswer === option ? styles.correctOption : null,
+                answerFeedback === 'incorrect' && selectedAnswer === option ? styles.incorrectOption : null
               ]}
               onPress={() => handleMathAnswer(option)}
               disabled={selectedAnswer !== null}
             >
-              <Text style={styles.mathOptionText}>{option}</Text>
+              <Text style={styles.optionText}>{option}</Text>
             </TouchableOpacity>
           ))}
         </View>
-
-        {isCompleted && (
-          <View style={styles.resultsContainer}>
-            <Text style={styles.resultsTitle}>Challenge Complete!</Text>
-            <Text style={styles.resultsText}>Score: {mathScore}/{MATH_PROBLEMS.length}</Text>
-            <Text style={styles.resultsText}>XP Earned: {earnedXP}</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => navigation.navigate('Home')}
-            >
-              <Text style={styles.buttonText}>Back to Home</Text>
-            </TouchableOpacity>
-          </View>
+        {answerFeedback && (
+          <Text style={[
+            styles.feedbackText,
+            answerFeedback === 'correct' ? styles.correctFeedback : styles.incorrectFeedback
+          ]}>
+            {answerFeedback === 'correct' ? 'Correct!' : 'Incorrect!'}
+          </Text>
         )}
       </View>
     );
   };
 
+  const handleMathAnswer = (answer: number) => {
+    const currentProblem = MATH_PROBLEMS[currentProblemIndex];
+    const isCorrect = answer === currentProblem.answer;
+
+    setSelectedAnswer(answer);
+    setAnswerFeedback(isCorrect ? 'correct' : 'incorrect');
+
+    if (isCorrect) {
+      setMathScore(mathScore + 1);
+    }
+
+    setTimeout(() => {
+      if (currentProblemIndex < MATH_PROBLEMS.length - 1) {
+        setCurrentProblemIndex(currentProblemIndex + 1);
+        setMathTimer(30);
+        setSelectedAnswer(null);
+        setAnswerFeedback(null);
+      } else {
+        setIsCompleted(true);
+        const score = mathScore;
+        const result = completeChallenge('math', score);
+        setEarnedXP(result.xp);
+        setFinalScore(score);
+        setShowResults(true);
+      }
+    }, 1000);
+  };
+
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>{challengeData.title}</Text>
+      <Text style={styles.description}>{challengeData.description}</Text>
+
       {challengeType === 'typing' && renderTypingChallenge()}
       {challengeType === 'memory' && renderMemoryChallenge()}
       {challengeType === 'math' && renderMathChallenge()}
 
-      <Modal visible={isSaving} transparent>
+      <Modal
+        visible={showResults}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowResults(false)}
+      >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.modalText}>Saving your results...</Text>
+            <Text style={styles.modalTitle}>Challenge Complete!</Text>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>Score:</Text>
+                <Text style={styles.statValue}>{finalScore}</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statLabel}>XP Earned:</Text>
+                <Text style={styles.statValue}>{earnedXP}</Text>
+              </View>
+              {challengeType === 'typing' && (
+                <>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>WPM:</Text>
+                    <Text style={styles.statValue}>
+                      {Math.round(typedText.trim().split(/\s+/).length / ((60 - typingTimer) / 60))}
+                    </Text>
+                  </View>
+                  <View style={styles.statItem}>
+                    <Text style={styles.statLabel}>Accuracy:</Text>
+                    <Text style={styles.statValue}>
+                      {Math.round((typedText.split('').filter((char, i) =>
+                        char === TYPING_TARGET_TEXT[i] && i < typedText.length).length / TYPING_TARGET_TEXT.length) * 100)}%
+                    </Text>
+                  </View>
+                </>
+              )}
+              {challengeType === 'memory' && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Memory Score:</Text>
+                  <Text style={styles.statValue}>{memoryScore}%</Text>
+                </View>
+              )}
+              {challengeType === 'math' && (
+                <View style={styles.statItem}>
+                  <Text style={styles.statLabel}>Math Score:</Text>
+                  <Text style={styles.statValue}>{mathScore}/{MATH_PROBLEMS.length}</Text>
+                </View>
+              )}
+            </View>
+
+            {user && (
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveProgress}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Progress</Text>
+                )}
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => {
+                setShowResults(false);
+                navigation.goBack();
+              }}
+            >
+              <Text style={styles.closeButtonText}>Continue</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -486,7 +446,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
@@ -496,167 +456,205 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
+    marginBottom: 20,
     color: '#666',
-    marginBottom: 20,
   },
-  timerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+  challengeContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   timerText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#007AFF',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#e74c3c',
   },
   textContainer: {
-    maxHeight: 200,
+    maxHeight: 150,
     marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
   },
   targetText: {
-    fontSize: 16,
+    fontSize: 18,
     lineHeight: 24,
   },
-  char: {
+  targetChar: {
     color: '#333',
   },
+  correctChar: {
+    color: '#2ecc71',
+  },
   errorChar: {
-    color: '#FF3B30',
+    color: '#e74c3c',
     textDecorationLine: 'underline',
   },
-  correctChar: {
-    color: '#34C759',
-  },
   input: {
-    height: 100,
+    fontSize: 18,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
-    fontSize: 16,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  memoryTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
   },
   memorySequence: {
     fontSize: 32,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginVertical: 30,
+    marginBottom: 20,
+    color: '#3498db',
   },
   memoryTimer: {
-    fontSize: 24,
-    textAlign: 'center',
-    marginBottom: 20,
-    color: '#007AFF',
-  },
-  memoryPrompt: {
     fontSize: 18,
-    marginBottom: 10,
     textAlign: 'center',
+    color: '#e74c3c',
   },
   memoryInput: {
-    height: 50,
+    fontSize: 24,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
-    fontSize: 18,
     textAlign: 'center',
     marginBottom: 20,
   },
-  mathProgress: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+  button: {
+    backgroundColor: '#3498db',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
   },
-  mathProgressText: {
-    fontSize: 16,
-    color: '#666',
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  mathQuestion: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#3498db',
   },
   mathTimer: {
     fontSize: 18,
-    color: '#007AFF',
-  },
-  mathQuestion: {
-    fontSize: 24,
-    fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 30,
+    color: '#e74c3c',
+    marginBottom: 20,
   },
-  mathOptions: {
+  optionsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
     marginBottom: 20,
   },
-  mathOption: {
-    width: '45%',
+  optionButton: {
+    backgroundColor: '#f0f0f0',
     padding: 15,
-    margin: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 5,
+    margin: 5,
+    width: '45%',
     alignItems: 'center',
   },
-  mathOptionText: {
-    fontSize: 18,
+  selectedOption: {
+    backgroundColor: '#3498db',
   },
   correctOption: {
-    backgroundColor: '#E5F7E5',
-    borderColor: '#34C759',
+    backgroundColor: '#2ecc71',
   },
   incorrectOption: {
-    backgroundColor: '#FFEBEE',
-    borderColor: '#FF3B30',
+    backgroundColor: '#e74c3c',
   },
-  resultsContainer: {
-    marginTop: 20,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  resultsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  optionText: {
+    fontSize: 18,
     color: '#333',
   },
-  resultsText: {
-    fontSize: 16,
-    marginBottom: 10,
-    color: '#666',
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
-    marginTop: 20,
-    width: '100%',
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
+  feedbackText: {
+    fontSize: 20,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  correctFeedback: {
+    color: '#2ecc71',
+  },
+  incorrectFeedback: {
+    color: '#e74c3c',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
     borderRadius: 10,
+    padding: 20,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  statsContainer: {
+    marginBottom: 20,
+  },
+  statItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  statLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  saveButton: {
+    backgroundColor: '#2ecc71',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  closeButton: {
+    backgroundColor: '#3498db',
+    padding: 15,
+    borderRadius: 5,
     alignItems: 'center',
   },
-  modalText: {
-    marginTop: 10,
-    fontSize: 16,
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });
 
