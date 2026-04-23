@@ -63,8 +63,8 @@ export async function generateOutfits(
   // Sort by score (highest first)
   scoredCombinations.sort((a, b) => b.score - a.score);
 
-  // Return top 5 suggestions
-  const maxSuggestions = Math.min(5, scoredCombinations.length);
+  // Return top 3-5 suggestions
+  const maxSuggestions = Math.min(5, Math.max(3, scoredCombinations.length));
   return scoredCombinations.slice(0, maxSuggestions).map(combination => ({
     items: combination.items,
     score: combination.score,
@@ -166,13 +166,17 @@ function filterByWeather(
   return items.filter(item => {
     // Hot weather (above 70°F)
     if (context.temp > 70) {
-      return !['outerwear', 'heavy'].some(tag => item.tags.includes(tag));
+      return !item.tags.includes('winter') &&
+             !item.tags.includes('cold') &&
+             !item.tags.includes('heavy');
     }
     // Cold weather (below 50°F)
     else if (context.temp < 50) {
-      return !['light', 'summer'].some(tag => item.tags.includes(tag));
+      return item.tags.includes('winter') ||
+             item.tags.includes('cold') ||
+             item.tags.includes('warm');
     }
-    // Moderate weather
+    // Mild weather (50-70°F)
     return true;
   });
 }
@@ -207,42 +211,34 @@ function calculateOutfitScore(
   // Base score based on number of items
   score += items.length * 2;
 
-  // Color harmony bonus
-  if (items.length >= 2) {
-    const primaryColors = items[0].colors;
-    const secondaryColors = items[1].colors;
+  // Color harmony score
+  if (items.length > 1) {
+    const primaryColor = items[0].colors[0];
+    const secondaryColors = items.slice(1).flatMap(item => item.colors);
 
     // Check for complementary colors
-    if (primaryColors.some(color =>
-      COMPLEMENTARY_COLORS[color]?.some(compColor =>
-        secondaryColors.includes(compColor)
-      )
-    )) {
-      score += 3;
+    if (COMPLEMENTARY_COLORS[primaryColor]?.some(color => secondaryColors.includes(color))) {
+      score += 5;
     }
 
     // Check for analogous colors
-    if (primaryColors.some(color =>
-      ANALOGOUS_COLORS[color]?.some(analogColor =>
-        secondaryColors.includes(analogColor)
-      )
-    )) {
-      score += 2;
+    if (ANALOGOUS_COLORS[primaryColor]?.some(color => secondaryColors.includes(color))) {
+      score += 3;
     }
 
-    // Monochrome bonus
-    if (primaryColors.some(color => secondaryColors.includes(color))) {
-      score += 1;
+    // Check for monochrome
+    if (secondaryColors.every(color => color === primaryColor)) {
+      score += 4;
     }
   }
 
-  // Weather appropriateness bonus
-  if (context.temp > 70 && !items.some(item => item.tags.includes('heavy'))) {
-    score += 1;
+  // Weather appropriateness
+  if (context.temp > 70 && items.every(item => !item.tags.includes('winter'))) {
+    score += 3;
   }
 
-  if (context.temp < 50 && items.some(item => item.tags.includes('warm'))) {
-    score += 1;
+  if (context.temp < 50 && items.some(item => item.tags.includes('winter') || item.tags.includes('cold'))) {
+    score += 3;
   }
 
   // Occasion appropriateness
@@ -253,11 +249,11 @@ function calculateOutfitScore(
   );
 
   if (isFormal && items.some(item => item.tags.includes('formal'))) {
-    score += 2;
+    score += 4;
   }
 
-  if (!isFormal && items.some(item => item.tags.includes('casual'))) {
-    score += 1;
+  if (!isFormal && items.every(item => !item.tags.includes('formal'))) {
+    score += 2;
   }
 
   return score;
