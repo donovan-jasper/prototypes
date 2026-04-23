@@ -104,6 +104,12 @@ export async function fetchCoachContext(userId: string, habitId: string): Promis
   };
 }
 
+// Get the user's preferred coach tone
+async function getCoachTone(userId: string): Promise<'supportive' | 'encouraging' | 'challenging'> {
+  const preferences = await getUserPreferences(userId);
+  return preferences?.coachTone || 'supportive';
+}
+
 // Generate a coach message with retry logic and caching
 export async function generateCoachMessage(context: CoachMessageContext): Promise<string> {
   // Check cache first
@@ -152,50 +158,34 @@ function buildPrompt(context: CoachMessageContext): string {
     Their current streak status is ${context.status}. They've missed ${context.missedDays} days recently.
     Write a ${context.userTone} message (max 50 words) to motivate them, considering their current streak status.
     If their streak is active, praise their progress.
-    If their streak is at-risk, encourage them to stay on track.
-    If their streak is broken, offer support and encouragement to restart.
+    If their streak is at-risk, encourage them to complete today.
+    If their streak is broken, gently remind them of their progress and encourage them to start fresh.
+    Keep the tone consistent with the user's preference (${context.userTone}).
+    The message should be personalized and motivational.
   `;
 }
 
-// Get a fallback message when API fails
-function getFallbackMessage(context: CoachMessageContext, error: Error | null): string {
-  if (error && error.message.includes('429')) {
-    // Rate limit error
-    return "Your habit coach is busy right now. Check back later for a personalized message!";
-  }
-
-  // Default fallback based on streak status
-  if (context.status === 'active') {
-    return `You're crushing it with your ${context.streakLength}-day streak! Keep going - you're on fire!`;
-  } else if (context.status === 'at-risk') {
-    return `Your ${context.habitName} streak is at risk! Just one more day to keep it going strong.`;
-  } else {
-    return `Don't worry about the broken streak. Every expert was once a beginner. Let's get back on track!`;
-  }
-}
-
-// Get cached message if available and not expired
+// Get a cached message if available
 async function getCachedMessage(context: CoachMessageContext): Promise<string | null> {
   return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
-        `SELECT message, created_at FROM ai_messages
-         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ? AND habit_name = ?
-         AND completion_rate = ? AND status = ? AND user_tone = ?`,
-        [context.streakLength, context.longestStreak, context.missedDays, context.habitName,
-         context.completionRate, context.status, context.userTone],
+        `SELECT message FROM ai_messages
+         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ?
+         AND habit_name = ? AND completion_rate = ? AND status = ? AND user_tone = ?
+         AND created_at > datetime('now', '-${config.cacheTTL} milliseconds')`,
+        [
+          context.streakLength,
+          context.longestStreak,
+          context.missedDays,
+          context.habitName,
+          context.completionRate,
+          context.status,
+          context.userTone
+        ],
         (_, { rows }) => {
           if (rows.length > 0) {
-            const item = rows.item(0);
-            const createdAt = new Date(item.created_at);
-            const now = new Date();
-
-            // Check if cache is still valid
-            if (now.getTime() - createdAt.getTime() < config.cacheTTL) {
-              resolve(item.message);
-            } else {
-              resolve(null);
-            }
+            resolve(rows.item(0).message);
           } else {
             resolve(null);
           }
@@ -209,16 +199,24 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
   });
 }
 
-// Cache a message in the database
+// Cache a generated message
 async function cacheMessage(context: CoachMessageContext, message: string): Promise<void> {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
         `INSERT OR REPLACE INTO ai_messages
-         (streak_length, longest_streak, missed_days, habit_name, completion_rate, status, user_tone, message, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
-        [context.streakLength, context.longestStreak, context.missedDays, context.habitName,
-         context.completionRate, context.status, context.userTone, message],
+         (streak_length, longest_streak, missed_days, habit_name, completion_rate, status, user_tone, message)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          context.streakLength,
+          context.longestStreak,
+          context.missedDays,
+          context.habitName,
+          context.completionRate,
+          context.status,
+          context.userTone,
+          message
+        ],
         () => resolve(),
         (_, error) => {
           console.error('Error caching message:', error);
@@ -229,56 +227,13 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
   });
 }
 
-// Get the user's preferred coach tone
-async function getCoachTone(userId: string): Promise<'supportive' | 'encouraging' | 'challenging'> {
-  try {
-    const preferences = await getUserPreferences(userId);
-    return preferences.coachTone || 'supportive';
-  } catch (error) {
-    console.error('Error getting coach tone:', error);
-    return 'supportive';
+// Get a fallback message when API fails
+function getFallbackMessage(context: CoachMessageContext, error: Error | null): string {
+  if (context.status === 'active') {
+    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep it up!`;
+  } else if (context.status === 'at-risk') {
+    return `You're close to breaking your streak for ${context.habitName}. Just one more day!`;
+  } else {
+    return `Don't worry about the break. Your longest streak was ${context.longestStreak} days. Let's start fresh today!`;
   }
 }
-
-// Schedule a coach notification
-export async function scheduleCoachNotification(userId: string, habitId: string, time: string) {
-  try {
-    const context = await fetchCoachContext(userId, habitId);
-    const message = await generateCoachMessage(context);
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "Your Habit Coach",
-        body: message,
-        data: { type: 'coach-message', habitId },
-      },
-      trigger: {
-        hour: parseInt(time.split(':')[0]),
-        minute: parseInt(time.split(':')[1]),
-        repeats: true,
-      },
-    });
-  } catch (error) {
-    console.error('Error scheduling coach notification:', error);
-  }
-}
-
-// Clear expired cache entries
-export async function clearExpiredCache() {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        `DELETE FROM ai_messages WHERE created_at < datetime('now', ?)`,
-        [`-${config.cacheTTL} milliseconds`],
-        () => resolve(true),
-        (_, error) => {
-          console.error('Error clearing expired cache:', error);
-          reject(error);
-        }
-      );
-    });
-  });
-}
-
-// Initialize the AI coach when this module is imported
-initializeAICoach();
