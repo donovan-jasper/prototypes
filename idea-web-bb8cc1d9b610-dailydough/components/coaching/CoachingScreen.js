@@ -137,26 +137,13 @@ export default function CoachingScreen() {
                         { height: `${barHeight}%` }
                       ]}
                     />
+                    <Text style={styles.trendMonth}>{trend.month}</Text>
+                    <Text style={styles.trendAmount}>${trend.total.toFixed(2)}</Text>
                   </View>
-                  <Text style={styles.trendAmount}>${trend.total.toFixed(0)}</Text>
-                  <Text style={styles.trendMonth}>{trend.month}</Text>
                 </View>
               );
             })}
           </View>
-        </View>
-      )}
-
-      {insights.length === 0 && categoryBreakdown.length === 0 && (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyStateIcon}>📊</Text>
-          <Text style={styles.emptyStateTitle}>No Data Yet</Text>
-          <Text style={styles.emptyStateMessage}>
-            Start tracking your expenses and income to receive personalized financial insights and recommendations.
-          </Text>
-          <TouchableOpacity style={styles.emptyStateButton}>
-            <Text style={styles.emptyStateButtonText}>Start Tracking</Text>
-          </TouchableOpacity>
         </View>
       )}
     </ScrollView>
@@ -170,19 +157,17 @@ const styles = StyleSheet.create({
   },
   header: {
     padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#007AFF',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    color: 'white',
+    marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666',
+    color: 'rgba(255,255,255,0.8)',
   },
   section: {
     marginBottom: 20,
@@ -191,12 +176,11 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginBottom: 10,
     color: '#333',
-    marginBottom: 12,
-    paddingHorizontal: 5,
   },
   insightCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 15,
     marginBottom: 10,
@@ -244,11 +228,11 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 12,
     fontSize: 12,
+    color: 'white',
     fontWeight: '500',
-    color: '#fff',
   },
   categoryCard: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 15,
     shadowColor: '#000',
@@ -262,7 +246,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomColor: '#eee',
   },
   categoryInfo: {
     flex: 1,
@@ -271,7 +255,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#333',
-    marginBottom: 2,
   },
   categoryCount: {
     fontSize: 12,
@@ -292,7 +275,7 @@ const styles = StyleSheet.create({
   trendCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 15,
     shadowColor: '#000',
@@ -302,8 +285,9 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   trendBar: {
+    flex: 1,
     alignItems: 'center',
-    width: (width - 60) / 6,
+    marginHorizontal: 2,
   },
   trendBarContainer: {
     height: 150,
@@ -314,50 +298,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     borderRadius: 4,
     width: '100%',
+    alignSelf: 'center',
+  },
+  trendMonth: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 5,
+    textAlign: 'center',
   },
   trendAmount: {
     fontSize: 12,
     fontWeight: '500',
     color: '#333',
-    marginTop: 4,
-  },
-  trendMonth: {
-    fontSize: 10,
-    color: '#666',
     marginTop: 2,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 30,
-    marginTop: 50,
-  },
-  emptyStateIcon: {
-    fontSize: 48,
-    marginBottom: 20,
-  },
-  emptyStateTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
-  },
-  emptyStateMessage: {
-    fontSize: 16,
-    color: '#666',
     textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  emptyStateButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 25,
-  },
-  emptyStateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
