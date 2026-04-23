@@ -25,7 +25,7 @@ export const applyEnhancement = async (imageUri, enhancementType = 'auto') => {
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
-        
+
         // Second pass for additional "brightness"
         manipulatedImage = await ImageManipulator.manipulateAsync(
           manipulatedImage.uri,
@@ -82,7 +82,7 @@ export const applyEnhancement = async (imageUri, enhancementType = 'auto') => {
             format: ImageManipulator.SaveFormat.PNG,
           }
         );
-        
+
         // Second pass for clarity
         manipulatedImage = await ImageManipulator.manipulateAsync(
           manipulatedImage.uri,
@@ -111,7 +111,7 @@ export const applyEnhancement = async (imageUri, enhancementType = 'auto') => {
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
-        
+
         manipulatedImage = await ImageManipulator.manipulateAsync(
           manipulatedImage.uri,
           [],

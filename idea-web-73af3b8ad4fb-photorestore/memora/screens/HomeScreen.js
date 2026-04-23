@@ -3,7 +3,7 @@ import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Scr
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { incrementUsage } from '../store/userSlice';
-import { restorePhoto } from '../services/RestorationService';
+import { applyEnhancement } from '../services/RestorationService';
 
 const HomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -12,6 +12,7 @@ const HomeScreen = ({ navigation }) => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [restoredImage, setRestoredImage] = useState(null);
   const [qualityMetrics, setQualityMetrics] = useState(null);
+  const [selectedEnhancement, setSelectedEnhancement] = useState('auto');
 
   const pickImage = async () => {
     if (!isPremium && usageCount >= 3) {
@@ -39,7 +40,7 @@ const HomeScreen = ({ navigation }) => {
     setIsProcessing(true);
 
     try {
-      const result = await restorePhoto(selectedImage);
+      const result = await applyEnhancement(selectedImage, selectedEnhancement);
       dispatch(incrementUsage());
       setRestoredImage(result.uri);
       setQualityMetrics({
@@ -57,6 +58,7 @@ const HomeScreen = ({ navigation }) => {
     setSelectedImage(null);
     setRestoredImage(null);
     setQualityMetrics(null);
+    setSelectedEnhancement('auto');
   };
 
   const saveResult = () => {
@@ -69,6 +71,14 @@ const HomeScreen = ({ navigation }) => {
       enhancement: qualityMetrics?.enhancement || 'auto',
     });
   };
+
+  const enhancementOptions = [
+    { value: 'auto', label: 'Auto' },
+    { value: 'brighten', label: 'Brighten' },
+    { value: 'sharpen', label: 'Sharpen' },
+    { value: 'vintage', label: 'Vintage' },
+    { value: 'modern', label: 'Modern' },
+  ];
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -92,6 +102,25 @@ const HomeScreen = ({ navigation }) => {
       {selectedImage && !restoredImage && (
         <View style={styles.imageContainer}>
           <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+
+          <View style={styles.enhancementSelector}>
+            <Text style={styles.enhancementLabel}>Select Enhancement:</Text>
+            <View style={styles.enhancementOptions}>
+              {enhancementOptions.map((option) => (
+                <TouchableOpacity
+                  key={option.value}
+                  style={[
+                    styles.enhancementButton,
+                    selectedEnhancement === option.value && styles.selectedEnhancement
+                  ]}
+                  onPress={() => setSelectedEnhancement(option.value)}
+                >
+                  <Text style={styles.enhancementButtonText}>{option.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
           <View style={styles.actionButtons}>
             <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
               <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -154,69 +183,100 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
     textAlign: 'center',
+    marginBottom: 20,
   },
   usageText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 20,
+    fontStyle: 'italic',
   },
   button: {
     backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,
     marginBottom: 20,
-    width: '100%',
-    alignItems: 'center',
   },
   buttonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   imageContainer: {
     width: '100%',
+    alignItems: 'center',
     marginBottom: 20,
   },
   previewImage: {
-    width: '100%',
+    width: 300,
     height: 300,
+    resizeMode: 'contain',
     borderRadius: 8,
     marginBottom: 20,
-    resizeMode: 'contain',
+    backgroundColor: '#fff',
+  },
+  enhancementSelector: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  enhancementLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  enhancementOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  enhancementButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: '#e0e0e0',
+  },
+  selectedEnhancement: {
+    backgroundColor: '#007AFF',
+  },
+  enhancementButtonText: {
+    color: '#333',
+    fontSize: 14,
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    marginTop: 20,
   },
   cancelButton: {
-    backgroundColor: '#e0e0e0',
+    flex: 1,
     padding: 15,
     borderRadius: 8,
-    flex: 1,
+    backgroundColor: '#e0e0e0',
     marginRight: 10,
-    alignItems: 'center',
   },
   cancelButtonText: {
     color: '#333',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   processButton: {
-    backgroundColor: '#007AFF',
+    flex: 1,
     padding: 15,
     borderRadius: 8,
-    flex: 1,
+    backgroundColor: '#34C759',
     marginLeft: 10,
-    alignItems: 'center',
   },
   processButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+    textAlign: 'center',
   },
   loadingContainer: {
     marginTop: 20,
@@ -229,31 +289,33 @@ const styles = StyleSheet.create({
   },
   resultContainer: {
     width: '100%',
+    alignItems: 'center',
     marginTop: 20,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
   },
   resultImage: {
-    width: '100%',
+    width: 300,
     height: 300,
+    resizeMode: 'contain',
     borderRadius: 8,
     marginBottom: 20,
-    resizeMode: 'contain',
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#fff',
   },
   metricsContainer: {
-    backgroundColor: 'white',
+    width: '100%',
     padding: 15,
+    backgroundColor: '#fff',
     borderRadius: 8,
     marginBottom: 20,
   },
   metricsTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 10,
     color: '#333',
   },

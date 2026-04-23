@@ -24,7 +24,7 @@ const ResultScreen = ({ route, navigation }) => {
     };
 
     const success = await saveRestoration(restoration);
-    
+
     if (success) {
       Alert.alert(
         'Saved!',
@@ -52,7 +52,7 @@ const ResultScreen = ({ route, navigation }) => {
         <Text style={styles.qualityText}>Quality: {(quality * 100).toFixed(0)}%</Text>
         <Text style={styles.enhancementText}>{enhancementLabels[enhancement] || enhancement}</Text>
       </View>
-      
+
       <View style={styles.imageSection}>
         <Text style={styles.label}>Original</Text>
         <Image source={{ uri: originalImage }} style={styles.image} />
@@ -65,6 +65,13 @@ const ResultScreen = ({ route, navigation }) => {
 
       <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
         <Text style={styles.saveButtonText}>Save to Gallery</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => navigation.goBack()}
+      >
+        <Text style={styles.backButtonText}>Back to Home</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -123,9 +130,22 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     marginTop: 16,
+    marginBottom: 16,
   },
   saveButtonText: {
     color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  backButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  backButtonText: {
+    color: '#007AFF',
     fontSize: 18,
     fontWeight: '600',
   },
