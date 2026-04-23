@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions, ScrollView, Modal, FlatList } from 'react-native';
 import { TensionLog } from '@/types';
 import { Colors } from '@/constants/colors';
 
@@ -13,6 +13,9 @@ const screenWidth = Dimensions.get('window').width;
 const cellSize = (screenWidth - 64) / 7;
 
 export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalendarProps) {
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [dayLogs, setDayLogs] = useState<TensionLog[]>([]);
+
   const getDayData = () => {
     const today = new Date();
     const dayData: { date: Date; tenseCount: number; relaxedCount: number }[] = [];
@@ -61,7 +64,51 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
     return days[date.getDay()];
   };
 
+  const handleDayPress = (date: Date) => {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const logsForDay = logs.filter(log => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= startOfDay && logDate <= endOfDay;
+    });
+
+    setDayLogs(logsForDay);
+    setSelectedDate(date);
+    onDayPress?.(date);
+  };
+
+  const closeModal = () => {
+    setSelectedDate(null);
+  };
+
   const dayData = getDayData();
+
+  const renderDayLogItem = ({ item }: { item: TensionLog }) => {
+    const logDate = new Date(item.timestamp);
+    const timeString = logDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    return (
+      <View style={styles.logItem}>
+        <View style={styles.logTimeContainer}>
+          <Text style={styles.logTime}>{timeString}</Text>
+        </View>
+        <View style={styles.logStatusContainer}>
+          <View style={[
+            styles.logStatusDot,
+            { backgroundColor: item.status === 'tense' ? Colors.light.tense : Colors.light.relaxed }
+          ]} />
+          <Text style={styles.logStatusText}>
+            {item.status === 'tense' ? 'Tense' : 'Relaxed'}
+          </Text>
+        </View>
+        <Text style={styles.logBodyZone}>{item.bodyZone}</Text>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -88,7 +135,7 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
                   { backgroundColor: color },
                   isToday && styles.todayCell
                 ]}
-                onPress={() => onDayPress?.(day.date)}
+                onPress={() => handleDayPress(day.date)}
                 activeOpacity={0.7}
               >
                 <Text style={styles.dayName}>{getDayName(day.date)}</Text>
@@ -120,6 +167,39 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
           <Text style={styles.legendText}>Tense</Text>
         </View>
       </View>
+
+      <Modal
+        visible={selectedDate !== null}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeModal}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedDate?.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              </Text>
+              <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            {dayLogs.length > 0 ? (
+              <FlatList
+                data={dayLogs}
+                renderItem={renderDayLogItem}
+                keyExtractor={(item) => item.id.toString()}
+                contentContainerStyle={styles.logList}
+              />
+            ) : (
+              <View style={styles.noDataContainer}>
+                <Text style={styles.noDataText}>No tension logs for this day</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -170,7 +250,7 @@ const styles = StyleSheet.create({
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: Colors.light.text,
   },
   percentage: {
@@ -180,7 +260,7 @@ const styles = StyleSheet.create({
   },
   legend: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginTop: 8,
   },
   legendItem: {
@@ -194,7 +274,82 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   legendText: {
-    fontSize: 10,
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    backgroundColor: Colors.light.background,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.light.text,
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    color: Colors.light.tint,
+    fontSize: 16,
+  },
+  logList: {
+    paddingBottom: 16,
+  },
+  logItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.light.border,
+  },
+  logTimeContainer: {
+    width: 60,
+  },
+  logTime: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+  },
+  logStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  logStatusDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  logStatusText: {
+    fontSize: 14,
+    color: Colors.light.text,
+  },
+  logBodyZone: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textTransform: 'capitalize',
+  },
+  noDataContainer: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  noDataText: {
+    fontSize: 16,
     color: Colors.light.textSecondary,
   },
 });
