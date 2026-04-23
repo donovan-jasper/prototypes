@@ -1,6 +1,17 @@
-export const generateChartConfig = (data: { columns: string[], rows: any[] }, type: 'bar' | 'line' | 'pie', xAxisColumn?: string, yAxisColumn?: string, groupByColumn?: string) => {
+export const generateChartConfig = (
+  data: { columns: string[], rows: any[] },
+  type: 'bar' | 'line' | 'pie',
+  xAxisColumn?: string,
+  yAxisColumn?: string,
+  groupByColumn?: string
+) => {
   if (data.rows.length === 0) {
-    return { type, data: { labels: [], datasets: [{ data: [] }] } };
+    return {
+      type,
+      data: { labels: [], datasets: [{ data: [] }] },
+      xAxisLabel: '',
+      yAxisLabel: ''
+    };
   }
 
   // Use provided columns or fall back to defaults
@@ -31,7 +42,12 @@ export const generateChartConfig = (data: { columns: string[], rows: any[] }, ty
   };
 };
 
-const groupDataByColumn = (rows: any[], groupColumn: string, xColumn: string, yColumn: string) => {
+const groupDataByColumn = (
+  rows: any[],
+  groupColumn: string,
+  xColumn: string,
+  yColumn: string
+) => {
   const groups: Record<string, any[]> = {};
 
   rows.forEach(row => {
@@ -45,7 +61,12 @@ const groupDataByColumn = (rows: any[], groupColumn: string, xColumn: string, yC
   return groups;
 };
 
-const createGroupedChartConfig = (groupedData: Record<string, any[]>, type: string, xColumn: string, yColumn: string) => {
+const createGroupedChartConfig = (
+  groupedData: Record<string, any[]>,
+  type: string,
+  xColumn: string,
+  yColumn: string
+) => {
   const groupNames = Object.keys(groupedData);
   const allXValues = new Set<string>();
 

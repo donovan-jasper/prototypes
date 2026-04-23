@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, Dimensions, Modal, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, Button, StyleSheet, Dimensions, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { generateChartConfig } from '../../lib/chart-generator';
 import ChartRenderer from '../../components/ChartRenderer';
-import ChartConfigurator from '../../components/ChartConfigurator';
 import { useChartStore } from '../../store/charts';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
@@ -21,7 +20,7 @@ const ChartScreen = () => {
   const [groupByColumn, setGroupByColumn] = useState<string | undefined>(undefined);
   const [showConfigurator, setShowConfigurator] = useState(false);
   const [tooltipData, setTooltipData] = useState<{ label: string; value: number } | null>(null);
-  const chartRef = React.useRef();
+  const chartRef = useRef();
 
   useEffect(() => {
     if (data) {
@@ -76,16 +75,17 @@ const ChartScreen = () => {
     }
   };
 
-  const handleConfigChange = (config: {
-    xAxis: string;
-    yAxis: string;
-    groupBy?: string;
-    chartType: 'bar' | 'line' | 'pie';
-  }) => {
-    setXAxisColumn(config.xAxis);
-    setYAxisColumn(config.yAxis);
-    setGroupByColumn(config.groupBy);
-    setChartType(config.chartType);
+  const handleRegenerate = () => {
+    if (data) {
+      const config = generateChartConfig(
+        data,
+        chartType,
+        xAxisColumn,
+        yAxisColumn,
+        groupByColumn
+      );
+      setChartConfig(config);
+    }
   };
 
   const handleDataPointClick = (data: { index: number; value: number; label: string }) => {
@@ -98,12 +98,27 @@ const ChartScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Chart Configuration</Text>
+        <Text style={styles.title}>Chart Visualization</Text>
+      </View>
+
+      <View style={styles.chartTypeSelector}>
         <TouchableOpacity
-          style={styles.configButton}
-          onPress={() => setShowConfigurator(true)}
+          style={[styles.chartTypeButton, chartType === 'bar' && styles.activeButton]}
+          onPress={() => setChartType('bar')}
         >
-          <Text style={styles.configButtonText}>Configure</Text>
+          <Text style={styles.chartTypeText}>Bar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chartTypeButton, chartType === 'line' && styles.activeButton]}
+          onPress={() => setChartType('line')}
+        >
+          <Text style={styles.chartTypeText}>Line</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.chartTypeButton, chartType === 'pie' && styles.activeButton]}
+          onPress={() => setChartType('pie')}
+        >
+          <Text style={styles.chartTypeText}>Pie</Text>
         </TouchableOpacity>
       </View>
 
@@ -128,14 +143,24 @@ const ChartScreen = () => {
       )}
 
       <View style={styles.buttonContainer}>
-        <Button
-          title="Save Chart"
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={handleRegenerate}
+        >
+          <Text style={styles.actionButtonText}>Regenerate Chart</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={handleSaveChart}
-        />
-        <Button
-          title="Export as PNG"
+        >
+          <Text style={styles.actionButtonText}>Save Chart</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={handleExport}
-        />
+        >
+          <Text style={styles.actionButtonText}>Export as PNG</Text>
+        </TouchableOpacity>
       </View>
 
       <Modal
@@ -144,15 +169,67 @@ const ChartScreen = () => {
         onRequestClose={() => setShowConfigurator(false)}
       >
         <View style={styles.modalContainer}>
-          <ChartConfigurator
-            columns={data?.columns || []}
-            onConfigChange={handleConfigChange}
-          />
+          <ScrollView>
+            <Text style={styles.modalTitle}>Chart Configuration</Text>
+            <View style={styles.configOption}>
+              <Text style={styles.configLabel}>X-Axis Column:</Text>
+              <View style={styles.columnSelector}>
+                {data?.columns.map((col, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.columnButton, xAxisColumn === col && styles.selectedColumn]}
+                    onPress={() => setXAxisColumn(col)}
+                  >
+                    <Text style={styles.columnText}>{col}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.configOption}>
+              <Text style={styles.configLabel}>Y-Axis Column:</Text>
+              <View style={styles.columnSelector}>
+                {data?.columns.map((col, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.columnButton, yAxisColumn === col && styles.selectedColumn]}
+                    onPress={() => setYAxisColumn(col)}
+                  >
+                    <Text style={styles.columnText}>{col}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            <View style={styles.configOption}>
+              <Text style={styles.configLabel}>Group By Column (optional):</Text>
+              <View style={styles.columnSelector}>
+                <TouchableOpacity
+                  style={[styles.columnButton, !groupByColumn && styles.selectedColumn]}
+                  onPress={() => setGroupByColumn(undefined)}
+                >
+                  <Text style={styles.columnText}>None</Text>
+                </TouchableOpacity>
+                {data?.columns.map((col, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.columnButton, groupByColumn === col && styles.selectedColumn]}
+                    onPress={() => setGroupByColumn(col)}
+                  >
+                    <Text style={styles.columnText}>{col}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+
           <View style={styles.modalButtonContainer}>
-            <Button
-              title="Done"
+            <TouchableOpacity
+              style={styles.modalButton}
               onPress={() => setShowConfigurator(false)}
-            />
+            >
+              <Text style={styles.modalButtonText}>Done</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -167,22 +244,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
   title: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
   },
-  configButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+  chartTypeSelector: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  chartTypeButton: {
+    padding: 10,
     borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
   },
-  configButtonText: {
+  activeButton: {
+    backgroundColor: '#4CAF50',
+  },
+  chartTypeText: {
     color: 'white',
     fontWeight: 'bold',
   },
@@ -190,17 +275,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     borderRadius: 8,
-    overflow: 'hidden',
+    padding: 16,
+    marginBottom: 16,
   },
   tooltip: {
     position: 'absolute',
-    bottom: 80,
+    bottom: 100,
     left: 0,
     right: 0,
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 8,
     borderRadius: 4,
+    alignItems: 'center',
   },
   tooltipText: {
     color: 'white',
@@ -209,15 +295,67 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginBottom: 16,
+  },
+  actionButton: {
+    backgroundColor: '#2196F3',
+    padding: 12,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  configOption: {
+    marginBottom: 16,
+  },
+  configLabel: {
+    fontSize: 16,
+    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  columnSelector: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  columnButton: {
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: '#e0e0e0',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  selectedColumn: {
+    backgroundColor: '#4CAF50',
+  },
+  columnText: {
+    color: 'white',
   },
   modalButtonContainer: {
     marginTop: 16,
+  },
+  modalButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 

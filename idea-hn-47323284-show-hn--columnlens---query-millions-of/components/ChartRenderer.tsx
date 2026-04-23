@@ -176,28 +176,28 @@ const styles = StyleSheet.create({
   pieContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
   },
   legendContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     marginTop: 16,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 16,
     marginBottom: 8,
   },
   legendColor: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    marginRight: 6,
+    marginRight: 8,
   },
   legendText: {
     fontSize: 12,
-    color: '#7F7F7F',
   },
 });
 
