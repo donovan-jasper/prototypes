@@ -1,14 +1,16 @@
 import { Task, TaskStatus } from '../types';
 import { AIProvider } from './aiProvider';
 import { NotificationManager } from './notifications';
+import { EventEmitter } from 'events';
 
-export class TaskQueue {
+export class TaskQueue extends EventEmitter {
   private tasks: Map<string, Task> = new Map();
   private maxParallel: number;
   private aiProvider: AIProvider;
   private notificationManager: NotificationManager;
 
   constructor(maxParallel: number = 2) {
+    super();
     this.maxParallel = maxParallel;
     this.aiProvider = new AIProvider();
     this.notificationManager = NotificationManager.getInstance();
@@ -54,12 +56,14 @@ export class TaskQueue {
       task.completedAt = Date.now();
       this.tasks.set(task.id, task);
       this.notificationManager.scheduleTaskCompletionNotification(task);
+      this.emit('taskCompleted', task);
       this.processQueue();
     }).catch(error => {
       task.status = TaskStatus.FAILED;
       task.error = error instanceof Error ? error.message : 'Unknown error';
       task.completedAt = Date.now();
       this.tasks.set(task.id, task);
+      this.emit('taskFailed', task);
       this.processQueue();
     });
   }
@@ -70,6 +74,7 @@ export class TaskQueue {
       task.status = TaskStatus.CANCELLED;
       task.completedAt = Date.now();
       this.tasks.set(id, task);
+      this.emit('taskCancelled', task);
       this.processQueue();
     }
   }
@@ -81,6 +86,7 @@ export class TaskQueue {
       task.completedAt = Date.now();
       this.tasks.set(id, task);
       this.notificationManager.scheduleTaskCompletionNotification(task);
+      this.emit('taskCompleted', task);
       this.processQueue();
     }
   }

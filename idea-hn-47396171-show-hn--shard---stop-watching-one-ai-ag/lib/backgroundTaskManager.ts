@@ -13,6 +13,7 @@ export class BackgroundTaskManager {
     this.taskQueue = taskQueue;
     this.notificationManager = NotificationManager.getInstance();
     this.setupAppStateListener();
+    this.setupTaskQueueListeners();
   }
 
   private setupAppStateListener() {
@@ -25,6 +26,20 @@ export class BackgroundTaskManager {
         this.startBackgroundMonitoring();
       }
       this.appState = nextAppState;
+    });
+  }
+
+  private setupTaskQueueListeners() {
+    this.taskQueue.on('taskCompleted', (task) => {
+      if (AppState.currentState.match(/inactive|background/)) {
+        this.notificationManager.scheduleTaskCompletionNotification(task);
+      }
+    });
+
+    this.taskQueue.on('taskFailed', (task) => {
+      if (AppState.currentState.match(/inactive|background/)) {
+        this.notificationManager.scheduleTaskFailureNotification(task);
+      }
     });
   }
 
@@ -52,5 +67,6 @@ export class BackgroundTaskManager {
   public cleanup() {
     this.stopBackgroundMonitoring();
     AppState.removeEventListener('change', this.setupAppStateListener);
+    this.taskQueue.removeAllListeners();
   }
 }

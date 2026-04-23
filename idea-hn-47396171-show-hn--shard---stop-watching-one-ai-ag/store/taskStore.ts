@@ -49,6 +49,28 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     if (!hasPermission) {
       await notificationManager.requestNotificationPermissions();
     }
+
+    // Set up task queue listeners
+    queue.on('taskCompleted', (task) => {
+      get().db.saveTask(task);
+      set(state => ({
+        tasks: state.tasks.map(t => t.id === task.id ? task : t)
+      }));
+    });
+
+    queue.on('taskFailed', (task) => {
+      get().db.saveTask(task);
+      set(state => ({
+        tasks: state.tasks.map(t => t.id === task.id ? task : t)
+      }));
+    });
+
+    queue.on('taskCancelled', (task) => {
+      get().db.saveTask(task);
+      set(state => ({
+        tasks: state.tasks.map(t => t.id === task.id ? task : t)
+      }));
+    });
   },
 
   addTask: (prompt: string, templateId?: string) => {

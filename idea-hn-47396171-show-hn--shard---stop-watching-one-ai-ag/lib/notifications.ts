@@ -66,6 +66,20 @@ export class NotificationManager {
     });
   }
 
+  public async scheduleTaskFailureNotification(task: Task) {
+    if (!task.completedAt) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: 'Task Failed',
+        body: `Your task "${task.prompt.substring(0, 30)}..." encountered an error`,
+        data: { taskId: task.id },
+        sound: 'default',
+      },
+      trigger: null,
+    });
+  }
+
   public async scheduleBackgroundTaskNotification(task: Task) {
     await Notifications.scheduleNotificationAsync({
       content: {
