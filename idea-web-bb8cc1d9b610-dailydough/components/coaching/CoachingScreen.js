@@ -4,7 +4,7 @@ import { generatePersonalizedInsights, getCategoryBreakdown, getSpendingTrends }
 
 const { width } = Dimensions.get('window');
 
-export default function CoachingScreen() {
+export default function CoachingScreen({ navigation }) {
   const [insights, setInsights] = useState([]);
   const [categoryBreakdown, setCategoryBreakdown] = useState([]);
   const [spendingTrends, setSpendingTrends] = useState([]);
@@ -100,6 +100,12 @@ export default function CoachingScreen() {
               </View>
             </View>
           ))}
+          <TouchableOpacity
+            style={styles.viewAllButton}
+            onPress={() => navigation.navigate('InsightsList')}
+          >
+            <Text style={styles.viewAllButtonText}>View All Insights</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -156,58 +162,61 @@ export default function CoachingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    padding: 16,
+    backgroundColor: '#f8f8f8',
   },
   header: {
-    marginBottom: 24,
+    padding: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 16,
+    marginBottom: 15,
   },
   refreshButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 5,
     alignSelf: 'flex-start',
   },
   refreshButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
+    paddingHorizontal: 15,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   insightCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    padding: 15,
+    marginBottom: 10,
     borderLeftWidth: 4,
   },
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   insightIcon: {
-    fontSize: 24,
-    marginRight: 12,
+    fontSize: 20,
+    marginRight: 10,
   },
   insightHeaderText: {
     flex: 1,
@@ -225,7 +234,7 @@ const styles = StyleSheet.create({
   insightMessage: {
     fontSize: 14,
     color: '#444',
-    marginBottom: 12,
+    marginBottom: 10,
     lineHeight: 20,
   },
   insightFooter: {
@@ -233,22 +242,33 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   priorityBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 4,
-    color: 'white',
+    color: '#fff',
     fontSize: 12,
+    fontWeight: '600',
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    borderRadius: 10,
+  },
+  viewAllButton: {
+    backgroundColor: '#f0f0f0',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  viewAllButtonText: {
+    color: '#007AFF',
     fontWeight: '600',
   },
   categoryCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
+    padding: 15,
   },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -257,9 +277,9 @@ const styles = StyleSheet.create({
   },
   categoryName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   categoryCount: {
     fontSize: 14,
@@ -272,43 +292,42 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
   },
   categoryPercent: {
     fontSize: 14,
     color: '#666',
   },
   trendCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 16,
+    padding: 15,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   trendBar: {
     alignItems: 'center',
-    width: (width - 64) / 6,
+    width: (width - 60) / 6,
   },
   trendBarContainer: {
     height: 150,
-    width: '100%',
     justifyContent: 'flex-end',
-    marginBottom: 8,
+    width: '100%',
   },
   trendBarFill: {
     backgroundColor: '#007AFF',
-    width: '100%',
+    width: '60%',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
   },
   trendMonth: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginTop: 5,
   },
   trendAmount: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#333',
+    marginTop: 2,
   },
 });
