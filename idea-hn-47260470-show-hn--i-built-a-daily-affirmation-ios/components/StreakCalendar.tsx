@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
 import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth, addMonths, subMonths, isBefore, isAfter } from 'date-fns';
-import { MILESTONE_DAYS, STREAK_COLORS } from '../lib/constants';
+import { MILESTONE_DAYS, STREAK_COLORS, MAX_GRACE_DAYS_PER_WEEK } from '../lib/constants';
 import { getGraceDaysUsedThisWeek, getConsecutiveStreakGroups } from '../lib/affirmations';
 
 interface StreakDay {
@@ -144,15 +144,11 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.grace }]} />
           <Text style={styles.legendText}>Grace Day</Text>
         </View>
-        <View style={styles.legendItem}>
-          <Text style={styles.legendBadge}>🎉</Text>
-          <Text style={styles.legendText}>Milestone</Text>
-        </View>
       </View>
 
-      <View style={styles.graceDaysInfo}>
+      <View style={styles.graceDaysCounter}>
         <Text style={styles.graceDaysText}>
-          Grace Days Used This Week: {graceDaysUsed}/{MAX_GRACE_DAYS_PER_WEEK}
+          Grace Days Used: {graceDaysUsed}/{MAX_GRACE_DAYS_PER_WEEK}
         </Text>
       </View>
     </View>
@@ -161,36 +157,29 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    margin: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    margin: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   monthHeader: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   navButton: {
-    fontSize: 20,
-    padding: 10,
-    color: '#4CAF50',
+    fontSize: 24,
+    paddingHorizontal: 12,
   },
   weekdays: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 10,
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   weekday: {
     fontSize: 12,
@@ -204,93 +193,91 @@ const styles = StyleSheet.create({
   },
   dayWrapper: {
     width: Dimensions.get('window').width / 7,
-    height: 50,
-    alignItems: 'center',
+    height: 40,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   dayContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dayContent: {
-    alignItems: 'center',
+    position: 'relative',
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   dayNumber: {
     fontSize: 14,
-    color: '#333',
   },
   today: {
-    color: '#4CAF50',
     fontWeight: 'bold',
+    color: '#007AFF',
   },
   milestone: {
-    color: '#FF5722',
+    color: '#FF6B6B',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 4,
+    position: 'absolute',
+    bottom: 4,
   },
   milestoneBadge: {
+    position: 'absolute',
+    top: -4,
     fontSize: 12,
-    marginTop: 2,
   },
   connectorLine: {
     position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 2,
+    height: 2,
     backgroundColor: '#4CAF50',
-    left: '50%',
-    marginLeft: -1,
+    width: '100%',
+    top: '50%',
+    marginTop: -1,
   },
   firstConnector: {
-    top: '50%',
-    height: '50%',
+    width: '50%',
+    left: '50%',
   },
   lastConnector: {
-    bottom: '50%',
-    height: '50%',
+    width: '50%',
   },
   legendContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 15,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    justifyContent: 'center',
+    marginTop: 16,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginHorizontal: 8,
   },
   legendDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    marginRight: 5,
-  },
-  legendBadge: {
-    fontSize: 12,
-    marginRight: 5,
+    marginRight: 4,
   },
   legendText: {
     fontSize: 12,
     color: '#666',
   },
-  graceDaysInfo: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+  graceDaysCounter: {
+    marginTop: 16,
+    padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
+    alignItems: 'center',
   },
   graceDaysText: {
-    fontSize: 12,
-    color: '#666',
-    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

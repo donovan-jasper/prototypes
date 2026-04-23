@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getCurrentStreak, calculateStreakWithGraceDays, updateStreak } from '../lib/database';
+import { getCurrentStreak, calculateStreakWithGraceDays, updateStreak, getGraceDaysUsedThisWeek } from '../lib/database';
 import { format } from 'date-fns';
 
 interface StoreState {
@@ -42,18 +42,3 @@ export const useStore = create<StoreState>((set) => ({
   setStreakCount: (count) => set({ streakCount: count }),
   setGraceDaysUsed: (count) => set({ graceDaysUsedThisWeek: count }),
 }));
-
-export const getGraceDaysUsedThisWeek = async (date: Date) => {
-  const weekStart = startOfWeek(date);
-  const weekEnd = endOfWeek(date);
-
-  const streaks = await getStreakData();
-  const graceDays = streaks.filter(streak => {
-    const streakDate = parseISO(streak.date);
-    return streak.is_grace_day === 1 &&
-           streakDate >= weekStart &&
-           streakDate <= weekEnd;
-  });
-
-  return graceDays.length;
-};
