@@ -22,17 +22,26 @@ export async function syncPendingMessages() {
       const message = JSON.parse(item.data);
       console.log('Attempting to sync message:', message.id);
 
-      // Simulate API call with timeout to simulate network
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Send to backend API
+      const response = await fetch('https://api.voxcrew.com/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message),
+      });
 
-      // If successful, delete from pending and update local message status
-      await db.runAsync('DELETE FROM pending_messages WHERE id = ?', [item.id]);
-      await updateMessageSyncedStatus(message.id, true);
-      synced++;
-      console.log('Successfully synced message:', message.id);
+      if (response.ok) {
+        // If successful, delete from pending and update local message status
+        await db.runAsync('DELETE FROM pending_messages WHERE id = ?', [item.id]);
+        await updateMessageSyncedStatus(message.id, true);
+        synced++;
+        console.log('Successfully synced message:', message.id);
+      } else {
+        console.warn(`Failed to sync message ${message.id} to backend (status: ${response.status}). Will retry later.`);
+        // Do not delete from pending_messages if API call failed, so it can be retried
+      }
     } catch (err) {
-      console.error('Failed to sync message', item.id, err);
-      // Optionally, implement retry logic here
+      console.error('Network error during sync for message', item.id, err);
+      // Do not delete from pending_messages if network error, so it can be retried
     }
   }
 

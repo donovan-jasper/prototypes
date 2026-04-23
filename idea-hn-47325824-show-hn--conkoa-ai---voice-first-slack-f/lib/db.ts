@@ -40,7 +40,7 @@ export async function initDatabase() {
 export async function saveMessage(message: Message, synced: boolean = true) {
   await db.runAsync(
     'INSERT INTO messages (id, channel_id, user_id, text, audio_url, timestamp, synced, version) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [message.id, message.channelId, message.userId, message.text, message.audioUrl || null, message.timestamp, synced ? 1 : 0, 1]
+    [message.id, message.channelId, message.userId, message.text, message.audioUrl || null, message.timestamp, synced ? 1 : 0, message.version || 1]
   );
 }
 
@@ -79,7 +79,7 @@ export async function updateMessageVersion(messageId: string, version: number) {
 export async function saveTask(task: Task) {
   await db.runAsync(
     'INSERT INTO tasks (id, title, description, due_date, completed, created_at, version) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [task.id, task.title, task.description || null, task.dueDate || null, task.completed ? 1 : 0, task.createdAt, 1]
+    [task.id, task.title, task.description || null, task.dueDate || null, task.completed ? 1 : 0, task.createdAt, task.version || 1]
   );
 }
 
@@ -104,5 +104,5 @@ export async function updateTask(taskId: string, updates: Partial<Task>) {
 
 export async function getPendingMessagesCount(): Promise<number> {
   const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM pending_messages');
-  return result.count;
+  return result ? result.count : 0;
 }

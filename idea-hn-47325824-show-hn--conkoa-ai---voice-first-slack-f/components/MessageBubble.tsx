@@ -5,18 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface MessageBubbleProps {
   message: Message;
-  isSynced: boolean;
+  currentUserId: string | null; // New prop for dynamic user ID
   onConflictResolve?: () => void;
 }
 
-const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isSynced, onConflictResolve }) => {
-  const isCurrentUser = message.userId === 'current-user';
+const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId, onConflictResolve }) => {
+  const isCurrentUser = message.userId === currentUserId;
   const isAI = message.userId === 'AI-Assistant';
 
   return (
     <View style={[
       styles.container,
-      isCurrentUser ? styles.currentUser : isAI ? styles.aiUser : styles.otherUser
+      isCurrentUser ? styles.currentUser : styles.otherUser // AI messages are also 'other'
     ]}>
       {!isCurrentUser && (
         <Text style={styles.username}>
@@ -28,7 +28,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isSynced, onConf
         styles.bubble,
         isCurrentUser ? styles.currentBubble : styles.otherBubble
       ]}>
-        <Text style={styles.text}>{message.text}</Text>
+        <Text style={[styles.text, isCurrentUser ? styles.currentText : styles.otherText]}>{message.text}</Text>
 
         {message.audioUrl && (
           <TouchableOpacity style={styles.audioButton}>
@@ -45,7 +45,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isSynced, onConf
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
 
-        {!isSynced && (
+        {!message.synced && ( // Use message.synced directly from the message object
           <TouchableOpacity onPress={onConflictResolve} style={styles.syncIndicator}>
             <Ionicons name="cloud-offline" size={16} color="#ff9500" />
           </TouchableOpacity>
@@ -64,9 +64,6 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-end',
   },
   otherUser: {
-    alignSelf: 'flex-start',
-  },
-  aiUser: {
     alignSelf: 'flex-start',
   },
   username: {
