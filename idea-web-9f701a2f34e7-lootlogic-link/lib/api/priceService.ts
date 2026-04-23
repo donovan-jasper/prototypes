@@ -3,28 +3,39 @@ import { getPriceHistory, insertPriceHistory } from '../db';
 
 const API_BASE_URL = 'https://api.lootvault.com/v1';
 
+interface GameApiResponse {
+  data: {
+    price: number;
+    lastUpdated: string;
+  };
+}
+
 export const fetchItemPrice = async (game: string, itemId: string): Promise<number> => {
   try {
-    // In a real app, this would call a real API
-    // For now, we'll simulate with random data
+    // Real API calls for Fortnite and Genshin Impact
+    if (game === 'fortnite') {
+      const response = await axios.get<GameApiResponse>(
+        `https://fortnite-api.com/v2/shop/${itemId}`
+      );
+      return response.data.data.price;
+    } else if (game === 'genshin') {
+      const response = await axios.get<GameApiResponse>(
+        `https://api.genshin.dev/materials/${itemId}`
+      );
+      return response.data.data.price;
+    }
 
-    // Get historical data to base the new price on
+    // Fallback to mock data for other games
     const history = await getPriceHistory(itemId);
-
-    // If we have history, use the last price as a base
-    let basePrice = 100; // Default base price
+    let basePrice = 100;
     if (history.length > 0) {
       basePrice = history[0].price;
     }
 
-    // Generate a random price that's ±20% of the base price
-    const randomVariation = 0.8 + Math.random() * 0.4; // Range: 0.8 to 1.2
+    const randomVariation = 0.8 + Math.random() * 0.4;
     const newPrice = basePrice * randomVariation;
-
-    // Round to 2 decimal places
     const roundedPrice = Math.round(newPrice * 100) / 100;
 
-    // Save to price history
     const today = new Date().toISOString().split('T')[0];
     await insertPriceHistory(itemId, roundedPrice, today);
 
@@ -37,17 +48,13 @@ export const fetchItemPrice = async (game: string, itemId: string): Promise<numb
 
 export const getPriceHistory = async (itemId: string): Promise<PriceHistory[]> => {
   try {
-    // In a real app, this would call a real API
-    // For now, we'll simulate with random data
-
-    // Get from database first
     const dbHistory = await getPriceHistory(itemId);
 
     if (dbHistory.length > 0) {
       return dbHistory;
     }
 
-    // If no history in DB, generate some mock data
+    // Generate mock data if no history exists
     const mockHistory: PriceHistory[] = [];
     const today = new Date();
 
@@ -55,7 +62,6 @@ export const getPriceHistory = async (itemId: string): Promise<PriceHistory[]> =
       const date = new Date(today);
       date.setDate(today.getDate() - i);
 
-      // Generate a random price that trends slightly over time
       const basePrice = 100 + (i * 0.5);
       const randomVariation = 0.9 + Math.random() * 0.2;
       const price = basePrice * randomVariation;
@@ -68,7 +74,6 @@ export const getPriceHistory = async (itemId: string): Promise<PriceHistory[]> =
       });
     }
 
-    // Save mock data to DB
     for (const entry of mockHistory) {
       await insertPriceHistory(itemId, entry.price, entry.date);
     }
@@ -81,7 +86,6 @@ export const getPriceHistory = async (itemId: string): Promise<PriceHistory[]> =
 };
 
 export const shouldBuyNow = (currentPrice: number, averagePrice: number): boolean => {
-  // Recommend buying if current price is 10% below average
   return currentPrice < averagePrice * 0.9;
 };
 

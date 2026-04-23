@@ -1,9 +1,11 @@
 import { create } from 'zustand';
 import { scheduleAlertNotification } from '../utils/notifications';
+import { fetchItemPrice } from '../api/priceService';
 
 interface AlertRule {
   id: string;
   game: string;
+  itemId: string;
   itemName: string;
   targetPrice: number;
   notificationType: 'price' | 'event';
@@ -14,10 +16,10 @@ interface AlertStore {
   activeAlerts: string[];
   createRule: (rule: Omit<AlertRule, 'id'>) => void;
   deleteRule: (ruleId: string) => void;
-  checkRules: (currentPrices: Record<string, number>) => Promise<void>;
+  checkRules: () => Promise<void>;
 }
 
-const useAlertStore = create<AlertStore>((set) => ({
+const useAlertStore = create<AlertStore>((set, get) => ({
   rules: [],
   activeAlerts: [],
   createRule: (rule) => set((state) => ({
@@ -26,28 +28,29 @@ const useAlertStore = create<AlertStore>((set) => ({
   deleteRule: (ruleId) => set((state) => ({
     rules: state.rules.filter(rule => rule.id !== ruleId)
   })),
-  checkRules: async (currentPrices) => {
-    set((state) => {
-      const newActiveAlerts: string[] = [];
+  checkRules: async () => {
+    const rules = get().rules;
+    const newActiveAlerts: string[] = [];
 
-      state.rules.forEach(rule => {
-        const itemKey = `${rule.game}-${rule.itemName}`;
-        const currentPrice = currentPrices[itemKey];
+    for (const rule of rules) {
+      try {
+        const currentPrice = await fetchItemPrice(rule.game, rule.itemId);
 
-        if (currentPrice !== undefined && currentPrice <= rule.targetPrice) {
+        if (currentPrice <= rule.targetPrice) {
           newActiveAlerts.push(rule.id);
 
-          // Schedule notification
-          scheduleAlertNotification({
+          await scheduleAlertNotification({
             title: 'Price Alert!',
             body: `${rule.itemName} is now ${currentPrice} (below your target of ${rule.targetPrice})`,
             data: { ruleId: rule.id }
           });
         }
-      });
+      } catch (error) {
+        console.error(`Error checking rule for ${rule.itemName}:`, error);
+      }
+    }
 
-      return { activeAlerts: newActiveAlerts };
-    });
+    set({ activeAlerts: newActiveAlerts });
   },
 }));
 

@@ -1,165 +1,152 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import { useInventoryStore } from '../lib/stores/inventoryStore';
 import { useAlertStore } from '../lib/stores/alertStore';
 
-interface AlertRuleFormProps {
-  onClose: () => void;
-}
-
-const AlertRuleForm: React.FC<AlertRuleFormProps> = ({ onClose }) => {
-  const { items } = useInventoryStore();
+const AlertRuleForm = ({ onClose }: { onClose: () => void }) => {
   const { createRule } = useAlertStore();
-  
-  const [selectedGame, setSelectedGame] = useState('');
+  const [game, setGame] = useState('fortnite');
+  const [itemId, setItemId] = useState('');
   const [itemName, setItemName] = useState('');
   const [targetPrice, setTargetPrice] = useState('');
+  const [notificationType, setNotificationType] = useState<'price' | 'event'>('price');
 
-  const games = Array.from(new Set(items.map(item => item.game)));
-  
-  const handleSave = () => {
-    if (!selectedGame || !itemName || !targetPrice) {
-      alert('Please fill in all fields');
-      return;
-    }
-
-    const price = parseFloat(targetPrice);
-    if (isNaN(price) || price <= 0) {
-      alert('Please enter a valid price');
+  const handleSubmit = () => {
+    if (!itemId || !itemName || !targetPrice) {
+      alert('Please fill all fields');
       return;
     }
 
     createRule({
-      id: Date.now().toString(),
-      game: selectedGame,
+      game,
+      itemId,
       itemName,
-      targetPrice: price,
+      targetPrice: parseFloat(targetPrice),
+      notificationType
     });
 
     onClose();
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>Create Alert Rule</Text>
-      
-      <View style={styles.field}>
+    <View style={styles.container}>
+      <Text style={styles.title}>Create New Alert</Text>
+
+      <View style={styles.formGroup}>
         <Text style={styles.label}>Game</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={selectedGame}
-            onValueChange={(value) => setSelectedGame(value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="Select a game..." value="" />
-            {games.map((game) => (
-              <Picker.Item key={game} label={game} value={game} />
-            ))}
-          </Picker>
-        </View>
+        <Picker
+          selectedValue={game}
+          onValueChange={(itemValue) => setGame(itemValue)}
+          style={styles.picker}
+        >
+          <Picker.Item label="Fortnite" value="fortnite" />
+          <Picker.Item label="Genshin Impact" value="genshin" />
+          <Picker.Item label="Destiny 2" value="destiny" />
+        </Picker>
       </View>
 
-      <View style={styles.field}>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Item ID</Text>
+        <TextInput
+          style={styles.input}
+          value={itemId}
+          onChangeText={setItemId}
+          placeholder="Enter item ID"
+        />
+      </View>
+
+      <View style={styles.formGroup}>
         <Text style={styles.label}>Item Name</Text>
         <TextInput
           style={styles.input}
           value={itemName}
           onChangeText={setItemName}
           placeholder="Enter item name"
-          placeholderTextColor="#999"
         />
       </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Target Price ($)</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Target Price</Text>
         <TextInput
           style={styles.input}
           value={targetPrice}
           onChangeText={setTargetPrice}
-          placeholder="0.00"
-          placeholderTextColor="#999"
-          keyboardType="decimal-pad"
+          placeholder="Enter target price"
+          keyboardType="numeric"
         />
       </View>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Save Alert</Text>
-        </TouchableOpacity>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Notification Type</Text>
+        <Picker
+          selectedValue={notificationType}
+          onValueChange={(itemValue) => setNotificationType(itemValue)}
+          style={styles.picker}
+        >
+          <Picker.Item label="Price Alert" value="price" />
+          <Picker.Item label="Event Alert" value="event" />
+        </Picker>
       </View>
-    </ScrollView>
+
+      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+        <Text style={styles.buttonText}>Create Alert</Text>
+      </TouchableOpacity>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     padding: 20,
     backgroundColor: '#fff',
+    borderRadius: 10,
+    maxHeight: '80%',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 24,
-  },
-  field: {
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  formGroup: {
+    marginBottom: 15,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 5,
     color: '#333',
-  },
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
-  },
-  picker: {
-    height: 50,
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 5,
+    padding: 10,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
+  picker: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    ...Platform.select({
+      ios: {
+        height: 150,
+      },
+      android: {
+        height: 50,
+      },
+    }),
   },
-  cancelButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+  button: {
+    backgroundColor: '#6200ee',
+    padding: 15,
+    borderRadius: 5,
     alignItems: 'center',
+    marginTop: 20,
   },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-  },
-  saveButton: {
-    flex: 1,
-    padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#03A9F4',
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+  buttonText: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

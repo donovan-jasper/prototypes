@@ -1,65 +1,71 @@
-import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, TouchableOpacity, Text, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Modal } from 'react-native';
 import { useAlertStore } from '../../lib/stores/alertStore';
 import AlertRuleForm from '../../components/AlertRuleForm';
+import { Ionicons } from '@expo/vector-icons';
 
-const Alerts = () => {
-  const { rules, loadRules, deleteRule } = useAlertStore();
-  const [modalVisible, setModalVisible] = useState(false);
+const AlertsScreen = () => {
+  const { rules, deleteRule, checkRules } = useAlertStore();
+  const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    loadRules();
+    // Check rules periodically
+    const interval = setInterval(() => {
+      checkRules();
+    }, 60 * 60 * 1000); // Every hour
+
+    return () => clearInterval(interval);
   }, []);
 
-  const handleDelete = (ruleId: string) => {
-    deleteRule(ruleId);
-  };
+  const renderItem = ({ item }: { item: any }) => (
+    <View style={styles.alertItem}>
+      <View style={styles.alertContent}>
+        <Text style={styles.alertTitle}>{item.itemName}</Text>
+        <Text style={styles.alertGame}>{item.game}</Text>
+        <Text style={styles.alertPrice}>Target: ${item.targetPrice}</Text>
+      </View>
+      <TouchableOpacity onPress={() => deleteRule(item.id)}>
+        <Ionicons name="trash-outline" size={24} color="#ff3b30" />
+      </TouchableOpacity>
+    </View>
+  );
 
   return (
     <View style={styles.container}>
+      <Text style={styles.title}>Price Alerts</Text>
+
       {rules.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Ionicons name="notifications-off-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>No alert rules yet</Text>
-          <Text style={styles.emptySubtext}>Tap the + button to create one</Text>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No alerts set yet</Text>
+          <Text style={styles.emptySubtext}>Create your first price alert to get notified when items drop below your target price</Text>
         </View>
       ) : (
         <FlatList
           data={rules}
-          renderItem={({ item }) => (
-            <View style={styles.ruleItem}>
-              <View style={styles.ruleContent}>
-                <Text style={styles.ruleGame}>{item.game}</Text>
-                <Text style={styles.ruleItemName}>{item.itemName}</Text>
-                <Text style={styles.rulePrice}>Target: ${item.targetPrice.toFixed(2)}</Text>
-              </View>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDelete(item.id)}
-              >
-                <Ionicons name="trash-outline" size={24} color="#ff4444" />
-              </TouchableOpacity>
-            </View>
-          )}
+          renderItem={renderItem}
           keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
         />
       )}
-      
-      <TouchableOpacity 
+
+      <TouchableOpacity
         style={styles.fab}
-        onPress={() => setModalVisible(true)}
+        onPress={() => setShowForm(true)}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Ionicons name="add" size={30} color="#fff" />
       </TouchableOpacity>
 
       <Modal
+        visible={showForm}
         animationType="slide"
-        transparent={false}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+        transparent={true}
+        onRequestClose={() => setShowForm(false)}
       >
-        <AlertRuleForm onClose={() => setModalVisible(false)} />
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <AlertRuleForm onClose={() => setShowForm(false)} />
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -68,69 +74,92 @@ const Alerts = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
-  emptyContainer: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+  },
+  list: {
+    paddingBottom: 20,
+  },
+  alertItem: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  alertGame: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  alertPrice: {
+    fontSize: 16,
+    color: '#6200ee',
+    fontWeight: 'bold',
+  },
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 20,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#666',
-    marginTop: 16,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
-  },
-  ruleItem: {
-    flexDirection: 'row',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    alignItems: 'center',
-  },
-  ruleContent: {
-    flex: 1,
-  },
-  ruleGame: {
-    fontSize: 12,
-    color: '#999',
-    marginBottom: 4,
-  },
-  ruleItemName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  rulePrice: {
-    fontSize: 14,
-    color: '#03A9F4',
-    fontWeight: '500',
-  },
-  deleteButton: {
-    padding: 8,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
   },
   fab: {
     position: 'absolute',
-    width: 56,
-    height: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
     right: 20,
     bottom: 20,
-    backgroundColor: '#03A9F4',
-    borderRadius: 28,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 500,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
   },
 });
 
-export default Alerts;
+export default AlertsScreen;
