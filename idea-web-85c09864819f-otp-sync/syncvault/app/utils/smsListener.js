@@ -1,46 +1,55 @@
-import * as SMS from 'expo-sms';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../App';
+import { encryptData } from './encryption';
+import * as SMS from 'expo-sms';
 
-export const startSMSListener = async () => {
-  try {
-    const { status } = await SMS.requestPermissionsAsync();
-    if (status !== 'granted') {
-      console.log('SMS permissions not granted');
-      return;
-    }
+export const startSMSListener = () => {
+  const user = auth.currentUser;
+  if (!user) return null;
 
-    const subscription = SMS.addListener((event) => {
-      if (event.data && event.data.messages) {
-        handleIncomingSMS(event.data.messages);
+  let isForwardingEnabled = true;
+
+  // Check forwarding status from Firestore
+  const checkForwardingStatus = async () => {
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        isForwardingEnabled = userDoc.data().smsForwardingEnabled !== false;
       }
-    });
-
-    return () => {
-      subscription.remove();
-    };
-  } catch (error) {
-    console.error('Error setting up SMS listener:', error);
-  }
-};
-
-const handleIncomingSMS = async (messages) => {
-  try {
-    const user = auth.currentUser;
-    if (!user) {
-      console.log('User not authenticated');
-      return;
+    } catch (error) {
+      console.error('Error checking forwarding status:', error);
     }
+  };
 
-    for (const message of messages) {
+  checkForwardingStatus();
+
+  const handleIncomingSMS = async (message) => {
+    if (!isForwardingEnabled) return;
+
+    try {
+      // Encrypt the message content
+      const encryptedContent = await encryptData(message.body);
+
+      // Store in Firestore
       await addDoc(collection(db, 'users', user.uid, 'smsMessages'), {
-        sender: message.originatingAddress || 'Unknown',
-        body: message.body,
+        sender: message.sender,
+        content: encryptedContent,
         timestamp: serverTimestamp(),
-        isRead: false
+        isEncrypted: true
       });
+
+      console.log('SMS forwarded successfully');
+    } catch (error) {
+      console.error('Error forwarding SMS:', error);
     }
-  } catch (error) {
-    console.error('Error processing incoming SMS:', error);
-  }
+  };
+
+  // Set up the SMS listener
+  const subscription = SMS.addListener(handleIncomingSMS);
+
+  return () => {
+    if (subscription) {
+      subscription.remove();
+    }
+  };
 };

@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert } from 'react-native';
-import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Alert, Switch } from 'react-native';
+import { collection, addDoc, serverTimestamp, query, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../App';
 import SMSList from '../components/SMSList';
 import { startSMSListener } from '../utils/smsListener';
+import { encryptData } from '../utils/encryption';
 
 const SMSScreen = () => {
   const [smsMessages, setSmsMessages] = useState([]);
   const [replyText, setReplyText] = useState('');
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [isForwardingEnabled, setIsForwardingEnabled] = useState(true);
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -68,9 +70,36 @@ const SMSScreen = () => {
     }
   };
 
+  const toggleForwarding = async () => {
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error('User not authenticated');
+
+      const userDocRef = doc(db, 'users', user.uid);
+      await updateDoc(userDocRef, {
+        smsForwardingEnabled: !isForwardingEnabled
+      });
+
+      setIsForwardingEnabled(!isForwardingEnabled);
+      Alert.alert('Success', `SMS forwarding ${!isForwardingEnabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('Error updating forwarding status:', error);
+      Alert.alert('Error', 'Failed to update forwarding status');
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Forwarded SMS Messages</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Forwarded SMS Messages</Text>
+        <View style={styles.settingsRow}>
+          <Text style={styles.settingsLabel}>Enable SMS Forwarding</Text>
+          <Switch
+            value={isForwardingEnabled}
+            onValueChange={toggleForwarding}
+          />
+        </View>
+      </View>
 
       {smsMessages.length === 0 ? (
         <View style={styles.emptyState}>
@@ -114,10 +143,23 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  header: {
+    marginBottom: 16,
+  },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+  },
+  settingsLabel: {
+    fontSize: 16,
+    color: '#333',
   },
   emptyState: {
     flex: 1,
