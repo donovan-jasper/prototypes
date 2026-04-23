@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
+import { handleCoachReply } from '../lib/ai-coach';
 
 interface AICoachMessageProps {
   message: string;
@@ -14,18 +15,23 @@ interface AICoachMessageProps {
     status: 'active' | 'at-risk' | 'broken';
   };
   onReply?: (response: string) => void;
+  userId?: string;
+  habitId?: string;
 }
 
 const AICoachMessage: React.FC<AICoachMessageProps> = ({
   message,
   isUser = false,
   streakContext,
-  onReply
+  onReply,
+  userId,
+  habitId
 }) => {
   const [displayedText, setDisplayedText] = useState('');
   const [typingAnimation] = useState(new Animated.Value(0));
   const [showTyping, setShowTyping] = useState(true);
   const [showContext, setShowContext] = useState(false);
+  const [isReplying, setIsReplying] = useState(false);
   const { user } = useStore();
 
   useEffect(() => {
@@ -65,9 +71,19 @@ const AICoachMessage: React.FC<AICoachMessageProps> = ({
     }
   };
 
-  const handleReply = (response: string) => {
-    if (onReply) {
-      onReply(response);
+  const handleReply = async (response: string) => {
+    if (!userId || !habitId) return;
+
+    setIsReplying(true);
+    try {
+      const replyMessage = await handleCoachReply(userId, habitId, response);
+      if (onReply) {
+        onReply(replyMessage);
+      }
+    } catch (error) {
+      console.error('Error handling reply:', error);
+    } finally {
+      setIsReplying(false);
     }
   };
 
@@ -123,7 +139,7 @@ const AICoachMessage: React.FC<AICoachMessageProps> = ({
             </Text>
           </View>
         )}
-        {!isUser && (
+        {!isUser && !isReplying && (
           <View style={styles.replyButtons}>
             <TouchableOpacity
               style={styles.replyButton}
@@ -137,6 +153,18 @@ const AICoachMessage: React.FC<AICoachMessageProps> = ({
             >
               <Text style={styles.replyButtonText}>Next steps</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.replyButton}
+              onPress={() => handleReply('I need help with this')}
+            >
+              <Text style={styles.replyButtonText}>Need help</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {isReplying && (
+          <View style={styles.replyIndicator}>
+            <ActivityIndicator size="small" color="#6C63FF" />
+            <Text style={styles.replyText}>Coach is thinking...</Text>
           </View>
         )}
       </View>
@@ -177,14 +205,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 4,
   },
   coachBubble: {
-    backgroundColor: '#F0F0F0',
+    backgroundColor: '#f0f0f0',
     borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
     lineHeight: 22,
     color: '#333',
-    marginBottom: 8,
   },
   typingIndicator: {
     position: 'absolute',
@@ -200,38 +227,47 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   contextToggleText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#6C63FF',
-    textDecorationLine: 'underline',
+    fontWeight: '500',
   },
   streakContextContainer: {
     marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
+    padding: 8,
+    backgroundColor: '#e6e6e6',
+    borderRadius: 8,
   },
   contextText: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
   },
   replyButtons: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
   },
   replyButton: {
-    backgroundColor: '#E0E0E0',
+    backgroundColor: '#6C63FF',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 16,
     marginRight: 8,
+    marginBottom: 8,
   },
   replyButtonText: {
-    fontSize: 12,
-    color: '#333',
+    color: '#fff',
+    fontSize: 14,
+  },
+  replyIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  replyText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
   },
 });
 

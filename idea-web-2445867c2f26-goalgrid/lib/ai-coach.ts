@@ -155,11 +155,12 @@ function buildPrompt(context: CoachMessageContext): string {
   return `
     You are a supportive habit coach. User has a ${context.streakLength}-day streak
     for ${context.habitName} (longest ${context.longestStreak} days) with a ${context.completionRate}% completion rate.
-    Their current streak status is ${context.status}. They've missed ${context.missedDays} days recently.
+    Their current streak status is ${context.status}. They have missed ${context.missedDays} days recently.
     Write a ${context.userTone} message (max 50 words) to motivate them.
-    If they're on a good streak, celebrate them.
-    If they're struggling, offer encouragement and remind them of their progress.
-    Keep the tone appropriate for the user's preference.
+    If their streak is active, praise their progress.
+    If their streak is at-risk, gently remind them to stay consistent.
+    If their streak is broken, encourage them to restart.
+    Keep the tone appropriate for a habit coach.
   `;
 }
 
@@ -169,9 +170,9 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
     db.transaction(tx => {
       tx.executeSql(
         `SELECT message FROM ai_messages
-         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ? AND habit_name = ?
-         AND completion_rate = ? AND status = ? AND user_tone = ?
-         AND created_at > datetime('now', '-${config.cacheTTL} milliseconds')`,
+         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ?
+         AND habit_name = ? AND completion_rate = ? AND status = ? AND user_tone = ?
+         AND datetime(created_at) > datetime('now', '-${config.cacheTTL} milliseconds')`,
         [
           context.streakLength,
           context.longestStreak,
@@ -199,7 +200,7 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
 
 // Cache a generated message
 async function cacheMessage(context: CoachMessageContext, message: string): Promise<void> {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
         `INSERT OR REPLACE INTO ai_messages
@@ -218,7 +219,7 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
         () => resolve(),
         (_, error) => {
           console.error('Error caching message:', error);
-          resolve();
+          reject(error);
         }
       );
     });
@@ -227,10 +228,58 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
 
 // Get a fallback message when API fails
 function getFallbackMessage(context: CoachMessageContext, error: Error | null): string {
-  if (context.streakLength > 0) {
-    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep going - you're doing great!`;
-  } else if (context.missedDays > 0) {
-    return `Don't worry about missing a day. Just start again tomorrow. You've got this!`;
+  if (context.status === 'active') {
+    return `Great job on your ${context.streakLength}-day streak for ${context.habitName}! Keep it up!`;
+  } else if (context.status === 'at-risk') {
+    return `You're doing well with ${context.habitName}, but remember to stay consistent. Every small step counts!`;
+  } else {
+    return `Don't worry about the missed days. Let's get back on track with ${context.habitName} today!`;
   }
-  return "Great job! Keep up the good work!";
+}
+
+// Schedule a daily coach check-in notification
+export async function scheduleCoachCheckIn(userId: string, habitId: string, time: string) {
+  const context = await fetchCoachContext(userId, habitId);
+  const message = await generateCoachMessage(context);
+
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Your AI Coach has a message",
+      body: message,
+      data: { type: 'coach-message', habitId },
+    },
+    trigger: {
+      hour: parseInt(time.split(':')[0]),
+      minute: parseInt(time.split(':')[1]),
+      repeats: true,
+    },
+  });
+}
+
+// Handle coach message reply
+export async function handleCoachReply(userId: string, habitId: string, reply: string): Promise<string> {
+  const context = await fetchCoachContext(userId, habitId);
+
+  const prompt = `
+    The user replied: "${reply}" to your previous message about their ${context.habitName} habit.
+    They have a ${context.streakLength}-day streak (longest ${context.longestStreak} days) with a ${context.completionRate}% completion rate.
+    Their current streak status is ${context.status}. They have missed ${context.missedDays} days recently.
+    Respond to their reply in a ${context.userTone} tone (max 50 words).
+    If they asked for next steps, suggest specific actions.
+    If they expressed doubt, provide encouragement.
+    Keep the response helpful and motivational.
+  `;
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: config.model,
+      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 100,
+    });
+
+    return completion.choices[0].message.content || "Thanks for your message! I'm here to help whenever you need.";
+  } catch (error) {
+    console.error('Error generating reply:', error);
+    return "Thanks for your message! I'm here to help whenever you need.";
+  }
 }
