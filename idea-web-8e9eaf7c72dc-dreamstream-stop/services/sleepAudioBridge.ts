@@ -1,12 +1,41 @@
-import { SleepDetector } from './sleepDetection';
+import { sleepDetector } from './sleepDetection';
 import { audioController } from './audioControl';
 
 class SleepAudioBridge {
-  private sleepDetector: SleepDetector;
   private isActive: boolean = false;
+  private sleepDetectionTimeout: NodeJS.Timeout | null = null;
+  private lastPauseTime: number | null = null;
+  private rewindAmount: number = 2; // minutes
 
   constructor() {
-    this.sleepDetector = new SleepDetector();
+    this.setupSleepDetectionListener();
+  }
+
+  private setupSleepDetectionListener() {
+    sleepDetector.onSleepStateChange((isSleeping) => {
+      if (isSleeping) {
+        this.handleSleepDetected();
+      } else {
+        this.handleWakeDetected();
+      }
+    });
+  }
+
+  private handleSleepDetected() {
+    if (!this.isActive) return;
+
+    // Only pause if we haven't paused recently (prevents multiple pauses)
+    if (!this.lastPauseTime || (Date.now() - this.lastPauseTime) > 30000) {
+      audioController.pausePlayback();
+      this.lastPauseTime = Date.now();
+    }
+  }
+
+  private handleWakeDetected() {
+    if (!this.isActive) return;
+
+    // Resume playback with rewind
+    audioController.resumePlayback(this.rewindAmount * 60 * 1000);
   }
 
   public async startMonitoring() {
@@ -14,18 +43,14 @@ class SleepAudioBridge {
 
     try {
       // Start sleep detection
-      await this.sleepDetector.startDetection();
+      await sleepDetector.startDetection();
 
-      // Subscribe to sleep state changes
-      this.sleepDetector.onSleepStateChange((isSleeping) => {
-        if (isSleeping) {
-          audioController.pausePlayback();
-        } else {
-          audioController.resumePlayback();
-        }
-      });
-
+      // Set active flag
       this.isActive = true;
+
+      // Start periodic check (fallback in case event-based detection fails)
+      this.startPeriodicCheck();
+
       console.log('Sleep-Audio bridge monitoring started');
     } catch (error) {
       console.error('Failed to start sleep-audio bridge:', error);
@@ -37,8 +62,19 @@ class SleepAudioBridge {
     if (!this.isActive) return;
 
     try {
-      await this.sleepDetector.stopDetection();
+      // Clear periodic check
+      if (this.sleepDetectionTimeout) {
+        clearTimeout(this.sleepDetectionTimeout);
+        this.sleepDetectionTimeout = null;
+      }
+
+      // Stop sleep detection
+      await sleepDetector.stopDetection();
+
+      // Reset state
       this.isActive = false;
+      this.lastPauseTime = null;
+
       console.log('Sleep-Audio bridge monitoring stopped');
     } catch (error) {
       console.error('Failed to stop sleep-audio bridge:', error);
@@ -46,10 +82,30 @@ class SleepAudioBridge {
     }
   }
 
-  public getStatus(): { isActive: boolean; isSleeping: boolean } {
+  private startPeriodicCheck() {
+    // Check every 30 seconds as a fallback
+    this.sleepDetectionTimeout = setTimeout(() => {
+      const state = sleepDetector.getCurrentState();
+
+      if (state.isSleeping && state.confidence >= 70) {
+        this.handleSleepDetected();
+      }
+
+      // Schedule next check
+      this.startPeriodicCheck();
+    }, 30000);
+  }
+
+  public setRewindAmount(minutes: number) {
+    this.rewindAmount = Math.max(0, Math.min(10, minutes)); // Limit to 0-10 minutes
+  }
+
+  public getStatus(): { isActive: boolean; isSleeping: boolean; confidence: number } {
+    const state = sleepDetector.getCurrentState();
     return {
       isActive: this.isActive,
-      isSleeping: this.sleepDetector.getCurrentState().isSleeping
+      isSleeping: state.isSleeping,
+      confidence: state.confidence
     };
   }
 }
