@@ -1,57 +1,131 @@
-import { Broadcast } from '../types';
-import { Coordinates, calculateDistance } from './location';
+import { supabase } from './supabase';
+import { sendPushNotification } from './notifications';
+import { useChatStore } from '../store/chatStore';
 
-export function filterByRadius(
-  broadcasts: Broadcast[],
-  userLocation: Coordinates,
-  radiusMiles: number
-): Broadcast[] {
-  return broadcasts.filter((broadcast) => {
-    const distance = calculateDistance(
-      userLocation,
-      { lat: broadcast.lat, lng: broadcast.lng }
-    );
-    return distance <= radiusMiles;
-  });
-}
+export async function handleInterest(broadcastId: string, userId: string) {
+  try {
+    // 1. Check if there's an existing chat room
+    const { data: existingChat, error: chatError } = await supabase
+      .from('chats')
+      .select('id, creator_user_id, interested_user_id')
+      .eq('broadcast_id', broadcastId)
+      .single();
 
-export function rankMatches(broadcasts: Broadcast[]): Broadcast[] {
-  return [...broadcasts].sort((a, b) => {
-    // Premium users get boosted higher
-    const premiumBoostA = a.isPremium ? -1 : 0;
-    const premiumBoostB = b.isPremium ? -1 : 0;
-
-    // Sort by distance first (closer is better)
-    if (a.distance !== b.distance) {
-      return a.distance - b.distance;
+    if (chatError && chatError.code !== 'PGRST116') {
+      throw chatError;
     }
 
-    // Then by recency (newer is better)
-    const timeDiff = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    // 2. If no existing chat, create one
+    if (!existingChat) {
+      const { data: broadcast, error: broadcastError } = await supabase
+        .from('broadcasts')
+        .select('user_id')
+        .eq('id', broadcastId)
+        .single();
 
-    // Apply premium boost if needed
-    if (premiumBoostA !== premiumBoostB) {
-      return premiumBoostA - premiumBoostB;
+      if (broadcastError) throw broadcastError;
+
+      const { data: newChat, error: createError } = await supabase
+        .from('chats')
+        .insert({
+          broadcast_id: broadcastId,
+          creator_user_id: broadcast.user_id,
+          interested_user_id: userId,
+          created_at: new Date().toISOString(),
+          is_unlocked: false
+        })
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      // 3. Send push notification to broadcast creator
+      await sendPushNotification(
+        broadcast.user_id,
+        'New Interest',
+        `Someone is interested in your "${broadcast.activity}" broadcast!`,
+        { type: 'interest', broadcastId, chatId: newChat.id }
+      );
+
+      return { chatId: newChat.id, isUnlocked: false };
     }
 
-    return timeDiff;
-  });
+    // 4. If chat exists, check for mutual interest
+    const isMutualInterest =
+      (existingChat.creator_user_id === userId && existingChat.interested_user_id !== userId) ||
+      (existingChat.interested_user_id === userId && existingChat.creator_user_id !== userId);
+
+    if (isMutualInterest) {
+      // 5. Unlock the chat if mutual interest
+      const { error: unlockError } = await supabase
+        .from('chats')
+        .update({ is_unlocked: true })
+        .eq('id', existingChat.id);
+
+      if (unlockError) throw unlockError;
+
+      // Notify both users
+      const otherUserId = existingChat.creator_user_id === userId
+        ? existingChat.interested_user_id
+        : existingChat.creator_user_id;
+
+      await sendPushNotification(
+        otherUserId,
+        'Chat Unlocked!',
+        'Your chat has been unlocked - start messaging now!',
+        { type: 'chat_unlocked', chatId: existingChat.id }
+      );
+
+      return { chatId: existingChat.id, isUnlocked: true };
+    }
+
+    return { chatId: existingChat.id, isUnlocked: existingChat.is_unlocked };
+  } catch (error) {
+    console.error('Error handling interest:', error);
+    throw error;
+  }
 }
 
-export function applyPremiumBoost(broadcasts: Broadcast[]): Broadcast[] {
-  return broadcasts.map((broadcast) => ({
-    ...broadcast,
-    // Premium broadcasts get their distance reduced by 20%
-    distance: broadcast.isPremium ? broadcast.distance * 0.8 : broadcast.distance,
-  }));
-}
+export async function checkForMutualInterest(chatId: string, userId: string) {
+  try {
+    const { data: chat, error: chatError } = await supabase
+      .from('chats')
+      .select('creator_user_id, interested_user_id, is_unlocked')
+      .eq('id', chatId)
+      .single();
 
-export function getFilteredAndRankedBroadcasts(
-  broadcasts: Broadcast[],
-  userLocation: Coordinates,
-  radiusMiles: number
-): Broadcast[] {
-  const filtered = filterByRadius(broadcasts, userLocation, radiusMiles);
-  const withBoost = applyPremiumBoost(filtered);
-  return rankMatches(withBoost);
+    if (chatError) throw chatError;
+
+    const isMutualInterest =
+      (chat.creator_user_id === userId && chat.interested_user_id !== userId) ||
+      (chat.interested_user_id === userId && chat.creator_user_id !== userId);
+
+    if (isMutualInterest && !chat.is_unlocked) {
+      const { error: unlockError } = await supabase
+        .from('chats')
+        .update({ is_unlocked: true })
+        .eq('id', chatId);
+
+      if (unlockError) throw unlockError;
+
+      // Notify both users
+      const otherUserId = chat.creator_user_id === userId
+        ? chat.interested_user_id
+        : chat.creator_user_id;
+
+      await sendPushNotification(
+        otherUserId,
+        'Chat Unlocked!',
+        'Your chat has been unlocked - start messaging now!',
+        { type: 'chat_unlocked', chatId }
+      );
+
+      return true;
+    }
+
+    return chat.is_unlocked;
+  } catch (error) {
+    console.error('Error checking mutual interest:', error);
+    throw error;
+  }
 }

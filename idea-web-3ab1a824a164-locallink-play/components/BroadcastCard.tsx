@@ -5,12 +5,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Broadcast } from '../types';
 import { formatDistance } from '../lib/location';
-import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/authStore';
 import { useBroadcastStore } from '../store/broadcastStore';
+import { useRouter } from 'expo-router';
 
 interface BroadcastCardProps {
   broadcast: Broadcast;
@@ -20,6 +21,7 @@ export default function BroadcastCard({ broadcast }: BroadcastCardProps) {
   const { user } = useAuthStore();
   const { expressInterest } = useBroadcastStore();
   const [expressing, setExpressing] = useState(false);
+  const router = useRouter();
 
   const isExpired = new Date(broadcast.expiresAt) < new Date();
   const timeLeft = getTimeLeft(broadcast.expiresAt);
@@ -29,9 +31,30 @@ export default function BroadcastCard({ broadcast }: BroadcastCardProps) {
 
     setExpressing(true);
     try {
-      await expressInterest(broadcast.id);
+      const result = await expressInterest(broadcast.id);
+
+      if (result.isUnlocked) {
+        Alert.alert(
+          'Chat Unlocked!',
+          'You have a mutual interest - start chatting now!',
+          [
+            {
+              text: 'Open Chat',
+              onPress: () => router.push(`/chat/${result.chatId}`),
+            },
+            { text: 'OK' },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Interest Sent',
+          'You expressed interest. You will be notified if there is a match.',
+          [{ text: 'OK' }]
+        );
+      }
     } catch (error) {
       console.error('Error expressing interest:', error);
+      Alert.alert('Error', 'Failed to express interest. Please try again.');
     } finally {
       setExpressing(false);
     }
@@ -117,6 +140,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    marginBottom: 16,
   },
   cardExpired: {
     opacity: 0.6,
