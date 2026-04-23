@@ -147,113 +147,103 @@ export default function InsightsScreen() {
           </View>
         </View>
 
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Tension Trends</Text>
+          <Text style={styles.summaryText}>{getTrendText()}</Text>
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View style={[
+                styles.progressFill,
+                { width: `${tensionScore * 100}%` }
+              ]} />
+            </View>
+            <Text style={styles.progressLabel}>
+              {Math.round(tensionScore * 100)}% tense
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.patternsContainer}>
+          <Text style={styles.patternsTitle}>Tension Patterns</Text>
+          {patterns.peakHours.length > 0 && (
+            <View style={styles.patternSection}>
+              <Text style={styles.patternSectionTitle}>Peak Tension Times</Text>
+              <View style={styles.patternTags}>
+                {patterns.peakHours.map(hour => (
+                  <View key={hour} style={styles.patternTag}>
+                    <Text style={styles.patternTagText}>{formatHour(hour)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          {patterns.peakDays.length > 0 && (
+            <View style={styles.patternSection}>
+              <Text style={styles.patternSectionTitle}>Peak Tension Days</Text>
+              <View style={styles.patternTags}>
+                {patterns.peakDays.map(day => {
+                  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                  return (
+                    <View key={day} style={styles.patternTag}>
+                      <Text style={styles.patternTagText}>{days[day]}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </View>
+
         <HeatmapCalendar
           logs={currentLogs}
           days={viewDays}
           onDayPress={handleDayPress}
         />
 
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Tension Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Tension Level:</Text>
-            <Text style={styles.summaryValue}>
-              {currentLogs.length === 0 ? 'No data' : `${(tensionScore * 100).toFixed(0)}% tense`}
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Trend:</Text>
-            <Text style={styles.summaryValue}>{getTrendText()}</Text>
-          </View>
-          {patterns.peakHours.length > 0 && (
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>Peak Tension Times:</Text>
-              <Text style={styles.summaryValue}>
-                {patterns.peakHours.map(hour => formatHour(hour)).join(', ')}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {!isPremium && (
-          <PremiumGate
-            title="Unlock Full History"
-            description="See your complete 30-day tension patterns and get deeper insights with JawZen Premium."
-            buttonText="Upgrade Now"
-            onPress={handleUpgrade}
-          />
-        )}
-      </ScrollView>
-
-      <Modal
-        visible={selectedDate !== null}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {selectedDate?.toLocaleDateString('en-US', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              })}
-            </Text>
-
-            {dayLogs.length > 0 ? (
-              <FlatList
-                data={dayLogs}
-                renderItem={renderDayLogItem}
-                keyExtractor={(item) => item.id.toString()}
-                style={styles.logList}
-              />
-            ) : (
-              <Text style={styles.noLogsText}>No tension logs for this day</Text>
-            )}
-
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={closeModal}
-            >
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={showPremiumGate}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowPremiumGate(false)}
-      >
-        <View style={styles.premiumModalContainer}>
-          <View style={styles.premiumModalContent}>
-            <Text style={styles.premiumModalTitle}>Premium Feature</Text>
-            <Text style={styles.premiumModalText}>
-              The 30-day view is available to Premium members only.
-            </Text>
-            <View style={styles.premiumModalButtons}>
-              <TouchableOpacity
-                style={[styles.premiumModalButton, styles.premiumModalCancel]}
-                onPress={() => setShowPremiumGate(false)}
-              >
-                <Text style={styles.premiumModalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.premiumModalButton, styles.premiumModalUpgrade]}
-                onPress={handleUpgrade}
-              >
-                <Text style={[styles.premiumModalButtonText, styles.premiumModalUpgradeText]}>
-                  Upgrade Now
+        <Modal
+          visible={!!selectedDate}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={closeModal}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>
+                  {selectedDate?.toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
                 </Text>
-              </TouchableOpacity>
+                <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
+                  <Text style={styles.closeButtonText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+
+              {dayLogs.length > 0 ? (
+                <FlatList
+                  data={dayLogs.sort((a, b) => b.timestamp - a.timestamp)}
+                  renderItem={renderDayLogItem}
+                  keyExtractor={(item) => item.id.toString()}
+                  contentContainerStyle={styles.logList}
+                />
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyStateText}>No tension logs for this day</Text>
+                </View>
+              )}
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
+
+        <PremiumGate
+          visible={showPremiumGate}
+          onClose={() => setShowPremiumGate(false)}
+          onUpgrade={handleUpgrade}
+          feature="30-day tension history"
+        />
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -294,61 +284,116 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   toggleTextActive: {
-    color: '#fff',
+    color: Colors.light.background,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  summaryContainer: {
+  summaryCard: {
     backgroundColor: Colors.light.backgroundSecondary,
     borderRadius: 12,
     padding: 16,
     marginBottom: 24,
   },
   summaryTitle: {
-    fontSize: 18,
+    fontSize: 16,
+    fontWeight: '600',
+    color: Colors.light.text,
+    marginBottom: 8,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    marginBottom: 16,
+  },
+  progressContainer: {
+    marginTop: 8,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: Colors.light.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.light.tense,
+    borderRadius: 4,
+  },
+  progressLabel: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    textAlign: 'right',
+  },
+  patternsContainer: {
+    marginBottom: 24,
+  },
+  patternsTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: Colors.light.text,
     marginBottom: 12,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
+  patternSection: {
+    marginBottom: 16,
   },
-  summaryLabel: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-  },
-  summaryValue: {
+  patternSectionTitle: {
     fontSize: 14,
     fontWeight: '500',
+    color: Colors.light.textSecondary,
+    marginBottom: 8,
+  },
+  patternTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  patternTag: {
+    backgroundColor: Colors.light.backgroundSecondary,
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  patternTagText: {
+    fontSize: 12,
     color: Colors.light.text,
   },
-  modalContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: Colors.light.background,
-    borderRadius: 12,
-    width: '90%',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
     maxHeight: '80%',
-    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: Colors.light.text,
-    marginBottom: 16,
-    textAlign: 'center',
+  },
+  closeButton: {
+    padding: 8,
+  },
+  closeButtonText: {
+    color: Colors.light.tint,
+    fontSize: 16,
   },
   logList: {
-    marginBottom: 16,
+    paddingBottom: 16,
   },
   logItem: {
     flexDirection: 'row',
@@ -362,7 +407,7 @@ const styles = StyleSheet.create({
   },
   logTime: {
     fontSize: 14,
-    color: Colors.light.text,
+    color: Colors.light.textSecondary,
   },
   logStatusContainer: {
     flexDirection: 'row',
@@ -384,68 +429,12 @@ const styles = StyleSheet.create({
     color: Colors.light.textSecondary,
     textTransform: 'capitalize',
   },
-  noLogsText: {
+  emptyState: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  emptyStateText: {
     fontSize: 14,
     color: Colors.light.textSecondary,
-    textAlign: 'center',
-    marginVertical: 20,
-  },
-  closeButton: {
-    backgroundColor: Colors.light.tint,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  premiumModalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  premiumModalContent: {
-    backgroundColor: Colors.light.background,
-    borderRadius: 12,
-    width: '85%',
-    padding: 20,
-  },
-  premiumModalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: Colors.light.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  premiumModalText: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  premiumModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  premiumModalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  premiumModalCancel: {
-    backgroundColor: Colors.light.backgroundSecondary,
-  },
-  premiumModalUpgrade: {
-    backgroundColor: Colors.light.tint,
-  },
-  premiumModalButtonText: {
-    fontWeight: '600',
-  },
-  premiumModalUpgradeText: {
-    color: '#fff',
   },
 });

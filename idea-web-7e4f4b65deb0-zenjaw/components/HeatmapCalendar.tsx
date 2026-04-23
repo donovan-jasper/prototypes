@@ -165,19 +165,17 @@ const styles = StyleSheet.create({
   },
   dayName: {
     fontSize: 10,
-    fontWeight: '500',
-    color: '#fff',
+    color: Colors.light.textSecondary,
     marginBottom: 2,
   },
   dayNumber: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
+    fontWeight: '500',
+    color: Colors.light.text,
   },
   percentage: {
     fontSize: 10,
-    fontWeight: '500',
-    color: '#fff',
+    color: Colors.light.textSecondary,
     marginTop: 2,
   },
   legend: {
@@ -196,7 +194,7 @@ const styles = StyleSheet.create({
     marginRight: 4,
   },
   legendText: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.light.textSecondary,
   },
 });
