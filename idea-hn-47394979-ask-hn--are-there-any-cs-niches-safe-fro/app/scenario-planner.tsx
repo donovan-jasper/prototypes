@@ -1,29 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, FlatList, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
+import { SKILLS, ROLES } from '../constants/skills';
 import { generateSkillRoadmap } from '../lib/roadmap-generator';
-import { calculateAIResistanceScore, getScoreCategory } from '../lib/scoring';
+import { calculateAIResistanceScore } from '../lib/scoring';
 import { isPremiumUser } from '../lib/database';
-import { ROLES, SKILLS } from '../constants/skills';
 import { Roadmap } from '../types';
 
 interface Scenario {
   id: string;
-  role: string;
-  skills: string[];
+  targetRole: string;
+  skillsToLearn: string[];
   experience: number;
-  roadmap?: Roadmap;
 }
 
 export default function ScenarioPlannerScreen() {
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [isPremium, setIsPremium] = useState(false);
   const [currentScenario, setCurrentScenario] = useState<Scenario>({
     id: Date.now().toString(),
-    role: '',
-    skills: [],
+    targetRole: '',
+    skillsToLearn: [],
     experience: 0
   });
+  const [roadmaps, setRoadmaps] = useState<Record<string, Roadmap>>({});
+  const [isPremium, setIsPremium] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -33,97 +33,64 @@ export default function ScenarioPlannerScreen() {
   async function checkPremiumStatus() {
     const premium = await isPremiumUser();
     setIsPremium(premium);
+    if (!premium) {
+      router.replace('/paywall');
+    }
   }
 
   function addScenario() {
-    if (scenarios.length >= 2 && !isPremium) {
-      router.push('/paywall');
-      return;
-    }
+    if (!currentScenario.targetRole) return;
 
-    const newScenario = {
-      ...currentScenario,
-      roadmap: generateSkillRoadmap({
-        currentRole: currentScenario.role,
-        targetRole: currentScenario.role,
-        currentSkills: currentScenario.skills,
-        experience: currentScenario.experience
-      })
-    };
-
-    setScenarios([...scenarios, newScenario]);
+    setScenarios([...scenarios, currentScenario]);
     setCurrentScenario({
       id: Date.now().toString(),
-      role: '',
-      skills: [],
+      targetRole: '',
+      skillsToLearn: [],
       experience: 0
     });
   }
 
-  function removeScenario(id: string) {
-    setScenarios(scenarios.filter(s => s.id !== id));
+  function generateRoadmaps() {
+    const newRoadmaps: Record<string, Roadmap> = {};
+
+    scenarios.forEach(scenario => {
+      const roadmap = generateSkillRoadmap({
+        currentRole: 'current-role', // In real app, get from user profile
+        targetRole: scenario.targetRole,
+        currentSkills: scenario.skillsToLearn,
+        experience: scenario.experience
+      });
+
+      newRoadmaps[scenario.id] = roadmap;
+    });
+
+    setRoadmaps(newRoadmaps);
   }
 
-  function toggleSkill(skillId: string) {
-    setCurrentScenario(prev => {
-      const skills = prev.skills.includes(skillId)
-        ? prev.skills.filter(id => id !== skillId)
-        : [...prev.skills, skillId];
-      return { ...prev, skills };
-    });
+  function calculateSalaryPotential(role: string): number {
+    // Simplified salary calculation based on role
+    const baseSalaries: Record<string, number> = {
+      'software-engineer': 100000,
+      'engineering-manager': 140000,
+      'product-manager': 130000,
+      'senior-engineer': 120000
+    };
+    return baseSalaries[role] || 110000;
   }
 
-  function renderScenario(scenario: Scenario) {
-    if (!scenario.roadmap) return null;
+  function calculateJobSecurity(role: string): number {
+    // Simplified job security calculation based on role
+    const securityScores: Record<string, number> = {
+      'software-engineer': 60,
+      'engineering-manager': 85,
+      'product-manager': 75,
+      'senior-engineer': 70
+    };
+    return securityScores[role] || 65;
+  }
 
-    const score = calculateAIResistanceScore({
-      role: scenario.role as any,
-      skills: scenario.skills,
-      experience: scenario.experience,
-      timestamp: Date.now()
-    });
-    const category = getScoreCategory(score);
-
-    return (
-      <View style={styles.scenarioCard}>
-        <View style={styles.scenarioHeader}>
-          <Text style={styles.scenarioTitle}>{ROLES[scenario.role]?.name || scenario.role}</Text>
-          <TouchableOpacity onPress={() => removeScenario(scenario.id)}>
-            <Text style={styles.removeButton}>×</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.metricsContainer}>
-          <View style={styles.metricBox}>
-            <Text style={styles.metricValue}>{score}</Text>
-            <Text style={styles.metricLabel}>AI Resistance</Text>
-            <Text style={[styles.metricCategory, { color: category === 'high' ? '#10b981' : category === 'medium' ? '#f59e0b' : '#ef4444' }]}>
-              {category}
-            </Text>
-          </View>
-
-          <View style={styles.metricBox}>
-            <Text style={styles.metricValue}>{scenario.roadmap.timeline} weeks</Text>
-            <Text style={styles.metricLabel}>Learning Time</Text>
-          </View>
-
-          <View style={styles.metricBox}>
-            <Text style={styles.metricValue}>Moderate</Text>
-            <Text style={styles.metricLabel}>Career Outlook</Text>
-          </View>
-        </View>
-
-        <View style={styles.skillsSection}>
-          <Text style={styles.sectionTitle}>Key Skills to Develop</Text>
-          {scenario.roadmap.skills.map((skill, index) => (
-            <View key={index} style={styles.skillItem}>
-              <Text style={styles.skillName}>{skill.skill}</Text>
-              <Text style={styles.skillTime}>{skill.estimatedWeeks} weeks</Text>
-            </View>
-          ))}
-        </View>
-      </View>
-    );
+  if (!isPremium) {
+    return null; // Will be redirected by checkPremiumStatus
   }
 
   return (
@@ -131,71 +98,113 @@ export default function ScenarioPlannerScreen() {
       <Text style={styles.title}>Career Scenario Planner</Text>
       <Text style={styles.subtitle}>Compare multiple career paths side-by-side</Text>
 
-      {scenarios.length > 0 && (
-        <View style={styles.comparisonContainer}>
-          {scenarios.map(scenario => (
-            <View key={scenario.id} style={styles.scenarioColumn}>
-              {renderScenario(scenario)}
-            </View>
-          ))}
-        </View>
-      )}
-
-      <View style={styles.formContainer}>
-        <Text style={styles.formTitle}>Add New Scenario</Text>
+      <View style={styles.scenarioBuilder}>
+        <Text style={styles.sectionTitle}>Add Career Scenario</Text>
 
         <Text style={styles.label}>Target Role</Text>
-        <View style={styles.roleSelector}>
+        <View style={styles.picker}>
           {Object.entries(ROLES).map(([key, value]) => (
             <TouchableOpacity
               key={key}
-              style={[styles.roleOption, currentScenario.role === key && styles.selectedRole]}
-              onPress={() => setCurrentScenario({...currentScenario, role: key})}
+              style={[styles.pickerOption, currentScenario.targetRole === key && styles.selected]}
+              onPress={() => setCurrentScenario({...currentScenario, targetRole: key})}
             >
               <Text>{value.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
-        <Text style={styles.label}>Current Skills</Text>
-        <View style={styles.skillsSelector}>
-          {SKILLS.map(skill => (
+        <Text style={styles.label}>Skills to Learn (select 3-5)</Text>
+        <View style={styles.skillsGrid}>
+          {SKILLS.slice(0, 12).map(skill => (
             <TouchableOpacity
               key={skill.id}
-              style={[styles.skillOption, currentScenario.skills.includes(skill.id) && styles.selectedSkill]}
-              onPress={() => toggleSkill(skill.id)}
+              style={[styles.skillChip, currentScenario.skillsToLearn.includes(skill.id) && styles.selected]}
+              onPress={() => {
+                setCurrentScenario(prev => ({
+                  ...prev,
+                  skillsToLearn: prev.skillsToLearn.includes(skill.id)
+                    ? prev.skillsToLearn.filter(s => s !== skill.id)
+                    : [...prev.skillsToLearn, skill.id]
+                }));
+              }}
             >
-              <Text>{skill.name}</Text>
+              <Text style={styles.skillText}>{skill.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         <Text style={styles.label}>Years of Experience</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={currentScenario.experience.toString()}
-          onChangeText={(text) => setCurrentScenario({...currentScenario, experience: parseInt(text) || 0})}
-        />
+        <View style={styles.experienceSlider}>
+          {[0, 1, 2, 3, 4, 5].map(year => (
+            <TouchableOpacity
+              key={year}
+              style={[styles.yearButton, currentScenario.experience === year && styles.selected]}
+              onPress={() => setCurrentScenario({...currentScenario, experience: year})}
+            >
+              <Text>{year}+</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
 
         <TouchableOpacity
-          style={[styles.addButton, (!currentScenario.role || currentScenario.skills.length === 0) && styles.disabledButton]}
+          style={[styles.addButton, !currentScenario.targetRole && styles.disabled]}
           onPress={addScenario}
-          disabled={!currentScenario.role || currentScenario.skills.length === 0}
+          disabled={!currentScenario.targetRole}
         >
           <Text style={styles.addButtonText}>Add Scenario</Text>
         </TouchableOpacity>
       </View>
 
-      {!isPremium && scenarios.length >= 2 && (
-        <View style={styles.premiumNotice}>
-          <Text style={styles.premiumText}>Add unlimited scenarios with Premium</Text>
+      {scenarios.length > 0 && (
+        <View style={styles.comparisonSection}>
           <TouchableOpacity
-            style={styles.premiumButton}
-            onPress={() => router.push('/paywall')}
+            style={styles.generateButton}
+            onPress={generateRoadmaps}
           >
-            <Text style={styles.premiumButtonText}>Upgrade Now</Text>
+            <Text style={styles.generateButtonText}>Generate Comparison</Text>
           </TouchableOpacity>
+
+          {Object.entries(roadmaps).map(([scenarioId, roadmap]) => {
+            const scenario = scenarios.find(s => s.id === scenarioId);
+            if (!scenario) return null;
+
+            const salary = calculateSalaryPotential(scenario.targetRole);
+            const security = calculateJobSecurity(scenario.targetRole);
+
+            return (
+              <View key={scenarioId} style={styles.scenarioCard}>
+                <Text style={styles.scenarioTitle}>{ROLES[scenario.targetRole as keyof typeof ROLES]?.name}</Text>
+
+                <View style={styles.metricsRow}>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricValue}>{security}%</Text>
+                    <Text style={styles.metricLabel}>Job Security</Text>
+                  </View>
+
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricValue}>{roadmap.timeline} weeks</Text>
+                    <Text style={styles.metricLabel}>Learning Time</Text>
+                  </View>
+
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricValue}>${salary.toLocaleString()}</Text>
+                    <Text style={styles.metricLabel}>Salary Potential</Text>
+                  </View>
+                </View>
+
+                <Text style={styles.recommendedSkills}>Recommended Skills:</Text>
+                <View style={styles.skillList}>
+                  {roadmap.skills.map((skill, index) => (
+                    <View key={index} style={styles.skillItem}>
+                      <Text style={styles.skillName}>{skill.skill}</Text>
+                      <Text style={styles.skillTime}>{skill.estimatedWeeks} weeks</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            );
+          })}
         </View>
       )}
     </ScrollView>
@@ -211,53 +220,111 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#1f2937'
+    marginBottom: 8
   },
   subtitle: {
     fontSize: 16,
     color: '#6b7280',
     marginBottom: 24
   },
-  comparisonContainer: {
+  scenarioBuilder: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 16,
+    marginBottom: 24
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 16
+  },
+  label: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginTop: 16,
+    marginBottom: 8
+  },
+  picker: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginBottom: 16
+  },
+  pickerOption: {
+    padding: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginRight: 8,
+    marginBottom: 8
+  },
+  skillsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16
+  },
+  skillChip: {
+    padding: 8,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8
+  },
+  skillText: {
+    fontSize: 14
+  },
+  experienceSlider: {
+    flexDirection: 'row',
+    marginBottom: 16
+  },
+  yearButton: {
+    padding: 12,
+    backgroundColor: '#f3f4f6',
+    borderRadius: 8,
+    marginRight: 8
+  },
+  addButton: {
+    backgroundColor: '#3b82f6',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center'
+  },
+  disabled: {
+    backgroundColor: '#9ca3af'
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  comparisonSection: {
     marginBottom: 32
   },
-  scenarioColumn: {
-    flex: 1,
-    marginHorizontal: 4
+  generateButton: {
+    backgroundColor: '#10b981',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 24
+  },
+  generateButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600'
   },
   scenarioCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  scenarioHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    padding: 20,
+    borderRadius: 16,
     marginBottom: 16
   },
   scenarioTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f2937'
-  },
-  removeButton: {
     fontSize: 20,
-    color: '#ef4444',
-    fontWeight: 'bold'
+    fontWeight: '600',
+    marginBottom: 16
   },
-  metricsContainer: {
+  metricsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16
+    marginBottom: 20
   },
   metricBox: {
     alignItems: 'center',
@@ -266,26 +333,19 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937'
+    marginBottom: 4
   },
   metricLabel: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginTop: 4
+    fontSize: 14,
+    color: '#6b7280'
   },
-  metricCategory: {
-    fontSize: 12,
-    fontWeight: '600',
-    marginTop: 4
-  },
-  skillsSection: {
-    marginTop: 16
-  },
-  sectionTitle: {
+  recommendedSkills: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#1f2937'
+    fontWeight: '500',
+    marginBottom: 12
+  },
+  skillList: {
+    marginTop: 8
   },
   skillItem: {
     flexDirection: 'row',
@@ -295,115 +355,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb'
   },
   skillName: {
-    fontSize: 14,
-    color: '#374151'
-  },
-  skillTime: {
-    fontSize: 14,
-    color: '#6b7280'
-  },
-  formContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
-  },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16,
-    color: '#1f2937'
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginTop: 16,
-    marginBottom: 8,
-    color: '#374151'
-  },
-  roleSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16
-  },
-  roleOption: {
-    padding: 10,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 8,
-    marginRight: 8,
-    marginBottom: 8
-  },
-  selectedRole: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#3b82f6',
-    borderWidth: 1
-  },
-  skillsSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16
-  },
-  skillOption: {
-    padding: 8,
-    backgroundColor: '#f3f4f6',
-    borderRadius: 6,
-    marginRight: 6,
-    marginBottom: 6
-  },
-  selectedSkill: {
-    backgroundColor: '#dbeafe',
-    borderColor: '#3b82f6',
-    borderWidth: 1
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
     fontSize: 16
   },
-  addButton: {
-    backgroundColor: '#3b82f6',
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center'
-  },
-  disabledButton: {
-    backgroundColor: '#9ca3af'
-  },
-  addButtonText: {
-    color: '#fff',
+  skillTime: {
     fontSize: 16,
-    fontWeight: '600'
+    color: '#6b7280'
   },
-  premiumNotice: {
-    backgroundColor: '#fef3c7',
-    padding: 16,
-    borderRadius: 12,
-    marginTop: 24,
-    alignItems: 'center'
-  },
-  premiumText: {
-    fontSize: 16,
-    color: '#92400e',
-    marginBottom: 12,
-    textAlign: 'center'
-  },
-  premiumButton: {
-    backgroundColor: '#f59e0b',
-    padding: 12,
-    borderRadius: 8,
-    width: '100%'
-  },
-  premiumButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center'
+  selected: {
+    backgroundColor: '#e0f2fe',
+    borderColor: '#3b82f6',
+    borderWidth: 1
   }
 });
