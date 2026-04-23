@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { getInstallCount, getDeepLinkCount, getInstallTrendData, getInstallsBySource } from '../services/AnalyticsService';
 
 const Analytics = () => {
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
-    color: '#333',
+    color: '#2c3e50',
   },
   statsRow: {
     flexDirection: 'row',
@@ -185,13 +185,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
     marginHorizontal: 4,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
   },
   statLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#7f8c8d',
     marginBottom: 4,
   },
   statValue: {
@@ -207,13 +207,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#f8f9fa',
     marginHorizontal: 4,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 6,
   },
   trendLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#7f8c8d',
     marginBottom: 4,
   },
   trendValue: {
@@ -222,17 +222,14 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   trendUp: {
-    fontSize: 16,
     color: '#27ae60',
     fontWeight: 'bold',
   },
   trendDown: {
-    fontSize: 16,
     color: '#e74c3c',
     fontWeight: 'bold',
   },
   trendNeutral: {
-    fontSize: 16,
     color: '#f39c12',
     fontWeight: 'bold',
   },
@@ -241,11 +238,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#ecf0f1',
   },
   sourceName: {
     fontSize: 16,
-    color: '#333',
+    color: '#2c3e50',
   },
   sourceCount: {
     fontSize: 16,
@@ -253,10 +250,9 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   noDataText: {
-    fontSize: 14,
-    color: '#999',
     textAlign: 'center',
-    padding: 16,
+    color: '#7f8c8d',
+    marginTop: 16,
   },
 });
 
