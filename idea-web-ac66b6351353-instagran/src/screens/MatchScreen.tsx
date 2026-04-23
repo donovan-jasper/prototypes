@@ -168,38 +168,42 @@ const MatchScreen = ({ navigation }: Props) => {
               style={[styles.card, animatedStyle]}
               {...(isCurrent ? panResponder.panHandlers : {})}
             >
-              <Image
-                source={{ uri: user.photoUrl }}
-                style={styles.userImage}
-              />
               <View style={styles.cardContent}>
-                <Text style={styles.userName}>{user.name}</Text>
+                {user.photoUrl ? (
+                  <Image source={{ uri: user.photoUrl }} style={styles.profileImage} />
+                ) : (
+                  <View style={styles.placeholderImage}>
+                    <Text style={styles.placeholderText}>{user.name.charAt(0)}</Text>
+                  </View>
+                )}
+                <Text style={styles.name}>{user.name}</Text>
                 <Text style={styles.matchScore}>Match: {user.matchScore}%</Text>
-                <Text style={styles.hobbiesTitle}>Hobbies:</Text>
-                <Text style={styles.hobbies}>{user.hobbies.join(', ')}</Text>
-                <Text style={styles.bioTitle}>About:</Text>
-                <Text style={styles.bio}>{user.bio}</Text>
-              </View>
-
-              {isCurrent && (
-                <View style={styles.actionButtons}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.dislikeButton]}
-                    onPress={() => handleSwipe('left')}
-                  >
-                    <Text style={styles.actionButtonText}>✕</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.likeButton]}
-                    onPress={() => handleSwipe('right')}
-                  >
-                    <Text style={styles.actionButtonText}>❤️</Text>
-                  </TouchableOpacity>
+                <View style={styles.hobbiesContainer}>
+                  {user.hobbies.map((hobby, i) => (
+                    <View key={i} style={styles.hobbyTag}>
+                      <Text style={styles.hobbyText}>{hobby}</Text>
+                    </View>
+                  ))}
                 </View>
-              )}
+              </View>
             </Animated.View>
           );
         })}
+      </View>
+
+      <View style={styles.actionButtons}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.dislikeButton]}
+          onPress={() => handleSwipe('left')}
+        >
+          <Text style={styles.actionButtonText}>✕</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.likeButton]}
+          onPress={() => handleSwipe('right')}
+        >
+          <Text style={styles.actionButtonText}>❤️</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -226,7 +230,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   refreshButtonText: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#6200ee',
   },
   cardContainer: {
@@ -236,58 +240,74 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '90%',
-    height: '80%',
+    height: '70%',
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowRadius: 4,
     elevation: 5,
     position: 'absolute',
-    padding: 16,
-  },
-  userImage: {
-    width: '100%',
-    height: 200,
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    padding: 20,
   },
   cardContent: {
-    padding: 16,
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  userName: {
-    fontSize: 22,
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 16,
+  },
+  placeholderImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  placeholderText: {
+    color: 'white',
+    fontSize: 48,
+    fontWeight: 'bold',
+  },
+  name: {
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
   },
   matchScore: {
     fontSize: 16,
     color: '#6200ee',
-    marginBottom: 12,
-  },
-  hobbiesTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  hobbies: {
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  bioTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 8,
-  },
-  bio: {
-    fontSize: 14,
     marginBottom: 16,
+  },
+  hobbiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  hobbyTag: {
+    backgroundColor: '#e3f2fd',
+    borderRadius: 16,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    margin: 4,
+  },
+  hobbyText: {
+    color: '#1976d2',
+    fontSize: 14,
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 'auto',
+    marginTop: 20,
   },
   actionButton: {
     width: 60,
@@ -298,14 +318,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   dislikeButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#ffebee',
   },
   likeButton: {
-    backgroundColor: '#4caf50',
+    backgroundColor: '#e8f5e9',
   },
   actionButtonText: {
     fontSize: 24,
-    color: 'white',
   },
   emptyText: {
     fontSize: 20,
@@ -324,8 +343,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#6200ee',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
     alignItems: 'center',
+    marginBottom: 12,
   },
   buttonText: {
     color: 'white',
