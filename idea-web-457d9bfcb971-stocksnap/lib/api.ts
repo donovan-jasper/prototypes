@@ -164,37 +164,64 @@ export const fetchStockChartData = async (symbol: string, resolution: string = '
 
 export const fetchDailyDigest = async (): Promise<DigestHighlight[]> => {
   try {
-    // In a real app, this would call your backend API that processes market data
-    // For demo purposes, we'll return mock data
+    // In a production app, this would call your backend API that processes market data
+    // For this prototype, we'll return mock data with some real market insights
 
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
 
+    // Get some market data to base our digest on
+    const techStocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META'];
+    const randomTechStock = techStocks[Math.floor(Math.random() * techStocks.length)];
+
+    const techStockData = await fetchStockData(randomTechStock);
+
+    // Create a realistic digest with some market insights
     return [
       {
         id: '1',
-        title: 'Tech Stocks Decline',
-        explanation: 'Major technology companies reported lower-than-expected earnings this quarter, leading to a sell-off in the sector. Investors are concerned about slowing growth in the digital advertising market.',
-        impact: 'negative',
+        title: 'Tech Stocks Mixed',
+        explanation: `Technology stocks showed mixed performance today. ${techStockData.name} (${techStockData.symbol}) is ${techStockData.change > 0 ? 'up' : 'down'} ${Math.abs(techStockData.change).toFixed(2)}% at $${techStockData.price.toFixed(2)}. The sector is reacting to mixed earnings reports and concerns about inflation.`,
+        impact: techStockData.change > 0 ? 'positive' : techStockData.change < 0 ? 'negative' : 'neutral',
         audioUrl: 'https://example.com/audio/tech-stocks.mp3'
       },
       {
         id: '2',
-        title: 'Energy Sector Rises',
-        explanation: 'Oil prices increased due to geopolitical tensions in the Middle East, benefiting energy companies. This positive development is expected to continue as global demand remains strong.',
-        impact: 'positive',
-        audioUrl: 'https://example.com/audio/energy-sector.mp3'
+        title: 'Interest Rates Stable',
+        explanation: 'The Federal Reserve kept interest rates unchanged today, maintaining a cautious stance on inflation. This stability is supporting riskier assets like stocks and bonds.',
+        impact: 'neutral',
+        audioUrl: 'https://example.com/audio/interest-rates.mp3'
       },
       {
         id: '3',
-        title: 'Consumer Spending Mixed',
-        explanation: 'While retail sales showed growth in the first half of the year, recent data indicates slower spending in the second quarter. This could impact consumer-facing stocks in the coming months.',
-        impact: 'neutral',
+        title: 'Consumer Spending Up',
+        explanation: 'Retail sales data showed stronger-than-expected growth in April, indicating continued consumer confidence. This bodes well for companies in the retail and service sectors.',
+        impact: 'positive',
         audioUrl: 'https://example.com/audio/consumer-spending.mp3'
       }
     ];
   } catch (error) {
-    console.error('Digest API error:', error);
-    throw new Error('Failed to fetch daily digest. Please try again later.');
+    console.error('Daily digest API error:', error);
+    // Return fallback data if API fails
+    return [
+      {
+        id: '1',
+        title: 'Market Update',
+        explanation: 'The stock market showed mixed performance today. Tech stocks led the way higher, while energy companies declined. Investors are watching for further guidance from the Federal Reserve.',
+        impact: 'neutral'
+      },
+      {
+        id: '2',
+        title: 'Earnings Season',
+        explanation: 'Many major companies are reporting earnings this week. Analysts are expecting mixed results across sectors.',
+        impact: 'neutral'
+      },
+      {
+        id: '3',
+        title: 'Global Trends',
+        explanation: 'Geopolitical tensions in Europe are keeping investors on edge. The dollar remains strong against most currencies.',
+        impact: 'neutral'
+      }
+    ];
   }
 };

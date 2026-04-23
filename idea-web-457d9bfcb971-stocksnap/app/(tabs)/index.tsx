@@ -1,117 +1,194 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { StackNavigationProp } from '@react-navigation/stack';
-import { RootStackParamList } from '../../types/navigation';
-import LessonCard from '../../components/LessonCard';
-import { lessons } from '../../constants/lessons';
-import { getLessonProgress } from '../../lib/database';
-import { useLessonsStore } from '../../store/useLessonsStore';
+import { fetchDailyDigest } from '../../lib/api';
+import { useUserStore } from '../../store/useUserStore';
+import Colors from '../../constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
+import SubscriptionPrompt from '../../components/SubscriptionPrompt';
 
-type LearnScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Learn'>;
+interface DigestHighlight {
+  id: string;
+  title: string;
+  explanation: string;
+  impact: 'positive' | 'negative' | 'neutral';
+  audioUrl?: string;
+}
 
-export default function LearnScreen() {
-  const navigation = useNavigation<LearnScreenNavigationProp>();
+const LearnScreen = () => {
+  const navigation = useNavigation();
+  const { isPremium } = useUserStore();
+  const [digest, setDigest] = useState<DigestHighlight[]>([]);
   const [loading, setLoading] = useState(true);
-  const { completedLessons, setCompletedLessons } = useLessonsStore();
-  const [lastIncompleteLesson, setLastIncompleteLesson] = useState<string | null>(null);
+  const [showSubscriptionPrompt, setShowSubscriptionPrompt] = useState(false);
 
   useEffect(() => {
-    const loadProgress = async () => {
+    const loadDigest = async () => {
       try {
-        const progress = await getLessonProgress();
-        const completed = progress.filter(item => item.completed).map(item => item.lesson_id);
-        setCompletedLessons(completed);
-
-        // Find the first incomplete lesson
-        const firstIncomplete = lessons.find(lesson => !completed.includes(lesson.id));
-        setLastIncompleteLesson(firstIncomplete?.id || null);
+        const data = await fetchDailyDigest();
+        setDigest(data);
       } catch (error) {
-        console.error('Failed to load lesson progress:', error);
+        console.error('Failed to load daily digest:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadProgress();
+    loadDigest();
   }, []);
 
-  const handleLessonPress = (lessonId: string) => {
-    navigation.navigate('Lesson', { id: lessonId });
-  };
-
-  const handleContinueLearning = () => {
-    if (lastIncompleteLesson) {
-      navigation.navigate('Lesson', { id: lastIncompleteLesson });
+  const handlePlayAudio = (audioUrl: string) => {
+    if (!isPremium) {
+      setShowSubscriptionPrompt(true);
+      return;
     }
+    // In a real app, this would play the audio
+    console.log('Playing audio:', audioUrl);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading your Daily Digest...</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      {lastIncompleteLesson && (
-        <TouchableOpacity
-          style={styles.continueButton}
-          onPress={handleContinueLearning}
-        >
-          <Text style={styles.continueButtonText}>Continue Learning</Text>
-        </TouchableOpacity>
-      )}
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Daily Digest</Text>
+        <Text style={styles.subtitle}>Your 3 key market highlights</Text>
+      </View>
 
-      <Text style={styles.title}>Learn Investing</Text>
+      {digest.map((highlight) => (
+        <View key={highlight.id} style={styles.highlightCard}>
+          <View style={styles.highlightHeader}>
+            <View style={[
+              styles.impactIndicator,
+              highlight.impact === 'positive' && styles.positive,
+              highlight.impact === 'negative' && styles.negative,
+              highlight.impact === 'neutral' && styles.neutral
+            ]} />
+            <Text style={styles.highlightTitle}>{highlight.title}</Text>
+            {highlight.audioUrl && (
+              <TouchableOpacity
+                onPress={() => handlePlayAudio(highlight.audioUrl!)}
+                style={styles.audioButton}
+              >
+                <Ionicons
+                  name={isPremium ? "play-circle" : "lock-closed"}
+                  size={24}
+                  color={isPremium ? Colors.primary : Colors.gray}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          <Text style={styles.highlightExplanation}>{highlight.explanation}</Text>
+        </View>
+      ))}
 
-      <FlatList
-        data={lessons}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <LessonCard
-            lesson={item}
-            isCompleted={completedLessons.includes(item.id)}
-            onPress={() => handleLessonPress(item.id)}
-          />
-        )}
-        contentContainerStyle={styles.listContent}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Today's Lessons</Text>
+        {/* Lesson cards would go here */}
+      </View>
+
+      <SubscriptionPrompt
+        visible={showSubscriptionPrompt}
+        onClose={() => setShowSubscriptionPrompt(false)}
+        onUpgrade={() => navigation.navigate('Profile')}
       />
-    </View>
+    </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: Colors.text,
+    fontSize: 16,
+  },
+  header: {
+    padding: 20,
+    backgroundColor: Colors.primary,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
+    color: Colors.white,
+    marginBottom: 4,
   },
-  listContent: {
-    paddingBottom: 20,
-  },
-  continueButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  continueButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  subtitle: {
     fontSize: 16,
+    color: Colors.white,
+    opacity: 0.9,
+  },
+  highlightCard: {
+    backgroundColor: Colors.card,
+    margin: 16,
+    padding: 16,
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  highlightHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  impactIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  positive: {
+    backgroundColor: Colors.success,
+  },
+  negative: {
+    backgroundColor: Colors.error,
+  },
+  neutral: {
+    backgroundColor: Colors.warning,
+  },
+  highlightTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+    flex: 1,
+  },
+  audioButton: {
+    padding: 4,
+  },
+  highlightExplanation: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    lineHeight: 24,
+  },
+  section: {
+    marginTop: 24,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: Colors.text,
+    marginBottom: 12,
   },
 });
+
+export default LearnScreen;

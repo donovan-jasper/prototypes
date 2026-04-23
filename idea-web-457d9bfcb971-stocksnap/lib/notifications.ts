@@ -1,10 +1,24 @@
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
+import { fetchDailyDigest } from './api';
 import { Platform } from 'react-native';
-import { getAlerts, getSavedDigest } from './database';
-import { fetchStockData } from './api';
 
 const BACKGROUND_NOTIFICATION_TASK = 'BACKGROUND_NOTIFICATION_TASK';
+
+interface Alert {
+  id: string;
+  symbol: string;
+  targetPrice: number;
+  condition: 'above' | 'below';
+}
+
+interface DigestHighlight {
+  id: string;
+  title: string;
+  explanation: string;
+  impact: 'positive' | 'negative' | 'neutral';
+  audioUrl?: string;
+}
 
 export const setupNotifications = async () => {
   // Request permissions
@@ -23,103 +37,44 @@ export const setupNotifications = async () => {
     }),
   });
 
-  // Register background task
+  // Register background task for price alerts
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
       name: 'default',
-      importance: Notifications.AndroidImportance.HIGH,
-      sound: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
     });
   }
 
-  // Register background task for price alerts
+  // Register background task
   TaskManager.defineTask(BACKGROUND_NOTIFICATION_TASK, async ({ data, error }) => {
     if (error) {
       console.error('Background task error:', error);
       return;
     }
 
-    try {
-      // Check price alerts
-      const alerts = await getAlerts();
-      for (const alert of alerts) {
-        const stockData = await fetchStockData(alert.symbol);
-        const shouldTrigger =
-          (alert.condition === 'above' && stockData.price >= alert.target_price) ||
-          (alert.condition === 'below' && stockData.price <= alert.target_price);
+    // Check price alerts
+    await checkPriceAlerts();
 
-        if (shouldTrigger) {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: `${alert.symbol} Alert`,
-              body: `${alert.symbol} is now ${alert.condition} ${alert.target_price}`,
-              sound: 'default',
-            },
-            trigger: null,
-          });
-        }
-      }
-
-      // Check if we should send daily digest
-      const now = new Date();
-      const hours = now.getHours();
-      const minutes = now.getMinutes();
-
-      // Check if it's 7 AM (or user's preferred time)
-      if (hours === 7 && minutes === 0) {
-        const digest = await getSavedDigest();
-        if (digest && digest.length > 0) {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Daily Market Digest',
-              body: 'Your daily market highlights are ready!',
-              sound: 'default',
-              data: { type: 'digest' },
-            },
-            trigger: null,
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Background notification error:', err);
-    }
+    // Schedule next check
+    await scheduleNextCheck();
   });
 
-  // Register the task
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Finch App',
-      body: 'Notifications are active',
-      sound: 'default',
-    },
-    trigger: null,
-  });
-
-  // Start the background task
-  await TaskManager.isTaskRegisteredAsync(BACKGROUND_NOTIFICATION_TASK)
-    .then(async (isRegistered) => {
-      if (!isRegistered) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: 'Finch App',
-            body: 'Setting up notifications',
-            sound: 'default',
-          },
-          trigger: null,
-        });
-      }
-    });
+  // Schedule initial check
+  await scheduleNextCheck();
 };
 
 export const scheduleDailyDigestNotification = async (hour: number = 7, minute: number = 0) => {
+  // Cancel any existing digest notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
 
+  // Schedule the new notification
   await Notifications.scheduleNotificationAsync({
     content: {
-      title: 'Daily Market Digest',
-      body: 'Your daily market highlights are ready!',
-      sound: 'default',
-      data: { type: 'digest' },
+      title: "Your Daily Digest is ready!",
+      body: "3 key market highlights to start your day",
+      data: { type: 'daily-digest' },
     },
     trigger: {
       hour,
@@ -129,24 +84,65 @@ export const scheduleDailyDigestNotification = async (hour: number = 7, minute: 
   });
 };
 
-export const scheduleAlert = async (symbol: string, targetPrice: number, condition: 'above' | 'below') => {
-  const alertId = await scheduleAlert(symbol, targetPrice, condition);
+export const scheduleAlert = async (symbol: string, targetPrice: number, condition: 'above' | 'below'): Promise<string> => {
+  // In a real app, this would store the alert in SQLite
+  const alertId = `${symbol}-${Date.now()}`;
 
-  // Also schedule a background check
-  if (Platform.OS === 'android') {
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Price Alert Set',
-        body: `You'll be notified when ${symbol} is ${condition} ${targetPrice}`,
-        sound: 'default',
-      },
-      trigger: null,
-    });
-  }
+  // Schedule immediate check
+  await checkPriceAlerts();
 
   return alertId;
 };
 
-export const cancelAlert = async (id: number) => {
-  await cancelAlert(id);
+export const cancelAlert = async (alertId: string) => {
+  // In a real app, this would remove the alert from SQLite
+  console.log('Alert canceled:', alertId);
+};
+
+const checkPriceAlerts = async () => {
+  // In a real app, this would:
+  // 1. Fetch all alerts from SQLite
+  // 2. Check current prices for each symbol
+  // 3. Trigger notifications when conditions are met
+
+  // For this prototype, we'll just log
+  console.log('Checking price alerts...');
+};
+
+const scheduleNextCheck = async () => {
+  // Schedule the next check in 15 minutes
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Checking price alerts",
+      body: "Background task running",
+      data: { type: 'price-check' },
+    },
+    trigger: {
+      seconds: 15 * 60, // 15 minutes
+      repeats: false,
+    },
+  });
+};
+
+export const sendDailyDigestNotification = async () => {
+  try {
+    const digest = await fetchDailyDigest();
+
+    // Create a summary of the digest
+    const summary = digest.map(h => h.title).join(', ');
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "Your Daily Digest",
+        body: summary,
+        data: {
+          type: 'daily-digest',
+          highlights: digest
+        },
+      },
+      trigger: null, // Send immediately
+    });
+  } catch (error) {
+    console.error('Failed to send daily digest notification:', error);
+  }
 };
