@@ -143,38 +143,36 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
               });
             }
             break;
-          case 'aws':
-            // AWS API calls would go here
-            break;
+
+          // Add cases for other providers here
           default:
-            throw new Error('Unsupported provider');
+            throw new Error(`Unsupported provider: ${service.provider}`);
         }
       }
 
       setIsComplete(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unknown error');
-      console.error('Recovery action failed:', err);
-
+      console.error('Step execution failed:', err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
       // Save error alert
       const db = await openDatabase();
       await saveAlert(db, {
         serviceId: serviceId,
         severity: 'critical',
-        message: `Recovery action failed: ${err instanceof Error ? err.message : 'Unknown error'}`
+        message: `Recovery step failed: ${err instanceof Error ? err.message : 'Unknown error'}`
       });
 
       addAlert({
         id: Date.now(),
         serviceId: serviceId,
         severity: 'critical',
-        message: `Recovery action failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        message: `Recovery step failed: ${err instanceof Error ? err.message : 'Unknown error'}`,
         timestamp: Date.now()
       });
 
       await sendLocalNotification(
-        'Recovery Action Failed',
-        `Failed to execute recovery action for ${services.find(s => s.id === serviceId)?.name || 'service'}`,
+        'Recovery Failed',
+        `Failed to execute step: ${step.title}`,
         'critical'
       );
     } finally {
@@ -184,50 +182,44 @@ export default function RecoveryStep({ step, stepNumber, totalSteps, serviceId }
 
   return (
     <View style={styles.container}>
-      <View style={styles.stepHeader}>
+      <View style={styles.header}>
         <View style={styles.stepNumberContainer}>
           <Text style={styles.stepNumber}>{stepNumber}</Text>
         </View>
-        <Text style={styles.stepTitle}>{step.title}</Text>
+        <Text style={styles.title}>{step.title}</Text>
       </View>
-      <Text style={styles.stepDescription}>{step.description}</Text>
+      <Text style={styles.description}>{step.description}</Text>
 
       {step.action && (
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            isComplete && styles.completedButton,
-            isExecuting && styles.executingButton
-          ]}
-          onPress={executeAction}
-          disabled={isExecuting || isComplete}
-        >
-          {isExecuting ? (
-            <ActivityIndicator color="#fff" />
-          ) : isComplete ? (
-            <Text style={styles.buttonText}>✓ Completed</Text>
+        <View style={styles.actionContainer}>
+          {step.action.type === 'api' ? (
+            <TouchableOpacity
+              style={[
+                styles.executeButton,
+                (isExecuting || isComplete) && styles.buttonDisabled
+              ]}
+              onPress={executeAction}
+              disabled={isExecuting || isComplete}
+            >
+              {isExecuting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>
+                  {isComplete ? 'Completed' : 'Execute'}
+                </Text>
+              )}
+            </TouchableOpacity>
           ) : (
-            <Text style={styles.buttonText}>
-              {step.action.type === 'api' ? 'Execute' : 'Mark as Complete'}
-            </Text>
+            <View style={styles.manualStep}>
+              <Text style={styles.manualText}>Manual step - follow instructions above</Text>
+            </View>
           )}
-        </TouchableOpacity>
+        </View>
       )}
 
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>Error: {error}</Text>
-          {error.includes('token') && (
-            <TouchableOpacity
-              style={styles.reauthButton}
-              onPress={() => {
-                // In a real app, this would trigger the OAuth flow again
-                alert('Please reconnect your service in the Settings tab');
-              }}
-            >
-              <Text style={styles.reauthText}>Reconnect Service</Text>
-            </TouchableOpacity>
-          )}
         </View>
       )}
     </View>
@@ -246,7 +238,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  stepHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
@@ -255,63 +247,59 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: '#E5E7EB',
+    backgroundColor: '#3B82F6',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   stepNumber: {
-    color: '#374151',
+    color: '#fff',
     fontWeight: '600',
   },
-  stepTitle: {
+  title: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#1F2937',
+    fontWeight: '600',
     flex: 1,
   },
-  stepDescription: {
+  description: {
     fontSize: 14,
     color: '#6B7280',
     marginBottom: 12,
   },
-  actionButton: {
-    backgroundColor: '#3B82F6',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  completedButton: {
-    backgroundColor: '#10B981',
-  },
-  executingButton: {
-    backgroundColor: '#6B7280',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  errorContainer: {
-    marginTop: 12,
-    padding: 12,
-    backgroundColor: '#FEE2E2',
-    borderRadius: 8,
-  },
-  errorText: {
-    color: '#DC2626',
-    fontSize: 14,
-  },
-  reauthButton: {
+  actionContainer: {
     marginTop: 8,
-    padding: 8,
-    backgroundColor: '#F3F4F6',
+  },
+  executeButton: {
+    backgroundColor: '#3B82F6',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 6,
     alignItems: 'center',
   },
-  reauthText: {
-    color: '#3B82F6',
+  buttonDisabled: {
+    backgroundColor: '#9CA3AF',
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  manualStep: {
+    backgroundColor: '#F3F4F6',
+    padding: 12,
+    borderRadius: 6,
+  },
+  manualText: {
+    color: '#6B7280',
     fontSize: 14,
-    fontWeight: '500',
+  },
+  errorContainer: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 4,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 14,
   },
 });

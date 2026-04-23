@@ -140,7 +140,7 @@ export default function RecoveryScreen() {
             ListFooterComponent={
               <View style={styles.footer}>
                 <Text style={styles.footerText}>
-                  {selectedWorkflow.steps.length} steps to complete this workflow
+                  {selectedWorkflow.steps.filter(s => s.action?.type === 'api').length} automated steps
                 </Text>
               </View>
             }
@@ -165,14 +165,14 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     color: '#6B7280',
-    fontSize: 16,
   },
   workflowList: {
+    flex: 1,
     padding: 16,
   },
   header: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '700',
     marginBottom: 24,
     color: '#1F2937',
   },
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 8,
-    color: '#374151',
+    color: '#1F2937',
   },
   workflowItem: {
     backgroundColor: '#fff',
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   workflowTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     marginBottom: 4,
   },
   workflowSteps: {
@@ -209,21 +209,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
     borderRadius: 8,
     padding: 16,
-    marginTop: 8,
   },
   noWorkflowsText: {
     color: '#6B7280',
-    fontSize: 14,
   },
   emptyState: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 48,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '500',
-    color: '#10B981',
+    fontWeight: '600',
     marginBottom: 8,
+    color: '#10B981',
   },
   emptySubtext: {
     fontSize: 14,
@@ -239,21 +237,20 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#3B82F6',
     fontSize: 16,
-    fontWeight: '500',
   },
   workflowHeader: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     marginBottom: 4,
     color: '#1F2937',
   },
   serviceInfo: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6B7280',
     marginBottom: 24,
   },
   footer: {
-    paddingVertical: 24,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   footerText: {
