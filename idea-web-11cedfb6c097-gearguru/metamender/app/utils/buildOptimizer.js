@@ -26,6 +26,11 @@ const calculateItemScore = (item, targetStats, weights) => {
     score += weights.rarity;
   }
 
+  // Bonus for matching type (if type is specified)
+  if (item.type && targetStats.type && item.type === targetStats.type) {
+    score += weights.type;
+  }
+
   return score;
 };
 
@@ -49,7 +54,8 @@ export const optimizeBuild = (stats) => {
     attack: 50,
     defense: 50,
     special: 20,
-    rarity: 15
+    rarity: 15,
+    type: 10
   };
 
   // Select top 3 weapons
