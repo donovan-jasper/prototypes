@@ -1,35 +1,55 @@
 import { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
+import * as InAppPurchases from 'expo-in-app-purchases';
 
 export const usePremiumStatus = () => {
-  const [isPremium, setIsPremium] = useState<boolean>(false);
+  const [isPremium, setIsPremium] = useState(false);
+  const [maxPinnedTasks, setMaxPinnedTasks] = useState(3);
 
-  // In a real app, this would check the user's subscription status
-  // For this prototype, we'll simulate it
   useEffect(() => {
-    // Simulate checking subscription status
-    const checkPremiumStatus = async () => {
-      // In a real implementation, you would:
-      // 1. Check local storage for cached status
-      // 2. Make an API call to verify subscription
-      // 3. Handle platform-specific purchase verification
+    const checkSubscription = async () => {
+      try {
+        await InAppPurchases.connectAsync();
 
-      // For this prototype, we'll just simulate a free user
-      setIsPremium(false);
+        // For testing purposes, you might want to use a test product ID
+        const productId = Platform.OS === 'ios'
+          ? 'com.yourapp.aura.premium'
+          : 'com.yourapp.aura.premium';
+
+        const purchases = await InAppPurchases.getPurchaseHistoryAsync();
+
+        // Check if user has an active subscription
+        const hasActiveSubscription = purchases.some(purchase =>
+          purchase.productId === productId &&
+          purchase.isCancelled === false &&
+          (purchase.expirationDate === null || new Date(purchase.expirationDate) > new Date())
+        );
+
+        setIsPremium(hasActiveSubscription);
+        setMaxPinnedTasks(hasActiveSubscription ? Infinity : 3);
+
+        await InAppPurchases.disconnectAsync();
+      } catch (error) {
+        console.error('Error checking subscription:', error);
+        // Fallback to free tier if there's an error
+        setIsPremium(false);
+        setMaxPinnedTasks(3);
+      }
     };
 
-    checkPremiumStatus();
+    checkSubscription();
+
+    // Set up listener for purchase updates
+    const subscription = InAppPurchases.setPurchaseListener(({ responseCode, results, error }) => {
+      if (responseCode === InAppPurchases.IAPResponseCode.OK) {
+        checkSubscription();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
-  // Free tier limits
-  const maxPinnedTasks = isPremium ? Infinity : 3;
-
-  return {
-    isPremium,
-    maxPinnedTasks,
-    // In a real app, you would also expose functions to:
-    // - initiatePurchase()
-    // - restorePurchase()
-    // - checkSubscriptionStatus()
-  };
+  return { isPremium, maxPinnedTasks };
 };

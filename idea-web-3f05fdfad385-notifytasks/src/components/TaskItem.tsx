@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { TaskContext } from '../context/TaskContext';
 import { Colors } from '../constants/Colors';
 import { Task } from '../types/TaskTypes';
+import { usePremiumStatus } from '../hooks/usePremiumStatus';
 
 interface TaskItemProps {
   task: Task;
@@ -10,8 +11,9 @@ interface TaskItemProps {
 
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   const { updateTaskStatus, deleteTask, updateTask } = useContext(TaskContext);
+  const { isPremium, maxPinnedTasks } = usePremiumStatus();
 
-  const handleToggleComplete = () => {
+  const handleCompleteToggle = () => {
     updateTaskStatus(task.id, !task.isCompleted);
   };
 
@@ -26,7 +28,19 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     );
   };
 
-  const handleTogglePin = () => {
+  const handlePinToggle = () => {
+    if (!isPremium && task.isPinned) {
+      Alert.alert(
+        'Premium Feature',
+        'You need to upgrade to Premium to pin tasks.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => {} }, // Navigation to premium screen would go here
+        ]
+      );
+      return;
+    }
+
     updateTask(task.id, { isPinned: !task.isPinned });
   };
 
@@ -34,9 +48,9 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
     <View style={styles.container}>
       <TouchableOpacity
         style={styles.checkbox}
-        onPress={handleToggleComplete}
+        onPress={handleCompleteToggle}
       >
-        {task.isCompleted && <View style={styles.checkmark} />}
+        {task.isCompleted && <View style={styles.checkboxInner} />}
       </TouchableOpacity>
 
       <View style={styles.contentContainer}>
@@ -45,33 +59,32 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
             styles.content,
             task.isCompleted && styles.completedText
           ]}
+          numberOfLines={2}
+          ellipsizeMode="tail"
         >
           {task.content}
         </Text>
-        <Text style={styles.date}>
-          {new Date(task.createdAt).toLocaleDateString()}
-        </Text>
-      </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleTogglePin}
-        >
-          <Text style={[
-            styles.actionText,
-            task.isPinned && styles.pinnedText
-          ]}>
-            {task.isPinned ? 'Unpin' : 'Pin'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.actionsContainer}>
+          <TouchableOpacity
+            style={styles.actionButton}
+            onPress={handlePinToggle}
+          >
+            <Text style={[
+              styles.actionText,
+              task.isPinned && styles.pinnedText
+            ]}>
+              {task.isPinned ? 'Unpin' : 'Pin'}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.actionButton, styles.deleteButton]}
-          onPress={handleDelete}
-        >
-          <Text style={styles.deleteText}>Delete</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.deleteButton]}
+            onPress={handleDelete}
+          >
+            <Text style={styles.deleteText}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -81,8 +94,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 12,
     backgroundColor: Colors.cardBackground,
-    padding: 16,
     borderRadius: 8,
     marginBottom: 8,
   },
@@ -96,7 +109,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkmark: {
+  checkboxInner: {
     width: 12,
     height: 12,
     backgroundColor: Colors.primary,
@@ -108,21 +121,18 @@ const styles = StyleSheet.create({
   content: {
     color: Colors.textPrimary,
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   completedText: {
+    color: Colors.textSecondary,
     textDecorationLine: 'line-through',
-    color: Colors.textSecondary,
   },
-  date: {
-    color: Colors.textSecondary,
-    fontSize: 12,
-  },
-  actions: {
+  actionsContainer: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
   },
   actionButton: {
-    padding: 8,
+    padding: 6,
     borderRadius: 4,
     marginLeft: 8,
   },
