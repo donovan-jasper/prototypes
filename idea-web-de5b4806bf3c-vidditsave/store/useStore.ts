@@ -6,16 +6,20 @@ interface StoreState {
   items: SavedItem[];
   collections: Collection[];
   isLoading: boolean;
+  downloadProgress: { [key: string]: { current: number; total: number } };
   fetchItems: (filter?: { type?: string; collectionId?: number; search?: string }) => Promise<void>;
   addItem: (item: Omit<SavedItem, 'id'>) => Promise<number>;
   removeItem: (id: number) => Promise<void>;
   fetchCollections: () => Promise<void>;
+  updateDownloadProgress: (url: string, current: number, total: number) => void;
+  clearDownloadProgress: (url: string) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
   items: [],
   collections: [],
   isLoading: false,
+  downloadProgress: {},
 
   fetchItems: async (filter) => {
     set({ isLoading: true });
@@ -64,5 +68,22 @@ export const useStore = create<StoreState>((set) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  updateDownloadProgress: (url, current, total) => {
+    set((state) => ({
+      downloadProgress: {
+        ...state.downloadProgress,
+        [url]: { current, total },
+      },
+    }));
+  },
+
+  clearDownloadProgress: (url) => {
+    set((state) => {
+      const newProgress = { ...state.downloadProgress };
+      delete newProgress[url];
+      return { downloadProgress: newProgress };
+    });
   },
 }));

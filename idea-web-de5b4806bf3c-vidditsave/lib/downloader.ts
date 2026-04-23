@@ -1,95 +1,52 @@
+import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { parseUrl } from './parser';
-import { ContentType } from '@/types';
+import { saveFile } from './storage';
+import { createThumbnail } from './media-utils';
 
-const VIDEOS_DIR = `${FileSystem.documentDirectory}media/videos/`;
-const IMAGES_DIR = `${FileSystem.documentDirectory}media/images/`;
-const ARTICLES_DIR = `${FileSystem.documentDirectory}media/articles/`;
-
-export interface DownloadResult {
+interface DownloadResult {
+  title: string;
+  type: 'video' | 'article' | 'image';
   fileUri: string;
   thumbnailUri?: string;
-  title: string;
   source: string;
-  type: ContentType;
-  fileSize: number;
   duration?: number;
-}
-
-function sanitizeFilename(filename: string): string {
-  return filename.replace(/[^a-z0-9_\-\.]/gi, '_').substring(0, 200);
-}
-
-function getFileExtension(url: string, type: ContentType): string {
-  const urlLower = url.toLowerCase();
-
-  if (type === 'video') {
-    if (urlLower.includes('.mp4')) return '.mp4';
-    if (urlLower.includes('.webm')) return '.webm';
-    if (urlLower.includes('.mov')) return '.mov';
-    return '.mp4';
-  }
-
-  if (type === 'image') {
-    if (urlLower.includes('.jpg') || urlLower.includes('.jpeg')) return '.jpg';
-    if (urlLower.includes('.png')) return '.png';
-    if (urlLower.includes('.gif')) return '.gif';
-    if (urlLower.includes('.webp')) return '.webp';
-    return '.jpg';
-  }
-
-  return '.html';
-}
-
-function getDirectoryForType(type: ContentType): string {
-  switch (type) {
-    case 'video':
-      return VIDEOS_DIR;
-    case 'image':
-      return IMAGES_DIR;
-    case 'article':
-      return ARTICLES_DIR;
-  }
+  fileSize?: number;
 }
 
 export async function downloadMedia(
   url: string,
-  onProgress?: (progress: number, total: number) => void
+  onProgress?: (current: number, total: number) => void
 ): Promise<DownloadResult> {
   const parsed = parseUrl(url);
-  const timestamp = Date.now();
-  const extension = getFileExtension(url, parsed.type);
-  const filename = `${sanitizeFilename(parsed.title)}_${timestamp}${extension}`;
-  const directory = getDirectoryForType(parsed.type);
-  const fileUri = `${directory}${filename}`;
-
-  // Ensure directory exists
-  await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-
-  let downloadUrl = parsed.downloadUrl || url;
-
-  if (parsed.type === 'article') {
-    const response = await fetch(url);
-    const html = await response.text();
-    await FileSystem.writeAsStringAsync(fileUri, html);
-
-    const fileInfo = await FileSystem.getInfoAsync(fileUri);
-
-    return {
-      fileUri,
-      title: parsed.title,
-      source: parsed.source,
-      type: parsed.type,
-      fileSize: fileInfo.size || 0,
-    };
+  if (!parsed) {
+    throw new Error('Could not parse URL');
   }
 
+  // For videos, we need to get the actual download URL first
+  let downloadUrl = url;
+  let title = parsed.title || 'Untitled';
+  let thumbnailUrl = parsed.thumbnail;
+
+  if (parsed.type === 'video') {
+    const videoInfo = await getVideoInfo(url);
+    downloadUrl = videoInfo.downloadUrl;
+    title = videoInfo.title;
+    thumbnailUrl = videoInfo.thumbnail;
+  }
+
+  // Create a unique filename
+  const extension = downloadUrl.split('.').pop() || 'mp4';
+  const filename = `${Date.now()}.${extension}`;
+  const fileUri = `${FileSystem.documentDirectory}media/${parsed.type}s/${filename}`;
+
+  // Download the file
   const downloadResumable = FileSystem.createDownloadResumable(
     downloadUrl,
     fileUri,
     {},
     (downloadProgress) => {
-      if (onProgress) {
+      if (onProgress && downloadProgress.totalBytesExpectedToWrite) {
         onProgress(
           downloadProgress.totalBytesWritten,
           downloadProgress.totalBytesExpectedToWrite
@@ -98,30 +55,63 @@ export async function downloadMedia(
     }
   );
 
-  const result = await downloadResumable.downloadAsync();
+  try {
+    const { uri } = await downloadResumable.downloadAsync();
+    const fileInfo = await FileSystem.getInfoAsync(uri);
 
-  if (!result) {
-    throw new Error('Download failed');
+    // Generate thumbnail if needed
+    let thumbnailUri: string | undefined;
+    if (parsed.type === 'video' && uri) {
+      thumbnailUri = await createThumbnail(uri);
+    } else if (parsed.type === 'image' && uri) {
+      // For images, we can use the original as thumbnail
+      thumbnailUri = uri;
+    } else if (thumbnailUrl) {
+      // Download the thumbnail
+      const thumbnailFilename = `${Date.now()}_thumb.jpg`;
+      const thumbnailUri = `${FileSystem.documentDirectory}media/thumbnails/${thumbnailFilename}`;
+      await FileSystem.downloadAsync(thumbnailUrl, thumbnailUri);
+    }
+
+    return {
+      title,
+      type: parsed.type,
+      fileUri: uri,
+      thumbnailUri,
+      source: parsed.source,
+      duration: parsed.duration,
+      fileSize: fileInfo.size,
+    };
+  } catch (error) {
+    console.error('Download failed:', error);
+    throw new Error('Failed to download media');
+  }
+}
+
+export async function getVideoInfo(url: string): Promise<{
+  title: string;
+  downloadUrl: string;
+  thumbnail: string;
+  duration?: number;
+}> {
+  // In a real implementation, this would use yt-dlp or platform APIs
+  // For this example, we'll simulate getting video info
+
+  // This is a placeholder - in production you would:
+  // 1. Use yt-dlp to get available formats
+  // 2. Select the best quality available
+  // 3. Return the direct download URL
+
+  // For YouTube example:
+  if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    return {
+      title: 'Sample Video',
+      downloadUrl: 'https://example.com/sample-video.mp4',
+      thumbnail: 'https://example.com/sample-thumbnail.jpg',
+      duration: 120,
+    };
   }
 
-  const fileInfo = await FileSystem.getInfoAsync(result.uri);
-
-  // For videos, generate a thumbnail
-  let thumbnailUri: string | undefined;
-  if (parsed.type === 'video') {
-    // In a real implementation, we would use expo-av or another library to generate a thumbnail
-    // For MVP, we'll just use a placeholder
-    thumbnailUri = `${directory}${sanitizeFilename(parsed.title)}_${timestamp}_thumb.jpg`;
-    // Create a placeholder thumbnail
-    await FileSystem.writeAsStringAsync(thumbnailUri, '');
-  }
-
-  return {
-    fileUri: result.uri,
-    thumbnailUri,
-    title: parsed.title,
-    source: parsed.source,
-    type: parsed.type,
-    fileSize: fileInfo.size || 0,
-  };
+  // For other platforms, implement similar logic
+  throw new Error('Unsupported video platform');
 }

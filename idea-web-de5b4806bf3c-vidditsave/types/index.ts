@@ -1,11 +1,9 @@
-export type ContentType = 'video' | 'article' | 'image';
-
 export interface SavedItem {
   id: number;
   url: string;
   title: string;
-  type: ContentType;
-  fileUri: string | null;
+  type: 'video' | 'article' | 'image';
+  fileUri: string;
   thumbnailUri: string | null;
   source: string;
   createdAt: number;
@@ -21,8 +19,11 @@ export interface Collection {
   createdAt: number;
 }
 
-export interface DownloadProgress {
-  itemId: number;
-  progress: number;
-  total: number;
+export interface ParsedUrlResult {
+  type: 'video' | 'article' | 'image';
+  title?: string;
+  thumbnail?: string;
+  source: string;
+  downloadUrl?: string;
+  duration?: number;
 }
