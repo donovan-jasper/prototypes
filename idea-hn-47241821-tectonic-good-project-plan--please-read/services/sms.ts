@@ -176,16 +176,11 @@ export const handleSafetyCheckInExpiration = async (checkInId: string) => {
 
   } catch (error) {
     console.error('Error handling safety check-in expiration:', error);
-    // Store for retry later
-    await storeOfflineMessage({
-      to: 'retry',
-      body: `Failed to process check-in ${checkInId}`,
-      timestamp: new Date().toISOString(),
-    });
+    throw error;
   }
 };
 
-const sendSMS = async (to: string, body: string) => {
+export const sendSMS = async (to: string, body: string) => {
   try {
     const response = await axios.post(TWILIO_BACKEND_URL, {
       to,
@@ -193,7 +188,7 @@ const sendSMS = async (to: string, body: string) => {
     });
 
     if (response.status !== 200) {
-      throw new Error(`Failed to send SMS: ${response.statusText}`);
+      throw new Error('Failed to send SMS');
     }
 
     return response.data;
@@ -203,7 +198,7 @@ const sendSMS = async (to: string, body: string) => {
   }
 };
 
-const storeOfflineMessage = async (message: OfflineMessage) => {
+export const storeOfflineMessage = async (message: OfflineMessage) => {
   try {
     const db = await initDatabase();
     await db.runAsync(
@@ -212,10 +207,11 @@ const storeOfflineMessage = async (message: OfflineMessage) => {
     );
   } catch (error) {
     console.error('Error storing offline message:', error);
+    throw error;
   }
 };
 
-export const retryOfflineMessages = async () => {
+export const processOfflineMessages = async () => {
   try {
     const db = await initDatabase();
 
@@ -234,10 +230,32 @@ export const retryOfflineMessages = async () => {
         // If successful, delete the message
         await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
       } catch (error) {
-        console.error(`Failed to retry message ${message.id}:`, error);
+        console.error(`Failed to send offline message to ${message.to_phone}:`, error);
+        // Keep the message for next retry
       }
     }
   } catch (error) {
-    console.error('Error retrying offline messages:', error);
+    console.error('Error processing offline messages:', error);
+    throw error;
+  }
+};
+
+export const setupOfflineMessageProcessing = async () => {
+  try {
+    // Register a background task to process offline messages periodically
+    await TaskManager.defineTask('offline-message-task', async () => {
+      await processOfflineMessages();
+      return BackgroundFetch.BackgroundFetchResult.NewData;
+    });
+
+    await BackgroundFetch.registerTaskAsync('offline-message-task', {
+      minimumInterval: 60 * 15, // 15 minutes
+      stopOnTerminate: false,
+      startOnBoot: true,
+    });
+
+    console.log('Offline message processing task registered successfully');
+  } catch (error) {
+    console.error('Error setting up offline message processing:', error);
   }
 };
