@@ -1,10 +1,8 @@
-export const WEBSOCKET_ENDPOINT = process.env.NODE_ENV === 'production'
-  ? 'wss://your-production-websocket-endpoint'
-  : 'ws://localhost:8080';
+// src/utils/constants.js
+export const DEFAULT_API_URL = 'http://localhost:8080';
+export const DEFAULT_WEBSOCKET_URL = 'ws://localhost:8080/ws';
 
-export const API_ENDPOINT = process.env.NODE_ENV === 'production'
-  ? 'https://your-production-api-endpoint'
-  : 'https://your-development-api-endpoint';
+export const PRODUCTION_API_URL = 'https://api.retropulse.app';
+export const PRODUCTION_WEBSOCKET_URL = 'wss://api.retropulse.app/ws';
 
-export const DEFAULT_WEBSOCKET_URL = 'wss://default-websocket-endpoint.example.com';
-export const DEFAULT_API_URL = 'https://default-api-endpoint.example.com';
+export const isProduction = process.env.NODE_ENV === 'production';

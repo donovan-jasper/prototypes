@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, ActivityIndicator, TouchableOpacity, TextInput, Alert, Switch, ScrollView } from 'react-native';
 import { kubernetesAPI } from '../services/KubernetesAPI';
-import { DEFAULT_WEBSOCKET_URL, DEFAULT_API_URL } from '../utils/constants';
+import { DEFAULT_WEBSOCKET_URL, DEFAULT_API_URL, PRODUCTION_API_URL, PRODUCTION_WEBSOCKET_URL, isProduction } from '../utils/constants';
 
 const MonitoringScreen = () => {
   const [cpu, setCPU] = useState(0);
@@ -9,8 +9,8 @@ const MonitoringScreen = () => {
   const [disk, setDisk] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [apiEndpoint, setApiEndpoint] = useState(process.env.KUBERNETES_API_URL || DEFAULT_API_URL);
-  const [wsEndpoint, setWsEndpoint] = useState(process.env.KUBERNETES_WS_ENDPOINT || DEFAULT_WEBSOCKET_URL);
+  const [apiEndpoint, setApiEndpoint] = useState(isProduction ? PRODUCTION_API_URL : process.env.KUBERNETES_API_URL || DEFAULT_API_URL);
+  const [wsEndpoint, setWsEndpoint] = useState(isProduction ? PRODUCTION_WEBSOCKET_URL : process.env.KUBERNETES_WS_ENDPOINT || DEFAULT_WEBSOCKET_URL);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [autoReconnect, setAutoReconnect] = useState(true);
@@ -172,8 +172,8 @@ const MonitoringScreen = () => {
               },
             ]}
           />
+          <Text style={styles.metricValue}>{value}%</Text>
         </View>
-        <Text style={styles.metricValue}>{value}%</Text>
       </View>
     );
   };
@@ -190,42 +190,32 @@ const MonitoringScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {isConfiguring && (
+      {isConfiguring ? (
         <View style={styles.configContainer}>
-          <Text style={styles.configTitle}>Configuration</Text>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>API Endpoint:</Text>
-            <TextInput
-              style={styles.input}
-              value={apiEndpoint}
-              onChangeText={setApiEndpoint}
-              placeholder="https://your-api-endpoint"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>WebSocket Endpoint:</Text>
-            <TextInput
-              style={styles.input}
-              value={wsEndpoint}
-              onChangeText={setWsEndpoint}
-              placeholder="wss://your-websocket-endpoint"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
+          <Text style={styles.configTitle}>API Configuration</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="API Endpoint"
+            value={apiEndpoint}
+            onChangeText={setApiEndpoint}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="WebSocket Endpoint"
+            value={wsEndpoint}
+            onChangeText={setWsEndpoint}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
           <View style={styles.switchContainer}>
-            <Text style={styles.switchLabel}>Auto Reconnect:</Text>
+            <Text style={styles.switchLabel}>Auto-reconnect</Text>
             <Switch
               value={autoReconnect}
               onValueChange={setAutoReconnect}
             />
           </View>
-
           <TouchableOpacity
             style={styles.saveButton}
             onPress={handleSaveConfig}
@@ -233,51 +223,47 @@ const MonitoringScreen = () => {
             <Text style={styles.saveButtonText}>Save Configuration</Text>
           </TouchableOpacity>
         </View>
-      )}
+      ) : (
+        <>
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#6200EE" />
+              <Text style={styles.loadingText}>Loading metrics...</Text>
+            </View>
+          )}
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.loadingText}>Loading system metrics...</Text>
-        </View>
-      )}
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity
+                style={styles.retryButton}
+                onPress={handleRefresh}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
-            onPress={handleRefresh}
-          >
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+          {!isLoading && !error && (
+            <View style={styles.metricsContainer}>
+              {renderProgressBar('CPU Usage', cpu, cpuAnim, getStatusColor(cpu))}
+              {renderProgressBar('Memory Usage', memory, memoryAnim, getStatusColor(memory))}
+              {renderProgressBar('Disk Usage', disk, diskAnim, getStatusColor(disk))}
 
-      {!isLoading && !error && (
-        <View style={styles.metricsContainer}>
-          {renderProgressBar('CPU Usage', cpu, cpuAnim, getStatusColor(cpu))}
-          {renderProgressBar('Memory Usage', memory, memoryAnim, getStatusColor(memory))}
-          {renderProgressBar('Disk Usage', disk, diskAnim, getStatusColor(disk))}
-
-          <View style={styles.statusContainer}>
-            <Text style={styles.statusLabel}>Connection Status:</Text>
-            <View style={[
-              styles.statusIndicator,
-              { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }
-            ]} />
-            <Text style={styles.statusText}>
-              {isConnected ? 'Connected' : 'Disconnected'}
-            </Text>
-          </View>
-
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={handleRefresh}
-          >
-            <Text style={styles.refreshButtonText}>Refresh Metrics</Text>
-          </TouchableOpacity>
-        </View>
+              <View style={styles.statusContainer}>
+                <Text style={styles.statusText}>
+                  Connection Status: {isConnected ? 'Connected' : 'Disconnected'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.refreshButton}
+                  onPress={handleRefresh}
+                >
+                  <Text style={styles.refreshButtonText}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );
@@ -286,8 +272,8 @@ const MonitoringScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
@@ -308,8 +294,8 @@ const styles = StyleSheet.create({
   },
   configContainer: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    padding: 20,
     marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -323,36 +309,29 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: '#333',
   },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  inputLabel: {
-    fontSize: 14,
-    marginBottom: 5,
-    color: '#666',
-  },
   input: {
-    borderWidth: 1,
+    height: 40,
     borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
-    fontSize: 14,
+    borderWidth: 1,
+    borderRadius: 5,
+    paddingHorizontal: 10,
+    marginBottom: 15,
     backgroundColor: '#fff',
   },
   switchContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 15,
   },
   switchLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#333',
   },
   saveButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200EE',
     padding: 12,
-    borderRadius: 4,
+    borderRadius: 5,
     alignItems: 'center',
   },
   saveButtonText: {
@@ -373,7 +352,7 @@ const styles = StyleSheet.create({
   errorContainer: {
     backgroundColor: '#ffebee',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 5,
     marginBottom: 20,
   },
   errorText: {
@@ -383,7 +362,7 @@ const styles = StyleSheet.create({
   retryButton: {
     backgroundColor: '#d32f2f',
     padding: 10,
-    borderRadius: 4,
+    borderRadius: 5,
     alignItems: 'center',
   },
   retryButtonText: {
@@ -392,8 +371,8 @@ const styles = StyleSheet.create({
   },
   metricsContainer: {
     backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -401,7 +380,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   metricContainer: {
-    marginBottom: 15,
+    marginBottom: 20,
   },
   metricLabel: {
     fontSize: 16,
@@ -410,47 +389,40 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   progressBarBackground: {
-    height: 10,
+    height: 20,
     backgroundColor: '#e0e0e0',
-    borderRadius: 5,
+    borderRadius: 10,
     overflow: 'hidden',
+    position: 'relative',
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 5,
+    borderRadius: 10,
   },
   metricValue: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
-    textAlign: 'right',
+    position: 'absolute',
+    right: 10,
+    top: 0,
+    bottom: 0,
+    textAlignVertical: 'center',
+    color: '#333',
+    fontWeight: 'bold',
   },
   statusContainer: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 15,
-  },
-  statusLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 10,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 5,
+    marginTop: 20,
   },
   statusText: {
     fontSize: 14,
     color: '#666',
   },
   refreshButton: {
-    backgroundColor: '#2196F3',
-    padding: 12,
-    borderRadius: 4,
-    alignItems: 'center',
-    marginTop: 20,
+    backgroundColor: '#6200EE',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
   },
   refreshButtonText: {
     color: '#fff',
