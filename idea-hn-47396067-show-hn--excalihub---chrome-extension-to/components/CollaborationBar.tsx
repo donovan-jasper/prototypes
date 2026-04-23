@@ -1,8 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useCollaboration } from '../hooks/useCollaboration';
+import { Ionicons } from '@expo/vector-icons';
 
-const CollaborationBar = () => {
+interface CollaborationBarProps {
+  onShare?: () => void;
+}
+
+const CollaborationBar: React.FC<CollaborationBarProps> = ({ onShare }) => {
   const { activeUsers, currentUser } = useCollaboration();
 
   if (!activeUsers || activeUsers.length === 0) {
@@ -29,6 +34,11 @@ const CollaborationBar = () => {
           </View>
         ))}
       </View>
+      {onShare && (
+        <TouchableOpacity style={styles.shareButton} onPress={onShare}>
+          <Ionicons name="share-social" size={20} color="#333" />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -41,6 +51,9 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     zIndex: 100,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   userList: {
     flexDirection: 'row',
@@ -73,6 +86,12 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     fontSize: 10,
     marginTop: 2,
+  },
+  shareButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 20,
+    padding: 8,
+    marginLeft: 8,
   },
 });
 

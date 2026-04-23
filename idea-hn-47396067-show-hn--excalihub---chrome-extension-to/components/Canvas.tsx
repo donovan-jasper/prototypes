@@ -1,157 +1,198 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Canvas as SkiaCanvas, Path, Group, Skia, SkPath } from '@shopify/react-native-skia';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import React, { useEffect, useRef, useState } from 'react';
+import { View, StyleSheet, Dimensions } from 'react-native';
+import { Canvas as SkiaCanvas, Path, Skia, useCanvasRef, useTouchHandler } from '@shopify/react-native-skia';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useDrawingStore } from '../store/useDrawingStore';
-import { CanvasElement } from '../types/drawing';
+import { CanvasElement, Cursor } from '../types/drawing';
+import { v4 as uuidv4 } from 'uuid';
 
-type CanvasProps = {
+const { width, height } = Dimensions.get('window');
+
+interface CanvasProps {
   initialElements?: CanvasElement[];
   onElementAdded?: (element: CanvasElement) => void;
   onElementUpdated?: (id: string, updates: Partial<CanvasElement>) => void;
   onElementRemoved?: (id: string) => void;
   onCursorMove?: (x: number, y: number) => void;
-  cursors?: Array<{ x: number; y: number; userId: string }>;
-  activeUsers?: Array<{ id: string; color: string }>;
-};
+  cursors?: Record<string, Cursor>;
+  activeUsers?: Array<{ id: string; name: string; color: string }>;
+  isReadOnly?: boolean;
+}
 
-const Canvas = ({
+const Canvas: React.FC<CanvasProps> = ({
   initialElements = [],
   onElementAdded,
   onElementUpdated,
   onElementRemoved,
   onCursorMove,
-  cursors = [],
+  cursors = {},
   activeUsers = [],
-}: CanvasProps) => {
+  isReadOnly = false,
+}) => {
+  const canvasRef = useCanvasRef();
+  const [elements, setElements] = useState<CanvasElement[]>(initialElements);
+  const [currentPath, setCurrentPath] = useState<Path | null>(null);
+  const [currentElement, setCurrentElement] = useState<CanvasElement | null>(null);
+  const [viewport, setViewport] = useState({ x: 0, y: 0, scale: 1 });
+  const [isDrawing, setIsDrawing] = useState(false);
+
   const {
-    elements,
-    addElement,
-    updateElement,
-    removeElement,
     currentTool,
     currentColor,
     currentStrokeWidth,
-    setElements,
+    addElement,
+    updateElement,
+    removeElement,
   } = useDrawingStore();
-
-  const pathRef = useRef<Path>(new Path());
-  const currentPathRef = useRef<CanvasElement | null>(null);
-  const lastCursorPosition = useRef({ x: 0, y: 0 });
 
   // Initialize with initial elements
   useEffect(() => {
-    if (initialElements.length > 0) {
-      setElements(initialElements);
+    setElements(initialElements);
+  }, [initialElements]);
+
+  // Handle element changes from collaboration
+  useEffect(() => {
+    if (onElementAdded || onElementUpdated || onElementRemoved) {
+      // This would be handled by the parent component in a real implementation
     }
-  }, [initialElements, setElements]);
+  }, [onElementAdded, onElementUpdated, onElementRemoved]);
 
-  // Handle drawing
+  const handleTouchStart = (x: number, y: number) => {
+    if (isReadOnly) return;
+
+    setIsDrawing(true);
+    onCursorMove?.(x, y);
+
+    if (currentTool === 'pen') {
+      const path = Skia.Path.Make();
+      path.moveTo(x, y);
+      setCurrentPath(path);
+
+      const newElement: CanvasElement = {
+        id: uuidv4(),
+        type: 'path',
+        path: path.toSVGString(),
+        color: currentColor,
+        strokeWidth: currentStrokeWidth,
+        points: [{ x, y }],
+      };
+
+      setCurrentElement(newElement);
+      setElements(prev => [...prev, newElement]);
+      onElementAdded?.(newElement);
+    }
+  };
+
+  const handleTouchMove = (x: number, y: number) => {
+    if (!isDrawing || isReadOnly) return;
+
+    onCursorMove?.(x, y);
+
+    if (currentTool === 'pen' && currentPath && currentElement) {
+      currentPath.lineTo(x, y);
+
+      const updatedElement = {
+        ...currentElement,
+        path: currentPath.toSVGString(),
+        points: [...currentElement.points, { x, y }],
+      };
+
+      setCurrentElement(updatedElement);
+      setElements(prev => prev.map(el =>
+        el.id === updatedElement.id ? updatedElement : el
+      ));
+      onElementUpdated?.(updatedElement.id, {
+        path: updatedElement.path,
+        points: updatedElement.points,
+      });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (!isDrawing || isReadOnly) return;
+
+    setIsDrawing(false);
+    setCurrentPath(null);
+    setCurrentElement(null);
+  };
+
+  const touchHandler = useTouchHandler({
+    onStart: ({ x, y }) => handleTouchStart(x, y),
+    onActive: ({ x, y }) => handleTouchMove(x, y),
+    onEnd: () => handleTouchEnd(),
+  });
+
   const panGesture = Gesture.Pan()
-    .onStart((e) => {
-      if (currentTool === 'pen') {
-        const newPath: CanvasElement = {
-          id: Math.random().toString(36).substring(2, 9),
-          type: 'path',
-          path: new Path(),
-          color: currentColor,
-          strokeWidth: currentStrokeWidth,
-          points: [{ x: e.x, y: e.y }],
-        };
-        newPath.path.moveTo(e.x, e.y);
-        currentPathRef.current = newPath;
-        addElement(newPath);
-        onElementAdded?.(newPath);
-      }
-    })
     .onUpdate((e) => {
-      if (currentTool === 'pen' && currentPathRef.current) {
-        const currentPath = currentPathRef.current;
-        currentPath.path.lineTo(e.x, e.y);
-        currentPath.points.push({ x: e.x, y: e.y });
-
-        updateElement(currentPath.id, {
-          path: currentPath.path,
-          points: currentPath.points,
-        });
-
-        onElementUpdated?.(currentPath.id, {
-          path: currentPath.path,
-          points: currentPath.points,
-        });
-      }
-
-      // Throttle cursor updates to avoid too many broadcasts
-      if (Math.abs(e.x - lastCursorPosition.current.x) > 5 ||
-          Math.abs(e.y - lastCursorPosition.current.y) > 5) {
-        onCursorMove?.(e.x, e.y);
-        lastCursorPosition.current = { x: e.x, y: e.y };
-      }
-    })
-    .onEnd(() => {
-      if (currentTool === 'pen' && currentPathRef.current) {
-        currentPathRef.current = null;
-      }
+      setViewport(prev => ({
+        ...prev,
+        x: prev.x + e.translationX / prev.scale,
+        y: prev.y + e.translationY / prev.scale,
+      }));
     });
 
-  // Render elements
-  const renderElement = useCallback((element: CanvasElement) => {
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      setViewport(prev => ({
+        ...prev,
+        scale: prev.scale * e.scale,
+      }));
+    });
+
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  const renderElement = (element: CanvasElement) => {
     switch (element.type) {
       case 'path':
         return (
           <Path
             key={element.id}
             path={element.path}
+            color={element.color}
             style="stroke"
             strokeWidth={element.strokeWidth}
-            color={element.color}
           />
         );
       // Add cases for other element types (rect, circle, etc.)
       default:
         return null;
     }
-  }, []);
+  };
 
-  // Render cursors
-  const renderCursors = useCallback(() => {
-    return cursors.map((cursor) => {
-      const user = activeUsers.find(u => u.id === cursor.userId);
-      if (!user) return null;
-
-      return (
-        <Group key={`cursor-${cursor.userId}`}>
-          <Path
-            path={Skia.Path.Make()
-              .moveTo(cursor.x - 10, cursor.y - 10)
-              .lineTo(cursor.x + 10, cursor.y + 10)
-              .moveTo(cursor.x + 10, cursor.y - 10)
-              .lineTo(cursor.x - 10, cursor.y + 10)}
-            style="stroke"
-            strokeWidth={2}
-            color={user.color}
-          />
-          <Path
-            path={Skia.Path.Make()
-              .moveTo(cursor.x, cursor.y)
-              .addCircle(cursor.x, cursor.y, 5)}
-            style="fill"
-            color={user.color}
-          />
-        </Group>
-      );
-    });
-  }, [cursors, activeUsers]);
+  const renderCursor = (cursor: Cursor, user: { id: string; color: string }) => {
+    return (
+      <View
+        key={`cursor-${user.id}`}
+        style={[
+          styles.cursor,
+          {
+            left: cursor.x,
+            top: cursor.y,
+            borderColor: user.color,
+          },
+        ]}
+      />
+    );
+  };
 
   return (
-    <View style={styles.container}>
-      <GestureDetector gesture={panGesture}>
-        <SkiaCanvas style={styles.canvas}>
+    <GestureDetector gesture={composedGesture}>
+      <View style={styles.container}>
+        <SkiaCanvas
+          ref={canvasRef}
+          style={styles.canvas}
+          onTouch={touchHandler}
+        >
           {elements.map(renderElement)}
-          {renderCursors()}
         </SkiaCanvas>
-      </GestureDetector>
-    </View>
+
+        {/* Render remote cursors */}
+        {Object.entries(cursors).map(([userId, cursor]) => {
+          const user = activeUsers.find(u => u.id === userId);
+          return user ? renderCursor(cursor, user) : null;
+        })}
+      </View>
+    </GestureDetector>
   );
 };
 
@@ -161,6 +202,16 @@ const styles = StyleSheet.create({
   },
   canvas: {
     flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  cursor: {
+    position: 'absolute',
+    width: 20,
+    height: 20,
+    borderWidth: 2,
+    borderRadius: 10,
+    pointerEvents: 'none',
   },
 });
 

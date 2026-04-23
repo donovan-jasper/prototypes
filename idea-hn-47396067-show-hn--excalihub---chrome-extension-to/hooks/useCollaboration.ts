@@ -1,176 +1,169 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
-import { serializeCanvas } from '../lib/drawing';
+import { v4 as uuidv4 } from 'uuid';
+import { CanvasElement, Cursor } from '../types/drawing';
 
-const COLORS = [
-  '#FF5733', '#33FF57', '#3357FF', '#F033FF',
-  '#FF33F0', '#33FFF0', '#FF8C33', '#8C33FF'
-];
+interface User {
+  id: string;
+  name: string;
+  color: string;
+}
 
-export const useCollaboration = (shareId: string) => {
-  const [activeUsers, setActiveUsers] = useState<Array<{
-    id: string;
-    name: string;
-    color: string;
-  }>>([]);
-  const [currentUser, setCurrentUser] = useState<{
-    id: string;
-    name: string;
-    color: string;
-  } | null>(null);
-  const [cursors, setCursors] = useState<Array<{
-    x: number;
-    y: number;
-    userId: string;
-  }>>([]);
-  const channelRef = useRef<any>(null);
-  const userIdRef = useRef<string>(Math.random().toString(36).substring(2, 9));
-  const userColorRef = useRef<string>(COLORS[Math.floor(Math.random() * COLORS.length)]);
+interface CollaborationHook {
+  activeUsers: User[];
+  currentUser: User | null;
+  cursors: Record<string, Cursor>;
+  broadcastElementChange: (type: 'element_added' | 'element_updated' | 'element_removed', payload: any) => void;
+  broadcastCursorMove: (x: number, y: number) => void;
+  connectToCollaboration: () => void;
+  disconnectFromCollaboration: () => void;
+  handleRemoteElementChange: (type: string, payload: any) => void;
+  handleRemoteCursorMove: (userId: string, x: number, y: number) => void;
+}
+
+export const useCollaboration = (shareId: string): CollaborationHook => {
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [cursors, setCursors] = useState<Record<string, Cursor>>({});
+  const [channel, setChannel] = useState<any>(null);
+
+  // Generate a random color for the current user
+  const getRandomColor = () => {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  };
 
   // Initialize current user
   useEffect(() => {
+    const userId = uuidv4();
     const userName = `User ${Math.floor(Math.random() * 1000)}`;
-    const user = {
-      id: userIdRef.current,
+    const userColor = getRandomColor();
+
+    setCurrentUser({
+      id: userId,
       name: userName,
-      color: userColorRef.current,
-    };
-    setCurrentUser(user);
+      color: userColor,
+    });
   }, []);
 
-  // Connect to collaboration channel
+  // Connect to Supabase realtime channel
   const connectToCollaboration = useCallback(() => {
-    if (!shareId) return;
+    if (!currentUser) return;
 
-    // Create a unique channel name for this drawing
-    const channelName = `drawing:${shareId}`;
-
-    // Subscribe to the channel
-    const channel = supabase.channel(channelName, {
+    const channelName = `collaboration-${shareId}`;
+    const newChannel = supabase.channel(channelName, {
       config: {
         presence: {
-          key: userIdRef.current,
+          key: currentUser.id,
         },
       },
     });
 
     // Track presence state
-    channel.on('presence', { event: 'sync' }, () => {
-      const state = channel.presenceState();
-      const users = Object.values(state).flat() as Array<{
-        id: string;
-        name: string;
-        color: string;
-      }>;
+    newChannel.on('presence', { event: 'sync' }, () => {
+      const newState = newChannel.presenceState();
+      const users = Object.values(newState).flat() as User[];
       setActiveUsers(users);
     });
 
+    // Track cursor movements
+    newChannel.on(
+      'broadcast',
+      { event: 'cursor_move' },
+      ({ payload }) => {
+        setCursors(prev => ({
+          ...prev,
+          [payload.userId]: { x: payload.x, y: payload.y },
+        }));
+      }
+    );
+
     // Track element changes
-    channel.on('broadcast', { event: 'element_change' }, ({ payload }) => {
-      if (payload.userId !== userIdRef.current) {
+    newChannel.on(
+      'broadcast',
+      { event: 'element_change' },
+      ({ payload }) => {
         handleRemoteElementChange(payload.type, payload.data);
       }
-    });
+    );
 
-    // Track cursor movements
-    channel.on('broadcast', { event: 'cursor_move' }, ({ payload }) => {
-      if (payload.userId !== userIdRef.current) {
-        handleRemoteCursorMove(payload.x, payload.y, payload.userId);
-      }
-    });
-
-    // Subscribe to the channel
-    channel.subscribe(async (status) => {
+    newChannel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        // Join presence
-        await channel.track({
-          id: userIdRef.current,
-          name: currentUser?.name || 'Anonymous',
-          color: userColorRef.current,
+        await newChannel.track({
+          id: currentUser.id,
+          name: currentUser.name,
+          color: currentUser.color,
         });
       }
     });
 
-    channelRef.current = channel;
+    setChannel(newChannel);
   }, [shareId, currentUser]);
 
-  // Disconnect from collaboration
+  // Disconnect from channel
   const disconnectFromCollaboration = useCallback(() => {
-    if (channelRef.current) {
-      channelRef.current.unsubscribe();
-      channelRef.current = null;
+    if (channel) {
+      channel.unsubscribe();
+      setChannel(null);
     }
-  }, []);
+  }, [channel]);
 
-  // Broadcast element changes
+  // Broadcast element changes to other users
   const broadcastElementChange = useCallback((type: string, data: any) => {
-    if (channelRef.current && currentUser) {
-      channelRef.current.send({
+    if (channel && currentUser) {
+      channel.send({
         type: 'broadcast',
         event: 'element_change',
         payload: {
           type,
           data,
-          userId: userIdRef.current,
+          userId: currentUser.id,
         },
       });
     }
-  }, [currentUser]);
+  }, [channel, currentUser]);
 
   // Broadcast cursor movements
   const broadcastCursorMove = useCallback((x: number, y: number) => {
-    if (channelRef.current && currentUser) {
-      channelRef.current.send({
+    if (channel && currentUser) {
+      channel.send({
         type: 'broadcast',
         event: 'cursor_move',
         payload: {
+          userId: currentUser.id,
           x,
           y,
-          userId: userIdRef.current,
         },
       });
     }
-  }, [currentUser]);
+  }, [channel, currentUser]);
 
   // Handle remote element changes
-  const handleRemoteElementChange = useCallback((type: string, data: any) => {
-    // Implement conflict resolution logic here
-    // For now, just apply the changes directly
-    switch (type) {
-      case 'element_added':
-        // Add the new element to the canvas
-        break;
-      case 'element_updated':
-        // Update the specified element
-        break;
-      case 'element_removed':
-        // Remove the specified element
-        break;
-    }
+  const handleRemoteElementChange = useCallback((type: string, payload: any) => {
+    // This would be implemented in the parent component
+    // to update the local state based on remote changes
   }, []);
 
   // Handle remote cursor movements
-  const handleRemoteCursorMove = useCallback((x: number, y: number, userId: string) => {
-    setCursors(prev => {
-      // Update or add the cursor position
-      const existingIndex = prev.findIndex(c => c.userId === userId);
-      if (existingIndex >= 0) {
-        const newCursors = [...prev];
-        newCursors[existingIndex] = { x, y, userId };
-        return newCursors;
-      }
-      return [...prev, { x, y, userId }];
-    });
+  const handleRemoteCursorMove = useCallback((userId: string, x: number, y: number) => {
+    setCursors(prev => ({
+      ...prev,
+      [userId]: { x, y },
+    }));
   }, []);
 
   return {
     activeUsers,
     currentUser,
     cursors,
-    connectToCollaboration,
-    disconnectFromCollaboration,
     broadcastElementChange,
     broadcastCursorMove,
+    connectToCollaboration,
+    disconnectFromCollaboration,
     handleRemoteElementChange,
     handleRemoteCursorMove,
   };
