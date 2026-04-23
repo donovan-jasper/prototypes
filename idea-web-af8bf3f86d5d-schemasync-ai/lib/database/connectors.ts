@@ -165,21 +165,9 @@ export const fetchSchema = async (database: Database) => {
 
     // Cache the schema
     await cacheSchema(database.id, schema);
-
     return schema;
   } catch (error) {
     console.error('Failed to fetch schema:', error);
-    throw error;
-  }
-};
-
-export const fetchAndCacheSchema = async (database: Database) => {
-  try {
-    const schema = await fetchSchema(database);
-    await cacheSchema(database.id, schema);
-    return schema;
-  } catch (error) {
-    console.error('Failed to fetch and cache schema:', error);
     throw error;
   }
 };

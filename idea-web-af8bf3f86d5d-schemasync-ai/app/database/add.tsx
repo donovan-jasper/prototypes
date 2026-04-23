@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { TextInput, Button, RadioButton, Text, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, Alert, ScrollView } from 'react-native';
+import { TextInput, Button, RadioButton, Text, ActivityIndicator, IconButton } from 'react-native-paper';
 import { useDatabaseStore } from '../../store/database-store';
 import { encryptCredentials } from '../../lib/utils/encryption';
 import { testConnection } from '../../lib/database/connectors';
@@ -18,10 +18,15 @@ const AddDatabaseScreen = () => {
   });
   const [isTesting, setIsTesting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const addDatabase = useDatabaseStore(state => state.addDatabase);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    // Reset connection status when form changes
+    if (connectionStatus !== 'idle') {
+      setConnectionStatus('idle');
+    }
   };
 
   const handleTestConnection = async () => {
@@ -31,16 +36,20 @@ const AddDatabaseScreen = () => {
     }
 
     setIsTesting(true);
+    setConnectionStatus('idle');
     try {
       const connectionString = `${formData.type}://${formData.username}:${formData.password}@${formData.host}:${formData.port}/${formData.databaseName}`;
       const isConnected = await testConnection(connectionString, formData.type);
 
       if (isConnected) {
+        setConnectionStatus('success');
         Alert.alert('Success', 'Connection successful!');
       } else {
+        setConnectionStatus('error');
         Alert.alert('Error', 'Connection failed');
       }
     } catch (error) {
+      setConnectionStatus('error');
       Alert.alert('Error', error.message || 'Connection test failed');
     } finally {
       setIsTesting(false);
@@ -50,6 +59,11 @@ const AddDatabaseScreen = () => {
   const handleSaveDatabase = async () => {
     if (!formData.name || !formData.host || !formData.port || !formData.username || !formData.password || !formData.databaseName) {
       Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
+    if (connectionStatus !== 'success') {
+      Alert.alert('Error', 'Please test the connection first and ensure it succeeds');
       return;
     }
 
@@ -83,6 +97,7 @@ const AddDatabaseScreen = () => {
         password: '',
         databaseName: ''
       });
+      setConnectionStatus('idle');
     } catch (error) {
       Alert.alert('Error', 'Failed to save database: ' + error.message);
     } finally {
@@ -90,8 +105,19 @@ const AddDatabaseScreen = () => {
     }
   };
 
+  const getStatusIcon = () => {
+    switch (connectionStatus) {
+      case 'success':
+        return <IconButton icon="check-circle" iconColor="green" size={20} />;
+      case 'error':
+        return <IconButton icon="alert-circle" iconColor="red" size={20} />;
+      default:
+        return null;
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text variant="headlineMedium" style={styles.title}>Add New Database</Text>
 
       <TextInput
@@ -170,21 +196,41 @@ const AddDatabaseScreen = () => {
           mode="outlined"
           onPress={handleTestConnection}
           disabled={isTesting || isSaving}
-          style={styles.button}
+          loading={isTesting}
+          icon={isTesting ? undefined : 'wifi'}
+          style={styles.testButton}
         >
-          {isTesting ? <ActivityIndicator /> : 'Test Connection'}
+          Test Connection
         </Button>
+
+        {getStatusIcon()}
 
         <Button
           mode="contained"
           onPress={handleSaveDatabase}
-          disabled={isTesting || isSaving}
-          style={styles.button}
+          disabled={isTesting || isSaving || connectionStatus !== 'success'}
+          loading={isSaving}
+          icon={isSaving ? undefined : 'content-save'}
+          style={styles.saveButton}
         >
-          {isSaving ? <ActivityIndicator /> : 'Save Database'}
+          Save Database
         </Button>
       </View>
-    </View>
+
+      {connectionStatus === 'success' && (
+        <View style={styles.statusContainer}>
+          <IconButton icon="check-circle" iconColor="green" size={20} />
+          <Text style={styles.successText}>Connection successful!</Text>
+        </View>
+      )}
+
+      {connectionStatus === 'error' && (
+        <View style={styles.statusContainer}>
+          <IconButton icon="alert-circle" iconColor="red" size={20} />
+          <Text style={styles.errorText}>Connection failed. Please check your credentials.</Text>
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
@@ -192,7 +238,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     marginBottom: 24,
@@ -207,16 +253,37 @@ const styles = StyleSheet.create({
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 4,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginTop: 24,
+    marginBottom: 16,
   },
-  button: {
+  testButton: {
     flex: 1,
-    marginHorizontal: 8,
+    marginRight: 8,
+  },
+  saveButton: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: connectionStatus === 'success' ? '#e8f5e9' : '#ffebee',
+  },
+  successText: {
+    color: 'green',
+    marginLeft: 8,
+  },
+  errorText: {
+    color: 'red',
+    marginLeft: 8,
   },
 });
 
