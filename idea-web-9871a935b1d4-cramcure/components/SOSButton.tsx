@@ -18,6 +18,7 @@ const SOSButton = () => {
         activeOpacity={0.7}
         accessibilityLabel="Quick Relief SOS Button"
         accessibilityHint="Opens immediate pain relief options"
+        accessibilityRole="button"
       >
         <View style={styles.sosIconContainer}>
           <MaterialIcons name="sos" size={32} color="#fff" />
@@ -46,6 +47,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
+    zIndex: 1000,
   },
   sosIconContainer: {
     transform: [{ rotate: '45deg' }],

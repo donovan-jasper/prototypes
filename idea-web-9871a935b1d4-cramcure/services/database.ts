@@ -37,7 +37,8 @@ export const initDatabase = async (name: string = 'peaceflow.db') => {
       beforePainLevel INTEGER,
       afterPainLevel INTEGER,
       duration INTEGER,
-      notes TEXT
+      notes TEXT,
+      FOREIGN KEY (exerciseId) REFERENCES exercises(id)
     );
 
     CREATE TABLE IF NOT EXISTS exercises (
@@ -134,30 +135,25 @@ export const getFavoriteExercises = async (db: SQLite.SQLiteDatabase) => {
   return results;
 };
 
-export const addFavoriteExercise = async (db: SQLite.SQLiteDatabase, exerciseId: number) => {
-  const now = new Date().toISOString();
-
-  // Check if already favorited
-  const existing = await db.getFirstAsync(
-    'SELECT * FROM user_exercise_favorites WHERE exerciseId = ?',
-    [exerciseId]
-  );
-
-  if (existing) {
-    return existing.id;
-  }
+export const addReliefSession = async (db: SQLite.SQLiteDatabase, sessionData: any) => {
+  const { date, exerciseId, beforePainLevel, afterPainLevel, duration, notes } = sessionData;
 
   const result = await db.runAsync(
-    'INSERT INTO user_exercise_favorites (exerciseId, addedDate) VALUES (?, ?)',
-    [exerciseId, now]
+    'INSERT INTO relief_sessions (date, exerciseId, beforePainLevel, afterPainLevel, duration, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    [date, exerciseId, beforePainLevel, afterPainLevel, duration, notes]
   );
 
   return result.lastInsertRowId;
 };
 
-export const removeFavoriteExercise = async (db: SQLite.SQLiteDatabase, exerciseId: number) => {
-  await db.runAsync(
-    'DELETE FROM user_exercise_favorites WHERE exerciseId = ?',
+export const getReliefSessions = async (db: SQLite.SQLiteDatabase, exerciseId: number) => {
+  const results = await db.getAllAsync(
+    'SELECT * FROM relief_sessions WHERE exerciseId = ? ORDER BY date DESC',
     [exerciseId]
   );
+
+  return results.map(session => ({
+    ...session,
+    date: parseISO(session.date),
+  }));
 };
