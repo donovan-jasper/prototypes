@@ -1,27 +1,20 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { VoiceClip } from '../types';
-import { SubscriptionContext } from '../context/SubscriptionContext';
 
 interface VoicePlayerProps {
   clip: VoiceClip;
-  onUpgradePress: () => void;
   onPlaybackStatusUpdate?: (status: any) => void;
 }
 
-const VoicePlayer: React.FC<VoicePlayerProps> = ({
-  clip,
-  onUpgradePress,
-  onPlaybackStatusUpdate
-}) => {
-  const { isPremium } = useContext(SubscriptionContext);
+const VoicePlayer: React.FC<VoicePlayerProps> = ({ clip, onPlaybackStatusUpdate }) => {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [playbackPosition, setPlaybackPosition] = useState(0);
-  const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(clip.duration * 1000);
 
   useEffect(() => {
     return () => {
@@ -32,15 +25,10 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   }, [sound]);
 
   const loadSound = async () => {
-    if (!isPremium && clip.isPremium) {
-      onUpgradePress();
-      return;
-    }
-
     setIsLoading(true);
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
-        require(`../assets/voices/${clip.audioFile}`),
+        { uri: `../assets/voices/${clip.audioFile}` },
         { shouldPlay: true },
         onPlaybackStatusUpdate || handlePlaybackStatusUpdate
       );
@@ -56,7 +44,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   const handlePlaybackStatusUpdate = (status: any) => {
     if (status.isLoaded) {
       setPlaybackPosition(status.positionMillis);
-      setPlaybackDuration(status.durationMillis || 0);
+      setPlaybackDuration(status.durationMillis || clip.duration * 1000);
       if (status.didJustFinish) {
         setIsPlaying(false);
       }
@@ -64,11 +52,6 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   };
 
   const togglePlayback = async () => {
-    if (!isPremium && clip.isPremium) {
-      onUpgradePress();
-      return;
-    }
-
     if (!sound) {
       await loadSound();
       return;
@@ -88,40 +71,20 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  if (!isPremium && clip.isPremium) {
-    return (
-      <View style={styles.lockedContainer}>
-        <View style={styles.lockIconContainer}>
-          <Ionicons name="lock-closed" size={24} color="#FFD700" />
-        </View>
-        <View style={styles.clipInfo}>
-          <Text style={styles.title}>{clip.title}</Text>
-          <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.upgradeButton}
-          onPress={onUpgradePress}
-        >
-          <Text style={styles.upgradeButtonText}>Upgrade to Unlock</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <View style={styles.clipHeader}>
+      <View style={styles.infoContainer}>
         <Text style={styles.title}>{clip.title}</Text>
+        <Text style={styles.category}>{clip.category}</Text>
         {clip.isPremium && (
           <View style={styles.premiumBadge}>
-            <Ionicons name="star" size={12} color="#FFD700" />
-            <Text style={styles.premiumBadgeText}>Premium</Text>
+            <Ionicons name="lock-closed" size={12} color="#FFD700" />
+            <Text style={styles.premiumText}>Premium</Text>
           </View>
         )}
       </View>
-      <Text style={styles.category}>{clip.category} • {clip.intensity}</Text>
 
-      <View style={styles.controls}>
+      <View style={styles.controlsContainer}>
         <TouchableOpacity onPress={togglePlayback} disabled={isLoading}>
           {isLoading ? (
             <ActivityIndicator size="small" color="#4CAF50" />
@@ -140,7 +103,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
             <View
               style={[
                 styles.progressFill,
-                { width: `${(playbackPosition / (playbackDuration || 1)) * 100}%` }
+                { width: `${(playbackPosition / playbackDuration) * 100}%` }
               ]}
             />
           </View>
@@ -153,73 +116,57 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 12,
+    marginVertical: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  lockedContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    opacity: 0.8,
-  },
-  lockIconContainer: {
-    marginRight: 12,
-  },
-  clipInfo: {
-    flex: 1,
+  infoContainer: {
+    marginBottom: 16,
   },
   title: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333333',
     marginBottom: 4,
   },
   category: {
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
+    textTransform: 'capitalize',
   },
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFD700',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
     alignSelf: 'flex-start',
-    marginTop: 4,
+    marginTop: 8,
   },
-  premiumBadgeText: {
-    marginLeft: 4,
+  premiumText: {
+    color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    marginLeft: 4,
   },
-  controls: {
+  controlsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 12,
   },
   progressContainer: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16,
   },
   progressBar: {
     height: 4,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#E0E0E0',
     borderRadius: 2,
     marginVertical: 8,
   },
@@ -230,25 +177,8 @@ const styles = StyleSheet.create({
   },
   timeText: {
     fontSize: 12,
-    color: '#666',
+    color: '#666666',
     textAlign: 'right',
-  },
-  upgradeButton: {
-    backgroundColor: '#FF9800',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  upgradeButtonText: {
-    color: 'white',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  clipHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
 });
 

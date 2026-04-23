@@ -23,3 +23,9 @@ export interface PromptSchedule {
 }
 
 export type Mood = 'struggling' | 'neutral' | 'crushing';
+
+export interface VoiceLibraryFilters {
+  category?: string;
+  mood?: Mood;
+  isPremium?: boolean;
+}
