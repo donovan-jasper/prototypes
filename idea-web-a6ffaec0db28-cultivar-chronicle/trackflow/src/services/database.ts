@@ -3,64 +3,39 @@ import { Entry, Category } from '../types';
 
 const db = SQLite.openDatabase('trackflow.db');
 
-export const initDatabase = () => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            icon TEXT,
-            color TEXT
-          );`
-        );
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS entries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            categoryId INTEGER NOT NULL,
-            timestamp INTEGER NOT NULL,
-            note TEXT,
-            photoUri TEXT,
-            weather TEXT,
-            temperature REAL,
-            location TEXT,
-            FOREIGN KEY (categoryId) REFERENCES categories (id)
-          );`
-        );
+const initializeDatabase = () => {
+  db.transaction(tx => {
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS categories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL,
+        color TEXT NOT NULL
+      );`
+    );
 
-        // Check if default category exists
-        tx.executeSql(
-          `SELECT COUNT(*) as count FROM categories;`,
-          [],
-          (_, result) => {
-            const count = result.rows.item(0).count;
-            if (count === 0) {
-              // Add default Fitness category
-              tx.executeSql(
-                `INSERT INTO categories (name, icon, color) VALUES (?, ?, ?);`,
-                ['Fitness', '💪', '#007AFF']
-              );
-            }
-          }
-        );
-      },
-      (error) => {
-        reject(error);
-      },
-      () => {
-        resolve();
-      }
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS entries (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        categoryId INTEGER NOT NULL,
+        timestamp INTEGER NOT NULL,
+        note TEXT,
+        photoUri TEXT,
+        weather TEXT,
+        temperature REAL,
+        location TEXT,
+        FOREIGN KEY (categoryId) REFERENCES categories (id)
+      );`
     );
   });
 };
 
-export const addEntry = (entry: Omit<Entry, 'id'>) => {
-  return new Promise<Entry>((resolve, reject) => {
-    db.transaction((tx) => {
+export const addEntry = (entry: Omit<Entry, 'id' | 'timestamp'>): Promise<Entry> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
       tx.executeSql(
         `INSERT INTO entries (categoryId, timestamp, note, photoUri, weather, temperature, location)
-         VALUES (?, ?, ?, ?, ?, ?, ?);`,
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           entry.categoryId,
           Date.now(),
@@ -71,7 +46,12 @@ export const addEntry = (entry: Omit<Entry, 'id'>) => {
           entry.location,
         ],
         (_, result) => {
-          resolve({ ...entry, id: result.insertId });
+          const newEntry: Entry = {
+            id: result.insertId,
+            timestamp: Date.now(),
+            ...entry,
+          };
+          resolve(newEntry);
         },
         (_, error) => {
           reject(error);
@@ -82,16 +62,16 @@ export const addEntry = (entry: Omit<Entry, 'id'>) => {
   });
 };
 
-export const getEntries = (categoryId: number) => {
-  return new Promise<Entry[]>((resolve, reject) => {
-    db.transaction((tx) => {
+export const getEntries = (categoryId: number): Promise<Entry[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
       tx.executeSql(
-        `SELECT * FROM entries WHERE categoryId = ? ORDER BY timestamp DESC;`,
+        `SELECT * FROM entries WHERE categoryId = ? ORDER BY timestamp DESC`,
         [categoryId],
-        (_, result) => {
+        (_, { rows }) => {
           const entries: Entry[] = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            entries.push(result.rows.item(i));
+          for (let i = 0; i < rows.length; i++) {
+            entries.push(rows.item(i));
           }
           resolve(entries);
         },
@@ -104,54 +84,43 @@ export const getEntries = (categoryId: number) => {
   });
 };
 
-export const getStreakCount = (categoryId: number) => {
-  return new Promise<number>((resolve, reject) => {
-    db.transaction((tx) => {
+export const getStreakCount = (categoryId: number): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
       tx.executeSql(
-        `SELECT timestamp FROM entries WHERE categoryId = ? ORDER BY timestamp DESC;`,
+        `SELECT timestamp FROM entries WHERE categoryId = ? ORDER BY timestamp DESC`,
         [categoryId],
-        (_, result) => {
-          if (result.rows.length === 0) {
+        (_, { rows }) => {
+          if (rows.length === 0) {
             resolve(0);
             return;
           }
 
-          // Step 1: Fetch all timestamps
-          const timestamps: number[] = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            timestamps.push(result.rows.item(i).timestamp);
-          }
-
-          // Step 2: Convert to date-only format (YYYY-MM-DD strings)
-          const dateStrings = timestamps.map(ts => {
-            const date = new Date(ts);
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-          });
-
-          // Step 3: Deduplicate dates
-          const uniqueDates = Array.from(new Set(dateStrings));
-
-          // Step 4: Sort in descending order (most recent first)
-          uniqueDates.sort((a, b) => b.localeCompare(a));
-
-          // Step 5: Start from today or most recent entry
+          let streak = 1;
           const today = new Date();
           today.setHours(0, 0, 0, 0);
-          const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-          let streak = 0;
-          let currentDateStr = uniqueDates[0] === todayStr ? todayStr : uniqueDates[0];
+          const firstEntryDate = new Date(rows.item(0).timestamp);
+          firstEntryDate.setHours(0, 0, 0, 0);
 
-          // Step 6: Count backwards while dates are consecutive
-          for (let i = 0; i < uniqueDates.length; i++) {
-            if (uniqueDates[i] === currentDateStr) {
+          if (firstEntryDate.getTime() !== today.getTime()) {
+            resolve(0);
+            return;
+          }
+
+          for (let i = 1; i < rows.length; i++) {
+            const currentDate = new Date(rows.item(i).timestamp);
+            currentDate.setHours(0, 0, 0, 0);
+
+            const previousDate = new Date(rows.item(i - 1).timestamp);
+            previousDate.setHours(0, 0, 0, 0);
+
+            const diffTime = previousDate.getTime() - currentDate.getTime();
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+
+            if (diffDays === 1) {
               streak++;
-              // Calculate previous day
-              const currentDate = new Date(currentDateStr);
-              currentDate.setDate(currentDate.getDate() - 1);
-              currentDateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
             } else {
-              // Step 7: Stop at first gap
               break;
             }
           }
@@ -167,14 +136,18 @@ export const getStreakCount = (categoryId: number) => {
   });
 };
 
-export const addCategory = (category: Omit<Category, 'id'>) => {
-  return new Promise<Category>((resolve, reject) => {
-    db.transaction((tx) => {
+export const addCategory = (category: Omit<Category, 'id'>): Promise<Category> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
       tx.executeSql(
-        `INSERT INTO categories (name, icon, color) VALUES (?, ?, ?);`,
+        `INSERT INTO categories (name, icon, color) VALUES (?, ?, ?)`,
         [category.name, category.icon, category.color],
         (_, result) => {
-          resolve({ ...category, id: result.insertId });
+          const newCategory: Category = {
+            id: result.insertId,
+            ...category,
+          };
+          resolve(newCategory);
         },
         (_, error) => {
           reject(error);
@@ -185,16 +158,16 @@ export const addCategory = (category: Omit<Category, 'id'>) => {
   });
 };
 
-export const getCategories = () => {
-  return new Promise<Category[]>((resolve, reject) => {
-    db.transaction((tx) => {
+export const getCategories = (): Promise<Category[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
       tx.executeSql(
-        `SELECT * FROM categories;`,
+        `SELECT * FROM categories`,
         [],
-        (_, result) => {
+        (_, { rows }) => {
           const categories: Category[] = [];
-          for (let i = 0; i < result.rows.length; i++) {
-            categories.push(result.rows.item(i));
+          for (let i = 0; i < rows.length; i++) {
+            categories.push(rows.item(i));
           }
           resolve(categories);
         },
@@ -206,3 +179,5 @@ export const getCategories = () => {
     });
   });
 };
+
+initializeDatabase();

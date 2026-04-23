@@ -1,14 +1,21 @@
 import { WEATHER_API_KEY } from '../utils/constants';
 
-const WEATHER_CACHE: Record<string, { data: any, timestamp: number }> = {};
+interface WeatherData {
+  temp: number;
+  condition: string;
+  icon: string;
+}
 
-export const fetchWeather = async (lat: number, lon: number) => {
+const weatherCache: Record<string, { data: WeatherData; timestamp: number }> = {};
+
+export const fetchWeather = async (lat: number, lon: number): Promise<WeatherData | null> => {
   const cacheKey = `${lat},${lon}`;
   const now = Date.now();
+  const cacheDuration = 60 * 60 * 1000; // 1 hour
 
-  // Check cache first (valid for 1 hour)
-  if (WEATHER_CACHE[cacheKey] && now - WEATHER_CACHE[cacheKey].timestamp < 3600000) {
-    return WEATHER_CACHE[cacheKey].data;
+  // Check cache first
+  if (weatherCache[cacheKey] && now - weatherCache[cacheKey].timestamp < cacheDuration) {
+    return weatherCache[cacheKey].data;
   }
 
   try {
@@ -22,18 +29,14 @@ export const fetchWeather = async (lat: number, lon: number) => {
 
     const data = await response.json();
 
-    if (!data.weather || !data.weather[0] || !data.main) {
-      throw new Error('Invalid weather data format');
-    }
-
-    const weatherData = {
+    const weatherData: WeatherData = {
       temp: Math.round(data.main.temp),
       condition: data.weather[0].main,
       icon: data.weather[0].icon,
     };
 
-    // Cache the result
-    WEATHER_CACHE[cacheKey] = {
+    // Update cache
+    weatherCache[cacheKey] = {
       data: weatherData,
       timestamp: now,
     };
