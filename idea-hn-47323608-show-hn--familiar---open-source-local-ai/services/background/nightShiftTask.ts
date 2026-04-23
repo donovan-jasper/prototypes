@@ -8,138 +8,136 @@ import { NotificationService } from '../notifications/notificationService';
 import { NightShiftSchedule } from '@/types';
 
 const NIGHT_SHIFT_TASK_NAME = 'night-shift-task';
-const NIGHT_SHIFT_SCHEDULE_KEY = 'nightShiftSchedule'; // Key for storing the schedule in SecureStore
+const NIGHT_SHIFT_SCHEDULE_KEY = 'nightShiftSchedule';
 
-export class NightShiftTask {
-  private taskExecutor: TaskExecutor;
-  private database: Database;
-  private notificationService: NotificationService;
-  private schedule: NightShiftSchedule;
+export const registerNightShiftTask = async () => {
+  try {
+    // Check if task is already registered
+    const isRegistered = await TaskManager.isTaskRegisteredAsync(NIGHT_SHIFT_TASK_NAME);
+    if (isRegistered) {
+      console.log('Night Shift Task: Already registered');
+      return;
+    }
 
-  constructor(
-    taskExecutor: TaskExecutor,
-    database: Database,
-    notificationService: NotificationService,
-    schedule: NightShiftSchedule
-  ) {
-    this.taskExecutor = taskExecutor;
-    this.database = database;
-    this.notificationService = notificationService;
-    this.schedule = schedule;
-  }
-
-  async register(): Promise<void> {
+    // Register the background task
     await BackgroundFetch.registerTaskAsync(NIGHT_SHIFT_TASK_NAME, {
       minimumInterval: 60 * 15, // 15 minutes
       stopOnTerminate: false,
       startOnBoot: true,
     });
-    console.log(`Night Shift Task: Registered task ${NIGHT_SHIFT_TASK_NAME}`);
+
+    console.log('Night Shift Task: Successfully registered');
+  } catch (error) {
+    console.error('Night Shift Task: Registration failed', error);
   }
+};
 
-  async unregister(): Promise<void> {
-    await BackgroundFetch.unregisterTaskAsync(NIGHT_SHIFT_TASK_NAME);
-    console.log(`Night Shift Task: Unregistered task ${NIGHT_SHIFT_TASK_NAME}`);
-  }
+TaskManager.defineTask(NIGHT_SHIFT_TASK_NAME, async (taskData) => {
+  try {
+    console.log('Night Shift Task: Executing background task');
 
-  async execute(): Promise<BackgroundFetch.BackgroundFetchResult> {
-    try {
-      console.log('Night Shift Task: Executing...');
+    // Initialize services
+    const taskExecutor = new TaskExecutor();
+    const database = new Database();
+    await database.init();
+    const notificationService = new NotificationService();
 
-      // Check if night shift is enabled
-      if (!this.schedule.enabled) {
-        console.log('Night Shift: Not enabled in schedule.');
-        return BackgroundFetch.BackgroundFetchResult.NoData;
-      }
-
-      // Check if in night shift window
-      if (!this.isInNightShiftWindow()) {
-        console.log('Night Shift: Not currently in the scheduled window.');
-        return BackgroundFetch.BackgroundFetchResult.NoData;
-      }
-
-      // Check battery and charging state
-      if (!await this.isBatterySafe()) {
-        console.log('Night Shift: Battery conditions not met (not charging or low level).');
-        return BackgroundFetch.BackgroundFetchResult.NoData;
-      }
-
-      // Get pending tasks
-      const tasks = await this.database.getPendingTasks();
-
-      if (tasks.length === 0) {
-        console.log('Night Shift: No pending tasks found.');
-        return BackgroundFetch.BackgroundFetchResult.NoData;
-      }
-
-      console.log(`Night Shift: Found ${tasks.length} pending tasks. Starting execution...`);
-      const completedTasks = [];
-      for (const task of tasks) {
-        try {
-          // Update task status to running
-          await this.database.updateTaskStatus(task.id, 'running');
-          console.log(`Night Shift: Task ${task.id} set to running.`);
-
-          // Execute the task
-          const result = await this.taskExecutor.execute(task);
-
-          // Update task status to completed
-          await this.database.updateTaskStatus(task.id, 'completed', Date.now(), result.error);
-
-          completedTasks.push(result);
-          console.log(`Night Shift: Task ${task.id} completed with status: ${result.status}.`);
-        } catch (error) {
-          console.error(`Error executing task ${task.id}:`, error);
-
-          // Update task status to failed
-          await this.database.updateTaskStatus(task.id, 'failed', Date.now(), (error as Error).message);
-        }
-      }
-
-      // Send notification if tasks were completed
-      if (completedTasks.length > 0) {
-        await this.notificationService.sendSummaryNotification(completedTasks);
-        console.log(`Night Shift: Sent summary notification for ${completedTasks.length} tasks.`);
-      }
-
-      return BackgroundFetch.BackgroundFetchResult.NewData;
-    } catch (error) {
-      console.error('Night Shift Task: Unhandled error during execution:', error);
-      return BackgroundFetch.BackgroundFetchResult.Failed;
+    // Load schedule from secure storage
+    const scheduleJson = await SecureStore.getItemAsync(NIGHT_SHIFT_SCHEDULE_KEY);
+    if (!scheduleJson) {
+      console.log('Night Shift Task: No schedule found');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
     }
-  }
 
-  private isInNightShiftWindow(): boolean {
+    const schedule: NightShiftSchedule = JSON.parse(scheduleJson);
+
+    // Check if night shift is enabled
+    if (!schedule.enabled) {
+      console.log('Night Shift Task: Not enabled in schedule');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    // Check if in night shift window
     const now = new Date();
     const currentHour = now.getHours();
 
-    // Check if current time is within the night shift window
-    if (this.schedule.startHour < this.schedule.endHour) {
-      // Window doesn't cross midnight (e.g., 2am-6am)
-      return currentHour >= this.schedule.startHour && currentHour < this.schedule.endHour;
+    let isInWindow = false;
+    if (schedule.startHour < schedule.endHour) {
+      // Window doesn't cross midnight
+      isInWindow = currentHour >= schedule.startHour && currentHour < schedule.endHour;
     } else {
-      // Window crosses midnight (e.g., 10pm-6am)
-      return currentHour >= this.schedule.startHour || currentHour < this.schedule.endHour;
+      // Window crosses midnight
+      isInWindow = currentHour >= schedule.startHour || currentHour < schedule.endHour;
     }
-  }
 
-  private async isBatterySafe(): Promise<boolean> {
-    // Check if charging is required and device is charging
-    if (this.schedule.requiresCharging) {
-      const batteryState = await Battery.getBatteryStateAsync();
-      if (batteryState !== Battery.BatteryState.CHARGING) {
-        console.log('Night Shift: Req');
-        return false;
+    if (!isInWindow) {
+      console.log('Night Shift Task: Not in scheduled window');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    // Check battery and charging state
+    const batteryState = await Battery.getBatteryStateAsync();
+    const batteryLevel = await Battery.getBatteryLevelAsync();
+
+    if (schedule.requiresCharging && batteryState !== Battery.BatteryState.CHARGING) {
+      console.log('Night Shift Task: Device not charging');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    if (batteryLevel * 100 < schedule.minBatteryLevel) {
+      console.log('Night Shift Task: Battery level too low');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    // Get pending tasks
+    const tasks = await database.getPendingTasks();
+
+    if (tasks.length === 0) {
+      console.log('Night Shift Task: No pending tasks');
+      return BackgroundFetch.BackgroundFetchResult.NoData;
+    }
+
+    console.log(`Night Shift Task: Found ${tasks.length} pending tasks`);
+
+    // Execute tasks
+    const completedTasks = [];
+    for (const task of tasks) {
+      try {
+        // Update task status to running
+        await database.updateTaskStatus(task.id, 'running');
+
+        // Execute the task
+        const result = await taskExecutor.execute(task);
+
+        // Update task status to completed
+        await database.updateTaskStatus(task.id, 'completed', Date.now(), result.error);
+
+        completedTasks.push(result);
+      } catch (error) {
+        console.error(`Night Shift Task: Error executing task ${task.id}`, error);
+
+        // Update task status to failed
+        await database.updateTaskStatus(task.id, 'failed', Date.now(), (error as Error).message);
       }
     }
 
-    // Check if battery level is above the minimum threshold
-    const batteryLevel = await Battery.getBatteryLevelAsync();
-    if (batteryLevel < this.schedule.minBatteryLevel) {
-      console.log('Night Shift: Battery level too low.');
-      return false;
+    // Send notification if tasks were completed
+    if (completedTasks.length > 0) {
+      await notificationService.sendSummaryNotification(completedTasks);
     }
 
-    return true;
+    return BackgroundFetch.BackgroundFetchResult.NewData;
+  } catch (error) {
+    console.error('Night Shift Task: Unhandled error', error);
+    return BackgroundFetch.BackgroundFetchResult.Failed;
   }
-}
+});
+
+export const unregisterNightShiftTask = async () => {
+  try {
+    await TaskManager.unregisterTaskAsync(NIGHT_SHIFT_TASK_NAME);
+    console.log('Night Shift Task: Successfully unregistered');
+  } catch (error) {
+    console.error('Night Shift Task: Unregistration failed', error);
+  }
+};

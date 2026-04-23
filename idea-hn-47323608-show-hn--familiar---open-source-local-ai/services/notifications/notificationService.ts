@@ -1,13 +1,16 @@
-// services/notifications/notificationService.ts
 import * as Notifications from 'expo-notifications';
 import { Task } from '@/types';
 
 export class NotificationService {
   constructor() {
+    this.setupNotificationHandler();
+  }
+
+  private setupNotificationHandler() {
     Notifications.setNotificationHandler({
       handleNotification: async () => ({
         shouldShowAlert: true,
-        shouldPlaySound: false,
+        shouldPlaySound: true,
         shouldSetBadge: false,
       }),
     });
@@ -15,52 +18,60 @@ export class NotificationService {
 
   async requestPermissions(): Promise<boolean> {
     const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') {
-      console.warn('NotificationService: Notification permissions not granted.');
-    }
     return status === 'granted';
   }
 
-  async sendSummaryNotification(completedTasks: any[]): Promise<void> {
-    const permissionGranted = await this.requestPermissions();
-    if (!permissionGranted) {
-      console.warn('NotificationService: Cannot send summary notification without permissions.');
+  async sendSummaryNotification(completedTasks: Task[]): Promise<void> {
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) {
+      console.log('Notification permission not granted');
       return;
     }
 
-    const tasksCount = completedTasks.length;
-    const filesProcessed = completedTasks.reduce((sum, task) => sum + (task.filesProcessed || 0), 0);
+    const photoTasks = completedTasks.filter(task => task.type === 'organize_photos');
+    const documentTasks = completedTasks.filter(task => task.type === 'process_documents');
 
-    let body = `You woke up to ${tasksCount} tasks completed!`;
-    if (filesProcessed > 0) {
-      body += ` ${filesProcessed} files were organized and processed.`;
+    let title = 'Night Shift Completed';
+    let body = '';
+
+    if (photoTasks.length > 0) {
+      const filesProcessed = photoTasks.reduce((sum, task) => sum + (task.filesProcessed || 0), 0);
+      body += `${filesProcessed} photos organized. `;
+    }
+
+    if (documentTasks.length > 0) {
+      const filesProcessed = documentTasks.reduce((sum, task) => sum + (task.filesProcessed || 0), 0);
+      body += `${filesProcessed} documents processed.`;
+    }
+
+    if (body === '') {
+      body = 'All tasks completed successfully.';
     }
 
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: 'NightOwl AI: Night Shift Report 🦉',
-        body: body,
-        data: { type: 'night_shift_summary', tasks: completedTasks.map(t => t.id) },
-      },
-      trigger: null, // Send immediately
-    });
-    console.log('NotificationService: Sent summary notification.');
-  }
-
-  async sendAlert(title: string, message: string): Promise<void> {
-    const permissionGranted = await this.requestPermissions();
-    if (!permissionGranted) {
-      console.warn('NotificationService: Cannot send alert notification without permissions.');
-      return;
-    }
-
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: `NightOwl AI: ${title}`,
-        body: message,
+        title,
+        body,
+        sound: 'default',
       },
       trigger: null,
     });
-    console.log(`NotificationService: Sent alert: ${title} - ${message}`);
+  }
+
+  async sendAlertNotification(title: string, body: string): Promise<void> {
+    const hasPermission = await this.requestPermissions();
+    if (!hasPermission) {
+      console.log('Notification permission not granted');
+      return;
+    }
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+      },
+      trigger: null,
+    });
   }
 }
