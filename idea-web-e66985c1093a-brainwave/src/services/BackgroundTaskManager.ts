@@ -5,6 +5,7 @@ import { AlertService } from './AlertService';
 import { DatabaseService } from './DatabaseService';
 import { SensorService } from './SensorService';
 import { AlertManager } from './AlertManager';
+import { AppState } from 'react-native';
 
 const BACKGROUND_TASK_NAME = 'flowguard-drowsiness-monitor';
 
@@ -16,6 +17,7 @@ export class BackgroundTaskManager {
   private alertManager: AlertManager;
   private isInitialized: boolean = false;
   private isTaskRegistered: boolean = false;
+  private currentAppState: string = 'active';
 
   constructor() {
     this.detectionEngine = new DetectionEngine('study');
@@ -27,6 +29,16 @@ export class BackgroundTaskManager {
       this.alertService,
       this.databaseService
     );
+
+    // Track app state changes
+    AppState.addEventListener('change', (nextAppState) => {
+      this.currentAppState = nextAppState;
+      if (nextAppState === 'active') {
+        this.handleAppForeground();
+      } else if (nextAppState === 'background') {
+        this.handleAppBackground();
+      }
+    });
   }
 
   async initialize(): Promise<void> {
@@ -41,6 +53,18 @@ export class BackgroundTaskManager {
     });
 
     this.isInitialized = true;
+  }
+
+  private async handleAppForeground(): Promise<void> {
+    if (this.isTaskRegistered) {
+      await this.registerBackgroundTask();
+    }
+  }
+
+  private async handleAppBackground(): Promise<void> {
+    if (this.isTaskRegistered) {
+      await this.registerBackgroundTask();
+    }
   }
 
   async registerBackgroundTask(): Promise<void> {
@@ -106,5 +130,9 @@ export class BackgroundTaskManager {
 
   async stopMonitoring(): Promise<void> {
     await this.sensorService.stopMonitoring();
+  }
+
+  getCurrentAppState(): string {
+    return this.currentAppState;
   }
 }

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { BackgroundTaskManager } from '../services/BackgroundTaskManager';
 import { ActivityProfile } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface AppContextType {
   isMonitoring: boolean;
@@ -16,6 +17,8 @@ interface AppContextType {
   setActiveProfile: (profile: ActivityProfile) => void;
   startBackgroundTask: () => Promise<void>;
   stopBackgroundTask: () => Promise<void>;
+  saveSessionState: () => Promise<void>;
+  restoreSessionState: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -38,9 +41,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const manager = new BackgroundTaskManager();
       await manager.initialize();
       backgroundTaskManagerRef.current = manager;
+
+      // Restore session state if available
+      await restoreSessionState();
     };
 
     initialize();
+
+    // Handle app state changes
+    const handleAppStateChange = async (nextAppState: string) => {
+      if (nextAppState === 'background') {
+        await saveSessionState();
+      } else if (nextAppState === 'active') {
+        await restoreSessionState();
+      }
+    };
+
+    // Add app state listener
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
 
     return () => {
       // Clean up when component unmounts
@@ -50,8 +68,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      subscription.remove();
     };
   }, []);
+
+  const saveSessionState = async () => {
+    try {
+      const state = {
+        isMonitoring,
+        activeProfile,
+        currentSession,
+      };
+      await AsyncStorage.setItem('sessionState', JSON.stringify(state));
+    } catch (error) {
+      console.error('Failed to save session state:', error);
+    }
+  };
+
+  const restoreSessionState = async () => {
+    try {
+      const savedState = await AsyncStorage.getItem('sessionState');
+      if (savedState) {
+        const state = JSON.parse(savedState);
+        setIsMonitoring(state.isMonitoring);
+        setActiveProfile(state.activeProfile);
+        setCurrentSession(state.currentSession);
+
+        // If session was active, restart monitoring
+        if (state.isMonitoring && state.currentSession.startTime) {
+          await startBackgroundTask();
+          startTimer();
+        }
+      }
+    } catch (error) {
+      console.error('Failed to restore session state:', error);
+    }
+  };
+
+  const startTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    timerRef.current = setInterval(() => {
+      setCurrentSession(prev => ({
+        ...prev,
+        elapsedTime: prev.startTime ? Math.floor((Date.now() - prev.startTime) / 1000) : 0,
+      }));
+    }, 1000);
+  };
 
   const startBackgroundTask = async () => {
     if (backgroundTaskManagerRef.current) {
@@ -84,13 +149,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // Start background task
     await startBackgroundTask();
 
-    // Start timer for elapsed time
-    timerRef.current = setInterval(() => {
-      setCurrentSession(prev => ({
-        ...prev,
-        elapsedTime: prev.startTime ? Math.floor((Date.now() - prev.startTime) / 1000) : 0,
-      }));
-    }, 1000);
+    // Start timer
+    startTimer();
+
+    // Save state immediately
+    await saveSessionState();
   };
 
   const stopSession = async () => {
@@ -128,6 +191,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       drowsinessEvents: 0,
       elapsedTime: 0,
     });
+
+    // Save state immediately
+    await saveSessionState();
   };
 
   const recordDrowsinessEvent = () => {
@@ -149,6 +215,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveProfile,
         startBackgroundTask,
         stopBackgroundTask,
+        saveSessionState,
+        restoreSessionState,
       }}
     >
       {children}

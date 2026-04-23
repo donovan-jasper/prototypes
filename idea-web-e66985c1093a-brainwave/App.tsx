@@ -8,6 +8,7 @@ import HistoryScreen from './src/screens/HistoryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import * as Notifications from 'expo-notifications';
 import * as TaskManager from 'expo-task-manager';
+import { AppState } from 'react-native';
 
 // Set notification handler
 Notifications.setNotificationHandler({
@@ -32,9 +33,18 @@ export default function App() {
 
     requestPermissions();
 
+    // Handle app state changes
+    const handleAppStateChange = (nextAppState: string) => {
+      console.log('App state changed:', nextAppState);
+    };
+
+    // Add app state listener
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+
     // Clean up when app is closed
     return () => {
       TaskManager.unregisterAllTasksAsync();
+      subscription.remove();
     };
   }, []);
 
