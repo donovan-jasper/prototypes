@@ -198,7 +198,6 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     marginBottom: 8,
-    textAlignVertical: 'top',
   },
   charCountRow: {
     flexDirection: 'row',
@@ -210,15 +209,15 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   aiResponseContainer: {
-    padding: 12,
     backgroundColor: '#f0f8ff',
+    padding: 12,
     borderRadius: 8,
     marginBottom: 16,
   },
   aiResponseLabel: {
     fontWeight: 'bold',
     marginBottom: 4,
-    color: '#1a73e8',
+    color: '#1e90ff',
   },
   aiResponseText: {
     fontSize: 14,
@@ -226,30 +225,34 @@ const styles = StyleSheet.create({
   },
   platformSelector: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
   platformChip: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   platformChipActive: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#1e90ff',
+    borderColor: '#1e90ff',
   },
   platformChipText: {
-    color: '#333',
+    color: '#666',
+    fontSize: 14,
   },
   platformChipTextActive: {
     color: '#fff',
+    fontWeight: 'bold',
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   enhanceButton: {
-    backgroundColor: '#1a73e8',
+    backgroundColor: '#1e90ff',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -257,7 +260,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postButton: {
-    backgroundColor: '#34a853',
+    backgroundColor: '#2ecc71',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -265,7 +268,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scheduleButton: {
-    backgroundColor: '#fbbc05',
+    backgroundColor: '#f39c12',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -278,5 +281,6 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 14,
   },
 });
