@@ -187,38 +187,39 @@ const styles = StyleSheet.create({
   },
   timestamp: {
     fontSize: 13,
-    color: '#9ca3af'
+    color: '#6b7280',
+    textAlign: 'right'
   },
   paywallCard: {
-    backgroundColor: '#8b5cf6',
-    padding: 24,
-    borderRadius: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 40
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    marginTop: 24,
+    borderWidth: 2,
+    borderColor: '#8b5cf6',
+    alignItems: 'center'
   },
   paywallTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#111827',
     marginBottom: 8
   },
   paywallText: {
-    fontSize: 14,
-    color: '#e9d5ff',
+    fontSize: 15,
+    color: '#4b5563',
     textAlign: 'center',
-    marginBottom: 16,
-    lineHeight: 20
+    marginBottom: 16
   },
   upgradeButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#8b5cf6',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8
   },
   upgradeButtonText: {
-    color: '#8b5cf6',
-    fontSize: 16,
-    fontWeight: '600'
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 15
   }
 });
