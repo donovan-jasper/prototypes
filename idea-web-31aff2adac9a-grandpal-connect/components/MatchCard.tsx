@@ -1,53 +1,58 @@
 import { View, StyleSheet } from 'react-native';
-import { Card, Text, Button, Chip } from 'react-native-paper';
+import { Card, Text, Button, Chip, Avatar } from 'react-native-paper';
 import { User } from '@/lib/types';
 
 interface MatchCardProps {
   user: User;
   matchScore: number;
+  onConnect: (userId: string) => void;
+  isConnecting: boolean;
 }
 
-export default function MatchCard({ user, matchScore }: MatchCardProps) {
-  const handleConnect = () => {
-    console.log('Connect with', user.name);
-  };
+export default function MatchCard({ user, matchScore, onConnect, isConnecting }: MatchCardProps) {
+  const sharedInterests = user.interests.slice(0, 3);
 
   return (
     <Card style={styles.card}>
       <Card.Content>
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
+          <Avatar.Image
+            size={64}
+            source={user.photoUrl ? { uri: user.photoUrl } : require('@/assets/images/default-avatar.png')}
+            style={styles.avatar}
+          />
+          <View style={styles.headerText}>
             <Text variant="titleLarge" style={styles.name}>{user.name}</Text>
             <Text variant="bodyMedium" style={styles.age}>{user.age} years old</Text>
+            {user.isPremium && (
+              <Chip mode="flat" style={styles.premiumBadge}>Premium</Chip>
+            )}
           </View>
-          {user.isPremium && (
-            <Chip mode="flat" style={styles.premiumBadge}>Premium</Chip>
-          )}
         </View>
 
         {user.bio && (
           <Text variant="bodyMedium" style={styles.bio}>{user.bio}</Text>
         )}
 
-        <View style={styles.matchScore}>
+        <View style={styles.matchScoreContainer}>
           <Text variant="bodySmall" style={styles.matchScoreLabel}>Match Score:</Text>
           <Text variant="bodyMedium" style={styles.matchScoreValue}>
             {Math.round(matchScore)}%
           </Text>
         </View>
 
-        {user.interests.length > 0 && (
+        {sharedInterests.length > 0 && (
           <View style={styles.interests}>
             <Text variant="bodySmall" style={styles.interestsLabel}>Shared Interests:</Text>
             <View style={styles.interestChips}>
-              {user.interests.slice(0, 5).map((interest) => (
+              {sharedInterests.map((interest) => (
                 <Chip key={interest} mode="outlined" style={styles.interestChip}>
                   {interest}
                 </Chip>
               ))}
-              {user.interests.length > 5 && (
+              {user.interests.length > 3 && (
                 <Chip mode="outlined" style={styles.interestChip}>
-                  +{user.interests.length - 5} more
+                  +{user.interests.length - 3} more
                 </Chip>
               )}
             </View>
@@ -56,7 +61,13 @@ export default function MatchCard({ user, matchScore }: MatchCardProps) {
       </Card.Content>
 
       <Card.Actions>
-        <Button mode="contained" onPress={handleConnect} style={styles.connectButton}>
+        <Button
+          mode="contained"
+          onPress={() => onConnect(user.id)}
+          loading={isConnecting}
+          disabled={isConnecting}
+          style={styles.connectButton}
+        >
           Connect
         </Button>
       </Card.Actions>
@@ -68,14 +79,17 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: 16,
     elevation: 2,
+    borderRadius: 8,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  headerLeft: {
+  avatar: {
+    marginRight: 16,
+  },
+  headerText: {
     flex: 1,
   },
   name: {
@@ -87,12 +101,15 @@ const styles = StyleSheet.create({
   },
   premiumBadge: {
     backgroundColor: '#ffd700',
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
   bio: {
     marginTop: 8,
     color: '#444',
+    lineHeight: 20,
   },
-  matchScore: {
+  matchScoreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
@@ -127,5 +144,6 @@ const styles = StyleSheet.create({
   connectButton: {
     flex: 1,
     marginHorizontal: 8,
+    borderRadius: 20,
   },
 });
