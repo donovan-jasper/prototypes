@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, ScrollView, Alert } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { incrementUsage } from '../store/userSlice';
@@ -13,6 +13,16 @@ const HomeScreen = ({ navigation }) => {
   const [restoredImage, setRestoredImage] = useState(null);
   const [qualityMetrics, setQualityMetrics] = useState(null);
   const [selectedEnhancement, setSelectedEnhancement] = useState('auto');
+  const [processingProgress, setProcessingProgress] = useState(0);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please grant camera roll permissions to select photos');
+      }
+    })();
+  }, []);
 
   const pickImage = async () => {
     if (!isPremium && usageCount >= 3) {
@@ -31,6 +41,7 @@ const HomeScreen = ({ navigation }) => {
       setSelectedImage(result.assets[0].uri);
       setRestoredImage(null);
       setQualityMetrics(null);
+      setProcessingProgress(0);
     }
   };
 
@@ -38,9 +49,24 @@ const HomeScreen = ({ navigation }) => {
     if (!selectedImage) return;
 
     setIsProcessing(true);
+    setProcessingProgress(0);
 
     try {
+      // Simulate processing progress
+      const progressInterval = setInterval(() => {
+        setProcessingProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90;
+          }
+          return prev + 10;
+        });
+      }, 500);
+
       const result = await applyEnhancement(selectedImage, selectedEnhancement);
+      clearInterval(progressInterval);
+      setProcessingProgress(100);
+
       dispatch(incrementUsage());
       setRestoredImage(result.uri);
       setQualityMetrics({
@@ -49,6 +75,7 @@ const HomeScreen = ({ navigation }) => {
       });
     } catch (error) {
       console.error('Failed to restore photo:', error);
+      Alert.alert('Error', 'Failed to restore the photo. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -59,6 +86,7 @@ const HomeScreen = ({ navigation }) => {
     setRestoredImage(null);
     setQualityMetrics(null);
     setSelectedEnhancement('auto');
+    setProcessingProgress(0);
   };
 
   const saveResult = () => {
@@ -73,11 +101,11 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const enhancementOptions = [
-    { value: 'auto', label: 'Auto' },
-    { value: 'brighten', label: 'Brighten' },
-    { value: 'sharpen', label: 'Sharpen' },
-    { value: 'vintage', label: 'Vintage' },
-    { value: 'modern', label: 'Modern' },
+    { value: 'auto', label: 'Auto', icon: 'auto-fix-high' },
+    { value: 'brighten', label: 'Brighten', icon: 'wb-sunny' },
+    { value: 'sharpen', label: 'Sharpen', icon: 'filter-sharp' },
+    { value: 'vintage', label: 'Vintage', icon: 'photo-camera' },
+    { value: 'modern', label: 'Modern', icon: 'photo-library' },
   ];
 
   return (
@@ -88,9 +116,19 @@ const HomeScreen = ({ navigation }) => {
       </Text>
 
       {!isPremium && (
-        <Text style={styles.usageText}>
-          Free restorations: {3 - usageCount} remaining
-        </Text>
+        <View style={styles.usageContainer}>
+          <Text style={styles.usageText}>
+            Free restorations: {3 - usageCount} remaining
+          </Text>
+          {usageCount >= 3 && (
+            <TouchableOpacity
+              style={styles.upgradeButton}
+              onPress={() => navigation.navigate('Upgrade')}
+            >
+              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       )}
 
       {!selectedImage && (
@@ -136,6 +174,10 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
           <Text style={styles.loadingText}>Restoring your photo...</Text>
+          <View style={styles.progressBarContainer}>
+            <View style={[styles.progressBar, { width: `${processingProgress}%` }]} />
+          </View>
+          <Text style={styles.progressText}>{processingProgress}%</Text>
         </View>
       )}
 
@@ -146,9 +188,10 @@ const HomeScreen = ({ navigation }) => {
 
           {qualityMetrics && (
             <View style={styles.metricsContainer}>
-              <Text style={styles.metricsTitle}>Quality Metrics</Text>
-              <Text style={styles.metricsText}>Enhancement: {qualityMetrics.enhancement}</Text>
-              <Text style={styles.metricsText}>Quality Score: {(qualityMetrics.quality * 100).toFixed(1)}%</Text>
+              <Text style={styles.qualityText}>Quality: {(qualityMetrics.quality * 100).toFixed(0)}%</Text>
+              <Text style={styles.enhancementText}>
+                {enhancementOptions.find(e => e.value === qualityMetrics.enhancement)?.label || 'Auto'}
+              </Text>
             </View>
           )}
 
@@ -156,8 +199,8 @@ const HomeScreen = ({ navigation }) => {
             <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
               <Text style={styles.cancelButtonText}>Start Over</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.processButton} onPress={saveResult}>
-              <Text style={styles.processButtonText}>Save Result</Text>
+            <TouchableOpacity style={styles.saveButton} onPress={saveResult}>
+              <Text style={styles.saveButtonText}>Save Result</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -170,52 +213,67 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    backgroundColor: '#f5f5f5',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
-    textAlign: 'center',
+    marginBottom: 8,
     color: '#333',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+    marginBottom: 24,
     textAlign: 'center',
+  },
+  usageContainer: {
+    width: '100%',
     marginBottom: 20,
+    alignItems: 'center',
   },
   usageText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 20,
-    fontStyle: 'italic',
+    marginBottom: 8,
   },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
+  upgradeButton: {
+    backgroundColor: '#FF9500',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginBottom: 20,
   },
-  buttonText: {
+  upgradeButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  buttonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
   },
   imageContainer: {
     width: '100%',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   previewImage: {
-    width: 300,
+    width: '100%',
     height: 300,
     resizeMode: 'contain',
     borderRadius: 8,
-    marginBottom: 20,
     backgroundColor: '#fff',
+    marginBottom: 20,
   },
   enhancementSelector: {
     width: '100%',
@@ -224,7 +282,7 @@ const styles = StyleSheet.create({
   enhancementLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 12,
     color: '#333',
   },
   enhancementOptions: {
@@ -234,7 +292,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   enhancementButton: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#e0e0e0',
@@ -250,79 +308,111 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: 20,
+    gap: 16,
   },
   cancelButton: {
     flex: 1,
-    padding: 15,
+    paddingVertical: 14,
     borderRadius: 8,
-    backgroundColor: '#e0e0e0',
-    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#007AFF',
+    alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#333',
+    color: '#007AFF',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
   processButton: {
     flex: 1,
-    padding: 15,
-    borderRadius: 8,
     backgroundColor: '#34C759',
-    marginLeft: 10,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   processButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
   loadingContainer: {
-    marginTop: 20,
+    width: '100%',
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 24,
   },
   loadingText: {
-    marginTop: 10,
     fontSize: 16,
+    color: '#666',
+    marginTop: 12,
+    marginBottom: 20,
+  },
+  progressBarContainer: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 14,
     color: '#666',
   },
   resultContainer: {
     width: '100%',
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 16,
     color: '#333',
   },
   resultImage: {
-    width: 300,
+    width: '100%',
     height: 300,
     resizeMode: 'contain',
     borderRadius: 8,
-    marginBottom: 20,
     backgroundColor: '#fff',
+    marginBottom: 20,
   },
   metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     width: '100%',
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
     marginBottom: 20,
+    paddingHorizontal: 20,
   },
-  metricsTitle: {
+  qualityText: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
+    color: '#007AFF',
   },
-  metricsText: {
-    fontSize: 14,
+  enhancementText: {
+    fontSize: 16,
     color: '#666',
-    marginBottom: 5,
+    fontStyle: 'italic',
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: '#34C759',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
