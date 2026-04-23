@@ -45,3 +45,13 @@ export interface UserProfile {
   preferences: Preference[];
   sparkScore: number;
 }
+
+export interface FeedbackNotification {
+  id: number;
+  idea_id: number;
+  commenter_id: number;
+  commenter_username: string;
+  comment_text: string;
+  created_at: string;
+  unread: boolean;
+}

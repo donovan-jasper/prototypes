@@ -1,77 +1,69 @@
 import React, { createContext, useState, useEffect } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { User } from '../lib/types';
+import { getUserById } from '../lib/users';
 
 interface AuthContextType {
-  user: User | null;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  user: any;
+  isAuthenticated: boolean;
+  login: (userId: number) => Promise<void>;
+  logout: () => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({
   user: null,
+  isAuthenticated: false,
   login: async () => {},
-  logout: async () => {},
-  register: async () => {},
+  logout: () => {},
 });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check for existing session
-    checkSession();
+    const checkAuth = async () => {
+      try {
+        const userId = await SecureStore.getItemAsync('userId');
+        if (userId) {
+          const userData = await getUserById(parseInt(userId));
+          if (userData) {
+            setUser(userData);
+            setIsAuthenticated(true);
+          }
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      }
+    };
+
+    checkAuth();
   }, []);
 
-  const checkSession = async () => {
+  const login = async (userId: number) => {
     try {
-      const userData = await SecureStore.getItemAsync('user');
+      const userData = await getUserById(userId);
       if (userData) {
-        setUser(JSON.parse(userData));
+        await SecureStore.setItemAsync('userId', userId.toString());
+        setUser(userData);
+        setIsAuthenticated(true);
       }
     } catch (error) {
-      console.error('Error checking session:', error);
+      console.error('Login failed:', error);
     }
   };
 
-  const login = async (email: string, password: string) => {
-    // In a real app, you would call your authentication API here
-    // For this prototype, we'll use mock data
-    const mockUser: User = {
-      id: 1,
-      username: 'testuser',
-      email,
-      location: 'San Francisco',
-      created_at: new Date().toISOString(),
-    };
-
-    await SecureStore.setItemAsync('user', JSON.stringify(mockUser));
-    setUser(mockUser);
-  };
-
   const logout = async () => {
-    await SecureStore.deleteItemAsync('user');
-    setUser(null);
-  };
-
-  const register = async (username: string, email: string, password: string) => {
-    // In a real app, you would call your registration API here
-    // For this prototype, we'll use mock data
-    const mockUser: User = {
-      id: Math.floor(Math.random() * 1000),
-      username,
-      email,
-      location: 'New York', // Default location
-      created_at: new Date().toISOString(),
-    };
-
-    await SecureStore.setItemAsync('user', JSON.stringify(mockUser));
-    setUser(mockUser);
+    try {
+      await SecureStore.deleteItemAsync('userId');
+      setUser(null);
+      setIsAuthenticated(false);
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, register }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
