@@ -1,24 +1,25 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { Text, Avatar, ActivityIndicator } from 'react-native-paper';
-import { Message } from '../lib/types';
-import { getMessages, sendMessage } from '../lib/matching';
+import { View, StyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { Text, TextInput, Button, Avatar, Appbar } from 'react-native-paper';
+import { getMessages, sendMessage, getMatchDetails } from '../lib/matching';
 import { AuthContext } from '../context/AuthContext';
+import { Message, Match } from '../lib/types';
 
 interface MessageListProps {
   matchId: number;
   currentUserId: number;
-  onSendMessage: () => void;
+  onBack: () => void;
 }
 
-const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSendMessage }) => {
+const MessageList = ({ matchId, currentUserId, onBack }: MessageListProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [matchDetails, setMatchDetails] = useState<Match | null>(null);
   const [loading, setLoading] = useState(true);
-  const { user } = useContext(AuthContext);
 
   useEffect(() => {
     loadMessages();
+    loadMatchDetails();
   }, [matchId]);
 
   const loadMessages = async () => {
@@ -33,14 +34,22 @@ const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSen
     }
   };
 
+  const loadMatchDetails = async () => {
+    try {
+      const details = await getMatchDetails(matchId);
+      setMatchDetails(details);
+    } catch (error) {
+      console.error('Error loading match details:', error);
+    }
+  };
+
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !user) return;
+    if (!newMessage.trim()) return;
 
     try {
-      const message = await sendMessage(matchId, user.id, newMessage);
+      const message = await sendMessage(matchId, currentUserId, newMessage);
       setMessages([...messages, message]);
       setNewMessage('');
-      onSendMessage();
     } catch (error) {
       console.error('Error sending message:', error);
     }
@@ -51,14 +60,12 @@ const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSen
     return (
       <View style={[styles.messageContainer, isCurrentUser ? styles.currentUserMessage : styles.otherUserMessage]}>
         {!isCurrentUser && (
-          <Avatar.Icon
-            size={32}
-            icon="account"
-            style={styles.avatar}
-          />
+          <Avatar.Icon size={24} icon="account" style={styles.avatar} />
         )}
         <View style={[styles.messageBubble, isCurrentUser ? styles.currentUserBubble : styles.otherUserBubble]}>
-          <Text style={styles.messageText}>{item.content}</Text>
+          <Text style={isCurrentUser ? styles.currentUserText : styles.otherUserText}>
+            {item.content}
+          </Text>
           <Text style={styles.messageTime}>
             {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </Text>
@@ -67,21 +74,16 @@ const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSen
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-        <Text>Loading messages...</Text>
-      </View>
-    );
-  }
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
     >
+      <Appbar.Header>
+        <Appbar.BackAction onPress={onBack} />
+        <Appbar.Content title={matchDetails ? `Chat with ${matchDetails.user1_id === currentUserId ? 'User' : 'User'}` : 'Chat'} />
+      </Appbar.Header>
+
       <FlatList
         data={messages}
         renderItem={renderMessage}
@@ -89,21 +91,23 @@ const MessageList: React.FC<MessageListProps> = ({ matchId, currentUserId, onSen
         contentContainerStyle={styles.messagesList}
         inverted
       />
+
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
+          placeholder="Type your message..."
           value={newMessage}
           onChangeText={setNewMessage}
-          placeholder="Type a message..."
           multiline
         />
-        <TouchableOpacity
-          style={styles.sendButton}
+        <Button
+          mode="contained"
           onPress={handleSendMessage}
           disabled={!newMessage.trim()}
+          style={styles.sendButton}
         >
-          <Text style={styles.sendButtonText}>Send</Text>
-        </TouchableOpacity>
+          Send
+        </Button>
       </View>
     </KeyboardAvoidingView>
   );
@@ -119,14 +123,16 @@ const styles = StyleSheet.create({
   },
   messageContainer: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 8,
     alignItems: 'flex-end',
   },
   currentUserMessage: {
     justifyContent: 'flex-end',
+    marginLeft: 40,
   },
   otherUserMessage: {
     justifyContent: 'flex-start',
+    marginRight: 40,
   },
   avatar: {
     marginRight: 8,
@@ -137,52 +143,39 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   currentUserBubble: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200ee',
     borderBottomRightRadius: 4,
   },
   otherUserBubble: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
     borderBottomLeftRadius: 4,
   },
-  messageText: {
-    color: '#333',
-    marginBottom: 4,
+  currentUserText: {
+    color: 'white',
+  },
+  otherUserText: {
+    color: 'black',
   },
   messageTime: {
     fontSize: 10,
-    color: '#666',
+    marginTop: 4,
+    color: 'rgba(255, 255, 255, 0.7)',
     textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
     padding: 8,
+    backgroundColor: 'white',
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
-    backgroundColor: '#fff',
   },
   input: {
     flex: 1,
-    maxHeight: 100,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    borderRadius: 20,
     marginRight: 8,
+    backgroundColor: 'white',
   },
   sendButton: {
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    backgroundColor: '#4CAF50',
-    borderRadius: 20,
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignSelf: 'flex-end',
   },
 });
 
