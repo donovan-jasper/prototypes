@@ -1,66 +1,36 @@
 import React from 'react';
 import { View, StyleSheet, Text } from 'react-native';
-import { Colors } from '@/constants/Colors';
 
 interface MapMarkerProps {
   score: number;
-  isSelected: boolean;
 }
 
-export const MapMarker: React.FC<MapMarkerProps> = ({ score, isSelected }) => {
+export const MapMarker: React.FC<MapMarkerProps> = ({ score }) => {
   // Determine color based on score
-  let color = Colors.green;
-  if (score < 80) color = Colors.yellow;
-  if (score < 70) color = Colors.red;
-
-  // Scale size based on selection
-  const size = isSelected ? 40 : 30;
+  let color = '#FF5252'; // Red for low scores
+  if (score >= 70) color = '#FFC107'; // Yellow for medium scores
+  if (score >= 90) color = '#4CAF50'; // Green for high scores
 
   return (
-    <View style={[
-      styles.markerContainer,
-      {
-        width: size,
-        height: size,
-        borderColor: isSelected ? Colors.primary : color,
-      }
-    ]}>
-      <View style={[
-        styles.marker,
-        {
-          backgroundColor: color,
-          width: size * 0.6,
-          height: size * 0.6,
-        }
-      ]}>
-        <Text style={[
-          styles.scoreText,
-          {
-            fontSize: size * 0.3,
-          }
-        ]}>
-          {score}
-        </Text>
-      </View>
+    <View style={[styles.markerContainer, { backgroundColor: color }]}>
+      <Text style={styles.scoreText}>{score}</Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   markerContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 20,
-    borderWidth: 2,
-  },
-  marker: {
+    width: 30,
+    height: 30,
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
   },
   scoreText: {
-    color: Colors.white,
+    color: 'white',
     fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 12,
   },
 });

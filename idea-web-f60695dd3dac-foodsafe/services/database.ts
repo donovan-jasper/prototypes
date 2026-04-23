@@ -3,11 +3,10 @@ import { Restaurant, Inspection, UserList } from '@/types';
 
 const db = SQLite.openDatabase('safebite.db');
 
-// Initialize database tables
 export const initDatabase = async () => {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         // Create restaurants table
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS restaurants (
@@ -66,96 +65,59 @@ export const initDatabase = async () => {
           );`
         );
       },
-      (error) => {
+      error => {
         console.error('Database initialization failed:', error);
         reject(error);
       },
       () => {
         console.log('Database initialized successfully');
-        resolve();
+        resolve(true);
       }
     );
   });
 };
 
-// Cache restaurant data
-export const cacheRestaurant = async (restaurant: Restaurant) => {
-  return new Promise<void>((resolve, reject) => {
+export const cacheRestaurants = async (restaurants: Restaurant[]) => {
+  return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO restaurants (
-            id, name, address, latitude, longitude, safetyScore,
-            lastInspectionDate, violationCount, cuisine, cachedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-          [
-            restaurant.id,
-            restaurant.name,
-            restaurant.address,
-            restaurant.latitude,
-            restaurant.longitude,
-            restaurant.safetyScore,
-            restaurant.lastInspectionDate,
-            restaurant.violationCount,
-            restaurant.cuisine,
-            new Date().toISOString(),
-          ],
-          () => resolve(),
-          (_, error) => {
-            console.error('Error caching restaurant:', error);
-            reject(error);
-          }
-        );
-      }
-    );
-  });
-};
-
-// Cache inspection data
-export const cacheInspections = async (inspections: Inspection[]) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        // First insert inspections
-        inspections.forEach((inspection) => {
+      tx => {
+        restaurants.forEach(restaurant => {
           tx.executeSql(
-            `INSERT OR REPLACE INTO inspections (id, restaurantId, date, score) VALUES (?, ?, ?, ?);`,
-            [inspection.id, inspection.restaurantId, inspection.date, inspection.score],
-            () => {
-              // Then insert violations for each inspection
-              inspection.violations.forEach((violation) => {
-                tx.executeSql(
-                  `INSERT OR REPLACE INTO violations (id, inspectionId, description, severity) VALUES (?, ?, ?, ?);`,
-                  [violation.id, inspection.id, violation.description, violation.severity],
-                  () => {},
-                  (_, error) => {
-                    console.error('Error caching violation:', error);
-                    reject(error);
-                  }
-                );
-              });
-            },
-            (_, error) => {
-              console.error('Error caching inspection:', error);
-              reject(error);
-            }
+            `INSERT OR REPLACE INTO restaurants (
+              id, name, address, latitude, longitude, safetyScore,
+              lastInspectionDate, violationCount, cuisine, cachedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              restaurant.id,
+              restaurant.name,
+              restaurant.address,
+              restaurant.latitude,
+              restaurant.longitude,
+              restaurant.safetyScore,
+              restaurant.lastInspectionDate,
+              restaurant.violationCount,
+              restaurant.cuisine,
+              new Date().toISOString()
+            ]
           );
         });
       },
-      (error) => {
-        console.error('Transaction failed:', error);
+      error => {
+        console.error('Failed to cache restaurants:', error);
         reject(error);
       },
-      () => resolve()
+      () => {
+        console.log(`Cached ${restaurants.length} restaurants`);
+        resolve(true);
+      }
     );
   });
 };
 
-// Get cached restaurants
 export const getCachedRestaurants = async (): Promise<Restaurant[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
           `SELECT * FROM restaurants ORDER BY cachedAt DESC LIMIT 50;`,
           [],
@@ -165,22 +127,53 @@ export const getCachedRestaurants = async (): Promise<Restaurant[]> => {
               restaurants.push(rows.item(i) as Restaurant);
             }
             resolve(restaurants);
-          },
-          (_, error) => {
-            console.error('Error getting cached restaurants:', error);
-            reject(error);
           }
         );
+      },
+      error => {
+        console.error('Failed to get cached restaurants:', error);
+        reject(error);
       }
     );
   });
 };
 
-// Get cached inspections for a restaurant
+export const cacheInspections = async (inspections: Inspection[]) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        inspections.forEach(inspection => {
+          // Insert inspection
+          tx.executeSql(
+            `INSERT OR REPLACE INTO inspections (id, restaurantId, date, score) VALUES (?, ?, ?, ?);`,
+            [inspection.id, inspection.restaurantId, inspection.date, inspection.score]
+          );
+
+          // Insert violations
+          inspection.violations.forEach(violation => {
+            tx.executeSql(
+              `INSERT OR REPLACE INTO violations (id, inspectionId, description, severity) VALUES (?, ?, ?, ?);`,
+              [violation.id, inspection.id, violation.description, violation.severity]
+            );
+          });
+        });
+      },
+      error => {
+        console.error('Failed to cache inspections:', error);
+        reject(error);
+      },
+      () => {
+        console.log(`Cached ${inspections.length} inspections`);
+        resolve(true);
+      }
+    );
+  });
+};
+
 export const getCachedInspections = async (restaurantId: string): Promise<Inspection[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
           `SELECT * FROM inspections WHERE restaurantId = ? ORDER BY date DESC;`,
           [restaurantId],
@@ -192,106 +185,102 @@ export const getCachedInspections = async (restaurantId: string): Promise<Inspec
             }
 
             // Now get violations for each inspection
-            const inspectionPromises = inspections.map((inspection) => {
+            const inspectionPromises = inspections.map(inspection => {
               return new Promise<Inspection>((resolveInspection) => {
                 tx.executeSql(
                   `SELECT * FROM violations WHERE inspectionId = ?;`,
                   [inspection.id],
-                  (_, { rows: violationRows }) => {
+                  (_, { rows }) => {
                     const violations = [];
-                    for (let j = 0; j < violationRows.length; j++) {
-                      violations.push(violationRows.item(j));
+                    for (let j = 0; j < rows.length; j++) {
+                      violations.push(rows.item(j));
                     }
-                    inspection.violations = violations;
-                    resolveInspection(inspection);
-                  },
-                  (_, error) => {
-                    console.error('Error getting violations:', error);
-                    inspection.violations = [];
-                    resolveInspection(inspection);
+                    resolveInspection({ ...inspection, violations });
                   }
                 );
               });
             });
 
-            Promise.all(inspectionPromises).then(resolve).catch(reject);
-          },
-          (_, error) => {
-            console.error('Error getting cached inspections:', error);
-            reject(error);
+            Promise.all(inspectionPromises).then(resolvedInspections => {
+              resolve(resolvedInspections);
+            });
           }
         );
+      },
+      error => {
+        console.error('Failed to get cached inspections:', error);
+        reject(error);
       }
     );
   });
 };
 
-// Clear old cache entries (older than 7 days)
-export const clearOldCache = async () => {
-  return new Promise<void>((resolve, reject) => {
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+export const clearOldCache = async (days: number = 7) => {
+  return new Promise((resolve, reject) => {
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - days);
 
     db.transaction(
-      (tx) => {
+      tx => {
         // Delete old restaurants
         tx.executeSql(
           `DELETE FROM restaurants WHERE cachedAt < ?;`,
-          [sevenDaysAgo.toISOString()],
-          () => {},
-          (_, error) => {
-            console.error('Error clearing old restaurants:', error);
-          }
+          [cutoffDate.toISOString()]
         );
 
         // Delete inspections for deleted restaurants
         tx.executeSql(
-          `DELETE FROM inspections WHERE restaurantId NOT IN (SELECT id FROM restaurants);`,
-          [],
-          () => {},
-          (_, error) => {
-            console.error('Error cleaning up inspections:', error);
-          }
+          `DELETE FROM inspections WHERE restaurantId NOT IN (SELECT id FROM restaurants);`
         );
 
         // Delete violations for deleted inspections
         tx.executeSql(
-          `DELETE FROM violations WHERE inspectionId NOT IN (SELECT id FROM inspections);`,
-          [],
-          () => {},
-          (_, error) => {
-            console.error('Error cleaning up violations:', error);
-          }
+          `DELETE FROM violations WHERE inspectionId NOT IN (SELECT id FROM inspections);`
         );
       },
-      (error) => {
-        console.error('Cache cleanup failed:', error);
+      error => {
+        console.error('Failed to clear old cache:', error);
         reject(error);
       },
-      () => resolve()
+      () => {
+        console.log('Cleared old cache entries');
+        resolve(true);
+      }
     );
   });
 };
 
-// User lists operations
-export const createUserList = async (name: string): Promise<UserList> => {
+export const saveUserList = async (list: UserList) => {
   return new Promise((resolve, reject) => {
-    const id = Math.random().toString(36).substring(2, 9);
-    const createdAt = new Date().toISOString();
-
     db.transaction(
-      (tx) => {
+      tx => {
+        // Insert or replace the list
         tx.executeSql(
-          `INSERT INTO userLists (id, name, createdAt) VALUES (?, ?, ?);`,
-          [id, name, createdAt],
-          () => {
-            resolve({ id, name, restaurantIds: [], createdAt });
-          },
-          (_, error) => {
-            console.error('Error creating user list:', error);
-            reject(error);
-          }
+          `INSERT OR REPLACE INTO userLists (id, name, createdAt) VALUES (?, ?, ?);`,
+          [list.id, list.name, list.createdAt]
         );
+
+        // Delete existing list items
+        tx.executeSql(
+          `DELETE FROM listItems WHERE listId = ?;`,
+          [list.id]
+        );
+
+        // Insert new list items
+        list.restaurantIds.forEach(restaurantId => {
+          tx.executeSql(
+            `INSERT INTO listItems (listId, restaurantId) VALUES (?, ?);`,
+            [list.id, restaurantId]
+          );
+        });
+      },
+      error => {
+        console.error('Failed to save user list:', error);
+        reject(error);
+      },
+      () => {
+        console.log('User list saved successfully');
+        resolve(true);
       }
     );
   });
@@ -300,7 +289,7 @@ export const createUserList = async (name: string): Promise<UserList> => {
 export const getUserLists = async (): Promise<UserList[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
           `SELECT * FROM userLists ORDER BY createdAt DESC;`,
           [],
@@ -312,71 +301,59 @@ export const getUserLists = async (): Promise<UserList[]> => {
             }
 
             // Now get restaurant IDs for each list
-            const listPromises = lists.map((list) => {
+            const listPromises = lists.map(list => {
               return new Promise<UserList>((resolveList) => {
                 tx.executeSql(
                   `SELECT restaurantId FROM listItems WHERE listId = ?;`,
                   [list.id],
-                  (_, { rows: restaurantRows }) => {
+                  (_, { rows }) => {
                     const restaurantIds = [];
-                    for (let j = 0; j < restaurantRows.length; j++) {
-                      restaurantIds.push(restaurantRows.item(j).restaurantId);
+                    for (let j = 0; j < rows.length; j++) {
+                      restaurantIds.push(rows.item(j).restaurantId);
                     }
-                    list.restaurantIds = restaurantIds;
-                    resolveList(list);
-                  },
-                  (_, error) => {
-                    console.error('Error getting list items:', error);
-                    list.restaurantIds = [];
-                    resolveList(list);
+                    resolveList({ ...list, restaurantIds });
                   }
                 );
               });
             });
 
-            Promise.all(listPromises).then(resolve).catch(reject);
-          },
-          (_, error) => {
-            console.error('Error getting user lists:', error);
-            reject(error);
+            Promise.all(listPromises).then(resolvedLists => {
+              resolve(resolvedLists);
+            });
           }
         );
+      },
+      error => {
+        console.error('Failed to get user lists:', error);
+        reject(error);
       }
     );
   });
 };
 
-export const addRestaurantToList = async (listId: string, restaurantId: string): Promise<void> => {
+export const deleteUserList = async (listId: string) => {
   return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
+        // Delete the list
         tx.executeSql(
-          `INSERT OR IGNORE INTO listItems (listId, restaurantId) VALUES (?, ?);`,
-          [listId, restaurantId],
-          () => resolve(),
-          (_, error) => {
-            console.error('Error adding restaurant to list:', error);
-            reject(error);
-          }
+          `DELETE FROM userLists WHERE id = ?;`,
+          [listId]
         );
-      }
-    );
-  });
-};
 
-export const removeRestaurantFromList = async (listId: string, restaurantId: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
+        // Delete list items
         tx.executeSql(
-          `DELETE FROM listItems WHERE listId = ? AND restaurantId = ?;`,
-          [listId, restaurantId],
-          () => resolve(),
-          (_, error) => {
-            console.error('Error removing restaurant from list:', error);
-            reject(error);
-          }
+          `DELETE FROM listItems WHERE listId = ?;`,
+          [listId]
         );
+      },
+      error => {
+        console.error('Failed to delete user list:', error);
+        reject(error);
+      },
+      () => {
+        console.log('User list deleted successfully');
+        resolve(true);
       }
     );
   });

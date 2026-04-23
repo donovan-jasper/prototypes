@@ -140,78 +140,65 @@ export const getRestaurantsByLocation = async (
   } catch (error) {
     console.error('Error fetching restaurants by location:', error);
     // Fallback to mock data if API fails
-    return mockRestaurants;
+    return mockRestaurants.filter(restaurant => {
+      const distance = Math.sqrt(
+        Math.pow(restaurant.latitude - latitude, 2) +
+        Math.pow(restaurant.longitude - longitude, 2)
+      );
+      return distance <= radius;
+    });
   }
 };
 
-export const getRestaurantById = async (id: string): Promise<Restaurant | null> => {
+export const getRestaurantDetails = async (restaurantId: string): Promise<Restaurant> => {
   try {
     // First try to get from cache
-    if (restaurantCache.has(id)) {
-      const restaurant = restaurantCache.get(id);
-      if (restaurant) {
-        // Get inspections to calculate safety score
-        const inspections = await getInspectionHistory(id);
-        if (inspections.length > 0) {
-          restaurant.safetyScore = calculateSafetyScore(inspections);
-          restaurant.lastInspectionDate = inspections[0].date;
-          restaurant.violationCount = inspections[0].violations.length;
-        }
-        return restaurant;
-      }
-    }
-
-    // If not in cache, fetch from API
-    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}/${id}`);
-
-    if (response.data) {
-      const restaurant = transformRestaurantData(response.data);
-      restaurantCache.set(restaurant.id, restaurant);
-
-      // Get inspections to calculate safety score
-      const inspections = await getInspectionHistory(id);
-      if (inspections.length > 0) {
-        restaurant.safetyScore = calculateSafetyScore(inspections);
-        restaurant.lastInspectionDate = inspections[0].date;
-        restaurant.violationCount = inspections[0].violations.length;
-      }
-
-      return restaurant;
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error fetching restaurant by ID:', error);
-    // Fallback to mock data if API fails
-    const mockRestaurant = mockRestaurants.find(r => r.id === id);
-    if (mockRestaurant) {
-      const inspections = await getInspectionHistory(id);
-      if (inspections.length > 0) {
-        mockRestaurant.safetyScore = calculateSafetyScore(inspections);
-        mockRestaurant.lastInspectionDate = inspections[0].date;
-        mockRestaurant.violationCount = inspections[0].violations.length;
-      }
-    }
-    return mockRestaurant || null;
-  }
-};
-
-export const getInspectionHistory = async (restaurantId: string): Promise<Inspection[]> => {
-  try {
-    // First try to get from cache
-    if (inspectionCache.has(restaurantId)) {
-      const inspections = inspectionCache.get(restaurantId);
-      if (inspections) {
-        return inspections;
-      }
+    if (restaurantCache.has(restaurantId)) {
+      return restaurantCache.get(restaurantId)!;
     }
 
     // If not in cache, fetch from API
     const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
       params: {
         business_id: restaurantId,
+        $limit: 1,
+      },
+    });
+
+    if (response.data.length === 0) {
+      throw new Error('Restaurant not found');
+    }
+
+    const restaurant = transformRestaurantData(response.data[0]);
+
+    // Cache the result
+    restaurantCache.set(restaurant.id, restaurant);
+
+    return restaurant;
+  } catch (error) {
+    console.error('Error fetching restaurant details:', error);
+    // Fallback to mock data if API fails
+    const mockRestaurant = mockRestaurants.find(r => r.id === restaurantId);
+    if (mockRestaurant) {
+      return mockRestaurant;
+    }
+    throw error;
+  }
+};
+
+export const getInspectionsForRestaurant = async (restaurantId: string): Promise<Inspection[]> => {
+  try {
+    // First try to get from cache
+    if (inspectionCache.has(restaurantId)) {
+      return inspectionCache.get(restaurantId)!;
+    }
+
+    // If not in cache, fetch from API
+    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
+      params: {
+        business_id: restaurantId,
+        $limit: 10,
         $order: 'inspection_date DESC',
-        $limit: 100,
       },
     });
 
@@ -222,161 +209,91 @@ export const getInspectionHistory = async (restaurantId: string): Promise<Inspec
 
     return inspections;
   } catch (error) {
-    console.error('Error fetching inspection history:', error);
+    console.error('Error fetching inspections:', error);
     // Fallback to mock data if API fails
-    return mockInspections[restaurantId] || [];
+    return mockInspections.filter(i => i.restaurantId === restaurantId);
   }
 };
 
-// Mock data as fallback
+// Mock data for when API fails
 const mockRestaurants: Restaurant[] = [
   {
     id: '1',
-    name: 'The Green Leaf Bistro',
-    address: '123 Main St, San Francisco, CA',
-    latitude: 37.7749,
-    longitude: -122.4194,
-    safetyScore: 95,
-    lastInspectionDate: '2024-02-15',
+    name: 'The Golden Bear',
+    address: '123 University Ave, San Francisco, CA 94132',
+    latitude: 37.7249,
+    longitude: -122.4696,
+    safetyScore: 88,
+    lastInspectionDate: '2023-05-15',
     violationCount: 1,
     cuisine: 'American',
   },
   {
     id: '2',
-    name: 'Sushi Paradise',
-    address: '456 Market St, San Francisco, CA',
-    latitude: 37.7849,
-    longitude: -122.4094,
-    safetyScore: 88,
-    lastInspectionDate: '2024-01-20',
-    violationCount: 3,
-    cuisine: 'Japanese',
-  },
-  {
-    id: '3',
-    name: 'Pizza Heaven',
-    address: '789 Valencia St, San Francisco, CA',
-    latitude: 37.7649,
-    longitude: -122.4294,
-    safetyScore: 72,
-    lastInspectionDate: '2024-02-01',
-    violationCount: 5,
-    cuisine: 'Italian',
-  },
-  {
-    id: '4',
-    name: 'Taco Fiesta',
-    address: '321 Mission St, San Francisco, CA',
-    latitude: 37.7949,
-    longitude: -122.3994,
-    safetyScore: 91,
-    lastInspectionDate: '2024-02-10',
-    violationCount: 2,
+    name: 'Tacos El Gordo',
+    address: '456 Mission St, San Francisco, CA 94105',
+    latitude: 37.7908,
+    longitude: -122.4012,
+    safetyScore: 92,
+    lastInspectionDate: '2023-06-20',
+    violationCount: 0,
     cuisine: 'Mexican',
   },
   {
-    id: '5',
-    name: 'Burger Palace',
-    address: '654 Castro St, San Francisco, CA',
-    latitude: 37.7549,
-    longitude: -122.4394,
-    safetyScore: 85,
-    lastInspectionDate: '2024-01-25',
-    violationCount: 4,
-    cuisine: 'American',
-  },
-  {
-    id: '6',
-    name: 'Thai Spice',
-    address: '987 Geary Blvd, San Francisco, CA',
-    latitude: 37.7849,
-    longitude: -122.4294,
-    safetyScore: 93,
-    lastInspectionDate: '2024-02-12',
-    violationCount: 1,
-    cuisine: 'Thai',
-  },
-  {
-    id: '7',
-    name: 'French Corner Cafe',
-    address: '147 Polk St, San Francisco, CA',
+    id: '3',
+    name: 'The Cheese Steak Shop',
+    address: '789 South Park Ave, San Francisco, CA 94108',
     latitude: 37.7749,
-    longitude: -122.4094,
-    safetyScore: 68,
-    lastInspectionDate: '2024-01-18',
-    violationCount: 7,
-    cuisine: 'French',
-  },
-  {
-    id: '8',
-    name: 'Indian Curry House',
-    address: '258 Divisadero St, San Francisco, CA',
-    latitude: 37.7649,
-    longitude: -122.4394,
-    safetyScore: 89,
-    lastInspectionDate: '2024-02-08',
-    violationCount: 2,
-    cuisine: 'Indian',
+    longitude: -122.4194,
+    safetyScore: 76,
+    lastInspectionDate: '2023-04-10',
+    violationCount: 3,
+    cuisine: 'American',
   },
 ];
 
-const mockInspections: Record<string, Inspection[]> = {
-  '1': [
-    {
-      id: 'i1-1',
-      restaurantId: '1',
-      date: '2024-02-15',
-      score: 95,
-      violations: [
-        { id: 'v1', description: 'Minor temperature issue in walk-in cooler', severity: 'low' },
-      ],
-    },
-    {
-      id: 'i1-2',
-      restaurantId: '1',
-      date: '2023-11-10',
-      score: 97,
-      violations: [],
-    },
-    {
-      id: 'i1-3',
-      restaurantId: '1',
-      date: '2023-08-05',
-      score: 94,
-      violations: [
-        { id: 'v2', description: 'Food handler certificate expired', severity: 'low' },
-      ],
-    },
-  ],
-  '2': [
-    {
-      id: 'i2-1',
-      restaurantId: '2',
-      date: '2024-01-20',
-      score: 88,
-      violations: [
-        { id: 'v3', description: 'Improper food storage temperature', severity: 'medium' },
-        { id: 'v4', description: 'Missing handwashing signage', severity: 'low' },
-        { id: 'v5', description: 'Inadequate pest control', severity: 'medium' },
-      ],
-    },
-    {
-      id: 'i2-2',
-      restaurantId: '2',
-      date: '2023-10-15',
-      score: 92,
-      violations: [
-        { id: 'v6', description: 'Minor cleaning issue', severity: 'low' },
-      ],
-    },
-    {
-      id: 'i2-3',
-      restaurantId: '2',
-      date: '2023-07-20',
-      score: 90,
-      violations: [
-        { id: 'v7', description: 'Equipment maintenance needed', severity: 'low' },
-      ],
-    },
-  ],
-};
+const mockInspections: Inspection[] = [
+  {
+    id: '1',
+    restaurantId: '1',
+    date: '2023-05-15',
+    score: 88,
+    violations: [
+      {
+        id: 'v1',
+        description: 'Improper food storage',
+        severity: 'medium',
+      },
+    ],
+  },
+  {
+    id: '2',
+    restaurantId: '2',
+    date: '2023-06-20',
+    score: 92,
+    violations: [],
+  },
+  {
+    id: '3',
+    restaurantId: '3',
+    date: '2023-04-10',
+    score: 76,
+    violations: [
+      {
+        id: 'v2',
+        description: 'Inadequate handwashing facilities',
+        severity: 'medium',
+      },
+      {
+        id: 'v3',
+        description: 'Expired food items',
+        severity: 'high',
+      },
+      {
+        id: 'v4',
+        description: 'Insects in food prep area',
+        severity: 'high',
+      },
+    ],
+  },
+];
