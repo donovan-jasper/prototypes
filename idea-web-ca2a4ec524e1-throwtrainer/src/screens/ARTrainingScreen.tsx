@@ -10,6 +10,7 @@ import { ThrowData, calculateAccuracy, screenToWorldCoordinates } from '../utils
 import { motionAnalyzer } from '../services/motionAnalyzer';
 import { ARTargetOverlay } from '../components/ARTargetOverlay';
 import { SessionTimer } from '../components/SessionTimer';
+import { Audio } from 'expo-av';
 
 const { width: viewportWidth, height: viewportHeight } = Dimensions.get('window');
 
@@ -28,11 +29,22 @@ export default function ARTrainingScreen({ navigation }) {
   const trajectoryLineRef = useRef<THREE.Line | null>(null);
   const targetMeshesRef = useRef<Array<THREE.Mesh>>([]);
   const targetGroupRef = useRef<THREE.Group>(new THREE.Group());
+  const hitSoundRef = useRef<Audio.Sound | null>(null);
+  const missSoundRef = useRef<Audio.Sound | null>(null);
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
+
+      // Load sound effects
+      const hitSound = new Audio.Sound();
+      await hitSound.loadAsync(require('../../assets/sounds/hit.mp3'));
+      hitSoundRef.current = hitSound;
+
+      const missSound = new Audio.Sound();
+      await missSound.loadAsync(require('../../assets/sounds/miss.mp3'));
+      missSoundRef.current = missSound;
     })();
 
     // Initialize motion analyzer
@@ -46,6 +58,8 @@ export default function ARTrainingScreen({ navigation }) {
     return () => {
       motionAnalyzer.stop();
       subscription.remove();
+      hitSoundRef.current?.unloadAsync();
+      missSoundRef.current?.unloadAsync();
     };
   }, []);
 
@@ -99,9 +113,11 @@ export default function ARTrainingScreen({ navigation }) {
       setHits(prev => prev + 1);
       logAttempt({ success: true, speed: throwData.speed, angle: throwData.angle, x: throwData.x, y: throwData.y });
       showFeedback(true, intersects[0].point);
+      hitSoundRef.current?.replayAsync();
     } else {
       logAttempt({ success: false, speed: throwData.speed, angle: throwData.angle, x: throwData.x, y: throwData.y });
       showFeedback(false, new THREE.Vector3(throwData.x, throwData.y, -1));
+      missSoundRef.current?.replayAsync();
     }
 
     // Visualize trajectory
@@ -137,148 +153,75 @@ export default function ARTrainingScreen({ navigation }) {
     }
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 2 });
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
     const line = new THREE.Line(geometry, material);
 
     sceneRef.current.add(line);
     trajectoryLineRef.current = line;
 
-    // Remove after 2 seconds
+    // Fade out the line after 2 seconds
     setTimeout(() => {
-      if (sceneRef.current && trajectoryLineRef.current) {
-        sceneRef.current.remove(trajectoryLineRef.current);
-        trajectoryLineRef.current = null;
+      if (sceneRef.current && line) {
+        sceneRef.current.remove(line);
       }
     }, 2000);
   };
 
-  const showFeedback = (isHit: boolean, position: THREE.Vector3) => {
+  const showFeedback = (hit: boolean, position: THREE.Vector3) => {
     if (!sceneRef.current) return;
 
-    // Create feedback sphere
-    const geometry = new THREE.SphereGeometry(0.1, 16, 16);
-    const material = new THREE.MeshBasicMaterial({
-      color: isHit ? 0x00ff00 : 0xff0000,
+    const feedbackGeometry = new THREE.CircleGeometry(0.3, 32);
+    const feedbackMaterial = new THREE.MeshBasicMaterial({
+      color: hit ? 0x00ff00 : 0xff0000,
       transparent: true,
       opacity: 0.8
     });
-    const sphere = new THREE.Mesh(geometry, material);
+    const feedback = new THREE.Mesh(feedbackGeometry, feedbackMaterial);
+    feedback.position.copy(position);
 
-    sphere.position.copy(position);
-    sceneRef.current.add(sphere);
+    sceneRef.current.add(feedback);
 
-    // Add particle explosion for hits
-    if (isHit) {
-      createParticleExplosion(position);
-    }
+    // Animate feedback
+    let scale = 0.1;
+    const animateFeedback = () => {
+      scale += 0.05;
+      feedback.scale.set(scale, scale, scale);
+      feedback.material.opacity -= 0.05;
 
-    // Remove after 1 second
-    setTimeout(() => {
-      if (sceneRef.current) {
-        sceneRef.current.remove(sphere);
-      }
-    }, 1000);
-  };
-
-  const createParticleExplosion = (position: THREE.Vector3) => {
-    if (!sceneRef.current) return;
-
-    const particleCount = 50;
-    const particles = new THREE.Group();
-
-    for (let i = 0; i < particleCount; i++) {
-      const geometry = new THREE.SphereGeometry(0.05, 8, 8);
-      const material = new THREE.MeshBasicMaterial({
-        color: new THREE.Color(Math.random(), Math.random(), Math.random()),
-        transparent: true,
-        opacity: 0.8
-      });
-      const particle = new THREE.Mesh(geometry, material);
-
-      // Random direction and speed
-      const direction = new THREE.Vector3(
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2,
-        (Math.random() - 0.5) * 2
-      ).normalize();
-
-      particle.position.copy(position);
-      particle.userData = {
-        velocity: direction.multiplyScalar(Math.random() * 2 + 1),
-        lifetime: 1.0
-      };
-
-      particles.add(particle);
-    }
-
-    sceneRef.current.add(particles);
-
-    // Animate particles
-    const animateParticles = () => {
-      const deltaTime = 0.016; // ~60fps
-
-      particles.children.forEach((particle: THREE.Mesh) => {
-        if (particle.userData.lifetime <= 0) {
-          sceneRef.current?.remove(particle);
-          return;
-        }
-
-        // Update position
-        particle.position.add(particle.userData.velocity.clone().multiplyScalar(deltaTime));
-
-        // Update lifetime
-        particle.userData.lifetime -= deltaTime;
-
-        // Fade out
-        const opacity = particle.userData.lifetime;
-        if (particle.material instanceof THREE.MeshBasicMaterial) {
-          particle.material.opacity = opacity;
-        }
-      });
-
-      // Remove particles group when empty
-      if (particles.children.length === 0 && sceneRef.current) {
-        sceneRef.current.remove(particles);
+      if (feedback.material.opacity <= 0) {
+        sceneRef.current?.remove(feedback);
       } else {
-        requestAnimationFrame(animateParticles);
+        requestAnimationFrame(animateFeedback);
       }
     };
 
-    animateParticles();
+    animateFeedback();
   };
 
   const handlePlaceTarget = (event: any) => {
-    if (!cameraRef.current || !sceneRef.current) return;
+    if (!isSessionActive) return;
 
     const { locationX, locationY } = event.nativeEvent;
+    const { x, y } = screenToWorldCoordinates(locationX, locationY, viewportWidth, viewportHeight);
 
-    // Convert screen coordinates to world coordinates
-    const worldPosition = screenToWorldCoordinates(
-      locationX,
-      locationY,
-      cameraRef.current,
-      viewportWidth,
-      viewportHeight
-    );
-
-    // Create new target
-    const targetId = Date.now().toString();
     const newTarget = {
-      x: worldPosition.x,
-      y: worldPosition.y,
-      z: worldPosition.z,
-      id: targetId
+      x,
+      y,
+      z: -3, // Fixed distance from camera
+      id: Date.now().toString()
     };
 
-    // Create 3D target mesh
-    const targetMesh = createTargetMesh(worldPosition);
-    targetMeshesRef.current.push(targetMesh);
-    targetGroupRef.current.add(targetMesh);
-
     setTargets(prev => [...prev, newTarget]);
+
+    // Create and add target mesh to scene
+    if (sceneRef.current) {
+      const targetMesh = createTargetMesh(newTarget);
+      targetMeshesRef.current.push(targetMesh);
+      targetGroupRef.current.add(targetMesh);
+    }
   };
 
-  const createTargetMesh = (position: THREE.Vector3): THREE.Mesh => {
+  const createTargetMesh = (target: { x: number; y: number; z: number }): THREE.Mesh => {
     // Create target ring
     const ringGeometry = new THREE.RingGeometry(0.5, 0.6, 32);
     const ringMaterial = new THREE.MeshBasicMaterial({
@@ -298,78 +241,67 @@ export default function ARTrainingScreen({ navigation }) {
     const targetGroup = new THREE.Group();
     targetGroup.add(ring);
     targetGroup.add(dot);
-    targetGroup.position.copy(position);
+    targetGroup.position.set(target.x, target.y, target.z);
 
     return targetGroup;
   };
 
-  const handleStartSession = () => {
-    if (targets.length === 0) {
-      Alert.alert('No Targets', 'Please place at least one target before starting a session');
-      return;
-    }
-
-    startSession();
+  const startSession = () => {
     setIsSessionActive(true);
     setHits(0);
     setTotalAttempts(0);
+    startSession();
   };
 
-  const handleEndSession = () => {
-    endSession();
+  const endCurrentSession = () => {
     setIsSessionActive(false);
-
-    // Show session summary
-    const accuracy = calculateAccuracy(hits, totalAttempts);
-    Alert.alert(
-      'Session Complete',
-      `Accuracy: ${accuracy}%\nHits: ${hits}\nTotal Attempts: ${totalAttempts}`,
-      [{ text: 'OK' }]
-    );
+    endSession();
+    setTargets([]);
+    targetMeshesRef.current.forEach(mesh => targetGroupRef.current.remove(mesh));
+    targetMeshesRef.current = [];
   };
 
   if (hasPermission === null) {
-    return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
+    return <View />;
   }
 
   if (hasPermission === false) {
-    return <View style={styles.container}><Text>No access to camera</Text></View>;
+    return <Text>No access to camera</Text>;
   }
 
   return (
     <View style={styles.container}>
-      <Camera style={StyleSheet.absoluteFill} type={Camera.Constants.Type.back}>
+      <Camera
+        style={styles.camera}
+        type={Camera.Constants.Type.back}
+        onTouchEnd={handlePlaceTarget}
+      >
         <GLView
           ref={glViewRef}
           style={StyleSheet.absoluteFill}
           onContextCreate={initializeScene}
         />
 
-        {!isSessionActive && (
-          <TouchableOpacity
-            style={styles.placeTargetButton}
-            onPress={handlePlaceTarget}
-          >
-            <Text style={styles.buttonText}>Place Target</Text>
-          </TouchableOpacity>
+        {isSessionActive && (
+          <View style={styles.overlay}>
+            <SessionTimer
+              hits={hits}
+              totalAttempts={totalAttempts}
+              onEndSession={endCurrentSession}
+            />
+            <Text style={styles.accuracyText}>
+              Accuracy: {calculateAccuracy(hits, totalAttempts)}%
+            </Text>
+          </View>
         )}
 
-        {isSessionActive ? (
-          <SessionTimer
-            hits={hits}
-            totalAttempts={totalAttempts}
-            onEndSession={handleEndSession}
-          />
-        ) : (
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity
-              style={styles.startButton}
-              onPress={handleStartSession}
-              disabled={targets.length === 0}
-            >
-              <Text style={styles.buttonText}>Start Session</Text>
-            </TouchableOpacity>
-          </View>
+        {!isSessionActive && (
+          <TouchableOpacity
+            style={styles.startButton}
+            onPress={startSession}
+          >
+            <Text style={styles.startButtonText}>Start Session</Text>
+          </TouchableOpacity>
         )}
       </Camera>
     </View>
@@ -380,31 +312,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  placeTargetButton: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 15,
-    borderRadius: 10,
-  },
-  controlsContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  startButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+  camera: {
     flex: 1,
   },
-  buttonText: {
+  overlay: {
+    position: 'absolute',
+    top: 40,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  accuracyText: {
     color: 'white',
+    fontSize: 18,
+    marginTop: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 8,
+    borderRadius: 8,
+  },
+  startButton: {
+    position: 'absolute',
+    bottom: 40,
+    alignSelf: 'center',
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 8,
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
   },
 });

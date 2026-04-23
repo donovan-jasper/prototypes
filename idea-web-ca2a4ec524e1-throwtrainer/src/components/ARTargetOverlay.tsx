@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { GLView } from 'expo-gl';
 import { Renderer } from 'expo-three';
@@ -6,9 +6,26 @@ import * as THREE from 'three';
 
 interface ARTargetOverlayProps {
   targets: Array<{ x: number; y: number; z: number; id: string }>;
+  onTargetPlaced?: (target: { x: number; y: number; z: number }) => void;
 }
 
-export const ARTargetOverlay: React.FC<ARTargetOverlayProps> = ({ targets }) => {
+export const ARTargetOverlay: React.FC<ARTargetOverlayProps> = ({ targets, onTargetPlaced }) => {
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
+  const targetMeshesRef = useRef<Array<THREE.Mesh>>([]);
+  const targetGroupRef = useRef<THREE.Group>(new THREE.Group());
+
+  useEffect(() => {
+    // Clean up when component unmounts
+    return () => {
+      if (sceneRef.current) {
+        targetMeshesRef.current.forEach(mesh => {
+          targetGroupRef.current.remove(mesh);
+        });
+      }
+    };
+  }, []);
+
   const initializeScene = (gl: WebGLRenderingContext) => {
     const { drawingBufferWidth: width, drawingBufferHeight: height } = gl;
 
@@ -19,16 +36,15 @@ export const ARTargetOverlay: React.FC<ARTargetOverlayProps> = ({ targets }) => 
 
     // Create scene
     const scene = new THREE.Scene();
+    sceneRef.current = scene;
 
     // Create camera
     const camera = new THREE.PerspectiveCamera(70, width / height, 0.01, 1000);
     camera.position.set(0, 0, 5);
+    cameraRef.current = camera;
 
-    // Create targets
-    targets.forEach(target => {
-      const targetMesh = createTargetMesh(target);
-      scene.add(targetMesh);
-    });
+    // Add target group to scene
+    scene.add(targetGroupRef.current);
 
     // Animation loop
     const animate = () => {
@@ -62,6 +78,24 @@ export const ARTargetOverlay: React.FC<ARTargetOverlayProps> = ({ targets }) => 
 
     return targetGroup;
   };
+
+  // Update targets when props change
+  useEffect(() => {
+    if (!sceneRef.current) return;
+
+    // Remove all existing targets
+    targetMeshesRef.current.forEach(mesh => {
+      targetGroupRef.current.remove(mesh);
+    });
+    targetMeshesRef.current = [];
+
+    // Add new targets
+    targets.forEach(target => {
+      const targetMesh = createTargetMesh(target);
+      targetMeshesRef.current.push(targetMesh);
+      targetGroupRef.current.add(targetMesh);
+    });
+  }, [targets]);
 
   return (
     <GLView
