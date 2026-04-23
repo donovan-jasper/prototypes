@@ -8,10 +8,13 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { getMessages, saveMessage } from '../services/database';
 import { AuthContext } from '../contexts/AuthContext';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Message {
   id: string;
@@ -19,6 +22,7 @@ interface Message {
   senderId: string;
   text: string;
   createdAt: number;
+  status?: 'sent' | 'delivered' | 'read';
 }
 
 const ChatScreen = () => {
@@ -27,11 +31,66 @@ const ChatScreen = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [ws, setWs] = useState<WebSocket | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     loadMessages();
+    setupWebSocket();
+
+    return () => {
+      if (ws) {
+        ws.close();
+      }
+    };
   }, [id]);
+
+  const setupWebSocket = () => {
+    try {
+      const socket = new WebSocket('wss://api.bridgegen.com/chat');
+      socket.onopen = () => {
+        console.log('WebSocket connected');
+        socket.send(JSON.stringify({
+          type: 'subscribe',
+          connectionId: id,
+          userId: user?.id
+        }));
+      };
+
+      socket.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'message') {
+          setMessages(prev => [...prev, data.message]);
+          scrollToBottom();
+        } else if (data.type === 'status') {
+          updateMessageStatus(data.messageId, data.status);
+        }
+      };
+
+      socket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        Alert.alert('Connection Error', 'Failed to connect to real-time server. Messages may not be delivered immediately.');
+      };
+
+      socket.onclose = () => {
+        console.log('WebSocket disconnected');
+        // Attempt to reconnect after delay
+        setTimeout(setupWebSocket, 5000);
+      };
+
+      setWs(socket);
+    } catch (error) {
+      console.error('WebSocket setup error:', error);
+      Alert.alert('Connection Error', 'Failed to establish real-time connection.');
+    }
+  };
+
+  const updateMessageStatus = (messageId: string, status: 'delivered' | 'read') => {
+    setMessages(prev => prev.map(msg =>
+      msg.id === messageId ? { ...msg, status } : msg
+    ));
+  };
 
   const loadMessages = async () => {
     try {
@@ -41,6 +100,7 @@ const ChatScreen = () => {
       setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
       console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -61,15 +121,29 @@ const ChatScreen = () => {
       senderId: user.id,
       text: inputText.trim(),
       createdAt: Date.now(),
+      status: 'sent'
     };
 
     try {
+      setSending(true);
       await saveMessage(newMessage);
       setMessages((prev) => [...prev, newMessage]);
       setInputText('');
+
+      // Send message via WebSocket if connected
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'message',
+          message: newMessage
+        }));
+      }
+
       setTimeout(() => scrollToBottom(), 100);
     } catch (error) {
       console.error('Error sending message:', error);
+      Alert.alert('Error', 'Failed to send message. Please try again.');
+    } finally {
+      setSending(false);
     }
   };
 
@@ -132,14 +206,21 @@ const ChatScreen = () => {
           >
             {item.text}
           </Text>
-          <Text
-            style={[
-              styles.timestamp,
-              isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp,
-            ]}
-          >
-            {formatTimestamp(item.createdAt)}
-          </Text>
+          <View style={styles.messageFooter}>
+            <Text
+              style={[
+                styles.timestamp,
+                isCurrentUser ? styles.currentUserTimestamp : styles.otherUserTimestamp,
+              ]}
+            >
+              {formatTimestamp(item.createdAt)}
+            </Text>
+            {isCurrentUser && item.status && (
+              <Text style={styles.statusIndicator}>
+                {item.status === 'read' ? '✓✓' : '✓'}
+              </Text>
+            )}
+          </View>
         </View>
       </View>
     );
@@ -148,7 +229,8 @@ const ChatScreen = () => {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <Text>Loading messages...</Text>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading messages...</Text>
       </View>
     );
   }
@@ -181,13 +263,18 @@ const ChatScreen = () => {
           onChangeText={setInputText}
           multiline
           maxLength={1000}
+          editable={!sending}
         />
         <TouchableOpacity
-          style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+          style={[styles.sendButton, (!inputText.trim() || sending) && styles.sendButtonDisabled]}
           onPress={handleSend}
-          disabled={!inputText.trim()}
+          disabled={!inputText.trim() || sending}
         >
-          <Text style={styles.sendButtonText}>Send</Text>
+          {sending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="send" size={20} color="#fff" />
+          )}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -203,10 +290,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
   },
   messagesList: {
     padding: 16,
-    flexGrow: 1,
+    paddingBottom: 20,
   },
   messageContainer: {
     marginBottom: 12,
@@ -219,21 +311,20 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   messageBubble: {
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    padding: 12,
+    borderRadius: 18,
   },
   currentUserBubble: {
     backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
   },
   otherUserBubble: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    backgroundColor: '#e5e5ea',
+    borderBottomLeftRadius: 4,
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 20,
+    lineHeight: 22,
   },
   currentUserText: {
     color: '#fff',
@@ -241,65 +332,70 @@ const styles = StyleSheet.create({
   otherUserText: {
     color: '#000',
   },
-  timestamp: {
-    fontSize: 11,
+  messageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
     marginTop: 4,
+  },
+  timestamp: {
+    fontSize: 12,
+    marginRight: 4,
   },
   currentUserTimestamp: {
     color: 'rgba(255, 255, 255, 0.7)',
   },
   otherUserTimestamp: {
-    color: '#666',
+    color: 'rgba(0, 0, 0, 0.5)',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    alignItems: 'flex-end',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    maxHeight: 100,
-    marginRight: 8,
-  },
-  sendButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  statusIndicator: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '500',
+    color: '#666',
     marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#666',
+    color: '#999',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
+  input: {
+    flex: 1,
+    minHeight: 40,
+    maxHeight: 100,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    fontSize: 16,
+  },
+  sendButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#cccccc',
   },
 });
 

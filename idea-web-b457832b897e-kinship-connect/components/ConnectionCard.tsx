@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet } from 'react-native';
-import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 interface ConnectionCardProps {
   connection: {
@@ -13,11 +13,10 @@ interface ConnectionCardProps {
     lastMessageTime: number;
     unreadCount: number;
   };
+  onPress: () => void;
 }
 
-const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
-  const router = useRouter();
-
+const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, onPress }) => {
   const formatTime = (timestamp: number) => {
     const now = Date.now();
     const diff = now - timestamp;
@@ -32,13 +31,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
     return new Date(timestamp).toLocaleDateString();
   };
 
-  const handlePress = () => {
-    router.push(`/chat/${connection.id}`);
-  };
-
   return (
-    <TouchableOpacity style={styles.card} onPress={handlePress} testID="connection-card">
-      <Image source={{ uri: connection.matchPhoto }} style={styles.avatar} />
+    <TouchableOpacity style={styles.card} onPress={onPress} testID="connection-card">
+      <Image
+        source={{ uri: connection.matchPhoto }}
+        style={styles.avatar}
+        defaultSource={require('../assets/images/default-avatar.png')}
+      />
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.name}>{connection.matchName}</Text>
@@ -55,6 +54,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           )}
         </View>
       </View>
+      <Ionicons name="chevron-forward" size={20} color="#999" style={styles.chevron} />
     </TouchableOpacity>
   );
 };
@@ -66,6 +66,7 @@ const styles = StyleSheet.create({
     padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    alignItems: 'center',
   },
   avatar: {
     width: 56,
@@ -116,6 +117,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 12,
     fontWeight: '600',
+  },
+  chevron: {
+    marginLeft: 8,
   },
 });
 
