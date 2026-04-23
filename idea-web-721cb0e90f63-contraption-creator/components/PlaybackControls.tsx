@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, TouchableOpacity, Text, StyleSheet, Animated } from 'react-native';
+import { View, TouchableOpacity, Text, StyleSheet, Animated, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { VideoRecorder } from '../lib/video';
 import { useStore } from '../lib/store';
+import * as MediaLibrary from 'expo-media-library';
 
 interface PlaybackControlsProps {
   canvasRef: React.RefObject<any>;
@@ -19,9 +20,17 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
   });
   const videoRecorderRef = useRef<VideoRecorder | null>(null);
   const recordingIndicatorAnim = useRef(new Animated.Value(0)).current;
+  const [permissionGranted, setPermissionGranted] = useState(false);
 
   useEffect(() => {
-    if (canvasRef.current) {
+    (async () => {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      setPermissionGranted(status === 'granted');
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (canvasRef.current && permissionGranted) {
       videoRecorderRef.current = new VideoRecorder(
         canvasRef,
         (state) => {
@@ -37,7 +46,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
         videoRecorderRef.current?.stopRecording();
       }
     };
-  }, [canvasRef]);
+  }, [canvasRef, permissionGranted]);
 
   useEffect(() => {
     if (isRecording) {
@@ -62,6 +71,23 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
   }, [isRecording]);
 
   const handleRecord = async () => {
+    if (!permissionGranted) {
+      Alert.alert(
+        'Permission Required',
+        'Please grant camera roll permissions to save videos',
+        [
+          {
+            text: 'OK',
+            onPress: async () => {
+              const { status } = await MediaLibrary.requestPermissionsAsync();
+              setPermissionGranted(status === 'granted');
+            },
+          },
+        ]
+      );
+      return;
+    }
+
     if (isRecording) {
       await videoRecorderRef.current?.stopRecording();
     } else {
@@ -95,7 +121,11 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
         <MaterialIcons name="replay" size={24} color="white" />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.recordButton} onPress={handleRecord}>
+      <TouchableOpacity
+        style={[styles.recordButton, !permissionGranted && styles.disabledButton]}
+        onPress={handleRecord}
+        disabled={!permissionGranted}
+      >
         {isRecording ? (
           <Animated.View
             style={[
@@ -104,7 +134,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
             ]}
           />
         ) : (
-          <MaterialIcons name="fiber-manual-record" size={24} color="red" />
+          <MaterialIcons name="fiber-manual-record" size={24} color={permissionGranted ? 'red' : 'gray'} />
         )}
       </TouchableOpacity>
 
@@ -141,6 +171,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 24,
     position: 'relative',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   recordingIndicator: {
     width: 16,
