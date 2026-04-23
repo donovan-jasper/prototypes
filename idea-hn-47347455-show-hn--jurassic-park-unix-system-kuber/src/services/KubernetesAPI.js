@@ -9,6 +9,7 @@ class KubernetesAPI {
     this.currentMemory = 60;
     this.currentDisk = 70;
     this.callback = null;
+    this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || 'ws://your-kubernetes-ws-endpoint';
   }
 
   async fetchMetrics() {
@@ -39,11 +40,7 @@ class KubernetesAPI {
       };
     } catch (error) {
       console.error('Error fetching Kubernetes metrics:', error);
-      return {
-        cpu: this.currentCpu,
-        memory: this.currentMemory,
-        disk: this.currentDisk
-      };
+      throw error; // Re-throw the error to be handled by the component
     }
   }
 
@@ -95,15 +92,15 @@ class KubernetesAPI {
       return this.currentDisk;
     } catch (error) {
       console.error('Error fetching disk metrics:', error);
-      return this.currentDisk;
+      throw error; // Re-throw the error to be handled by the component
     }
   }
 
   subscribeToMetrics(endpoint, callback) {
     this.callback = callback;
 
-    // Use environment variable for WebSocket endpoint
-    const wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || endpoint;
+    // Use the configured WebSocket endpoint
+    const wsEndpoint = this.wsEndpoint || endpoint;
     this.ws = new WebSocket(wsEndpoint);
 
     this.ws.onmessage = (event) => {
