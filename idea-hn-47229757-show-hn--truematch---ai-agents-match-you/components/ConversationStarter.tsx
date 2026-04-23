@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Clipboard, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Clipboard, ActivityIndicator, FlatList } from 'react-native';
 import Colors from '../constants/Colors';
 import { generateConversationStarters } from '../lib/ai/conversationGenerator';
 
@@ -14,44 +14,42 @@ export const ConversationStarter: React.FC<ConversationStarterProps> = ({
   onSend,
   onCopy
 }) => {
-  const [starter, setStarter] = useState<string>('');
+  const [starters, setStarters] = useState<string[]>([]);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
-  const [copied, setCopied] = useState<boolean>(false);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const generateStarter = async () => {
+  const generateStarters = async () => {
     setIsGenerating(true);
     setError(null);
     try {
-      const newStarter = await generateConversationStarters(matchId);
-      setStarter(newStarter);
+      const newStarters = await generateConversationStarters(matchId);
+      setStarters(newStarters);
     } catch (error) {
-      console.error('Error generating conversation starter:', error);
-      setError('Failed to generate conversation starter. Please try again.');
-      setStarter('');
+      console.error('Error generating conversation starters:', error);
+      setError('Failed to generate conversation starters. Please try again.');
+      setStarters([]);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleCopy = () => {
-    if (starter) {
-      Clipboard.setString(starter);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      if (onCopy) onCopy();
-    }
+  const handleCopy = (starter: string, index: number) => {
+    Clipboard.setString(starter);
+    setCopiedIndex(index);
+    setTimeout(() => setCopiedIndex(null), 2000);
+    if (onCopy) onCopy();
   };
 
   useEffect(() => {
-    generateStarter();
+    generateStarters();
   }, [matchId]);
 
   if (isGenerating) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={Colors.primary} />
-        <Text style={styles.loadingText}>Generating conversation starter...</Text>
+        <Text style={styles.loadingText}>Generating conversation starters...</Text>
       </View>
     );
   }
@@ -60,50 +58,67 @@ export const ConversationStarter: React.FC<ConversationStarterProps> = ({
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={generateStarter}>
+        <TouchableOpacity style={styles.refreshButton} onPress={generateStarters}>
           <Text style={styles.refreshButtonText}>Try Again</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  if (!starter) {
+  if (starters.length === 0) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No conversation starter available</Text>
-        <TouchableOpacity style={styles.refreshButton} onPress={generateStarter}>
+        <Text style={styles.emptyText}>No conversation starters available</Text>
+        <TouchableOpacity style={styles.refreshButton} onPress={generateStarters}>
           <Text style={styles.refreshButtonText}>Generate New</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.starterText}>{starter}</Text>
+  const renderStarterItem = ({ item, index }: { item: string; index: number }) => (
+    <View style={styles.starterContainer}>
+      <Text style={styles.starterText}>{item}</Text>
       <View style={styles.actions}>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={handleCopy}
+          onPress={() => handleCopy(item, index)}
           accessibilityLabel="Copy conversation starter"
         >
-          <Text style={styles.actionButtonText}>{copied ? 'Copied!' : 'Copy'}</Text>
+          <Text style={styles.actionButtonText}>
+            {copiedIndex === index ? 'Copied!' : 'Copy'}
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.actionButton, styles.sendButton]}
-          onPress={() => onSend(starter)}
+          onPress={() => onSend(item)}
           accessibilityLabel="Send conversation starter"
         >
           <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
         </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Conversation Starters</Text>
         <TouchableOpacity
-          style={[styles.actionButton, styles.refreshButton]}
-          onPress={generateStarter}
-          accessibilityLabel="Refresh conversation starter"
+          style={styles.refreshButton}
+          onPress={generateStarters}
+          accessibilityLabel="Refresh conversation starters"
         >
-          <Text style={styles.actionButtonText}>Refresh</Text>
+          <Text style={styles.refreshButtonText}>Refresh</Text>
         </TouchableOpacity>
       </View>
+      <FlatList
+        data={starters}
+        renderItem={renderStarterItem}
+        keyExtractor={(item, index) => `starter-${index}`}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
+      />
     </View>
   );
 };
@@ -119,6 +134,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
+    maxHeight: 400,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: Colors.text,
+    fontFamily: 'System',
+  },
+  starterContainer: {
+    marginBottom: 16,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
   },
   starterText: {
     fontSize: 16,
@@ -129,24 +163,18 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   actionButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 4,
     backgroundColor: Colors.secondary,
-    flex: 1,
     marginRight: 8,
     alignItems: 'center',
   },
   sendButton: {
     backgroundColor: Colors.primary,
-    marginRight: 0,
-  },
-  refreshButton: {
-    backgroundColor: Colors.accent,
-    marginRight: 0,
   },
   actionButtonText: {
     color: Colors.white,
@@ -156,6 +184,18 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: Colors.white,
+  },
+  refreshButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    backgroundColor: Colors.accent,
+  },
+  refreshButtonText: {
+    color: Colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: 'System',
   },
   loadingContainer: {
     flexDirection: 'row',
@@ -186,12 +226,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   errorText: {
-    color: Colors.error,
+    color: Colors.errorText,
     marginBottom: 8,
     fontFamily: 'System',
   },
-  refreshButtonText: {
-    color: Colors.white,
-    fontFamily: 'System',
+  listContent: {
+    paddingBottom: 8,
   },
 });
