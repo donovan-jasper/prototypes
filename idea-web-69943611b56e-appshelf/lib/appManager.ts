@@ -1,12 +1,19 @@
 import * as Application from 'expo-application';
-import { Platform } from 'react-native';
+import { Platform, Linking } from 'react-native';
 import * as SQLite from 'expo-sqlite';
 import * as Device from 'expo-device';
 import { NativeModules } from 'react-native';
 
 const db = SQLite.openDatabase('flowdeck.db');
 
-export const getInstalledApps = async () => {
+interface App {
+  packageName: string;
+  label: string;
+  icon?: string;
+  category?: string;
+}
+
+export const getInstalledApps = async (): Promise<App[]> => {
   if (Platform.OS === 'ios') {
     // iOS doesn't allow listing installed apps, return curated list
     return getCuratedApps();
@@ -26,7 +33,7 @@ export const getInstalledApps = async () => {
 };
 
 // Native module implementation for Android
-const getAndroidInstalledApps = async () => {
+const getAndroidInstalledApps = async (): Promise<App[]> => {
   if (Platform.OS !== 'android') {
     return [];
   }
@@ -45,7 +52,7 @@ const getAndroidInstalledApps = async () => {
   }
 };
 
-const getCuratedApps = () => {
+const getCuratedApps = (): App[] => {
   // Curated list of common apps for iOS with URL schemes
   return [
     {
@@ -229,18 +236,6 @@ const getCuratedApps = () => {
       category: 'productivity'
     },
     {
-      packageName: 'onenote://',
-      label: 'OneNote',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'notion://',
-      label: 'Notion',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
       packageName: 'trello://',
       label: 'Trello',
       icon: undefined,
@@ -253,38 +248,8 @@ const getCuratedApps = () => {
       category: 'productivity'
     },
     {
-      packageName: 'todoist://',
-      label: 'Todoist',
-      icon: undefined,
-      category: 'productivity'
-    },
-    {
-      packageName: 'outlook://',
-      label: 'Outlook',
-      icon: undefined,
-      category: 'communication'
-    },
-    {
-      packageName: 'protonmail://',
-      label: 'ProtonMail',
-      icon: undefined,
-      category: 'communication'
-    },
-    {
-      packageName: 'signal://',
-      label: 'Signal',
-      icon: undefined,
-      category: 'communication'
-    },
-    {
-      packageName: 'telegram://',
-      label: 'Telegram',
-      icon: undefined,
-      category: 'communication'
-    },
-    {
-      packageName: 'discord://',
-      label: 'Discord',
+      packageName: 'zoom://',
+      label: 'Zoom',
       icon: undefined,
       category: 'communication'
     },
@@ -295,142 +260,40 @@ const getCuratedApps = () => {
       category: 'communication'
     },
     {
-      packageName: 'zoom://',
-      label: 'Zoom',
+      packageName: 'discord://',
+      label: 'Discord',
       icon: undefined,
       category: 'communication'
     },
     {
-      packageName: 'teams://',
-      label: 'Microsoft Teams',
+      packageName: 'telegram://',
+      label: 'Telegram',
       icon: undefined,
       category: 'communication'
     },
     {
-      packageName: 'fitness://',
-      label: 'Fitness',
+      packageName: 'signal://',
+      label: 'Signal',
       icon: undefined,
-      category: 'health'
+      category: 'communication'
     },
     {
-      packageName: 'health://',
-      label: 'Health',
+      packageName: 'outlook://',
+      label: 'Outlook',
       icon: undefined,
-      category: 'health'
+      category: 'productivity'
     },
     {
-      packageName: 'strava://',
-      label: 'Strava',
+      packageName: 'onedrive://',
+      label: 'OneDrive',
       icon: undefined,
-      category: 'health'
+      category: 'productivity'
     },
     {
-      packageName: 'myfitnesspal://',
-      label: 'MyFitnessPal',
+      packageName: 'icloud://',
+      label: 'iCloud',
       icon: undefined,
-      category: 'health'
-    },
-    {
-      packageName: 'googlefit://',
-      label: 'Google Fit',
-      icon: undefined,
-      category: 'health'
-    },
-    {
-      packageName: 'applehealth://',
-      label: 'Apple Health',
-      icon: undefined,
-      category: 'health'
-    },
-    {
-      packageName: 'podcasts://',
-      label: 'Podcasts',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'audible://',
-      label: 'Audible',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'libby://',
-      label: 'Libby',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'kindle://',
-      label: 'Kindle',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'goodreads://',
-      label: 'Goodreads',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'banking://',
-      label: 'Banking',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'chase://',
-      label: 'Chase',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'wellsfargo://',
-      label: 'Wells Fargo',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'venmo://',
-      label: 'Venmo',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'cashapp://',
-      label: 'Cash App',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'paypal://',
-      label: 'PayPal',
-      icon: undefined,
-      category: 'finance'
-    },
-    {
-      packageName: 'uber://',
-      label: 'Uber',
-      icon: undefined,
-      category: 'transportation'
-    },
-    {
-      packageName: 'lyft://',
-      label: 'Lyft',
-      icon: undefined,
-      category: 'transportation'
-    },
-    {
-      packageName: 'waze://',
-      label: 'Waze',
-      icon: undefined,
-      category: 'transportation'
-    },
-    {
-      packageName: 'googletranslate://',
-      label: 'Google Translate',
-      icon: undefined,
-      category: 'utilities'
+      category: 'productivity'
     },
     {
       packageName: 'googlephotos://',
@@ -439,366 +302,128 @@ const getCuratedApps = () => {
       category: 'media'
     },
     {
-      packageName: 'dropcam://',
-      label: 'Dropcam',
+      packageName: 'googlekeep://',
+      label: 'Google Keep',
       icon: undefined,
-      category: 'home'
+      category: 'productivity'
     },
     {
-      packageName: 'ring://',
-      label: 'Ring',
+      packageName: 'googlecalendar://',
+      label: 'Google Calendar',
       icon: undefined,
-      category: 'home'
+      category: 'productivity'
     },
     {
-      packageName: 'nest://',
-      label: 'Nest',
+      packageName: 'googlemaps://',
+      label: 'Google Maps',
       icon: undefined,
-      category: 'home'
+      category: 'navigation'
     },
     {
-      packageName: 'ecobee://',
-      label: 'Ecobee',
+      packageName: 'googledrive://',
+      label: 'Google Drive',
       icon: undefined,
-      category: 'home'
+      category: 'productivity'
     },
     {
-      packageName: 'hue://',
-      label: 'Philips Hue',
+      packageName: 'googletranslate://',
+      label: 'Google Translate',
       icon: undefined,
-      category: 'home'
+      category: 'productivity'
     },
     {
-      packageName: 'googlehome://',
-      label: 'Google Home',
-      icon: undefined,
-      category: 'home'
-    },
-    {
-      packageName: 'alexa://',
-      label: 'Alexa',
-      icon: undefined,
-      category: 'home'
-    },
-    {
-      packageName: 'siri://',
-      label: 'Siri',
-      icon: undefined,
-      category: 'utilities'
-    },
-    {
-      packageName: 'googleassistant://',
-      label: 'Google Assistant',
-      icon: undefined,
-      category: 'utilities'
-    },
-    {
-      packageName: 'bible://',
-      label: 'Bible',
-      icon: undefined,
-      category: 'spiritual'
-    },
-    {
-      packageName: 'prayer://',
-      label: 'Prayer',
-      icon: undefined,
-      category: 'spiritual'
-    },
-    {
-      packageName: 'meditation://',
-      label: 'Meditation',
-      icon: undefined,
-      category: 'wellness'
-    },
-    {
-      packageName: 'headspace://',
-      label: 'Headspace',
-      icon: undefined,
-      category: 'wellness'
-    },
-    {
-      packageName: 'calm://',
-      label: 'Calm',
-      icon: undefined,
-      category: 'wellness'
-    },
-    {
-      packageName: 'inshorts://',
-      label: 'Inshorts',
+      packageName: 'googlenews://',
+      label: 'Google News',
       icon: undefined,
       category: 'news'
     },
     {
-      packageName: 'flipboard://',
-      label: 'Flipboard',
+      packageName: 'googlesheets://',
+      label: 'Google Sheets',
       icon: undefined,
-      category: 'news'
+      category: 'productivity'
     },
     {
-      packageName: 'feeder://',
-      label: 'Feeder',
+      packageName: 'googledocs://',
+      label: 'Google Docs',
       icon: undefined,
-      category: 'news'
+      category: 'productivity'
     },
     {
-      packageName: 'reeder://',
-      label: 'Reeder',
+      packageName: 'googleforms://',
+      label: 'Google Forms',
       icon: undefined,
-      category: 'news'
+      category: 'productivity'
     },
     {
-      packageName: 'pocketcasts://',
-      label: 'Pocket Casts',
+      packageName: 'googlecontacts://',
+      label: 'Google Contacts',
       icon: undefined,
-      category: 'entertainment'
+      category: 'communication'
     },
     {
-      packageName: 'overcast://',
-      label: 'Overcast',
+      packageName: 'googlefit://',
+      label: 'Google Fit',
       icon: undefined,
-      category: 'entertainment'
+      category: 'health'
     },
     {
-      packageName: 'castro://',
-      label: 'Castro',
+      packageName: 'googlefitness://',
+      label: 'Google Fitness',
       icon: undefined,
-      category: 'entertainment'
+      category: 'health'
     },
     {
-      packageName: 'tunein://',
-      label: 'TuneIn',
+      packageName: 'googlefitnessapp://',
+      label: 'Google Fitness App',
       icon: undefined,
-      category: 'entertainment'
+      category: 'health'
     },
     {
-      packageName: 'soundcloud://',
-      label: 'SoundCloud',
+      packageName: 'googlefitnessapp://',
+      label: 'Google Fitness App',
       icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'bandcamp://',
-      label: 'Bandcamp',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'spotifyartist://',
-      label: 'Spotify Artist',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidal://',
-      label: 'Tidal',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'amazonmusic://',
-      label: 'Amazon Music',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'applemusic://',
-      label: 'Apple Music',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'soundhound://',
-      label: 'SoundHound',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'shazam://',
-      label: 'Shazam',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tunein://',
-      label: 'TuneIn',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'iheartradio://',
-      label: 'iHeartRadio',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'pandora://',
-      label: 'Pandora',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'deezer://',
-      label: 'Deezer',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'lastfm://',
-      label: 'Last.fm',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidal://',
-      label: 'Tidal',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'qobuz://',
-      label: 'Qobuz',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidalhiFi://',
-      label: 'Tidal HiFi',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'napster://',
-      label: 'Napster',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'soundcloud://',
-      label: 'SoundCloud',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'bandcamp://',
-      label: 'Bandcamp',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'spotifyartist://',
-      label: 'Spotify Artist',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidal://',
-      label: 'Tidal',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'amazonmusic://',
-      label: 'Amazon Music',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'applemusic://',
-      label: 'Apple Music',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'soundhound://',
-      label: 'SoundHound',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'shazam://',
-      label: 'Shazam',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tunein://',
-      label: 'TuneIn',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'iheartradio://',
-      label: 'iHeartRadio',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'pandora://',
-      label: 'Pandora',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'deezer://',
-      label: 'Deezer',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'lastfm://',
-      label: 'Last.fm',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidal://',
-      label: 'Tidal',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'qobuz://',
-      label: 'Qobuz',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'tidalhiFi://',
-      label: 'Tidal HiFi',
-      icon: undefined,
-      category: 'entertainment'
-    },
-    {
-      packageName: 'napster://',
-      label: 'Napster',
-      icon: undefined,
-      category: 'entertainment'
+      category: 'health'
     }
   ];
 };
 
-const cacheApps = async (apps) => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      tx => {
-        tx.executeSql(
-          'CREATE TABLE IF NOT EXISTS apps (packageName TEXT PRIMARY KEY, label TEXT, icon TEXT, lastUsed INTEGER, category TEXT);'
-        );
+export const launchApp = async (packageName: string) => {
+  try {
+    if (Platform.OS === 'ios') {
+      // For iOS, use URL scheme
+      const url = packageName.startsWith('http') ? packageName : packageName;
+      const supported = await Linking.canOpenURL(url);
 
-        apps.forEach(app => {
-          tx.executeSql(
-            'INSERT OR REPLACE INTO apps (packageName, label, icon, lastUsed, category) VALUES (?, ?, ?, ?, ?);',
-            [app.packageName, app.label, app.icon || '', Date.now(), app.category || '']
-          );
-        });
-      },
-      error => {
-        console.error('Error caching apps:', error);
-        reject(error);
-      },
-      () => {
-        resolve();
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        console.log(`Don't know how to open URL: ${url}`);
       }
-    );
-  });
+    } else {
+      // For Android, use package name
+      await Linking.openURL(`intent://#Intent;package=${packageName};end`);
+    }
+  } catch (error) {
+    console.error('Error launching app:', error);
+  }
+};
+
+const cacheApps = async (apps: App[]) => {
+  try {
+    await db.transactionAsync(async (tx) => {
+      // Clear existing apps
+      await tx.executeSqlAsync('DELETE FROM apps');
+
+      // Insert new apps
+      for (const app of apps) {
+        await tx.executeSqlAsync(
+          'INSERT INTO apps (packageName, label, icon, category) VALUES (?, ?, ?, ?)',
+          [app.packageName, app.label, app.icon, app.category]
+        );
+      }
+    });
+  } catch (error) {
+    console.error('Error caching apps:', error);
+  }
 };

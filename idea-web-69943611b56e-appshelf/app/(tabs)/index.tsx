@@ -1,93 +1,119 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useApps } from '../../hooks/useApps';
-import { useModes } from '../../hooks/useModes';
-import AppIcon from '../../components/AppIcon';
 import { useAppStore } from '../../store/appStore';
+import AppIcon from '../../components/AppIcon';
+import { getInstalledApps } from '../../lib/appManager';
+import { switchMode } from '../../lib/modeEngine';
 import { MaterialIcons } from '@expo/vector-icons';
 
 const HomeScreen = () => {
   const navigation = useNavigation();
-  const { apps, loadApps, isLoading } = useApps();
-  const { modes, loadModes } = useModes();
-  const { activeMode, setActiveMode } = useAppStore();
-  const [displayedApps, setDisplayedApps] = useState([]);
+  const { activeMode, modes, setActiveMode, apps, setApps } = useAppStore();
+  const [loading, setLoading] = useState(true);
+  const [filteredApps, setFilteredApps] = useState([]);
 
   useEffect(() => {
+    const loadApps = async () => {
+      try {
+        const installedApps = await getInstalledApps();
+        setApps(installedApps);
+
+        if (activeMode) {
+          // Filter apps based on current mode
+          const modeApps = installedApps.filter(app =>
+            activeMode.appIds.includes(app.packageName)
+          );
+          setFilteredApps(modeApps);
+        } else {
+          setFilteredApps(installedApps);
+        }
+      } catch (error) {
+        console.error('Error loading apps:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadApps();
-    loadModes();
-  }, []);
+  }, [activeMode, setApps]);
 
   useEffect(() => {
-    if (activeMode && apps.length > 0) {
-      // Filter apps based on the current mode
-      const filteredApps = apps.filter(app =>
+    if (activeMode) {
+      const modeApps = apps.filter(app =>
         activeMode.appIds.includes(app.packageName)
       );
-      setDisplayedApps(filteredApps);
-    } else if (apps.length > 0) {
-      // If no active mode, show all apps
-      setDisplayedApps(apps);
+      setFilteredApps(modeApps);
+    } else {
+      setFilteredApps(apps);
     }
   }, [activeMode, apps]);
 
-  const handleModePress = () => {
+  const handleModeSwitch = () => {
     navigation.navigate('modes');
   };
 
   const handleAppLongPress = (app) => {
-    // Show app options (remove from mode, app info, etc.)
+    // Show context menu for app
     console.log('Long press on app:', app.label);
   };
 
-  const renderAppItem = ({ item }) => (
-    <AppIcon
-      app={item}
-      onLongPress={() => handleAppLongPress(item)}
-    />
-  );
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading your apps...</Text>
+      </View>
+    );
+  }
+
+  if (!activeMode && modes.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyTitle}>Welcome to FlowDeck</Text>
+        <Text style={styles.emptySubtitle}>Create your first mode to get started</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => navigation.navigate('modes')}
+        >
+          <Text style={styles.createButtonText}>Create Mode</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>
+        <Text style={styles.modeName}>
           {activeMode ? activeMode.name : 'All Apps'}
         </Text>
-        <TouchableOpacity
-          style={styles.modeButton}
-          onPress={handleModePress}
-        >
-          <Text style={styles.modeButtonText}>Modes</Text>
-          <MaterialIcons name="keyboard-arrow-right" size={20} color="#666" />
+        <TouchableOpacity onPress={handleModeSwitch}>
+          <MaterialIcons name="edit" size={24} color="#007AFF" />
         </TouchableOpacity>
       </View>
 
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <Text>Loading apps...</Text>
-        </View>
-      ) : displayedApps.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
-            {activeMode
-              ? 'No apps in this mode. Add some from the Modes screen.'
-              : 'No apps found. Please check your permissions.'}
-          </Text>
-          {Platform.OS === 'ios' && (
-            <Text style={styles.iosNote}>
-              Note: iOS doesn't allow listing installed apps. You can create curated modes.
-            </Text>
-          )}
-        </View>
-      ) : (
+      {filteredApps.length > 0 ? (
         <FlatList
-          data={displayedApps}
-          renderItem={renderAppItem}
+          data={filteredApps}
+          renderItem={({ item }) => (
+            <AppIcon
+              app={item}
+              onLongPress={() => handleAppLongPress(item)}
+            />
+          )}
           keyExtractor={(item) => item.packageName}
           numColumns={4}
           contentContainerStyle={styles.grid}
         />
+      ) : (
+        <View style={styles.emptyAppsContainer}>
+          <Text style={styles.emptyAppsText}>
+            {activeMode
+              ? 'No apps in this mode. Add some from the mode editor.'
+              : 'No apps found. Please check your app permissions.'}
+          </Text>
+        </View>
       )}
     </View>
   );
@@ -98,6 +124,45 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  createButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -106,44 +171,23 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  title: {
-    fontSize: 24,
+  modeName: {
+    fontSize: 20,
     fontWeight: 'bold',
   },
-  modeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modeButtonText: {
-    fontSize: 16,
-    color: '#666',
-    marginRight: 4,
-  },
   grid: {
-    padding: 16,
+    padding: 8,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
+  emptyAppsContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
   },
-  emptyText: {
+  emptyAppsText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 16,
-  },
-  iosNote: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 8,
   },
 });
 
