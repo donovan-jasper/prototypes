@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, RefreshControl, ScrollView, Alert } from 'react-native';
 import SubscriptionList from '../components/SubscriptionList';
 import SubscriptionService from '../services/SubscriptionService';
 
@@ -11,7 +11,6 @@ const HomeScreen = ({ navigation }) => {
 
   const loadData = useCallback(async () => {
     try {
-      // Initialize database if not already done
       await SubscriptionService.initDatabase();
       await SubscriptionService.seedDatabase();
 
@@ -25,6 +24,7 @@ const HomeScreen = ({ navigation }) => {
       setUpcomingRenewals(renewals);
     } catch (error) {
       console.error('Error loading data:', error);
+      Alert.alert('Error', 'Failed to load subscriptions. Please try again.');
     }
   }, []);
 
@@ -49,6 +49,7 @@ const HomeScreen = ({ navigation }) => {
       await loadData();
     } catch (error) {
       console.error('Error unsubscribing:', error);
+      Alert.alert('Error', 'Failed to unsubscribe. Please try again.');
     }
   };
 
@@ -84,11 +85,18 @@ const HomeScreen = ({ navigation }) => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your Subscriptions</Text>
-        <SubscriptionList
-          subscriptions={subscriptions}
-          onUnsubscribe={handleUnsubscribe}
-          navigation={navigation}
-        />
+        {subscriptions.length > 0 ? (
+          <SubscriptionList
+            subscriptions={subscriptions}
+            onUnsubscribe={handleUnsubscribe}
+            navigation={navigation}
+          />
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>No active subscriptions found</Text>
+            <Text style={styles.emptyStateSubtext}>Add your first subscription to get started</Text>
+          </View>
+        )}
       </View>
 
       {upcomingRenewals.length > 0 && (
@@ -196,6 +204,23 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  emptyState: {
+    padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 4,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#666',
   },
 });
 
