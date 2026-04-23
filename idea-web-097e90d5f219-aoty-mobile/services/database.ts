@@ -203,13 +203,3 @@ export const getAlbumsByArtist = async (artistId: string): Promise<Album[]> => {
     throw error;
   }
 };
-
-export const getAllAlbums = async (): Promise<Album[]> => {
-  try {
-    const result = await db.getAllAsync<Album>('SELECT * FROM albums ORDER BY consensusScore DESC');
-    return result;
-  } catch (error) {
-    console.error('Failed to get all albums:', error);
-    throw error;
-  }
-};

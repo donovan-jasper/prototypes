@@ -170,11 +170,12 @@ export default function ArtistsScreen() {
 
       {searching && (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#bb86fc' : '#6200ee'} />
+          <ActivityIndicator size="large" color={colorScheme === 'dark' ? '#ffffff' : '#000000'} />
+          <Text style={{ color: colorScheme === 'dark' ? '#ffffff' : '#000000' }}>Searching artists...</Text>
         </View>
       )}
 
-      {searchQuery.length > 0 && searchResults.length > 0 && (
+      {searchResults.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
             Search Results
@@ -192,7 +193,7 @@ export default function ArtistsScreen() {
       {followedArtists.length > 0 && (
         <>
           <Text style={[styles.sectionTitle, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
-            Followed Artists ({followedArtists.length}{!isPremium && `/${FREE_TIER_LIMIT}`})
+            Followed Artists
           </Text>
           <FlatList
             data={followedArtists}
@@ -204,10 +205,10 @@ export default function ArtistsScreen() {
         </>
       )}
 
-      {followedArtists.length === 0 && searchQuery.length === 0 && !searching && (
+      {followedArtists.length === 0 && searchResults.length === 0 && !searching && (
         <View style={styles.emptyState}>
-          <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#b0b0b0' : '#666666' }]}>
-            You're not following any artists yet. Search above to find your favorites!
+          <Text style={[styles.emptyText, { color: colorScheme === 'dark' ? '#ffffff' : '#000000' }]}>
+            You're not following any artists yet. Search above to find artists to follow.
           </Text>
         </View>
       )}
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   errorContainer: {
-    padding: 12,
+    padding: 16,
     backgroundColor: 'rgba(255, 0, 0, 0.1)',
     borderRadius: 4,
     marginBottom: 16,
@@ -236,12 +237,13 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 16,
     marginBottom: 8,
+    marginTop: 16,
   },
   list: {
     flex: 1,
@@ -267,5 +269,6 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
+    color: '#666',
   },
 });
