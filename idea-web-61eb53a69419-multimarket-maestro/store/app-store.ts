@@ -1,136 +1,158 @@
 import { create } from 'zustand';
-import { AppState, Listing, PlatformConnection } from '../types';
+import { Listing, Platform } from '../types';
+import { SyncEngine } from '../lib/sync-engine';
+import { EbayAdapter } from '../lib/platform-adapters/ebay-adapter';
+import { EtsyAdapter } from '../lib/platform-adapters/etsy-adapter';
+import { DepopAdapter } from '../lib/platform-adapters/depop-adapter';
 
-const mockListings: Listing[] = [
-  {
-    id: '1',
-    title: 'Vintage Leather Jacket',
-    description: 'Classic brown leather jacket in excellent condition',
-    price: 89.99,
-    quantity: 1,
-    images: ['https://picsum.photos/400/400?random=1'],
-    platforms: ['ebay', 'depop'],
-    syncStatus: 'synced',
-    createdAt: '2026-03-15T10:00:00Z',
-    updatedAt: '2026-03-15T10:00:00Z',
-  },
-  {
-    id: '2',
-    title: 'Handmade Ceramic Mug Set',
-    description: 'Set of 4 artisan ceramic mugs with unique glaze patterns',
-    price: 45.00,
-    quantity: 3,
-    images: ['https://picsum.photos/400/400?random=2'],
-    platforms: ['etsy'],
-    syncStatus: 'synced',
-    createdAt: '2026-03-14T14:30:00Z',
-    updatedAt: '2026-03-14T14:30:00Z',
-  },
-  {
-    id: '3',
-    title: 'Nike Air Max Sneakers',
-    description: 'Size 10, gently used, authentic Nike sneakers',
-    price: 65.00,
-    quantity: 1,
-    images: ['https://picsum.photos/400/400?random=3'],
-    platforms: ['poshmark', 'facebook'],
-    syncStatus: 'pending',
-    createdAt: '2026-03-16T09:15:00Z',
-    updatedAt: '2026-03-17T16:20:00Z',
-  },
-  {
-    id: '4',
-    title: 'Vintage Band T-Shirt',
-    description: 'Rare 90s concert tee, size M, excellent condition',
-    price: 35.00,
-    quantity: 1,
-    images: ['https://picsum.photos/400/400?random=4'],
-    platforms: ['depop', 'ebay'],
-    syncStatus: 'synced',
-    createdAt: '2026-03-13T11:00:00Z',
-    updatedAt: '2026-03-13T11:00:00Z',
-  },
-  {
-    id: '5',
-    title: 'Wooden Plant Stand',
-    description: 'Mid-century modern style plant stand, solid wood',
-    price: 55.00,
-    quantity: 2,
-    images: ['https://picsum.photos/400/400?random=5'],
-    platforms: ['facebook', 'etsy'],
-    syncStatus: 'error',
-    createdAt: '2026-03-12T08:45:00Z',
-    updatedAt: '2026-03-17T12:00:00Z',
-  },
-];
+interface AppState {
+  listings: Listing[];
+  platforms: Platform[];
+  syncStatus: 'idle' | 'syncing' | 'synced' | 'pending' | 'error';
+  isOnline: boolean;
+  syncEngine: SyncEngine;
+  initialize: () => Promise<void>;
+  addListing: (listing: Listing) => Promise<void>;
+  updateListing: (listing: Listing) => Promise<void>;
+  deleteListing: (id: string) => Promise<void>;
+  setSyncStatus: (status: AppState['syncStatus']) => void;
+  setOnlineStatus: (isOnline: boolean) => void;
+  triggerSync: () => Promise<void>;
+}
 
-const mockPlatforms: PlatformConnection[] = [
-  { id: '1', name: 'ebay', enabled: true, lastSync: '2026-03-18T00:45:00Z' },
-  { id: '2', name: 'etsy', enabled: true, lastSync: '2026-03-18T00:45:00Z' },
-  { id: '3', name: 'depop', enabled: true, lastSync: '2026-03-18T00:30:00Z' },
-  { id: '4', name: 'poshmark', enabled: false },
-  { id: '5', name: 'facebook', enabled: true, lastSync: '2026-03-17T23:50:00Z' },
-];
-
-export const useAppStore = create<AppState>((set) => ({
-  listings: mockListings,
-  platforms: mockPlatforms,
+export const useAppStore = create<AppState>((set, get) => ({
+  listings: [],
+  platforms: [],
+  syncStatus: 'idle',
   isOnline: true,
-  isSyncing: false,
+  syncEngine: new SyncEngine(),
 
-  addListing: (listing) => {
-    const newListing: Listing = {
-      ...listing,
-      id: Date.now().toString(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      syncStatus: 'pending',
-    };
-    set((state) => ({
-      listings: [newListing, ...state.listings],
+  initialize: async () => {
+    const { syncEngine } = get();
+
+    // Initialize platform adapters
+    const ebayAdapter = new EbayAdapter('your-ebay-api-token');
+    const etsyAdapter = new EtsyAdapter('your-etsy-api-token');
+    const depopAdapter = new DepopAdapter('your-depop-api-token');
+
+    syncEngine.registerAdapter('ebay', ebayAdapter);
+    syncEngine.registerAdapter('etsy', etsyAdapter);
+    syncEngine.registerAdapter('depop', depopAdapter);
+
+    // Load initial data
+    await get().loadListings();
+    await get().loadPlatforms();
+
+    // Start initial sync
+    await get().triggerSync();
+  },
+
+  loadListings: async () => {
+    const listings = await getListings();
+    set({ listings });
+  },
+
+  loadPlatforms: async () => {
+    // In a real app, this would load from database
+    const platforms: Platform[] = [
+      { id: 1, name: 'ebay', enabled: true },
+      { id: 2, name: 'etsy', enabled: true },
+      { id: 3, name: 'depop', enabled: true }
+    ];
+    set({ platforms });
+  },
+
+  addListing: async (listing) => {
+    const { isOnline, syncEngine } = get();
+
+    if (isOnline) {
+      // If online, sync immediately
+      await syncEngine.syncAll();
+    } else {
+      // If offline, queue the change
+      await syncEngine.queueChange({
+        listingId: listing.id,
+        platform: 'all', // Will be expanded to individual platforms
+        action: 'create',
+        listing,
+        status: 'pending'
+      });
+    }
+
+    // Update local state
+    set(state => ({
+      listings: [...state.listings, listing],
+      syncStatus: isOnline ? 'synced' : 'pending'
     }));
   },
 
-  updateListing: (id, updates) => {
-    set((state) => ({
-      listings: state.listings.map((listing) =>
-        listing.id === id
-          ? { ...listing, ...updates, updatedAt: new Date().toISOString() }
-          : listing
-      ),
+  updateListing: async (listing) => {
+    const { isOnline, syncEngine } = get();
+
+    if (isOnline) {
+      // If online, sync immediately
+      await syncEngine.syncAll();
+    } else {
+      // If offline, queue the change
+      await syncEngine.queueChange({
+        listingId: listing.id,
+        platform: 'all', // Will be expanded to individual platforms
+        action: 'update',
+        listing,
+        status: 'pending'
+      });
+    }
+
+    // Update local state
+    set(state => ({
+      listings: state.listings.map(l => l.id === listing.id ? listing : l),
+      syncStatus: isOnline ? 'synced' : 'pending'
     }));
   },
 
-  deleteListing: (id) => {
-    set((state) => ({
-      listings: state.listings.filter((listing) => listing.id !== id),
+  deleteListing: async (id) => {
+    const { isOnline, syncEngine } = get();
+
+    if (isOnline) {
+      // If online, sync immediately
+      await syncEngine.syncAll();
+    } else {
+      // If offline, queue the change
+      await syncEngine.queueChange({
+        listingId: id,
+        platform: 'all', // Will be expanded to individual platforms
+        action: 'delete',
+        listing: null,
+        status: 'pending'
+      });
+    }
+
+    // Update local state
+    set(state => ({
+      listings: state.listings.filter(l => l.id !== id),
+      syncStatus: isOnline ? 'synced' : 'pending'
     }));
   },
 
-  togglePlatform: (platformId) => {
-    set((state) => ({
-      platforms: state.platforms.map((platform) =>
-        platform.id === platformId
-          ? { ...platform, enabled: !platform.enabled }
-          : platform
-      ),
-    }));
+  setSyncStatus: (status) => set({ syncStatus: status }),
+
+  setOnlineStatus: (isOnline) => {
+    set({ isOnline });
+    if (isOnline) {
+      // When coming back online, trigger sync
+      get().triggerSync();
+    }
   },
 
   triggerSync: async () => {
-    set({ isSyncing: true });
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    set((state) => ({
-      isSyncing: false,
-      listings: state.listings.map((listing) => ({
-        ...listing,
-        syncStatus: 'synced',
-      })),
-      platforms: state.platforms.map((platform) =>
-        platform.enabled
-          ? { ...platform, lastSync: new Date().toISOString() }
-          : platform
-      ),
-    }));
-  },
+    const { syncEngine } = get();
+    set({ syncStatus: 'syncing' });
+    try {
+      await syncEngine.syncAll();
+      set({ syncStatus: 'synced' });
+    } catch (error) {
+      console.error('Sync failed:', error);
+      set({ syncStatus: 'error' });
+    }
+  }
 }));

@@ -5,30 +5,24 @@ export interface Listing {
   price: number;
   quantity: number;
   images: string[];
-  platforms: Platform[];
+  platforms: string[];
   syncStatus: 'synced' | 'pending' | 'error';
-  createdAt: string;
-  updatedAt: string;
+  attributes?: Record<string, any>;
+  tags?: string[];
 }
 
-export type Platform = 'ebay' | 'etsy' | 'depop' | 'poshmark' | 'facebook';
-
-export interface PlatformConnection {
-  id: string;
-  name: Platform;
-  enabled: boolean;
+export interface Platform {
+  id: number;
+  name: string;
   apiToken?: string;
-  lastSync?: string;
+  enabled: boolean;
 }
 
-export interface AppState {
-  listings: Listing[];
-  platforms: PlatformConnection[];
-  isOnline: boolean;
-  isSyncing: boolean;
-  addListing: (listing: Omit<Listing, 'id' | 'createdAt' | 'updatedAt'>) => void;
-  updateListing: (id: string, updates: Partial<Listing>) => void;
-  deleteListing: (id: string) => void;
-  togglePlatform: (platformId: string) => void;
-  triggerSync: () => Promise<void>;
+export interface SyncQueueItem {
+  id?: number;
+  listingId: string;
+  platform: string;
+  action: 'create' | 'update' | 'delete';
+  listing: Listing | null;
+  status: 'pending' | 'completed' | 'failed';
 }
