@@ -1,50 +1,54 @@
 import { useState, useEffect } from 'react';
-import * as SpeechRecognition from 'expo-speech-recognition';
+import * as Speech from 'expo-speech';
 
 const useVoiceRecognition = () => {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const startListening = () => {
+    setIsListening(true);
+    setError(null);
+  };
+
+  const stopListening = () => {
+    setIsListening(false);
+  };
 
   useEffect(() => {
-    (async () => {
-      const { status } = await SpeechRecognition.requestPermissionsAsync();
-      if (status !== 'granted') {
-        console.error('Permission to access microphone was denied');
+    let recognition: Speech.SpeechRecognition | null = null;
+
+    if (isListening) {
+      try {
+        recognition = Speech.startListening({
+          onRecognized: (result) => {
+            setTranscript(result.text);
+          },
+          onError: (error) => {
+            setError(error.message);
+            setIsListening(false);
+          },
+        });
+      } catch (err) {
+        setError('Failed to start speech recognition');
+        setIsListening(false);
       }
-    })();
-  }, []);
-
-  const startListening = async () => {
-    setIsListening(true);
-    setTranscript(''); // Clear previous transcript
-    try {
-      await SpeechRecognition.startAsync({
-        language: 'en-US',
-        onRecognized: (result) => {
-          setTranscript(prev => prev + ' ' + result.text);
-        },
-        onError: (error) => {
-          console.error('Speech recognition error:', error);
-          setIsListening(false);
-        },
-      });
-    } catch (error) {
-      console.error('Speech recognition error:', error);
-      setIsListening(false);
     }
-  };
 
-  const stopListening = async () => {
-    try {
-      await SpeechRecognition.stopAsync();
-    } catch (error) {
-      console.error('Error stopping speech recognition:', error);
-    } finally {
-      setIsListening(false);
-    }
-  };
+    return () => {
+      if (recognition) {
+        Speech.stopListening(recognition);
+      }
+    };
+  }, [isListening]);
 
-  return { isListening, transcript, startListening, stopListening };
+  return {
+    isListening,
+    transcript,
+    error,
+    startListening,
+    stopListening,
+  };
 };
 
 export default useVoiceRecognition;
