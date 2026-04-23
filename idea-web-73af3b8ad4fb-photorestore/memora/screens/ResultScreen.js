@@ -1,78 +1,50 @@
 import React from 'react';
-import { View, Image, StyleSheet, Text, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { saveRestoration } from '../services/StorageService';
+import { View, Text, StyleSheet, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
-const ResultScreen = ({ route, navigation }) => {
-  const { originalImage, restoredImage, quality, enhancement } = route.params;
-
-  const enhancementLabels = {
-    auto: 'Auto Enhancement',
-    brighten: 'Brightened',
-    sharpen: 'Sharpened',
-    vintage: 'Vintage Style',
-    modern: 'Modern Style',
-  };
-
-  const handleSave = async () => {
-    const restoration = {
-      id: Date.now().toString(),
-      originalUri: originalImage,
-      restoredUri: restoredImage,
-      quality: quality,
-      enhancement: enhancement,
-      timestamp: Date.now(),
-    };
-
-    const success = await saveRestoration(restoration);
-
-    if (success) {
-      Alert.alert(
-        'Saved!',
-        'Your restored photo has been saved to the gallery.',
-        [
-          {
-            text: 'View Gallery',
-            onPress: () => navigation.navigate('Gallery', { screen: 'GalleryList' }),
-          },
-          {
-            text: 'OK',
-            style: 'cancel',
-          },
-        ]
-      );
-    } else {
-      Alert.alert('Error', 'Failed to save the photo. Please try again.');
-    }
-  };
+const ResultScreen = () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const { imageUri, qualityScore, enhancementType } = route.params || {};
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Restoration Complete!</Text>
-      <View style={styles.infoRow}>
-        <Text style={styles.qualityText}>Quality: {(quality * 100).toFixed(0)}%</Text>
-        <Text style={styles.enhancementText}>{enhancementLabels[enhancement] || enhancement}</Text>
+      <Text style={styles.title}>Restoration Result</Text>
+
+      <View style={styles.imageContainer}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} />
+        ) : (
+          <View style={styles.placeholder}>
+            <Text>No image available</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.imageSection}>
-        <Text style={styles.label}>Original</Text>
-        <Image source={{ uri: originalImage }} style={styles.image} />
+      <View style={styles.infoContainer}>
+        <Text style={styles.infoText}>Enhancement: {enhancementType || 'Auto'}</Text>
+        {qualityScore && (
+          <Text style={styles.infoText}>
+            Quality Score: {(qualityScore * 100).toFixed(1)}%
+          </Text>
+        )}
       </View>
 
-      <View style={styles.imageSection}>
-        <Text style={styles.label}>Restored</Text>
-        <Image source={{ uri: restoredImage }} style={styles.image} />
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => navigation.navigate('Detail', { imageUri })}
+        >
+          <Text style={styles.buttonText}>View Details</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.secondaryButton]}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={[styles.buttonText, styles.secondaryButtonText]}>Back to Restoration</Text>
+        </TouchableOpacity>
       </View>
-
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save to Gallery</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>Back to Home</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -81,73 +53,69 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    alignItems: 'center',
     backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    marginBottom: 24,
-  },
-  qualityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  enhancementText: {
-    fontSize: 16,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  imageSection: {
+  imageContainer: {
     width: '100%',
-    marginBottom: 24,
+    height: 300,
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  label: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: 20,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   image: {
-    width: 300,
-    height: 300,
+    width: '100%',
+    height: '100%',
     resizeMode: 'contain',
-    borderRadius: 8,
-    backgroundColor: '#fff',
   },
-  saveButton: {
-    backgroundColor: '#34C759',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 8,
-    marginTop: 16,
-    marginBottom: 16,
+  placeholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  backButton: {
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+  infoContainer: {
+    padding: 15,
+    backgroundColor: 'white',
     borderRadius: 8,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  infoText: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  buttonContainer: {
+    marginTop: 20,
+  },
+  button: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#4CAF50',
   },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 18,
-    fontWeight: '600',
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  secondaryButtonText: {
+    color: '#4CAF50',
   },
 });
 

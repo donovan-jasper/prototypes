@@ -1,55 +1,66 @@
-import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, Text, FlatList, Image, TouchableOpacity, Dimensions } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { getRestorations } from '../services/StorageService';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import * as FileSystem from 'expo-file-system';
 
-const { width } = Dimensions.get('window');
-const ITEM_SIZE = (width - 48) / 3;
+const GalleryScreen = () => {
+  const [photos, setPhotos] = useState([]);
+  const navigation = useNavigation();
 
-const GalleryScreen = ({ navigation }) => {
-  const [restorations, setRestorations] = useState([]);
+  useEffect(() => {
+    loadPhotos();
+  }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadRestorations();
-    }, [])
-  );
+  const loadPhotos = async () => {
+    try {
+      const files = await FileSystem.readDirectoryAsync(FileSystem.cacheDirectory);
+      const imageFiles = files.filter(file => file.endsWith('.jpg') || file.endsWith('.png'));
 
-  const loadRestorations = async () => {
-    const data = await getRestorations();
-    setRestorations(data);
+      const photoData = imageFiles.map((file, index) => ({
+        id: index.toString(),
+        uri: `${FileSystem.cacheDirectory}${file}`,
+        date: new Date().toISOString(),
+      }));
+
+      setPhotos(photoData);
+    } catch (error) {
+      console.error('Error loading photos:', error);
+    }
   };
 
   const renderItem = ({ item }) => (
     <TouchableOpacity
-      style={styles.gridItem}
-      onPress={() => navigation.navigate('Detail', { restoration: item })}
+      style={styles.photoContainer}
+      onPress={() => navigation.navigate('Detail', { imageUri: item.uri })}
     >
-      <Image source={{ uri: item.restoredUri }} style={styles.thumbnail} />
-      <View style={styles.qualityBadge}>
-        <Text style={styles.qualityText}>{(item.quality * 100).toFixed(0)}%</Text>
-      </View>
+      <Image source={{ uri: item.uri }} style={styles.photo} />
     </TouchableOpacity>
   );
 
-  if (restorations.length === 0) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No saved restorations yet</Text>
-        <Text style={styles.emptySubtext}>Restore a photo to get started</Text>
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <FlatList
-        data={restorations}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        numColumns={3}
-        contentContainerStyle={styles.grid}
-      />
+      <Text style={styles.title}>Your Gallery</Text>
+
+      {photos.length > 0 ? (
+        <FlatList
+          data={photos}
+          renderItem={renderItem}
+          keyExtractor={item => item.id}
+          numColumns={2}
+          contentContainerStyle={styles.list}
+        />
+      ) : (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No photos in your gallery yet</Text>
+          <Text style={styles.emptySubtext}>Restore some photos to see them here</Text>
+          <TouchableOpacity
+            style={styles.restoreButton}
+            onPress={() => navigation.navigate('Restore')}
+          >
+            <Text style={styles.restoreButtonText}>Go to Restoration</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 };
@@ -57,53 +68,57 @@ const GalleryScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
     backgroundColor: '#f5f5f5',
   },
-  grid: {
-    padding: 8,
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  gridItem: {
-    width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    margin: 4,
+  list: {
+    justifyContent: 'space-between',
+  },
+  photoContainer: {
+    flex: 1,
+    margin: 5,
+    aspectRatio: 1,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: '#e0e0e0',
   },
-  thumbnail: {
+  photo: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
-  },
-  qualityBadge: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    backgroundColor: 'rgba(0, 122, 255, 0.9)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  qualityText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
+    fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  restoreButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  restoreButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
