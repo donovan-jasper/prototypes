@@ -1,5 +1,5 @@
 import { computeImageHash, compareHashes } from '../utils/imageHash';
-import { getAllMedia, updateMediaHash, getDuplicates as dbGetDuplicates } from '../database/queries';
+import { getAllMedia, updateMediaHash } from '../database/queries';
 
 interface MediaItem {
   id: string;
@@ -97,17 +97,10 @@ export const getDuplicates = async (): Promise<DuplicateGroup[]> => {
     // First find any new duplicates
     const newDuplicates = await findDuplicates();
 
-    // Then get any existing duplicates from database
-    const existingDuplicates = await dbGetDuplicates();
+    // Filter out groups with only one item
+    const validDuplicates = newDuplicates.filter(group => group.matches.length > 1);
 
-    // Combine and deduplicate
-    const allDuplicates = [...newDuplicates, ...existingDuplicates];
-    const uniqueDuplicates = allDuplicates.filter(
-      (group, index, self) =>
-        index === self.findIndex((g) => g.hash === group.hash)
-    );
-
-    return uniqueDuplicates;
+    return validDuplicates;
   } catch (error) {
     console.error('Error getting duplicates:', error);
     return [];

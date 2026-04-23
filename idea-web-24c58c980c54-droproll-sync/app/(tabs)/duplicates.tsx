@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { DuplicateCard } from '../../components/DuplicateCard';
-import { getDuplicates } from '../../database/queries';
+import { getDuplicates } from '../../services/duplicateDetector';
 import { useMediaStore } from '../../store/mediaStore';
 
 export default function DuplicatesScreen() {
@@ -42,7 +42,7 @@ export default function DuplicatesScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#4CAF50" />
       </View>
     );
   }

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useMediaStore } from '../store/mediaStore';
-import { deleteMedia, updateMedia } from '../database/queries';
+import { deleteMedia } from '../database/queries';
 import { CloudBadge } from './CloudBadge';
 import * as FileSystem from 'expo-file-system';
 
@@ -182,13 +182,14 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
   button: {
     flex: 1,
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 8,
   },
   keepOneButton: {
     backgroundColor: '#4CAF50',
