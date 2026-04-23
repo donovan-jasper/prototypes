@@ -19,7 +19,7 @@ export const getAppointmentWithDocuments = async (id: number): Promise<(Appointm
 
   return {
     ...appointment,
-    documents
+    documents: documents || []
   };
 };
 
