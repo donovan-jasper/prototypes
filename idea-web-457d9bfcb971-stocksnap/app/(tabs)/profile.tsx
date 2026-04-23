@@ -142,10 +142,10 @@ const ProfileScreen = () => {
           <Ionicons name="chevron-forward" size={20} color={Colors.textSecondary} />
         </TouchableOpacity>
 
-        <View style={styles.settingItem}>
+        <TouchableOpacity style={styles.settingItem}>
           <Text style={styles.settingLabel}>App Version</Text>
           <Text style={styles.settingValue}>1.0.0</Text>
-        </View>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -157,18 +157,18 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
   },
   header: {
-    padding: 16,
+    padding: 24,
     borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: Colors.text,
   },
   section: {
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    padding: 16,
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     color: Colors.success,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   freeText: {
     color: Colors.warning,
@@ -202,14 +202,14 @@ const styles = StyleSheet.create({
   upgradeButton: {
     backgroundColor: Colors.primary,
     padding: 12,
-    borderRadius: 4,
+    borderRadius: 8,
     marginTop: 16,
     alignItems: 'center',
   },
   upgradeButtonText: {
     color: Colors.white,
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   timePicker: {
     flexDirection: 'row',
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 16,
     color: Colors.text,
-    marginHorizontal: 12,
+    marginHorizontal: 16,
     minWidth: 60,
     textAlign: 'center',
   },

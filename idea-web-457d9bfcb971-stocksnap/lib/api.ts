@@ -32,6 +32,7 @@ interface DigestHighlight {
   title: string;
   explanation: string;
   impact: 'positive' | 'negative' | 'neutral';
+  change?: number;
   audioUrl?: string;
 }
 
@@ -175,54 +176,55 @@ export const fetchDailyDigest = async (): Promise<DigestHighlight[]> => {
     const randomTechStock = techStocks[Math.floor(Math.random() * techStocks.length)];
 
     const techStockData = await fetchStockData(randomTechStock);
-    const marketIndexData = await fetchStockData('^GSPC'); // S&P 500
+    const techChange = techStockData.change || 0;
 
-    // Create 3 highlights with different impacts
-    return [
+    // Get economic indicator data (mock)
+    const economicIndicators = [
+      { name: 'Fed Rate', change: -0.25, impact: 'negative' },
+      { name: 'CPI', change: 0.1, impact: 'neutral' },
+      { name: 'Unemployment', change: 0.0, impact: 'neutral' }
+    ];
+    const randomIndicator = economicIndicators[Math.floor(Math.random() * economicIndicators.length)];
+
+    // Get sector performance (mock)
+    const sectors = [
+      { name: 'Technology', change: techChange, impact: techChange > 0 ? 'positive' : 'negative' },
+      { name: 'Healthcare', change: 0.5, impact: 'positive' },
+      { name: 'Energy', change: -1.2, impact: 'negative' }
+    ];
+    const randomSector = sectors[Math.floor(Math.random() * sectors.length)];
+
+    // Create the digest highlights
+    const digest: DigestHighlight[] = [
       {
-        id: '1',
-        title: `Tech Stocks ${techStockData.change > 0 ? 'Rise' : 'Fall'}`,
-        explanation: `Technology stocks led the market ${techStockData.change > 0 ? 'higher' : 'lower'} today, with ${techStockData.name} (${techStockData.symbol}) ${techStockData.change > 0 ? 'gaining' : 'losing'} ${Math.abs(techStockData.change).toFixed(2)}%. The sector's performance was driven by strong earnings reports from major companies and positive sentiment around AI advancements.`,
-        impact: techStockData.change > 0 ? 'positive' : 'negative',
-        audioUrl: 'https://example.com/audio/tech-stocks.mp3'
+        id: 'tech-stock',
+        title: `${techStockData.name} Stock Movement`,
+        explanation: `Today, ${techStockData.name} (${techStockData.symbol}) ${techChange > 0 ? 'rose' : 'fell'} by ${Math.abs(techChange).toFixed(2)}%. This reflects ${techChange > 0 ? 'strong investor confidence' : 'concerns about market conditions'} in the tech sector.`,
+        impact: techChange > 0 ? 'positive' : 'negative',
+        change: techChange,
+        audioUrl: 'https://example.com/audio/tech-stock.mp3'
       },
       {
-        id: '2',
-        title: 'Market Sentiment Mixed',
-        explanation: 'Overall market sentiment remains mixed as investors weigh the potential for interest rate cuts against economic concerns. The S&P 500 index is currently trading at ' + marketIndexData.price.toFixed(2) + ', showing a ' + (marketIndexData.change > 0 ? 'positive' : 'negative') + ' change of ' + Math.abs(marketIndexData.change).toFixed(2) + '%.',
-        impact: 'neutral',
-        audioUrl: 'https://example.com/audio/market-sentiment.mp3'
+        id: 'economic-indicator',
+        title: `${randomIndicator.name} Update`,
+        explanation: `The latest ${randomIndicator.name} data shows a ${randomIndicator.change > 0 ? 'rise' : 'decline'} of ${Math.abs(randomIndicator.change).toFixed(2)} points. This ${randomIndicator.impact === 'positive' ? 'positive' : randomIndicator.impact === 'negative' ? 'negative' : 'neutral'} development suggests ${randomIndicator.impact === 'positive' ? 'potential economic growth' : randomIndicator.impact === 'negative' ? 'economic challenges ahead' : 'stable economic conditions'}.`,
+        impact: randomIndicator.impact as 'positive' | 'negative' | 'neutral',
+        change: randomIndicator.change,
+        audioUrl: 'https://example.com/audio/economic-indicator.mp3'
       },
       {
-        id: '3',
-        title: 'Economic Data Release',
-        explanation: 'Today\'s employment report showed a stronger-than-expected increase in non-farm payrolls, which could support the case for a Fed rate cut later this year. The unemployment rate remained stable at 4.1%, while average hourly earnings increased by 0.3%.',
-        impact: 'positive',
-        audioUrl: 'https://example.com/audio/economic-data.mp3'
+        id: 'sector-performance',
+        title: `${randomSector.name} Sector Performance`,
+        explanation: `The ${randomSector.name} sector ${randomSector.change > 0 ? 'gained' : 'lost'} ${Math.abs(randomSector.change).toFixed(2)}% today. This ${randomSector.impact === 'positive' ? 'positive' : 'negative'} performance indicates ${randomSector.impact === 'positive' ? 'strong demand for sector stocks' : 'potential headwinds for the sector'}.`,
+        impact: randomSector.impact as 'positive' | 'negative' | 'neutral',
+        change: randomSector.change,
+        audioUrl: 'https://example.com/audio/sector-performance.mp3'
       }
     ];
+
+    return digest;
   } catch (error) {
-    console.error('Failed to fetch daily digest:', error);
-    // Return fallback data if API fails
-    return [
-      {
-        id: '1',
-        title: 'Market Update',
-        explanation: 'The stock market showed mixed performance today with tech stocks leading the gains. Investors are watching economic indicators closely for signs of a potential interest rate cut.',
-        impact: 'neutral'
-      },
-      {
-        id: '2',
-        title: 'Sector Performance',
-        explanation: 'Energy stocks continued to rise as oil prices climbed, while financial stocks showed slight declines due to rising interest rates.',
-        impact: 'positive'
-      },
-      {
-        id: '3',
-        title: 'Earnings Season',
-        explanation: 'Several major companies have reported earnings this week, with most beating expectations. Analysts are optimistic about the upcoming quarter.',
-        impact: 'positive'
-      }
-    ];
+    console.error('Error fetching daily digest:', error);
+    throw new Error('Failed to fetch daily digest. Please try again later.');
   }
 };
