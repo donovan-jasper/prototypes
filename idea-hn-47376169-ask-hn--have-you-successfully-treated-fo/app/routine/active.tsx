@@ -29,6 +29,10 @@ export default function ActiveRoutineScreen() {
 
   const playSound = async (type: 'start' | 'complete' | 'error' | 'next') => {
     try {
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
       const soundObject = new Audio.Sound();
       let source;
 
@@ -147,18 +151,21 @@ export default function ActiveRoutineScreen() {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Calibration Required</Text>
+            <Text style={styles.modalTitle}>Calibrate Your Posture</Text>
             <Text style={styles.modalText}>
-              Please hold your phone steady in your ideal posture for the current exercise.
+              Please hold your phone in your starting position for the exercise.
             </Text>
             <Text style={styles.modalText}>
-              This helps the app understand your correct posture.
+              Keep your phone steady and follow the on-screen instructions.
             </Text>
             <TouchableOpacity
               style={styles.modalButton}
-              onPress={() => setShowCalibrationModal(false)}
+              onPress={() => {
+                setShowCalibrationModal(false);
+                setHasCalibratedForSession(true);
+              }}
             >
-              <Text style={styles.modalButtonText}>Got it!</Text>
+              <Text style={styles.modalButtonText}>Start Calibration</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -170,8 +177,8 @@ export default function ActiveRoutineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
     padding: 20,
+    backgroundColor: '#fff',
   },
   header: {
     marginBottom: 20,
@@ -192,13 +199,14 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 10,
+    width: '100%',
     backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#2196F3',
+    backgroundColor: '#007AFF',
   },
   instructionsContainer: {
     marginBottom: 20,
@@ -208,16 +216,17 @@ const styles = StyleSheet.create({
   },
   instructionsTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 5,
+    fontWeight: 'bold',
+    marginBottom: 10,
   },
   instructionsText: {
     fontSize: 16,
-    lineHeight: 22,
+    color: '#333',
   },
   detectorContainer: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   completionContainer: {
     flex: 1,
@@ -227,24 +236,23 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginTop: 20,
     marginBottom: 10,
     textAlign: 'center',
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 30,
+    marginBottom: 20,
     textAlign: 'center',
   },
   streakText: {
     fontSize: 18,
     color: '#4CAF50',
-    fontWeight: '600',
     marginBottom: 30,
+    fontWeight: 'bold',
   },
   button: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#007AFF',
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 5,
@@ -252,11 +260,12 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   loadingText: {
-    fontSize: 18,
-    marginTop: 10,
+    marginTop: 20,
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
   },
   modalContainer: {
@@ -280,19 +289,19 @@ const styles = StyleSheet.create({
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 10,
+    marginBottom: 15,
     textAlign: 'center',
+    color: '#333',
   },
   modalButton: {
-    backgroundColor: '#2196F3',
+    backgroundColor: '#007AFF',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 5,
-    marginTop: 20,
+    marginTop: 10,
   },
   modalButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
   },
 });
