@@ -70,14 +70,15 @@ const HomeScreen = () => {
       <Text style={styles.title}>Aura</Text>
 
       {showPremiumPrompt && (
-        <View style={styles.premiumPrompt}>
+        <TouchableOpacity style={styles.premiumPrompt} onPress={handleUpgradePress}>
           <Text style={styles.premiumText}>
-            You've reached your limit of pinned tasks. Upgrade to Premium to pin unlimited tasks!
+            You've pinned {tasks.filter(t => t.isPinned).length} of {maxPinnedTasks} allowed pinned tasks.
+            Upgrade to Premium to pin unlimited tasks!
           </Text>
-          <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgradePress}>
+          <View style={styles.upgradeButton}>
             <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-          </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
       )}
 
       <View style={styles.inputContainer}>
@@ -88,6 +89,7 @@ const HomeScreen = () => {
           value={newTaskContent}
           onChangeText={setNewTaskContent}
           onSubmitEditing={handleAddTask}
+          returnKeyType="done"
         />
         <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
           <Text style={styles.addButtonText}>Add</Text>
@@ -182,6 +184,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    minWidth: 60,
   },
   addButtonText: {
     color: Colors.white,

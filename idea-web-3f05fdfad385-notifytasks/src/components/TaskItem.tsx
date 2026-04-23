@@ -1,5 +1,5 @@
 import React, { useContext } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { TaskContext } from '../context/TaskContext';
 import { Colors } from '../constants/Colors';
 import { usePremiumStatus } from '../hooks/usePremiumStatus';
@@ -17,7 +17,7 @@ interface TaskItemProps {
 }
 
 const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
-  const { updateTaskStatus, deleteTask, updateTask } = useContext(TaskContext);
+  const { updateTaskStatus, deleteTask, updateTask, tasks } = useContext(TaskContext);
   const { isPremium, maxPinnedTasks } = usePremiumStatus();
 
   const handleToggleComplete = () => {
@@ -25,23 +25,28 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
   };
 
   const handleDelete = () => {
-    deleteTask(task.id);
+    Alert.alert(
+      'Delete Task',
+      'Are you sure you want to delete this task?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteTask(task.id) }
+      ]
+    );
   };
 
   const handleTogglePin = () => {
     if (!isPremium && task.isPinned) {
-      // User is trying to unpin, which is always allowed
       updateTask(task.id, { isPinned: false });
       return;
     }
 
     if (!isPremium && !task.isPinned) {
-      // Check if user has reached their limit
       const pinnedTasks = tasks.filter(t => t.isPinned);
       if (pinnedTasks.length >= maxPinnedTasks) {
         Alert.alert(
           "Premium Feature",
-          "You've reached your limit of pinned tasks. Upgrade to Premium to pin unlimited tasks!",
+          `You've reached your limit of ${maxPinnedTasks} pinned tasks. Upgrade to Premium to pin unlimited tasks!`,
           [{ text: "OK" }]
         );
         return;
@@ -80,13 +85,13 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
 
       <View style={styles.actions}>
         <TouchableOpacity
-          style={[
-            styles.pinButton,
-            task.isPinned && styles.pinnedButton
-          ]}
+          style={styles.pinButton}
           onPress={handleTogglePin}
         >
-          <Text style={styles.pinButtonText}>
+          <Text style={[
+            styles.pinButtonText,
+            task.isPinned && styles.pinnedButtonText
+          ]}>
             {task.isPinned ? '★' : '☆'}
           </Text>
         </TouchableOpacity>
@@ -151,11 +156,12 @@ const styles = StyleSheet.create({
     padding: 8,
     marginRight: 8,
   },
-  pinnedButton: {
-    color: Colors.warningButton,
-  },
   pinButtonText: {
     fontSize: 18,
+    color: Colors.textSecondary,
+  },
+  pinnedButtonText: {
+    color: Colors.warningButton,
   },
   deleteButton: {
     padding: 8,
