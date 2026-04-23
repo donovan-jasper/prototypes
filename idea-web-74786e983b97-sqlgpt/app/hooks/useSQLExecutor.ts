@@ -27,11 +27,36 @@ const useSQLExecutor = () => {
             date TEXT
           );
 
+          CREATE TABLE IF NOT EXISTS customers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            email TEXT,
+            join_date TEXT
+          );
+
+          CREATE TABLE IF NOT EXISTS orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            customer_id INTEGER,
+            order_date TEXT,
+            total REAL,
+            FOREIGN KEY(customer_id) REFERENCES customers(id)
+          );
+
           INSERT OR IGNORE INTO sales (product, amount, date)
           VALUES
             ('Widget A', 100.50, '2023-10-15'),
             ('Widget B', 75.25, '2023-10-16'),
             ('Widget C', 120.00, '2023-10-17');
+
+          INSERT OR IGNORE INTO customers (name, email, join_date)
+          VALUES
+            ('John Doe', 'john@example.com', '2023-01-15'),
+            ('Jane Smith', 'jane@example.com', '2023-02-20');
+
+          INSERT OR IGNORE INTO orders (customer_id, order_date, total)
+          VALUES
+            (1, '2023-10-01', 150.00),
+            (2, '2023-10-05', 200.00);
         `);
       } catch (error) {
         console.error('Database initialization failed:', error);

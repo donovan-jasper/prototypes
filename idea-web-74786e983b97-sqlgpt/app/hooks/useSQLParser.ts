@@ -19,7 +19,7 @@ const useSQLParser = () => {
     } else if (lowerCaseQuery.includes('products')) {
       sqlQuery = 'SELECT * FROM products';
     } else {
-      sqlQuery = 'SELECT * FROM table';
+      sqlQuery = 'SELECT * FROM sales'; // Default to sales table
     }
 
     // Date filtering

@@ -12,7 +12,6 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const recognitionRef = useRef<Speech.SpeechRecognition | null>(null);
 
   useEffect(() => {
     const startPulseAnimation = () => {
@@ -39,11 +38,14 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
 
     if (isListening) {
       try {
-        recognitionRef.current = Speech.startListening({
+        Speech.recognizeAsync({
+          language: 'en-US',
+          prompt: 'Speak your query',
           onRecognized: (result) => {
             const text = result.text;
             setTranscript(text);
             onSpeechResults(text);
+            setIsListening(false);
           },
           onError: (error) => {
             setError(error.message);
@@ -56,17 +58,10 @@ const VoiceInput: React.FC<VoiceInputProps> = ({ onSpeechResults }) => {
         setIsListening(false);
       }
     } else {
-      if (recognitionRef.current) {
-        Speech.stopListening(recognitionRef.current);
-        recognitionRef.current = null;
-      }
       stopPulseAnimation();
     }
 
     return () => {
-      if (recognitionRef.current) {
-        Speech.stopListening(recognitionRef.current);
-      }
       stopPulseAnimation();
     };
   }, [isListening, onSpeechResults, pulseAnim]);
