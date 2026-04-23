@@ -23,7 +23,7 @@ const ContentHub = () => {
         setContentSources(sources);
         setFeaturedContent(featured);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Failed to load content');
       } finally {
         setLoading(false);
       }
@@ -51,6 +51,7 @@ const ContentHub = () => {
           source={{ uri: item.logo }}
           style={styles.sourceLogo}
           resizeMode="contain"
+          onError={() => console.log('Failed to load logo for', item.name)}
         />
         <Text style={styles.sourceName}>{item.name}</Text>
         <Text style={styles.sourceDescription} numberOfLines={2}>
@@ -71,6 +72,7 @@ const ContentHub = () => {
           source={{ uri: item.image }}
           style={styles.featuredImage}
           resizeMode="cover"
+          onError={() => console.log('Failed to load featured image for', item.title)}
         />
       )}
       <View style={styles.featuredContent}>
@@ -93,6 +95,16 @@ const ContentHub = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Error loading content: {error}</Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => {
+            setError(null);
+            setLoading(true);
+            fetchData();
+          }}
+        >
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -101,27 +113,35 @@ const ContentHub = () => {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       <View style={styles.section}>
         <Text style={styles.sectionHeader}>Featured Content</Text>
-        <FlatList
-          data={featuredContent}
-          renderItem={renderFeaturedItem}
-          keyExtractor={(item) => item.id}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.featuredList}
-        />
+        {featuredContent.length > 0 ? (
+          <FlatList
+            data={featuredContent}
+            renderItem={renderFeaturedItem}
+            keyExtractor={(item) => item.id || Math.random().toString()}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.featuredList}
+          />
+        ) : (
+          <Text style={styles.emptyState}>No featured content available</Text>
+        )}
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionHeader}>Premium Content Sources</Text>
-        <FlatList
-          data={contentSources}
-          renderItem={renderSource}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.listContent}
-          scrollEnabled={false}
-        />
+        {contentSources.length > 0 ? (
+          <FlatList
+            data={contentSources}
+            renderItem={renderSource}
+            keyExtractor={(item) => item.id}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            contentContainerStyle={styles.listContent}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.emptyState}>No content sources available</Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -195,16 +215,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   sourceLogo: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 80,
     marginBottom: 12,
   },
   sourceName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
     textAlign: 'center',
+    color: '#333',
   },
   sourceDescription: {
     fontSize: 14,
@@ -215,7 +235,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#f8f8f8',
   },
   loadingText: {
     marginTop: 16,
@@ -227,11 +247,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#f8f8f8',
   },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
     textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyState: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
 
