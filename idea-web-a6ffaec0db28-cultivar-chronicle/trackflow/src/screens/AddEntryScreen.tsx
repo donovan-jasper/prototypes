@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, StyleSheet, Image, Text, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, TextInput, Button, StyleSheet, Image, Text, ActivityIndicator, Alert, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
@@ -18,6 +18,7 @@ const AddEntryScreen: React.FC = () => {
   const [location, setLocation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [skipPhoto, setSkipPhoto] = useState(false);
 
   const pickImageFromCamera = async () => {
     setError(null);
@@ -37,6 +38,7 @@ const AddEntryScreen: React.FC = () => {
 
       if (!result.canceled) {
         setPhotoUri(result.assets[0].uri);
+        setSkipPhoto(false);
         await fetchLocationAndWeather();
       }
     } catch (err) {
@@ -62,6 +64,7 @@ const AddEntryScreen: React.FC = () => {
 
       if (!result.canceled) {
         setPhotoUri(result.assets[0].uri);
+        setSkipPhoto(false);
         await fetchLocationAndWeather();
       }
     } catch (err) {
@@ -104,8 +107,14 @@ const AddEntryScreen: React.FC = () => {
     }
   };
 
+  const handleSkipPhoto = async () => {
+    setSkipPhoto(true);
+    setPhotoUri(null);
+    await fetchLocationAndWeather();
+  };
+
   const handleAddEntry = async () => {
-    if (!photoUri) {
+    if (!skipPhoto && !photoUri) {
       setError('Please capture or select a photo first');
       return;
     }
@@ -117,7 +126,7 @@ const AddEntryScreen: React.FC = () => {
       await addEntry({
         categoryId: selectedCategoryId,
         note,
-        photoUri,
+        photoUri: skipPhoto ? null : photoUri,
         weather,
         temperature,
         location,
@@ -132,13 +141,13 @@ const AddEntryScreen: React.FC = () => {
   };
 
   const retryFetch = async () => {
-    if (photoUri) {
+    if (photoUri || skipPhoto) {
       await fetchLocationAndWeather();
     }
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.buttonRow}>
         <TouchableOpacity style={styles.actionButton} onPress={pickImageFromCamera}>
           <Ionicons name="camera" size={24} color="#fff" />
@@ -150,66 +159,74 @@ const AddEntryScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {photoUri && (
+      <TouchableOpacity style={styles.skipButton} onPress={handleSkipPhoto}>
+        <Ionicons name="image-outline" size={24} color="#666" />
+        <Text style={styles.skipButtonText}>Skip Photo</Text>
+      </TouchableOpacity>
+
+      {photoUri && !skipPhoto && (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photoUri }} style={styles.preview} />
+        </View>
+      )}
+
+      {skipPhoto && (
+        <View style={styles.skipPhotoContainer}>
+          <Ionicons name="image-outline" size={64} color="#ccc" />
+          <Text style={styles.skipPhotoText}>No photo added</Text>
         </View>
       )}
 
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Fetching weather data...</Text>
+          <Text style={styles.loadingText}>Fetching location and weather data...</Text>
         </View>
       )}
 
       {error && (
         <View style={styles.errorContainer}>
           <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </TouchableOpacity>
+          <Button title="Retry" onPress={retryFetch} />
         </View>
       )}
 
-      {weather && !isLoading && !error && (
-        <View style={styles.weatherInfo}>
-          <View style={styles.weatherItem}>
-            <Ionicons name="thermometer-outline" size={20} color="#007AFF" />
-            <Text style={styles.weatherText}>{weather}</Text>
-          </View>
-          {temperature && (
-            <View style={styles.weatherItem}>
-              <Ionicons name="thermometer" size={20} color="#007AFF" />
-              <Text style={styles.weatherText}>{temperature}°C</Text>
-            </View>
-          )}
-          {location && (
-            <View style={styles.weatherItem}>
-              <Ionicons name="location-outline" size={20} color="#007AFF" />
-              <Text style={styles.weatherText}>{location}</Text>
-            </View>
-          )}
+      <View style={styles.noteContainer}>
+        <Text style={styles.label}>Note</Text>
+        <TextInput
+          style={styles.noteInput}
+          multiline
+          numberOfLines={4}
+          placeholder="Add a note about your entry..."
+          value={note}
+          onChangeText={setNote}
+        />
+      </View>
+
+      {weather && (
+        <View style={styles.weatherContainer}>
+          <Ionicons name="partly-sunny" size={24} color="#FFD700" />
+          <Text style={styles.weatherText}>
+            {weather} • {temperature}°C
+          </Text>
         </View>
       )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Add a note (optional)"
-        value={note}
-        onChangeText={setNote}
-        multiline
-        placeholderTextColor="#999"
-      />
+      {location && (
+        <View style={styles.locationContainer}>
+          <Ionicons name="location" size={24} color="#FF5A5F" />
+          <Text style={styles.locationText}>{location}</Text>
+        </View>
+      )}
 
       <TouchableOpacity
-        style={[styles.addButton, (!photoUri || isLoading) && styles.disabledButton]}
+        style={[styles.submitButton, (!skipPhoto && !photoUri) && styles.disabledButton]}
         onPress={handleAddEntry}
-        disabled={!photoUri || isLoading}
+        disabled={!skipPhoto && !photoUri}
       >
-        <Text style={styles.addButtonText}>Add Entry</Text>
+        <Text style={styles.submitButtonText}>Add Entry</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 };
 
@@ -225,97 +242,121 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    alignItems: 'center',
+    flex: 1,
     marginHorizontal: 5,
   },
   buttonText: {
     color: '#fff',
-    marginLeft: 8,
-    fontSize: 16,
+    marginTop: 5,
+    fontWeight: '600',
+  },
+  skipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  skipButtonText: {
+    color: '#666',
+    marginLeft: 10,
+    fontWeight: '600',
   },
   previewContainer: {
     marginBottom: 20,
-    alignItems: 'center',
+    borderRadius: 10,
+    overflow: 'hidden',
   },
   preview: {
     width: '100%',
-    height: 200,
-    borderRadius: 8,
+    height: 250,
     resizeMode: 'cover',
+  },
+  skipPhotoContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  skipPhotoText: {
+    color: '#666',
+    marginTop: 10,
+    fontSize: 16,
   },
   loadingContainer: {
     alignItems: 'center',
-    marginVertical: 20,
+    padding: 20,
+    marginBottom: 20,
   },
   loadingText: {
     marginTop: 10,
     color: '#666',
   },
   errorContainer: {
-    backgroundColor: '#FFEBEE',
     padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#fff0f0',
+    borderRadius: 10,
     marginBottom: 20,
-    alignItems: 'center',
   },
   errorText: {
-    color: '#D32F2F',
+    color: '#d32f2f',
     marginBottom: 10,
-    textAlign: 'center',
   },
-  retryButton: {
-    backgroundColor: '#D32F2F',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 4,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  weatherInfo: {
-    backgroundColor: '#F5F5F5',
-    padding: 15,
-    borderRadius: 8,
+  noteContainer: {
     marginBottom: 20,
   },
-  weatherItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  weatherText: {
-    marginLeft: 8,
+  label: {
     fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
   },
-  input: {
+  noteInput: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 15,
-    marginBottom: 20,
+    fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
   },
-  addButton: {
+  weatherContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  weatherText: {
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  locationText: {
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  submitButton: {
     backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
   },
   disabledButton: {
-    backgroundColor: '#CCCCCC',
+    backgroundColor: '#ccc',
   },
-  addButtonText: {
+  submitButtonText: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
   },
 });
 
