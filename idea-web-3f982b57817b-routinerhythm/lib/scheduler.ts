@@ -156,106 +156,40 @@ export function adaptRoutine(
   });
 
   if (slotsInWindow.length === 0) {
-    return null;
+    // No available slots in preferred window, try to find any slot
+    const allSlots = findAvailableSlots(date, schedule);
+    if (allSlots.length === 0) return null;
+
+    // Find the slot closest to preferred window
+    const closestSlot = allSlots.reduce((prev, curr) => {
+      const prevDiff = Math.abs(prev.start.getTime() - windowStart.getTime());
+      const currDiff = Math.abs(curr.start.getTime() - windowStart.getTime());
+      return currDiff < prevDiff ? curr : prev;
+    });
+
+    return closestSlot.start;
   }
 
-  // Find the largest available slot in the preferred window
-  const largestSlot = slotsInWindow.reduce((prev, current) => {
+  // Find the slot that best fits the routine duration
+  const routineDuration = routine.tasks.reduce((sum, task) => sum + (task.estimatedMinutes || 0), 0);
+  const routineDurationMs = routineDuration * 60 * 1000;
+
+  const fittingSlots = slotsInWindow.filter(slot => {
+    const slotDuration = slot.end.getTime() - slot.start.getTime();
+    return slotDuration >= routineDurationMs;
+  });
+
+  if (fittingSlots.length > 0) {
+    // Return the earliest fitting slot in the preferred window
+    return fittingSlots[0].start;
+  }
+
+  // If no exact fit, return the largest available slot in the window
+  const largestSlot = slotsInWindow.reduce((prev, curr) => {
     const prevDuration = prev.end.getTime() - prev.start.getTime();
-    const currentDuration = current.end.getTime() - current.start.getTime();
-    return currentDuration > prevDuration ? current : prev;
+    const currDuration = curr.end.getTime() - curr.start.getTime();
+    return currDuration > prevDuration ? curr : prev;
   });
 
-  // Calculate how much of the routine can fit in this slot
-  const routineDuration = routine.tasks.length * 15 * 60 * 1000; // Assuming 15 min per task
-  const slotDuration = largestSlot.end.getTime() - largestSlot.start.getTime();
-
-  if (slotDuration >= routineDuration) {
-    // Routine fits in this slot - suggest the start time
-    return largestSlot.start;
-  } else {
-    // Routine doesn't fit - suggest the earliest possible time in the window
-    return windowStart;
-  }
-}
-
-/**
- * Calculates an energy score for each hour of the day based on completion history
- */
-export function calculateEnergyScore(
-  completions: RoutineCompletion[],
-  date: Date = new Date()
-): Record<number, number> {
-  const energyScores: Record<number, number> = {};
-
-  // Initialize all hours with base score of 50
-  for (let hour = 0; hour < 24; hour++) {
-    energyScores[hour] = 50;
-  }
-
-  // Group completions by hour
-  const completionsByHour: Record<number, RoutineCompletion[]> = {};
-
-  completions.forEach(completion => {
-    const hour = completion.completedAt.getHours();
-    if (!completionsByHour[hour]) {
-      completionsByHour[hour] = [];
-    }
-    completionsByHour[hour].push(completion);
-  });
-
-  // Calculate energy score for each hour
-  for (const hour in completionsByHour) {
-    const hourCompletions = completionsByHour[hour];
-    const successfulCompletions = hourCompletions.filter(c => c.successful);
-    const successRate = successfulCompletions.length / hourCompletions.length;
-
-    // Adjust score based on success rate
-    // 100% success = 100, 0% success = 0
-    energyScores[parseInt(hour)] = Math.round(successRate * 100);
-  }
-
-  return energyScores;
-}
-
-/**
- * Suggests optimal times for all tasks in a queue based on priority and schedule
- */
-export function suggestTaskTimes(
-  tasks: Task[],
-  schedule: ScheduleBlock[],
-  date: Date = new Date(),
-  energyPatterns?: RoutineCompletion[]
-): Record<string, Date | null> {
-  const suggestions: Record<string, Date | null> = {};
-
-  // Sort tasks by priority (high to low)
-  const sortedTasks = [...tasks].sort((a, b) => {
-    const priorityOrder = { high: 3, medium: 2, low: 1 };
-    return priorityOrder[b.priority] - priorityOrder[a.priority];
-  });
-
-  // Create a working copy of the schedule to track allocations
-  const allocatedSchedule = [...schedule];
-
-  for (const task of sortedTasks) {
-    // Find the best time for this task
-    const suggestedTime = suggestTaskTime(task, date, allocatedSchedule, energyPatterns);
-
-    if (suggestedTime) {
-      // Add this task to the schedule to block that time for other tasks
-      const taskEndTime = addMinutes(suggestedTime, task.estimatedMinutes);
-      allocatedSchedule.push({
-        id: `task-${task.id}`,
-        title: task.title,
-        startTime: suggestedTime,
-        endTime: taskEndTime,
-        type: 'task',
-      });
-    }
-
-    suggestions[task.id] = suggestedTime;
-  }
-
-  return suggestions;
+  return largestSlot.start;
 }
