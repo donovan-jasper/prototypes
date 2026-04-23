@@ -159,7 +159,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
         onPress={handleRecord}
       >
         {isRecording ? (
-          <View style={styles.recordingIndicatorContainer}>
+          <View style={styles.recordingContainer}>
             <Animated.View
               style={[
                 styles.recordingIndicator,
@@ -196,17 +196,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#3498db',
   },
   recordButton: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    padding: 12,
+    borderRadius: 24,
     backgroundColor: '#e74c3c',
+    width: 60,
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
   },
   disabledButton: {
     opacity: 0.5,
   },
-  recordingIndicatorContainer: {
+  recordingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
