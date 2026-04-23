@@ -1,16 +1,15 @@
 import axios from 'axios';
+import { webSocketService } from './WebSocketService';
 
 class KubernetesAPI {
   constructor() {
     this.baseURL = process.env.KUBERNETES_API_URL || 'https://your-kubernetes-api-endpoint';
     this.token = process.env.KUBERNETES_API_TOKEN || 'your-api-token';
-    this.ws = null;
     this.currentCpu = 50;
     this.currentMemory = 60;
     this.currentDisk = 70;
     this.callback = null;
     this.errorCallback = null;
-    this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || 'ws://your-kubernetes-ws-endpoint';
   }
 
   async fetchMetrics() {
@@ -41,7 +40,7 @@ class KubernetesAPI {
       };
     } catch (error) {
       console.error('Error fetching Kubernetes metrics:', error);
-      throw error; // Re-throw the error to be handled by the component
+      throw error;
     }
   }
 
@@ -52,8 +51,7 @@ class KubernetesAPI {
 
     const cpuValue = nodeMetrics.usage.cpu;
     const cpuCores = parseInt(cpuValue) / 1000000000;
-    // Get node capacity from metrics
-    const capacity = nodeMetrics.usage.capacity?.cpu || '8000000000'; // Default to 8 cores
+    const capacity = nodeMetrics.usage.capacity?.cpu || '8000000000';
     const totalCores = parseInt(capacity) / 1000000000;
     const cpuPercentage = (cpuCores / totalCores) * 100;
     return Math.min(100, Math.max(0, Math.round(cpuPercentage)));
@@ -66,7 +64,7 @@ class KubernetesAPI {
 
     const memoryValue = nodeMetrics.usage.memory;
     const memoryGB = parseInt(memoryValue) / (1024 * 1024 * 1024);
-    const capacity = nodeMetrics.usage.capacity?.memory || '32212254720'; // Default to 32GB
+    const capacity = nodeMetrics.usage.capacity?.memory || '32212254720';
     const totalGB = parseInt(capacity) / (1024 * 1024 * 1024);
     const memoryPercentage = (memoryGB / totalGB) * 100;
     return Math.min(100, Math.max(0, Math.round(memoryPercentage)));
@@ -93,68 +91,38 @@ class KubernetesAPI {
       return this.currentDisk;
     } catch (error) {
       console.error('Error fetching disk metrics:', error);
-      throw error; // Re-throw the error to be handled by the component
+      throw error;
     }
   }
 
-  subscribeToMetrics(endpoint, callback, errorCallback) {
+  subscribeToMetrics(callback, errorCallback) {
     this.callback = callback;
     this.errorCallback = errorCallback;
 
-    // Use the configured WebSocket endpoint
-    const wsEndpoint = this.wsEndpoint || endpoint;
+    webSocketService.connect(
+      (data) => {
+        this.currentCpu = data.cpu || this.currentCpu;
+        this.currentMemory = data.memory || this.currentMemory;
+        this.currentDisk = data.disk || this.currentDisk;
 
-    // Close existing connection if it exists
-    if (this.ws) {
-      this.ws.close();
-    }
-
-    this.ws = new WebSocket(wsEndpoint);
-
-    this.ws.onmessage = (event) => {
-      try {
-        const metrics = JSON.parse(event.data);
-        this.currentCpu = metrics.cpu || this.currentCpu;
-        this.currentMemory = metrics.memory || this.currentMemory;
-        this.currentDisk = metrics.disk || this.currentDisk;
-
-        callback({
-          cpu: this.currentCpu,
-          memory: this.currentMemory,
-          disk: this.currentDisk,
-        });
-      } catch (error) {
-        console.log('Error parsing WebSocket message:', error);
+        if (this.callback) {
+          this.callback({
+            cpu: this.currentCpu,
+            memory: this.currentMemory,
+            disk: this.currentDisk,
+          });
+        }
+      },
+      (error) => {
+        console.error('WebSocket error:', error);
+        if (this.errorCallback) {
+          this.errorCallback(error);
+        }
       }
-    };
-
-    this.ws.onopen = () => {
-      callback({
-        cpu: this.currentCpu,
-        memory: this.currentMemory,
-        disk: this.currentDisk,
-      });
-    };
-
-    this.ws.onerror = (event) => {
-      console.log('Error occurred while connecting to WebSocket:', event);
-      if (this.errorCallback) {
-        this.errorCallback(event);
-      }
-    };
-
-    this.ws.onclose = () => {
-      console.log('WebSocket connection closed');
-      if (this.errorCallback) {
-        this.errorCallback(new Error('WebSocket connection closed'));
-      }
-    };
+    );
 
     return () => {
-      if (this.ws) {
-        this.ws.close();
-        this.ws = null;
-      }
+      webSocketService.disconnect();
     };
   }
 }

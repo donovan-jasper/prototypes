@@ -13,7 +13,6 @@ const MonitoringScreen = () => {
   const [wsEndpoint, setWsEndpoint] = useState(process.env.KUBERNETES_WS_ENDPOINT || WEBSOCKET_ENDPOINT);
   const [isConfiguring, setIsConfiguring] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [autoReconnect, setAutoReconnect] = useState(true);
 
   // Animation values for progress bars
@@ -59,7 +58,6 @@ const MonitoringScreen = () => {
     // Set up WebSocket for real-time updates
     const setupWebSocket = () => {
       unsubscribe = kubernetesAPI.subscribeToMetrics(
-        wsEndpoint,
         (metrics) => {
           if (isMounted) {
             setCPU(metrics.cpu);
@@ -67,7 +65,6 @@ const MonitoringScreen = () => {
             setDisk(metrics.disk);
             setError(null);
             setIsConnected(true);
-            setRetryCount(0);
 
             // Animate the progress bars
             animateBar(cpuAnim, metrics.cpu);
@@ -78,12 +75,7 @@ const MonitoringScreen = () => {
         (error) => {
           if (isMounted) {
             setIsConnected(false);
-            if (autoReconnect && retryCount < 5) {
-              setTimeout(() => {
-                setRetryCount(prev => prev + 1);
-                setupWebSocket();
-              }, 3000 * (retryCount + 1));
-            }
+            setError('WebSocket connection failed. Using fallback polling.');
           }
         }
       );
@@ -102,7 +94,7 @@ const MonitoringScreen = () => {
       }
       clearInterval(intervalId);
     };
-  }, [wsEndpoint, autoReconnect, retryCount]);
+  }, []);
 
   const animateBar = (animRef, toValue) => {
     Animated.timing(animRef, {
@@ -162,15 +154,41 @@ const MonitoringScreen = () => {
     return '#F44336'; // Red
   };
 
+  const renderProgressBar = (label, value, animValue, color) => {
+    const width = animValue.interpolate({
+      inputRange: [0, 100],
+      outputRange: ['0%', '100%'],
+    });
+
+    return (
+      <View style={styles.metricContainer}>
+        <Text style={styles.metricLabel}>{label}</Text>
+        <View style={styles.progressBarBackground}>
+          <Animated.View style={[styles.progressBar, { width, backgroundColor: color }]} />
+        </View>
+        <Text style={styles.metricValue}>{value}%</Text>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>System Monitoring</Text>
 
+      {isLoading && <ActivityIndicator size="large" color="#0000ff" />}
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.statusContainer}>
-        <View style={[styles.statusIndicator, { backgroundColor: isConnected ? '#4CAF50' : '#F44336' }]} />
         <Text style={styles.statusText}>
-          {isConnected ? 'Connected' : 'Disconnected'}
-          {retryCount > 0 && ` (Retrying ${retryCount}/5)`}
+          Connection: {isConnected ? 'Connected' : 'Disconnected'}
         </Text>
         <Switch
           value={autoReconnect}
@@ -178,127 +196,43 @@ const MonitoringScreen = () => {
           trackColor={{ false: '#767577', true: '#81b0ff' }}
           thumbColor={autoReconnect ? '#f5dd4b' : '#f4f3f4'}
         />
-        <Text style={styles.switchLabel}>Auto-reconnect</Text>
+        <Text style={styles.statusText}>Auto-reconnect</Text>
       </View>
 
-      {isConfiguring ? (
+      {renderProgressBar('CPU Usage', cpu, cpuAnim, getStatusColor(cpu))}
+      {renderProgressBar('Memory Usage', memory, memoryAnim, getStatusColor(memory))}
+      {renderProgressBar('Disk Usage', disk, diskAnim, getStatusColor(disk))}
+
+      <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
+        <Text style={styles.refreshButtonText}>Refresh</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity style={styles.configButton} onPress={() => setIsConfiguring(!isConfiguring)}>
+        <Text style={styles.configButtonText}>{isConfiguring ? 'Cancel' : 'Configure Endpoints'}</Text>
+      </TouchableOpacity>
+
+      {isConfiguring && (
         <View style={styles.configContainer}>
-          <Text style={styles.configTitle}>Configuration</Text>
+          <Text style={styles.configLabel}>API Endpoint:</Text>
+          <TextInput
+            style={styles.configInput}
+            value={apiEndpoint}
+            onChangeText={setApiEndpoint}
+            placeholder="https://your-kubernetes-api-endpoint"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Kubernetes API Endpoint:</Text>
-            <TextInput
-              style={styles.input}
-              value={apiEndpoint}
-              onChangeText={setApiEndpoint}
-              placeholder="https://your-kubernetes-api-endpoint"
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
+          <Text style={styles.configLabel}>WebSocket Endpoint:</Text>
+          <TextInput
+            style={styles.configInput}
+            value={wsEndpoint}
+            onChangeText={setWsEndpoint}
+            placeholder="ws://your-websocket-endpoint"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>WebSocket Endpoint:</Text>
-            <TextInput
-              style={styles.input}
-              value={wsEndpoint}
-              onChangeText={setWsEndpoint}
-              placeholder={WEBSOCKET_ENDPOINT}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </View>
-
-          <View style={styles.buttonGroup}>
-            <TouchableOpacity style={styles.button} onPress={handleSaveConfig}>
-              <Text style={styles.buttonText}>Save</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={[styles.button, styles.cancelButton]} onPress={() => setIsConfiguring(false)}>
-              <Text style={styles.buttonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSaveConfig}>
+            <Text style={styles.saveButtonText}>Save Configuration</Text>
+          </TouchableOpacity>
         </View>
-      ) : (
-        <>
-          {isLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" style={styles.loadingIndicator} />
-          ) : error ? (
-            <View style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
-                <Text style={styles.retryButtonText}>Retry</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <>
-              <View style={styles.metricContainer}>
-                <Text style={styles.metricLabel}>CPU Usage</Text>
-                <View style={styles.progressBarContainer}>
-                  <Animated.View
-                    style={[
-                      styles.progressBar,
-                      {
-                        width: cpuAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: getStatusColor(cpu),
-                      },
-                    ]}
-                  />
-                  <Text style={styles.metricValue}>{cpu}%</Text>
-                </View>
-              </View>
-
-              <View style={styles.metricContainer}>
-                <Text style={styles.metricLabel}>Memory Usage</Text>
-                <View style={styles.progressBarContainer}>
-                  <Animated.View
-                    style={[
-                      styles.progressBar,
-                      {
-                        width: memoryAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: getStatusColor(memory),
-                      },
-                    ]}
-                  />
-                  <Text style={styles.metricValue}>{memory}%</Text>
-                </View>
-              </View>
-
-              <View style={styles.metricContainer}>
-                <Text style={styles.metricLabel}>Disk Usage</Text>
-                <View style={styles.progressBarContainer}>
-                  <Animated.View
-                    style={[
-                      styles.progressBar,
-                      {
-                        width: diskAnim.interpolate({
-                          inputRange: [0, 100],
-                          outputRange: ['0%', '100%'],
-                        }),
-                        backgroundColor: getStatusColor(disk),
-                      },
-                    ]}
-                  />
-                  <Text style={styles.metricValue}>{disk}%</Text>
-                </View>
-              </View>
-
-              <View style={styles.buttonGroup}>
-                <TouchableOpacity style={styles.button} onPress={handleRefresh}>
-                  <Text style={styles.buttonText}>Refresh</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.button} onPress={() => setIsConfiguring(true)}>
-                  <Text style={styles.buttonText}>Configure</Text>
-                </TouchableOpacity>
-              </View>
-            </>
-          )}
-        </>
       )}
     </View>
   );
@@ -315,89 +249,44 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-    color: '#333',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  errorText: {
+    color: '#d32f2f',
+    marginBottom: 10,
+  },
+  retryButton: {
+    backgroundColor: '#d32f2f',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    padding: 10,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    elevation: 2,
-  },
-  statusIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
   },
   statusText: {
-    fontSize: 16,
     marginRight: 10,
-  },
-  switchLabel: {
-    fontSize: 14,
-    marginLeft: 5,
-  },
-  configContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 8,
-    elevation: 2,
-  },
-  configTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 5,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
-    fontSize: 16,
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  button: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 4,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: '#F44336',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   metricContainer: {
     marginBottom: 20,
   },
   metricLabel: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 8,
-    color: '#333',
+    marginBottom: 5,
   },
-  progressBarContainer: {
+  progressBarBackground: {
     height: 20,
     backgroundColor: '#e0e0e0',
     borderRadius: 10,
@@ -408,35 +297,57 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   metricValue: {
-    position: 'absolute',
-    right: 10,
-    top: 0,
-    bottom: 0,
-    textAlignVertical: 'center',
-    fontSize: 14,
-    color: '#333',
+    marginTop: 5,
+    textAlign: 'right',
   },
-  loadingIndicator: {
-    marginTop: 20,
-  },
-  errorContainer: {
+  refreshButton: {
+    backgroundColor: '#2196f3',
+    padding: 15,
+    borderRadius: 5,
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 15,
   },
-  errorText: {
-    color: '#F44336',
+  refreshButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  configButton: {
+    backgroundColor: '#4caf50',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  configButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  configContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 15,
+  },
+  configLabel: {
     fontSize: 16,
-    marginBottom: 10,
-    textAlign: 'center',
+    marginBottom: 5,
   },
-  retryButton: {
-    backgroundColor: '#4CAF50',
+  configInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
     padding: 10,
-    borderRadius: 4,
+    borderRadius: 5,
+    marginBottom: 15,
   },
-  retryButtonText: {
-    color: '#fff',
-    fontSize: 16,
+  saveButton: {
+    backgroundColor: '#4caf50',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
