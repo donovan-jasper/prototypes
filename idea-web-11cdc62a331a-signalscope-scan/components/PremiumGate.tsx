@@ -40,6 +40,33 @@ const PremiumGate: React.FC<PremiumGateProps> = ({ title, description, featureLi
       <Text style={styles.footerText}>
         Only $3.99/month or $29.99/year
       </Text>
+
+      <View style={styles.benefitsContainer}>
+        <Text style={styles.benefitsTitle}>Why Go Premium?</Text>
+        <View style={styles.benefitItem}>
+          <Ionicons name="cash-outline" size={24} color="#007AFF" />
+          <View style={styles.benefitTextContainer}>
+            <Text style={styles.benefitTitle}>Save Money</Text>
+            <Text style={styles.benefitDescription}>Get accurate savings estimates when switching carriers</Text>
+          </View>
+        </View>
+
+        <View style={styles.benefitItem}>
+          <Ionicons name="bar-chart-outline" size={24} color="#007AFF" />
+          <View style={styles.benefitTextContainer}>
+            <Text style={styles.benefitTitle}>Data-Driven Decisions</Text>
+            <Text style={styles.benefitDescription}>See real performance metrics from thousands of users</Text>
+          </View>
+        </View>
+
+        <View style={styles.benefitItem}>
+          <Ionicons name="shield-checkmark-outline" size={24} color="#007AFF" />
+          <View style={styles.benefitTextContainer}>
+            <Text style={styles.benefitTitle}>Reliable Coverage</Text>
+            <Text style={styles.benefitDescription}>Make informed decisions before signing contracts</Text>
+          </View>
+        </View>
+      </View>
     </ScrollView>
   );
 };
@@ -101,6 +128,39 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
     marginBottom: 20,
+  },
+  benefitsContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+  benefitsTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+    textAlign: 'center',
+  },
+  benefitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  benefitTextContainer: {
+    marginLeft: 15,
+    flex: 1,
+  },
+  benefitTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 3,
+  },
+  benefitDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 20,
   },
 });
 
