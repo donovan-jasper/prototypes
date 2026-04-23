@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
-import { buildStreamUrl, isOnHomeNetwork, establishRemoteConnection } from '../lib/streaming';
+import { buildStreamUrl, isOnHomeNetwork, establishRemoteConnection, getRemoteStreamUrl } from '../lib/streaming';
 
 export const useStreamUrl = (channelNumber: string) => {
   const [streamUrl, setStreamUrl] = useState<string>('');
   const [isLocal, setIsLocal] = useState<boolean>(true);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [showPaywall, setShowPaywall] = useState<boolean>(false);
 
   useEffect(() => {
     const getStreamUrl = async () => {
@@ -18,6 +19,12 @@ export const useStreamUrl = (channelNumber: string) => {
       setIsLocal(onHomeNetwork);
 
       if (!onHomeNetwork) {
+        const isPremium = await isRemoteStreamingEnabled();
+        if (!isPremium) {
+          setShowPaywall(true);
+          return;
+        }
+
         setIsConnecting(true);
         const connectionSuccess = await establishRemoteConnection();
         setIsConnecting(false);
@@ -26,14 +33,17 @@ export const useStreamUrl = (channelNumber: string) => {
           setConnectionError('Failed to establish remote connection');
           return;
         }
-      }
 
-      const url = await buildStreamUrl(channelNumber, onHomeNetwork);
-      setStreamUrl(url);
+        const remoteUrl = await getRemoteStreamUrl(channelNumber);
+        setStreamUrl(remoteUrl);
+      } else {
+        const localUrl = await buildStreamUrl(channelNumber, true);
+        setStreamUrl(localUrl);
+      }
     };
 
     getStreamUrl();
   }, [channelNumber]);
 
-  return { streamUrl, isLocal, isConnecting, connectionError };
+  return { streamUrl, isLocal, isConnecting, connectionError, showPaywall };
 };

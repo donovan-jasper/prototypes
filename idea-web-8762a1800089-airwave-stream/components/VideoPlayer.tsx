@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, Dimensions, ActivityIndicator, TouchableOpacity, Platform, Alert } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useStreamUrl } from '../hooks/useStreamUrl';
-import { isRemoteStreamingEnabled } from '../lib/streaming';
 import { useNavigation } from '@react-navigation/native';
 import PiPController from './PiPController';
 
@@ -16,7 +15,7 @@ export default function VideoPlayer({ channelNumber }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
   const [isPiPActive, setIsPiPActive] = useState(false);
-  const { streamUrl, isLocal, isConnecting, connectionError } = useStreamUrl(channelNumber);
+  const { streamUrl, isLocal, isConnecting, connectionError, showPaywall } = useStreamUrl(channelNumber);
   const navigation = useNavigation();
   const videoRef = useRef<Video>(null);
 
@@ -76,6 +75,20 @@ export default function VideoPlayer({ channelNumber }: Props) {
       }
     }
   };
+
+  if (showPaywall) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Remote streaming requires a premium subscription</Text>
+        <TouchableOpacity
+          style={styles.upgradeButton}
+          onPress={() => navigation.navigate('settings')}
+        >
+          <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (error) {
     return (
@@ -194,13 +207,13 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 18,
     textAlign: 'center',
-    padding: 20,
+    marginBottom: 20,
   },
   upgradeButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 5,
-    marginTop: 20,
+    backgroundColor: '#FF9500',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   upgradeButtonText: {
     color: 'white',
@@ -218,8 +231,8 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
     marginHorizontal: 10,
   },
   controlButtonText: {
@@ -228,8 +241,8 @@ const styles = StyleSheet.create({
   },
   pipButton: {
     backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
     marginHorizontal: 10,
   },
 });

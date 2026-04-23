@@ -87,3 +87,8 @@ export const establishRemoteConnection = async (): Promise<boolean> => {
     return false;
   }
 };
+
+export const getRemoteStreamUrl = async (channelNumber: string): Promise<string> => {
+  const userId = await AsyncStorage.getItem('userId') || 'demo-user';
+  return `${Config.API_BASE_URL}/stream/${userId}/${channelNumber}`;
+};
