@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { DrillResult, UserStats, Achievement } from './types';
+import { DrillResult, UserStats, Achievement, Drill } from './types';
 import { DRILLS } from '../constants/Drills';
 
 let db: SQLite.SQLiteDatabase | null = null;
@@ -130,6 +130,24 @@ export const updateDrillDifficulty = async (drillId: string, newDifficulty: numb
   );
 };
 
+export const getAllDrills = async (): Promise<Drill[]> => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  const results = await database.getAllAsync('SELECT * FROM drills');
+
+  return results.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    difficulty: row.difficulty,
+    duration: row.duration,
+    bestScore: row.bestScore,
+    difficultyChange: row.difficultyChange || 0,
+  }));
+};
+
 export const getUserStats = async (): Promise<UserStats> => {
   const database = await openDatabase();
   await initDatabase();
@@ -177,66 +195,37 @@ const calculateStreak = (dates: string[]): number => {
     .map(d => new Date(d))
     .sort((a, b) => b.getTime() - a.getTime());
 
+  let currentStreak = 1;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const mostRecent = new Date(sortedDates[0]);
-  mostRecent.setHours(0, 0, 0, 0);
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
 
-  const daysDiff = Math.floor((today.getTime() - mostRecent.getTime()) / (1000 * 60 * 60 * 24));
-
-  if (daysDiff === 0) {
-    return dates.length;
-  } else if (daysDiff === 1) {
-    return dates.length;
-  } else {
+  if (sortedDates[0].getTime() !== today.getTime()) {
     return 0;
   }
+
+  for (let i = 1; i < sortedDates.length; i++) {
+    const diff = Math.floor((today.getTime() - sortedDates[i].getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diff === i) {
+      currentStreak++;
+    } else {
+      break;
+    }
+  }
+
+  return currentStreak;
 };
 
-const getAchievements = async (): Promise<Achievement[]> => {
+export const getAchievements = async (): Promise<Achievement[]> => {
   const database = await openDatabase();
   await initDatabase();
 
-  const achievements = await database.getAllAsync('SELECT * FROM achievements');
+  const results = await database.getAllAsync('SELECT * FROM achievements');
 
-  if (achievements.length === 0) {
-    // Initialize default achievements if none exist
-    const defaultAchievements: Achievement[] = [
-      {
-        id: 'first-drill',
-        title: 'First Drill',
-        description: 'Complete your first practice drill',
-        icon: 'trophy',
-        unlocked: false,
-      },
-      {
-        id: 'streak-3',
-        title: '3-Day Streak',
-        description: 'Complete drills for 3 consecutive days',
-        icon: 'flame',
-        unlocked: false,
-      },
-      {
-        id: 'accuracy-90',
-        title: 'Precision Master',
-        description: 'Achieve 90%+ accuracy in a drill',
-        icon: 'bullseye',
-        unlocked: false,
-      },
-    ];
-
-    for (const achievement of defaultAchievements) {
-      await database.runAsync(
-        'INSERT INTO achievements (id, title, description, icon, unlocked) VALUES (?, ?, ?, ?, ?)',
-        [achievement.id, achievement.title, achievement.description, achievement.icon, achievement.unlocked]
-      );
-    }
-
-    return defaultAchievements;
-  }
-
-  return achievements.map((row: any) => ({
+  return results.map((row: any) => ({
     id: row.id,
     title: row.title,
     description: row.description,

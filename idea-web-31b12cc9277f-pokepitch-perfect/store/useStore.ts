@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Drill, DrillResult, UserStats } from '../lib/types';
-import { saveDrillResult, getUserStats, getDrillResults, updateDrillDifficulty } from '../lib/database';
+import { saveDrillResult, getUserStats, getDrillResults, updateDrillDifficulty, getAllDrills } from '../lib/database';
 import { adjustDifficulty } from '../lib/adaptive';
 
 interface StoreState {
@@ -14,6 +14,7 @@ interface StoreState {
   updateStats: () => Promise<void>;
   togglePremium: () => void;
   setDrills: (drills: Drill[]) => void;
+  loadDrills: () => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -32,6 +33,11 @@ export const useStore = create<StoreState>((set, get) => ({
   isPremium: false,
 
   setDrills: (drills) => {
+    set({ drills });
+  },
+
+  loadDrills: async () => {
+    const drills = await getAllDrills();
     set({ drills });
   },
 
@@ -58,11 +64,16 @@ export const useStore = create<StoreState>((set, get) => ({
         // Update the drill's difficulty in the database
         await updateDrillDifficulty(currentDrill.id, newDifficulty);
 
+        // Calculate difficulty change for display
+        const difficultyChange = newDifficulty - currentDrill.difficulty;
+
         // Update the store
         set(state => ({
           currentSession: result,
           drills: state.drills.map(d =>
-            d.id === currentDrill.id ? { ...d, difficulty: newDifficulty } : d
+            d.id === currentDrill.id
+              ? { ...d, difficulty: newDifficulty, difficultyChange }
+              : d
           ),
         }));
       } else {

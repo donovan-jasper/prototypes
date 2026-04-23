@@ -3,13 +3,13 @@ import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
 import DrillSession from '../../components/DrillSession';
 import { useStore } from '../../store/useStore';
 import { DrillResult } from '../../lib/types';
-import { adjustDifficulty, shouldLevelUp } from '../../lib/adaptive';
+import { adjustDifficulty } from '../../lib/adaptive';
+import { getDrillResults } from '../../lib/database';
 
 export default function Practice() {
   const { currentDrill, startDrill, submitResult, drills, updateStats } = useStore();
   const [result, setResult] = useState<DrillResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [drillResults, setDrillResults] = useState<DrillResult[]>([]);
 
   useEffect(() => {
     if (!currentDrill && drills.length > 0) {
@@ -24,14 +24,16 @@ export default function Practice() {
 
     // Get all results for this drill
     const allResults = await getDrillResults(result.drillId);
-    setDrillResults(allResults);
 
     // Check if difficulty should increase
-    if (shouldLevelUp(allResults)) {
-      const updatedDrill = adjustDifficulty(currentDrill!, allResults);
+    const { shouldAdjust, newDifficulty } = adjustDifficulty(currentDrill!, allResults);
+
+    if (shouldAdjust && currentDrill) {
+      const difficultyChange = newDifficulty - currentDrill.difficulty;
       Alert.alert(
-        'Difficulty Increased!',
-        `Your performance is improving! The drill difficulty has increased to ${Math.round(updatedDrill.difficulty * 100)}%`,
+        'Difficulty Adjusted',
+        `Your performance has ${difficultyChange > 0 ? 'improved' : 'declined'}! ` +
+        `Difficulty is now ${Math.round(newDifficulty * 100)}%`,
         [{ text: 'OK' }]
       );
     }
@@ -82,9 +84,3 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
-
-async function getDrillResults(drillId: string): Promise<DrillResult[]> {
-  // In a real app, this would query the database
-  // For now, we'll return an empty array
-  return [];
-}
