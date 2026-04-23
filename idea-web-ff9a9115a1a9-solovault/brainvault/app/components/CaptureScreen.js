@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, Text, FlatList, StyleSheet, Alert, Switch } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, FlatList, StyleSheet, Alert, Switch, Image, ActivityIndicator } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { saveItem, getItems } from '../utils/storage';
 import { getChannels } from '../utils/channel';
-import Voice from 'react-native-voice';
-import * as Sharing from 'react-native-share-menu';
+import Voice from '@react-native-voice/voice';
+import * as Sharing from 'expo-sharing';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const CaptureScreen = () => {
   const [text, setText] = useState('');
@@ -16,6 +17,8 @@ const CaptureScreen = () => {
   const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceResults, setVoiceResults] = useState([]);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [timer, setTimer] = useState(null);
 
   useEffect(() => {
     loadChannels();
@@ -31,6 +34,7 @@ const CaptureScreen = () => {
     return () => {
       Voice.destroy().then(Voice.removeAllListeners);
       Sharing.removeListener('onShare');
+      if (timer) clearInterval(timer);
     };
   }, []);
 
@@ -50,12 +54,19 @@ const CaptureScreen = () => {
   const onSpeechError = (e) => {
     console.error('Voice error:', e);
     setIsRecording(false);
+    if (timer) clearInterval(timer);
   };
 
   const startRecording = async () => {
     try {
       await Voice.start('en-US');
       setIsRecording(true);
+      setRecordingTime(0);
+
+      const newTimer = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setTimer(newTimer);
     } catch (e) {
       console.error(e);
     }
@@ -65,6 +76,7 @@ const CaptureScreen = () => {
     try {
       await Voice.stop();
       setIsRecording(false);
+      if (timer) clearInterval(timer);
     } catch (e) {
       console.error(e);
     }
@@ -142,6 +154,7 @@ const CaptureScreen = () => {
       setText('');
       setImageUri(null);
       setVoiceResults([]);
+      setRecordingTime(0);
       await loadRecentItems();
 
       Alert.alert('Success', 'Item saved successfully!');
@@ -165,74 +178,99 @@ const CaptureScreen = () => {
     <View style={styles.container}>
       <View style={styles.captureSection}>
         <View style={styles.modeToggleContainer}>
-          <Text style={styles.modeLabel}>Text Mode</Text>
+          <Text style={styles.modeLabel}>Voice Mode</Text>
           <Switch
             value={isVoiceMode}
-            onValueChange={(value) => setIsVoiceMode(value)}
+            onValueChange={setIsVoiceMode}
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={isVoiceMode ? '#f5dd4b' : '#f4f3f4'}
           />
-          <Text style={styles.modeLabel}>Voice Mode</Text>
         </View>
 
-        {isVoiceMode ? (
-          <View style={styles.voiceInputContainer}>
-            <TouchableOpacity
-              style={[styles.voiceButton, isRecording && styles.recordingButton]}
-              onPressIn={startRecording}
-              onPressOut={stopRecording}
-            >
-              <Text style={styles.voiceButtonText}>
-                {isRecording ? 'Recording...' : 'Hold to Record'}
-              </Text>
+        {imageUri ? (
+          <View style={styles.imagePreviewContainer}>
+            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+            <TouchableOpacity onPress={() => setImageUri(null)} style={styles.removeImageButton}>
+              <MaterialIcons name="close" size={24} color="white" />
             </TouchableOpacity>
-            {voiceResults.length > 0 && (
-              <Text style={styles.voiceTranscript}>
-                {voiceResults.join(' ')}
-              </Text>
-            )}
           </View>
         ) : (
           <TextInput
-            style={styles.input}
-            onChangeText={setText}
-            value={text}
-            placeholder="Type a note or paste a link..."
+            style={styles.textInput}
             multiline
+            placeholder="Type your note or tap to record..."
+            value={text}
+            onChangeText={setText}
+            editable={!isVoiceMode}
           />
         )}
 
-        <TouchableOpacity style={styles.imageButton} onPress={handleImagePicker}>
-          <Text style={styles.imageButtonText}>
-            {imageUri ? '✓ Image Selected' : '📷 Pick Image'}
-          </Text>
-        </TouchableOpacity>
-
-        <View style={styles.pickerContainer}>
-          <Text style={styles.label}>Channel:</Text>
-          <Picker
-            selectedValue={selectedChannelId}
-            style={styles.picker}
-            onValueChange={(itemValue) => setSelectedChannelId(itemValue)}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, { backgroundColor: '#4CAF50' }]}
+            onPress={handleImagePicker}
           >
-            {channels.map((channel) => (
-              <Picker.Item key={channel.id} label={channel.name} value={channel.id} />
-            ))}
-          </Picker>
+            <MaterialIcons name="image" size={24} color="white" />
+            <Text style={styles.actionButtonText}>Image</Text>
+          </TouchableOpacity>
+
+          {isVoiceMode ? (
+            isRecording ? (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#f44336' }]}
+                onPress={stopRecording}
+              >
+                <MaterialIcons name="mic" size={24} color="white" />
+                <Text style={styles.actionButtonText}>Stop</Text>
+                <Text style={styles.recordingTime}>{recordingTime}s</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#2196F3' }]}
+                onPress={startRecording}
+              >
+                <MaterialIcons name="mic" size={24} color="white" />
+                <Text style={styles.actionButtonText}>Record</Text>
+              </TouchableOpacity>
+            )
+          ) : null}
         </View>
 
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>Save</Text>
-        </TouchableOpacity>
+        {isRecording && (
+          <View style={styles.recordingIndicator}>
+            <ActivityIndicator size="small" color="#f44336" />
+            <Text style={styles.recordingText}>Recording...</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.recentSection}>
-        <Text style={styles.recentTitle}>Recently Saved</Text>
+      <View style={styles.channelSection}>
+        <Text style={styles.sectionTitle}>Save to Channel</Text>
+        <Picker
+          selectedValue={selectedChannelId}
+          onValueChange={(itemValue) => setSelectedChannelId(itemValue)}
+          style={styles.picker}
+        >
+          {channels.map(channel => (
+            <Picker.Item key={channel.id} label={channel.name} value={channel.id} />
+          ))}
+        </Picker>
+      </View>
+
+      <TouchableOpacity
+        style={styles.saveButton}
+        onPress={handleSave}
+      >
+        <Text style={styles.saveButtonText}>Save</Text>
+      </TouchableOpacity>
+
+      <View style={styles.recentItemsSection}>
+        <Text style={styles.sectionTitle}>Recent Items</Text>
         <FlatList
           data={recentItems}
-          keyExtractor={(item) => item.id.toString()}
           renderItem={renderItem}
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>No items yet. Start capturing!</Text>
-          }
+          keyExtractor={item => item.id.toString()}
+          style={styles.recentItemsList}
         />
       </View>
     </View>
@@ -242,125 +280,157 @@ const CaptureScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   captureSection: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   modeToggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   modeLabel: {
     fontSize: 16,
-    marginHorizontal: 10,
+    color: '#333',
   },
-  voiceInputContainer: {
-    marginBottom: 15,
-  },
-  voiceButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  recordingButton: {
-    backgroundColor: '#F44336',
-  },
-  voiceButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  voiceTranscript: {
-    fontSize: 14,
-    color: '#666',
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  input: {
-    height: 100,
-    borderColor: '#ccc',
+  textInput: {
+    height: 120,
+    borderColor: '#ddd',
     borderWidth: 1,
     borderRadius: 8,
-    marginBottom: 15,
-    padding: 10,
+    padding: 12,
     fontSize: 16,
+    marginBottom: 16,
+    textAlignVertical: 'top',
   },
-  imageButton: {
-    backgroundColor: '#2196F3',
+  imagePreviewContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    resizeMode: 'cover',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 16,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
+    flex: 1,
+    marginHorizontal: 4,
   },
-  imageButtonText: {
+  actionButtonText: {
     color: 'white',
+    marginLeft: 8,
     fontSize: 16,
   },
-  pickerContainer: {
-    marginBottom: 15,
+  recordingTime: {
+    color: 'white',
+    marginLeft: 8,
+    fontSize: 14,
   },
-  label: {
-    fontSize: 16,
-    marginBottom: 5,
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  recordingText: {
+    color: '#f44336',
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  channelSection: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#333',
   },
   picker: {
     height: 50,
     width: '100%',
   },
   saveButton: {
-    backgroundColor: '#9C27B0',
-    padding: 15,
+    backgroundColor: '#6200ee',
+    padding: 16,
     borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 16,
   },
   saveButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
-  recentSection: {
+  recentItemsSection: {
     flex: 1,
-    padding: 20,
   },
-  recentTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
+  recentItemsList: {
+    flex: 1,
   },
   itemContainer: {
-    backgroundColor: '#fff',
-    padding: 15,
+    backgroundColor: 'white',
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   itemType: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   itemText: {
     fontSize: 16,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   itemDate: {
     fontSize: 12,
     color: '#999',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 20,
   },
 });
 
