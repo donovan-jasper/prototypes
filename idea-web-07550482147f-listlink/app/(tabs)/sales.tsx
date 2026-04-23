@@ -6,7 +6,7 @@ import { formatCurrency, formatDate } from '../../lib/utils/formatting';
 import { PlatformBadge } from '../../components/PlatformBadge';
 import { DateRangePicker } from '../../components/DateRangePicker';
 import { CSVExportButton } from '../../components/CSVExportButton';
-import { Card, ActivityIndicator, Divider, useTheme } from 'react-native-paper';
+import { Card, ActivityIndicator, Divider, useTheme, Button } from 'react-native-paper';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
@@ -138,8 +138,8 @@ export default function SalesScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
-        <Text style={styles.loadingText}>Loading sales data...</Text>
+        <ActivityIndicator size="large" />
+        <Text>Loading sales data...</Text>
       </View>
     );
   }
@@ -147,10 +147,10 @@ export default function SalesScreen() {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error loading sales data: {error}</Text>
-        <TouchableOpacity onPress={() => loadListings({ status: 'sold' })}>
-          <Text style={styles.retryText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.errorText}>Error loading sales: {error}</Text>
+        <Button mode="contained" onPress={() => loadListings({ status: 'sold' })}>
+          Retry
+        </Button>
       </View>
     );
   }
@@ -158,21 +158,23 @@ export default function SalesScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.summaryContainer}>
-        <Card style={styles.summaryCard} mode="outlined">
-          <Text style={styles.summaryTitle}>Sales Summary</Text>
-          <Divider style={styles.divider} />
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Sales:</Text>
+        <Card style={styles.summaryCard}>
+          <Card.Content>
+            <Text style={styles.summaryTitle}>Total Sales</Text>
             <Text style={styles.summaryValue}>{formatCurrency(totalSales)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Total Profit:</Text>
+          </Card.Content>
+        </Card>
+        <Card style={styles.summaryCard}>
+          <Card.Content>
+            <Text style={styles.summaryTitle}>Total Profit</Text>
             <Text style={styles.summaryValue}>{formatCurrency(totalProfit)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Average Margin:</Text>
+          </Card.Content>
+        </Card>
+        <Card style={styles.summaryCard}>
+          <Card.Content>
+            <Text style={styles.summaryTitle}>Avg Margin</Text>
             <Text style={styles.summaryValue}>{avgMargin.toFixed(1)}%</Text>
-          </View>
+          </Card.Content>
         </Card>
       </View>
 
@@ -199,7 +201,7 @@ export default function SalesScreen() {
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ItemSeparatorComponent={() => <Divider />}
         />
       )}
     </View>
@@ -216,10 +218,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -227,40 +225,25 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   errorText: {
-    fontSize: 16,
-    color: 'red',
-    textAlign: 'center',
     marginBottom: 16,
-  },
-  retryText: {
-    color: 'blue',
-    fontSize: 16,
+    textAlign: 'center',
   },
   summaryContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 16,
   },
   summaryCard: {
-    padding: 16,
+    flex: 1,
+    marginHorizontal: 4,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  divider: {
-    marginVertical: 8,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 4,
-  },
-  summaryLabel: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   controlsContainer: {
@@ -271,7 +254,7 @@ const styles = StyleSheet.create({
   },
   saleItem: {
     marginBottom: 8,
-    padding: 12,
+    padding: 8,
   },
   saleItemHeader: {
     flexDirection: 'row',
@@ -291,7 +274,7 @@ const styles = StyleSheet.create({
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 4,
+    marginBottom: 4,
   },
   detailLabel: {
     fontSize: 14,
@@ -304,16 +287,13 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: 16,
   },
-  separator: {
-    height: 8,
-  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
     color: '#666',
+    fontSize: 16,
   },
 });

@@ -1,11 +1,11 @@
-interface ProfitCalculationParams {
+export interface ProfitCalculationParams {
   salePrice: number;
   sourcingCost: number;
   platform: string;
   shippingCost: number;
 }
 
-interface ProfitResult {
+export interface ProfitResult {
   profit: number;
   margin: number;
   fees: number;
@@ -20,11 +20,10 @@ export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
     poshmark: 0.15, // 15% processing fee
     mercari: 0.1, // 10% service fee
     depop: 0.12, // 12% processing fee
-    stockx: 0.1, // 10% processing fee
-    whatnot: 0.1, // 10% processing fee
+    default: 0.1 // Default 10% fee for other platforms
   };
 
-  const feePercentage = platformFees[platform.toLowerCase()] || 0.1;
+  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
   const fees = salePrice * feePercentage;
   const totalCost = sourcingCost + fees + shippingCost;
   const profit = salePrice - totalCost;
@@ -33,7 +32,7 @@ export function calculateProfit(params: ProfitCalculationParams): ProfitResult {
   return {
     profit: Math.max(0, profit), // Ensure profit isn't negative
     margin: Math.max(0, margin), // Ensure margin isn't negative
-    fees,
+    fees
   };
 }
 
@@ -43,11 +42,10 @@ export function calculateFees(price: number, platform: string): number {
     poshmark: 0.15,
     mercari: 0.1,
     depop: 0.12,
-    stockx: 0.1,
-    whatnot: 0.1,
+    default: 0.1
   };
 
-  const feePercentage = platformFees[platform.toLowerCase()] || 0.1;
+  const feePercentage = platformFees[platform as keyof typeof platformFees] || platformFees.default;
   return price * feePercentage;
 }
 

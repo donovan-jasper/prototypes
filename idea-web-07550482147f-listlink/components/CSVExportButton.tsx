@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { Button, useTheme } from 'react-native-paper';
+import { Button, IconButton } from 'react-native-paper';
 
 interface CSVExportButtonProps {
   onPress: () => void;
@@ -9,19 +9,15 @@ interface CSVExportButtonProps {
 }
 
 export function CSVExportButton({ onPress, disabled, loading }: CSVExportButtonProps) {
-  const theme = useTheme();
-
   return (
-    <Button
-      mode="contained"
+    <IconButton
+      icon="file-export"
+      size={24}
       onPress={onPress}
       disabled={disabled}
       loading={loading}
       style={styles.button}
-      icon="file-export"
-    >
-      Export CSV
-    </Button>
+    />
   );
 }
 
