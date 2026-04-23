@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { BarChart } from 'react-native-chart-kit';
 import { getRecentReadings } from '../../services/database';
 import { usePremium } from '../../hooks/usePremium';
 import PremiumGate from '../../components/PremiumGate';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
@@ -15,6 +16,7 @@ export default function CompareScreen() {
   const [comparisonData, setComparisonData] = useState<any>(null);
   const [neighborhoodRankings, setNeighborhoodRankings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showSavings, setShowSavings] = useState(false);
   const { isPremium } = usePremium();
 
   useEffect(() => {
@@ -167,7 +169,7 @@ export default function CompareScreen() {
                   borderRadius: 16
                 },
                 propsForBackgroundLines: {
-                  strokeWidth: 1,
+                  strokeWidth: 0.5,
                   stroke: '#e3e3e3'
                 }
               }}
@@ -175,38 +177,76 @@ export default function CompareScreen() {
                 marginVertical: 8,
                 borderRadius: 16
               }}
+              fromZero={true}
+              showValuesOnTopOfBars={true}
             />
+          </View>
+        )}
+
+        <View style={styles.metricsContainer}>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>{comparisonData?.signal || 0}%</Text>
+            <Text style={styles.metricLabel}>Signal Strength</Text>
+          </View>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>{comparisonData?.speed || 0}%</Text>
+            <Text style={styles.metricLabel}>Download Speed</Text>
+          </View>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>{comparisonData?.reliability || 0}%</Text>
+            <Text style={styles.metricLabel}>Reliability</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.savingsButton}
+          onPress={() => setShowSavings(!showSavings)}
+        >
+          <Text style={styles.savingsButtonText}>
+            {showSavings ? 'Hide Savings Calculator' : 'Show Savings Calculator'}
+          </Text>
+          <Ionicons
+            name={showSavings ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color="#007AFF"
+          />
+        </TouchableOpacity>
+
+        {showSavings && (
+          <View style={styles.savingsContainer}>
+            <Text style={styles.savingsTitle}>Switch Savings Calculator</Text>
+            <Text style={styles.savingsDescription}>
+              Estimated savings if you switch to {selectedCarrier} based on historical data:
+            </Text>
+
+            <View style={styles.savingsBox}>
+              <Text style={styles.savingsAmount}>${comparisonData?.savings || 0}/month</Text>
+              <Text style={styles.savingsSubtitle}>Potential Savings</Text>
+            </View>
+
+            <Text style={styles.savingsNote}>
+              * Based on average signal quality improvements and typical carrier pricing models.
+              Actual savings may vary based on your specific usage patterns and contract terms.
+            </Text>
           </View>
         )}
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Switch Savings Calculator</Text>
-        <View style={styles.savingsCard}>
-          <Text style={styles.savingsText}>
-            Estimated savings if switching to {selectedCarrier}:
-          </Text>
-          <Text style={styles.savingsAmount}>
-            ${comparisonData?.savings || 0}/month
-          </Text>
-          <Text style={styles.savingsNote}>
-            Based on average savings from similar users in your area
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Neighborhood Rankings</Text>
-        {neighborhoodRankings.map((item, index) => (
-          <View key={item.carrier} style={styles.rankingItem}>
-            <Text style={styles.rankNumber}>{index + 1}</Text>
-            <Text style={styles.rankCarrier}>{item.carrier}</Text>
-            <View style={styles.rankBarContainer}>
-              <View style={[styles.rankBar, { width: `${item.score}%` }]} />
+
+        <View style={styles.rankingsContainer}>
+          {neighborhoodRankings.map((item, index) => (
+            <View key={item.carrier} style={styles.rankingItem}>
+              <Text style={styles.rankingPosition}>{index + 1}</Text>
+              <Text style={styles.rankingCarrier}>{item.carrier}</Text>
+              <View style={styles.rankingBarContainer}>
+                <View style={[styles.rankingBar, { width: `${item.score}%` }]} />
+              </View>
+              <Text style={styles.rankingScore}>{Math.round(item.score)}</Text>
             </View>
-            <Text style={styles.rankScore}>{Math.round(item.score)}</Text>
-          </View>
-        ))}
+          ))}
+        </View>
       </View>
     </ScrollView>
   );
@@ -217,15 +257,34 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
   section: {
-    marginBottom: 24,
-    paddingHorizontal: 20,
+    backgroundColor: 'white',
+    marginBottom: 10,
+    padding: 15,
+    borderRadius: 10,
+    margin: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 16,
+    marginBottom: 15,
   },
   pickerContainer: {
     borderWidth: 1,
@@ -238,88 +297,124 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   chartContainer: {
-    marginVertical: 10,
-    borderRadius: 16,
-    backgroundColor: '#fff',
+    marginBottom: 20,
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  metricBox: {
+    flex: 1,
+    alignItems: 'center',
     padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    marginHorizontal: 5,
   },
-  savingsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  metricValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
   },
-  savingsText: {
-    fontSize: 16,
+  metricLabel: {
+    fontSize: 12,
     color: '#666',
-    marginBottom: 8,
+    marginTop: 5,
+    textAlign: 'center',
+  },
+  savingsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  savingsButtonText: {
+    fontSize: 16,
+    color: '#007AFF',
+    fontWeight: '600',
+    marginRight: 5,
+  },
+  savingsContainer: {
+    backgroundColor: '#f0f8ff',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  savingsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  savingsDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
+  },
+  savingsBox: {
+    backgroundColor: '#e6f7ff',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
   },
   savingsAmount: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#2ECC71',
-    marginBottom: 8,
+    color: '#007AFF',
+  },
+  savingsSubtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
   },
   savingsNote: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#999',
+    marginTop: 10,
+  },
+  rankingsContainer: {
+    marginTop: 10,
   },
   rankingItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  rankNumber: {
+  rankingPosition: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
     width: 30,
     textAlign: 'center',
   },
-  rankCarrier: {
+  rankingCarrier: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#333',
     flex: 1,
   },
-  rankBarContainer: {
+  rankingBarContainer: {
     height: 10,
-    backgroundColor: '#e3e3e3',
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
     flex: 2,
     marginHorizontal: 10,
   },
-  rankBar: {
+  rankingBar: {
     height: '100%',
     backgroundColor: '#007AFF',
     borderRadius: 5,
   },
-  rankScore: {
+  rankingScore: {
     fontSize: 14,
     color: '#666',
     width: 40,
     textAlign: 'right',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
   },
 });
