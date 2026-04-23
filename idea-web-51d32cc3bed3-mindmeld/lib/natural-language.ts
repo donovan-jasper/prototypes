@@ -1,116 +1,98 @@
-import { parse, isValid, addDays, addWeeks, addMonths } from 'date-fns';
+import { format, parse, isValid, addDays, addWeeks, addMonths } from 'date-fns';
 
 interface ParsedReminder {
   title: string;
   date: Date;
   time: Date;
   location?: string;
-  category?: string;
+  category?: 'personal' | 'work' | 'health' | 'finance' | 'other';
 }
 
-export function parseNaturalLanguage(text: string): ParsedReminder {
-  const lowerText = text.toLowerCase();
+export function parseNaturalLanguage(input: string): ParsedReminder {
+  // Initialize with default values
   const now = new Date();
-  let date = new Date(now);
-  let time = new Date(now);
-  let title = '';
-  let location: string | undefined;
-  let category: string | undefined;
+  const result: ParsedReminder = {
+    title: '',
+    date: now,
+    time: now,
+  };
 
-  // Extract date/time
-  const dateRegex = /(tomorrow|today|next week|in \d+ days|at \d+:\d+|next monday|next tuesday|next wednesday|next thursday|next friday|next saturday|next sunday)/;
-  const dateMatch = lowerText.match(dateRegex);
+  // Convert to lowercase for easier processing
+  const lowerInput = input.toLowerCase();
 
-  if (dateMatch) {
-    const matchText = dateMatch[0];
+  // Extract date/time information
+  const dateTimeMatch = lowerInput.match(
+    /(tomorrow|today|next week|next month|in \d+ days|in \d+ weeks|in \d+ months|on \w+ \d+|at \d+:\d+ [ap]m)/g
+  );
 
-    if (matchText.includes('tomorrow')) {
-      date = addDays(now, 1);
-    } else if (matchText.includes('next week')) {
-      date = addDays(now, 7);
-    } else if (matchText.includes('in ')) {
-      const days = parseInt(matchText.split(' ')[1]);
-      date = addDays(now, days);
-    } else if (matchText.includes('next ')) {
-      const dayMap: Record<string, number> = {
-        monday: 1,
-        tuesday: 2,
-        wednesday: 3,
-        thursday: 4,
-        friday: 5,
-        saturday: 6,
-        sunday: 0
-      };
-      const dayName = matchText.split(' ')[1];
-      const targetDay = dayMap[dayName];
-      const currentDay = now.getDay();
+  if (dateTimeMatch) {
+    dateTimeMatch.forEach(match => {
+      if (match.includes('tomorrow')) {
+        result.date = addDays(now, 1);
+      } else if (match.includes('next week')) {
+        result.date = addWeeks(now, 1);
+      } else if (match.includes('next month')) {
+        result.date = addMonths(now, 1);
+      } else if (match.includes('in ')) {
+        const daysMatch = match.match(/in (\d+) days/);
+        const weeksMatch = match.match(/in (\d+) weeks/);
+        const monthsMatch = match.match(/in (\d+) months/);
 
-      let daysToAdd = (targetDay - currentDay + 7) % 7;
-      if (daysToAdd === 0) daysToAdd = 7; // If it's the same day, set for next week
-      date = addDays(now, daysToAdd);
-    }
-
-    const timeRegex = /at (\d+):(\d+)/;
-    const timeMatch = lowerText.match(timeRegex);
-    if (timeMatch) {
-      const hours = parseInt(timeMatch[1]);
-      const minutes = parseInt(timeMatch[2]);
-      time.setHours(hours, minutes);
-    }
+        if (daysMatch) {
+          result.date = addDays(now, parseInt(daysMatch[1]));
+        } else if (weeksMatch) {
+          result.date = addWeeks(now, parseInt(weeksMatch[1]));
+        } else if (monthsMatch) {
+          result.date = addMonths(now, parseInt(monthsMatch[1]));
+        }
+      } else if (match.includes('on ')) {
+        // Simple date parsing (e.g., "on Monday")
+        // In a real app, you'd want more robust date parsing
+        const dateStr = match.replace('on ', '');
+        const parsedDate = parse(dateStr, 'EEEE', now);
+        if (isValid(parsedDate)) {
+          result.date = parsedDate;
+        }
+      } else if (match.includes('at ')) {
+        // Time parsing (e.g., "at 3pm")
+        const timeStr = match.replace('at ', '');
+        const parsedTime = parse(timeStr, 'h:mm a', now);
+        if (isValid(parsedTime)) {
+          result.time = parsedTime;
+        }
+      }
+    });
   }
 
   // Extract location
-  const locationRegex = /near (.*?)(?= at|$)/;
-  const locationMatch = lowerText.match(locationRegex);
+  const locationMatch = lowerInput.match(/(near|at|in) (.+?)(?= at \d+:\d+|$)/);
   if (locationMatch) {
-    location = locationMatch[1];
+    result.location = locationMatch[2].trim();
   }
 
   // Extract category
-  const categoryKeywords: Record<string, string> = {
-    'work': 'work',
-    'meeting': 'work',
-    'project': 'work',
-    'call': 'personal',
-    'mom': 'personal',
-    'dad': 'personal',
-    'medication': 'health',
-    'exercise': 'health',
-    'gym': 'health',
-    'bill': 'finance',
-    'payment': 'finance',
-    'appointment': 'health'
+  const categoryKeywords = {
+    'work': ['work', 'meeting', 'project', 'office', 'job'],
+    'personal': ['personal', 'family', 'mom', 'dad', 'friend', 'social'],
+    'health': ['health', 'exercise', 'gym', 'doctor', 'medication'],
+    'finance': ['finance', 'bill', 'payment', 'bank', 'money'],
   };
 
-  for (const [keyword, cat] of Object.entries(categoryKeywords)) {
-    if (lowerText.includes(keyword)) {
-      category = cat;
+  for (const [category, keywords] of Object.entries(categoryKeywords)) {
+    if (keywords.some(keyword => lowerInput.includes(keyword))) {
+      result.category = category as any;
       break;
     }
   }
 
-  // Extract title - remove date/time/location parts
-  let titleText = text;
-  if (dateMatch) {
-    titleText = titleText.replace(dateMatch[0], '');
-  }
-  if (locationMatch) {
-    titleText = titleText.replace(locationMatch[0], '');
+  // Extract title - everything after "remind me to" or similar
+  const titleMatch = input.match(/(?:remind me to|remind me|remind|set a reminder to|create a reminder to) (.+)/i);
+  if (titleMatch) {
+    result.title = titleMatch[1].trim();
+  } else {
+    // Fallback to the entire input if no clear command found
+    result.title = input.trim();
   }
 
-  // Clean up the title
-  title = titleText
-    .replace(/remind me to?/i, '')
-    .replace(/please/i, '')
-    .replace(/at \d+:\d+/i, '')
-    .replace(/near .*/i, '')
-    .trim();
-
-  return {
-    title,
-    date,
-    time,
-    location,
-    category
-  };
+  return result;
 }
