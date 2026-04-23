@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import * as ExpoCalendar from 'expo-calendar';
 import { getTasks } from '../utils/database';
@@ -177,53 +177,50 @@ const CalendarScreen = () => {
         {calendarEvents.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Calendar Events</Text>
-            {calendarEvents.map((event, index) => (
-              <View key={index} style={styles.eventItem}>
-                <View style={styles.eventTimeContainer}>
+            <FlatList
+              data={calendarEvents}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <View style={[styles.eventItem, { backgroundColor: item.color || '#f0f0f0' }]}>
+                  <Text style={styles.eventTitle}>{item.title}</Text>
                   <Text style={styles.eventTime}>
-                    {formatTime(event.startDate)} - {formatTime(event.endDate)}
+                    {formatTime(item.startDate)} - {formatTime(item.endDate)}
                   </Text>
                 </View>
-                <Text style={styles.eventTitle}>{event.title}</Text>
-                {event.location && (
-                  <Text style={styles.eventLocation}>{event.location}</Text>
-                )}
-              </View>
-            ))}
+              )}
+              scrollEnabled={false}
+            />
           </View>
         )}
 
         {dateTasks.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tasks</Text>
-            {dateTasks.map((task, index) => (
-              <View key={index} style={styles.taskItem}>
-                <View style={[
-                  styles.taskCategory,
-                  { backgroundColor: getCategoryColor(task.category) }
-                ]}>
-                  <Text style={styles.taskCategoryText}>
-                    {task.category || 'General'}
-                  </Text>
+            <FlatList
+              data={dateTasks}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <View style={[styles.taskItem, { backgroundColor: getPriorityColor(item.priority) }]}>
+                  <Text style={styles.taskTitle}>{item.title}</Text>
+                  {item.notes && <Text style={styles.taskNotes}>{item.notes}</Text>}
+                  <Text style={styles.taskTime}>{formatTime(item.dueDate)}</Text>
                 </View>
-                <Text style={styles.taskTitle}>{task.title}</Text>
-              </View>
-            ))}
+              )}
+              scrollEnabled={false}
+            />
           </View>
         )}
       </ScrollView>
     );
   };
 
-  const getCategoryColor = (category) => {
-    const colors = {
-      'Work': '#FF6B6B',
-      'Personal': '#4ECDC4',
-      'Shopping': '#45B7D1',
-      'Health': '#FFBE0B',
-      'General': '#A5D8FF'
-    };
-    return colors[category] || '#A5D8FF';
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return '#ffcccc';
+      case 'medium': return '#fff2cc';
+      case 'low': return '#e6ffe6';
+      default: return '#f0f0f0';
+    }
   };
 
   return (
@@ -244,13 +241,6 @@ const CalendarScreen = () => {
           arrowColor: '#007AFF',
         }}
       />
-
-      {permissionError && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{permissionError}</Text>
-        </View>
-      )}
-
       {renderSelectedDateContent()}
     </View>
   );
@@ -259,7 +249,7 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#fff',
   },
   contentContainer: {
     flex: 1,
@@ -271,70 +261,47 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 12,
+    color: '#333',
   },
   eventItem: {
-    backgroundColor: 'white',
+    padding: 12,
     borderRadius: 8,
-    padding: 16,
     marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  eventTimeContainer: {
-    marginBottom: 4,
-  },
-  eventTime: {
-    fontSize: 14,
-    color: '#666',
   },
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 4,
   },
-  eventLocation: {
+  eventTime: {
     fontSize: 14,
-    color: '#666',
+    color: '#555',
   },
   taskItem: {
-    backgroundColor: 'white',
+    padding: 12,
     borderRadius: 8,
-    padding: 16,
     marginBottom: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  taskCategory: {
-    width: 8,
-    height: '100%',
-    borderTopLeftRadius: 8,
-    borderBottomLeftRadius: 8,
-    marginRight: 12,
-  },
-  taskCategoryText: {
-    display: 'none',
   },
   taskTitle: {
     fontSize: 16,
-    color: '#333',
-    flex: 1,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  taskNotes: {
+    fontSize: 14,
+    color: '#555',
+    marginBottom: 4,
+  },
+  taskTime: {
+    fontSize: 14,
+    color: '#555',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   emptyStateText: {
     fontSize: 16,
@@ -345,20 +312,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   loadingText: {
-    marginTop: 12,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
-  },
-  errorContainer: {
-    padding: 16,
-    backgroundColor: '#FFEBEE',
-  },
-  errorText: {
-    color: '#C62828',
-    textAlign: 'center',
   },
 });
 
