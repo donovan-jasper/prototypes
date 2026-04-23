@@ -28,7 +28,7 @@ export const initDatabase = () => {
             FOREIGN KEY (categoryId) REFERENCES categories (id)
           );`
         );
-        
+
         // Check if default category exists
         tx.executeSql(
           `SELECT COUNT(*) as count FROM categories;`,
