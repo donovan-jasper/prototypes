@@ -3,26 +3,69 @@ import { getPriceHistory, insertPriceHistory } from '../db';
 
 const API_BASE_URL = 'https://api.lootvault.com/v1';
 
-interface GameApiResponse {
+interface FortniteApiResponse {
+  status: number;
   data: {
-    price: number;
-    lastUpdated: string;
+    item: {
+      id: string;
+      name: string;
+      description: string;
+      type: {
+        id: string;
+        name: string;
+      };
+      rarity: {
+        id: string;
+        name: string;
+      };
+      images: {
+        icon: string;
+        featured: string;
+      };
+      shopHistory: Array<{
+        regularPrice: number;
+        finalPrice: number;
+        lastUpdate: string;
+      }>;
+    };
   };
+}
+
+interface GenshinApiResponse {
+  id: number;
+  name: string;
+  rarity: number;
+  type: string;
+  description: string;
+  icon: string;
+  price: number;
+  lastUpdated: string;
 }
 
 export const fetchItemPrice = async (game: string, itemId: string): Promise<number> => {
   try {
     // Real API calls for Fortnite and Genshin Impact
     if (game === 'fortnite') {
-      const response = await axios.get<GameApiResponse>(
+      const response = await axios.get<FortniteApiResponse>(
         `https://fortnite-api.com/v2/shop/${itemId}`
       );
-      return response.data.data.price;
+
+      if (response.data.status === 200 && response.data.data.item.shopHistory.length > 0) {
+        const latestPrice = response.data.data.item.shopHistory[0].finalPrice;
+        const today = new Date().toISOString().split('T')[0];
+        await insertPriceHistory(itemId, latestPrice, today);
+        return latestPrice;
+      }
     } else if (game === 'genshin') {
-      const response = await axios.get<GameApiResponse>(
+      const response = await axios.get<GenshinApiResponse>(
         `https://api.genshin.dev/materials/${itemId}`
       );
-      return response.data.data.price;
+
+      if (response.data.price) {
+        const today = new Date().toISOString().split('T')[0];
+        await insertPriceHistory(itemId, response.data.price, today);
+        return response.data.price;
+      }
     }
 
     // Fallback to mock data for other games

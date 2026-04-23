@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { getItemsFromDB, updateItemValue } from '../db';
+import { getItemsFromDB, updateItemValue, getItemById } from '../db';
+import { fetchItemPrice } from '../api/priceService';
 
 interface Item {
   id: string;
@@ -7,6 +8,7 @@ interface Item {
   game: string;
   rarity: string;
   value: number;
+  imageUrl?: string;
 }
 
 interface InventoryStore {
@@ -17,6 +19,7 @@ interface InventoryStore {
   addItem: (item: Item) => void;
   removeItem: (itemId: string) => void;
   updateItemValue: (itemId: string, newValue: number) => void;
+  refreshItemPrice: (itemId: string) => Promise<void>;
   setSelectedGame: (game: string | null) => void;
 }
 
@@ -69,6 +72,33 @@ const useInventoryStore = create<InventoryStore>((set) => ({
       totalValue
     };
   }),
+
+  refreshItemPrice: async (itemId) => {
+    try {
+      const item = await getItemById(itemId);
+      if (!item) return;
+
+      const newPrice = await fetchItemPrice(item.game, item.id);
+
+      set((state) => {
+        const updatedItems = state.items.map(i =>
+          i.id === itemId ? { ...i, value: newPrice } : i
+        );
+
+        const totalValue = updatedItems.reduce((sum, i) => sum + i.value, 0);
+
+        // Update in database
+        updateItemValue(itemId, newPrice);
+
+        return {
+          items: updatedItems,
+          totalValue
+        };
+      });
+    } catch (error) {
+      console.error('Error refreshing item price:', error);
+    }
+  },
 
   setSelectedGame: (game) => set({ selectedGame: game }),
 }));
