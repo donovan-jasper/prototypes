@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createSession, completeSession, getStreak, getLastSessionDate, resetStreak } from '../lib/database';
+import { createSession, completeSession, getStreak, getLastSessionDate, resetStreak, hasSessionToday } from '../lib/database';
 import { isSameDay, subDays } from 'date-fns';
 import { scheduleStreakWarning } from '../lib/notifications';
 
@@ -48,6 +48,13 @@ export const useStore = create<StoreState>((set, get) => ({
 
   startSession: async (duration, voicePack) => {
     try {
+      // Check if user has already completed a session today
+      const sessionToday = await hasSessionToday();
+      if (sessionToday) {
+        console.log('User has already completed a session today');
+        return;
+      }
+
       // Check if we need to reset streak before starting a new session
       await get().resetStreakIfNeeded();
 
@@ -155,7 +162,7 @@ export const useStore = create<StoreState>((set, get) => ({
         const lastDate = new Date(lastSessionDate);
         const yesterday = subDays(today, 1);
 
-        // If last session was yesterday, schedule warning for today
+        // Only schedule warning if last session was yesterday
         if (isSameDay(lastDate, yesterday)) {
           const streak = await getStreak();
           await scheduleStreakWarning(streak);
