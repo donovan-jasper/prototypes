@@ -199,7 +199,7 @@ const extractHealthMetric = (text) => {
 };
 
 const extractEvent = (text) => {
-  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:a\.?m\.?|p\.?m\.?))/i);
+  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:a|p)m?)/i);
   const titleMatch = text.match(/:\s*(.+)/);
 
   if (timeMatch && titleMatch) {
@@ -218,7 +218,7 @@ const extractHeadline = (text) => {
 };
 
 const extractSongInfo = (text) => {
-  const match = text.match(/(?:playing|now playing)\s*(.+?)\s*(?:by|-)\s*(.+)/i);
+  const match = text.match(/(?:now playing|playing now):?\s*(.+?)\s*-\s*(.+)/i);
   if (match) {
     return {
       title: match[1].trim(),
@@ -234,6 +234,5 @@ const extractTransactionType = (text) => {
   if (lowerText.includes('withdrawal')) return 'withdrawal';
   if (lowerText.includes('payment')) return 'payment';
   if (lowerText.includes('transfer')) return 'transfer';
-  if (lowerText.includes('charge')) return 'charge';
   return 'transaction';
 };
