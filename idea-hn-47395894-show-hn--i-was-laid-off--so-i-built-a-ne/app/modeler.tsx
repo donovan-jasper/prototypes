@@ -148,53 +148,51 @@ export default function ScenarioModeler() {
                     />
                   )}
                 />
+
+                <Controller
+                  control={control}
+                  name="annualIncome"
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      label="Annual Income ($)"
+                      value={value}
+                      onChangeText={onChange}
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  )}
+                />
               </>
             )}
-
-            <Controller
-              control={control}
-              name="annualIncome"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Annual Income ($)"
-                  value={value}
-                  onChangeText={onChange}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              )}
-            />
-
-            <Button
-              mode="contained"
-              onPress={handleSubmit(onSubmit)}
-              style={styles.button}
-            >
-              Calculate Scenario
-            </Button>
           </Card.Content>
         </Card>
+
+        <Button
+          mode="contained"
+          onPress={handleSubmit(onSubmit)}
+          style={styles.button}
+        >
+          Calculate Scenario
+        </Button>
 
         {results && (
           <>
             <Card style={styles.card}>
               <Card.Content>
                 <Text variant="titleMedium">Results</Text>
-
+                <Divider style={styles.divider} />
                 <View style={styles.resultRow}>
                   <Text variant="bodyMedium">Equity Value:</Text>
                   <Text variant="bodyMedium" style={styles.resultValue}>
                     ${results.equityValue.toLocaleString()}
                   </Text>
                 </View>
-
                 <View style={styles.resultRow}>
                   <Text variant="bodyMedium">Tax Impact:</Text>
                   <Text variant="bodyMedium" style={styles.resultValue}>
                     ${results.taxImpact.toLocaleString()}
                   </Text>
                 </View>
-
                 <View style={styles.resultRow}>
                   <Text variant="bodyMedium">AMT Impact:</Text>
                   <Text variant="bodyMedium" style={styles.resultValue}>
@@ -230,18 +228,21 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    marginBottom: 16,
+    marginTop: 16,
   },
   segmented: {
-    marginBottom: 16,
+    marginTop: 16,
   },
   button: {
-    marginTop: 8,
+    marginVertical: 16,
+  },
+  divider: {
+    marginVertical: 12,
   },
   resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 8,
+    marginVertical: 4,
   },
   resultValue: {
     fontWeight: 'bold',
