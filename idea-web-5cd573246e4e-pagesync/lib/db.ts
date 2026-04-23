@@ -83,3 +83,36 @@ export const searchBooksByISBN = async (isbn: string) => {
     [isbn]
   );
 };
+
+export const findOrCreateBook = async (bookInfo: {
+  title: string | null;
+  isbn: string | null;
+  totalPages?: number;
+}) => {
+  // First try to find by ISBN if available
+  if (bookInfo.isbn) {
+    const isbnMatches = await searchBooksByISBN(bookInfo.isbn);
+    if (isbnMatches.length > 0) {
+      return isbnMatches[0];
+    }
+  }
+
+  // Then try to find by title if available
+  if (bookInfo.title) {
+    const titleMatches = await searchBooksByTitle(bookInfo.title);
+    if (titleMatches.length > 0) {
+      return titleMatches[0];
+    }
+  }
+
+  // If no match found, create a new book
+  if (bookInfo.title) {
+    return await addBook({
+      title: bookInfo.title,
+      isbn: bookInfo.isbn,
+      totalPages: bookInfo.totalPages
+    });
+  }
+
+  throw new Error('No book information provided');
+};

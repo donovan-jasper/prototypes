@@ -2,7 +2,7 @@ import { View, Button, Text, StyleSheet, Modal, TouchableOpacity, TextInput, Fla
 import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { scanPage } from '../../lib/ocr';
-import { updateProgress, searchBooksByTitle, addBook } from '../../lib/db';
+import { updateProgress, searchBooksByTitle, addBook, searchBooksByISBN } from '../../lib/db';
 import { useBookStore } from '../../lib/store';
 
 interface ScanResult {
@@ -56,13 +56,30 @@ export default function ScanScreen() {
           return;
         }
 
-        if (ocrResult.bookInfo.title) {
-          const matches = await searchBooksByTitle(ocrResult.bookInfo.title);
-          setMatchedBooks(matches);
-        } else {
-          setMatchedBooks(books);
+        // First try to match by ISBN if available
+        if (ocrResult.bookInfo.isbn) {
+          const isbnMatches = await searchBooksByISBN(ocrResult.bookInfo.isbn);
+          if (isbnMatches.length > 0) {
+            setMatchedBooks(isbnMatches);
+            setModalVisible(true);
+            setScanning(false);
+            return;
+          }
         }
 
+        // Then try to match by title
+        if (ocrResult.bookInfo.title) {
+          const titleMatches = await searchBooksByTitle(ocrResult.bookInfo.title);
+          if (titleMatches.length > 0) {
+            setMatchedBooks(titleMatches);
+            setModalVisible(true);
+            setScanning(false);
+            return;
+          }
+        }
+
+        // If no matches found, show all books for selection
+        setMatchedBooks(books);
         setModalVisible(true);
       }
     } catch (error) {
@@ -129,6 +146,7 @@ export default function ScanScreen() {
       const newBook = await addBook({
         title: newBookTitle.trim(),
         author: newBookAuthor.trim() || undefined,
+        isbn: scanResult?.bookInfo.isbn || undefined,
         totalPages: pages,
       });
 
@@ -171,22 +189,24 @@ export default function ScanScreen() {
         </Text>
 
         {successMessage && (
-          <View style={styles.successBanner}>
+          <View style={styles.successContainer}>
             <Text style={styles.successText}>{successMessage}</Text>
           </View>
         )}
 
-        <Button
-          title={scanning ? "Scanning..." : "Scan Page"}
-          onPress={handleScan}
-          disabled={scanning}
-          color="#4CAF50"
-        />
+        <View style={styles.buttonContainer}>
+          <Button
+            title="Scan Page"
+            onPress={handleScan}
+            disabled={scanning}
+            color="#4CAF50"
+          />
+        </View>
 
         {scanning && (
           <View style={styles.scanningIndicator}>
             <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.scanningText}>Processing image...</Text>
+            <Text style={styles.scanningText}>Scanning...</Text>
           </View>
         )}
       </View>
@@ -239,23 +259,25 @@ export default function ScanScreen() {
                 />
 
                 <View style={styles.buttonRow}>
-                  <Button
-                    title="Cancel"
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.cancelButton]}
                     onPress={resetModal}
-                    color="#9E9E9E"
-                  />
-                  <Button
-                    title="Create Book"
+                  >
+                    <Text style={styles.buttonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.modalButton, styles.confirmButton]}
                     onPress={handleCreateNewBook}
-                    color="#4CAF50"
-                  />
+                  >
+                    <Text style={styles.buttonText}>Create Book</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <>
                 {matchedBooks.length > 0 ? (
                   <>
-                    <Text style={styles.sectionTitle}>Matching Books</Text>
                     <FlatList
                       data={matchedBooks}
                       keyExtractor={(item) => item.id}
@@ -268,45 +290,55 @@ export default function ScanScreen() {
                           onPress={() => handleSelectBook(item.id)}
                         >
                           <Text style={styles.bookTitle}>{item.title}</Text>
-                          {item.author && <Text style={styles.bookAuthor}>{item.author}</Text>}
+                          {item.author && (
+                            <Text style={styles.bookAuthor}>{item.author}</Text>
+                          )}
+                          <Text style={styles.bookProgress}>
+                            Current: Page {item.currentPage}
+                            {item.totalPages ? ` of ${item.totalPages}` : ''}
+                          </Text>
                         </TouchableOpacity>
                       )}
                       style={styles.bookList}
                     />
 
                     <View style={styles.buttonRow}>
-                      <Button
-                        title="Cancel"
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.cancelButton]}
                         onPress={resetModal}
-                        color="#9E9E9E"
-                      />
-                      <Button
-                        title="Confirm"
+                      >
+                        <Text style={styles.buttonText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.confirmButton]}
                         onPress={handleConfirm}
-                        color="#4CAF50"
                         disabled={!selectedBookId}
-                      />
+                      >
+                        <Text style={styles.buttonText}>Update Progress</Text>
+                      </TouchableOpacity>
                     </View>
                   </>
                 ) : (
-                  <>
-                    <Text style={styles.noBooksText}>
-                      No books matched. Would you like to create a new book?
-                    </Text>
+                  <View style={styles.noBooksContainer}>
+                    <Text style={styles.noBooksText}>No matching books found</Text>
 
                     <View style={styles.buttonRow}>
-                      <Button
-                        title="Cancel"
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.cancelButton]}
                         onPress={resetModal}
-                        color="#9E9E9E"
-                      />
-                      <Button
-                        title="Create New Book"
+                      >
+                        <Text style={styles.buttonText}>Cancel</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.modalButton, styles.confirmButton]}
                         onPress={handleManualEntry}
-                        color="#4CAF50"
-                      />
+                      >
+                        <Text style={styles.buttonText}>Enter Manually</Text>
+                      </TouchableOpacity>
                     </View>
-                  </>
+                  </View>
                 )}
               </>
             )}
@@ -336,30 +368,34 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 30,
+    color: '#666',
     paddingHorizontal: 20,
   },
-  successBanner: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
+  buttonContainer: {
     marginBottom: 20,
     width: '100%',
   },
-  successText: {
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
   scanningIndicator: {
-    marginTop: 30,
+    marginTop: 20,
     alignItems: 'center',
   },
   scanningText: {
     marginTop: 10,
-    color: '#666',
+    fontSize: 16,
+    color: '#4CAF50',
+  },
+  successContainer: {
+    backgroundColor: '#e8f5e9',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    width: '100%',
+  },
+  successText: {
+    color: '#2e7d32',
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -379,13 +415,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 10,
     color: '#333',
+  },
+  manualEntryForm: {
+    width: '100%',
   },
   input: {
     borderWidth: 1,
@@ -395,9 +428,14 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     fontSize: 16,
   },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#444',
+  },
   bookList: {
-    maxHeight: 200,
-    marginBottom: 20,
+    maxHeight: 300,
   },
   bookItem: {
     padding: 15,
@@ -410,24 +448,48 @@ const styles = StyleSheet.create({
   bookTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
   bookAuthor: {
     fontSize: 14,
     color: '#666',
     marginTop: 2,
   },
-  noBooksText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
+  bookProgress: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 5,
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 20,
   },
-  manualEntryForm: {
-    marginTop: 10,
+  modalButton: {
+    padding: 12,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f44336',
+  },
+  confirmButton: {
+    backgroundColor: '#4CAF50',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  noBooksContainer: {
+    alignItems: 'center',
+    padding: 20,
+  },
+  noBooksText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
   },
 });
