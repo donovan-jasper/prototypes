@@ -7,7 +7,9 @@ import {
   StatusBar,
   TouchableOpacity,
   Text,
-  Dimensions
+  Dimensions,
+  Animated,
+  Easing
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getBook, updateBook } from '../../lib/database';
@@ -15,7 +17,7 @@ import { loadEpubContent, EpubContent } from '../../lib/epubParser';
 import EpubRenderer from '../../components/EpubRenderer';
 import ReaderControls from '../../components/ReaderControls';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function ReaderScreen() {
   const router = useRouter();
@@ -30,6 +32,7 @@ export default function ReaderScreen() {
   const [scrollPosition, setScrollPosition] = useState(0);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadBook();
@@ -189,19 +192,18 @@ export default function ReaderScreen() {
         onToggleControls={handleToggleControls}
       />
 
-      <ReaderControls
-        visible={showControls}
-        fontSize={fontSize}
-        theme={theme}
-        marginSize={marginSize}
-        progress={calculateProgress()}
-        totalChapters={epubContent.chapters.length}
-        currentChapter={currentChapter}
-        onFontSizeChange={handleFontSizeChange}
-        onThemeChange={handleThemeChange}
-        onMarginSizeChange={handleMarginSizeChange}
-        onClose={() => setShowControls(false)}
-      />
+      {showControls && (
+        <ReaderControls
+          fontSize={fontSize}
+          onFontSizeChange={handleFontSizeChange}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          marginSize={marginSize}
+          onMarginSizeChange={handleMarginSizeChange}
+          progress={calculateProgress()}
+          onClose={handleToggleControls}
+        />
+      )}
     </View>
   );
 }
@@ -214,20 +216,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   errorText: {
-    fontSize: 16,
-    color: '#666',
+    color: 'red',
+    fontSize: 18,
   },
   backButton: {
     position: 'absolute',
-    top: 50,
-    left: 16,
+    top: 40,
+    left: 20,
     zIndex: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.1)',
     borderRadius: 20,
   },
   backButtonText: {

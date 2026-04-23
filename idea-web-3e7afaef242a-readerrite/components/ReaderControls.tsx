@@ -1,74 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   View,
   StyleSheet,
   Text,
   TouchableOpacity,
-  Animated,
-  Dimensions,
   Slider,
+  ScrollView,
   Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ReaderControlsProps {
-  visible: boolean;
   fontSize: number;
-  theme: 'light' | 'sepia' | 'dark';
-  marginSize: number;
-  progress: number;
-  totalChapters: number;
-  currentChapter: number;
   onFontSizeChange: (size: number) => void;
+  theme: 'light' | 'sepia' | 'dark';
   onThemeChange: (theme: 'light' | 'sepia' | 'dark') => void;
+  marginSize: number;
   onMarginSizeChange: (size: number) => void;
+  progress: number;
   onClose: () => void;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
 export default function ReaderControls({
-  visible,
   fontSize,
-  theme,
-  marginSize,
-  progress,
-  totalChapters,
-  currentChapter,
   onFontSizeChange,
+  theme,
   onThemeChange,
+  marginSize,
   onMarginSizeChange,
+  progress,
   onClose
 }: ReaderControlsProps) {
-  const [slideAnim] = useState(new Animated.Value(0));
-  const [showAdvanced, setShowAdvanced] = useState(false);
-
-  useEffect(() => {
-    Animated.timing(slideAnim, {
-      toValue: visible ? 1 : 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  }, [visible]);
-
-  const slideUp = slideAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [300, 0],
-  });
-
   const themeColors = {
     light: {
       background: '#ffffff',
       text: '#000000',
-      controlBackground: '#f5f5f5',
+      controlBackground: '#f0f0f0',
       sliderTrack: '#d3d3d3',
       sliderThumb: '#007AFF',
     },
     sepia: {
       background: '#f4ecd8',
       text: '#5c4a3a',
-      controlBackground: '#e8dcc0',
-      sliderTrack: '#c8b898',
+      controlBackground: '#e8dcc8',
+      sliderTrack: '#d3c3b3',
       sliderThumb: '#8b6914',
     },
     dark: {
@@ -82,130 +57,117 @@ export default function ReaderControls({
 
   const currentTheme = themeColors[theme];
 
-  const handleThemeChange = (newTheme: 'light' | 'sepia' | 'dark') => {
-    onThemeChange(newTheme);
-  };
-
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        {
-          transform: [{ translateY: slideUp }],
-          backgroundColor: currentTheme.background,
-        }
-      ]}
-    >
-      <View style={styles.progressContainer}>
-        <Text style={[styles.progressText, { color: currentTheme.text }]}>
-          {Math.round(progress)}% complete
-        </Text>
-        <Text style={[styles.chapterText, { color: currentTheme.text }]}>
-          Chapter {currentChapter + 1} of {totalChapters}
-        </Text>
-      </View>
-
-      <View style={styles.controlsContainer}>
-        <View style={styles.controlGroup}>
-          <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Font Size</Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={12}
-            maximumValue={30}
-            step={1}
-            value={fontSize}
-            onValueChange={onFontSizeChange}
-            minimumTrackTintColor={currentTheme.sliderThumb}
-            maximumTrackTintColor={currentTheme.sliderTrack}
-            thumbTintColor={currentTheme.sliderThumb}
-          />
-          <Text style={[styles.sliderValue, { color: currentTheme.text }]}>{fontSize}</Text>
-        </View>
-
-        <View style={styles.controlGroup}>
-          <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Theme</Text>
-          <View style={styles.themeButtons}>
-            <TouchableOpacity
-              style={[
-                styles.themeButton,
-                theme === 'light' && styles.activeThemeButton,
-                { backgroundColor: theme === 'light' ? '#ffffff' : currentTheme.controlBackground }
-              ]}
-              onPress={() => handleThemeChange('light')}
-            >
-              <Text style={[styles.themeButtonText, { color: theme === 'light' ? '#000000' : currentTheme.text }]}>
-                Light
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.themeButton,
-                theme === 'sepia' && styles.activeThemeButton,
-                { backgroundColor: theme === 'sepia' ? '#f4ecd8' : currentTheme.controlBackground }
-              ]}
-              onPress={() => handleThemeChange('sepia')}
-            >
-              <Text style={[styles.themeButtonText, { color: theme === 'sepia' ? '#5c4a3a' : currentTheme.text }]}>
-                Sepia
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.themeButton,
-                theme === 'dark' && styles.activeThemeButton,
-                { backgroundColor: theme === 'dark' ? '#1a1a1a' : currentTheme.controlBackground }
-              ]}
-              onPress={() => handleThemeChange('dark')}
-            >
-              <Text style={[styles.themeButtonText, { color: theme === 'dark' ? '#ffffff' : currentTheme.text }]}>
-                Dark
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          style={styles.advancedToggle}
-          onPress={() => setShowAdvanced(!showAdvanced)}
-        >
-          <Text style={[styles.advancedToggleText, { color: currentTheme.text }]}>
-            {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
-          </Text>
+    <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
           <Ionicons
-            name={showAdvanced ? 'chevron-up' : 'chevron-down'}
-            size={18}
+            name="close"
+            size={24}
             color={currentTheme.text}
           />
         </TouchableOpacity>
-
-        {showAdvanced && (
-          <View style={styles.advancedControls}>
-            <View style={styles.controlGroup}>
-              <Text style={[styles.controlLabel, { color: currentTheme.text }]}>Margins</Text>
-              <Slider
-                style={styles.slider}
-                minimumValue={10}
-                maximumValue={40}
-                step={1}
-                value={marginSize}
-                onValueChange={onMarginSizeChange}
-                minimumTrackTintColor={currentTheme.sliderThumb}
-                maximumTrackTintColor={currentTheme.sliderTrack}
-                thumbTintColor={currentTheme.sliderThumb}
-              />
-              <Text style={[styles.sliderValue, { color: currentTheme.text }]}>{marginSize}</Text>
-            </View>
-          </View>
-        )}
+        <Text style={[styles.title, { color: currentTheme.text }]}>Reading Settings</Text>
       </View>
 
-      <TouchableOpacity
-        style={styles.closeButton}
-        onPress={onClose}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <Ionicons name="close" size={24} color={currentTheme.text} />
-      </TouchableOpacity>
-    </Animated.View>
+        <View style={[styles.controlSection, { backgroundColor: currentTheme.controlBackground }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Font Size</Text>
+          <View style={styles.sliderContainer}>
+            <Text style={[styles.sliderLabel, { color: currentTheme.text }]}>A</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={12}
+              maximumValue={30}
+              step={1}
+              value={fontSize}
+              onValueChange={onFontSizeChange}
+              minimumTrackTintColor={currentTheme.sliderThumb}
+              maximumTrackTintColor={currentTheme.sliderTrack}
+              thumbTintColor={currentTheme.sliderThumb}
+            />
+            <Text style={[styles.sliderLabel, { color: currentTheme.text }]}>A</Text>
+          </View>
+        </View>
+
+        <View style={[styles.controlSection, { backgroundColor: currentTheme.controlBackground }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Theme</Text>
+          <View style={styles.themeOptions}>
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                theme === 'light' && styles.selectedTheme,
+                { backgroundColor: '#ffffff', borderColor: currentTheme.text }
+              ]}
+              onPress={() => onThemeChange('light')}
+            >
+              <Text style={[styles.themeText, { color: '#000000' }]}>Light</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                theme === 'sepia' && styles.selectedTheme,
+                { backgroundColor: '#f4ecd8', borderColor: currentTheme.text }
+              ]}
+              onPress={() => onThemeChange('sepia')}
+            >
+              <Text style={[styles.themeText, { color: '#5c4a3a' }]}>Sepia</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.themeOption,
+                theme === 'dark' && styles.selectedTheme,
+                { backgroundColor: '#1a1a1a', borderColor: currentTheme.text }
+              ]}
+              onPress={() => onThemeChange('dark')}
+            >
+              <Text style={[styles.themeText, { color: '#e0e0e0' }]}>Dark</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={[styles.controlSection, { backgroundColor: currentTheme.controlBackground }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.text }]}>Margins</Text>
+          <View style={styles.sliderContainer}>
+            <Text style={[styles.sliderLabel, { color: currentTheme.text }]}>Narrow</Text>
+            <Slider
+              style={styles.slider}
+              minimumValue={10}
+              maximumValue={40}
+              step={1}
+              value={marginSize}
+              onValueChange={onMarginSizeChange}
+              minimumTrackTintColor={currentTheme.sliderThumb}
+              maximumTrackTintColor={currentTheme.sliderTrack}
+              thumbTintColor={currentTheme.sliderThumb}
+            />
+            <Text style={[styles.sliderLabel, { color: currentTheme.text }]}>Wide</Text>
+          </View>
+        </View>
+
+        <View style={[styles.progressContainer, { backgroundColor: currentTheme.controlBackground }]}>
+          <Text style={[styles.progressText, { color: currentTheme.text }]}>
+            Progress: {progress.toFixed(0)}%
+          </Text>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: currentTheme.sliderThumb
+                }
+              ]}
+            />
+          </View>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -215,84 +177,101 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    padding: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+    maxHeight: '70%',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 5,
+      },
+    }),
   },
-  progressContainer: {
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.1)',
+  },
+  closeButton: {
+    padding: 5,
+    marginRight: 10,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  controlSection: {
+    padding: 15,
+    margin: 10,
+    borderRadius: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  sliderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  slider: {
+    flex: 1,
+    marginHorizontal: 10,
+  },
+  sliderLabel: {
+    fontSize: 14,
+    width: 30,
+    textAlign: 'center',
+  },
+  themeOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  themeOption: {
+    flex: 1,
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 2,
+    marginHorizontal: 5,
     alignItems: 'center',
-    marginBottom: 20,
+  },
+  selectedTheme: {
+    borderWidth: 3,
+  },
+  themeText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  progressContainer: {
+    padding: 15,
+    margin: 10,
+    borderRadius: 10,
   },
   progressText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  chapterText: {
-    fontSize: 14,
-  },
-  controlsContainer: {
-    marginBottom: 20,
-  },
-  controlGroup: {
-    marginBottom: 20,
-  },
-  controlLabel: {
-    fontSize: 16,
-    fontWeight: '500',
     marginBottom: 10,
   },
-  slider: {
-    width: '100%',
-    height: 40,
+  progressBar: {
+    height: 6,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 3,
+    overflow: 'hidden',
   },
-  sliderValue: {
-    fontSize: 14,
-    textAlign: 'right',
-    marginTop: 5,
-  },
-  themeButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  themeButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  activeThemeButton: {
-    borderColor: '#007AFF',
-  },
-  themeButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  advancedToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  advancedToggleText: {
-    fontSize: 14,
-    marginRight: 5,
-  },
-  advancedControls: {
-    marginTop: 10,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    padding: 5,
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
   },
 });

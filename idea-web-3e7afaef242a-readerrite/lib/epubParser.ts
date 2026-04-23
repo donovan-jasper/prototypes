@@ -12,9 +12,11 @@ export interface EpubContent {
     title: string;
     author: string;
     language?: string;
+    coverPath?: string;
   };
   chapters: EpubChapter[];
   currentChapter: number;
+  css: string;
 }
 
 export async function loadEpubContent(filePath: string, currentPage: number = 0): Promise<EpubContent> {
@@ -60,6 +62,9 @@ export async function loadEpubContent(filePath: string, currentPage: number = 0)
     // Extract metadata
     const metadata = extractMetadata(opfDoc);
 
+    // Extract CSS
+    const css = await extractCss(opfDoc, zipContent);
+
     // Extract chapters from spine
     const chapters = await extractChapters(opfDoc, zipContent);
 
@@ -70,6 +75,7 @@ export async function loadEpubContent(filePath: string, currentPage: number = 0)
       metadata,
       chapters,
       currentChapter: safeCurrentPage,
+      css,
     };
   } catch (error) {
     console.error('Error loading EPUB:', error);
@@ -80,11 +86,54 @@ export async function loadEpubContent(filePath: string, currentPage: number = 0)
 function extractMetadata(opfDoc: Document): EpubContent['metadata'] {
   const titleElement = opfDoc.querySelector('dc\\:title, title');
   const authorElement = opfDoc.querySelector('dc\\:creator, creator');
+  const languageElement = opfDoc.querySelector('dc\\:language, language');
+  const coverElement = opfDoc.querySelector('meta[name="cover"]');
+
+  let coverPath = undefined;
+  if (coverElement) {
+    const coverId = coverElement.getAttribute('content');
+    if (coverId) {
+      const itemElement = opfDoc.querySelector(`item[id="${coverId}"]`);
+      if (itemElement) {
+        coverPath = itemElement.getAttribute('href');
+      }
+    }
+  }
 
   return {
     title: titleElement?.textContent || 'Unknown Title',
     author: authorElement?.textContent || 'Unknown Author',
+    language: languageElement?.textContent,
+    coverPath,
   };
+}
+
+async function extractCss(opfDoc: Document, zipContent: JSZip): Promise<string> {
+  const manifest = opfDoc.querySelector('manifest');
+  if (!manifest) {
+    return '';
+  }
+
+  let cssContent = '';
+  const cssItems = Array.from(manifest.querySelectorAll('item[media-type="text/css"]'));
+
+  for (const item of cssItems) {
+    const href = item.getAttribute('href');
+    if (!href) continue;
+
+    // Get the full path by combining with the OPF directory
+    const opfPath = opfDoc.documentURI || '';
+    const opfDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
+    const fullPath = opfDir + href;
+
+    const cssFile = zipContent.file(fullPath);
+    if (!cssFile) continue;
+
+    const content = await cssFile.async('text');
+    cssContent += content + '\n';
+  }
+
+  return cssContent;
 }
 
 async function extractChapters(opfDoc: Document, zipContent: JSZip): Promise<EpubChapter[]> {

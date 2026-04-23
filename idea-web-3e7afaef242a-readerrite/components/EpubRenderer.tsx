@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Dimensions, Platform, PanResponder } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { EpubContent } from '../lib/epubParser';
 
@@ -14,6 +14,7 @@ interface EpubRendererProps {
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const TAP_ZONE_WIDTH = SCREEN_WIDTH / 3;
+const SWIPE_THRESHOLD = 50;
 
 export default function EpubRenderer({
   epubContent,
@@ -27,6 +28,21 @@ export default function EpubRenderer({
   const [scrollPosition, setScrollPosition] = useState(0);
   const webViewRef = useRef<WebView>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > SWIPE_THRESHOLD) {
+          goToPreviousChapter();
+        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
+          goToNextChapter();
+        }
+      },
+    })
+  ).current;
 
   const themeStyles = {
     light: {
@@ -138,6 +154,16 @@ export default function EpubRenderer({
                 maxScroll: document.body.scrollHeight - window.innerHeight
               }));
             });
+
+            document.addEventListener('click', function(e) {
+              if (e.target.tagName === 'A') {
+                e.preventDefault();
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'link',
+                  href: e.target.href
+                }));
+              }
+            });
           </script>
         </body>
       </html>
@@ -176,32 +202,25 @@ export default function EpubRenderer({
 
   const handleWebViewMessage = (event: any) => {
     try {
-      const data = JSON.parse(event.nativeEvent.data);
-      if (data.type === 'scroll') {
+      const message = JSON.parse(event.nativeEvent.data);
+
+      if (message.type === 'scroll') {
+        setScrollPosition(message.position);
+
         if (scrollTimeoutRef.current) {
           clearTimeout(scrollTimeoutRef.current);
         }
 
         scrollTimeoutRef.current = setTimeout(() => {
-          setScrollPosition(data.position);
-        }, 200);
+          // Save scroll position for current chapter
+        }, 1000);
+      } else if (message.type === 'link') {
+        // Handle link navigation
       }
     } catch (error) {
-      console.error('Error parsing webview message:', error);
+      console.error('Error parsing WebView message:', error);
     }
   };
-
-  useEffect(() => {
-    if (webViewRef.current) {
-      const html = generateHtml(epubContent.chapters[currentChapter].content);
-      webViewRef.current.injectJavaScript(`
-        document.open();
-        document.write(\`${html.replace(/`/g, '\\`')}\`);
-        document.close();
-        true;
-      `);
-    }
-  }, [currentChapter, fontSize, theme, marginSize]);
 
   useEffect(() => {
     return () => {
@@ -212,28 +231,28 @@ export default function EpubRenderer({
   }, []);
 
   return (
-    <TouchableOpacity
-      style={styles.container}
-      activeOpacity={1}
-      onPress={handleTap}
-    >
-      <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html: generateHtml(epubContent.chapters[currentChapter].content) }}
-        style={styles.webview}
-        scrollEnabled={true}
-        showsVerticalScrollIndicator={false}
-        bounces={false}
-        onMessage={handleWebViewMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        injectedJavaScript={`
-          window.scrollTo(0, ${scrollPosition});
-          true;
-        `}
-      />
-    </TouchableOpacity>
+    <View style={styles.container} {...panResponder.panHandlers}>
+      <TouchableOpacity
+        style={styles.webViewContainer}
+        activeOpacity={1}
+        onPress={handleTap}
+      >
+        <WebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: generateHtml(epubContent.chapters[currentChapter].content) }}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          scalesPageToFit={false}
+          style={styles.webView}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.warn('WebView error: ', nativeEvent);
+          }}
+        />
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -241,8 +260,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  webview: {
+  webViewContainer: {
     flex: 1,
-    backgroundColor: 'transparent',
+  },
+  webView: {
+    flex: 1,
   },
 });
