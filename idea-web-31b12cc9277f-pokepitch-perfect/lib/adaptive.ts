@@ -1,49 +1,56 @@
 import { Drill, DrillResult } from './types';
 
-export function shouldLevelUp(results: DrillResult[]): boolean {
-  // Check if user scored 80%+ on last 3 attempts
+export const shouldLevelUp = (results: DrillResult[]): boolean => {
+  // Check if the last 3 results are all 80%+ accuracy
   if (results.length < 3) return false;
 
-  const lastThree = results.slice(-3);
-  return lastThree.every(result => result.score >= 80);
-}
+  const lastThree = results.slice(0, 3);
+  return lastThree.every(result => result.accuracy >= 80);
+};
 
-export function adjustDifficulty(drill: Drill, results: DrillResult[]): Drill {
-  if (shouldLevelUp(results)) {
-    // Increase difficulty by 15%
+export const adjustDifficulty = (drill: Drill, results: DrillResult[]): Drill => {
+  const levelUp = shouldLevelUp(results);
+
+  let newDifficulty = drill.difficulty;
+  let difficultyChange = 0;
+
+  if (levelUp) {
+    // Increase difficulty by 15% but cap at 1.0
+    newDifficulty = Math.min(drill.difficulty * 1.15, 1.0);
+    difficultyChange = Math.round((newDifficulty - drill.difficulty) * 100);
+  } else if (results.length > 0) {
+    // If the last result was below 50% accuracy, decrease difficulty by 10%
+    const lastResult = results[0];
+    if (lastResult.accuracy < 50) {
+      newDifficulty = Math.max(drill.difficulty * 0.9, 0.1);
+      difficultyChange = Math.round((newDifficulty - drill.difficulty) * 100);
+    }
+  }
+
+  return {
+    ...drill,
+    difficulty: newDifficulty,
+    difficultyChange: difficultyChange !== 0 ? difficultyChange : undefined,
+  };
+};
+
+export const getRecommendedDrill = (drills: Drill[], userStats: UserStats): Drill => {
+  // Find the drill with the lowest average accuracy
+  const drillsWithStats = drills.map(drill => {
+    const drillResults = userStats.accuracyHistory.filter((_, index) =>
+      userStats.accuracyHistory[index] === drill.id
+    );
+    const avgAccuracy = drillResults.length > 0
+      ? drillResults.reduce((sum, acc) => sum + acc, 0) / drillResults.length
+      : 0;
+
     return {
       ...drill,
-      difficulty: Math.min(drill.difficulty + 0.15, 1.0), // Cap at 1.0
-      duration: Math.max(drill.duration * 0.85, 5), // Decrease duration by 15% (minimum 5s)
+      avgAccuracy,
     };
-  }
-  return drill;
-}
-
-export function getRecommendedDrill(drills: Drill[], results: DrillResult[]): Drill | null {
-  if (results.length === 0) return null;
-
-  // Find the drill with the lowest average score
-  const drillScores: Record<string, { total: number; count: number }> = {};
-
-  results.forEach(result => {
-    if (!drillScores[result.drillId]) {
-      drillScores[result.drillId] = { total: 0, count: 0 };
-    }
-    drillScores[result.drillId].total += result.score;
-    drillScores[result.drillId].count += 1;
   });
 
-  const drillAverages = Object.entries(drillScores).map(([drillId, { total, count }]) => ({
-    drillId,
-    average: total / count,
-  }));
-
-  if (drillAverages.length === 0) return null;
-
-  const weakestDrillId = drillAverages.reduce((prev, current) =>
-    prev.average < current.average ? prev : current
-  ).drillId;
-
-  return drills.find(drill => drill.id === weakestDrillId) || null;
-}
+  // Sort by average accuracy (ascending) and pick the first one
+  const sortedDrills = [...drillsWithStats].sort((a, b) => a.avgAccuracy - b.avgAccuracy);
+  return sortedDrills[0];
+};

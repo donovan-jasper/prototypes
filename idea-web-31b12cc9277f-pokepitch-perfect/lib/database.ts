@@ -14,18 +14,19 @@ const openDatabase = async () => {
 
 export const initDatabase = async () => {
   if (isInitialized) return;
-  
+
   const database = await openDatabase();
-  
+
   await database.execAsync(`
     CREATE TABLE IF NOT EXISTS drills (
       id TEXT PRIMARY KEY,
       name TEXT,
       description TEXT,
       type TEXT,
-      difficulty TEXT,
+      difficulty REAL,
       duration INTEGER,
-      bestScore REAL
+      bestScore REAL,
+      difficultyChange REAL
     );
 
     CREATE TABLE IF NOT EXISTS drill_results (
@@ -36,6 +37,7 @@ export const initDatabase = async () => {
       reactionTime REAL,
       consistency REAL,
       timestamp TEXT,
+      difficulty REAL,
       FOREIGN KEY (drillId) REFERENCES drills(id)
     );
 
@@ -57,40 +59,73 @@ export const initDatabase = async () => {
       unlocked BOOLEAN
     );
   `);
-  
+
   // Seed drills if table is empty
   const drillCount = await database.getFirstAsync<{ count: number }>(
     'SELECT COUNT(*) as count FROM drills'
   );
-  
+
   if (drillCount && drillCount.count === 0) {
     for (const drill of DRILLS) {
       await database.runAsync(
-        'INSERT INTO drills (id, name, description, type, difficulty, duration, bestScore) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [drill.id, drill.name, drill.description, drill.type, drill.difficulty, drill.duration, drill.bestScore]
+        'INSERT INTO drills (id, name, description, type, difficulty, duration, bestScore, difficultyChange) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [drill.id, drill.name, drill.description, drill.type, drill.difficulty, drill.duration, drill.bestScore, null]
       );
     }
   }
-  
+
   isInitialized = true;
 };
 
 export const saveDrillResult = async (result: DrillResult) => {
   const database = await openDatabase();
   await initDatabase();
-  
+
   await database.runAsync(
-    'INSERT INTO drill_results (drillId, score, accuracy, reactionTime, consistency, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
-    [result.drillId, result.score.total, result.accuracy, result.reactionTime, result.consistency, result.timestamp]
+    'INSERT INTO drill_results (drillId, score, accuracy, reactionTime, consistency, timestamp, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [result.drillId, result.score, result.accuracy, result.reactionTime, result.consistency, result.timestamp, result.difficulty]
   );
+
+  // Update best score if needed
+  const currentBest = await database.getFirstAsync<{ bestScore: number }>(
+    'SELECT bestScore FROM drills WHERE id = ?',
+    [result.drillId]
+  );
+
+  if (currentBest && result.score > currentBest.bestScore) {
+    await database.runAsync(
+      'UPDATE drills SET bestScore = ? WHERE id = ?',
+      [result.score, result.drillId]
+    );
+  }
+};
+
+export const getDrillResults = async (drillId: string): Promise<DrillResult[]> => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  const results = await database.getAllAsync(
+    'SELECT * FROM drill_results WHERE drillId = ? ORDER BY timestamp DESC',
+    [drillId]
+  );
+
+  return results.map((row: any) => ({
+    drillId: row.drillId,
+    score: row.score,
+    accuracy: row.accuracy,
+    reactionTime: row.reactionTime,
+    consistency: row.consistency,
+    timestamp: row.timestamp,
+    difficulty: row.difficulty,
+  }));
 };
 
 export const getUserStats = async (): Promise<UserStats> => {
   const database = await openDatabase();
   await initDatabase();
-  
+
   const results = await database.getAllAsync('SELECT * FROM drill_results ORDER BY timestamp DESC');
-  
+
   if (results.length === 0) {
     return {
       streak: 0,
@@ -102,18 +137,18 @@ export const getUserStats = async (): Promise<UserStats> => {
       achievements: await getAchievements(),
     };
   }
-  
+
   const totalDrills = results.length;
   const totalScore = results.reduce((sum: number, row: any) => sum + row.score, 0);
   const accuracyHistory = results.slice(0, 30).map((row: any) => row.accuracy);
   const reactionTimeHistory = results.slice(0, 30).map((row: any) => row.reactionTime);
   const consistencyHistory = results.slice(0, 30).map((row: any) => row.consistency);
-  
+
   const uniqueDates = new Set(
     results.map((row: any) => new Date(row.timestamp).toDateString())
   );
   const streak = calculateStreak(Array.from(uniqueDates));
-  
+
   return {
     streak,
     totalDrills,
@@ -127,27 +162,27 @@ export const getUserStats = async (): Promise<UserStats> => {
 
 const calculateStreak = (dates: string[]): number => {
   if (dates.length === 0) return 0;
-  
+
   const sortedDates = dates
     .map(d => new Date(d))
     .sort((a, b) => b.getTime() - a.getTime());
-  
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const mostRecent = new Date(sortedDates[0]);
   mostRecent.setHours(0, 0, 0, 0);
-  
+
   const daysDiff = Math.floor((today.getTime() - mostRecent.getTime()) / (1000 * 60 * 60 * 24));
   if (daysDiff > 1) return 0;
-  
+
   let streak = 1;
   for (let i = 1; i < sortedDates.length; i++) {
     const current = new Date(sortedDates[i]);
     current.setHours(0, 0, 0, 0);
     const previous = new Date(sortedDates[i - 1]);
     previous.setHours(0, 0, 0, 0);
-    
+
     const diff = Math.floor((previous.getTime() - current.getTime()) / (1000 * 60 * 60 * 24));
     if (diff === 1) {
       streak++;
@@ -155,20 +190,48 @@ const calculateStreak = (dates: string[]): number => {
       break;
     }
   }
-  
+
   return streak;
 };
 
 export const getAchievements = async (): Promise<Achievement[]> => {
   const database = await openDatabase();
   await initDatabase();
-  
+
   const results = await database.getAllAsync('SELECT * FROM achievements WHERE unlocked = 1');
-  
+
   return results.map((row: any) => ({
     id: row.id,
     title: row.title,
     description: row.description,
     icon: row.icon,
   }));
+};
+
+export const getAllDrills = async (): Promise<Drill[]> => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  const results = await database.getAllAsync('SELECT * FROM drills');
+
+  return results.map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    type: row.type,
+    difficulty: row.difficulty,
+    duration: row.duration,
+    bestScore: row.bestScore,
+    difficultyChange: row.difficultyChange,
+  }));
+};
+
+export const updateDrillDifficulty = async (drillId: string, difficulty: number, difficultyChange: number | null) => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  await database.runAsync(
+    'UPDATE drills SET difficulty = ?, difficultyChange = ? WHERE id = ?',
+    [difficulty, difficultyChange, drillId]
+  );
 };

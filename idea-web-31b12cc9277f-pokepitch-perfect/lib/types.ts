@@ -3,38 +3,49 @@ export interface Drill {
   name: string;
   description: string;
   type: 'aim' | 'timing' | 'swipe' | 'pattern' | 'reflex';
-  difficulty: number; // 0.0 to 1.0
-  duration: number; // in seconds
-  targetCount?: number;
-  pattern?: string[];
-  speed?: number;
+  difficulty: number; // 0-1 scale
+  duration: number; // seconds
+  bestScore: number;
+  difficultyChange?: number; // Percentage change since last session
 }
 
 export interface DrillResult {
-  id: string;
   drillId: string;
   score: number;
   accuracy: number;
   reactionTime: number;
   consistency: number;
-  timestamp: number;
-  duration: number;
+  timestamp: string;
+  difficulty: number;
 }
 
 export interface UserStats {
-  totalDrillsCompleted: number;
-  averageScore: number;
-  bestDrill: string;
   streak: number;
-  lastDrillDate: number;
+  totalDrills: number;
+  totalScore: number;
+  accuracyHistory: number[];
+  reactionTimeHistory: number[];
+  consistencyHistory: number[];
+  achievements: Achievement[];
 }
 
 export interface Achievement {
   id: string;
-  name: string;
+  title: string;
   description: string;
   icon: string;
-  unlocked: boolean;
-  progress: number;
-  goal: number;
+}
+
+export interface Target {
+  id: string;
+  x: number;
+  y: number;
+  timestamp: number;
+}
+
+export interface UserInput {
+  targetId: string | null;
+  timestamp: number;
+  isHit: boolean;
+  reactionTime?: number;
 }

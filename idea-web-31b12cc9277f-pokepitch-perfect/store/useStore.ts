@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Drill, DrillResult, UserStats } from '../lib/types';
-import { saveDrillResult, getUserStats } from '../lib/database';
+import { saveDrillResult, getUserStats, getDrillResults } from '../lib/database';
 import { adjustDifficulty } from '../lib/adaptive';
 
 interface StoreState {
@@ -10,9 +10,10 @@ interface StoreState {
   userStats: UserStats;
   isPremium: boolean;
   startDrill: (drillId: string) => void;
-  submitResult: (result: DrillResult) => void;
+  submitResult: (result: DrillResult) => Promise<void>;
   updateStats: () => Promise<void>;
   togglePremium: () => void;
+  setDrills: (drills: Drill[]) => void;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -20,18 +21,24 @@ export const useStore = create<StoreState>((set, get) => ({
   currentDrill: null,
   currentSession: null,
   userStats: {
-    totalDrillsCompleted: 0,
-    averageScore: 0,
-    bestDrill: '',
     streak: 0,
-    lastDrillDate: 0,
+    totalDrills: 0,
+    totalScore: 0,
+    accuracyHistory: [],
+    reactionTimeHistory: [],
+    consistencyHistory: [],
+    achievements: [],
   },
   isPremium: false,
+
+  setDrills: (drills) => {
+    set({ drills });
+  },
 
   startDrill: (drillId) => {
     const drill = get().drills.find(d => d.id === drillId);
     if (drill) {
-      set({ currentDrill: drill });
+      set({ currentDrill: drill, currentSession: null });
     }
   },
 
@@ -43,15 +50,18 @@ export const useStore = create<StoreState>((set, get) => ({
     const allResults = await getDrillResults(result.drillId);
 
     // Adjust difficulty if needed
-    const updatedDrill = adjustDifficulty(get().currentDrill!, allResults);
+    const currentDrill = get().currentDrill;
+    if (currentDrill) {
+      const updatedDrill = adjustDifficulty(currentDrill, allResults);
 
-    // Update the store
-    set(state => ({
-      currentSession: result,
-      drills: state.drills.map(d =>
-        d.id === updatedDrill.id ? updatedDrill : d
-      ),
-    }));
+      // Update the store
+      set(state => ({
+        currentSession: result,
+        drills: state.drills.map(d =>
+          d.id === updatedDrill.id ? updatedDrill : d
+        ),
+      }));
+    }
 
     // Update user stats
     await get().updateStats();
@@ -66,9 +76,3 @@ export const useStore = create<StoreState>((set, get) => ({
     set(state => ({ isPremium: !state.isPremium }));
   },
 }));
-
-// Helper function to get drill results (would be implemented in database.ts)
-async function getDrillResults(drillId: string): Promise<DrillResult[]> {
-  // Implementation would query the database
-  return [];
-}
