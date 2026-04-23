@@ -104,73 +104,88 @@ export const useAppStore = create<AppState>((set, get) => ({
   addListing: async (listing) => {
     const { isOnline, syncEngine } = get();
 
-    if (isOnline) {
-      // If online, sync immediately
-      await syncEngine.syncAll();
-    } else {
-      // If offline, queue the change
-      await syncEngine.queueChange({
-        listingId: listing.id,
-        platform: 'all', // Will be expanded to individual platforms
-        action: 'create',
-        listing,
-        status: 'pending'
-      });
-    }
-
-    // Update local state
     set(state => ({
       listings: [...state.listings, listing],
-      syncStatus: isOnline ? 'synced' : 'pending'
+      syncStatus: isOnline ? 'syncing' : 'pending'
     }));
+
+    try {
+      if (isOnline) {
+        // If online, sync immediately
+        await syncEngine.syncAll();
+        set({ syncStatus: 'synced' });
+      } else {
+        // If offline, queue the change
+        await syncEngine.queueChange({
+          listingId: listing.id,
+          platform: 'all', // Will be expanded to individual platforms
+          action: 'create',
+          listing,
+          status: 'pending'
+        });
+      }
+    } catch (error) {
+      set({ syncStatus: 'error' });
+      throw error;
+    }
   },
 
   updateListing: async (listing) => {
     const { isOnline, syncEngine } = get();
 
-    if (isOnline) {
-      // If online, sync immediately
-      await syncEngine.syncAll();
-    } else {
-      // If offline, queue the change
-      await syncEngine.queueChange({
-        listingId: listing.id,
-        platform: 'all', // Will be expanded to individual platforms
-        action: 'update',
-        listing,
-        status: 'pending'
-      });
-    }
-
-    // Update local state
     set(state => ({
       listings: state.listings.map(l => l.id === listing.id ? listing : l),
-      syncStatus: isOnline ? 'synced' : 'pending'
+      syncStatus: isOnline ? 'syncing' : 'pending'
     }));
+
+    try {
+      if (isOnline) {
+        // If online, sync immediately
+        await syncEngine.syncAll();
+        set({ syncStatus: 'synced' });
+      } else {
+        // If offline, queue the change
+        await syncEngine.queueChange({
+          listingId: listing.id,
+          platform: 'all', // Will be expanded to individual platforms
+          action: 'update',
+          listing,
+          status: 'pending'
+        });
+      }
+    } catch (error) {
+      set({ syncStatus: 'error' });
+      throw error;
+    }
   },
 
   deleteListing: async (id) => {
     const { isOnline, syncEngine } = get();
 
-    if (isOnline) {
-      // If online, sync immediately
-      await syncEngine.syncAll();
-    } else {
-      // If offline, queue the change
-      await syncEngine.queueChange({
-        listingId: id,
-        platform: 'all', // Will be expanded to individual platforms
-        action: 'delete',
-        listing: null,
-        status: 'pending'
-      });
-    }
-
-    // Update local state
     set(state => ({
       listings: state.listings.filter(l => l.id !== id),
-      syncStatus: isOnline ? 'synced' : 'pending'
+      syncStatus: isOnline ? 'syncing' : 'pending'
     }));
+
+    try {
+      if (isOnline) {
+        // If online, sync immediately
+        await syncEngine.syncAll();
+        set({ syncStatus: 'synced' });
+      } else {
+        // If offline, queue the change
+        await syncEngine.queueChange({
+          listingId: id,
+          platform: 'all', // Will be expanded to individual platforms
+          action: 'delete',
+          listing: null,
+          status: 'pending'
+        });
+      }
+    } catch (error) {
+      set({ syncStatus: 'error' });
+      throw error;
+    }
   },
 
   setSyncStatus: (status) => set({ syncStatus: status }),
@@ -184,23 +199,21 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   triggerSync: async () => {
-    const { syncEngine } = get();
+    const { syncEngine, isOnline } = get();
+
+    if (!isOnline) {
+      set({ syncStatus: 'pending' });
+      return;
+    }
+
     set({ syncStatus: 'syncing' });
+
     try {
       await syncEngine.syncAll();
       set({ syncStatus: 'synced' });
-
-      // Update last sync time for connected platforms
-      const now = new Date().toISOString();
-      set(state => ({
-        platforms: state.platforms.map(platform => ({
-          ...platform,
-          lastSync: platform.enabled ? now : platform.lastSync
-        }))
-      }));
     } catch (error) {
-      console.error('Sync failed:', error);
       set({ syncStatus: 'error' });
+      throw error;
     }
   },
 
@@ -212,5 +225,5 @@ export const useAppStore = create<AppState>((set, get) => ({
           : platform
       )
     }));
-  }
+  },
 }));

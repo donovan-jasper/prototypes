@@ -3,6 +3,7 @@ import { StyleSheet, FlatList, RefreshControl, View } from 'react-native';
 import { Text, FAB, Snackbar } from 'react-native-paper';
 import { useAppStore } from '../../store/app-store';
 import InventoryCard from '../../components/InventoryCard';
+import SyncStatusIndicator from '../../components/SyncStatusIndicator';
 import { Listing } from '../../types';
 import { router } from 'expo-router';
 
@@ -37,6 +38,7 @@ export default function InventoryScreen() {
 
   return (
     <View style={styles.container}>
+      <SyncStatusIndicator />
       <FlatList
         data={listings}
         keyExtractor={(item) => item.id}
