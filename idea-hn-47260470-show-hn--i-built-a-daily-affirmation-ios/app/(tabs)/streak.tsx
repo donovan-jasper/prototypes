@@ -6,6 +6,8 @@ import { useStore } from '../../store/useStore';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import { format } from 'date-fns';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MILESTONE_DAYS } from '../../lib/constants';
 
 const StreakScreen = () => {
   const [streakData, setStreakData] = useState([]);
@@ -51,17 +53,29 @@ const StreakScreen = () => {
   };
 
   const nextMilestone = React.useMemo(() => {
-    const next = [7, 30, 100, 365].find(day => day > streakCount);
+    const next = MILESTONE_DAYS.find(day => day > streakCount);
     return next || 365;
   }, [streakCount]);
+
+  const getMilestoneImage = () => {
+    if (streakCount >= 365) return require('../../assets/milestones/365.png');
+    if (streakCount >= 100) return require('../../assets/milestones/100.png');
+    if (streakCount >= 30) return require('../../assets/milestones/30.png');
+    if (streakCount >= 7) return require('../../assets/milestones/7.png');
+    return null;
+  };
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Streak</Text>
         <Text style={styles.streakCount}>{streakCount} days</Text>
+
         {shouldShowMilestone(streakCount) && (
-          <View style={styles.milestoneContainer}>
+          <LinearGradient
+            colors={['#4CAF50', '#8BC34A']}
+            style={styles.milestoneContainer}
+          >
             <Text style={styles.milestoneText}>🎉 Milestone Reached!</Text>
             <TouchableOpacity
               style={styles.shareButton}
@@ -72,7 +86,7 @@ const StreakScreen = () => {
                 {isSharing ? 'Sharing...' : 'Share Milestone'}
               </Text>
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
         )}
       </View>
 
@@ -134,25 +148,29 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: '#4CAF50',
     marginTop: 5,
+    fontWeight: 'bold',
   },
   milestoneContainer: {
     marginTop: 15,
+    padding: 15,
+    borderRadius: 10,
     alignItems: 'center',
+    width: '100%',
   },
   milestoneText: {
     fontSize: 18,
-    color: '#FF5722',
+    color: 'white',
     fontWeight: 'bold',
     marginBottom: 10,
   },
   shareButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'white',
     paddingVertical: 8,
     paddingHorizontal: 15,
     borderRadius: 20,
   },
   shareButtonText: {
-    color: 'white',
+    color: '#4CAF50',
     fontWeight: 'bold',
   },
   statsContainer: {
@@ -181,13 +199,14 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#4CAF50',
   },
   progressContainer: {
     backgroundColor: 'white',
     padding: 20,
-    margin: 20,
+    marginHorizontal: 10,
     borderRadius: 10,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -197,12 +216,12 @@ const styles = StyleSheet.create({
   progressTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
+    color: '#333',
   },
   progressBar: {
     height: 10,
-    backgroundColor: '#eee',
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
     overflow: 'hidden',
     marginBottom: 10,
@@ -220,7 +239,7 @@ const styles = StyleSheet.create({
   infoBox: {
     backgroundColor: 'white',
     padding: 20,
-    margin: 20,
+    margin: 10,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -229,10 +248,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   infoTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
+    color: '#333',
   },
   infoText: {
     fontSize: 14,

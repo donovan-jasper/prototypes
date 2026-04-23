@@ -25,18 +25,15 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     fetchGraceDays();
   }, [currentMonth]);
 
-  // Get the current month and create an array of all days in the month
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
 
-  // Create a map of streak dates for quick lookup
   const streakMap = new Map<string, boolean>();
   streakData.forEach(day => {
     streakMap.set(day.date, day.isGraceDay || false);
   });
 
-  // Get all milestone dates in the current month
   const milestoneDates = MILESTONE_DAYS.map(days => {
     const milestoneDate = new Date(currentMonth);
     milestoneDate.setDate(currentMonth.getDate() - days);
@@ -51,7 +48,6 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
-  // Find consecutive days to draw connecting lines
   const getConsecutiveDays = () => {
     const consecutiveGroups: string[][] = [];
     let currentGroup: string[] = [];
@@ -95,7 +91,6 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     const isMilestone = milestoneDates.includes(dayString);
     const isToday = isSameDay(day, new Date());
 
-    // Check if this day is part of a consecutive streak
     let isInConsecutiveGroup = false;
     let isFirstInGroup = false;
     let isLastInGroup = false;
@@ -158,7 +153,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.weekdaysHeader}>
+      <View style={styles.weekdays}>
         {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
           <Text key={index} style={styles.weekday}>{day}</Text>
         ))}
@@ -166,30 +161,26 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
 
       <View style={styles.calendarGrid}>
         {daysInMonth.map((day, index) => (
-          <View key={index} style={styles.dayWrapper}>
+          <View key={index} style={styles.dayCell}>
             {renderDay(day, index)}
           </View>
         ))}
       </View>
 
-      <View style={styles.legendContainer}>
+      <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
-          <Text style={styles.legendText}>Completed Day</Text>
+          <Text style={styles.legendText}>Check-in</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.grace }]} />
-          <Text style={styles.legendText}>Grace Day</Text>
+          <Text style={styles.legendText}>Grace day</Text>
         </View>
         <View style={styles.legendItem}>
           <Text style={styles.legendBadge}>🎉</Text>
           <Text style={styles.legendText}>Milestone</Text>
         </View>
       </View>
-
-      <Text style={styles.graceDaysInfo}>
-        Grace Days Used This Week: {graceDaysUsed}/2
-      </Text>
     </View>
   );
 };
@@ -215,16 +206,14 @@ const styles = StyleSheet.create({
   monthHeader: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
   },
   navButton: {
     fontSize: 20,
-    paddingHorizontal: 15,
-    color: '#4CAF50',
+    paddingHorizontal: 10,
   },
-  weekdaysHeader: {
+  weekdays: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
   weekday: {
@@ -237,7 +226,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  dayWrapper: {
+  dayCell: {
     width: Dimensions.get('window').width / 7,
     height: 50,
     justifyContent: 'center',
@@ -247,16 +236,17 @@ const styles = StyleSheet.create({
     position: 'relative',
     width: '100%',
     height: '100%',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   dayContent: {
-    position: 'relative',
-    zIndex: 1,
+    position: 'absolute',
+    zIndex: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
   },
   dayNumber: {
     fontSize: 14,
-    color: '#333',
   },
   today: {
     fontWeight: 'bold',
@@ -269,31 +259,32 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 3,
+    marginTop: 4,
+  },
+  milestoneBadge: {
+    fontSize: 12,
+    marginTop: 4,
   },
   connectorLine: {
     position: 'absolute',
     height: 2,
     backgroundColor: '#4CAF50',
-    zIndex: 0,
+    width: '100%',
+    top: '50%',
+    zIndex: 1,
   },
   firstConnector: {
     width: '50%',
-    right: 0,
+    left: '50%',
   },
   lastConnector: {
     width: '50%',
-    left: 0,
   },
-  milestoneBadge: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  legendContainer: {
+  legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginTop: 15,
-    paddingVertical: 10,
+    paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: '#eee',
   },
@@ -312,12 +303,6 @@ const styles = StyleSheet.create({
     marginRight: 5,
   },
   legendText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  graceDaysInfo: {
-    marginTop: 10,
-    textAlign: 'center',
     fontSize: 12,
     color: '#666',
   },
