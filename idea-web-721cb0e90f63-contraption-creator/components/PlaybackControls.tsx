@@ -21,10 +21,12 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
   const videoRecorderRef = useRef<VideoRecorder | null>(null);
   const recordingIndicatorAnim = useRef(new Animated.Value(0)).current;
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<MediaLibrary.PermissionResponse | null>(null);
 
   useEffect(() => {
     (async () => {
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status, canAskAgain } = await MediaLibrary.getPermissionsAsync();
+      setPermissionStatus({ status, canAskAgain });
       setPermissionGranted(status === 'granted');
     })();
   }, []);
@@ -72,29 +74,56 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
 
   const handleRecord = async () => {
     if (!permissionGranted) {
-      Alert.alert(
-        'Permission Required',
-        'Please grant camera roll permissions to save videos',
-        [
-          {
-            text: 'OK',
-            onPress: async () => {
-              const { status } = await MediaLibrary.requestPermissionsAsync();
-              setPermissionGranted(status === 'granted');
+      if (permissionStatus?.canAskAgain) {
+        Alert.alert(
+          'Permission Required',
+          'Please grant camera roll permissions to save videos',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
             },
-          },
-        ]
-      );
+            {
+              text: 'OK',
+              onPress: async () => {
+                const { status, canAskAgain } = await MediaLibrary.requestPermissionsAsync();
+                setPermissionStatus({ status, canAskAgain });
+                setPermissionGranted(status === 'granted');
+              },
+            },
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Permission Required',
+          'Please enable camera roll permissions in your device settings',
+          [
+            {
+              text: 'OK',
+            },
+          ]
+        );
+      }
       return;
     }
 
     if (isRecording) {
-      const videoUri = await videoRecorderRef.current?.stopRecording();
-      if (videoUri) {
-        Alert.alert('Success', 'Video saved to camera roll!');
+      try {
+        const videoUri = await videoRecorderRef.current?.stopRecording();
+        if (videoUri) {
+          Alert.alert('Success', 'Video saved to camera roll!');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to save video. Please try again.');
+        console.error('Recording error:', error);
       }
     } else {
-      await videoRecorderRef.current?.startRecording();
+      try {
+        await videoRecorderRef.current?.startRecording();
+      } catch (error) {
+        Alert.alert('Error', 'Failed to start recording. Please try again.');
+        console.error('Recording error:', error);
+      }
     }
   };
 
@@ -163,26 +192,30 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 16,
     backgroundColor: '#2c3e50',
     borderTopWidth: 1,
     borderTopColor: '#34495e',
   },
   button: {
-    padding: 12,
-    backgroundColor: '#3498db',
-    borderRadius: 24,
-  },
-  recordButton: {
-    padding: 12,
-    backgroundColor: 'white',
-    borderRadius: 24,
     width: 48,
     height: 48,
-    justifyContent: 'center',
+    borderRadius: 24,
+    backgroundColor: '#3498db',
     alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
+  },
+  recordButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'white',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
   },
   disabledButton: {
     opacity: 0.5,
@@ -193,31 +226,34 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   timerContainer: {
-    position: 'absolute',
-    top: -20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 4,
   },
   timerText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
   },
   saveButton: {
-    padding: 12,
-    backgroundColor: '#2ecc71',
+    width: 48,
+    height: 48,
     borderRadius: 24,
+    backgroundColor: '#2ecc71',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 8,
   },
   watermarkNotice: {
     position: 'absolute',
-    bottom: -20,
+    bottom: 16,
     left: 0,
     right: 0,
     alignItems: 'center',
   },
   watermarkText: {
-    color: '#95a5a6',
+    color: '#bdc3c7',
     fontSize: 12,
   },
 });

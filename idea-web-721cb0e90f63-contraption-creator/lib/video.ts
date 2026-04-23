@@ -24,6 +24,7 @@ export class VideoRecorder {
   private frames: string[] = [];
   private maxDuration: number = 15000; // 15 seconds max
   private video: Video | null = null;
+  private frameRate: number = 30; // frames per second
 
   constructor(
     canvasRef: RefObject<any>,
@@ -53,6 +54,9 @@ export class VideoRecorder {
       await recording.prepareToRecordAsync();
       await recording.startAsync();
       this.recordingState.recording = recording;
+
+      // Start capturing frames
+      this.startFrameCapture();
     } catch (error) {
       console.error('Error starting video recording:', error);
       throw error;
@@ -62,6 +66,24 @@ export class VideoRecorder {
     this.startTimer();
 
     this.onRecordingStateChange(this.recordingState);
+  }
+
+  private startFrameCapture(): void {
+    if (this.frameCaptureInterval) clearInterval(this.frameCaptureInterval);
+
+    this.frameCaptureInterval = setInterval(async () => {
+      if (this.canvasRef.current && this.recordingState.isRecording) {
+        try {
+          const frame = await captureRef(this.canvasRef, {
+            format: 'jpg',
+            quality: 0.8,
+          });
+          this.frames.push(frame);
+        } catch (error) {
+          console.error('Error capturing frame:', error);
+        }
+      }
+    }, 1000 / this.frameRate);
   }
 
   private startTimer(): void {
@@ -89,6 +111,12 @@ export class VideoRecorder {
     if (!this.recordingState.isRecording) return null;
 
     try {
+      // Stop frame capture
+      if (this.frameCaptureInterval) {
+        clearInterval(this.frameCaptureInterval);
+        this.frameCaptureInterval = null;
+      }
+
       // Stop timer
       if (this.intervalId) {
         clearInterval(this.intervalId);
@@ -98,6 +126,12 @@ export class VideoRecorder {
       // Stop actual video recording
       if (this.recordingState.recording) {
         const videoUri = await this.recordingState.recording.stopAndUnloadAsync();
+
+        // Process frames to create final video
+        // In a real implementation, you would use a video processing library
+        // to combine the frames into a proper video file
+
+        // Save to media library
         const asset = await MediaLibrary.saveToLibraryAsync(videoUri);
 
         // Add watermark for free users
@@ -108,6 +142,7 @@ export class VideoRecorder {
       }
     } catch (error) {
       console.error('Error saving video:', error);
+      throw error;
     } finally {
       this.recordingState = {
         isRecording: false,

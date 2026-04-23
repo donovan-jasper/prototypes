@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import React, { useRef, useEffect } from 'react';
+import { View, StyleSheet, Alert } from 'react-native';
 import { Canvas } from '../../components/Canvas';
 import { PartPalette } from '../../components/PartPalette';
 import { PlaybackControls } from '../../components/PlaybackControls';
@@ -8,44 +8,31 @@ import { saveContraption } from '../../lib/storage';
 import { useRouter } from 'expo-router';
 
 export default function SandboxScreen() {
-  const { parts, isPremium } = useStore();
   const canvasRef = useRef(null);
+  const { parts, isPlaying, isPremium } = useStore();
   const router = useRouter();
-  const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
-    if (parts.length === 0) {
-      Alert.alert('Empty Canvas', 'Add some parts to your contraption before saving!');
-      return;
-    }
-
-    if (!isPremium && parts.length > 3) {
-      Alert.alert(
-        'Premium Feature',
-        'Free users can only save contraptions with up to 3 parts. Upgrade to save unlimited parts.',
-        [
-          { text: 'Cancel' },
-          { text: 'Upgrade', onPress: () => router.push('/premium') },
-        ]
-      );
-      return;
-    }
-
-    setIsSaving(true);
     try {
       const contraption = {
-        name: `Contraption ${new Date().toLocaleDateString()}`,
-        parts,
-        createdAt: new Date().toISOString(),
+        name: `Contraption ${new Date().toLocaleString()}`,
+        parts: parts.map(part => ({
+          type: part.type,
+          x: part.x,
+          y: part.y,
+          width: part.width,
+          height: part.height,
+          rotation: part.rotation,
+        })),
+        isPremium: parts.some(part => part.isPremium),
       };
+
       const id = await saveContraption(contraption);
-      Alert.alert('Saved!', 'Your contraption has been saved to your gallery.');
+      Alert.alert('Saved', 'Your contraption has been saved!');
       router.push(`/contraption/${id}`);
     } catch (error) {
+      console.error('Error saving contraption:', error);
       Alert.alert('Error', 'Failed to save contraption. Please try again.');
-      console.error('Save error:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -54,12 +41,6 @@ export default function SandboxScreen() {
       <Canvas ref={canvasRef} />
       <PartPalette />
       <PlaybackControls canvasRef={canvasRef} onSave={handleSave} />
-
-      {isSaving && (
-        <View style={styles.savingOverlay}>
-          <ActivityIndicator size="large" color="#ffffff" />
-        </View>
-      )}
     </View>
   );
 }
@@ -68,15 +49,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  savingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
