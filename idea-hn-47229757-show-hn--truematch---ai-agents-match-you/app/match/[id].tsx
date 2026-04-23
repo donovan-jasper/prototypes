@@ -1,110 +1,35 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Clipboard, ActivityIndicator, ScrollView, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { generateConversationStarters } from '../../lib/ai/conversationGenerator';
 import { useMatches } from '../../hooks/useMatches';
 import { useBehaviorTracking } from '../../hooks/useBehaviorTracking';
 import Colors from '../../constants/Colors';
 import { ConversationStarter } from '../../components/ConversationStarter';
 
-const ConversationStarterModal = ({ visible, onClose, starters, onRefresh, onSend, isGenerating }) => {
-  return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <Text style={styles.modalTitle}>Conversation Starters</Text>
-
-          <ScrollView style={styles.startersList}>
-            {starters.length > 0 ? (
-              starters.map((starter, index) => (
-                <ConversationStarter
-                  key={index}
-                  starter={starter}
-                  onSend={onSend}
-                  onCopy={() => {}}
-                />
-              ))
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No conversation starters available</Text>
-              </View>
-            )}
-          </ScrollView>
-
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.refreshButton, isGenerating && styles.disabledButton]}
-              onPress={onRefresh}
-              disabled={isGenerating}
-            >
-              {isGenerating ? (
-                <ActivityIndicator size="small" color={Colors.white} />
-              ) : (
-                <Text style={styles.refreshButtonText}>Refresh Starters</Text>
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Text style={styles.closeButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-};
-
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams();
   const { matches, loading, sendMessage } = useMatches();
   const { trackInteraction } = useBehaviorTracking();
-  const [showStartersModal, setShowStartersModal] = useState(false);
-  const [conversationStarters, setConversationStarters] = useState([]);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [showStarters, setShowStarters] = useState(false);
 
   const match = matches.find(m => m.id === id);
 
   useEffect(() => {
     if (match) {
-      generateStarters();
+      trackInteraction('view_match_detail', {
+        matchId: match.id,
+        compatibilityScore: match.compatibilityScore
+      });
     }
   }, [match]);
 
-  const generateStarters = async () => {
-    if (!match) return;
-
-    setIsGenerating(true);
-    try {
-      const userVector = match.userBehaviorVector || new Array(128).fill(0.5);
-      const matchVector = match.matchBehaviorVector || new Array(128).fill(0.5);
-
-      const starters = await generateConversationStarters(userVector, matchVector);
-      setConversationStarters(starters);
-
-      trackInteraction('view_conversation_starters', {
-        matchId: match.id,
-        count: starters.length
-      });
-    } catch (error) {
-      console.error('Error generating conversation starters:', error);
-      setConversationStarters([]);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const handleSendStarter = (message) => {
+  const handleSendStarter = (message: string) => {
     if (match) {
       sendMessage(match.id, message);
       trackInteraction('send_conversation_starter', {
         matchId: match.id,
         message
       });
-      setShowStartersModal(false);
     }
   };
 
@@ -144,24 +69,27 @@ export default function MatchDetailScreen() {
           ))}
         </View>
 
+        <View style={styles.starterContainer}>
+          <Text style={styles.sectionTitle}>Conversation Starter</Text>
+          <ConversationStarter
+            matchId={match.id}
+            onSend={handleSendStarter}
+            onCopy={() => trackInteraction('copy_conversation_starter', { matchId: match.id })}
+          />
+        </View>
+
         <View style={styles.actionsContainer}>
           <TouchableOpacity
-            style={styles.startersButton}
-            onPress={() => setShowStartersModal(true)}
+            style={styles.messageButton}
+            onPress={() => {
+              // Navigate to chat screen
+              trackInteraction('navigate_to_chat', { matchId: match.id });
+            }}
           >
-            <Text style={styles.startersButtonText}>Get Conversation Starters</Text>
+            <Text style={styles.messageButtonText}>Message</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      <ConversationStarterModal
-        visible={showStartersModal}
-        onClose={() => setShowStartersModal(false)}
-        starters={conversationStarters}
-        onRefresh={generateStarters}
-        onSend={handleSendStarter}
-        isGenerating={isGenerating}
-      />
     </SafeAreaView>
   );
 }
@@ -171,11 +99,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: Colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
   scrollContent: {
     padding: 16,
   },
   header: {
     marginBottom: 24,
+    alignItems: 'center',
   },
   matchName: {
     fontSize: 24,
@@ -195,17 +130,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   insightItem: {
     backgroundColor: Colors.card,
     borderRadius: 8,
-    padding: 16,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 8,
   },
   insightTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: Colors.text,
     marginBottom: 4,
   },
@@ -213,93 +148,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textSecondary,
   },
-  actionsContainer: {
-    marginTop: 24,
+  starterContainer: {
+    marginBottom: 24,
   },
-  startersButton: {
+  actionsContainer: {
+    marginTop: 16,
+  },
+  messageButton: {
     backgroundColor: Colors.primary,
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
   },
-  startersButtonText: {
+  messageButtonText: {
     color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: Colors.background,
-    marginHorizontal: 20,
-    borderRadius: 8,
-    padding: 20,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  startersList: {
-    maxHeight: '70%',
-  },
-  emptyState: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: Colors.textSecondary,
-    fontSize: 16,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
-  refreshButton: {
-    backgroundColor: Colors.primary,
-    padding: 12,
-    borderRadius: 4,
-    flex: 1,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  refreshButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  closeButton: {
-    backgroundColor: Colors.secondary,
-    padding: 12,
-    borderRadius: 4,
-    flex: 1,
-    marginLeft: 8,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: Colors.white,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
   },
   errorText: {
     color: Colors.error,
-    fontSize: 18,
+    fontSize: 16,
     textAlign: 'center',
     marginTop: 20,
   },

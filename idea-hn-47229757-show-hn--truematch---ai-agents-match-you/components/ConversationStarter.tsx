@@ -1,34 +1,65 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Clipboard, ActivityIndicator } from 'react-native';
 import Colors from '../constants/Colors';
+import { generateConversationStarters } from '../lib/ai/conversationGenerator';
 
 interface ConversationStarterProps {
-  starter: string;
+  matchId: string;
   onSend: (message: string) => void;
   onCopy?: () => void;
-  isGenerating?: boolean;
 }
 
 export const ConversationStarter: React.FC<ConversationStarterProps> = ({
-  starter,
+  matchId,
   onSend,
-  onCopy,
-  isGenerating = false
+  onCopy
 }) => {
-  const [copied, setCopied] = useState(false);
+  const [starter, setStarter] = useState<string>('');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [copied, setCopied] = useState<boolean>(false);
+
+  const generateStarter = async () => {
+    setIsGenerating(true);
+    try {
+      const newStarter = await generateConversationStarters(matchId);
+      setStarter(newStarter);
+    } catch (error) {
+      console.error('Error generating conversation starter:', error);
+      setStarter('Sorry, I couldn\'t generate a conversation starter at this time.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const handleCopy = () => {
-    Clipboard.setString(starter);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-    if (onCopy) onCopy();
+    if (starter) {
+      Clipboard.setString(starter);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      if (onCopy) onCopy();
+    }
   };
+
+  React.useEffect(() => {
+    generateStarter();
+  }, [matchId]);
 
   if (isGenerating) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color={Colors.primary} />
-        <Text style={styles.loadingText}>Generating conversation starters...</Text>
+        <Text style={styles.loadingText}>Generating conversation starter...</Text>
+      </View>
+    );
+  }
+
+  if (!starter) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No conversation starter available</Text>
+        <TouchableOpacity style={styles.refreshButton} onPress={generateStarter}>
+          <Text style={styles.refreshButtonText}>Try Again</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -42,6 +73,9 @@ export const ConversationStarter: React.FC<ConversationStarterProps> = ({
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionButton, styles.sendButton]} onPress={() => onSend(starter)}>
           <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, styles.refreshButton]} onPress={generateStarter}>
+          <Text style={styles.actionButtonText}>Refresh</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -78,6 +112,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     marginRight: 0,
   },
+  refreshButton: {
+    backgroundColor: Colors.accent,
+    marginRight: 0,
+  },
   actionButtonText: {
     color: Colors.white,
     fontSize: 14,
@@ -96,5 +134,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     color: Colors.textSecondary,
     fontSize: 14,
+  },
+  emptyContainer: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: Colors.textSecondary,
+    marginBottom: 8,
+  },
+  refreshButtonText: {
+    color: Colors.white,
   },
 });
