@@ -1,117 +1,251 @@
 import * as SQLite from 'expo-sqlite';
 import { Gift, SentGift } from '../types';
 
-let db: SQLite.SQLiteDatabase | null = null;
+const db = SQLite.openDatabase('giftswift.db');
 
-export async function getDatabase() {
-  if (!db) {
-    db = await SQLite.openDatabaseAsync('giftswift.db');
-  }
-  return db;
-}
+export const initGiftsTable = async () => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS gifts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            category TEXT NOT NULL,
+            price REAL NOT NULL,
+            description TEXT,
+            image_url TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+          );`,
+          [],
+          () => resolve(),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function createGift(data: Omit<Gift, 'id' | 'createdAt'>): Promise<Gift> {
-  const database = await getDatabase();
-  const result = await database.runAsync(
-    `INSERT INTO gifts (title, category, price, description, imageUrl) VALUES (?, ?, ?, ?, ?)`,
-    [data.title, data.category, data.price, data.description || '', data.imageUrl || '']
-  );
+export const initSentGiftsTable = async () => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS sent_gifts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            gift_id INTEGER NOT NULL,
+            recipient_id INTEGER NOT NULL,
+            message TEXT,
+            status TEXT DEFAULT 'sent',
+            sent_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            redeemed_at TEXT,
+            FOREIGN KEY (gift_id) REFERENCES gifts(id),
+            FOREIGN KEY (recipient_id) REFERENCES recipients(id)
+          );`,
+          [],
+          () => resolve(),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-  return {
-    id: result.lastInsertRowId,
-    ...data,
-    createdAt: new Date().toISOString(),
-  };
-}
+export const createGift = async (gift: Omit<Gift, 'id'>): Promise<Gift> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `INSERT INTO gifts (title, category, price, description, image_url)
+           VALUES (?, ?, ?, ?, ?);`,
+          [
+            gift.title,
+            gift.category,
+            gift.price,
+            gift.description || null,
+            gift.imageUrl || null,
+          ],
+          (_, result) => {
+            const id = result.insertId;
+            resolve({ ...gift, id });
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function getGiftById(id: number): Promise<Gift | null> {
-  const database = await getDatabase();
-  const result = await database.getFirstAsync<Gift>(
-    `SELECT * FROM gifts WHERE id = ?`,
-    [id]
-  );
-  return result || null;
-}
+export const getGiftById = async (id: number): Promise<Gift | null> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT * FROM gifts WHERE id = ?;`,
+          [id],
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              const item = rows.item(0);
+              resolve({
+                id: item.id,
+                title: item.title,
+                category: item.category,
+                price: item.price,
+                description: item.description,
+                imageUrl: item.image_url,
+              });
+            } else {
+              resolve(null);
+            }
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function getGiftsByCategory(category: string): Promise<Gift[]> {
-  const database = await getDatabase();
-  const results = await database.getAllAsync<Gift>(
-    `SELECT * FROM gifts WHERE category = ? ORDER BY createdAt DESC`,
-    [category]
-  );
-  return results;
-}
+export const getGiftsByCategory = async (category: string): Promise<Gift[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT * FROM gifts WHERE category = ? ORDER BY title ASC;`,
+          [category],
+          (_, { rows }) => {
+            const gifts: Gift[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              const item = rows.item(i);
+              gifts.push({
+                id: item.id,
+                title: item.title,
+                category: item.category,
+                price: item.price,
+                description: item.description,
+                imageUrl: item.image_url,
+              });
+            }
+            resolve(gifts);
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function getAllGifts(): Promise<Gift[]> {
-  const database = await getDatabase();
-  const results = await database.getAllAsync<Gift>(
-    `SELECT * FROM gifts ORDER BY createdAt DESC`
-  );
-  return results;
-}
+export const searchGifts = async (query: string): Promise<Gift[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT * FROM gifts
+           WHERE title LIKE ? OR description LIKE ?
+           ORDER BY title ASC;`,
+          [`%${query}%`, `%${query}%`],
+          (_, { rows }) => {
+            const gifts: Gift[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              const item = rows.item(i);
+              gifts.push({
+                id: item.id,
+                title: item.title,
+                category: item.category,
+                price: item.price,
+                description: item.description,
+                imageUrl: item.image_url,
+              });
+            }
+            resolve(gifts);
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function searchGifts(query: string): Promise<Gift[]> {
-  const database = await getDatabase();
-  const searchTerm = `%${query}%`;
-  const results = await database.getAllAsync<Gift>(
-    `SELECT * FROM gifts WHERE title LIKE ? OR description LIKE ? ORDER BY createdAt DESC`,
-    [searchTerm, searchTerm]
-  );
-  return results;
-}
+export const recordSentGift = async (giftId: number, recipientId: number, message?: string): Promise<SentGift> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `INSERT INTO sent_gifts (gift_id, recipient_id, message)
+           VALUES (?, ?, ?);`,
+          [giftId, recipientId, message || null],
+          (_, result) => {
+            const id = result.insertId;
+            resolve({
+              id,
+              giftId,
+              recipientId,
+              message: message || null,
+              status: 'sent',
+              sentAt: new Date().toISOString(),
+              redeemedAt: null,
+            });
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-export async function createSentGift(data: {
-  giftId: number;
-  recipientId: number;
-  message: string;
-  status: string;
-}): Promise<SentGift> {
-  const database = await getDatabase();
-  const sentAt = new Date().toISOString();
-  
-  const result = await database.runAsync(
-    `INSERT INTO sent_gifts (giftId, recipientId, message, status, sentAt) VALUES (?, ?, ?, ?, ?)`,
-    [data.giftId, data.recipientId, data.message, data.status, sentAt]
-  );
+export const getSentGiftsByRecipient = async (recipientId: number): Promise<SentGift[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT * FROM sent_gifts
+           WHERE recipient_id = ?
+           ORDER BY sent_at DESC;`,
+          [recipientId],
+          (_, { rows }) => {
+            const sentGifts: SentGift[] = [];
+            for (let i = 0; i < rows.length; i++) {
+              const item = rows.item(i);
+              sentGifts.push({
+                id: item.id,
+                giftId: item.gift_id,
+                recipientId: item.recipient_id,
+                message: item.message,
+                status: item.status,
+                sentAt: item.sent_at,
+                redeemedAt: item.redeemed_at,
+              });
+            }
+            resolve(sentGifts);
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
 
-  return {
-    id: result.lastInsertRowId,
-    ...data,
-    sentAt,
-    redeemedAt: null,
-  };
-}
-
-export async function getSentGifts(): Promise<SentGift[]> {
-  const database = await getDatabase();
-  const results = await database.getAllAsync<SentGift>(
-    `SELECT * FROM sent_gifts ORDER BY sentAt DESC`
-  );
-  return results;
-}
-
-export async function getSentGiftById(id: number): Promise<SentGift | null> {
-  const database = await getDatabase();
-  const result = await database.getFirstAsync<SentGift>(
-    `SELECT * FROM sent_gifts WHERE id = ?`,
-    [id]
-  );
-  return result || null;
-}
-
-export async function updateSentGiftStatus(id: number, status: string): Promise<void> {
-  const database = await getDatabase();
-  await database.runAsync(
-    `UPDATE sent_gifts SET status = ? WHERE id = ?`,
-    [status, id]
-  );
-}
-
-export async function markGiftAsRedeemed(id: number): Promise<void> {
-  const database = await getDatabase();
-  const redeemedAt = new Date().toISOString();
-  await database.runAsync(
-    `UPDATE sent_gifts SET status = 'redeemed', redeemedAt = ? WHERE id = ?`,
-    [redeemedAt, id]
-  );
-}
+export const updateGiftStatus = async (id: number, status: string, redeemedAt?: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `UPDATE sent_gifts
+           SET status = ?, redeemed_at = ?
+           WHERE id = ?;`,
+          [status, redeemedAt || null, id],
+          () => resolve(),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};

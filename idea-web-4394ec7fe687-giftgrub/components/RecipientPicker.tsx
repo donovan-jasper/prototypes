@@ -11,25 +11,38 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { getRecipients, addRecipient } from '../lib/recipients';
 import { Recipient } from '../types';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 interface RecipientPickerProps {
   onSelect: (recipient: Recipient) => void;
+  onAddNew?: () => void;
 }
 
-export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
+export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerProps) {
   const [recipients, setRecipients] = useState<Recipient[]>([]);
   const [filteredRecipients, setFilteredRecipients] = useState<Recipient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newRecipientName, setNewRecipientName] = useState('');
-  const [newRecipientEmail, setNewRecipientEmail] = useState('');
-  const [newRecipientPhone, setNewRecipientPhone] = useState('');
+  const [newRecipient, setNewRecipient] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    preferences: {
+      birthday: '',
+      anniversary: '',
+      notificationsEnabled: true,
+    },
+  });
   const [saving, setSaving] = useState(false);
+  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
+  const [showAnniversaryPicker, setShowAnniversaryPicker] = useState(false);
 
   useEffect(() => {
     loadRecipients();
@@ -64,35 +77,51 @@ export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
   };
 
   const handleAddRecipient = async () => {
-    if (!newRecipientName.trim()) {
+    if (!newRecipient.name.trim()) {
       Alert.alert('Error', 'Please enter a name');
       return;
     }
 
-    if (!newRecipientEmail.trim() && !newRecipientPhone.trim()) {
+    if (!newRecipient.email.trim() && !newRecipient.phone.trim()) {
       Alert.alert('Error', 'Please enter either an email or phone number');
       return;
     }
 
     setSaving(true);
     try {
-      const newRecipient = await addRecipient({
-        name: newRecipientName.trim(),
-        email: newRecipientEmail.trim() || undefined,
-        phone: newRecipientPhone.trim() || undefined,
-      });
-
+      const addedRecipient = await addRecipient(newRecipient);
       await loadRecipients();
       setShowAddModal(false);
-      setNewRecipientName('');
-      setNewRecipientEmail('');
-      setNewRecipientPhone('');
-      onSelect(newRecipient);
+      resetNewRecipient();
+      onSelect(addedRecipient);
+      if (onAddNew) onAddNew();
     } catch (error) {
       Alert.alert('Error', 'Failed to add recipient');
     } finally {
       setSaving(false);
     }
+  };
+
+  const resetNewRecipient = () => {
+    setNewRecipient({
+      name: '',
+      email: '',
+      phone: '',
+      preferences: {
+        birthday: '',
+        anniversary: '',
+        notificationsEnabled: true,
+      },
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not set';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
   };
 
   const renderRecipientItem = ({ item }: { item: Recipient }) => (
@@ -118,6 +147,12 @@ export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
       <Text style={styles.emptyStateText}>
         {searchQuery ? 'No recipients found' : 'No recipients yet'}
       </Text>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={() => setShowAddModal(true)}
+      >
+        <Text style={styles.addButtonText}>Add New Recipient</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -146,17 +181,18 @@ export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
         </View>
+      ) : filteredRecipients.length === 0 ? (
+        renderEmptyState()
       ) : (
         <FlatList
           data={filteredRecipients}
           renderItem={renderRecipientItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
-          ListEmptyComponent={renderEmptyState}
-          showsVerticalScrollIndicator={false}
         />
       )}
 
+      {/* Add Recipient Modal */}
       <Modal
         visible={showAddModal}
         animationType="slide"
@@ -164,62 +200,135 @@ export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
         onRequestClose={() => setShowAddModal(false)}
       >
         <KeyboardAvoidingView
-          style={styles.modalContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
         >
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setShowAddModal(false)}>
-              <Text style={styles.modalCancelText}>Cancel</Text>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add New Recipient</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Full Name"
+              value={newRecipient.name}
+              onChangeText={(text) => setNewRecipient({ ...newRecipient, name: text })}
+              autoFocus
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Email (optional)"
+              value={newRecipient.email}
+              onChangeText={(text) => setNewRecipient({ ...newRecipient, email: text })}
+              keyboardType="email-address"
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Phone (optional)"
+              value={newRecipient.phone}
+              onChangeText={(text) => setNewRecipient({ ...newRecipient, phone: text })}
+              keyboardType="phone-pad"
+            />
+
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.label}>Birthday</Text>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowBirthdayPicker(true)}
+              >
+                <Text style={styles.dateText}>
+                  {newRecipient.preferences.birthday
+                    ? formatDate(newRecipient.preferences.birthday)
+                    : 'Select date'}
+                </Text>
+              </TouchableOpacity>
+              {showBirthdayPicker && (
+                <DateTimePicker
+                  value={new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(event, date) => {
+                    setShowBirthdayPicker(false);
+                    if (date) {
+                      setNewRecipient({
+                        ...newRecipient,
+                        preferences: {
+                          ...newRecipient.preferences,
+                          birthday: date.toISOString(),
+                        },
+                      });
+                    }
+                  }}
+                />
+              )}
+            </View>
+
+            <View style={styles.datePickerContainer}>
+              <Text style={styles.label}>Anniversary</Text>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowAnniversaryPicker(true)}
+              >
+                <Text style={styles.dateText}>
+                  {newRecipient.preferences.anniversary
+                    ? formatDate(newRecipient.preferences.anniversary)
+                    : 'Select date'}
+                </Text>
+              </TouchableOpacity>
+              {showAnniversaryPicker && (
+                <DateTimePicker
+                  value={new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={(event, date) => {
+                    setShowAnniversaryPicker(false);
+                    if (date) {
+                      setNewRecipient({
+                        ...newRecipient,
+                        preferences: {
+                          ...newRecipient.preferences,
+                          anniversary: date.toISOString(),
+                        },
+                      });
+                    }
+                  }}
+                />
+              )}
+            </View>
+
+            <View style={styles.switchContainer}>
+              <Text style={styles.label}>Enable Notifications</Text>
+              <Switch
+                value={newRecipient.preferences.notificationsEnabled}
+                onValueChange={(value) =>
+                  setNewRecipient({
+                    ...newRecipient,
+                    preferences: {
+                      ...newRecipient.preferences,
+                      notificationsEnabled: value,
+                    },
+                  })
+                }
+              />
+            </View>
+
+            <TouchableOpacity
+              style={styles.saveButton}
+              onPress={handleAddRecipient}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.saveButtonText}>Add Recipient</Text>
+              )}
             </TouchableOpacity>
-            <Text style={styles.modalTitle}>Add Recipient</Text>
-            <TouchableOpacity onPress={handleAddRecipient} disabled={saving}>
-              <Text style={[styles.modalSaveText, saving && styles.modalSaveTextDisabled]}>
-                {saving ? 'Saving...' : 'Save'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.modalContent}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Name *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter name"
-                value={newRecipientName}
-                onChangeText={setNewRecipientName}
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Email</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter email"
-                value={newRecipientEmail}
-                onChangeText={setNewRecipientEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Phone</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Enter phone number"
-                value={newRecipientPhone}
-                onChangeText={setNewRecipientPhone}
-                keyboardType="phone-pad"
-                placeholderTextColor="#999"
-              />
-            </View>
-
-            <Text style={styles.helperText}>
-              * Required field. At least one contact method (email or phone) is required.
-            </Text>
-          </View>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -229,72 +338,64 @@ export default function RecipientPicker({ onSelect }: RecipientPickerProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
     paddingHorizontal: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    margin: 16,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 12,
+    height: 40,
     fontSize: 16,
-    color: '#1a1a1a',
   },
   addNewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#e3f2fd',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   addNewText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
     marginLeft: 8,
+    fontSize: 16,
+    color: '#007AFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listContent: {
-    flexGrow: 1,
+    paddingBottom: 16,
   },
   recipientItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   avatarContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
   avatarText: {
-    fontSize: 20,
-    fontWeight: '600',
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   recipientInfo: {
     flex: 1,
@@ -302,79 +403,94 @@ const styles = StyleSheet.create({
   recipientName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 4,
   },
   recipientContact: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 40,
+    marginTop: 2,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    padding: 32,
   },
   emptyStateText: {
     fontSize: 16,
     color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
+  },
+  modalContent: {
+    padding: 16,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  modalCancelText: {
-    fontSize: 16,
-    color: '#007AFF',
+    marginBottom: 24,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  modalSaveText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  modalSaveTextDisabled: {
-    opacity: 0.5,
-  },
-  modalContent: {
-    padding: 20,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
     fontSize: 16,
-    color: '#1a1a1a',
-    borderWidth: 1
+  },
+  datePickerContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  datePickerButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  switchContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
