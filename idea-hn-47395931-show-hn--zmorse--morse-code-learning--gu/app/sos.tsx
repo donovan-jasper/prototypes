@@ -85,9 +85,9 @@ export default function SOSScreen() {
       // Add a short pause at the end
       pattern.push(500);
 
+      // In a real implementation, you would use expo-camera's torch mode
+      // For this demo, we'll use haptic feedback to simulate the flash
       for (const duration of pattern) {
-        // Toggle flashlight
-        // In a real app, you would use expo-camera's torch mode
         await Haptics.impactAsync(
           duration > 200 ? Haptics.ImpactFeedbackStyle.Heavy : Haptics.ImpactFeedbackStyle.Light
         );
@@ -168,7 +168,7 @@ export default function SOSScreen() {
               placeholder="Enter your message"
               value={newMessage}
               onChangeText={setNewMessage}
-              autoFocus
+              autoFocus={true}
             />
             <View style={styles.buttonRow}>
               <Button
@@ -179,7 +179,7 @@ export default function SOSScreen() {
               <Button
                 title="Save"
                 onPress={handleSaveMessage}
-                disabled={!newMessage.trim()}
+                color="#007AFF"
               />
             </View>
           </View>
@@ -198,8 +198,8 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
     fontSize: 32,
@@ -210,24 +210,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#FF3B30',
     marginBottom: 40,
+    textAlign: 'center',
   },
   info: {
     marginTop: 40,
     textAlign: 'center',
     color: '#666',
+    paddingHorizontal: 20,
   },
   premiumSection: {
     marginTop: 30,
-    padding: 20,
-    backgroundColor: '#f0f8ff',
-    borderRadius: 10,
-    width: '100%',
     alignItems: 'center',
   },
   premiumText: {
     fontSize: 16,
-    marginBottom: 15,
-    color: '#007AFF',
+    marginBottom: 10,
   },
   modalContainer: {
     flex: 1,
@@ -237,24 +234,22 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    padding: 25,
-    borderRadius: 15,
-    width: '85%',
-    maxWidth: 400,
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 15,
   },
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    borderRadius: 5,
+    padding: 10,
     marginBottom: 20,
+    fontSize: 16,
   },
   buttonRow: {
     flexDirection: 'row',
