@@ -5,12 +5,14 @@ import { getVoiceClipsByCategory, getClipsByCategoryAndMood, getPremiumClips } f
 import VoicePlayer from '../../components/VoicePlayer';
 import { VoiceClip } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const categories = ['all', 'morning', 'focus', 'energy', 'calm', 'celebrate'];
 const moods = ['struggling', 'neutral', 'crushing'];
 
 const LibraryScreen = () => {
-  const { isPremium, purchaseSubscription } = useSubscription();
+  const { isPremium } = useSubscription();
+  const navigation = useNavigation();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedMood, setSelectedMood] = useState('neutral');
   const [searchQuery, setSearchQuery] = useState('');
@@ -45,10 +47,17 @@ const LibraryScreen = () => {
   };
 
   const handlePurchase = async () => {
-    const success = await purchaseSubscription();
-    if (success) {
+    // In a real app, you would call the purchase function from your subscription service
+    // For this prototype, we'll just simulate a successful purchase
+    setTimeout(() => {
       setShowPaywall(false);
-    }
+      // In a real app, you would update the subscription status here
+    }, 1000);
+  };
+
+  const handleNavigateToSettings = () => {
+    setShowPaywall(false);
+    navigation.navigate('settings');
   };
 
   const renderCategoryButton = (category: string) => (
@@ -160,12 +169,7 @@ const LibraryScreen = () => {
 
               <View style={styles.featureRow}>
                 <Text style={styles.featureText}>10 rotating clips</Text>
-                <Text style={styles.featureText}>50+ clips</Text>
-              </View>
-
-              <View style={styles.featureRow}>
-                <Text style={styles.featureText}>1 goal</Text>
-                <Text style={styles.featureText}>5 goals</Text>
+                <Text style={styles.featureText}>Full library</Text>
               </View>
 
               <View style={styles.featureRow}>
@@ -188,7 +192,7 @@ const LibraryScreen = () => {
 
             <TouchableOpacity
               style={styles.closeButton}
-              onPress={() => setShowPaywall(false)}
+              onPress={handleNavigateToSettings}
             >
               <Text style={styles.closeButtonText}>Maybe Later</Text>
             </TouchableOpacity>
@@ -218,7 +222,7 @@ const styles = StyleSheet.create({
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#673ab7',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -226,7 +230,7 @@ const styles = StyleSheet.create({
   premiumBadgeText: {
     color: 'white',
     marginLeft: 4,
-    fontSize: 14,
+    fontSize: 12,
   },
   searchContainer: {
     marginBottom: 16,
@@ -255,10 +259,10 @@ const styles = StyleSheet.create({
   categoryButton: {
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#e0e0e0',
+    borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
+    backgroundColor: '#e0e0e0',
   },
   selectedCategoryButton: {
     backgroundColor: '#673ab7',
@@ -277,8 +281,8 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    backgroundColor: '#e0e0e0',
     marginRight: 8,
+    backgroundColor: '#e0e0e0',
     alignItems: 'center',
   },
   selectedMoodButton: {
@@ -298,8 +302,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyText: {
-    fontSize: 16,
     color: '#666',
+    fontSize: 16,
   },
   modalContainer: {
     flex: 1,
@@ -311,13 +315,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 20,
-    width: '90%',
+    width: '80%',
     maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
   },
   featureComparison: {
@@ -326,9 +330,7 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 8,
   },
   featureText: {
     fontSize: 16,
@@ -338,20 +340,20 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
-    alignItems: 'center',
   },
   purchaseButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
   closeButton: {
-    padding: 16,
-    alignItems: 'center',
+    padding: 12,
   },
   closeButtonText: {
-    color: '#666',
+    color: '#673ab7',
     fontSize: 16,
+    textAlign: 'center',
   },
 });
 
