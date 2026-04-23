@@ -11,6 +11,8 @@ interface TaskState {
   rescheduleTask: (id: string, scheduledFor: Date) => void;
   clearAll: () => void;
   suggestTimeForTask: (taskId: string, date: Date, commitments: ScheduleBlock[]) => void;
+  getTasksForDate: (date: Date) => Task[];
+  getOverdueTasks: () => Task[];
 }
 
 export const useTaskStore = create<TaskState>((set, get) => ({
@@ -88,5 +90,20 @@ export const useTaskStore = create<TaskState>((set, get) => ({
         ),
       }));
     }
+  },
+
+  getTasksForDate: (date) => {
+    return get().tasks.filter(task => {
+      if (!task.scheduledFor) return false;
+      return isSameDay(task.scheduledFor, date) && !task.completed;
+    });
+  },
+
+  getOverdueTasks: () => {
+    const now = new Date();
+    return get().tasks.filter(task => {
+      if (!task.scheduledFor || task.completed) return false;
+      return task.scheduledFor < now;
+    });
   },
 }));

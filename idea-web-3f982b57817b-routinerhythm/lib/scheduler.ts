@@ -156,46 +156,56 @@ export function adaptRoutine(
   });
 
   if (slotsInWindow.length === 0) {
-    // If no slots in preferred window, find earliest available slot
-    return availableSlots.length > 0 ? availableSlots[0].start : null;
+    return null;
   }
 
-  // Return the earliest slot within the preferred window
-  return slotsInWindow[0].start;
+  // Find the slot that best fits the routine duration
+  const routineDuration = routine.tasks.length * 15; // Assuming 15 minutes per task
+  const bestSlot = slotsInWindow.reduce((best, current) => {
+    const currentDuration = differenceInMinutes(current.end, current.start);
+    const bestDuration = differenceInMinutes(best.end, best.start);
+
+    // Prefer slots that exactly fit or are closest to the routine duration
+    if (Math.abs(currentDuration - routineDuration) < Math.abs(bestDuration - routineDuration)) {
+      return current;
+    }
+    return best;
+  });
+
+  // Return the start time of the best slot
+  return bestSlot.start;
 }
 
 /**
- * Calculates energy patterns from task completion history
+ * Calculates energy patterns from completion history
  */
-export function calculateEnergyPatterns(completions: RoutineCompletion[]): {
-  peakHours: number[];
-  lowEnergyHours: number[];
-} {
-  if (completions.length === 0) {
+export function calculateEnergyScore(
+  completionHistory: RoutineCompletion[]
+): { peakHours: number[], lowEnergyHours: number[] } {
+  if (!completionHistory || completionHistory.length === 0) {
     // Default patterns if no data
     return {
       peakHours: [9, 10, 11], // 9am-11am
-      lowEnergyHours: [22, 23, 0, 1, 2, 3, 4] // 10pm-4am
+      lowEnergyHours: [22, 23, 0, 1, 2, 3] // 10pm-3am
     };
   }
 
   // Group completions by hour
-  const hourStats: Record<number, { completed: number; total: number }> = {};
+  const hourStats: Record<number, { completed: number, total: number }> = {};
 
   for (let i = 0; i < 24; i++) {
     hourStats[i] = { completed: 0, total: 0 };
   }
 
-  completions.forEach(completion => {
-    const hour = completion.completedAt.getHours();
+  completionHistory.forEach(completion => {
+    const hour = completion.time.getHours();
     hourStats[hour].total++;
-
-    if (completion.status === 'completed') {
+    if (completion.completed) {
       hourStats[hour].completed++;
     }
   });
 
-  // Calculate completion rates
+  // Calculate completion rates per hour
   const completionRates = Object.entries(hourStats).map(([hour, stats]) => ({
     hour: parseInt(hour),
     rate: stats.total > 0 ? stats.completed / stats.total : 0
@@ -205,99 +215,51 @@ export function calculateEnergyPatterns(completions: RoutineCompletion[]): {
   const sortedHours = completionRates.sort((a, b) => b.rate - a.rate);
 
   // Get top 3 peak hours
-  const peakHours = sortedHours.slice(0, 3).map(item => item.hour);
+  const peakHours = sortedHours.slice(0, 3).map(h => h.hour);
 
   // Get bottom 3 low energy hours
-  const lowEnergyHours = sortedHours.slice(-3).map(item => item.hour);
+  const lowEnergyHours = sortedHours.slice(-3).map(h => h.hour);
 
   return { peakHours, lowEnergyHours };
 }
 
 /**
- * Suggests optimal times for tasks based on energy patterns
+ * Suggests optimal time for a task considering energy patterns
  */
-export function suggestEnergyAwareTime(
+export function suggestOptimalTaskTime(
   task: Task,
   date: Date,
   commitments: ScheduleBlock[],
-  energyPatterns: { peakHours: number[]; lowEnergyHours: number[] }
+  completionHistory?: RoutineCompletion[]
 ): Date | null {
-  const availableSlots = findAvailableSlots(date, commitments);
-  const taskDurationMs = task.estimatedMinutes * 60 * 1000;
+  const energyPatterns = completionHistory ? calculateEnergyScore(completionHistory) : null;
+  const baseSuggestion = suggestTaskTime(task, date, commitments);
 
-  // Filter slots that can fit the task
-  const viableSlots = availableSlots.filter((slot) => {
-    const slotDuration = slot.end.getTime() - slot.start.getTime();
-    return slotDuration >= taskDurationMs;
-  });
-
-  if (viableSlots.length === 0) {
-    return null;
+  if (!baseSuggestion || !energyPatterns) {
+    return baseSuggestion;
   }
 
-  // Apply energy-aware selection
+  // If task is high priority, consider energy patterns
   if (task.priority === 'high') {
-    // High priority: prefer peak hours
-    const peakSlot = viableSlots.find(slot =>
-      energyPatterns.peakHours.includes(slot.start.getHours())
-    );
-    return peakSlot ? peakSlot.start : viableSlots[0].start;
-  } else if (task.priority === 'medium') {
-    // Medium priority: avoid low energy hours
-    const nonLowEnergySlots = viableSlots.filter(slot =>
-      !energyPatterns.lowEnergyHours.includes(slot.start.getHours())
-    );
-    return nonLowEnergySlots.length > 0 ? nonLowEnergySlots[0].start : viableSlots[0].start;
-  } else {
-    // Low priority: prefer low energy hours
-    const lowEnergySlot = viableSlots.find(slot =>
-      energyPatterns.lowEnergyHours.includes(slot.start.getHours())
-    );
-    return lowEnergySlot ? lowEnergySlot.start : viableSlots[viableSlots.length - 1].start;
-  }
-}
+    const suggestionHour = baseSuggestion.getHours();
 
-/**
- * Finds the best day to schedule a task based on schedule availability
- */
-export function findBestDayForTask(
-  task: Task,
-  startDate: Date,
-  endDate: Date,
-  commitments: ScheduleBlock[]
-): Date | null {
-  let currentDate = startOfDay(startDate);
-  const endDay = endOfDay(endDate);
-  let bestDate: Date | null = null;
-  let bestScore = -Infinity;
+    // Check if suggested time is in low energy hours
+    if (energyPatterns.lowEnergyHours.includes(suggestionHour)) {
+      // Try to find a better time in peak hours
+      const availableSlots = findAvailableSlots(date, commitments);
+      const taskDurationMs = task.estimatedMinutes * 60 * 1000;
 
-  while (currentDate <= endDay) {
-    const availableSlots = findAvailableSlots(currentDate, commitments);
-    const taskDurationMs = task.estimatedMinutes * 60 * 1000;
+      const peakSlots = availableSlots.filter(slot => {
+        const slotDuration = slot.end.getTime() - slot.start.getTime();
+        const slotHour = slot.start.getHours();
+        return slotDuration >= taskDurationMs && energyPatterns.peakHours.includes(slotHour);
+      });
 
-    // Find slots that can fit the task
-    const viableSlots = availableSlots.filter((slot) => {
-      const slotDuration = slot.end.getTime() - slot.start.getTime();
-      return slotDuration >= taskDurationMs;
-    });
-
-    if (viableSlots.length > 0) {
-      // Score this day based on:
-      // 1. Number of available slots
-      // 2. Proximity to today (earlier is better)
-      const daysFromToday = differenceInMinutes(currentDate, new Date()) / (24 * 60);
-
-      // Higher score is better
-      const score = viableSlots.length - (daysFromToday * 0.1);
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestDate = currentDate;
+      if (peakSlots.length > 0) {
+        return peakSlots[0].start;
       }
     }
-
-    currentDate = addDays(currentDate, 1);
   }
 
-  return bestDate;
+  return baseSuggestion;
 }
