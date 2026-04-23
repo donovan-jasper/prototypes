@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { QueryInput } from '../../components/QueryInput';
 import { ResultsTable } from '../../components/ResultsTable';
+import { VoiceButton } from '../../components/VoiceButton';
 import { useQuery } from '../../hooks/useQuery';
 import { useDatabase } from '../../hooks/useDatabase';
 import { useSubscription } from '../../hooks/useSubscription';
@@ -77,6 +78,8 @@ export default function QueryScreen() {
           <ResultsTable data={results} />
         )}
       </ScrollView>
+
+      <VoiceButton />
     </View>
   );
 }

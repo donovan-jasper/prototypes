@@ -16,7 +16,7 @@ const VoiceButton = () => {
       if (transcription.text && currentDatabase) {
         try {
           // Execute the transcribed query
-          const results = await executeQuery(transcription.text, currentDatabase.id);
+          const results = await executeQuery(currentDatabase.id, transcription.text);
           // You might want to show results or speak them here
         } catch (error) {
           console.error('Query execution failed:', error);
