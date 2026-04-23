@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { db } from '../../firebase';
-import { collection, query, getDocs, orderBy } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit } from 'firebase/firestore';
 
 interface Discussion {
   id: string;
@@ -10,31 +10,56 @@ interface Discussion {
   title: string;
   commentCount: number;
   lastActivity: number;
+  createdAt: number;
+  authorId: string;
+  isPinned?: boolean;
 }
 
 const CommunityScreen = () => {
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const navigation = useNavigation<any>();
 
   const fetchDiscussions = useCallback(async () => {
     setIsLoading(true);
+    setError(null);
     try {
       const discussionsRef = collection(db, 'discussions');
-      const q = query(discussionsRef, orderBy('lastActivity', 'desc'));
+      const q = query(
+        discussionsRef,
+        orderBy('isPinned', 'desc'),
+        orderBy('lastActivity', 'desc'),
+        limit(50)
+      );
+
       const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        setDiscussions([]);
+        return;
+      }
 
       const fetchedDiscussions: Discussion[] = [];
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         fetchedDiscussions.push({
           id: doc.id,
-          ...doc.data()
-        } as Discussion);
+          contentId: data.contentId || 0,
+          title: data.title || 'Untitled Discussion',
+          commentCount: data.commentCount || 0,
+          lastActivity: data.lastActivity?.toMillis() || Date.now(),
+          createdAt: data.createdAt?.toMillis() || Date.now(),
+          authorId: data.authorId || '',
+          isPinned: data.isPinned || false
+        });
       });
 
       setDiscussions(fetchedDiscussions);
     } catch (error) {
       console.error('Error fetching discussions:', error);
+      setError('Failed to load discussions. Please check your connection and try again.');
+      Alert.alert('Error', 'Failed to load discussions. Please try again later.');
     } finally {
       setIsLoading(false);
     }
@@ -74,6 +99,11 @@ const CommunityScreen = () => {
       activeOpacity={0.7}
     >
       <View style={styles.itemHeader}>
+        {item.isPinned && (
+          <View style={styles.pinBadge}>
+            <Text style={styles.pinText}>Pinned</Text>
+          </View>
+        )}
         <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
         <View style={styles.badgeContainer}>
           <View style={styles.badge}>
@@ -89,6 +119,18 @@ const CommunityScreen = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6200ee" />
+        <Text style={styles.loadingText}>Loading discussions...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={fetchDiscussions} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -107,6 +149,12 @@ const CommunityScreen = () => {
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          ListHeaderComponent={
+            <View style={styles.headerContainer}>
+              <Text style={styles.headerTitle}>Community Discussions</Text>
+              <Text style={styles.headerSubtitle}>Join the conversation about your favorite content</Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -124,8 +172,50 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
   },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#6200ee',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   listContent: {
     paddingVertical: 12,
+  },
+  headerContainer: {
+    padding: 16,
+    backgroundColor: '#6200ee',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.8)',
   },
   itemContainer: {
     backgroundColor: '#fff',
@@ -141,20 +231,31 @@ const styles = StyleSheet.create({
   },
   itemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 4,
+  },
+  pinBadge: {
+    backgroundColor: '#ff9800',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginRight: 8,
+  },
+  pinText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   itemTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
     flex: 1,
-    marginRight: 8,
   },
   itemSubtitle: {
     fontSize: 14,
     color: '#666',
+    marginTop: 4,
   },
   badgeContainer: {
     flexDirection: 'row',
