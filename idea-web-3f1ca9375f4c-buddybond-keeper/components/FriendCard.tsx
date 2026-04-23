@@ -27,6 +27,20 @@ export default function FriendCard({ friend, onPress }: FriendCardProps) {
     return `${diffDays} days ago`;
   };
 
+  const getHealthStatusText = () => {
+    const healthStatus = calculateHealthScore(friend);
+    switch (healthStatus) {
+      case 'healthy':
+        return 'Healthy';
+      case 'warning':
+        return 'Needs Attention';
+      case 'neglected':
+        return 'At Risk';
+      default:
+        return 'Unknown';
+    }
+  };
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       <Avatar.Image
@@ -35,10 +49,15 @@ export default function FriendCard({ friend, onPress }: FriendCardProps) {
         style={styles.avatar}
       />
       <View style={styles.infoContainer}>
-        <Text style={styles.name}>{friend.name}</Text>
+        <View style={styles.nameContainer}>
+          <Text style={styles.name}>{friend.name}</Text>
+          <View style={styles.healthBadge}>
+            <HealthIndicator friend={friend} size={12} />
+            <Text style={styles.healthStatusText}>{getHealthStatusText()}</Text>
+          </View>
+        </View>
         <Text style={styles.lastContacted}>{getLastContactedText()}</Text>
       </View>
-      <HealthIndicator friend={friend} size={16} />
     </TouchableOpacity>
   );
 }
@@ -59,6 +78,11 @@ const styles = StyleSheet.create({
   infoContainer: {
     flex: 1,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   name: {
     fontSize: 16,
     fontWeight: '500',
@@ -68,5 +92,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  healthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  healthStatusText: {
+    fontSize: 12,
+    color: '#333',
+    marginLeft: 4,
   },
 });
