@@ -1,5 +1,6 @@
 import db from './database';
 import { Appointment, Document } from '../types';
+import { getDocumentsByAppointment } from './documentService';
 
 export const addAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'completed'>): Promise<Appointment> => {
   const result = await db.runAsync(
@@ -8,6 +9,18 @@ export const addAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' 
   );
 
   return (await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [result.lastInsertRowId]))!;
+};
+
+export const getAppointmentWithDocuments = async (id: number): Promise<(Appointment & { documents: Document[] }) | null> => {
+  const appointment = await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [id]);
+  if (!appointment) return null;
+
+  const documents = await getDocumentsByAppointment(id);
+
+  return {
+    ...appointment,
+    documents
+  };
 };
 
 export const getAppointmentsByMember = async (familyMemberId: number): Promise<Appointment[]> => {
@@ -32,23 +45,4 @@ export const updateAppointment = async (id: number, data: Partial<Appointment>):
 
 export const deleteAppointment = async (id: number): Promise<void> => {
   await db.runAsync('DELETE FROM appointments WHERE id = ?', [id]);
-};
-
-export const getAppointmentWithDocuments = async (id: number): Promise<Appointment & { documents: Document[] }> => {
-  const appointment = await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [id]);
-  if (!appointment) throw new Error('Appointment not found');
-
-  const documents = await db.getAllAsync<Document>(
-    'SELECT * FROM documents WHERE appointment_id = ? ORDER BY upload_date DESC',
-    [id]
-  );
-
-  return { ...appointment, documents };
-};
-
-export const attachDocumentToAppointment = async (documentId: number, appointmentId: number): Promise<void> => {
-  await db.runAsync(
-    'UPDATE documents SET appointment_id = ? WHERE id = ?',
-    [appointmentId, documentId]
-  );
 };

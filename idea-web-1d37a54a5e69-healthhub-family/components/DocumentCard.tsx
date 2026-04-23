@@ -1,82 +1,86 @@
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Document } from '../types';
+import Colors from '../constants/Colors';
 import { format } from 'date-fns';
 
 interface DocumentCardProps {
   document: Document;
-  onPress: () => void;
-  onDelete: () => void;
+  onView?: (document: Document) => void;
+  onDelete?: (documentId: number) => void;
 }
 
-export default function DocumentCard({ document, onPress, onDelete }: DocumentCardProps) {
-  const isImage = document.type.includes('image');
+const DocumentCard: React.FC<DocumentCardProps> = ({ document, onView, onDelete }) => {
+  const getFileIcon = (type: string) => {
+    if (type.includes('image')) return 'image-outline';
+    if (type.includes('pdf')) return 'document-text-outline';
+    return 'document-outline';
+  };
 
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress}>
+    <View style={styles.container}>
       <View style={styles.iconContainer}>
-        {isImage ? (
-          <Image
-            source={{ uri: document.fileUri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        ) : (
-          <Ionicons name="document-outline" size={24} color="#007AFF" />
-        )}
+        <Ionicons name={getFileIcon(document.type)} size={24} color={Colors.primary} />
       </View>
-      <View style={styles.infoContainer}>
+      <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{document.title}</Text>
         <Text style={styles.date}>{format(new Date(document.uploadDate), 'MMM d, yyyy')}</Text>
       </View>
-      <TouchableOpacity style={styles.deleteButton} onPress={(e) => {
-        e.stopPropagation();
-        onDelete();
-      }}>
-        <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      <View style={styles.actions}>
+        {onView && (
+          <TouchableOpacity onPress={() => onView(document)} style={styles.actionButton}>
+            <Ionicons name="eye-outline" size={20} color={Colors.primary} />
+          </TouchableOpacity>
+        )}
+        {onDelete && (
+          <TouchableOpacity onPress={() => onDelete(document.id)} style={styles.actionButton}>
+            <Ionicons name="trash-outline" size={20} color={Colors.error} />
+          </TouchableOpacity>
+        )}
+      </View>
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#fff',
+    padding: 16,
+    backgroundColor: Colors.card,
     borderRadius: 8,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
   },
   iconContainer: {
     width: 40,
     height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: Colors.primaryLight,
     alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
-    overflow: 'hidden',
   },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  infoContainer: {
+  info: {
     flex: 1,
   },
   title: {
     fontSize: 16,
     fontWeight: '500',
+    color: Colors.text,
+    marginBottom: 4,
   },
   date: {
     fontSize: 14,
-    color: '#666',
-    marginTop: 4,
+    color: Colors.textSecondary,
   },
-  deleteButton: {
+  actions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
     padding: 8,
+    marginLeft: 8,
   },
 });
+
+export default DocumentCard;

@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Platform, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Platform, FlatList, Modal } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { getAppointmentWithDocuments, deleteAppointment } from '../../lib/appointmentService';
@@ -7,9 +7,10 @@ import { format } from 'date-fns';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { pickDocument, addDocument, attachDocumentToAppointment, getDocumentsByMember } from '../../lib/documentService';
+import { pickDocument, addDocument, attachDocumentToAppointment, getDocumentsByMember, deleteDocument } from '../../lib/documentService';
 import { usePremium } from '../../hooks/usePremium';
 import DocumentCard from '../../components/DocumentCard';
+import Colors from '../../constants/Colors';
 
 export default function AppointmentDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -39,6 +40,7 @@ export default function AppointmentDetail() {
     try {
       const documents = await getDocumentsByMember(appointment.familyMemberId);
       setVaultDocuments(documents.filter(doc => !doc.appointmentId));
+      setShowVault(true);
     } catch (error) {
       console.error('Failed to load vault documents:', error);
     }
@@ -187,10 +189,7 @@ export default function AppointmentDetail() {
         <Text style={styles.provider}>{appointment.provider}</Text>
         <Text style={styles.date}>{format(new Date(appointment.date), 'MMMM d, yyyy h:mm a')}</Text>
         {appointment.location && (
-          <View style={styles.locationContainer}>
-            <Ionicons name="location-outline" size={16} color="#666" />
-            <Text style={styles.location}>{appointment.location}</Text>
-          </View>
+          <Text style={styles.location}>{appointment.location}</Text>
         )}
       </View>
 
@@ -203,91 +202,85 @@ export default function AppointmentDetail() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Documents</Text>
+          <Text style={styles.sectionTitle}>Attached Documents</Text>
           <View style={styles.actionButtons}>
             <TouchableOpacity onPress={handleAddDocument} style={styles.actionButton}>
-              <Ionicons name="camera" size={20} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Take Photo</Text>
+              <Ionicons name="add" size={20} color={Colors.primary} />
+              <Text style={styles.actionButtonText}>Add New</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                loadVaultDocuments();
-                setShowVault(true);
-              }}
-              style={styles.actionButton}
-            >
-              <Ionicons name="folder-open" size={20} color="#007AFF" />
-              <Text style={styles.actionButtonText}>Attach from Vault</Text>
+            <TouchableOpacity onPress={loadVaultDocuments} style={styles.actionButton}>
+              <Ionicons name="folder-open" size={20} color={Colors.primary} />
+              <Text style={styles.actionButtonText}>From Vault</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {appointment.documents.length > 0 ? (
-          <View style={styles.documentsContainer}>
-            {appointment.documents.map((doc) => (
+          <FlatList
+            data={appointment.documents}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
               <DocumentCard
-                key={doc.id}
-                document={doc}
-                onPress={() => handleViewDocument(doc)}
-                onDelete={() => handleDeleteDocument(doc.id)}
+                document={item}
+                onView={handleViewDocument}
+                onDelete={handleDeleteDocument}
               />
-            ))}
-          </View>
+            )}
+            scrollEnabled={false}
+          />
         ) : (
           <View style={styles.emptyState}>
-            <Ionicons name="document-outline" size={48} color="#ccc" />
+            <Ionicons name="document-outline" size={48} color={Colors.gray} />
             <Text style={styles.emptyText}>No documents attached</Text>
-            <Text style={styles.emptySubtext}>Add documents to keep track of your appointment records</Text>
           </View>
         )}
       </View>
 
-      {showVault && (
-        <View style={styles.modal}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>Select Document from Vault</Text>
-            <TouchableOpacity onPress={() => setShowVault(false)}>
-              <Ionicons name="close" size={24} color="#666" />
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={vaultDocuments}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.vaultItem}
-                onPress={() => handleAttachVaultDocument(item)}
-              >
-                <View style={styles.vaultItemIcon}>
-                  {item.type.includes('image') ? (
-                    <Ionicons name="image-outline" size={24} color="#007AFF" />
-                  ) : (
-                    <Ionicons name="document-outline" size={24} color="#007AFF" />
-                  )}
-                </View>
-                <View style={styles.vaultItemContent}>
-                  <Text style={styles.vaultItemTitle}>{item.title}</Text>
-                  <Text style={styles.vaultItemDate}>{format(new Date(item.uploadDate), 'MMM d, yyyy')}</Text>
-                </View>
-              </TouchableOpacity>
-            )}
-            ListEmptyComponent={
-              <View style={styles.emptyVault}>
-                <Ionicons name="folder-outline" size={48} color="#ccc" />
-                <Text style={styles.emptyText}>No documents in vault</Text>
-                <Text style={styles.emptySubtext}>Add documents to your vault first</Text>
-              </View>
-            }
-          />
-        </View>
-      )}
-
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-          <Text style={styles.deleteButtonText}>Delete Appointment</Text>
+        <TouchableOpacity onPress={() => router.push(`/appointment/edit/${appointment.id}`)} style={styles.editButton}>
+          <Ionicons name="pencil" size={20} color={Colors.primary} />
+          <Text style={styles.editButtonText}>Edit</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
+          <Ionicons name="trash" size={20} color={Colors.error} />
+          <Text style={styles.deleteButtonText}>Delete</Text>
         </TouchableOpacity>
       </View>
+
+      <Modal
+        visible={showVault}
+        animationType="slide"
+        onRequestClose={() => setShowVault(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select from Vault</Text>
+            <TouchableOpacity onPress={() => setShowVault(false)}>
+              <Ionicons name="close" size={24} color={Colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {vaultDocuments.length > 0 ? (
+            <FlatList
+              data={vaultDocuments}
+              keyExtractor={(item) => item.id.toString()}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.vaultItem}
+                  onPress={() => handleAttachVaultDocument(item)}
+                >
+                  <DocumentCard document={item} />
+                </TouchableOpacity>
+              )}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="folder-outline" size={48} color={Colors.gray} />
+              <Text style={styles.emptyText}>No documents in vault</Text>
+            </View>
+          )}
+        </View>
+      </Modal>
     </ScrollView>
   );
 }
@@ -295,42 +288,37 @@ export default function AppointmentDetail() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: Colors.background,
   },
   header: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.border,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: Colors.text,
     marginBottom: 4,
   },
   provider: {
     fontSize: 18,
-    color: '#666',
+    color: Colors.textSecondary,
     marginBottom: 8,
   },
   date: {
     fontSize: 16,
-    color: '#444',
-    marginBottom: 8,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 8,
+    color: Colors.textSecondary,
+    marginBottom: 4,
   },
   location: {
     fontSize: 16,
-    color: '#444',
-    marginLeft: 8,
+    color: Colors.textSecondary,
   },
   section: {
     padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.border,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -341,6 +329,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: Colors.text,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -351,110 +340,70 @@ const styles = StyleSheet.create({
     marginLeft: 16,
   },
   actionButtonText: {
-    color: '#007AFF',
+    color: Colors.primary,
     marginLeft: 4,
-    fontSize: 14,
   },
   notes: {
     fontSize: 16,
+    color: Colors.text,
     lineHeight: 24,
-    color: '#333',
-  },
-  documentsContainer: {
-    marginTop: 12,
   },
   emptyState: {
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 32,
   },
   emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 16,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
+    color: Colors.gray,
     marginTop: 8,
-    textAlign: 'center',
   },
-  modal: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: '70%',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.primaryLight,
+  },
+  editButtonText: {
+    color: Colors.primary,
+    marginLeft: 8,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: Colors.errorLight,
+  },
+  deleteButtonText: {
+    color: Colors.error,
+    marginLeft: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: Colors.background,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: Colors.border,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: Colors.text,
   },
   vaultItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  vaultItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  vaultItemContent: {
-    flex: 1,
-  },
-  vaultItemTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  vaultItemDate: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  emptyVault: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  footer: {
-    padding: 20,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#FF3B30',
-  },
-  deleteButtonText: {
-    color: '#FF3B30',
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '500',
+    borderBottomColor: Colors.border,
   },
 });
