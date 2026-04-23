@@ -104,6 +104,17 @@ const DigestScreen = () => {
     }
   };
 
+  const getImpactIcon = (impact: string) => {
+    switch (impact) {
+      case 'positive':
+        return 'arrow-up-circle';
+      case 'negative':
+        return 'arrow-down-circle';
+      default:
+        return 'remove-circle';
+    }
+  };
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -135,9 +146,17 @@ const DigestScreen = () => {
       {digest.map((highlight) => (
         <View key={highlight.id} style={styles.highlightCard}>
           <View style={styles.highlightHeader}>
-            <Text style={[styles.highlightTitle, { color: getImpactColor(highlight.impact) }]}>
-              {highlight.title}
-            </Text>
+            <View style={styles.titleContainer}>
+              <Ionicons
+                name={getImpactIcon(highlight.impact)}
+                size={24}
+                color={getImpactColor(highlight.impact)}
+                style={styles.impactIcon}
+              />
+              <Text style={[styles.highlightTitle, { color: getImpactColor(highlight.impact) }]}>
+                {highlight.title}
+              </Text>
+            </View>
             {highlight.audioUrl && (
               <TouchableOpacity
                 onPress={() => playAudio(highlight.audioUrl!, highlight.id)}
@@ -174,52 +193,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: Colors.background,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.background,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: Colors.text,
-    fontSize: 16,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: Colors.background,
-  },
-  errorText: {
-    marginTop: 16,
-    color: Colors.error,
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    backgroundColor: Colors.primary,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: Colors.white,
-    fontWeight: 'bold',
+    padding: 16,
   },
   header: {
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
@@ -227,9 +210,9 @@ const styles = StyleSheet.create({
   },
   highlightCard: {
     backgroundColor: Colors.cardBackground,
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
-    margin: 16,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -242,37 +225,81 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  impactIcon: {
+    marginRight: 8,
+  },
   highlightTitle: {
     fontSize: 18,
     fontWeight: '600',
+    flex: 1,
   },
   highlightExplanation: {
     fontSize: 16,
-    color: Colors.text,
+    color: Colors.textSecondary,
     lineHeight: 24,
   },
-  premiumPrompt: {
-    backgroundColor: Colors.primaryLight,
-    padding: 16,
-    margin: 16,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: Colors.textSecondary,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: Colors.background,
+    padding: 24,
+  },
+  errorText: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    marginVertical: 16,
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
+  },
+  retryButtonText: {
+    color: Colors.white,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  premiumPrompt: {
+    backgroundColor: Colors.cardBackground,
+    borderRadius: 8,
+    padding: 16,
+    marginTop: 16,
     alignItems: 'center',
   },
   premiumText: {
-    color: Colors.primary,
     fontSize: 16,
+    color: Colors.text,
     marginBottom: 12,
-    fontWeight: '500',
   },
   upgradeButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
   },
   upgradeButtonText: {
     color: Colors.white,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
