@@ -4,6 +4,7 @@ import { webSocketService } from './WebSocketService';
 class KubernetesAPI {
   constructor() {
     this.baseURL = process.env.KUBERNETES_API_URL || 'https://your-kubernetes-api-endpoint';
+    this.wsEndpoint = process.env.KUBERNETES_WS_ENDPOINT || 'wss://your-websocket-endpoint';
     this.token = process.env.KUBERNETES_API_TOKEN || 'your-api-token';
     this.currentCpu = 50;
     this.currentMemory = 60;
@@ -100,6 +101,7 @@ class KubernetesAPI {
     this.errorCallback = errorCallback;
 
     webSocketService.connect(
+      this.wsEndpoint,
       (data) => {
         this.currentCpu = data.cpu || this.currentCpu;
         this.currentMemory = data.memory || this.currentMemory;
