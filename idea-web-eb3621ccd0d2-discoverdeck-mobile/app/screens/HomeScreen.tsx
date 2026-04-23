@@ -1,29 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { mockApps } from '../utils/mockApps';
+import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import { getRecommendations } from '../utils/recommendations';
 import { AppRecommendation } from '../types/app';
 
 const HomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredApps, setFilteredApps] = useState<AppRecommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<AppRecommendation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (searchQuery.trim() === '') {
-      setFilteredApps(mockApps);
-    } else {
-      const query = searchQuery.toLowerCase();
-      const results = mockApps.filter(app =>
-        app.tags.some(tag => tag.toLowerCase().includes(query)) ||
-        app.useCases.some(useCase => useCase.toLowerCase().includes(query)) ||
-        app.name.toLowerCase().includes(query) ||
-        app.description.toLowerCase().includes(query)
-      );
-      setFilteredApps(results);
-    }
+    const fetchRecommendations = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const { data, error } = await getRecommendations(searchQuery);
+        if (error) {
+          setError(error);
+        } else {
+          setRecommendations(data);
+        }
+      } catch (err) {
+        setError('Failed to fetch recommendations');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const debounceTimer = setTimeout(() => {
+      fetchRecommendations();
+    }, 300);
+
+    return () => clearTimeout(debounceTimer);
   }, [searchQuery]);
 
+  const handleAppPress = (app: AppRecommendation) => {
+    const url = Platform.OS === 'ios' ? app.appStoreUrl : app.playStoreUrl;
+    Linking.openURL(url).catch(err => console.error("Couldn't open URL:", err));
+  };
+
   const renderAppItem = ({ item }: { item: AppRecommendation }) => (
-    <TouchableOpacity style={styles.appCard} onPress={() => console.log('App selected:', item.name)}>
+    <TouchableOpacity
+      style={styles.appCard}
+      onPress={() => handleAppPress(item)}
+      activeOpacity={0.8}
+    >
       <Image source={{ uri: item.iconUrl }} style={styles.appIcon} />
       <View style={styles.appInfo}>
         <Text style={styles.appName}>{item.name}</Text>
@@ -34,6 +56,9 @@ const HomeScreen = () => {
           </Text>
           <Text style={styles.reviewCount}>{item.reviewCount} reviews</Text>
         </View>
+      </View>
+      <View style={styles.installButton}>
+        <Text style={styles.installText}>Install</Text>
       </View>
     </TouchableOpacity>
   );
@@ -51,11 +76,15 @@ const HomeScreen = () => {
         autoCapitalize="none"
       />
 
-      {filteredApps.length === 0 && searchQuery.trim() !== '' ? (
+      {loading ? (
+        <ActivityIndicator size="large" color="#6200EE" style={styles.loader} />
+      ) : error ? (
+        <Text style={styles.errorText}>{error}</Text>
+      ) : recommendations.length === 0 && searchQuery.trim() !== '' ? (
         <Text style={styles.emptyText}>No apps found. Try a different search.</Text>
       ) : (
         <FlatList
-          data={filteredApps}
+          data={recommendations}
           renderItem={renderAppItem}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
@@ -142,6 +171,24 @@ const styles = StyleSheet.create({
   reviewCount: {
     fontSize: 12,
     color: '#999',
+  },
+  installButton: {
+    backgroundColor: '#6200EE',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  installText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  loader: {
+    marginTop: 40,
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 20,
   },
   emptyText: {
     textAlign: 'center',

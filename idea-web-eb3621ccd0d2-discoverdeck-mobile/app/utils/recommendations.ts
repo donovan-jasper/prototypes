@@ -16,101 +16,49 @@ interface AppRecommendation {
   isFeatured?: boolean;
 }
 
-const mockApps: AppRecommendation[] = [
-  {
-    id: '1',
-    name: 'Notion',
-    description: 'All-in-one workspace for notes, tasks, and wikis',
-    category: 'productivity',
-    tags: ['notes', 'tasks', 'organization'],
-    iconUrl: 'https://example.com/notion-icon.png',
-    appStoreUrl: 'https://apps.apple.com/us/app/notion/id123456789',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=notion',
-    rating: 4.5,
-    reviewCount: 12000,
-    expertRating: 4.8,
-    isFeatured: true
-  },
-  {
-    id: '2',
-    name: 'Trello',
-    description: 'Visual project management tool',
-    category: 'productivity',
-    tags: ['tasks', 'project management', 'collaboration'],
-    iconUrl: 'https://example.com/trello-icon.png',
-    appStoreUrl: 'https://apps.apple.com/us/app/trello/id987654321',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=trello',
-    rating: 4.3,
-    reviewCount: 8000,
-    expertRating: 4.6,
-    isFeatured: true
-  },
-  {
-    id: '3',
-    name: 'Headspace',
-    description: 'Meditation and mindfulness app',
-    category: 'health',
-    tags: ['meditation', 'mental health', 'wellness'],
-    iconUrl: 'https://example.com/headspace-icon.png',
-    appStoreUrl: 'https://apps.apple.com/us/app/headspace/id123456789',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=headspace',
-    rating: 4.7,
-    reviewCount: 15000,
-    expertRating: 4.9,
-    isFeatured: true
-  },
-  {
-    id: '4',
-    name: 'Duolingo',
-    description: 'Language learning app',
-    category: 'education',
-    tags: ['language', 'learning', 'gamification'],
-    iconUrl: 'https://example.com/duolingo-icon.png',
-    appStoreUrl: 'https://apps.apple.com/us/app/duolingo/id123456789',
-    playStoreUrl: 'https://play.google.com/store/apps/details?id=duolingo',
-    rating: 4.6,
-    reviewCount: 20000,
-    expertRating: 4.7
-  }
-];
-
 export const getRecommendations = async (
   searchTerm: string = '',
   category: string = '',
   limitCount: number = 10
 ): Promise<{ data: AppRecommendation[]; loading: boolean; error: string | null }> => {
   try {
-    // For MVP, we'll use mock data until Firebase is fully set up
-    let filteredApps = [...mockApps];
+    let appsCollection = collection(db, 'apps');
+    let q = query(appsCollection, limit(limitCount));
 
     if (searchTerm) {
       const lowerSearch = searchTerm.toLowerCase();
-      filteredApps = filteredApps.filter(app =>
-        app.name.toLowerCase().includes(lowerSearch) ||
-        app.description.toLowerCase().includes(lowerSearch) ||
-        app.category.toLowerCase().includes(lowerSearch) ||
-        app.tags.some(tag => tag.toLowerCase().includes(lowerSearch))
+      q = query(
+        appsCollection,
+        where('searchable', 'array-contains', lowerSearch),
+        limit(limitCount)
       );
     } else if (category) {
-      filteredApps = filteredApps.filter(app =>
-        app.category.toLowerCase() === category.toLowerCase()
+      q = query(
+        appsCollection,
+        where('category', '==', category),
+        orderBy('expertRating', 'desc'),
+        limit(limitCount)
       );
     } else {
-      // Default to featured apps if no search or category
-      filteredApps = filteredApps.filter(app => app.isFeatured);
+      q = query(
+        appsCollection,
+        where('isFeatured', '==', true),
+        orderBy('expertRating', 'desc'),
+        limit(limitCount)
+      );
     }
 
-    // Sort by expert rating if available, otherwise by regular rating
-    filteredApps.sort((a, b) => {
-      const aRating = a.expertRating || a.rating;
-      const bRating = b.expertRating || b.rating;
-      return bRating - aRating;
+    const querySnapshot = await getDocs(q);
+    const apps: AppRecommendation[] = [];
+
+    querySnapshot.forEach((doc) => {
+      apps.push({
+        id: doc.id,
+        ...doc.data()
+      } as AppRecommendation);
     });
 
-    // Apply limit
-    filteredApps = filteredApps.slice(0, limitCount);
-
-    return { data: filteredApps, loading: false, error: null };
+    return { data: apps, loading: false, error: null };
   } catch (error) {
     console.error('Error fetching recommendations:', error);
     return { data: [], loading: false, error: 'Failed to fetch recommendations' };
