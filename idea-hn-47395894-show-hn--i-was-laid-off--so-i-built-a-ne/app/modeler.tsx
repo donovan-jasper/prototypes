@@ -3,7 +3,7 @@ import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, TextInput, Button, SegmentedButtons, Card, Divider } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import PremiumGate from '../components/PremiumGate';
-import { calculateEquityValue, calculateTaxImpact, calculateAMT } from '../lib/calculations';
+import { calculateEquityValue, calculateTaxImpact, calculateAMT, calculateScenarioValues } from '../lib/calculations';
 import { useEquityStore } from '../store/equityStore';
 import ScenarioChart from '../components/ScenarioChart';
 
@@ -57,20 +57,15 @@ export default function ScenarioModeler() {
     });
 
     // Generate chart data based on user's equity
-    const chartData = Array.from({ length: 10 }, (_, i) => {
-      const x = i + 1;
-      let scenarioValue = 0;
-
-      equities.forEach(equity => {
-        scenarioValue += calculateEquityValue(
-          equity.shares,
-          equity.strikePrice,
-          (valuation / 1000000) * (1 + i * 0.1)
-        );
-      });
-
-      return { x, y: scenarioValue };
-    });
+    const valuationRange = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4];
+    const chartData = calculateScenarioValues(
+      equities.map(e => ({
+        shares: e.shares,
+        strikePrice: e.strikePrice,
+        currentPrice: e.currentPrice
+      })),
+      valuationRange
+    );
 
     setResults({
       equityValue: totalEquityValue,
@@ -153,75 +148,59 @@ export default function ScenarioModeler() {
                     />
                   )}
                 />
+
+                <Controller
+                  control={control}
+                  name="annualIncome"
+                  render={({ field: { onChange, value } }) => (
+                    <TextInput
+                      label="Annual Income ($)"
+                      value={value}
+                      onChangeText={onChange}
+                      keyboardType="numeric"
+                      style={styles.input}
+                    />
+                  )}
+                />
               </>
             )}
-
-            <Controller
-              control={control}
-              name="annualIncome"
-              render={({ field: { onChange, value } }) => (
-                <TextInput
-                  label="Annual Income ($)"
-                  value={value}
-                  onChangeText={onChange}
-                  keyboardType="numeric"
-                  style={styles.input}
-                />
-              )}
-            />
-
-            <Button
-              mode="contained"
-              onPress={handleSubmit(onSubmit)}
-              style={styles.button}
-            >
-              Calculate Scenario
-            </Button>
           </Card.Content>
         </Card>
 
+        <Button
+          mode="contained"
+          onPress={handleSubmit(onSubmit)}
+          style={styles.button}
+        >
+          Calculate Scenario
+        </Button>
+
         {results && (
           <>
-            <Card style={styles.resultsCard}>
+            <Card style={styles.card}>
               <Card.Content>
                 <Text variant="titleMedium">Results</Text>
-
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">Equity Value:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
-                    ${results.equityValue.toLocaleString()}
-                  </Text>
+                  <Text>Estimated Equity Value:</Text>
+                  <Text style={styles.resultValue}>${results.equityValue.toLocaleString()}</Text>
                 </View>
-
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">Tax Impact:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
-                    ${results.taxImpact.toLocaleString()}
-                  </Text>
+                  <Text>Estimated Tax Impact:</Text>
+                  <Text style={styles.resultValue}>${results.taxImpact.toLocaleString()}</Text>
                 </View>
-
                 <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">AMT Impact:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
-                    ${results.amtImpact.toLocaleString()}
-                  </Text>
-                </View>
-
-                <Divider style={styles.divider} />
-
-                <View style={styles.resultRow}>
-                  <Text variant="bodyLarge">Net Proceeds:</Text>
-                  <Text variant="bodyLarge" style={styles.resultValue}>
-                    ${(results.equityValue - results.taxImpact - results.amtImpact).toLocaleString()}
-                  </Text>
+                  <Text>Estimated AMT Impact:</Text>
+                  <Text style={styles.resultValue}>${results.amtImpact.toLocaleString()}</Text>
                 </View>
               </Card.Content>
             </Card>
 
-            <ScenarioChart
-              data={results.chartData}
-              title="Valuation Scenario"
-            />
+            <Card style={styles.card}>
+              <Card.Content>
+                <Text variant="titleMedium">Valuation Scenario</Text>
+                <ScenarioChart data={results.chartData} />
+              </Card.Content>
+            </Card>
           </>
         )}
       </ScrollView>
@@ -233,36 +212,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5'
   },
   title: {
-    marginBottom: 24,
-    textAlign: 'center'
+    marginBottom: 16,
+    textAlign: 'center',
   },
   card: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   input: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   segmented: {
-    marginBottom: 16
+    marginBottom: 16,
   },
   button: {
-    marginTop: 8
-  },
-  resultsCard: {
-    marginBottom: 16
+    marginVertical: 16,
   },
   resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 8
+    marginVertical: 8,
   },
   resultValue: {
-    fontWeight: 'bold'
+    fontWeight: 'bold',
   },
-  divider: {
-    marginVertical: 16
-  }
 });

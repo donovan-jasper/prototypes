@@ -1,59 +1,49 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
+import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme } from 'victory-native';
 import { Text } from 'react-native-paper';
-import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme, VictoryLabel } from 'victory-native';
 
 interface ScenarioChartProps {
   data: { x: number; y: number }[];
-  title: string;
 }
 
-export default function ScenarioChart({ data, title }: ScenarioChartProps) {
+export default function ScenarioChart({ data }: ScenarioChartProps) {
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text>No data available for chart</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text variant="titleMedium" style={styles.title}>
-        {title}
-      </Text>
       <VictoryChart
         theme={VictoryTheme.material}
+        domainPadding={{ x: 20, y: 20 }}
         height={300}
-        width={350}
-        padding={{ top: 40, bottom: 50, left: 50, right: 20 }}
-        domainPadding={{ x: 20 }}
       >
         <VictoryAxis
-          dependentAxis
-          tickFormat={(x) => `$${(x / 1000).toFixed(0)}k`}
+          label="Valuation Multiplier"
           style={{
             axisLabel: { padding: 30 }
           }}
         />
         <VictoryAxis
-          tickFormat={(x) => `${x * 10}%`}
+          dependentAxis
+          label="Equity Value ($)"
           style={{
-            axisLabel: { padding: 30 }
+            axisLabel: { padding: 40 }
           }}
         />
         <VictoryLine
           data={data}
+          x="x"
+          y="y"
           style={{
-            data: { stroke: '#4CAF50', strokeWidth: 3 },
+            data: { stroke: '#4CAF50', strokeWidth: 2 },
             parent: { border: '1px solid #ccc' }
           }}
-          interpolation="natural"
-        />
-        <VictoryLabel
-          text="Valuation Increase (%)"
-          x={175}
-          y={280}
-          textAnchor="middle"
-        />
-        <VictoryLabel
-          text="Equity Value ($)"
-          x={25}
-          y={150}
-          textAnchor="middle"
-          angle={-90}
         />
       </VictoryChart>
     </View>
@@ -63,18 +53,10 @@ export default function ScenarioChart({ data, title }: ScenarioChartProps) {
 const styles = StyleSheet.create({
   container: {
     marginVertical: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2
   },
-  title: {
-    textAlign: 'center',
-    marginBottom: 8,
-    fontWeight: 'bold'
-  }
+  emptyContainer: {
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 });
