@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, TextInput, Button, SegmentedButtons, Card } from 'react-native-paper';
+import { Text, TextInput, Button, SegmentedButtons, Card, Divider } from 'react-native-paper';
 import { useForm, Controller } from 'react-hook-form';
 import PremiumGate from '../components/PremiumGate';
 import { calculateEquityValue, calculateTaxImpact, calculateAMT } from '../lib/calculations';
@@ -181,39 +181,48 @@ export default function ScenarioModeler() {
         </Card>
 
         {results && (
-          <Card style={styles.card}>
-            <Card.Content>
-              <Text variant="titleMedium">Results</Text>
+          <>
+            <Card style={styles.resultsCard}>
+              <Card.Content>
+                <Text variant="titleMedium">Results</Text>
 
-              <View style={styles.resultRow}>
-                <Text variant="bodyLarge">Total Equity Value:</Text>
-                <Text variant="bodyLarge" style={styles.resultValue}>
-                  ${results.equityValue.toLocaleString()}
-                </Text>
-              </View>
+                <View style={styles.resultRow}>
+                  <Text variant="bodyLarge">Equity Value:</Text>
+                  <Text variant="bodyLarge" style={styles.resultValue}>
+                    ${results.equityValue.toLocaleString()}
+                  </Text>
+                </View>
 
-              <View style={styles.resultRow}>
-                <Text variant="bodyLarge">Estimated Tax:</Text>
-                <Text variant="bodyLarge" style={styles.resultValue}>
-                  ${results.taxImpact.toLocaleString()}
-                </Text>
-              </View>
+                <View style={styles.resultRow}>
+                  <Text variant="bodyLarge">Tax Impact:</Text>
+                  <Text variant="bodyLarge" style={styles.resultValue}>
+                    ${results.taxImpact.toLocaleString()}
+                  </Text>
+                </View>
 
-              {saleType === 'secondary' && (
                 <View style={styles.resultRow}>
                   <Text variant="bodyLarge">AMT Impact:</Text>
                   <Text variant="bodyLarge" style={styles.resultValue}>
                     ${results.amtImpact.toLocaleString()}
                   </Text>
                 </View>
-              )}
 
-              <ScenarioChart
-                data={results.chartData}
-                title="Equity Value Projection"
-              />
-            </Card.Content>
-          </Card>
+                <Divider style={styles.divider} />
+
+                <View style={styles.resultRow}>
+                  <Text variant="bodyLarge">Net Proceeds:</Text>
+                  <Text variant="bodyLarge" style={styles.resultValue}>
+                    ${(results.equityValue - results.taxImpact - results.amtImpact).toLocaleString()}
+                  </Text>
+                </View>
+              </Card.Content>
+            </Card>
+
+            <ScenarioChart
+              data={results.chartData}
+              title="Valuation Scenario"
+            />
+          </>
         )}
       </ScrollView>
     </PremiumGate>
@@ -242,13 +251,18 @@ const styles = StyleSheet.create({
   button: {
     marginTop: 8
   },
+  resultsCard: {
+    marginBottom: 16
+  },
   resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginVertical: 8
   },
   resultValue: {
-    fontWeight: 'bold',
-    color: '#4CAF50'
+    fontWeight: 'bold'
+  },
+  divider: {
+    marginVertical: 16
   }
 });

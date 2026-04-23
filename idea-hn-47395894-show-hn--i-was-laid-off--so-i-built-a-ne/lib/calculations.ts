@@ -38,3 +38,27 @@ export const calculateAMT = (
   const spread = (fmv - strikePrice) * shares;
   return spread * 0.28; // AMT rate
 };
+
+export const calculateScenarioValues = (
+  equities: Array<{
+    shares: number;
+    strikePrice: number;
+    currentPrice: number;
+  }>,
+  valuationRange: number[]
+): Array<{ x: number; y: number }> => {
+  return valuationRange.map((multiplier, index) => {
+    const totalValue = equities.reduce((sum, equity) => {
+      return sum + calculateEquityValue(
+        equity.shares,
+        equity.strikePrice,
+        equity.currentPrice * multiplier
+      );
+    }, 0);
+
+    return {
+      x: index + 1,
+      y: totalValue
+    };
+  });
+};
