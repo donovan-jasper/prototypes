@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { Card, Text, IconButton, Avatar, useTheme } from 'react-native-paper';
+import { Card, Text, IconButton, Avatar, useTheme, TextInput } from 'react-native-paper';
 import { useCommunity } from '../hooks/useCommunity';
 import { useAppContext } from '../contexts/AppContext';
 
