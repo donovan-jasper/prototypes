@@ -1,36 +1,38 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
-import { Task } from '../types';
-import { loadTasks, saveTasks, loadStreak, saveStreak } from '../lib/storage';
-import TaskItem from '../components/TaskItem';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { TaskItem } from '../components/TaskItem';
+import { getTasks, saveTasks } from '../lib/storage';
 
-const TaskListScreen = () => {
+interface Task {
+  id: string;
+  text: string;
+  completed: boolean;
+  streak: number;
+  lastCompleted: string | null;
+}
+
+export const TaskListScreen = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [longestStreak, setLongestStreak] = useState(0);
 
   useEffect(() => {
-    const loadData = async () => {
-      const loadedTasks = await loadTasks();
-      const { currentStreak, longestStreak } = await loadStreak();
-      setTasks(loadedTasks);
-      setCurrentStreak(currentStreak);
-      setLongestStreak(longestStreak);
-    };
-    loadData();
+    loadTasks();
   }, []);
 
-  const addTask = async () => {
+  const loadTasks = async () => {
+    const storedTasks = await getTasks();
+    setTasks(storedTasks);
+  };
+
+  const handleAddTask = async () => {
     if (newTaskText.trim() === '') return;
 
     const newTask: Task = {
       id: Date.now().toString(),
-      title: newTaskText,
+      text: newTaskText.trim(),
       completed: false,
-      createdAt: new Date().toISOString(),
-      lastCompleted: null,
       streak: 0,
+      lastCompleted: null,
     };
 
     const updatedTasks = [...tasks, newTask];
@@ -39,30 +41,28 @@ const TaskListScreen = () => {
     setNewTaskText('');
   };
 
-  const toggleTaskCompletion = async (taskId: string) => {
+  const handleToggleComplete = async (taskId: string) => {
     const updatedTasks = tasks.map(task => {
       if (task.id === taskId) {
-        const newCompletedStatus = !task.completed;
         const today = new Date().toISOString().split('T')[0];
-        const lastCompletedDate = task.lastCompleted?.split('T')[0];
-
         let newStreak = task.streak;
+        let lastCompleted = task.lastCompleted;
 
-        if (newCompletedStatus) {
-          if (lastCompletedDate === today) {
-            // Already completed today, just toggle
-            return { ...task, completed: newCompletedStatus };
+        if (!task.completed) {
+          // Task being completed
+          if (task.lastCompleted === today) {
+            // Already completed today - no change
+            return task;
           }
 
-          if (lastCompletedDate) {
-            const lastCompleted = new Date(task.lastCompleted);
-            const yesterday = new Date();
-            yesterday.setDate(yesterday.getDate() - 1);
+          if (task.lastCompleted) {
+            const lastDate = new Date(task.lastCompleted);
+            const diffDays = Math.floor((new Date().getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
 
-            if (lastCompleted.toISOString().split('T')[0] === yesterday.toISOString().split('T')[0]) {
+            if (diffDays === 1) {
               // Consecutive day
-              newStreak += 1;
-            } else {
+              newStreak = task.streak + 1;
+            } else if (diffDays > 1) {
               // Broken streak
               newStreak = 1;
             }
@@ -71,24 +71,22 @@ const TaskListScreen = () => {
             newStreak = 1;
           }
 
-          // Update streaks
-          const newCurrentStreak = newStreak;
-          const newLongestStreak = Math.max(newCurrentStreak, longestStreak);
-
-          setCurrentStreak(newCurrentStreak);
-          setLongestStreak(newLongestStreak);
-          saveStreak(newCurrentStreak, newLongestStreak);
-
-          return {
-            ...task,
-            completed: newCompletedStatus,
-            lastCompleted: new Date().toISOString(),
-            streak: newStreak
-          };
+          lastCompleted = today;
         } else {
-          // Task marked incomplete
-          return { ...task, completed: newCompletedStatus };
+          // Task being uncompleted
+          if (task.lastCompleted === today) {
+            // Undoing today's completion
+            newStreak = task.streak - 1;
+            lastCompleted = null;
+          }
         }
+
+        return {
+          ...task,
+          completed: !task.completed,
+          streak: newStreak,
+          lastCompleted: lastCompleted,
+        };
       }
       return task;
     });
@@ -97,35 +95,9 @@ const TaskListScreen = () => {
     await saveTasks(updatedTasks);
   };
 
-  const deleteTask = async (taskId: string) => {
-    Alert.alert(
-      'Delete Task',
-      'Are you sure you want to delete this task?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const updatedTasks = tasks.filter(task => task.id !== taskId);
-            setTasks(updatedTasks);
-            await saveTasks(updatedTasks);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
-
   return (
     <View style={styles.container}>
-      <View style={styles.streakContainer}>
-        <Text style={styles.streakText}>Current Streak: {currentStreak} days</Text>
-        <Text style={styles.streakText}>Longest Streak: {longestStreak} days</Text>
-      </View>
+      <Text style={styles.title}>Your Tasks</Text>
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -133,9 +105,9 @@ const TaskListScreen = () => {
           placeholder="Add a new task..."
           value={newTaskText}
           onChangeText={setNewTaskText}
-          onSubmitEditing={addTask}
+          onSubmitEditing={handleAddTask}
         />
-        <TouchableOpacity style={styles.addButton} onPress={addTask}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
@@ -146,15 +118,10 @@ const TaskListScreen = () => {
         renderItem={({ item }) => (
           <TaskItem
             task={item}
-            onToggleComplete={() => toggleTaskCompletion(item.id)}
-            onDelete={() => deleteTask(item.id)}
+            onToggleComplete={() => handleToggleComplete(item.id)}
           />
         )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No tasks yet. Add one to get started!</Text>
-          </View>
-        }
+        contentContainerStyle={styles.listContent}
       />
     </View>
   );
@@ -163,57 +130,40 @@ const TaskListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
     backgroundColor: '#f5f5f5',
   },
-  streakContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 8,
-  },
-  streakText: {
-    fontSize: 16,
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#1976d2',
+    marginBottom: 20,
+    color: '#333',
   },
   inputContainer: {
     flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   input: {
     flex: 1,
-    padding: 12,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
+    height: 50,
     borderColor: '#ddd',
-    marginRight: 8,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    backgroundColor: '#fff',
+    marginRight: 10,
   },
   addButton: {
-    backgroundColor: '#1976d2',
-    padding: 12,
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
     borderRadius: 8,
     justifyContent: 'center',
-    alignItems: 'center',
   },
   addButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+  listContent: {
+    paddingBottom: 20,
   },
 });
-
-export default TaskListScreen;
