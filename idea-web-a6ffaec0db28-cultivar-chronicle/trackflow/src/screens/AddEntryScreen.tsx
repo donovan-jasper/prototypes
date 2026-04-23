@@ -7,6 +7,7 @@ import { addEntry } from '../services/database';
 import { fetchWeather } from '../services/weather';
 import { useCategories } from '../hooks/useCategories';
 import { Ionicons } from '@expo/vector-icons';
+import Toast from 'react-native-toast-message';
 
 const AddEntryScreen: React.FC = () => {
   const navigation = useNavigation();
@@ -19,6 +20,29 @@ const AddEntryScreen: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skipPhoto, setSkipPhoto] = useState(false);
+
+  useEffect(() => {
+    if (error) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error,
+        visibilityTime: 3000,
+      });
+    }
+  }, [error]);
+
+  const validateEntry = () => {
+    if (!skipPhoto && !photoUri) {
+      setError('Please capture or select a photo first');
+      return false;
+    }
+    if (!note.trim()) {
+      setError('Please add a note to your entry');
+      return false;
+    }
+    return true;
+  };
 
   const pickImageFromCamera = async () => {
     setError(null);
@@ -114,10 +138,7 @@ const AddEntryScreen: React.FC = () => {
   };
 
   const handleAddEntry = async () => {
-    if (!skipPhoto && !photoUri) {
-      setError('Please capture or select a photo first');
-      return;
-    }
+    if (!validateEntry()) return;
 
     setIsLoading(true);
     setError(null);
@@ -131,6 +152,14 @@ const AddEntryScreen: React.FC = () => {
         temperature,
         location,
       });
+
+      Toast.show({
+        type: 'success',
+        text1: 'Success',
+        text2: 'Entry added successfully!',
+        visibilityTime: 2000,
+      });
+
       navigation.goBack();
     } catch (error) {
       console.error('Error adding entry:', error);
@@ -155,26 +184,15 @@ const AddEntryScreen: React.FC = () => {
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={pickImageFromGallery}>
           <Ionicons name="images" size={24} color="#fff" />
-          <Text style={styles.buttonText}>Choose from Gallery</Text>
+          <Text style={styles.buttonText}>Select Photo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.skipButton} onPress={handleSkipPhoto}>
+          <Text style={styles.skipText}>Skip Photo</Text>
         </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.skipButton} onPress={handleSkipPhoto}>
-        <Ionicons name="image-outline" size={24} color="#666" />
-        <Text style={styles.skipButtonText}>Skip Photo</Text>
-      </TouchableOpacity>
-
       {photoUri && !skipPhoto && (
-        <View style={styles.previewContainer}>
-          <Image source={{ uri: photoUri }} style={styles.preview} />
-        </View>
-      )}
-
-      {skipPhoto && (
-        <View style={styles.skipPhotoContainer}>
-          <Ionicons name="image-outline" size={64} color="#ccc" />
-          <Text style={styles.skipPhotoText}>No photo added</Text>
-        </View>
+        <Image source={{ uri: photoUri }} style={styles.previewImage} />
       )}
 
       {isLoading && (
@@ -184,22 +202,14 @@ const AddEntryScreen: React.FC = () => {
         </View>
       )}
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Button title="Retry" onPress={retryFetch} />
-        </View>
-      )}
-
       <View style={styles.noteContainer}>
-        <Text style={styles.label}>Note</Text>
         <TextInput
           style={styles.noteInput}
-          multiline
-          numberOfLines={4}
-          placeholder="Add a note about your entry..."
+          placeholder="Add a note..."
           value={note}
           onChangeText={setNote}
+          multiline
+          numberOfLines={4}
         />
       </View>
 
@@ -214,18 +224,30 @@ const AddEntryScreen: React.FC = () => {
 
       {location && (
         <View style={styles.locationContainer}>
-          <Ionicons name="location" size={24} color="#FF5A5F" />
+          <Ionicons name="location" size={20} color="#FF3B30" />
           <Text style={styles.locationText}>{location}</Text>
         </View>
       )}
 
       <TouchableOpacity
-        style={[styles.submitButton, (!skipPhoto && !photoUri) && styles.disabledButton]}
+        style={[styles.saveButton, isLoading && styles.disabledButton]}
         onPress={handleAddEntry}
-        disabled={!skipPhoto && !photoUri}
+        disabled={isLoading}
       >
-        <Text style={styles.submitButtonText}>Add Entry</Text>
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.saveButtonText}>Save Entry</Text>
+        )}
       </TouchableOpacity>
+
+      {error && (
+        <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
+          <Text style={styles.retryText}>Retry Fetching Data</Text>
+        </TouchableOpacity>
+      )}
+
+      <Toast />
     </ScrollView>
   );
 };
@@ -234,7 +256,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -247,82 +269,46 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     flex: 1,
-    marginHorizontal: 5,
+    marginRight: 10,
+  },
+  skipButton: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   buttonText: {
     color: '#fff',
     marginTop: 5,
-    fontWeight: '600',
+    fontSize: 12,
   },
-  skipButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    marginBottom: 20,
+  skipText: {
+    color: '#007AFF',
+    fontSize: 12,
   },
-  skipButtonText: {
-    color: '#666',
-    marginLeft: 10,
-    fontWeight: '600',
-  },
-  previewContainer: {
-    marginBottom: 20,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  preview: {
+  previewImage: {
     width: '100%',
-    height: 250,
-    resizeMode: 'cover',
-  },
-  skipPhotoContainer: {
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f8f8f8',
+    height: 200,
     borderRadius: 10,
     marginBottom: 20,
-  },
-  skipPhotoText: {
-    color: '#666',
-    marginTop: 10,
-    fontSize: 16,
   },
   loadingContainer: {
     alignItems: 'center',
-    padding: 20,
-    marginBottom: 20,
+    marginVertical: 20,
   },
   loadingText: {
     marginTop: 10,
     color: '#666',
   },
-  errorContainer: {
-    padding: 15,
-    backgroundColor: '#fff0f0',
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#d32f2f',
-    marginBottom: 10,
-  },
   noteContainer: {
     marginBottom: 20,
   },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
   noteInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,
-    fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
   },
@@ -344,19 +330,32 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     fontSize: 16,
   },
-  submitButton: {
+  saveButton: {
     backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 10,
     alignItems: 'center',
+    marginBottom: 20,
   },
   disabledButton: {
-    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
-  submitButtonText: {
+  saveButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  retryButton: {
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FF3B30',
+    marginBottom: 20,
+  },
+  retryText: {
+    color: '#FF3B30',
+    fontSize: 16,
   },
 });
 
