@@ -3,6 +3,7 @@ import * as SQLite from 'expo-sqlite';
 import { getUserPreferences } from './database';
 import { calculateStreak, getLongestStreak, calculateCompletionRate, getStreakStatus } from './streaks';
 import { getHabitCompletions } from './habits';
+import * as Notifications from 'expo-notifications';
 
 const openai = new OpenAI({
   apiKey: process.env.EXPO_PUBLIC_OPENAI_API_KEY,
@@ -136,7 +137,87 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
   });
 }
 
-export async function getCoachTone(userId: string): Promise<'supportive' | 'encouraging' | 'challenging'> {
+async function getCoachTone(userId: string): Promise<'supportive' | 'encouraging' | 'challenging'> {
   const preferences = await getUserPreferences(userId);
   return preferences?.coachTone || 'supportive';
+}
+
+export async function scheduleDailyCoachNotification(userId: string) {
+  // Cancel any existing notifications for this user
+  await cancelCoachNotifications(userId);
+
+  // Get user's preferred notification time
+  const preferences = await getUserPreferences(userId);
+  const notificationTime = preferences?.notificationTime || '09:00';
+
+  // Parse time and create notification date
+  const [hours, minutes] = notificationTime.split(':').map(Number);
+  const now = new Date();
+  const notificationDate = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    hours,
+    minutes,
+    0
+  );
+
+  // If time has already passed today, schedule for tomorrow
+  if (notificationDate < now) {
+    notificationDate.setDate(notificationDate.getDate() + 1);
+  }
+
+  // Schedule the notification
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Your AI Coach is waiting",
+      body: "Check in with your daily motivation message!",
+      sound: 'default',
+      data: { type: 'coach-checkin', userId },
+    },
+    trigger: {
+      hour: hours,
+      minute: minutes,
+      repeats: true,
+    },
+  });
+
+  // Store in database for tracking
+  await storeScheduledNotification(userId, notificationDate);
+}
+
+async function cancelCoachNotifications(userId: string) {
+  // Cancel all notifications with this userId
+  await Notifications.cancelAsync();
+
+  // Remove from database
+  return new Promise((resolve) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM scheduled_notifications WHERE user_id = ? AND type = ?',
+        [userId, 'coach-checkin'],
+        () => resolve(),
+        (_, error) => {
+          console.error('Error canceling notifications:', error);
+          resolve();
+        }
+      );
+    });
+  });
+}
+
+async function storeScheduledNotification(userId: string, date: Date) {
+  return new Promise((resolve) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO scheduled_notifications (user_id, type, scheduled_time) VALUES (?, ?, ?)',
+        [userId, 'coach-checkin', date.toISOString()],
+        () => resolve(),
+        (_, error) => {
+          console.error('Error storing notification:', error);
+          resolve();
+        }
+      );
+    });
+  });
 }
