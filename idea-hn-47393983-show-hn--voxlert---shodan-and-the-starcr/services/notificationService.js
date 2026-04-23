@@ -1,3 +1,8 @@
+import * as Notifications from 'expo-notifications';
+import { Platform } from 'react-native';
+import { generateNarrativeText } from './contextService';
+import { playNarration } from './audioService';
+
 const APP_CATEGORIES = {
   EMAIL: ['gmail', 'outlook', 'mail', 'yahoo mail', 'apple mail'],
   MESSAGING: ['whatsapp', 'messenger', 'telegram', 'signal', 'discord', 'slack'],
@@ -55,13 +60,11 @@ const CATEGORIZATION_RULES = {
 };
 
 const extractSenderFromTitle = (title) => {
-  // Handle formats like "John Doe:" or "John Doe -"
   const match = title.match(/^([^-:]+)[:\s-]/);
   return match ? match[1].trim() : null;
 };
 
 const extractTimeFromBody = (body) => {
-  // Look for time patterns like "in 5 minutes", "arriving in 10 mins", etc.
   const timeMatch = body.match(/(?:in|arriving in|will arrive in)\s*(\d+)\s*(min|minute|minut|mins)/i);
   if (timeMatch) {
     return parseInt(timeMatch[1]);
@@ -70,49 +73,47 @@ const extractTimeFromBody = (body) => {
 };
 
 const extractLocationFromBody = (body) => {
-  // Look for location patterns
   const locationMatch = body.match(/(?:at|to|destination:)\s*([^.,]+)/i);
   return locationMatch ? locationMatch[1].trim() : null;
 };
 
 const extractAmountFromBody = (body) => {
-  // Look for monetary amounts
   const amountMatch = body.match(/\$?(\d+(?:\.\d{2})?)/);
   return amountMatch ? parseFloat(amountMatch[1]) : null;
 };
 
 const generateNarrativeForEmail = (notification) => {
-  const sender = extractSenderFromTitle(notification.title) || 
-                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] || 
+  const sender = extractSenderFromTitle(notification.title) ||
+                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] ||
                  'unknown sender';
-  
+
   let narrative = `New email from ${sender}`;
-  
+
   if (notification.body && notification.body.length > 0) {
     narrative += `: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
   }
-  
+
   return narrative;
 };
 
 const generateNarrativeForMessaging = (notification) => {
-  const sender = extractSenderFromTitle(notification.title) || 
-                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] || 
+  const sender = extractSenderFromTitle(notification.title) ||
+                 notification.body.match(/from:\s*([^\s]+)/i)?.[1] ||
                  'unknown contact';
-  
+
   let narrative = `New message from ${sender}`;
-  
+
   if (notification.body && notification.body.length > 0) {
     narrative += `: ${notification.body}`;
   }
-  
+
   return narrative;
 };
 
 const generateNarrativeForSocial = (notification) => {
   const lowerTitle = notification.title.toLowerCase();
   const lowerBody = notification.body.toLowerCase();
-  
+
   if (lowerTitle.includes('like') || lowerBody.includes('liked')) {
     return `Someone liked your post`;
   } else if (lowerTitle.includes('comment') || lowerBody.includes('commented')) {
@@ -129,53 +130,91 @@ const generateNarrativeForSocial = (notification) => {
 const generateNarrativeForRideSharing = (notification) => {
   const time = extractTimeFromBody(notification.body);
   const location = extractLocationFromBody(notification.body);
-  
-  if (time !== null) {
-    return `Your ${notification.app} ride will arrive in ${time} minutes`;
+
+  if (time && location) {
+    return `Your ${notification.app} is arriving in ${time} minutes at ${location}`;
+  } else if (time) {
+    return `Your ${notification.app} is arriving in ${time} minutes`;
   } else if (location) {
-    return `Your ${notification.app} ride is heading to ${location}`;
+    return `Your ${notification.app} is at ${location}`;
   } else {
-    return `Update from ${notification.app}: ${notification.body}`;
+    return `New ${notification.app} update: ${notification.body}`;
   }
 };
 
 const generateNarrativeForFoodDelivery = (notification) => {
   const time = extractTimeFromBody(notification.body);
   const location = extractLocationFromBody(notification.body);
-  
-  if (time !== null) {
-    return `Your food delivery will arrive in ${time} minutes`;
+
+  if (time && location) {
+    return `Your ${notification.app} order will arrive in ${time} minutes at ${location}`;
+  } else if (time) {
+    return `Your ${notification.app} order will arrive in ${time} minutes`;
   } else if (location) {
-    return `Your order is being delivered to ${location}`;
+    return `Your ${notification.app} order is at ${location}`;
   } else {
-    return `Food delivery update: ${notification.body}`;
+    return `New ${notification.app} update: ${notification.body}`;
   }
 };
 
 const generateNarrativeForBanking = (notification) => {
   const amount = extractAmountFromBody(notification.body);
-  
-  if (amount !== null) {
-    return `Bank transaction: $${amount.toFixed(2)}. ${notification.body}`;
+
+  if (amount) {
+    return `New transaction of $${amount} in your ${notification.app} account`;
   } else {
-    return `Banking alert: ${notification.body}`;
+    return `New ${notification.app} update: ${notification.body}`;
   }
 };
 
 const generateNarrativeForHealth = (notification) => {
-  return `Health update from ${notification.app}: ${notification.body}`;
+  const lowerBody = notification.body.toLowerCase();
+
+  if (lowerBody.includes('step') || lowerBody.includes('walk')) {
+    return `Your step count has been updated`;
+  } else if (lowerBody.includes('calorie') || lowerBody.includes('calories')) {
+    return `Your calorie count has been updated`;
+  } else if (lowerBody.includes('workout') || lowerBody.includes('exercise')) {
+    return `Your workout has been recorded`;
+  } else {
+    return `New ${notification.app} health update: ${notification.body}`;
+  }
 };
 
 const generateNarrativeForProductivity = (notification) => {
-  return `Task or calendar update: ${notification.body}`;
+  const lowerTitle = notification.title.toLowerCase();
+  const lowerBody = notification.body.toLowerCase();
+
+  if (lowerTitle.includes('meeting') || lowerBody.includes('meeting')) {
+    return `You have a meeting scheduled`;
+  } else if (lowerTitle.includes('task') || lowerBody.includes('task')) {
+    return `New task assigned`;
+  } else if (lowerTitle.includes('reminder') || lowerBody.includes('reminder')) {
+    return `Reminder: ${notification.body}`;
+  } else {
+    return `New ${notification.app} update: ${notification.body}`;
+  }
 };
 
 const generateNarrativeForNews = (notification) => {
-  return `Latest news from ${notification.app}: ${notification.body.substring(0, 60)}${notification.body.length > 60 ? '...' : ''}`;
+  return `Breaking news from ${notification.app}: ${notification.body.substring(0, 50)}${notification.body.length > 50 ? '...' : ''}`;
 };
 
 const generateNarrativeForMusic = (notification) => {
-  return `Music update from ${notification.app}: ${notification.body}`;
+  const lowerTitle = notification.title.toLowerCase();
+  const lowerBody = notification.body.toLowerCase();
+
+  if (lowerTitle.includes('play') || lowerBody.includes('play')) {
+    return `Now playing: ${notification.body}`;
+  } else if (lowerTitle.includes('like') || lowerBody.includes('liked')) {
+    return `Someone liked your song`;
+  } else {
+    return `New ${notification.app} music update: ${notification.body}`;
+  }
+};
+
+const generateNarrativeForDefault = (notification) => {
+  return `New notification from ${notification.app}: ${notification.body}`;
 };
 
 const NARRATIVE_GENERATORS = {
@@ -188,50 +227,81 @@ const NARRATIVE_GENERATORS = {
   health: generateNarrativeForHealth,
   productivity: generateNarrativeForProductivity,
   news: generateNarrativeForNews,
-  music: generateNarrativeForMusic
+  music: generateNarrativeForMusic,
+  default: generateNarrativeForDefault
 };
 
-export const categorizeNotification = (notification) => {
+const categorizeNotification = (notification) => {
   for (const [category, rule] of Object.entries(CATEGORIZATION_RULES)) {
     if (rule(notification)) {
       return category;
     }
   }
-  return 'other';
+  return 'default';
 };
 
-export const generateNarrativeText = (notification) => {
+const processNotification = (notification) => {
   const category = categorizeNotification(notification);
-  
-  if (NARRATIVE_GENERATORS[category]) {
-    return NARRATIVE_GENERATORS[category](notification);
-  }
-  
-  // Default fallback
-  return `${notification.app} notification: ${notification.title} - ${notification.body}`;
+  const generator = NARRATIVE_GENERATORS[category] || NARRATIVE_GENERATORS.default;
+  const narrative = generator(notification);
+
+  return {
+    original: notification,
+    category,
+    narrative
+  };
 };
 
-export const processNotification = (rawNotification) => {
-  // Extract key information from the notification
-  const notificationData = {
-    app: rawNotification.request?.content?.data?.appName || 
-         rawNotification.request?.content?.title || 
-         'Unknown App',
-    title: rawNotification.request?.content?.title || '',
-    body: rawNotification.request?.content?.body || '',
-    timestamp: Date.now(),
-    raw: rawNotification
-  };
+const setupNotificationListener = () => {
+  if (Platform.OS === 'android') {
+    Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#FF231F7C',
+    });
+  }
 
-  // Categorize the notification
-  const category = categorizeNotification(notificationData);
-  
-  // Generate narrative text
-  const narrative = generateNarrativeText(notificationData);
+  Notifications.addNotificationReceivedListener(async (notification) => {
+    try {
+      const processed = processNotification({
+        app: notification.request.content.data?.app || 'Unknown App',
+        title: notification.request.content.title || '',
+        body: notification.request.content.body || ''
+      });
 
-  // Add processed data to the notification object
-  notificationData.category = category;
-  notificationData.narrative = narrative;
+      const narrative = generateNarrativeText({
+        app: processed.original.app,
+        action: processed.category,
+        details: {
+          title: processed.original.title,
+          body: processed.original.body
+        }
+      });
 
-  return notificationData;
+      await playNarration(narrative);
+    } catch (error) {
+      console.error('Error processing notification:', error);
+    }
+  });
+
+  Notifications.addNotificationResponseReceivedListener((response) => {
+    console.log('Notification response received:', response);
+  });
+};
+
+const requestNotificationPermissions = async () => {
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    console.log('Notification permissions not granted');
+    return false;
+  }
+  return true;
+};
+
+export {
+  processNotification,
+  setupNotificationListener,
+  requestNotificationPermissions,
+  categorizeNotification
 };
