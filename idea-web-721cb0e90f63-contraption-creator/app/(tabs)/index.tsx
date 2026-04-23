@@ -1,27 +1,26 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, StyleSheet, Alert } from 'react-native';
 import { Canvas } from '../../components/Canvas';
 import { PartPalette } from '../../components/PartPalette';
 import { PlaybackControls } from '../../components/PlaybackControls';
 import { useStore } from '../../lib/store';
 import { saveContraption } from '../../lib/storage';
-import { useRouter } from 'expo-router';
 
 export default function SandboxScreen() {
-  const router = useRouter();
   const canvasRef = useRef(null);
   const { parts, isPremium } = useStore();
-  const [contraptionId, setContraptionId] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Load contraption if editing existing
-    const id = router.params?.id as string;
-    if (id) {
-      setContraptionId(id);
-    }
-  }, [router.params]);
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async () => {
+    if (isSaving) return;
+
+    if (parts.length === 0) {
+      Alert.alert('Nothing to save', 'Add some parts to your contraption first');
+      return;
+    }
+
+    setIsSaving(true);
+
     try {
       const contraption = {
         name: `Contraption ${new Date().toLocaleString()}`,
@@ -33,27 +32,24 @@ export default function SandboxScreen() {
           height: part.height,
           rotation: part.rotation,
         })),
+        createdAt: new Date().toISOString(),
       };
 
       const id = await saveContraption(contraption);
-      Alert.alert('Success', 'Contraption saved!');
-      router.push(`/contraption/${id}`);
+      Alert.alert('Saved!', 'Your contraption has been saved successfully');
     } catch (error) {
+      console.error('Error saving contraption:', error);
       Alert.alert('Error', 'Failed to save contraption. Please try again.');
-      console.error('Save error:', error);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.canvasContainer}>
-        <Canvas ref={canvasRef} />
-      </View>
+      <Canvas ref={canvasRef} />
       <PartPalette />
-      <PlaybackControls
-        canvasRef={canvasRef}
-        onSave={handleSave}
-      />
+      <PlaybackControls canvasRef={canvasRef} onSave={handleSave} />
     </View>
   );
 }
@@ -62,14 +58,5 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  canvasContainer: {
-    flex: 1,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
-    margin: 16,
-    borderRadius: 8,
-    overflow: 'hidden',
   },
 });

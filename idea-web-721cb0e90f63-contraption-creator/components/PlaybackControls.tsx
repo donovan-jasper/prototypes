@@ -157,27 +157,23 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
       <TouchableOpacity
         style={[styles.recordButton, !permissionGranted && styles.disabledButton]}
         onPress={handleRecord}
-        disabled={!permissionGranted}
       >
         {isRecording ? (
-          <Animated.View
-            style={[
-              styles.recordingIndicator,
-              { backgroundColor: recordingIndicatorColor },
-            ]}
-          />
+          <View style={styles.recordingIndicatorContainer}>
+            <Animated.View
+              style={[
+                styles.recordingIndicator,
+                { backgroundColor: recordingIndicatorColor },
+              ]}
+            />
+            <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+          </View>
         ) : (
           <MaterialIcons name="fiber-manual-record" size={24} color="white" />
         )}
       </TouchableOpacity>
 
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>
-          {isRecording ? formatTime(recordingTime) : '0:00'}
-        </Text>
-      </View>
-
-      <TouchableOpacity style={styles.saveButton} onPress={onSave}>
+      <TouchableOpacity style={styles.button} onPress={onSave}>
         <MaterialIcons name="save" size={24} color="white" />
       </TouchableOpacity>
     </View>
@@ -187,54 +183,42 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 16,
     backgroundColor: '#2c3e50',
     borderTopWidth: 1,
     borderTopColor: '#34495e',
   },
   button: {
-    width: 48,
-    height: 48,
+    padding: 12,
     borderRadius: 24,
     backgroundColor: '#3498db',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 8,
   },
   recordButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#e74c3c',
-    alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 8,
+    alignItems: 'center',
   },
   disabledButton: {
     opacity: 0.5,
   },
-  recordingIndicator: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-  },
-  timeContainer: {
-    width: 60,
+  recordingIndicatorContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  timeText: {
+  recordingIndicator: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  recordingTime: {
     color: 'white',
     fontSize: 14,
-  },
-  saveButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#2ecc71',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 8,
+    fontWeight: 'bold',
   },
 });
