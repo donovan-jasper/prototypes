@@ -1,66 +1,39 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
-import MapView, { Marker, Callout } from 'react-native-maps';
-import * as Location from 'expo-location';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { useRestaurants } from '@/hooks/useRestaurants';
 import { Restaurant } from '@/types';
+import RestaurantCard from '@/components/RestaurantCard';
 import { useRouter } from 'expo-router';
-import { SafetyScoreBadge } from '@/components/SafetyScoreBadge';
-import { RestaurantCard } from '@/components/RestaurantCard';
-import { MapMarker } from '@/components/MapMarker';
 
-export default function MapScreen() {
-  const router = useRouter();
-  const { restaurants, isLoading, error, refresh } = useRestaurants();
-  const [region, setRegion] = useState({
-    latitude: 37.7749,
-    longitude: -122.4194,
-    latitudeDelta: 0.0922,
-    longitudeDelta: 0.0421,
-  });
+const MapScreen = () => {
+  const { restaurants, isLoading, error, location, fetchRestaurantsByLocation } = useRestaurants();
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
-
-  const handleRegionChange = useCallback((newRegion) => {
-    setRegion(newRegion);
-  }, []);
-
-  const handleMarkerPress = useCallback((restaurant: Restaurant) => {
-    setSelectedRestaurant(restaurant);
-  }, []);
-
-  const handleCalloutPress = useCallback(() => {
-    if (selectedRestaurant) {
-      router.push(`/restaurant/${selectedRestaurant.id}`);
-    }
-  }, [selectedRestaurant, router]);
+  const router = useRouter();
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          console.log('Location permission not granted');
-          return;
-        }
+    fetchRestaurantsByLocation();
+  }, [fetchRestaurantsByLocation]);
 
-        const location = await Location.getCurrentPositionAsync({});
-        setRegion({
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        });
-      } catch (err) {
-        console.error('Error getting location:', err);
-      }
-    })();
-  }, []);
+  const getMarkerColor = (score: number) => {
+    if (score >= 90) return 'green';
+    if (score >= 70) return 'yellow';
+    return 'red';
+  };
 
-  if (isLoading) {
+  const handleMarkerPress = (restaurant: Restaurant) => {
+    setSelectedRestaurant(restaurant);
+  };
+
+  const handleCardPress = (restaurantId: string) => {
+    router.push(`/restaurant/${restaurantId}`);
+  };
+
+  if (isLoading && !location) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading nearby restaurants...</Text>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Finding your location...</Text>
       </View>
     );
   }
@@ -68,10 +41,7 @@ export default function MapScreen() {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Failed to load restaurants: {error.message}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={refresh}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+        <Text style={styles.errorText}>{error}</Text>
       </View>
     );
   }
@@ -80,8 +50,13 @@ export default function MapScreen() {
     <View style={styles.container}>
       <MapView
         style={styles.map}
-        region={region}
-        onRegionChangeComplete={handleRegionChange}
+        provider={PROVIDER_GOOGLE}
+        initialRegion={{
+          latitude: location?.coords.latitude || 37.7749,
+          longitude: location?.coords.longitude || -122.4194,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
         showsUserLocation={true}
         followsUserLocation={true}
       >
@@ -92,34 +67,23 @@ export default function MapScreen() {
               latitude: restaurant.latitude,
               longitude: restaurant.longitude,
             }}
+            pinColor={getMarkerColor(restaurant.safetyScore)}
             onPress={() => handleMarkerPress(restaurant)}
-          >
-            <MapMarker score={restaurant.safetyScore} />
-            <Callout onPress={handleCalloutPress}>
-              <View style={styles.calloutContainer}>
-                <RestaurantCard
-                  restaurant={restaurant}
-                  showDistance={false}
-                  onPress={() => router.push(`/restaurant/${restaurant.id}`)}
-                />
-              </View>
-            </Callout>
-          </Marker>
+          />
         ))}
       </MapView>
 
       {selectedRestaurant && (
-        <View style={styles.selectedRestaurantContainer}>
+        <View style={styles.cardContainer}>
           <RestaurantCard
             restaurant={selectedRestaurant}
-            showDistance={true}
-            onPress={() => router.push(`/restaurant/${selectedRestaurant.id}`)}
+            onPress={() => handleCardPress(selectedRestaurant.id)}
           />
         </View>
       )}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
@@ -132,7 +96,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
     marginTop: 10,
@@ -146,35 +109,17 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    color: 'red',
     fontSize: 16,
-    color: '#d32f2f',
     textAlign: 'center',
-    marginBottom: 20,
   },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  calloutContainer: {
-    width: 250,
-  },
-  selectedRestaurantContainer: {
+  cardContainer: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    zIndex: 1,
   },
 });
+
+export default MapScreen;

@@ -1,140 +1,88 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Restaurant } from '@/types';
+import * as api from '@/services/api';
 import * as Location from 'expo-location';
-import { Restaurant, Inspection } from '@/types';
-import { searchRestaurants, getRestaurantsByLocation, getRestaurantDetails, getInspectionsForRestaurant } from '@/services/api';
-import { cacheRestaurants, getCachedRestaurants, cacheInspections, getCachedInspections } from '@/services/database';
 
-interface UseRestaurantsResult {
-  restaurants: Restaurant[];
-  isLoading: boolean;
-  error: Error | null;
-  refresh: () => Promise<void>;
-  searchRestaurants: (query: string) => Promise<void>;
-  getRestaurantById: (id: string) => Promise<Restaurant | null>;
-  getInspectionsByRestaurantId: (id: string) => Promise<Inspection[]>;
-}
-
-export const useRestaurants = (): UseRestaurantsResult => {
+export const useRestaurants = () => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [location, setLocation] = useState<Location.LocationObject | null>(null);
 
   const fetchRestaurantsByLocation = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // Get user location
+      // Get current location
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        throw new Error('Location permission not granted');
+        throw new Error('Permission to access location was denied');
       }
 
-      const location = await Location.getCurrentPositionAsync({});
-      const { latitude, longitude } = location.coords;
+      const currentLocation = await Location.getCurrentPositionAsync({});
+      setLocation(currentLocation);
 
-      // First try to get from cache
-      const cachedRestaurants = await getCachedRestaurants();
-      if (cachedRestaurants.length > 0) {
-        setRestaurants(cachedRestaurants);
-      }
+      // Fetch restaurants near current location
+      const fetchedRestaurants = await api.getRestaurantsByLocation(
+        currentLocation.coords.latitude,
+        currentLocation.coords.longitude
+      );
 
-      // Then fetch from API
-      const apiRestaurants = await getRestaurantsByLocation(latitude, longitude);
-      setRestaurants(apiRestaurants);
-
-      // Cache the results
-      await cacheRestaurants(apiRestaurants);
+      setRestaurants(fetchedRestaurants);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to fetch restaurants'));
+      setError(err instanceof Error ? err.message : 'Failed to fetch restaurants');
       console.error('Error fetching restaurants:', err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const handleSearchRestaurants = useCallback(async (query: string) => {
+  const searchRestaurants = useCallback(async (query: string) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      // First try to get from cache
-      const cachedRestaurants = await getCachedRestaurants();
-      const cachedResults = cachedRestaurants.filter(
-        restaurant =>
-          restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
-          restaurant.address.toLowerCase().includes(query.toLowerCase()) ||
-          restaurant.cuisine.toLowerCase().includes(query.toLowerCase())
-      );
-
-      if (cachedResults.length > 0) {
-        setRestaurants(cachedResults);
-        setIsLoading(false);
-        return;
-      }
-
-      // If not in cache, fetch from API
-      const apiRestaurants = await searchRestaurants(query);
-      setRestaurants(apiRestaurants);
-
-      // Cache the results
-      await cacheRestaurants(apiRestaurants);
+      const results = await api.searchRestaurants(query);
+      setRestaurants(results);
     } catch (err) {
-      setError(err instanceof Error ? err : new Error('Failed to search restaurants'));
+      setError(err instanceof Error ? err.message : 'Failed to search restaurants');
       console.error('Error searching restaurants:', err);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  const getRestaurantById = useCallback(async (id: string): Promise<Restaurant | null> => {
+  const getRestaurantDetails = useCallback(async (restaurantId: string) => {
     try {
-      // First try to get from cache
-      const cachedRestaurants = await getCachedRestaurants();
-      const cachedRestaurant = cachedRestaurants.find(r => r.id === id);
-      if (cachedRestaurant) {
-        return cachedRestaurant;
-      }
+      setIsLoading(true);
+      setError(null);
 
-      // If not in cache, fetch from API
-      const restaurant = await getRestaurantDetails(id);
-      await cacheRestaurants([restaurant]);
+      const restaurant = await api.getRestaurantDetails(restaurantId);
       return restaurant;
     } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch restaurant details');
       console.error('Error fetching restaurant details:', err);
-      return null;
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   }, []);
 
-  const getInspectionsByRestaurantId = useCallback(async (id: string): Promise<Inspection[]> => {
-    try {
-      // First try to get from cache
-      const cachedInspections = await getCachedInspections(id);
-      if (cachedInspections.length > 0) {
-        return cachedInspections;
-      }
-
-      // If not in cache, fetch from API
-      const inspections = await getInspectionsForRestaurant(id);
-      await cacheInspections(inspections);
-      return inspections;
-    } catch (err) {
-      console.error('Error fetching inspections:', err);
-      return [];
+  const refreshData = useCallback(async () => {
+    if (location) {
+      await fetchRestaurantsByLocation();
     }
-  }, []);
-
-  useEffect(() => {
-    fetchRestaurantsByLocation();
-  }, [fetchRestaurantsByLocation]);
+  }, [location, fetchRestaurantsByLocation]);
 
   return {
     restaurants,
     isLoading,
     error,
-    refresh: fetchRestaurantsByLocation,
-    searchRestaurants: handleSearchRestaurants,
-    getRestaurantById,
-    getInspectionsByRestaurantId,
+    location,
+    fetchRestaurantsByLocation,
+    searchRestaurants,
+    getRestaurantDetails,
+    refreshData,
   };
 };

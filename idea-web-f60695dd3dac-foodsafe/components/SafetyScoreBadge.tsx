@@ -3,53 +3,64 @@ import { View, Text, StyleSheet } from 'react-native';
 
 interface SafetyScoreBadgeProps {
   score: number;
-  size?: 'small' | 'medium' | 'large';
+  lastInspectionDate: string;
 }
 
-export const SafetyScoreBadge: React.FC<SafetyScoreBadgeProps> = ({ score, size = 'medium' }) => {
-  // Determine color based on score
-  let color = '#FF5252'; // Red for low scores
-  if (score >= 70) color = '#FFC107'; // Yellow for medium scores
-  if (score >= 90) color = '#4CAF50'; // Green for high scores
+const SafetyScoreBadge: React.FC<SafetyScoreBadgeProps> = ({ score, lastInspectionDate }) => {
+  const getScoreColor = () => {
+    if (score >= 90) return '#4CAF50'; // Green
+    if (score >= 70) return '#FFC107'; // Yellow
+    return '#F44336'; // Red
+  };
 
-  // Determine size
-  const sizeStyles = {
-    small: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      fontSize: 12,
-    },
-    medium: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      fontSize: 16,
-    },
-    large: {
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      fontSize: 24,
-    },
-  }[size];
+  const getScoreText = () => {
+    if (score >= 90) return 'Excellent';
+    if (score >= 70) return 'Good';
+    return 'Needs Attention';
+  };
 
   return (
-    <View style={[styles.badge, { backgroundColor: color }, sizeStyles]}>
-      <Text style={[styles.scoreText, { fontSize: sizeStyles.fontSize }]}>{score}</Text>
+    <View style={styles.container}>
+      <View style={[styles.scoreCircle, { backgroundColor: getScoreColor() }]}>
+        <Text style={styles.scoreText}>{score}</Text>
+      </View>
+      <View style={styles.infoContainer}>
+        <Text style={styles.scoreLabel}>{getScoreText()}</Text>
+        <Text style={styles.dateText}>Last inspected: {lastInspectionDate}</Text>
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  badge: {
+  container: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  scoreCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
+    marginRight: 10,
   },
   scoreText: {
     color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
   },
+  infoContainer: {
+    flex: 1,
+  },
+  scoreLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#666',
+  },
 });
+
+export default SafetyScoreBadge;

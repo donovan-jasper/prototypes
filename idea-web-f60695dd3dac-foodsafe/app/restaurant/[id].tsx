@@ -1,102 +1,62 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, StyleSheet, Text, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, StyleSheet, Text, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useRestaurants } from '@/hooks/useRestaurants';
-import { useSubscription } from '@/hooks/useSubscription';
 import { Restaurant, Inspection } from '@/types';
-import { SafetyScoreBadge } from '@/components/SafetyScoreBadge';
-import { InspectionTimeline } from '@/components/InspectionTimeline';
-import { Colors } from '@/constants/Colors';
+import SafetyScoreBadge from '@/components/SafetyScoreBadge';
+import InspectionTimeline from '@/components/InspectionTimeline';
 import { Ionicons } from '@expo/vector-icons';
-import { useLists } from '@/hooks/useLists';
+import * as api from '@/services/api';
 
-export default function RestaurantDetailScreen() {
+const RestaurantDetailScreen = () => {
   const { id } = useLocalSearchParams();
-  const router = useRouter();
-  const { isPremium } = useSubscription();
-  const { getRestaurantDetails, getInspectionHistory } = useRestaurants();
-  const { lists, addRestaurantToList, createList } = useLists();
-
+  const { isLoading, error } = useRestaurants();
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [inspections, setInspections] = useState<Inspection[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!id) return;
-
+    const fetchRestaurantDetails = async () => {
       try {
-        setIsLoading(true);
-        const restaurantData = await getRestaurantDetails(id as string);
+        setIsLoadingDetails(true);
+
+        // Fetch restaurant details
+        const restaurantData = await api.getRestaurantDetails(id as string);
         setRestaurant(restaurantData);
 
-        if (restaurantData) {
-          const inspectionData = await getInspectionHistory(restaurantData.id);
-          setInspections(inspectionData);
-        }
+        // Fetch inspection history
+        const inspectionData = await api.getInspectionsForRestaurant(id as string);
+        setInspections(inspectionData);
       } catch (err) {
-        console.error('Error loading restaurant details:', err);
-        setError('Failed to load restaurant details');
+        console.error('Error fetching restaurant details:', err);
       } finally {
-        setIsLoading(false);
+        setIsLoadingDetails(false);
       }
     };
 
-    loadData();
-  }, [id, getRestaurantDetails, getInspectionHistory]);
+    fetchRestaurantDetails();
+  }, [id]);
 
-  const handleAddToList = useCallback(async () => {
-    if (!restaurant) return;
-
-    // Check if user has lists
-    if (lists.length === 0) {
-      // Create a default list if none exist
-      try {
-        const newList = await createList('My Favorites');
-        await addRestaurantToList(newList.id, restaurant.id);
-        Alert.alert('Added to List', `${restaurant.name} was added to your new favorites list.`);
-      } catch (err) {
-        Alert.alert('Error', 'Failed to create list. Please try again.');
-      }
-      return;
-    }
-
-    // For simplicity, just add to the first list
-    try {
-      await addRestaurantToList(lists[0].id, restaurant.id);
-      Alert.alert('Added to List', `${restaurant.name} was added to your favorites list.`);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to add to list. Please try again.');
-    }
-  }, [restaurant, lists, createList, addRestaurantToList]);
-
-  if (isLoading) {
+  if (isLoadingDetails) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.loadingText}>Loading restaurant details...</Text>
       </View>
     );
   }
 
-  if (error) {
+  if (error || !restaurant) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
-          <Text style={styles.retryButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (!restaurant) {
-    return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Restaurant not found</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => router.back()}>
-          <Text style={styles.retryButtonText}>Go Back</Text>
+        <Text style={styles.errorText}>{error || 'Restaurant not found'}</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+          <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -114,61 +74,40 @@ export default function RestaurantDetailScreen() {
         <SafetyScoreBadge
           score={restaurant.safetyScore}
           lastInspectionDate={restaurant.lastInspectionDate}
-          violationCount={restaurant.violationCount}
         />
-      </View>
-
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleAddToList}
-        >
-          <Ionicons name="bookmark-outline" size={20} color={Colors.primary} />
-          <Text style={styles.actionButtonText}>Save</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => Alert.alert('Share', 'Sharing functionality coming soon!')}
-        >
-          <Ionicons name="share-outline" size={20} color={Colors.primary} />
-          <Text style={styles.actionButtonText}>Share</Text>
-        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Inspection History</Text>
-        {isPremium ? (
-          <InspectionTimeline inspections={inspections} />
-        ) : (
-          <View style={styles.premiumPrompt}>
-            <Text style={styles.premiumText}>
-              View full inspection history with SafeBite Pro
-            </Text>
-            <TouchableOpacity
-              style={styles.premiumButton}
-              onPress={() => router.push('/profile')}
-            >
-              <Text style={styles.premiumButtonText}>Upgrade Now</Text>
-            </TouchableOpacity>
-          </View>
-        )}
+        <InspectionTimeline inspections={inspections} />
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Location</Text>
-        <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapPlaceholderText}>Map will be displayed here</Text>
-        </View>
+        <Text style={styles.sectionTitle}>About This Restaurant</Text>
+        <Text style={styles.description}>
+          {restaurant.name} is a {restaurant.cuisine} restaurant located at {restaurant.address}.
+          This establishment has a safety score of {restaurant.safetyScore} based on the most recent inspection.
+        </Text>
       </View>
+
+      <TouchableOpacity
+        style={styles.addToListButton}
+        onPress={() => {
+          // In a real app, this would add the restaurant to a user's list
+          alert('This would add the restaurant to your list in a full implementation');
+        }}
+      >
+        <Ionicons name="add-circle-outline" size={24} color="#4CAF50" />
+        <Text style={styles.addToListText}>Add to List</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
@@ -177,9 +116,9 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
-    color: Colors.text,
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
@@ -188,112 +127,79 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    color: 'red',
     fontSize: 16,
-    color: Colors.error,
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  retryButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
   },
-  retryButtonText: {
-    color: Colors.white,
+  backButtonText: {
+    marginLeft: 5,
+    color: '#4CAF50',
     fontSize: 16,
   },
   header: {
     padding: 20,
-    backgroundColor: Colors.white,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    borderBottomColor: '#eee',
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 4,
+    marginBottom: 5,
   },
   cuisine: {
     fontSize: 16,
-    color: Colors.textSecondary,
-    marginBottom: 4,
+    color: '#666',
+    marginBottom: 5,
   },
   address: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: '#888',
   },
   scoreContainer: {
     padding: 20,
-    backgroundColor: Colors.white,
-    marginTop: 1,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: Colors.white,
-    marginTop: 1,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    backgroundColor: Colors.background,
-    borderRadius: 20,
-  },
-  actionButtonText: {
-    marginLeft: 8,
-    color: Colors.primary,
-    fontSize: 14,
+    backgroundColor: 'white',
+    marginTop: 10,
+    marginBottom: 10,
   },
   section: {
-    marginTop: 1,
-    backgroundColor: Colors.white,
     padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    backgroundColor: 'white',
+    marginBottom: 10,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: Colors.text,
-    marginBottom: 16,
+    marginBottom: 10,
   },
-  premiumPrompt: {
-    backgroundColor: Colors.background,
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  premiumText: {
-    fontSize: 16,
-    color: Colors.text,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  premiumButton: {
-    backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 5,
-  },
-  premiumButtonText: {
-    color: Colors.white,
+  description: {
     fontSize: 14,
+    color: '#444',
+    lineHeight: 20,
   },
-  mapPlaceholder: {
-    height: 200,
-    backgroundColor: Colors.background,
-    borderRadius: 8,
-    justifyContent: 'center',
+  addToListButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    backgroundColor: '#e8f5e9',
+    margin: 20,
+    borderRadius: 8,
   },
-  mapPlaceholderText: {
-    color: Colors.textSecondary,
+  addToListText: {
+    marginLeft: 10,
+    color: '#4CAF50',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
+
+export default RestaurantDetailScreen;

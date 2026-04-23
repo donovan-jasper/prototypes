@@ -80,12 +80,25 @@ export const searchRestaurants = async (query: string): Promise<Restaurant[]> =>
 
     const restaurants = response.data.map(transformRestaurantData);
 
+    // Fetch inspections for each restaurant to calculate safety score
+    const restaurantsWithScores = await Promise.all(
+      restaurants.map(async (restaurant) => {
+        const inspections = await getInspectionsForRestaurant(restaurant.id);
+        return {
+          ...restaurant,
+          safetyScore: calculateSafetyScore(inspections),
+          lastInspectionDate: inspections.length > 0 ? inspections[0].date : 'No inspections',
+          violationCount: inspections.length > 0 ? inspections[0].violations.length : 0,
+        };
+      })
+    );
+
     // Cache the results
-    restaurants.forEach(restaurant => {
+    restaurantsWithScores.forEach(restaurant => {
       restaurantCache.set(restaurant.id, restaurant);
     });
 
-    return restaurants;
+    return restaurantsWithScores;
   } catch (error) {
     console.error('Error searching restaurants:', error);
     throw new Error('Failed to search restaurants. Please check your connection.');
@@ -125,33 +138,64 @@ export const getRestaurantsByLocation = async (
 
     const restaurants = response.data.map(transformRestaurantData);
 
+    // Fetch inspections for each restaurant to calculate safety score
+    const restaurantsWithScores = await Promise.all(
+      restaurants.map(async (restaurant) => {
+        const inspections = await getInspectionsForRestaurant(restaurant.id);
+        return {
+          ...restaurant,
+          safetyScore: calculateSafetyScore(inspections),
+          lastInspectionDate: inspections.length > 0 ? inspections[0].date : 'No inspections',
+          violationCount: inspections.length > 0 ? inspections[0].violations.length : 0,
+        };
+      })
+    );
+
     // Cache the results
-    restaurants.forEach(restaurant => {
+    restaurantsWithScores.forEach(restaurant => {
       restaurantCache.set(restaurant.id, restaurant);
     });
 
-    return restaurants;
+    return restaurantsWithScores;
   } catch (error) {
     console.error('Error fetching restaurants by location:', error);
     throw new Error('Failed to fetch nearby restaurants. Please check your connection.');
   }
 };
 
-export const getRestaurantDetails = async (id: string): Promise<Restaurant> => {
+export const getRestaurantDetails = async (restaurantId: string): Promise<Restaurant> => {
   try {
     // First try to get from cache
-    if (restaurantCache.has(id)) {
-      return restaurantCache.get(id)!;
+    if (restaurantCache.has(restaurantId)) {
+      return restaurantCache.get(restaurantId)!;
     }
 
     // If not in cache, fetch from API
-    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}/${id}`);
-    const restaurant = transformRestaurantData(response.data);
+    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
+      params: {
+        business_id: restaurantId,
+        $limit: 1,
+      },
+    });
+
+    if (response.data.length === 0) {
+      throw new Error('Restaurant not found');
+    }
+
+    const restaurant = transformRestaurantData(response.data[0]);
+    const inspections = await getInspectionsForRestaurant(restaurantId);
+
+    const restaurantWithScore = {
+      ...restaurant,
+      safetyScore: calculateSafetyScore(inspections),
+      lastInspectionDate: inspections.length > 0 ? inspections[0].date : 'No inspections',
+      violationCount: inspections.length > 0 ? inspections[0].violations.length : 0,
+    };
 
     // Cache the result
-    restaurantCache.set(restaurant.id, restaurant);
+    restaurantCache.set(restaurantId, restaurantWithScore);
 
-    return restaurant;
+    return restaurantWithScore;
   } catch (error) {
     console.error('Error fetching restaurant details:', error);
     throw new Error('Failed to fetch restaurant details. Please check your connection.');
@@ -169,8 +213,8 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
     const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
       params: {
         business_id: restaurantId,
+        $limit: 100,
         $order: 'inspection_date DESC',
-        $limit: 10,
       },
     });
 
@@ -182,6 +226,11 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
     return inspections;
   } catch (error) {
     console.error('Error fetching inspections:', error);
-    throw new Error('Failed to fetch inspection history. Please check your connection.');
+    throw new Error('Failed to fetch inspection data. Please check your connection.');
   }
+};
+
+export const clearCache = () => {
+  restaurantCache.clear();
+  inspectionCache.clear();
 };
