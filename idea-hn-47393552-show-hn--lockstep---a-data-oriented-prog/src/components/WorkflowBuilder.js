@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, PanResponder, Dimensions, TouchableOpacity } from 'react-native';
-import { Svg, Path, Circle } from 'react-native-svg';
+import { Svg, Path, Circle, G, Text as SvgText } from 'react-native-svg';
 import WorkflowService from '../services/WorkflowService';
 
 const { width, height } = Dimensions.get('window');
@@ -54,7 +54,7 @@ const WorkflowBuilder = () => {
     const newNode = {
       id: Date.now().toString(),
       x: width / 2,
-      y: height / 2,
+      y: height / 3,
       type: type,
       label: type.charAt(0).toUpperCase() + type.slice(1)
     };
@@ -118,6 +118,31 @@ const WorkflowBuilder = () => {
     });
   };
 
+  const renderNodes = () => {
+    return nodes.map(node => (
+      <G key={node.id}>
+        <Circle
+          cx={node.x}
+          cy={node.y}
+          r="20"
+          fill={node.type === 'filter' ? '#4a6fa5' :
+                node.type === 'transform' ? '#5cb85c' : '#d9534f'}
+          onPress={() => startConnection(node.id)}
+          onPressOut={() => completeConnection(node.id)}
+        />
+        <SvgText
+          x={node.x}
+          y={node.y + 5}
+          fontSize="10"
+          fill="white"
+          textAnchor="middle"
+        >
+          {node.label}
+        </SvgText>
+      </G>
+    ));
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.toolbar}>
@@ -127,8 +152,8 @@ const WorkflowBuilder = () => {
         <TouchableOpacity style={styles.button} onPress={() => addNode('transform')}>
           <Text style={styles.buttonText}>+ Transform</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => addNode('action')}>
-          <Text style={styles.buttonText}>+ Action</Text>
+        <TouchableOpacity style={styles.button} onPress={() => addNode('output')}>
+          <Text style={styles.buttonText}>+ Output</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.saveButton} onPress={saveWorkflow}>
           <Text style={styles.saveButtonText}>Save Workflow</Text>
@@ -150,34 +175,7 @@ const WorkflowBuilder = () => {
             </marker>
           </defs>
           {renderConnections()}
-          {nodes.map(node => (
-            <React.Fragment key={node.id}>
-              <Circle
-                cx={node.x}
-                cy={node.y}
-                r="20"
-                fill="#4a6fa5"
-                onPress={() => isConnecting ? completeConnection(node.id) : startConnection(node.id)}
-              />
-              <Text
-                x={node.x}
-                y={node.y + 5}
-                textAnchor="middle"
-                fill="white"
-                fontSize="12"
-              >
-                {node.label}
-              </Text>
-            </React.Fragment>
-          ))}
-          {isConnecting && connectionStart && (
-            <Path
-              d={`M${connectionStart.x},${connectionStart.y} L${connectionStart.x + 1},${connectionStart.y + 1}`}
-              stroke="#666"
-              strokeWidth="2"
-              strokeDasharray="5,5"
-            />
-          )}
+          {renderNodes()}
         </Svg>
       </View>
     </View>
@@ -199,15 +197,15 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#4a6fa5',
     padding: 10,
-    marginRight: 10,
     borderRadius: 5,
+    marginRight: 10,
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },
   saveButton: {
-    backgroundColor: '#2ecc71',
+    backgroundColor: '#5cb85c',
     padding: 10,
     borderRadius: 5,
     marginLeft: 'auto',

@@ -49,6 +49,19 @@ class WorkflowService {
       });
     });
   }
+
+  static async getWorkflowById(id) {
+    return new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT * FROM workflows WHERE id = ?;',
+          [id],
+          (_, { rows: { _array } }) => resolve(_array[0]),
+          (_, error) => reject(error)
+        );
+      });
+    });
+  }
 }
 
 export default WorkflowService;
