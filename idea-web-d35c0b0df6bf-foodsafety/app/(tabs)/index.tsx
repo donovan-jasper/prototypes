@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { getNearbyEstablishments } from '@/services/api';
 import { Establishment } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
+import { calculateSafetyScore } from '@/utils/safetyScore';
 import { registerBackgroundService } from '@/services/backgroundService';
 import { requestNotificationPermissions, setupNotificationHandlers } from '@/services/notifications';
 import { initializeDatabase } from '@/services/database';
@@ -20,7 +21,14 @@ const MapScreen = () => {
   const fetchEstablishments = useCallback(async (latitude: number, longitude: number) => {
     try {
       const data = await getNearbyEstablishments(latitude, longitude);
-      setEstablishments(data);
+      // Calculate safety scores for each establishment
+      const establishmentsWithScores = await Promise.all(
+        data.map(async (est) => {
+          const score = await calculateSafetyScore(est.id);
+          return { ...est, safetyScore: score.grade };
+        })
+      );
+      setEstablishments(establishmentsWithScores);
     } catch (err) {
       setError('Failed to load nearby establishments');
       console.error(err);

@@ -59,6 +59,61 @@ const mockEstablishments: Establishment[] = [
     lastInspectionDate: '2023-09-15',
     cuisineType: 'Mexican',
     isOpen: true
+  },
+  {
+    id: 'est-6',
+    name: 'Pizza Paradise',
+    address: '789 Cheese Ave, Dairyville',
+    latitude: 37.7449,
+    longitude: -122.4594,
+    safetyScore: 'A',
+    lastInspectionDate: '2023-10-20',
+    cuisineType: 'Italian',
+    isOpen: true
+  },
+  {
+    id: 'est-7',
+    name: 'Seafood Shack',
+    address: '123 Ocean Blvd, Coastal City',
+    latitude: 37.7349,
+    longitude: -122.4694,
+    safetyScore: 'B',
+    lastInspectionDate: '2023-09-25',
+    cuisineType: 'Seafood',
+    isOpen: true
+  },
+  {
+    id: 'est-8',
+    name: 'Deli Delight',
+    address: '456 Sandwich St, Breadtown',
+    latitude: 37.7249,
+    longitude: -122.4794,
+    safetyScore: 'C',
+    lastInspectionDate: '2023-08-20',
+    cuisineType: 'Delicatessen',
+    isOpen: true
+  },
+  {
+    id: 'est-9',
+    name: 'Bakery Bliss',
+    address: '789 Pastry Lane, Sweetville',
+    latitude: 37.7149,
+    longitude: -122.4894,
+    safetyScore: 'A',
+    lastInspectionDate: '2023-10-10',
+    cuisineType: 'Bakery',
+    isOpen: true
+  },
+  {
+    id: 'est-10',
+    name: 'Coffee Corner',
+    address: '321 Brew Ave, Java Junction',
+    latitude: 37.7049,
+    longitude: -122.4994,
+    safetyScore: 'B',
+    lastInspectionDate: '2023-09-30',
+    cuisineType: 'Café',
+    isOpen: true
   }
 ];
 
@@ -127,6 +182,63 @@ const mockInspections: Record<string, Inspection[]> = {
       criticalViolations: 0,
       nonCriticalViolations: 2
     }
+  ],
+  'est-6': [
+    {
+      id: 'insp-6',
+      establishmentId: 'est-6',
+      inspectionDate: '2023-10-20',
+      violations: [],
+      criticalViolations: 0,
+      nonCriticalViolations: 0
+    }
+  ],
+  'est-7': [
+    {
+      id: 'insp-7',
+      establishmentId: 'est-7',
+      inspectionDate: '2023-09-25',
+      violations: [
+        { type: 'non-critical', description: 'Minor pest activity' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 1
+    }
+  ],
+  'est-8': [
+    {
+      id: 'insp-8',
+      establishmentId: 'est-8',
+      inspectionDate: '2023-08-20',
+      violations: [
+        { type: 'non-critical', description: 'Food packaging not sealed properly' },
+        { type: 'non-critical', description: 'Inadequate handwashing facilities' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 2
+    }
+  ],
+  'est-9': [
+    {
+      id: 'insp-9',
+      establishmentId: 'est-9',
+      inspectionDate: '2023-10-10',
+      violations: [],
+      criticalViolations: 0,
+      nonCriticalViolations: 0
+    }
+  ],
+  'est-10': [
+    {
+      id: 'insp-10',
+      establishmentId: 'est-10',
+      inspectionDate: '2023-09-30',
+      violations: [
+        { type: 'non-critical', description: 'Equipment not sanitized' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 1
+    }
   ]
 };
 
@@ -147,6 +259,15 @@ const mockRecalls: Record<string, Recall[]> = {
       recallDate: '2023-10-20',
       description: 'Tainted meat detected in inventory',
       severity: 'high'
+    }
+  ],
+  'est-8': [
+    {
+      id: 'recall-3',
+      establishmentId: 'est-8',
+      recallDate: '2023-11-05',
+      description: 'Possible cross-contamination in deli meats',
+      severity: 'medium'
     }
   ]
 };
@@ -186,9 +307,9 @@ export const getRecalls = async (establishmentId: string): Promise<Recall[]> => 
   return mockRecalls[establishmentId] || [];
 };
 
-// Helper function to calculate distance between two coordinates (Haversine formula)
-export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-  const R = 6371; // Radius of the earth in km
+// Helper function to calculate distance between two coordinates (in miles)
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  const R = 3958.8; // Radius of the Earth in miles
   const dLat = deg2rad(lat2 - lat1);
   const dLon = deg2rad(lon2 - lon1);
   const a =
@@ -196,7 +317,7 @@ export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2
     Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
     Math.sin(dLon / 2) * Math.sin(dLon / 2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  const distance = R * c; // Distance in km
+  const distance = R * c; // Distance in miles
   return distance;
 };
 
