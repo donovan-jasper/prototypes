@@ -2,14 +2,14 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import VoiceInput from '../../components/VoiceInput';
 import { generateSchema } from '../../lib/ai';
-import { createDatabase } from '../../lib/db'; // Import createDatabase
+import { createDatabase } from '../../lib/db';
 import { useStore } from '../../store/useStore';
-import { useRouter } from 'expo-router'; // Import useRouter for navigation
-import { Field } from '../../lib/schema'; // Import Field type
+import { useRouter } from 'expo-router';
+import { Field } from '../../lib/schema';
 
 const CreateDatabaseScreen = () => {
   const [voiceInput, setVoiceInput] = useState('');
-  const [schema, setSchema] = useState<Field[]>([]); // Use Field type
+  const [schema, setSchema] = useState<Field[]>([]);
   const [databaseName, setDatabaseName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { addDatabase } = useStore();
@@ -46,11 +46,10 @@ const CreateDatabaseScreen = () => {
 
     setIsLoading(true);
     try {
-      // Call the modified createDatabase which returns the full database object
       const newDb = await createDatabase(databaseName, schema);
-      addDatabase(newDb); // Add the database with its unique ID to Zustand
+      addDatabase(newDb);
       Alert.alert('Success', `Database "${newDb.name}" created!`);
-      router.push(`/database/${newDb.id}`); // Navigate to the newly created database
+      router.push(`/database/${newDb.id}`);
     } catch (error) {
       Alert.alert('Error', 'Failed to create database. Please try again.');
       console.error('Database creation error:', error);

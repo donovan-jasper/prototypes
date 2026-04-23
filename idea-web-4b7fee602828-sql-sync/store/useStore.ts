@@ -1,13 +1,32 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Database, Field, SyncOperation } from '../lib/schema'; // Import types
+
+interface Field {
+  name: string;
+  type: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB';
+  description?: string;
+}
+
+interface Database {
+  id: string;
+  name: string;
+  schema: Field[];
+}
+
+interface SyncOperation {
+  type: 'INSERT' | 'UPDATE' | 'DELETE';
+  table: string;
+  data?: any;
+  rowId?: number;
+  timestamp?: number;
+}
 
 interface AppState {
   databases: Database[];
   currentDb: Database | null;
   syncQueue: SyncOperation[];
-  user: any; // Define a proper User type if available
+  user: any;
   isOnline: boolean;
   addDatabase: (database: Database) => void;
   removeDatabase: (id: string) => void;
@@ -28,11 +47,9 @@ const useStore = create<AppState>()(
       user: null,
       isOnline: true,
       addDatabase: (database) => set((state) => {
-        // The database object now comes with a unique ID from createDatabase
-        // This logic ensures the ID is present, but createDatabase will provide it.
         const dbWithId = {
           ...database,
-          id: database.id || `db_${Date.now()}` // Fallback, but createDatabase will provide it
+          id: database.id || `db_${Date.now()}`
         };
         return { databases: [...state.databases, dbWithId] };
       }),
@@ -50,7 +67,6 @@ const useStore = create<AppState>()(
       clearSyncQueue: () => set({ syncQueue: [] }),
       setUser: (user) => set({ user }),
       setOnlineStatus: (isOnline) => set({ isOnline }),
-      // Helper function to get database by ID
       getDatabaseById: (id) => {
         const state = get();
         return state.databases.find(db => db.id === id);
@@ -62,7 +78,6 @@ const useStore = create<AppState>()(
       partialize: (state) => ({
         databases: state.databases,
         user: state.user,
-        // Don't persist syncQueue or currentDb
       }),
     }
   )

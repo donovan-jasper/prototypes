@@ -1,6 +1,12 @@
 import axios from 'axios';
 
-const generateSchema = async (voiceInput) => {
+interface Field {
+  name: string;
+  type: 'TEXT' | 'INTEGER' | 'REAL' | 'BLOB';
+  description?: string;
+}
+
+const generateSchema = async (voiceInput: string): Promise<Field[]> => {
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
       model: 'gpt-4o-mini',
@@ -31,7 +37,7 @@ const generateSchema = async (voiceInput) => {
   }
 };
 
-const naturalLanguageQuery = async (question, schema) => {
+const naturalLanguageQuery = async (question: string, schema: Field[]): Promise<string> => {
   try {
     const response = await axios.post('https://api.openai.com/v1/chat/completions', {
       model: 'gpt-4o-mini',

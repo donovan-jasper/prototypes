@@ -3,10 +3,14 @@ import { View, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'rea
 import * as Speech from 'expo-speech';
 import { Ionicons } from '@expo/vector-icons';
 
-const VoiceInput = ({ onTranscription }) => {
+interface VoiceInputProps {
+  onTranscription: (text: string) => void;
+}
+
+const VoiceInput = ({ onTranscription }: VoiceInputProps) => {
   const [isRecording, setIsRecording] = useState(false);
   const [transcription, setTranscription] = useState('');
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const startRecording = async () => {
     setIsRecording(true);
