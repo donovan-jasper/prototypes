@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, Button, Modal, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, TextInput, Button, Modal, StyleSheet, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { DebateNode, Evidence } from '../utils/debateTree';
 
 interface ArgumentModalProps {
@@ -75,7 +75,7 @@ const ArgumentModal: React.FC<ArgumentModalProps> = ({ visible, onClose, onSubmi
                 <Text style={styles.parentTitle}>{parentNode.title}</Text>
               </View>
             )}
-            
+
             <TextInput
               style={styles.input}
               placeholder="Enter your argument"
@@ -83,20 +83,20 @@ const ArgumentModal: React.FC<ArgumentModalProps> = ({ visible, onClose, onSubmi
               onChangeText={setTitle}
               multiline
             />
-            
+
             <View style={styles.typeSelector}>
               <Text style={styles.typeLabel}>Argument type:</Text>
               <View style={styles.buttonContainer}>
                 <View style={styles.typeButton}>
-                  <Button 
-                    title="Pro" 
+                  <Button
+                    title="Pro"
                     onPress={() => setType('pro')}
                     color={type === 'pro' ? '#2e7d32' : '#999'}
                   />
                 </View>
                 <View style={styles.typeButton}>
-                  <Button 
-                    title="Con" 
+                  <Button
+                    title="Con"
                     onPress={() => setType('con')}
                     color={type === 'con' ? '#c62828' : '#999'}
                   />
@@ -106,14 +106,14 @@ const ArgumentModal: React.FC<ArgumentModalProps> = ({ visible, onClose, onSubmi
 
             <View style={styles.evidenceSection}>
               <Text style={styles.sectionLabel}>Evidence:</Text>
-              
+
               {evidence.map((item, index) => (
                 <View key={index} style={styles.evidenceItem}>
                   <View style={styles.evidenceInfo}>
                     <Text style={styles.evidenceType}>[{item.type.toUpperCase()}]</Text>
                     <Text style={styles.evidenceTitle} numberOfLines={1}>{item.title}</Text>
                   </View>
-                  <TouchableOpacity 
+                  <TouchableOpacity
                     onPress={() => handleRemoveEvidence(index)}
                     style={styles.removeButton}
                   >
@@ -123,7 +123,7 @@ const ArgumentModal: React.FC<ArgumentModalProps> = ({ visible, onClose, onSubmi
               ))}
 
               {!showEvidenceForm ? (
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.addEvidenceButton}
                   onPress={() => setShowEvidenceForm(true)}
                 >
@@ -140,37 +140,46 @@ const ArgumentModal: React.FC<ArgumentModalProps> = ({ visible, onClose, onSubmi
                   />
                   <TextInput
                     style={styles.evidenceInput}
-                    placeholder="Evidence title"
+                    placeholder="Evidence Title"
                     value={evidenceTitle}
                     onChangeText={setEvidenceTitle}
                   />
                   <View style={styles.evidenceFormButtons}>
-                    <View style={styles.evidenceFormButton}>
-                      <Button title="Add" onPress={handleAddEvidence} />
-                    </View>
-                    <View style={styles.evidenceFormButton}>
-                      <Button 
-                        title="Cancel" 
-                        onPress={() => {
-                          setShowEvidenceForm(false);
-                          setEvidenceUrl('');
-                          setEvidenceTitle('');
-                        }} 
-                        color="#666" 
-                      />
-                    </View>
+                    <TouchableOpacity
+                      style={[styles.evidenceFormButton, styles.cancelButton]}
+                      onPress={() => {
+                        setShowEvidenceForm(false);
+                        setEvidenceUrl('');
+                        setEvidenceTitle('');
+                      }}
+                    >
+                      <Text style={styles.evidenceFormButtonText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.evidenceFormButton, styles.addButton]}
+                      onPress={handleAddEvidence}
+                    >
+                      <Text style={styles.evidenceFormButtonText}>Add</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
             </View>
-            
+
             <View style={styles.actionButtons}>
-              <View style={styles.actionButton}>
-                <Button title="Submit" onPress={handleSubmit} />
-              </View>
-              <View style={styles.actionButton}>
-                <Button title="Cancel" onPress={handleClose} color="#666" />
-              </View>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={handleClose}
+              >
+                <Text style={styles.actionButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.submitButton]}
+                onPress={handleSubmit}
+                disabled={!title.trim()}
+              >
+                <Text style={styles.actionButtonText}>Submit</Text>
+              </TouchableOpacity>
             </View>
           </ScrollView>
         </View>
@@ -187,142 +196,148 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modal: {
-    width: '85%',
+    width: '90%',
     maxHeight: '80%',
-    padding: 20,
     backgroundColor: 'white',
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+    borderRadius: 10,
+    padding: 20,
   },
   parentInfo: {
-    marginBottom: 16,
-    padding: 12,
+    marginBottom: 15,
+    padding: 10,
     backgroundColor: '#f5f5f5',
-    borderRadius: 8,
+    borderRadius: 5,
   },
   parentLabel: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   parentTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
   },
   input: {
+    height: 100,
+    borderColor: '#ddd',
     borderWidth: 1,
-    borderColor: '#ccc',
-    padding: 12,
-    marginBottom: 16,
-    borderRadius: 8,
-    minHeight: 80,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
     textAlignVertical: 'top',
   },
   typeSelector: {
-    marginBottom: 16,
+    marginBottom: 15,
   },
   typeLabel: {
     fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
+    fontWeight: '500',
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   typeButton: {
-    flex: 1,
-    marginHorizontal: 4,
+    width: '48%',
   },
   evidenceSection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   sectionLabel: {
     fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
-    color: '#333',
+    fontWeight: '500',
   },
   evidenceItem: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 10,
     backgroundColor: '#f9f9f9',
-    borderRadius: 6,
+    borderRadius: 5,
     marginBottom: 8,
   },
   evidenceInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   evidenceType: {
-    fontSize: 10,
-    fontWeight: 'bold',
+    fontSize: 12,
     color: '#666',
     marginRight: 8,
   },
   evidenceTitle: {
     fontSize: 14,
-    color: '#333',
     flex: 1,
   },
   removeButton: {
-    padding: 4,
-    marginLeft: 8,
+    padding: 5,
   },
   removeButtonText: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#c62828',
-    fontWeight: 'bold',
   },
   addEvidenceButton: {
-    padding: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 6,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
     alignItems: 'center',
   },
   addEvidenceButtonText: {
-    color: '#1976d2',
-    fontWeight: '600',
+    color: '#2e7d32',
+    fontWeight: '500',
   },
   evidenceForm: {
-    padding: 12,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 6,
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 5,
   },
   evidenceInput: {
+    height: 40,
+    borderColor: '#ddd',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderRadius: 5,
     padding: 10,
-    marginBottom: 8,
-    borderRadius: 6,
-    backgroundColor: 'white',
+    marginBottom: 10,
   },
   evidenceFormButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    justifyContent: 'flex-end',
   },
   evidenceFormButton: {
-    flex: 1,
-    marginHorizontal: 4,
+    padding: 8,
+    borderRadius: 5,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  addButton: {
+    backgroundColor: '#2e7d32',
+  },
+  evidenceFormButtonText: {
+    color: 'white',
   },
   actionButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    justifyContent: 'flex-end',
   },
   actionButton: {
-    flex: 1,
-    marginHorizontal: 4,
+    padding: 10,
+    borderRadius: 5,
+    marginLeft: 10,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  submitButton: {
+    backgroundColor: '#2e7d32',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
 });
 
