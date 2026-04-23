@@ -1,79 +1,60 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Platform, AppState, TouchableOpacity, Text } from 'react-native';
-import { Video, AVPlaybackStatus } from 'expo-av';
-import { useRouter } from 'expo-router';
+import { View, StyleSheet, Text, TouchableOpacity, Platform } from 'react-native';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useStreamUrl } from '../hooks/useStreamUrl';
 
-interface PiPControllerProps {
+interface Props {
   channelNumber: string;
-  isLocal: boolean;
 }
 
-export default function PiPController({ channelNumber, isLocal }: PiPControllerProps) {
-  const router = useRouter();
+export default function PiPController({ channelNumber }: Props) {
+  const [status, setStatus] = useState<AVPlaybackStatus | null>(null);
+  const [isPiPActive, setIsPiPActive] = useState(true);
   const { streamUrl } = useStreamUrl(channelNumber);
   const videoRef = useRef<Video>(null);
-  const [status, setStatus] = useState<AVPlaybackStatus>({} as AVPlaybackStatus);
-  const [isPiPActive, setIsPiPActive] = useState(false);
-  const [isBuffering, setIsBuffering] = useState(true);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'background' && !isPiPActive) {
-        enterPiPMode();
+    const setupPiP = async () => {
+      if (videoRef.current && Platform.OS === 'ios') {
+        try {
+          await videoRef.current.presentPictureInPictureAsync();
+          setIsPiPActive(true);
+        } catch (error) {
+          console.error('Failed to enter PiP mode:', error);
+        }
       }
-    });
+    };
+
+    setupPiP();
 
     return () => {
-      subscription.remove();
+      if (videoRef.current && Platform.OS === 'ios') {
+        videoRef.current.stopPictureInPictureAsync();
+      }
     };
-  }, [isPiPActive]);
-
-  const enterPiPMode = async () => {
-    if (!videoRef.current) return;
-
-    try {
-      if (Platform.OS === 'android') {
-        await videoRef.current.presentFullscreenPlayer();
-      } else if (Platform.OS === 'ios') {
-        await videoRef.current.presentPictureInPictureAsync();
-      }
-      setIsPiPActive(true);
-    } catch (error) {
-      console.error('Failed to enter PiP mode:', error);
-    }
-  };
-
-  const exitPiPMode = async () => {
-    if (!videoRef.current) return;
-
-    try {
-      if (Platform.OS === 'android') {
-        await videoRef.current.dismissFullscreenPlayer();
-      } else if (Platform.OS === 'ios') {
-        await videoRef.current.stopPictureInPictureAsync();
-      }
-      setIsPiPActive(false);
-    } catch (error) {
-      console.error('Failed to exit PiP mode:', error);
-    }
-  };
+  }, []);
 
   const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     setStatus(status);
-    setIsBuffering(status.isBuffering || !status.isLoaded);
+  };
 
-    if (status.error) {
-      console.error('Playback error:', status.error);
+  const exitPiPMode = async () => {
+    if (videoRef.current) {
+      try {
+        if (Platform.OS === 'android') {
+          await videoRef.current.dismissFullscreenPlayer();
+        } else if (Platform.OS === 'ios') {
+          await videoRef.current.stopPictureInPictureAsync();
+        }
+        setIsPiPActive(false);
+      } catch (error) {
+        console.error('Failed to exit PiP mode:', error);
+      }
     }
   };
 
-  if (!streamUrl) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>Loading stream...</Text>
-      </View>
-    );
+  if (!isPiPActive) {
+    return null;
   }
 
   return (
@@ -82,100 +63,48 @@ export default function PiPController({ channelNumber, isLocal }: PiPControllerP
         ref={videoRef}
         style={styles.video}
         source={{ uri: streamUrl }}
-        useNativeControls={!isPiPActive}
-        resizeMode="contain"
-        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
+        useNativeControls={false}
+        resizeMode={ResizeMode.CONTAIN}
         shouldPlay
-        isMuted={isPiPActive}
+        isLooping={false}
+        onPlaybackStatusUpdate={handlePlaybackStatusUpdate}
       />
 
-      {isBuffering && !isPiPActive && (
-        <View style={styles.bufferingIndicator}>
-          <Text style={styles.bufferingText}>Buffering...</Text>
-        </View>
-      )}
-
-      {!isPiPActive && (
-        <View style={styles.controls}>
-          <TouchableOpacity
-            style={styles.pipButton}
-            onPress={enterPiPMode}
-          >
-            <Text style={styles.pipButtonText}>Enter PiP</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {isPiPActive && (
-        <View style={styles.pipControls}>
-          <TouchableOpacity
-            style={styles.exitButton}
-            onPress={exitPiPMode}
-          >
-            <Text style={styles.exitButtonText}>Exit PiP</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      <TouchableOpacity
+        style={styles.exitButton}
+        onPress={exitPiPMode}
+      >
+        <Text style={styles.exitButtonText}>Exit PiP</Text>
+      </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  video: {
-    flex: 1,
-  },
-  bufferingIndicator: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-  },
-  bufferingText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  controls: {
     position: 'absolute',
     bottom: 20,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  pipButton: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    padding: 10,
-    borderRadius: 5,
-  },
-  pipButtonText: {
-    color: '#fff',
-    fontSize: 16,
-  },
-  pipControls: {
-    position: 'absolute',
-    top: 20,
     right: 20,
+    width: 150,
+    height: 84,
+    backgroundColor: 'black',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  video: {
+    width: '100%',
+    height: '100%',
   },
   exitButton: {
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    padding: 8,
-    borderRadius: 5,
+    position: 'absolute',
+    top: 5,
+    right: 5,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 5,
+    borderRadius: 3,
   },
   exitButtonText: {
-    color: '#fff',
-    fontSize: 14,
-  },
-  errorText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 20,
+    color: 'white',
+    fontSize: 12,
   },
 });

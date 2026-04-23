@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, Dimensions, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
+import { View, StyleSheet, Text, Dimensions, ActivityIndicator, TouchableOpacity, Platform, Alert } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useStreamUrl } from '../hooks/useStreamUrl';
 import { isRemoteStreamingEnabled } from '../lib/streaming';
@@ -8,30 +8,23 @@ import PiPController from './PiPController';
 
 interface Props {
   channelNumber: string;
-  isLocal: boolean;
 }
 
-export default function VideoPlayer({ channelNumber, isLocal }: Props) {
+export default function VideoPlayer({ channelNumber }: Props) {
   const [status, setStatus] = useState<AVPlaybackStatus | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
   const [isPiPActive, setIsPiPActive] = useState(false);
-  const { streamUrl } = useStreamUrl(channelNumber);
+  const { streamUrl, isLocal, isConnecting, connectionError } = useStreamUrl(channelNumber);
   const navigation = useNavigation();
   const videoRef = useRef<Video>(null);
 
   useEffect(() => {
-    const checkRemoteAccess = async () => {
-      if (!isLocal) {
-        const enabled = await isRemoteStreamingEnabled();
-        if (!enabled) {
-          setError('Remote streaming requires a premium subscription');
-        }
-      }
-    };
-    checkRemoteAccess();
-  }, [isLocal]);
+    if (connectionError) {
+      setError(connectionError);
+    }
+  }, [connectionError]);
 
   const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
     setStatus(status);
@@ -100,6 +93,15 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
     );
   }
 
+  if (isConnecting) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#fff" />
+        <Text style={styles.loadingText}>Establishing remote connection...</Text>
+      </View>
+    );
+  }
+
   if (!streamUrl) {
     return (
       <View style={styles.container}>
@@ -110,7 +112,7 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
   }
 
   if (isPiPActive) {
-    return <PiPController channelNumber={channelNumber} isLocal={isLocal} />;
+    return <PiPController channelNumber={channelNumber} />;
   }
 
   return (
@@ -171,15 +173,39 @@ const styles = StyleSheet.create({
   },
   video: {
     width: width,
-    height: height * 0.7,
+    height: height * 0.6,
   },
   loadingOverlay: {
     position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
-    width: '100%',
-    height: '100%',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorText: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
+    padding: 20,
+  },
+  upgradeButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    marginTop: 20,
+  },
+  upgradeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   controlsOverlay: {
     position: 'absolute',
@@ -191,13 +217,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   controlButton: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 10,
-    borderRadius: 5,
-    marginHorizontal: 10,
-  },
-  pipButton: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 10,
     borderRadius: 5,
     marginHorizontal: 10,
@@ -206,26 +226,10 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
   },
-  errorText: {
-    color: 'white',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  loadingText: {
-    color: 'white',
-    fontSize: 16,
-    marginTop: 10,
-  },
-  upgradeButton: {
-    backgroundColor: '#FFD700',
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 20,
-  },
-  upgradeButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
+  pipButton: {
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 10,
   },
 });

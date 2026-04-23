@@ -67,3 +67,23 @@ export const isRemoteStreamingEnabled = async (): Promise<boolean> => {
   const subscriptionStatus = await AsyncStorage.getItem('subscriptionStatus');
   return subscriptionStatus === 'premium' && Config.ENABLE_REMOTE_STREAMING;
 };
+
+export const establishRemoteConnection = async (): Promise<boolean> => {
+  try {
+    const isEnabled = await isRemoteStreamingEnabled();
+    if (!isEnabled) return false;
+
+    // In a real implementation, this would:
+    // 1. Generate a secure token for the user
+    // 2. Establish a WebSocket connection to the backend
+    // 3. Set up the reverse proxy tunnel
+    // 4. Return true if successful
+
+    // For demo purposes, we'll simulate a successful connection
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    return true;
+  } catch (error) {
+    console.error('Error establishing remote connection:', error);
+    return false;
+  }
+};
