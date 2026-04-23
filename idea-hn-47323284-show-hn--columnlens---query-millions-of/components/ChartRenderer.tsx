@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
   legendContainer: {
     flexDirection: 'row',
     marginTop: 16,
-    paddingHorizontal: 8,
+    paddingHorizontal: 16,
   },
   legendItem: {
     flexDirection: 'row',
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 8,
     borderRadius: 4,
   },
@@ -217,6 +217,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
 });
 

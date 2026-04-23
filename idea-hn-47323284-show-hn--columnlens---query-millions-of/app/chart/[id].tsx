@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Dimensions, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { generateChartConfig } from '../../lib/chart-generator';
 import ChartRenderer from '../../components/ChartRenderer';
@@ -7,6 +7,7 @@ import { useChartStore } from '../../store/charts';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system';
+import { Picker } from '@react-native-picker/picker';
 
 const ChartScreen = () => {
   const route = useRoute();
@@ -19,6 +20,7 @@ const ChartScreen = () => {
   const [yAxisColumn, setYAxisColumn] = useState<string | undefined>(undefined);
   const [groupByColumn, setGroupByColumn] = useState<string | undefined>(undefined);
   const [tooltipData, setTooltipData] = useState<{ label: string; value: number } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
   const chartRef = useRef();
 
   useEffect(() => {
@@ -51,6 +53,7 @@ const ChartScreen = () => {
 
   const handleExport = async () => {
     try {
+      setIsExporting(true);
       if (!chartRef.current) return;
 
       const uri = await captureRef(chartRef, {
@@ -71,6 +74,8 @@ const ChartScreen = () => {
       });
     } catch (error) {
       console.error('Error exporting chart:', error);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -98,6 +103,15 @@ const ChartScreen = () => {
     setChartType(newType);
   };
 
+  if (!data) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+        <Text>Loading chart data...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -105,13 +119,53 @@ const ChartScreen = () => {
       </View>
 
       <ScrollView style={styles.content}>
+        <View style={styles.axisControls}>
+          <View style={styles.axisControl}>
+            <Text style={styles.axisLabel}>X-Axis:</Text>
+            <Picker
+              selectedValue={xAxisColumn}
+              style={styles.axisPicker}
+              onValueChange={(itemValue) => setXAxisColumn(itemValue)}
+            >
+              {data.columns.map((col, index) => (
+                <Picker.Item key={index} label={col} value={col} />
+              ))}
+            </Picker>
+          </View>
+
+          <View style={styles.axisControl}>
+            <Text style={styles.axisLabel}>Y-Axis:</Text>
+            <Picker
+              selectedValue={yAxisColumn}
+              style={styles.axisPicker}
+              onValueChange={(itemValue) => setYAxisColumn(itemValue)}
+            >
+              {data.columns.map((col, index) => (
+                <Picker.Item key={index} label={col} value={col} />
+              ))}
+            </Picker>
+          </View>
+
+          <View style={styles.axisControl}>
+            <Text style={styles.axisLabel}>Group By:</Text>
+            <Picker
+              selectedValue={groupByColumn}
+              style={styles.axisPicker}
+              onValueChange={(itemValue) => setGroupByColumn(itemValue)}
+            >
+              <Picker.Item label="None" value={undefined} />
+              {data.columns.map((col, index) => (
+                <Picker.Item key={index} label={col} value={col} />
+              ))}
+            </Picker>
+          </View>
+        </View>
+
         <View style={styles.chartContainer} ref={chartRef}>
           {chartConfig && (
             <ChartRenderer
               data={chartConfig.data}
-              type={chartType}
-              xAxisLabel={chartConfig.xAxisLabel}
-              yAxisLabel={chartConfig.yAxisLabel}
+              initialType={chartType}
               onDataPointClick={handleDataPointClick}
               onTypeChange={handleTypeChange}
             />
@@ -140,10 +194,15 @@ const ChartScreen = () => {
             <Text style={styles.actionButtonText}>Save Chart</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.actionButton}
+            style={[styles.actionButton, isExporting && styles.disabledButton]}
             onPress={handleExport}
+            disabled={isExporting}
           >
-            <Text style={styles.actionButtonText}>Export as PNG</Text>
+            {isExporting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.actionButtonText}>Export as PNG</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -170,39 +229,43 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
+  axisControls: {
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 12,
+  },
+  axisControl: {
+    marginBottom: 8,
+  },
+  axisLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  axisPicker: {
+    height: 50,
+  },
   chartContainer: {
     marginBottom: 24,
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 24,
-  },
-  actionButton: {
-    backgroundColor: '#4285F4',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   tooltip: {
     position: 'absolute',
     bottom: 20,
-    left: 20,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 8,
     borderRadius: 4,
@@ -210,6 +273,31 @@ const styles = StyleSheet.create({
   tooltipText: {
     color: 'white',
     fontSize: 14,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+  },
+  actionButton: {
+    flex: 1,
+    backgroundColor: '#4285F4',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  disabledButton: {
+    opacity: 0.7,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
