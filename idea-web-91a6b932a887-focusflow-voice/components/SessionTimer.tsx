@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Vibration } from 'react-native';
 import { Svg, Circle } from 'react-native-svg';
 
 interface SessionTimerProps {
@@ -11,10 +11,11 @@ interface SessionTimerProps {
 const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPaused }) => {
   const [timeLeft, setTimeLeft] = useState(duration * 60);
   const [isActive, setIsActive] = useState(true);
+  const [isWarning, setIsWarning] = useState(false);
 
-  const radius = 100;
+  const radius = 150;
   const circumference = 2 * Math.PI * radius;
-  const strokeWidth = 10;
+  const strokeWidth = 12;
   const progress = (timeLeft / (duration * 60)) * circumference;
 
   useEffect(() => {
@@ -32,6 +33,13 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
             onComplete();
             return 0;
           }
+
+          // Trigger warning at last 30 seconds
+          if (prevTime === 30) {
+            setIsWarning(true);
+            Vibration.vibrate([0, 500, 200, 500]);
+          }
+
           return prevTime - 1;
         });
       }, 1000);
@@ -57,7 +65,7 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
           cx={radius}
           cy={radius}
           r={radius - strokeWidth / 2}
-          stroke="#e0e0e0"
+          stroke="#333"
           strokeWidth={strokeWidth}
           fill="none"
         />
@@ -65,7 +73,7 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
           cx={radius}
           cy={radius}
           r={radius - strokeWidth / 2}
-          stroke="#4CAF50"
+          stroke={isWarning ? '#FF5252' : '#4CAF50'}
           strokeWidth={strokeWidth}
           strokeDasharray={circumference}
           strokeDashoffset={circumference - progress}
@@ -75,7 +83,12 @@ const SessionTimer: React.FC<SessionTimerProps> = ({ duration, onComplete, isPau
         />
       </Svg>
       <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{formatTime(timeLeft)}</Text>
+        <Text style={[styles.timeText, isWarning && styles.warningText]}>
+          {formatTime(timeLeft)}
+        </Text>
+        {isWarning && (
+          <Text style={styles.warningMessage}>Time's up soon!</Text>
+        )}
       </View>
     </View>
   );
@@ -97,9 +110,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   timeText: {
-    fontSize: 36,
+    fontSize: 48,
     fontWeight: 'bold',
-    color: '#333',
+    color: 'white',
+  },
+  warningText: {
+    color: '#FF5252',
+  },
+  warningMessage: {
+    fontSize: 16,
+    color: '#FF5252',
+    marginTop: 10,
+    fontWeight: '600',
   },
 });
 

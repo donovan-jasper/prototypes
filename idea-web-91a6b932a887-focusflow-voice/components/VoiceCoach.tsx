@@ -12,6 +12,7 @@ interface VoiceCoachProps {
 const VoiceCoach: React.FC<VoiceCoachProps> = ({ duration, voicePack, isPaused }) => {
   const [currentMessage, setCurrentMessage] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [lastPhase, setLastPhase] = useState<'start' | 'midpoint' | 'end' | 'pause' | 'resume'>('start');
 
   useEffect(() => {
     // Speak initial message when session starts
@@ -21,7 +22,7 @@ const VoiceCoach: React.FC<VoiceCoachProps> = ({ duration, voicePack, isPaused }
   useEffect(() => {
     if (isPaused) {
       speakMessage('pause');
-    } else {
+    } else if (lastPhase === 'pause') {
       speakMessage('resume');
     }
   }, [isPaused]);
@@ -29,6 +30,7 @@ const VoiceCoach: React.FC<VoiceCoachProps> = ({ duration, voicePack, isPaused }
   const speakMessage = async (phase: 'start' | 'midpoint' | 'end' | 'pause' | 'resume') => {
     try {
       setIsSpeaking(true);
+      setLastPhase(phase);
       const message = generateCoachingMessage(phase, duration, voicePack);
       setCurrentMessage(message);
 
@@ -59,37 +61,47 @@ const VoiceCoach: React.FC<VoiceCoachProps> = ({ duration, voicePack, isPaused }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.message}>{currentMessage}</Text>
-      {isSpeaking && (
-        <View style={styles.speakingIndicator}>
-          <ActivityIndicator size="small" color="#4CAF50" />
-          <Text style={styles.speakingText}>Coach is speaking...</Text>
-        </View>
-      )}
+      <View style={styles.messageContainer}>
+        <Text style={styles.message}>{currentMessage}</Text>
+        {isSpeaking && (
+          <View style={styles.speakingIndicator}>
+            <ActivityIndicator size="small" color="#4CAF50" />
+            <Text style={styles.speakingText}>Coach is speaking...</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 40,
+    marginTop: 20,
     paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  messageContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 12,
+    padding: 15,
+    maxWidth: '90%',
     alignItems: 'center',
   },
   message: {
     fontSize: 18,
-    color: '#333',
+    color: 'white',
     textAlign: 'center',
     marginBottom: 10,
+    lineHeight: 24,
   },
   speakingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: 5,
   },
   speakingText: {
     marginLeft: 8,
-    color: '#666',
+    color: '#A5D6A7',
     fontSize: 14,
   },
 });

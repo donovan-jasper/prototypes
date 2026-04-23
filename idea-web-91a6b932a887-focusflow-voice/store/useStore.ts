@@ -13,6 +13,7 @@ interface UserStats {
   totalFocusTime: number;
   currentStreak: number;
   longestStreak: number;
+  lastSessionDate: string | null;
 }
 
 interface StoreState {
@@ -27,6 +28,7 @@ interface StoreState {
   updateStats: (duration: number) => void;
   setPremiumStatus: (isPremium: boolean) => void;
   setVoicePack: (voicePack: string) => void;
+  resetStreakIfNeeded: () => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -38,6 +40,7 @@ export const useStore = create<StoreState>((set) => ({
     totalFocusTime: 0,
     currentStreak: 0,
     longestStreak: 0,
+    lastSessionDate: null,
   },
 
   startSession: async (duration, voicePack) => {
@@ -71,17 +74,70 @@ export const useStore = create<StoreState>((set) => ({
   },
 
   updateStats: (duration) => {
-    set((state) => ({
-      userStats: {
-        totalSessions: state.userStats.totalSessions + 1,
-        totalFocusTime: state.userStats.totalFocusTime + duration,
-        currentStreak: state.userStats.currentStreak + 1,
-        longestStreak: Math.max(
-          state.userStats.currentStreak + 1,
-          state.userStats.longestStreak
-        ),
-      },
-    }));
+    set((state) => {
+      const today = new Date().toISOString().split('T')[0];
+      let newStreak = state.userStats.currentStreak + 1;
+      let newLongestStreak = state.userStats.longestStreak;
+
+      // Check if this is a new day
+      if (state.userStats.lastSessionDate !== today) {
+        // If it's the next day after a break, reset streak
+        if (state.userStats.lastSessionDate) {
+          const lastDate = new Date(state.userStats.lastSessionDate);
+          const currentDate = new Date(today);
+          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays > 1) {
+            newStreak = 1;
+          }
+        } else {
+          newStreak = 1;
+        }
+      }
+
+      // Update longest streak if needed
+      if (newStreak > state.userStats.longestStreak) {
+        newLongestStreak = newStreak;
+      }
+
+      return {
+        userStats: {
+          totalSessions: state.userStats.totalSessions + 1,
+          totalFocusTime: state.userStats.totalFocusTime + duration,
+          currentStreak: newStreak,
+          longestStreak: newLongestStreak,
+          lastSessionDate: today,
+        },
+      };
+    });
+  },
+
+  resetStreakIfNeeded: () => {
+    set((state) => {
+      const today = new Date().toISOString().split('T')[0];
+
+      if (state.userStats.lastSessionDate !== today) {
+        const lastDate = state.userStats.lastSessionDate ? new Date(state.userStats.lastSessionDate) : null;
+        const currentDate = new Date(today);
+
+        if (lastDate) {
+          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          if (diffDays > 1) {
+            return {
+              userStats: {
+                ...state.userStats,
+                currentStreak: 0,
+              },
+            };
+          }
+        }
+      }
+
+      return state;
+    });
   },
 
   setPremiumStatus: (isPremium) => set({ isPremium }),
