@@ -1,5 +1,5 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import React from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface AIHealthReportProps {
   analysis: string;
@@ -8,18 +8,27 @@ interface AIHealthReportProps {
 }
 
 export default function AIHealthReport({ analysis, healthScore, issues }: AIHealthReportProps) {
+  const getHealthColor = () => {
+    if (healthScore >= 80) return '#4CAF50'; // Green
+    if (healthScore >= 60) return '#FFC107'; // Yellow
+    return '#F44336'; // Red
+  };
+
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.healthScoreContainer}>
-        <Text style={styles.healthScoreLabel}>Health Score</Text>
-        <Text style={[
-          styles.healthScoreValue,
-          healthScore < 50 ? styles.badScore :
-          healthScore < 80 ? styles.mediumScore :
-          styles.goodScore
-        ]}>
-          {healthScore}
-        </Text>
+    <View style={styles.container}>
+      <Text style={styles.title}>AI Health Analysis</Text>
+
+      <View style={styles.scoreContainer}>
+        <Text style={styles.scoreLabel}>Health Score:</Text>
+        <View style={styles.scoreBar}>
+          <View
+            style={[
+              styles.scoreFill,
+              { width: `${healthScore}%`, backgroundColor: getHealthColor() }
+            ]}
+          />
+          <Text style={styles.scoreValue}>{healthScore}/100</Text>
+        </View>
       </View>
 
       <View style={styles.section}>
@@ -29,65 +38,94 @@ export default function AIHealthReport({ analysis, healthScore, issues }: AIHeal
 
       {issues.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Potential Issues</Text>
+          <Text style={styles.sectionTitle}>Identified Issues</Text>
           {issues.map((issue, index) => (
             <View key={index} style={styles.issueItem}>
-              <Ionicons name="alert-circle" size={16} color="#FF6B6B" />
+              <Text style={styles.bullet}>•</Text>
               <Text style={styles.issueText}>{issue}</Text>
             </View>
           ))}
         </View>
       )}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    backgroundColor: 'white',
+    borderRadius: 8,
     padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  healthScoreContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  healthScoreLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
-  },
-  healthScoreValue: {
-    fontSize: 48,
+  title: {
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
   },
-  goodScore: {
-    color: '#4CAF50',
+  scoreContainer: {
+    marginBottom: 16,
   },
-  mediumScore: {
-    color: '#FFC107',
-  },
-  badScore: {
-    color: '#F44336',
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
+  scoreLabel: {
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
-  analysisText: {
+  scoreBar: {
+    height: 20,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 10,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  scoreFill: {
+    height: '100%',
+    borderRadius: 10,
+  },
+  scoreValue: {
+    position: 'absolute',
+    right: 8,
+    top: 0,
+    bottom: 0,
+    lineHeight: 20,
+    fontWeight: 'bold',
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 1,
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
     fontSize: 16,
-    lineHeight: 24,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#444',
+  },
+  analysisText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#555',
   },
   issueItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
+  },
+  bullet: {
+    marginRight: 8,
+    fontSize: 16,
+    color: '#F44336',
   },
   issueText: {
-    marginLeft: 8,
-    fontSize: 16,
+    flex: 1,
+    fontSize: 14,
+    color: '#555',
   },
 });
