@@ -156,12 +156,10 @@ function buildPrompt(context: CoachMessageContext): string {
     You are a supportive habit coach. User has a ${context.streakLength}-day streak
     for ${context.habitName} (longest ${context.longestStreak} days) with a ${context.completionRate}% completion rate.
     Their current streak status is ${context.status}. They've missed ${context.missedDays} days recently.
-    Write a ${context.userTone} message (max 50 words) to motivate them, considering their current streak status.
-    If their streak is active, praise their progress.
-    If their streak is at-risk, encourage them to complete today.
-    If their streak is broken, gently remind them of their progress and encourage them to start fresh.
-    Keep the tone consistent with the user's preference (${context.userTone}).
-    The message should be personalized and motivational.
+    Write a ${context.userTone} message (max 50 words) to motivate them.
+    If they're on a good streak, celebrate them.
+    If they're struggling, offer encouragement and remind them of their progress.
+    Keep the tone appropriate for the user's preference.
   `;
 }
 
@@ -171,8 +169,8 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
     db.transaction(tx => {
       tx.executeSql(
         `SELECT message FROM ai_messages
-         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ?
-         AND habit_name = ? AND completion_rate = ? AND status = ? AND user_tone = ?
+         WHERE streak_length = ? AND longest_streak = ? AND missed_days = ? AND habit_name = ?
+         AND completion_rate = ? AND status = ? AND user_tone = ?
          AND created_at > datetime('now', '-${config.cacheTTL} milliseconds')`,
         [
           context.streakLength,
@@ -201,7 +199,7 @@ async function getCachedMessage(context: CoachMessageContext): Promise<string | 
 
 // Cache a generated message
 async function cacheMessage(context: CoachMessageContext, message: string): Promise<void> {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
         `INSERT OR REPLACE INTO ai_messages
@@ -220,7 +218,7 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
         () => resolve(),
         (_, error) => {
           console.error('Error caching message:', error);
-          reject(error);
+          resolve();
         }
       );
     });
@@ -229,11 +227,10 @@ async function cacheMessage(context: CoachMessageContext, message: string): Prom
 
 // Get a fallback message when API fails
 function getFallbackMessage(context: CoachMessageContext, error: Error | null): string {
-  if (context.status === 'active') {
-    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep it up!`;
-  } else if (context.status === 'at-risk') {
-    return `You're close to breaking your streak for ${context.habitName}. Just one more day!`;
-  } else {
-    return `Don't worry about the break. Your longest streak was ${context.longestStreak} days. Let's start fresh today!`;
+  if (context.streakLength > 0) {
+    return `You're on a ${context.streakLength}-day streak for ${context.habitName}! Keep going - you're doing great!`;
+  } else if (context.missedDays > 0) {
+    return `Don't worry about missing a day. Just start again tomorrow. You've got this!`;
   }
+  return "Great job! Keep up the good work!";
 }

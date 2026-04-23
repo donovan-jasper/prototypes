@@ -30,7 +30,7 @@ export async function scheduleDailyCoachNotification(userId: string) {
   }
 
   // Schedule the notification
-  await Notifications.scheduleNotificationAsync({
+  const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: "Your AI Coach is waiting",
       body: "Check in with your daily motivation message!",
@@ -45,7 +45,9 @@ export async function scheduleDailyCoachNotification(userId: string) {
   });
 
   // Store in database for tracking
-  await storeScheduledNotification(userId, notificationDate);
+  await storeScheduledNotification(userId, notificationDate, notificationId);
+
+  return notificationId;
 }
 
 export async function scheduleHabitReminder(habitId: string, habitName: string, reminderTime: string) {
@@ -70,7 +72,7 @@ export async function scheduleHabitReminder(habitId: string, habitName: string, 
   }
 
   // Schedule the notification
-  await Notifications.scheduleNotificationAsync({
+  const notificationId = await Notifications.scheduleNotificationAsync({
     content: {
       title: `Time for ${habitName}!`,
       body: "Don't forget to complete your habit today!",
@@ -85,12 +87,19 @@ export async function scheduleHabitReminder(habitId: string, habitName: string, 
   });
 
   // Store in database for tracking
-  await storeScheduledNotification(habitId, notificationDate, 'habit-reminder');
+  await storeScheduledNotification(habitId, notificationDate, notificationId, 'habit-reminder');
+
+  return notificationId;
 }
 
 async function cancelCoachNotifications(userId: string) {
-  // Cancel all notifications with this userId
-  await Notifications.cancelAsync();
+  // Get all notification IDs for this user
+  const notificationIds = await getNotificationIds(userId, 'coach-checkin');
+
+  // Cancel all notifications with these IDs
+  if (notificationIds.length > 0) {
+    await Notifications.cancelScheduledNotificationsAsync(notificationIds);
+  }
 
   // Remove from database
   return new Promise((resolve) => {
@@ -109,8 +118,13 @@ async function cancelCoachNotifications(userId: string) {
 }
 
 async function cancelHabitNotifications(habitId: string) {
-  // Cancel all notifications with this habitId
-  await Notifications.cancelAsync();
+  // Get all notification IDs for this habit
+  const notificationIds = await getNotificationIds(habitId, 'habit-reminder');
+
+  // Cancel all notifications with these IDs
+  if (notificationIds.length > 0) {
+    await Notifications.cancelScheduledNotificationsAsync(notificationIds);
+  }
 
   // Remove from database
   return new Promise((resolve) => {
@@ -128,16 +142,39 @@ async function cancelHabitNotifications(habitId: string) {
   });
 }
 
+async function getNotificationIds(identifier: string, type: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT notification_id FROM scheduled_notifications WHERE user_id = ? AND type = ?',
+        [identifier, type],
+        (_, { rows }) => {
+          const ids = [];
+          for (let i = 0; i < rows.length; i++) {
+            ids.push(rows.item(i).notification_id);
+          }
+          resolve(ids);
+        },
+        (_, error) => {
+          console.error('Error fetching notification IDs:', error);
+          resolve([]);
+        }
+      );
+    });
+  });
+}
+
 async function storeScheduledNotification(
   identifier: string,
   date: Date,
+  notificationId: string,
   type: 'coach-checkin' | 'habit-reminder' = 'coach-checkin'
 ) {
   return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
-        'INSERT INTO scheduled_notifications (user_id, type, scheduled_time) VALUES (?, ?, ?)',
-        [identifier, type, date.toISOString()],
+        'INSERT INTO scheduled_notifications (user_id, type, scheduled_time, notification_id) VALUES (?, ?, ?, ?)',
+        [identifier, type, date.toISOString(), notificationId],
         () => resolve(),
         (_, error) => {
           console.error('Error storing notification:', error);
@@ -171,10 +208,27 @@ export async function initializeNotifications() {
     console.log('Notification response received:', notificationData);
     // You can add navigation logic here based on notification type
   });
+
+  // Create notifications table if it doesn't exist
+  db.transaction(tx => {
+    tx.executeSql(`
+      CREATE TABLE IF NOT EXISTS scheduled_notifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        scheduled_time TEXT NOT NULL,
+        notification_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  });
 }
 
 export async function cancelAllNotifications() {
+  // Cancel all notifications
   await Notifications.cancelAllScheduledNotificationsAsync();
+
+  // Clear database
   return new Promise((resolve) => {
     db.transaction(tx => {
       tx.executeSql(
@@ -182,7 +236,7 @@ export async function cancelAllNotifications() {
         [],
         () => resolve(),
         (_, error) => {
-          console.error('Error clearing notifications:', error);
+          console.error('Error canceling all notifications:', error);
           resolve();
         }
       );
