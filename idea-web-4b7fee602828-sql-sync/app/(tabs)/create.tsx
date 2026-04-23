@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   typeInput: {
-    width: 80,
+    width: 100,
   },
 });
 
