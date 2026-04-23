@@ -60,17 +60,3 @@ export async function getPhotoById(
   );
   return result || null;
 }
-
-export async function deletePhoto(
-  db: SQLite.SQLiteDatabase,
-  id: number
-): Promise<void> {
-  // First get the photo to delete the file
-  const photo = await getPhotoById(db, id);
-  if (photo && photo.uri) {
-    await FileSystem.deleteAsync(photo.uri, { idempotent: true });
-  }
-
-  // Then delete from database
-  await db.runAsync('DELETE FROM photos WHERE id = ?', [id]);
-}
