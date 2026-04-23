@@ -4,8 +4,9 @@ import { useContactStore } from '../../store/contactStore';
 import { getMonthlyCheckIns, getTopContactsByScore, getImprovementScore } from '../../lib/analytics';
 import { Contact, Interaction } from '../../types';
 import { format } from 'date-fns';
-import { Card, ProgressBar, Title, Subheading, Divider, useTheme } from 'react-native-paper';
+import { Card, ProgressBar, Title, Subheading, Divider, useTheme, Button } from 'react-native-paper';
 import InsightChart from '../../components/InsightChart';
+import { useRouter } from 'expo-router';
 
 const InsightsScreen = () => {
   const { contacts, interactions } = useContactStore();
@@ -14,6 +15,7 @@ const InsightsScreen = () => {
   const [improvementScore, setImprovementScore] = useState(0);
   const [loading, setLoading] = useState(true);
   const theme = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     const currentDate = new Date();
@@ -93,12 +95,28 @@ const InsightsScreen = () => {
                   <Subheading style={[styles.contactFrequency, { color: theme.colors.onSurface }]}>
                     Check-in frequency: every {contact.frequency} days
                   </Subheading>
+                  <Button
+                    mode="outlined"
+                    onPress={() => router.push(`/contact/${contact.id}`)}
+                    style={styles.viewContactButton}
+                  >
+                    View Contact
+                  </Button>
                 </View>
                 {index < topContacts.length - 1 && <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />}
               </View>
             ))
           ) : (
-            <Text style={[styles.noDataText, { color: theme.colors.onSurface }]}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
+            <View style={styles.emptyState}>
+              <Text style={[styles.noDataText, { color: theme.colors.onSurface }]}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
+              <Button
+                mode="contained"
+                onPress={() => router.push('/contacts')}
+                style={styles.addContactButton}
+              >
+                Add Contacts
+              </Button>
+            </View>
           )}
         </Card.Content>
       </Card>
@@ -112,16 +130,16 @@ const InsightsScreen = () => {
           </View>
           <ProgressBar
             progress={improvementScore / 100}
-            color={improvementScore > 50 ? '#4CAF50' : improvementScore > 30 ? '#FFC107' : '#F44336'}
-            style={styles.progressBar}
+            color={improvementScore > 70 ? '#4CAF50' : improvementScore > 40 ? '#FFC107' : '#F44336'}
+            style={styles.improvementProgress}
           />
-          <Subheading style={[styles.improvementText, { color: theme.colors.onSurface }]}>
-            {improvementScore > 50
-              ? 'Great job! You\'re improving your relationship maintenance.'
-              : improvementScore > 30
-                ? 'You\'re making progress. Keep it up!'
-                : 'Let\'s work on maintaining more consistent contact.'}
-          </Subheading>
+          <Text style={[styles.improvementDescription, { color: theme.colors.onSurface }]}>
+            {improvementScore > 70
+              ? 'Great job! You\'re maintaining strong relationships.'
+              : improvementScore > 40
+                ? 'You\'re doing well, but could improve consistency.'
+                : 'Consider increasing your check-in frequency with some contacts.'}
+          </Text>
         </Card.Content>
       </Card>
     </ScrollView>
@@ -137,6 +155,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
   loadingText: {
     marginTop: 16,
@@ -155,11 +174,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   contactCard: {
-    marginBottom: 16,
+    paddingVertical: 16,
   },
   contactHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   contactName: {
@@ -170,37 +190,56 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  contactFrequency: {
-    marginTop: 8,
-    fontSize: 14,
-  },
   progressBar: {
     height: 8,
     borderRadius: 4,
+    marginBottom: 8,
+  },
+  contactFrequency: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  viewContactButton: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
   divider: {
+    height: 1,
     marginVertical: 16,
   },
   improvementHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   improvementLabel: {
     fontSize: 16,
   },
   improvementScore: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
   },
-  improvementText: {
-    marginTop: 8,
+  improvementProgress: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  improvementDescription: {
     fontSize: 14,
+    marginTop: 8,
   },
   noDataText: {
-    textAlign: 'center',
-    marginTop: 16,
     fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 24,
+  },
+  addContactButton: {
+    marginTop: 16,
   },
 });
 
