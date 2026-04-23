@@ -16,9 +16,9 @@ let db: SQLite.SQLiteDatabase | null = null;
 
 export async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (db) return db;
-  
+
   db = await SQLite.openDatabaseAsync('sellsync.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS listings (
       id TEXT PRIMARY KEY,
@@ -32,7 +32,7 @@ export async function openDatabase(): Promise<SQLite.SQLiteDatabase> {
       createdAt TEXT NOT NULL
     );
   `);
-  
+
   return db;
 }
 
@@ -40,13 +40,13 @@ export async function createListing(listing: Omit<Listing, 'id' | 'createdAt'>):
   const database = await openDatabase();
   const id = `listing_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
-  
+
   await database.runAsync(
     `INSERT INTO listings (id, title, description, price, platform, status, images, sourcingCost, createdAt)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [id, listing.title, listing.description || '', listing.price, listing.platform, listing.status, listing.images || '[]', listing.sourcingCost || 0, createdAt]
   );
-  
+
   return id;
 }
 
@@ -54,14 +54,14 @@ export async function updateListing(id: string, updates: Partial<Omit<Listing, '
   const database = await openDatabase();
   const fields: string[] = [];
   const values: any[] = [];
-  
+
   Object.entries(updates).forEach(([key, value]) => {
     fields.push(`${key} = ?`);
     values.push(value);
   });
-  
+
   if (fields.length === 0) return;
-  
+
   values.push(id);
   await database.runAsync(
     `UPDATE listings SET ${fields.join(', ')} WHERE id = ?`,
@@ -79,23 +79,23 @@ export async function getListings(filters?: { status?: string; platform?: string
   let query = 'SELECT * FROM listings';
   const conditions: string[] = [];
   const values: any[] = [];
-  
+
   if (filters?.status) {
     conditions.push('status = ?');
     values.push(filters.status);
   }
-  
+
   if (filters?.platform) {
     conditions.push('platform = ?');
     values.push(filters.platform);
   }
-  
+
   if (conditions.length > 0) {
     query += ' WHERE ' + conditions.join(' AND ');
   }
-  
+
   query += ' ORDER BY createdAt DESC';
-  
+
   const result = await database.getAllAsync<Listing>(query, values);
   return result;
 }

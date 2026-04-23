@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,7 +15,7 @@ export default function ImageUploader({ images, onImagesChange, maxImages = 10 }
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
     const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
       Alert.alert('Permission Required', 'Camera and photo library access are needed to upload images.');
       return false;
@@ -35,7 +35,7 @@ export default function ImageUploader({ images, onImagesChange, maxImages = 10 }
     setLoading(true);
     try {
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -63,7 +63,7 @@ export default function ImageUploader({ images, onImagesChange, maxImages = 10 }
     setLoading(true);
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsMultipleSelection: true,
         selectionLimit: maxImages - images.length,
         aspect: [4, 3],
@@ -101,7 +101,7 @@ export default function ImageUploader({ images, onImagesChange, maxImages = 10 }
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Photos ({images.length}/{maxImages})</Text>
-      
+
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollView}>
         <View style={styles.imageGrid}>
           {images.map((uri, index) => (
@@ -115,15 +115,21 @@ export default function ImageUploader({ images, onImagesChange, maxImages = 10 }
               </TouchableOpacity>
             </View>
           ))}
-          
+
           {images.length < maxImages && (
             <TouchableOpacity
               style={styles.addButton}
               onPress={showOptions}
               disabled={loading}
             >
-              <Ionicons name="camera-outline" size={32} color="#666" />
-              <Text style={styles.addButtonText}>Add Photo</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color="#666" />
+              ) : (
+                <>
+                  <Ionicons name="camera-outline" size={32} color="#666" />
+                  <Text style={styles.addButtonText}>Add Photo</Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
         </View>
@@ -181,11 +187,11 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fafafa',
+    backgroundColor: '#f9f9f9',
   },
   addButtonText: {
     marginTop: 8,
-    fontSize: 12,
     color: '#666',
+    fontSize: 12,
   },
 });
