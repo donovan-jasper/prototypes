@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, TouchableOpacity, Text, FlatList, StyleSheet, Alert } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, FlatList, StyleSheet, Alert, Switch } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
 import { saveItem, getItems } from '../utils/storage';
 import { getChannels } from '../utils/channel';
+import Voice from 'react-native-voice';
+import * as Sharing from 'react-native-share-menu';
 
 const CaptureScreen = () => {
   const [text, setText] = useState('');
@@ -11,11 +13,62 @@ const CaptureScreen = () => {
   const [selectedChannelId, setSelectedChannelId] = useState(null);
   const [recentItems, setRecentItems] = useState([]);
   const [imageUri, setImageUri] = useState(null);
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceResults, setVoiceResults] = useState([]);
 
   useEffect(() => {
     loadChannels();
     loadRecentItems();
+
+    // Initialize voice recognition
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechError = onSpeechError;
+
+    // Handle shared content
+    Sharing.addListener('onShare', handleSharedContent);
+
+    return () => {
+      Voice.destroy().then(Voice.removeAllListeners);
+      Sharing.removeListener('onShare');
+    };
   }, []);
+
+  const handleSharedContent = async (sharedData) => {
+    if (sharedData.mimeType.includes('text')) {
+      setText(sharedData.data);
+    } else if (sharedData.mimeType.includes('image')) {
+      setImageUri(sharedData.data);
+    }
+  };
+
+  const onSpeechResults = (e) => {
+    setVoiceResults(e.value);
+    setText(prevText => prevText + ' ' + e.value.join(' '));
+  };
+
+  const onSpeechError = (e) => {
+    console.error('Voice error:', e);
+    setIsRecording(false);
+  };
+
+  const startRecording = async () => {
+    try {
+      await Voice.start('en-US');
+      setIsRecording(true);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      await Voice.stop();
+      setIsRecording(false);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadChannels = async () => {
     try {
@@ -40,13 +93,14 @@ const CaptureScreen = () => {
 
   const detectType = (content) => {
     if (imageUri) return 'image';
+    if (voiceResults.length > 0) return 'voice';
     const urlPattern = /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
     return urlPattern.test(content) ? 'url' : 'text';
   };
 
   const handleImagePicker = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (permissionResult.granted === false) {
       Alert.alert('Permission Required', 'Permission to access camera roll is required!');
       return;
@@ -64,8 +118,8 @@ const CaptureScreen = () => {
   };
 
   const handleSave = async () => {
-    if (!text.trim() && !imageUri) {
-      Alert.alert('Error', 'Please enter text or select an image');
+    if (!text.trim() && !imageUri && voiceResults.length === 0) {
+      Alert.alert('Error', 'Please enter text, select an image, or record a voice memo');
       return;
     }
 
@@ -77,13 +131,19 @@ const CaptureScreen = () => {
     try {
       const content = imageUri || text;
       const type = detectType(content);
-      
-      await saveItem(content, type, selectedChannelId);
-      
+
+      const metadata = {
+        voiceTranscript: voiceResults.join(' '),
+        recordingDuration: voiceResults.length > 0 ? (voiceResults.length * 0.5).toFixed(1) : null
+      };
+
+      await saveItem(content, type, selectedChannelId, metadata);
+
       setText('');
       setImageUri(null);
+      setVoiceResults([]);
       await loadRecentItems();
-      
+
       Alert.alert('Success', 'Item saved successfully!');
     } catch (error) {
       console.error('Error saving item:', error);
@@ -94,7 +154,9 @@ const CaptureScreen = () => {
   const renderItem = ({ item }) => (
     <View style={styles.itemContainer}>
       <Text style={styles.itemType}>{item.type.toUpperCase()}</Text>
-      <Text style={styles.itemText} numberOfLines={2}>{item.text}</Text>
+      <Text style={styles.itemText} numberOfLines={2}>
+        {item.type === 'voice' ? item.metadata?.voiceTranscript || 'Voice memo' : item.text}
+      </Text>
       <Text style={styles.itemDate}>{new Date(item.created_at).toLocaleString()}</Text>
     </View>
   );
@@ -102,13 +164,41 @@ const CaptureScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.captureSection}>
-        <TextInput
-          style={styles.input}
-          onChangeText={setText}
-          value={text}
-          placeholder="Type a note or paste a link..."
-          multiline
-        />
+        <View style={styles.modeToggleContainer}>
+          <Text style={styles.modeLabel}>Text Mode</Text>
+          <Switch
+            value={isVoiceMode}
+            onValueChange={(value) => setIsVoiceMode(value)}
+          />
+          <Text style={styles.modeLabel}>Voice Mode</Text>
+        </View>
+
+        {isVoiceMode ? (
+          <View style={styles.voiceInputContainer}>
+            <TouchableOpacity
+              style={[styles.voiceButton, isRecording && styles.recordingButton]}
+              onPressIn={startRecording}
+              onPressOut={stopRecording}
+            >
+              <Text style={styles.voiceButtonText}>
+                {isRecording ? 'Recording...' : 'Hold to Record'}
+              </Text>
+            </TouchableOpacity>
+            {voiceResults.length > 0 && (
+              <Text style={styles.voiceTranscript}>
+                {voiceResults.join(' ')}
+              </Text>
+            )}
+          </View>
+        ) : (
+          <TextInput
+            style={styles.input}
+            onChangeText={setText}
+            value={text}
+            placeholder="Type a note or paste a link..."
+            multiline
+          />
+        )}
 
         <TouchableOpacity style={styles.imageButton} onPress={handleImagePicker}>
           <Text style={styles.imageButtonText}>
@@ -160,6 +250,41 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  modeToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+  },
+  modeLabel: {
+    fontSize: 16,
+    marginHorizontal: 10,
+  },
+  voiceInputContainer: {
+    marginBottom: 15,
+  },
+  voiceButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  recordingButton: {
+    backgroundColor: '#F44336',
+  },
+  voiceButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  voiceTranscript: {
+    fontSize: 14,
+    color: '#666',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
   input: {
     height: 100,
     borderColor: '#ccc',
@@ -168,43 +293,37 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     padding: 10,
     fontSize: 16,
-    textAlignVertical: 'top',
   },
   imageButton: {
-    backgroundColor: '#007AFF',
-    padding: 15,
+    backgroundColor: '#2196F3',
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 15,
   },
   imageButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
   },
   pickerContainer: {
     marginBottom: 15,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
     marginBottom: 5,
-    color: '#333',
   },
   picker: {
     height: 50,
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 8,
+    width: '100%',
   },
   saveButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#9C27B0',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
   saveButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -213,28 +332,25 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   recentTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#333',
   },
   itemContainer: {
     backgroundColor: '#fff',
     padding: 15,
     borderRadius: 8,
     marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
   },
   itemType: {
     fontSize: 12,
-    fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#666',
     marginBottom: 5,
   },
   itemText: {
     fontSize: 16,
-    color: '#333',
     marginBottom: 5,
   },
   itemDate: {
@@ -244,7 +360,6 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     color: '#999',
-    fontSize: 16,
     marginTop: 20,
   },
 });
