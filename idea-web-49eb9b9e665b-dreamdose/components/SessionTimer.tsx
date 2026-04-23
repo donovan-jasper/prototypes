@@ -1,18 +1,55 @@
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Svg, Circle } from 'react-native-svg';
+import { cueScheduler } from '../lib/session/cueScheduler';
 
 interface SessionTimerProps {
-  remainingSeconds: number;
-  totalSeconds: number;
-  isPaused: boolean;
+  sessionId: string;
+  durationMinutes: number;
+  onComplete: () => void;
+  onInterrupt: () => void;
 }
 
 const SessionTimer: React.FC<SessionTimerProps> = ({
-  remainingSeconds,
-  totalSeconds,
-  isPaused,
+  sessionId,
+  durationMinutes,
+  onComplete,
+  onInterrupt,
 }) => {
+  const [remainingSeconds, setRemainingSeconds] = useState(durationMinutes * 60);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const totalSeconds = durationMinutes * 60;
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+
+    if (isActive && !isPaused) {
+      interval = setInterval(() => {
+        setRemainingSeconds(prev => {
+          if (prev <= 1) {
+            clearInterval(interval!);
+            onComplete();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isActive, isPaused, onComplete]);
+
+  useEffect(() => {
+    if (isPaused) {
+      cueScheduler.pause();
+    } else if (isActive) {
+      cueScheduler.resume();
+    }
+  }, [isPaused, isActive]);
+
   const progress = remainingSeconds / totalSeconds;
   const minutes = Math.floor(remainingSeconds / 60);
   const seconds = remainingSeconds % 60;
@@ -22,6 +59,16 @@ const SessionTimer: React.FC<SessionTimerProps> = ({
   const strokeWidth = 12;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - progress);
+
+  const handlePauseResume = () => {
+    setIsPaused(!isPaused);
+  };
+
+  const handleStop = () => {
+    setIsActive(false);
+    cueScheduler.stop();
+    onInterrupt();
+  };
 
   return (
     <View style={styles.container}>
@@ -56,6 +103,24 @@ const SessionTimer: React.FC<SessionTimerProps> = ({
           <Text style={styles.statusText}>Paused</Text>
         )}
       </View>
+
+      <View style={styles.controls}>
+        <TouchableOpacity
+          style={styles.controlButton}
+          onPress={handlePauseResume}
+        >
+          <Text style={styles.controlText}>
+            {isPaused ? 'Resume' : 'Pause'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.controlButton, styles.stopButton]}
+          onPress={handleStop}
+        >
+          <Text style={[styles.controlText, styles.stopText]}>Stop</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 };
@@ -64,6 +129,7 @@ const styles = StyleSheet.create({
   container: {
     justifyContent: 'center',
     alignItems: 'center',
+    paddingVertical: 40,
   },
   timeContainer: {
     position: 'absolute',
@@ -79,6 +145,28 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
     marginTop: 8,
+  },
+  controls: {
+    flexDirection: 'row',
+    marginTop: 40,
+    gap: 20,
+  },
+  controlButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+  },
+  stopButton: {
+    backgroundColor: '#FF3B30',
+  },
+  controlText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  stopText: {
+    color: 'white',
   },
 });
 
