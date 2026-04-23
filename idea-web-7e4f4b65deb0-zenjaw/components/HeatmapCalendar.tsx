@@ -149,16 +149,16 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
       <View style={styles.legend}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: Colors.light.tense }]} />
-          <Text style={styles.legendText}>Tense (70%+)</Text>
+          <View style={[styles.legendBox, { backgroundColor: Colors.light.relaxed }]} />
+          <Text style={styles.legendText}>Relaxed</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: '#f59e0b' }]} />
-          <Text style={styles.legendText}>Moderate (40-70%)</Text>
+          <Text style={styles.legendText}>Moderate</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendBox, { backgroundColor: Colors.light.relaxed }]} />
-          <Text style={styles.legendText}>Relaxed (<40%)</Text>
+          <View style={[styles.legendBox, { backgroundColor: Colors.light.tense }]} />
+          <Text style={styles.legendText}>Tense</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendBox, { backgroundColor: Colors.light.border }]} />
@@ -168,8 +168,8 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
 
       <Modal
         visible={selectedDate !== null}
-        transparent={true}
         animationType="slide"
+        transparent={true}
         onRequestClose={closeModal}
       >
         <View style={styles.modalContainer}>
@@ -178,7 +178,6 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
               <Text style={styles.modalTitle}>
                 {selectedDate?.toLocaleDateString('en-US', {
                   weekday: 'long',
-                  year: 'numeric',
                   month: 'long',
                   day: 'numeric'
                 })}
@@ -192,7 +191,7 @@ export default function HeatmapCalendar({ logs, days, onDayPress }: HeatmapCalen
               <FlatList
                 data={dayLogs}
                 renderItem={renderDayLogItem}
-                keyExtractor={(item, index) => `${item.id}-${index}`}
+                keyExtractor={(item) => item.id.toString()}
                 contentContainerStyle={styles.logList}
               />
             ) : (
@@ -233,8 +232,8 @@ const styles = StyleSheet.create({
   cell: {
     width: cellSize,
     height: cellSize,
-    marginBottom: 8,
     borderRadius: 4,
+    marginBottom: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -262,23 +261,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 16,
-    flexWrap: 'wrap',
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
-    marginBottom: 8,
   },
   legendBox: {
     width: 16,
     height: 16,
-    borderRadius: 2,
-    marginRight: 4,
+    borderRadius: 4,
+    marginRight: 8,
   },
   legendText: {
     fontSize: 12,
-    color: Colors.light.textSecondary,
+    color: Colors.light.text,
   },
   modalContainer: {
     flex: 1,
@@ -307,8 +303,8 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   closeButtonText: {
+    fontSize: 16,
     color: Colors.light.tint,
-    fontWeight: 'bold',
   },
   logList: {
     paddingBottom: 16,
@@ -352,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noDataText: {
-    fontSize: 14,
+    fontSize: 16,
     color: Colors.light.textSecondary,
   },
 });
