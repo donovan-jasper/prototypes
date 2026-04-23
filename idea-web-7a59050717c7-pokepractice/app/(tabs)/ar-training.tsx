@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Dimensions } from 'react-native';
 import { Camera } from 'expo-camera';
 import { GLView } from 'expo-gl';
-import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { useStore } from '../../store/useStore';
 import { savePerformance } from '../../lib/database';
 import { calculateScore, getAccuracyRating } from '../../lib/scoring';
+import { ARTargetOverlay } from '../../components/ARTargetOverlay';
+import { AREngine } from '../../lib/ar-engine';
+
+const { width, height } = Dimensions.get('window');
 
 const ARTargetPractice = () => {
   const [hasPermission, setHasPermission] = useState(null);
-  const [targets, setTargets] = useState([]);
   const [hits, setHits] = useState(0);
   const [misses, setMisses] = useState(0);
   const [gameActive, setGameActive] = useState(false);
@@ -18,10 +20,7 @@ const ARTargetPractice = () => {
   const [score, setScore] = useState(null);
   const cameraRef = useRef(null);
   const glViewRef = useRef(null);
-  const sceneRef = useRef(null);
-  const cameraThreeRef = useRef(null);
-  const rendererRef = useRef(null);
-  const targetMeshes = useRef([]);
+  const arEngineRef = useRef(new AREngine());
   const { isPremium } = useStore();
 
   useEffect(() => {
@@ -29,6 +28,10 @@ const ARTargetPractice = () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     })();
+
+    return () => {
+      arEngineRef.current.cleanup();
+    };
   }, []);
 
   useEffect(() => {
@@ -69,7 +72,10 @@ const ARTargetPractice = () => {
     setGameActive(false);
     const total = hits + misses;
     const calculatedScore = calculateScore({ hits, total, timeMs: 30000 });
-    setScore(calculatedScore);
+    setScore({
+      ...calculatedScore,
+      rating: getAccuracyRating(calculatedScore.accuracy)
+    });
 
     // Save to database
     await savePerformance({
@@ -82,18 +88,17 @@ const ARTargetPractice = () => {
   };
 
   const spawnTargets = () => {
-    const newTargets = [];
+    // Clear existing targets
+    arEngineRef.current.cleanup();
+
+    // Spawn new targets
     for (let i = 0; i < 5; i++) {
-      newTargets.push({
-        id: Date.now() + i,
-        x: Math.random() * 2 - 1, // -1 to 1 range
-        y: Math.random() * 2 - 1,
-        z: -2, // Fixed distance from camera
-        radius: 0.1,
-        color: new THREE.Color(Math.random(), Math.random(), Math.random())
+      arEngineRef.current.addTarget({
+        x: (Math.random() * 2 - 1) * 0.5, // More centered
+        y: (Math.random() * 2 - 1) * 0.5,
+        z: -2
       });
     }
-    setTargets(newTargets);
   };
 
   const handleTap = (event) => {
@@ -108,29 +113,22 @@ const ARTargetPractice = () => {
 
     // Create a ray from the camera through the tap point
     const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera({ x, y }, cameraThreeRef.current);
+    raycaster.setFromCamera({ x, y }, arEngineRef.current.camera);
 
     // Check for intersections with targets
-    const intersects = raycaster.intersectObjects(targetMeshes.current);
+    const hitTarget = arEngineRef.current.checkIntersection(raycaster);
 
-    if (intersects.length > 0) {
+    if (hitTarget) {
       // Hit a target
       setHits(prev => prev + 1);
-      // Remove the hit target
-      const hitTarget = intersects[0].object;
-      sceneRef.current.remove(hitTarget);
-      targetMeshes.current = targetMeshes.current.filter(mesh => mesh !== hitTarget);
+      arEngineRef.current.removeTarget(hitTarget);
 
       // Spawn a new target
-      const newTarget = {
-        id: Date.now(),
-        x: Math.random() * 2 - 1,
-        y: Math.random() * 2 - 1,
-        z: -2,
-        radius: 0.1,
-        color: new THREE.Color(Math.random(), Math.random(), Math.random())
-      };
-      addTargetToScene(newTarget);
+      arEngineRef.current.addTarget({
+        x: (Math.random() * 2 - 1) * 0.5,
+        y: (Math.random() * 2 - 1) * 0.5,
+        z: -2
+      });
     } else {
       // Miss
       setMisses(prev => prev + 1);
@@ -140,41 +138,24 @@ const ARTargetPractice = () => {
   const initGL = async (gl) => {
     if (!gl) return;
 
-    // Initialize Three.js renderer
-    rendererRef.current = new Renderer({ gl });
-    rendererRef.current.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
-
-    // Create scene
-    sceneRef.current = new THREE.Scene();
-
-    // Create camera
-    cameraThreeRef.current = new THREE.PerspectiveCamera(75, gl.drawingBufferWidth / gl.drawingBufferHeight, 0.1, 1000);
-    cameraThreeRef.current.position.z = 0;
-
-    // Add initial targets
-    targets.forEach(target => addTargetToScene(target));
+    // Initialize AR engine
+    arEngineRef.current.initialize(gl);
 
     // Animation loop
     const animate = () => {
-      requestAnimationFrame(animate);
-      rendererRef.current.render(sceneRef.current, cameraThreeRef.current);
-      gl.endFrameEXP();
+      if (glViewRef.current) {
+        requestAnimationFrame(animate);
+        arEngineRef.current.render();
+        gl.endFrameEXP();
+      }
     };
     animate();
-  };
-
-  const addTargetToScene = (target) => {
-    const geometry = new THREE.SphereGeometry(target.radius, 32, 32);
-    const material = new THREE.MeshBasicMaterial({ color: target.color });
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(target.x, target.y, target.z);
-    sceneRef.current.add(mesh);
-    targetMeshes.current.push(mesh);
   };
 
   if (hasPermission === null) {
     return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
   }
+
   if (hasPermission === false) {
     return <View style={styles.container}><Text>No access to camera</Text></View>;
   }
@@ -183,35 +164,31 @@ const ARTargetPractice = () => {
     <View style={styles.container}>
       <Camera
         ref={cameraRef}
-        style={styles.camera}
+        style={StyleSheet.absoluteFill}
         type={Camera.Constants.Type.back}
         onTouchStart={handleTap}
       >
         <GLView
           ref={glViewRef}
-          style={styles.glView}
+          style={StyleSheet.absoluteFill}
           onContextCreate={initGL}
         />
-      </Camera>
 
-      <View style={styles.overlay}>
-        <Text style={styles.timer}>Time: {timeLeft}s</Text>
-        <Text style={styles.score}>Hits: {hits} | Misses: {misses}</Text>
+        <ARTargetOverlay
+          hits={hits}
+          misses={misses}
+          timeLeft={timeLeft}
+          score={score}
+        />
 
-        {!gameActive && score && (
-          <View style={styles.results}>
-            <Text style={styles.resultTitle}>Game Over!</Text>
-            <Text style={styles.resultScore}>Score: {score.score}</Text>
-            <Text style={styles.resultAccuracy}>Accuracy: {score.accuracy}% ({getAccuracyRating(score.accuracy)})</Text>
+        {!gameActive && (
+          <View style={styles.startButtonContainer}>
+            <TouchableOpacity style={styles.startButton} onPress={startGame}>
+              <Text style={styles.startButtonText}>Start Game</Text>
+            </TouchableOpacity>
           </View>
         )}
-
-        {!gameActive && !score && (
-          <TouchableOpacity style={styles.startButton} onPress={startGame}>
-            <Text style={styles.startButtonText}>Start AR Training</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      </Camera>
     </View>
   );
 };
@@ -220,68 +197,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  camera: {
-    flex: 1,
-  },
-  glView: {
-    flex: 1,
-  },
-  overlay: {
+  startButtonContainer: {
     position: 'absolute',
-    top: 0,
+    bottom: 50,
     left: 0,
     right: 0,
-    padding: 20,
     alignItems: 'center',
-  },
-  timer: {
-    fontSize: 24,
-    color: 'white',
-    fontWeight: 'bold',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 10,
-  },
-  score: {
-    fontSize: 18,
-    color: 'white',
-    marginTop: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 10,
   },
   startButton: {
     backgroundColor: '#4CAF50',
-    padding: 15,
+    paddingVertical: 15,
+    paddingHorizontal: 30,
     borderRadius: 10,
-    marginTop: 20,
   },
   startButtonText: {
     color: 'white',
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  results: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  resultTitle: {
-    fontSize: 24,
-    color: 'white',
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  resultScore: {
-    fontSize: 20,
-    color: 'white',
-    marginBottom: 5,
-  },
-  resultAccuracy: {
-    fontSize: 16,
-    color: 'white',
   },
 });
 

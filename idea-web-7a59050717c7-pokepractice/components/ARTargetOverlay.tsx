@@ -15,8 +15,10 @@ interface ARTargetOverlayProps {
 export const ARTargetOverlay = ({ hits, misses, timeLeft, score }: ARTargetOverlayProps) => {
   return (
     <View style={styles.overlay}>
-      <Text style={styles.timer}>Time: {timeLeft}s</Text>
-      <Text style={styles.score}>Hits: {hits} | Misses: {misses}</Text>
+      <View style={styles.statsContainer}>
+        <Text style={styles.timer}>Time: {timeLeft}s</Text>
+        <Text style={styles.score}>Hits: {hits} | Misses: {misses}</Text>
+      </View>
 
       {score && (
         <View style={styles.results}>
@@ -38,8 +40,14 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
   },
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginBottom: 20,
+  },
   timer: {
-    fontSize: 24,
+    fontSize: 20,
     color: 'white',
     fontWeight: 'bold',
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -47,9 +55,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   score: {
-    fontSize: 18,
+    fontSize: 20,
     color: 'white',
-    marginTop: 10,
+    fontWeight: 'bold',
     backgroundColor: 'rgba(0,0,0,0.5)',
     padding: 10,
     borderRadius: 10,

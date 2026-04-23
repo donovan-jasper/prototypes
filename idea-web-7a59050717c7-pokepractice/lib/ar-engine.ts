@@ -71,4 +71,8 @@ export class AREngine {
     }
     this.targets = [];
   }
+
+  get camera() {
+    return this.camera;
+  }
 }
