@@ -1,5 +1,7 @@
 import * as Notifications from 'expo-notifications';
-import { addRecallAlert } from './database';
+import { addRecallAlert, getRecallAlertsForEstablishment } from './database';
+import { getSavedLocations } from './database';
+import { getRecalls } from './api';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -32,6 +34,36 @@ export const scheduleRecallAlert = async (establishmentId: string, establishment
   }
 };
 
+export const checkForRecallAlerts = async () => {
+  try {
+    const savedLocations = await getSavedLocations();
+
+    for (const location of savedLocations) {
+      const recalls = await getRecalls(location.establishmentId);
+
+      for (const recall of recalls) {
+        // Check if we've already scheduled this notification
+        const existingAlerts = await getRecallAlertsForEstablishment(location.establishmentId);
+        const alreadyScheduled = existingAlerts.some(alert =>
+          alert.recallDate === recall.recallDate &&
+          alert.description === recall.description
+        );
+
+        if (!alreadyScheduled) {
+          await scheduleRecallAlert(
+            location.establishmentId,
+            location.name,
+            recall.recallDate,
+            recall.description
+          );
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error checking for recall alerts:', error);
+  }
+};
+
 export const requestNotificationPermissions = async () => {
   const { status } = await Notifications.requestPermissionsAsync();
   if (status !== 'granted') {
@@ -39,4 +71,35 @@ export const requestNotificationPermissions = async () => {
     return false;
   }
   return true;
+};
+
+export const setupNotificationHandlers = () => {
+  // Handle notification taps
+  Notifications.addNotificationResponseReceivedListener(response => {
+    const { establishmentId } = response.notification.request.content.data;
+
+    if (establishmentId) {
+      // Navigate to establishment detail
+      // In a real app, this would use the navigation service
+      console.log(`Notification tapped for establishment: ${establishmentId}`);
+    }
+  });
+};
+
+export const setupRecallAlerts = async () => {
+  // Check for permissions
+  const hasPermission = await requestNotificationPermissions();
+  if (!hasPermission) return;
+
+  // Set up notification handlers
+  setupNotificationHandlers();
+
+  // Check for recall alerts immediately
+  await checkForRecallAlerts();
+
+  // Set up periodic checks (every 6 hours)
+  const interval = 6 * 60 * 60 * 1000; // 6 hours in milliseconds
+  setInterval(async () => {
+    await checkForRecallAlerts();
+  }, interval);
 };

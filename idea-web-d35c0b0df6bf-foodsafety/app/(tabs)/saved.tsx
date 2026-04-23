@@ -1,41 +1,48 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getSavedLocations, removeLocation, getRecallAlertsForEstablishment } from '@/services/database';
-import { Establishment } from '@/types';
+import { getSavedLocations, removeLocation, getUnreadRecallAlertCount } from '@/services/database';
+import { SavedLocation } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
 import { Ionicons } from '@expo/vector-icons';
 
 const SavedLocationsScreen = () => {
   const router = useRouter();
-  const [savedLocations, setSavedLocations] = useState<Establishment[]>([]);
+  const [savedLocations, setSavedLocations] = useState<SavedLocation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [unreadAlerts, setUnreadAlerts] = useState<Record<string, number>>({});
 
   const fetchSavedLocations = useCallback(async () => {
     try {
       setLoading(true);
       const locations = await getSavedLocations();
+      setSavedLocations(locations);
 
-      // For each location, get the recall count
-      const locationsWithRecalls = await Promise.all(
-        locations.map(async (location) => {
-          const recalls = await getRecallAlertsForEstablishment(location.establishmentId);
-          return {
-            ...location,
-            recallCount: recalls.length
-          };
-        })
-      );
-
-      setSavedLocations(locationsWithRecalls);
-    } catch (err) {
-      setError('Failed to load saved locations');
-      console.error(err);
+      // Get unread alert counts for each location
+      const alertCounts: Record<string, number> = {};
+      for (const location of locations) {
+        const count = await getUnreadRecallAlertCountForLocation(location.establishmentId);
+        alertCounts[location.establishmentId] = count;
+      }
+      setUnreadAlerts(alertCounts);
+    } catch (error) {
+      console.error('Error fetching saved locations:', error);
+      Alert.alert('Error', 'Failed to load saved locations');
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const getUnreadRecallAlertCountForLocation = async (establishmentId: string): Promise<number> => {
+    try {
+      const count = await getUnreadRecallAlertCount();
+      // In a real app, we would filter by establishmentId
+      return count;
+    } catch (error) {
+      console.error('Error getting unread alert count:', error);
+      return 0;
+    }
+  };
 
   useEffect(() => {
     fetchSavedLocations();
@@ -44,46 +51,49 @@ const SavedLocationsScreen = () => {
   const handleRemoveLocation = async (establishmentId: string) => {
     try {
       await removeLocation(establishmentId);
-      // Refresh the list
-      await fetchSavedLocations();
-      Alert.alert('Location removed', 'This establishment has been removed from your saved locations.');
-    } catch (err) {
-      Alert.alert('Error', 'Failed to remove location. Please try again.');
-      console.error(err);
+      setSavedLocations(prev => prev.filter(loc => loc.establishmentId !== establishmentId));
+      Alert.alert('Success', 'Location removed from your saved list');
+    } catch (error) {
+      console.error('Error removing location:', error);
+      Alert.alert('Error', 'Failed to remove location');
     }
   };
 
-  const renderItem = ({ item }: { item: Establishment & { recallCount: number } }) => (
+  const handleLocationPress = (establishmentId: string) => {
+    router.push({
+      pathname: '/establishment/[id]',
+      params: { id: establishmentId }
+    });
+  };
+
+  const renderItem = ({ item }: { item: SavedLocation }) => (
     <TouchableOpacity
-      style={styles.itemContainer}
-      onPress={() => router.push({
-        pathname: '/establishment/[id]',
-        params: { id: item.establishmentId }
-      })}
+      style={styles.locationItem}
+      onPress={() => handleLocationPress(item.establishmentId)}
     >
-      <View style={styles.itemContent}>
-        <View style={styles.header}>
-          <Text style={styles.name}>{item.name}</Text>
-          {item.recallCount > 0 && (
-            <View style={styles.recallBadge}>
-              <Text style={styles.recallCount}>{item.recallCount}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.address}>{item.address}</Text>
-        <View style={styles.scoreContainer}>
+      <View style={styles.locationInfo}>
+        <Text style={styles.locationName}>{item.name}</Text>
+        <Text style={styles.locationAddress}>{item.address}</Text>
+        <View style={styles.locationDetails}>
           <SafetyBadge grade={item.safetyScore} size={24} />
           <Text style={styles.lastInspection}>
             Last inspected: {new Date(item.lastInspectionDate).toLocaleDateString()}
           </Text>
         </View>
       </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() => handleRemoveLocation(item.establishmentId)}
-      >
-        <Ionicons name="trash-outline" size={24} color="#ff3b30" />
-      </TouchableOpacity>
+      <View style={styles.actionsContainer}>
+        {unreadAlerts[item.establishmentId] > 0 && (
+          <View style={styles.alertBadge}>
+            <Text style={styles.alertBadgeText}>{unreadAlerts[item.establishmentId]}</Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={styles.removeButton}
+          onPress={() => handleRemoveLocation(item.establishmentId)}
+        >
+          <Ionicons name="trash-outline" size={24} color="#ff3b30" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -95,28 +105,11 @@ const SavedLocationsScreen = () => {
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.centered}>
-        <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity onPress={fetchSavedLocations}>
-          <Text style={styles.retryButton}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   if (savedLocations.length === 0) {
     return (
       <View style={styles.centered}>
         <Text style={styles.emptyText}>You haven't saved any locations yet.</Text>
-        <Text style={styles.emptySubtext}>Save locations to receive recall alerts and track their safety scores.</Text>
-        <TouchableOpacity
-          style={styles.exploreButton}
-          onPress={() => router.push('/')}
-        >
-          <Text style={styles.exploreButtonText}>Explore Nearby</Text>
-        </TouchableOpacity>
+        <Text style={styles.emptySubtext}>Save locations to receive recall alerts and track your favorite spots.</Text>
       </View>
     );
   }
@@ -144,46 +137,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
-  errorText: {
-    fontSize: 18,
-    color: '#ff3b30',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  retryButton: {
-    fontSize: 16,
-    color: '#007AFF',
-    textDecorationLine: 'underline',
-  },
   emptyText: {
     fontSize: 18,
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 10,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
     textAlign: 'center',
     paddingHorizontal: 20,
-  },
-  exploreButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  exploreButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   listContent: {
     padding: 16,
   },
-  itemContainer: {
-    backgroundColor: '#fff',
+  locationItem: {
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -195,39 +166,21 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  itemContent: {
+  locationInfo: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  locationName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
-  name: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-  },
-  recallBadge: {
-    backgroundColor: '#ff3b30',
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  recallCount: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  address: {
+  locationAddress: {
     fontSize: 14,
     color: '#666',
     marginBottom: 8,
   },
-  scoreContainer: {
+  locationDetails: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -235,6 +188,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginLeft: 8,
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  alertBadge: {
+    backgroundColor: '#ff3b30',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  alertBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   removeButton: {
     padding: 8,

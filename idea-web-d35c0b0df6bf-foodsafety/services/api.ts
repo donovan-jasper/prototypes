@@ -27,7 +27,39 @@ const mockEstablishments: Establishment[] = [
     cuisineType: 'Japanese',
     isOpen: true
   },
-  // Add more mock establishments...
+  {
+    id: 'est-3',
+    name: 'Burger Palace',
+    address: '789 Fast Food Blvd, Metropolis',
+    latitude: 37.7949,
+    longitude: -122.4394,
+    safetyScore: 'C',
+    lastInspectionDate: '2023-08-10',
+    cuisineType: 'Fast Food',
+    isOpen: true
+  },
+  {
+    id: 'est-4',
+    name: 'Healthy Greens',
+    address: '321 Organic Lane, Eco City',
+    latitude: 37.7649,
+    longitude: -122.4094,
+    safetyScore: 'A',
+    lastInspectionDate: '2023-10-05',
+    cuisineType: 'Vegetarian',
+    isOpen: true
+  },
+  {
+    id: 'est-5',
+    name: 'Taco Fiesta',
+    address: '555 Spice St, Flavor Town',
+    latitude: 37.7549,
+    longitude: -122.4494,
+    safetyScore: 'B',
+    lastInspectionDate: '2023-09-15',
+    cuisineType: 'Mexican',
+    isOpen: true
+  }
 ];
 
 const mockInspections: Record<string, Inspection[]> = {
@@ -56,6 +88,45 @@ const mockInspections: Record<string, Inspection[]> = {
       criticalViolations: 0,
       nonCriticalViolations: 2
     }
+  ],
+  'est-3': [
+    {
+      id: 'insp-3',
+      establishmentId: 'est-3',
+      inspectionDate: '2023-08-10',
+      violations: [
+        { type: 'non-critical', description: 'Food packaging not sealed properly' },
+        { type: 'non-critical', description: 'Inadequate handwashing facilities' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 2
+    }
+  ],
+  'est-4': [
+    {
+      id: 'insp-4',
+      establishmentId: 'est-4',
+      inspectionDate: '2023-10-05',
+      violations: [
+        { type: 'non-critical', description: 'Minor pest activity' },
+        { type: 'non-critical', description: 'Food storage temperature not logged' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 2
+    }
+  ],
+  'est-5': [
+    {
+      id: 'insp-5',
+      establishmentId: 'est-5',
+      inspectionDate: '2023-09-15',
+      violations: [
+        { type: 'non-critical', description: 'Equipment not sanitized' },
+        { type: 'non-critical', description: 'Handwashing facility not provided' }
+      ],
+      criticalViolations: 0,
+      nonCriticalViolations: 2
+    }
   ]
 };
 
@@ -66,6 +137,14 @@ const mockRecalls: Record<string, any[]> = {
       establishmentId: 'est-1',
       recallDate: '2023-11-01',
       description: 'Possible contamination in salad bar'
+    }
+  ],
+  'est-3': [
+    {
+      id: 'recall-2',
+      establishmentId: 'est-3',
+      recallDate: '2023-10-20',
+      description: 'Tainted meat detected in inventory'
     }
   ]
 };

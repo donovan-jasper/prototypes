@@ -7,7 +7,8 @@ import { getNearbyEstablishments } from '@/services/api';
 import { Establishment } from '@/types';
 import SafetyBadge from '@/components/SafetyBadge';
 import { registerBackgroundService } from '@/services/backgroundService';
-import { requestNotificationPermissions } from '@/services/notifications';
+import { requestNotificationPermissions, setupNotificationHandlers } from '@/services/notifications';
+import { initializeDatabase } from '@/services/database';
 
 const MapScreen = () => {
   const router = useRouter();
@@ -29,6 +30,9 @@ const MapScreen = () => {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Initialize database
+        await initializeDatabase();
+
         // Request location permissions
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
@@ -49,6 +53,9 @@ const MapScreen = () => {
 
         // Request notification permissions
         await requestNotificationPermissions();
+
+        // Setup notification handlers
+        setupNotificationHandlers();
 
         // Register background service
         await registerBackgroundService();

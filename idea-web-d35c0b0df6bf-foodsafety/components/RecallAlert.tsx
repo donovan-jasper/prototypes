@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { format } from 'date-fns';
+import { Ionicons } from '@expo/vector-icons';
 
 interface RecallAlertProps {
   recallDate: string;
@@ -8,20 +8,16 @@ interface RecallAlertProps {
 }
 
 const RecallAlert: React.FC<RecallAlertProps> = ({ recallDate, description }) => {
-  const formattedDate = format(new Date(recallDate), 'MMMM d, yyyy');
-
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>⚠️ Recall Alert</Text>
-        <Text style={styles.date}>{formattedDate}</Text>
+      <View style={styles.iconContainer}>
+        <Ionicons name="alert-circle" size={24} color="#ff3b30" />
       </View>
-      <Text style={styles.description}>{description}</Text>
-      <View style={styles.warningBox}>
-        <Text style={styles.warningText}>
-          This establishment has been recalled. Exercise caution when consuming food from this location.
-          Please check with the establishment for more information about affected products.
+      <View style={styles.content}>
+        <Text style={styles.date}>
+          {new Date(recallDate).toLocaleDateString()}
         </Text>
+        <Text style={styles.description}>{description}</Text>
       </View>
     </View>
   );
@@ -29,50 +25,30 @@ const RecallAlert: React.FC<RecallAlertProps> = ({ recallDate, description }) =>
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
+    flexDirection: 'row',
+    backgroundColor: '#fff5f5',
     borderRadius: 8,
     padding: 16,
-    marginVertical: 8,
+    marginBottom: 12,
     borderLeftWidth: 4,
     borderLeftColor: '#ff3b30',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
+  iconContainer: {
+    marginRight: 12,
+    justifyContent: 'center',
   },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#ff3b30',
+  content: {
+    flex: 1,
   },
   date: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: 'bold',
+    color: '#ff3b30',
+    marginBottom: 4,
   },
   description: {
-    fontSize: 16,
-    color: '#333',
-    marginBottom: 12,
-    lineHeight: 22,
-  },
-  warningBox: {
-    backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 4,
-    borderLeftWidth: 3,
-    borderLeftColor: '#c62828',
-  },
-  warningText: {
-    color: '#c62828',
     fontSize: 14,
-    lineHeight: 20,
+    color: '#333',
   },
 });
 

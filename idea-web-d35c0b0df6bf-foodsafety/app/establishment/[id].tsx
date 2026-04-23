@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getEstablishmentDetails, getInspections, getRecalls } from '@/services/api';
-import { getRecallAlertsForEstablishment, saveLocation, isLocationSaved, removeLocation } from '@/services/database';
+import { getRecallAlertsForEstablishment, saveLocation, isLocationSaved, removeLocation, markRecallAlertAsRead } from '@/services/database';
 import SafetyBadge from '@/components/SafetyBadge';
 import InspectionTimeline from '@/components/InspectionTimeline';
 import RecallAlert from '@/components/RecallAlert';
@@ -33,6 +33,11 @@ const EstablishmentDetailScreen = () => {
       // Check if location is saved
       const saved = await isLocationSaved(id as string);
       setIsSaved(saved);
+
+      // Mark all recall alerts as read when viewing the establishment
+      if (recallAlertsData.length > 0) {
+        await Promise.all(recallAlertsData.map(alert => markRecallAlertAsRead(alert.id)));
+      }
     } catch (err) {
       setError('Failed to load establishment details');
       console.error(err);
@@ -144,7 +149,7 @@ const EstablishmentDetailScreen = () => {
         {inspections.length > 0 ? (
           <InspectionTimeline inspections={inspections} />
         ) : (
-          <Text style={styles.noData}>No inspection history available</Text>
+          <Text style={styles.noDataText}>No inspection history available</Text>
         )}
       </View>
     </ScrollView>
@@ -174,7 +179,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   header: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     padding: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
@@ -188,6 +193,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 24,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 4,
   },
   address: {
@@ -198,7 +204,6 @@ const styles = StyleSheet.create({
   scoreContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
   lastInspection: {
     fontSize: 14,
@@ -207,23 +212,24 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     padding: 8,
-    marginTop: 4,
+    marginLeft: 8,
   },
   section: {
-    marginTop: 16,
-    paddingHorizontal: 20,
+    backgroundColor: 'white',
+    padding: 20,
+    marginBottom: 12,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: 'bold',
     color: '#333',
+    marginBottom: 16,
   },
-  noData: {
+  noDataText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginTop: 20,
+    padding: 20,
   },
 });
 
