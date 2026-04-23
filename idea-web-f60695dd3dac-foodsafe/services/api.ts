@@ -213,7 +213,7 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
     const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
       params: {
         business_id: restaurantId,
-        $limit: 100,
+        $limit: 10,
         $order: 'inspection_date DESC',
       },
     });
@@ -230,6 +230,12 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
   }
 };
 
+// Fallback function to get cached data when offline
+export const getCachedRestaurants = (): Restaurant[] => {
+  return Array.from(restaurantCache.values());
+};
+
+// Clear cache when needed (e.g., when user logs out)
 export const clearCache = () => {
   restaurantCache.clear();
   inspectionCache.clear();

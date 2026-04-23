@@ -4,24 +4,29 @@ export interface Restaurant {
   address: string;
   latitude: number;
   longitude: number;
-  safetyScore: number;
+  safetyScore: number; // 0-100 scale
   lastInspectionDate: string;
   violationCount: number;
   cuisine: string;
+  isPremium?: boolean; // Flag for premium restaurants
 }
 
 export interface Inspection {
   id: string;
   restaurantId: string;
   date: string;
-  score: number;
+  score: number; // 0-100 scale
   violations: Violation[];
+  inspectionType?: string; // Routine, complaint-driven, etc.
+  inspectorName?: string;
 }
 
 export interface Violation {
   id: string;
   description: string;
-  severity: 'low' | 'medium' | 'high';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  code?: string; // Health code reference
+  repeatViolation?: boolean;
 }
 
 export interface UserList {
@@ -29,9 +34,39 @@ export interface UserList {
   name: string;
   restaurantIds: string[];
   createdAt: string;
+  isPublic?: boolean;
+  description?: string;
 }
 
 export interface SubscriptionStatus {
   isPremium: boolean;
   expiresAt?: string;
+  subscriptionType?: 'monthly' | 'annual';
+  features?: {
+    unlimitedLists: boolean;
+    advancedFilters: boolean;
+    fullInspectionHistory: boolean;
+    violationPhotos: boolean;
+    adFree: boolean;
+  };
+}
+
+export interface LocationData {
+  latitude: number;
+  longitude: number;
+  accuracy?: number;
+  altitude?: number;
+  heading?: number;
+  speed?: number;
+  timestamp?: number;
+}
+
+export interface FilterOptions {
+  minScore?: number;
+  maxScore?: number;
+  cuisine?: string;
+  hasRecentInspection?: boolean;
+  hasNoViolations?: boolean;
+  isAllergyFriendly?: boolean;
+  isKidFriendly?: boolean;
 }
