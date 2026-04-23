@@ -15,8 +15,8 @@ interface SecurityFinding {
 
 export const useSecurityScan = (files: Array<{ path: string; content: string }>) => {
   const [securityFindings, setSecurityFindings] = useState<SecurityFinding[]>([]);
-  const [securityScore, setSecurityScore] = useState<number>(100);
-  const [isScanning, setIsScanning] = useState<boolean>(false);
+  const [securityScore, setSecurityScore] = useState(100);
+  const [isScanning, setIsScanning] = useState(false);
 
   useEffect(() => {
     if (files.length === 0) return;
@@ -26,6 +26,7 @@ export const useSecurityScan = (files: Array<{ path: string; content: string }>)
       try {
         const findings = scanForVulnerabilities(files);
         const score = calculateSecurityScore(findings);
+
         setSecurityFindings(findings);
         setSecurityScore(score);
       } catch (error) {
@@ -42,11 +43,5 @@ export const useSecurityScan = (files: Array<{ path: string; content: string }>)
     securityFindings,
     securityScore,
     isScanning,
-    refreshScan: () => {
-      const findings = scanForVulnerabilities(files);
-      const score = calculateSecurityScore(findings);
-      setSecurityFindings(findings);
-      setSecurityScore(score);
-    }
   };
 };

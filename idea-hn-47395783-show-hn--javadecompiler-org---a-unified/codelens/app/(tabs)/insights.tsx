@@ -1,14 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { useSecurityScan } from '../../hooks/useSecurityScan';
 import { SecurityBadge } from '../../components/SecurityBadge';
 import { useDecompilation } from '../../hooks/useDecompilation';
-import { CodeViewer } from '../../components/CodeViewer';
+import CodeViewer from '../../components/CodeViewer';
 
 const InsightsScreen = () => {
   const { currentDecompilation } = useDecompilation();
   const { securityFindings, securityScore, isScanning } = useSecurityScan(currentDecompilation?.files || []);
-  const [selectedFinding, setSelectedFinding] = React.useState(null);
+  const [selectedFinding, setSelectedFinding] = useState(null);
+  const [selectedLocation, setSelectedLocation] = useState(null);
 
   if (!currentDecompilation) {
     return (
@@ -25,6 +26,23 @@ const InsightsScreen = () => {
       </View>
     );
   }
+
+  const getFileContent = (filePath: string) => {
+    const file = currentDecompilation.files.find(f => f.path === filePath);
+    return file ? file.content : '';
+  };
+
+  const getVulnerableLines = (filePath: string) => {
+    const finding = securityFindings.find(f =>
+      f.locations.some(loc => loc.filePath === filePath)
+    );
+
+    if (!finding) return [];
+
+    return finding.locations
+      .filter(loc => loc.filePath === filePath)
+      .map(loc => loc.lineNumber);
+  };
 
   return (
     <View style={styles.container}>
@@ -54,19 +72,35 @@ const InsightsScreen = () => {
             data={selectedFinding.locations}
             keyExtractor={(item, index) => `${item.filePath}-${index}`}
             renderItem={({ item }) => (
-              <View style={styles.locationItem}>
+              <TouchableOpacity
+                style={styles.locationItem}
+                onPress={() => setSelectedLocation(item)}
+              >
                 <Text style={styles.filePath}>{item.filePath}:{item.lineNumber}</Text>
                 <ScrollView horizontal style={styles.codeSnippetContainer}>
-                  <CodeViewer
-                    code={item.codeSnippet}
-                    language="java"
-                    showLineNumbers={false}
-                    style={styles.codeSnippet}
-                  />
+                  <Text style={styles.codeSnippet}>{item.codeSnippet}</Text>
                 </ScrollView>
-              </View>
+              </TouchableOpacity>
             )}
           />
+
+          {selectedLocation && (
+            <View style={styles.codeViewerContainer}>
+              <Text style={styles.codeViewerTitle}>Code Viewer</Text>
+              <CodeViewer
+                code={getFileContent(selectedLocation.filePath)}
+                vulnerableLines={getVulnerableLines(selectedLocation.filePath)}
+                onLinePress={(lineNumber) => {
+                  const location = selectedFinding.locations.find(
+                    loc => loc.filePath === selectedLocation.filePath && loc.lineNumber === lineNumber
+                  );
+                  if (location) {
+                    setSelectedLocation(location);
+                  }
+                }}
+              />
+            </View>
+          )}
         </View>
       ) : (
         <FlatList
@@ -188,29 +222,42 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8
   },
+  findingDescription: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 16
+  },
   locationsTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginTop: 16,
     marginBottom: 8
   },
   locationItem: {
-    marginBottom: 16,
     padding: 12,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 4
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee'
   },
   filePath: {
-    fontFamily: 'monospace',
-    marginBottom: 8,
-    color: '#555'
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 4
   },
   codeSnippetContainer: {
-    maxHeight: 100
+    maxHeight: 60
   },
   codeSnippet: {
-    fontFamily: 'monospace',
-    fontSize: 12
+    fontFamily: 'Courier',
+    fontSize: 12,
+    color: '#333'
+  },
+  codeViewerContainer: {
+    flex: 1,
+    marginTop: 16
+  },
+  codeViewerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8
   }
 });
 
