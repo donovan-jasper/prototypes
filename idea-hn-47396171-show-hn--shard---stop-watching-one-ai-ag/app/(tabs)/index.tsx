@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable } from 'react-native';
 import { useTaskStore } from '../../store/taskStore';
 import TaskCard from '../../components/TaskCard';
+import NotificationPermissionBanner from '../../components/NotificationPermissionBanner';
 import { TaskStatus } from '../../types';
+import { router } from 'expo-router';
 
 export default function TaskQueueScreen() {
   const { tasks, addTask, cancelTask, initialize, subscription } = useTaskStore();
@@ -26,10 +28,9 @@ export default function TaskQueueScreen() {
   const canAddTask = activeTasks.length < subscription.maxParallelTasks;
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <View style={styles.container}>
+      <NotificationPermissionBanner />
+
       <View style={styles.header}>
         <Text style={styles.title}>Active Tasks</Text>
         <Text style={styles.subtitle}>
@@ -46,8 +47,8 @@ export default function TaskQueueScreen() {
           multiline
           maxLength={500}
         />
-        <Pressable 
-          style={[styles.addButton, (!canAddTask || !prompt.trim()) && styles.addButtonDisabled]}
+        <Pressable
+          style={[styles.addButton, !canAddTask && styles.addButtonDisabled]}
           onPress={handleAddTask}
           disabled={!canAddTask || !prompt.trim()}
         >
@@ -56,30 +57,27 @@ export default function TaskQueueScreen() {
       </View>
 
       {!canAddTask && (
-        <View style={styles.limitWarningContainer}>
-          <Text style={styles.limitWarning}>
-            Task limit reached. Upgrade to Pro for more parallel tasks.
-          </Text>
-        </View>
+        <Text style={styles.limitWarning}>
+          Task limit reached. Upgrade to Pro for more parallel tasks.
+        </Text>
       )}
 
       <FlatList
         data={activeTasks}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
-          <TaskCard 
-            task={item} 
+          <TaskCard
+            task={item}
             onCancel={cancelTask}
+            onPress={(id) => router.push(`/task/${id}`)}
           />
         )}
         contentContainerStyle={styles.list}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No active tasks. Add one above!</Text>
-          </View>
+          <Text style={styles.emptyText}>No active tasks. Add one above!</Text>
         }
       />
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -117,7 +115,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 80,
     marginBottom: 12,
-    textAlignVertical: 'top',
   },
   addButton: {
     backgroundColor: '#2196F3',
@@ -126,34 +123,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButtonDisabled: {
-    backgroundColor: '#ccc',
+    backgroundColor: '#cccccc',
   },
   addButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  limitWarningContainer: {
-    backgroundColor: '#FFF3CD',
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#FFE69C',
-  },
   limitWarning: {
-    color: '#856404',
+    color: '#F44336',
     fontSize: 14,
     textAlign: 'center',
+    padding: 12,
+    backgroundColor: '#fff',
   },
   list: {
     padding: 16,
   },
-  emptyContainer: {
-    padding: 40,
-    alignItems: 'center',
-  },
   emptyText: {
-    fontSize: 16,
     color: '#999',
     textAlign: 'center',
+    marginTop: 32,
+    fontSize: 16,
   },
 });

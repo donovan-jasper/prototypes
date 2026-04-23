@@ -1,14 +1,17 @@
 import { Task, TaskStatus } from '../types';
 import { AIProvider } from './aiProvider';
+import { NotificationManager } from './notifications';
 
 export class TaskQueue {
   private tasks: Map<string, Task> = new Map();
   private maxParallel: number;
   private aiProvider: AIProvider;
+  private notificationManager: NotificationManager;
 
   constructor(maxParallel: number = 2) {
     this.maxParallel = maxParallel;
     this.aiProvider = new AIProvider();
+    this.notificationManager = NotificationManager.getInstance();
   }
 
   addTask(task: Task): void {
@@ -50,6 +53,7 @@ export class TaskQueue {
       task.result = result;
       task.completedAt = Date.now();
       this.tasks.set(task.id, task);
+      this.notificationManager.scheduleTaskCompletionNotification(task);
       this.processQueue();
     }).catch(error => {
       task.status = TaskStatus.FAILED;
@@ -76,6 +80,7 @@ export class TaskQueue {
       task.status = TaskStatus.COMPLETED;
       task.completedAt = Date.now();
       this.tasks.set(id, task);
+      this.notificationManager.scheduleTaskCompletionNotification(task);
       this.processQueue();
     }
   }

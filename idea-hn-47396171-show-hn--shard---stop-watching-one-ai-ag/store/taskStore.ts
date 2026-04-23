@@ -2,24 +2,29 @@ import { create } from 'zustand';
 import { Task, TaskStatus, UserSubscription } from '../types';
 import { TaskQueue } from '../lib/taskQueue';
 import { Database } from '../lib/database';
+import { NotificationManager } from '../lib/notifications';
 
 interface TaskStore {
   tasks: Task[];
   queue: TaskQueue;
   db: Database;
   subscription: UserSubscription;
-  
+  notificationManager: NotificationManager;
+
   initialize: () => Promise<void>;
   addTask: (prompt: string, templateId?: string) => void;
   cancelTask: (id: string) => void;
   loadHistory: () => Promise<void>;
   updateSubscription: (subscription: UserSubscription) => void;
+  checkNotificationPermissions: () => Promise<boolean>;
+  requestNotificationPermissions: () => Promise<void>;
 }
 
 export const useTaskStore = create<TaskStore>((set, get) => ({
   tasks: [],
   queue: new TaskQueue(2),
   db: new Database(),
+  notificationManager: NotificationManager.getInstance(),
   subscription: {
     isPro: false,
     maxParallelTasks: 2,
@@ -28,13 +33,19 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   initialize: async () => {
-    const { db } = get();
+    const { db, notificationManager } = get();
     await db.initialize();
     await get().loadHistory();
+
+    // Check notification permissions on app start
+    const hasPermission = await notificationManager.checkNotificationPermissions();
+    if (!hasPermission) {
+      await notificationManager.requestNotificationPermissions();
+    }
   },
 
   addTask: (prompt: string, templateId?: string) => {
-    const { queue, db, tasks } = get();
+    const { queue, db, tasks, notificationManager } = get();
     const task: Task = {
       id: Date.now().toString(),
       prompt,
@@ -55,7 +66,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
         }));
         db.saveTask(updated);
 
-        if (updated.status === TaskStatus.COMPLETED || 
+        if (updated.status === TaskStatus.COMPLETED ||
             updated.status === TaskStatus.FAILED ||
             updated.status === TaskStatus.CANCELLED) {
           clearInterval(interval);
@@ -79,5 +90,19 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
     const { queue } = get();
     queue.setMaxParallel(subscription.maxParallelTasks);
     set({ subscription });
+  },
+
+  checkNotificationPermissions: async () => {
+    const { notificationManager } = get();
+    return await notificationManager.checkNotificationPermissions();
+  },
+
+  requestNotificationPermissions: async () => {
+    const { notificationManager } = get();
+    const granted = await notificationManager.requestNotificationPermissions();
+    if (!granted) {
+      // Handle case where user denied permission
+      console.log('Notification permission denied');
+    }
   },
 }));
