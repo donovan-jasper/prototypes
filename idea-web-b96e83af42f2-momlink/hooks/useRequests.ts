@@ -12,6 +12,7 @@ interface UseRequestsParams {
 export function useRequests({ latitude, longitude, radius }: UseRequestsParams) {
   const [requests, setRequests] = useState<Request[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadRequests();
@@ -20,6 +21,7 @@ export function useRequests({ latitude, longitude, radius }: UseRequestsParams) 
   async function loadRequests() {
     try {
       setLoading(true);
+      setError(null);
       const data = await getRequests(latitude, longitude, radius);
       const filtered = data.filter(req => {
         const distance = calculateDistance(latitude, longitude, req.latitude, req.longitude);
@@ -28,10 +30,11 @@ export function useRequests({ latitude, longitude, radius }: UseRequestsParams) 
       setRequests(filtered);
     } catch (error) {
       console.error('Error loading requests:', error);
+      setError('Failed to load requests. Please try again.');
     } finally {
       setLoading(false);
     }
   }
 
-  return { requests, loading, refresh: loadRequests };
+  return { requests, loading, error, refresh: loadRequests };
 }
