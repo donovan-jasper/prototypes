@@ -162,6 +162,7 @@ const BarcodeScanner = () => {
         style={styles.camera}
         type={cameraType}
         onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+        ratio="16:9"
       >
         <View style={styles.overlay}>
           <View style={styles.scanArea}>
@@ -170,7 +171,7 @@ const BarcodeScanner = () => {
             <View style={styles.cornerBottomLeft} />
             <View style={styles.cornerBottomRight} />
           </View>
-          <Text style={styles.scanText}>Scan a barcode</Text>
+          <Text style={styles.scanText}>Scan a barcode to add media</Text>
         </View>
       </Camera>
 
@@ -219,6 +220,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   scanArea: {
     width: 250,
@@ -229,8 +231,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderTopWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#6200EE',
@@ -239,8 +241,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     right: 0,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderTopWidth: 4,
     borderRightWidth: 4,
     borderColor: '#6200EE',
@@ -249,8 +251,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     left: 0,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderBottomWidth: 4,
     borderLeftWidth: 4,
     borderColor: '#6200EE',
@@ -259,8 +261,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
     borderBottomWidth: 4,
     borderRightWidth: 4,
     borderColor: '#6200EE',
@@ -268,8 +270,8 @@ const styles = StyleSheet.create({
   scanText: {
     color: '#fff',
     marginTop: 20,
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    textAlign: 'center',
   },
   controls: {
     position: 'absolute',
@@ -316,8 +318,8 @@ const styles = StyleSheet.create({
   manualEntryTitle: {
     color: '#fff',
     fontSize: 20,
-    fontWeight: 'bold',
     marginBottom: 20,
+    fontWeight: 'bold',
   },
   manualEntryInput: {
     backgroundColor: '#fff',
@@ -336,7 +338,9 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    width: '48%',
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#666',
@@ -348,7 +352,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
   scanningOverlay: {
     position: 'absolute',
@@ -362,8 +365,8 @@ const styles = StyleSheet.create({
   },
   scanningText: {
     color: '#fff',
-    fontSize: 18,
     marginTop: 20,
+    fontSize: 16,
   },
 });
 
