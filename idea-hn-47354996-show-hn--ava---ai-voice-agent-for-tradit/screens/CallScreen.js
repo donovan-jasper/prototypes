@@ -144,24 +144,23 @@ function CallScreen() {
         {canAnswerOrScreen && (
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.actionButton, styles.screenButton]}
+              style={[styles.button, styles.answerButton]}
+              onPress={handleAnswerCall}
+            >
+              <Text style={styles.buttonText}>Answer</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.screenButton]}
               onPress={handleScreenCall}
-              disabled={callData.isScreening}
             >
               <Text style={styles.buttonText}>Screen Call</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.answerButton]}
-              onPress={handleAnswerCall}
-              disabled={callData.isScreening}
-            >
-              <Text style={styles.buttonText}>Answer Call</Text>
-            </TouchableOpacity>
           </View>
         )}
+
         {canEnd && (
           <TouchableOpacity
-            style={[styles.actionButton, styles.endButton]}
+            style={[styles.button, styles.endButton]}
             onPress={handleEndCall}
           >
             <Text style={styles.buttonText}>End Call</Text>
@@ -187,11 +186,12 @@ function CallScreen() {
 
     return (
       <ScrollView style={styles.historyContainer}>
-        {pastCalls.map((call, index) => (
-          <View key={index} style={styles.callItem}>
-            <Text style={styles.callDate}>{new Date(call.call_time).toLocaleString()}</Text>
-            <Text style={styles.callSummary}>{call.summary}</Text>
-            <Text style={styles.callConfidence}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
+        {pastCalls.map((call) => (
+          <View key={call.id} style={styles.callItem}>
+            <Text style={styles.callItemTitle}>{call.caller_id || 'Unknown'}</Text>
+            <Text style={styles.callItemTime}>{new Date(call.call_time).toLocaleString()}</Text>
+            <Text style={styles.callItemSummary}>{call.summary}</Text>
+            <Text style={styles.callItemConfidence}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
           </View>
         ))}
       </ScrollView>
@@ -201,7 +201,7 @@ function CallScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>CallGuard</Text>
+        <Text style={styles.headerTitle}>CallGuard</Text>
         <TouchableOpacity
           style={styles.historyToggle}
           onPress={() => setShowHistory(!showHistory)}
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  title: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#673AB7',
@@ -257,6 +257,48 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 20,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 20,
+  },
+  button: {
+    padding: 15,
+    borderRadius: 8,
+    width: 120,
+    alignItems: 'center',
+  },
+  answerButton: {
+    backgroundColor: '#4CAF50',
+  },
+  screenButton: {
+    backgroundColor: '#673AB7',
+  },
+  endButton: {
+    backgroundColor: '#F44336',
+    marginTop: 20,
+    width: '100%',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 10,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
   screeningIndicator: {
     marginVertical: 20,
   },
@@ -264,8 +306,8 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 20,
     padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
+    backgroundColor: 'white',
+    borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -288,55 +330,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginBottom: 10,
     color: '#333',
-    fontStyle: 'italic',
   },
   confidenceText: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'right',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    width: '100%',
-    marginTop: 20,
-  },
-  actionButton: {
-    padding: 15,
-    borderRadius: 10,
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  screenButton: {
-    backgroundColor: '#673AB7',
-  },
-  answerButton: {
-    backgroundColor: '#4CAF50',
-  },
-  endButton: {
-    backgroundColor: '#F44336',
-    marginTop: 20,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    fontStyle: 'italic',
   },
   historyContainer: {
     flex: 1,
@@ -347,24 +345,31 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderRadius: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 2,
   },
-  callDate: {
+  callItemTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
+    color: '#673AB7',
+  },
+  callItemTime: {
     fontSize: 12,
     color: '#999',
     marginBottom: 5,
   },
-  callSummary: {
+  callItemSummary: {
     fontSize: 14,
     color: '#333',
     marginBottom: 5,
   },
-  callConfidence: {
+  callItemConfidence: {
     fontSize: 12,
     color: '#666',
+    fontStyle: 'italic',
   },
   loadingIndicator: {
     marginTop: 20,
