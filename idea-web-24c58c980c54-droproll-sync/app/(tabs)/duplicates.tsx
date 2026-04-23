@@ -76,7 +76,7 @@ export default function DuplicatesScreen() {
         renderItem={({ item, index }) => (
           <View style={index === currentIndex ? styles.visibleCard : styles.hiddenCard}>
             <DuplicateCard
-              duplicates={item}
+              duplicates={item.matches}
               onResolve={handleDuplicateResolved}
             />
           </View>

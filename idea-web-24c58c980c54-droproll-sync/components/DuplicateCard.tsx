@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { useMediaStore } from '../store/mediaStore';
 import { deleteMedia, updateMedia } from '../database/queries';
 import { CloudBadge } from './CloudBadge';
+import * as FileSystem from 'expo-file-system';
 
 interface DuplicateCardProps {
   duplicates: {
@@ -26,13 +27,23 @@ export const DuplicateCard: React.FC<DuplicateCardProps> = ({ duplicates, onReso
       // Delete all duplicates except the one we're keeping
       for (const duplicate of duplicates) {
         if (duplicate.id !== keepId) {
-          await deleteMedia(duplicate.id);
-          removeMedia(duplicate.id);
+          try {
+            // Delete the file from filesystem
+            await FileSystem.deleteAsync(duplicate.localPath, { idempotent: true });
+            // Remove from database
+            await deleteMedia(duplicate.id);
+            // Remove from store
+            removeMedia(duplicate.id);
+          } catch (error) {
+            console.error(`Error deleting duplicate ${duplicate.id}:`, error);
+            // Continue with other deletions even if one fails
+          }
         }
       }
       onResolve();
     } catch (error) {
       console.error('Error resolving duplicates:', error);
+      Alert.alert('Error', 'Failed to resolve duplicates. Please try again.');
     } finally {
       setIsResolving(false);
     }
@@ -43,6 +54,9 @@ export const DuplicateCard: React.FC<DuplicateCardProps> = ({ duplicates, onReso
     try {
       // Just mark them as resolved without deleting
       onResolve();
+    } catch (error) {
+      console.error('Error marking duplicates as resolved:', error);
+      Alert.alert('Error', 'Failed to mark duplicates as resolved. Please try again.');
     } finally {
       setIsResolving(false);
     }

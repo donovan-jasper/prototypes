@@ -1,5 +1,5 @@
 import { computeImageHash, compareHashes } from '../utils/imageHash';
-import { getAllMedia, updateMediaHash } from '../database/queries';
+import { getAllMedia, updateMediaHash, getDuplicates as dbGetDuplicates } from '../database/queries';
 
 interface MediaItem {
   id: string;
@@ -20,11 +20,14 @@ export const findDuplicates = async (similarityThreshold = 0.9): Promise<Duplica
     const allMedia = await getAllMedia();
     const duplicateGroups: DuplicateGroup[] = [];
 
+    // First compute hashes for any media that don't have them
+    const mediaWithHashes = await computeAndStoreHashes(allMedia);
+
     // Compare all pairs of media items
-    for (let i = 0; i < allMedia.length; i++) {
-      for (let j = i + 1; j < allMedia.length; j++) {
-        const item1 = allMedia[i];
-        const item2 = allMedia[j];
+    for (let i = 0; i < mediaWithHashes.length; i++) {
+      for (let j = i + 1; j < mediaWithHashes.length; j++) {
+        const item1 = mediaWithHashes[i];
+        const item2 = mediaWithHashes[j];
 
         // Skip if either item doesn't have a hash
         if (!item1.hash || !item2.hash) continue;
@@ -87,4 +90,26 @@ export const computeAndStoreHashes = async (mediaItems: MediaItem[]): Promise<Me
   }
 
   return updatedItems;
+};
+
+export const getDuplicates = async (): Promise<DuplicateGroup[]> => {
+  try {
+    // First find any new duplicates
+    const newDuplicates = await findDuplicates();
+
+    // Then get any existing duplicates from database
+    const existingDuplicates = await dbGetDuplicates();
+
+    // Combine and deduplicate
+    const allDuplicates = [...newDuplicates, ...existingDuplicates];
+    const uniqueDuplicates = allDuplicates.filter(
+      (group, index, self) =>
+        index === self.findIndex((g) => g.hash === group.hash)
+    );
+
+    return uniqueDuplicates;
+  } catch (error) {
+    console.error('Error getting duplicates:', error);
+    return [];
+  }
 };
