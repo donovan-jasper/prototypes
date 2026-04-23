@@ -84,9 +84,16 @@ const TaskItem: React.FC<TaskItemProps> = ({ task }) => {
       </View>
 
       <View style={styles.actions}>
+        {!isPremium && task.isPinned && (
+          <View style={styles.premiumBadge}>
+            <Text style={styles.premiumBadgeText}>Premium</Text>
+          </View>
+        )}
+
         <TouchableOpacity
           style={styles.pinButton}
           onPress={handleTogglePin}
+          disabled={!isPremium && !task.isPinned && tasks.filter(t => t.isPinned).length >= maxPinnedTasks}
         >
           <Text style={[
             styles.pinButtonText,
@@ -151,6 +158,18 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  premiumBadge: {
+    backgroundColor: Colors.warningBackground,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  premiumBadgeText: {
+    color: Colors.warningText,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   pinButton: {
     padding: 8,

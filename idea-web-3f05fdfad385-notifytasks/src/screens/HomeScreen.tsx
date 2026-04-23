@@ -184,17 +184,16 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 60,
   },
   addButtonText: {
     color: Colors.white,
     fontWeight: 'bold',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   emptyState: {
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
   },
   emptyText: {

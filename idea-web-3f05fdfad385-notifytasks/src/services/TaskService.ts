@@ -161,19 +161,17 @@ export const TaskService = {
         return;
       }
 
-      updateValues.push(id);
-
       db.transaction(
         tx => {
           tx.executeSql(
             `UPDATE tasks SET ${updateFields.join(', ')} WHERE id = ?;`,
-            updateValues,
+            [...updateValues, id],
             async () => {
               const updatedTask = await TaskService.getTaskById(id);
               if (updatedTask) {
                 resolve(updatedTask);
               } else {
-                reject(new Error('Task not found after update'));
+                reject(new Error('Failed to retrieve updated task'));
               }
             },
             (_, error) => reject(error)
@@ -204,38 +202,23 @@ export const TaskService = {
     });
   },
 
-  getActiveGlanceableTasks: async (limit: number = 3): Promise<Task[]> => {
-    return new Promise((resolve, reject) => {
-      db.transaction(
-        tx => {
-          tx.executeSql(
-            `SELECT * FROM tasks
-             WHERE isCompleted = 0
-             ORDER BY isPinned DESC, createdAt DESC
-             LIMIT ?;`,
-            [limit],
-            (_, { rows }) => {
-              const tasks: Task[] = [];
-              for (let i = 0; i < rows.length; i++) {
-                const row = rows.item(i);
-                tasks.push({
-                  id: row.id,
-                  content: row.content,
-                  type: row.type as 'task' | 'note' | 'reminder',
-                  isCompleted: row.isCompleted === 1,
-                  isPinned: row.isPinned === 1,
-                  createdAt: row.createdAt,
-                  dueDate: row.dueDate || undefined,
-                  isPremium: row.isPremium === 1
-                });
-              }
-              resolve(tasks);
-            },
-            (_, error) => reject(error)
-          );
-        },
-        error => reject(error)
-      );
-    });
+  getActiveGlanceableTasks: async (isPremium: boolean, maxPinnedTasks: number): Promise<Task[]> => {
+    const allTasks = await TaskService.getTasks();
+
+    // Filter for active tasks (not completed) that are either pinned or not
+    const activeTasks = allTasks.filter(task => !task.isCompleted);
+
+    // For premium users, return all active tasks
+    if (isPremium) {
+      return activeTasks;
+    }
+
+    // For free users, limit pinned tasks and include unpinned tasks
+    const pinnedTasks = activeTasks.filter(task => task.isPinned);
+    const unpinnedTasks = activeTasks.filter(task => !task.isPinned);
+
+    // Take up to maxPinnedTasks pinned tasks, then add unpinned tasks
+    const limitedPinnedTasks = pinnedTasks.slice(0, maxPinnedTasks);
+    return [...limitedPinnedTasks, ...unpinnedTasks];
   }
 };
