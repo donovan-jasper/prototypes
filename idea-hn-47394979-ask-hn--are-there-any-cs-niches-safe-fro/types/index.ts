@@ -29,3 +29,11 @@ export interface Roadmap {
   timeline: number;
   targetRole: string;
 }
+
+export interface Scenario {
+  id: string;
+  role: Role;
+  skills: string[];
+  experience: number;
+  roadmap?: Roadmap;
+}

@@ -64,6 +64,15 @@ export default function ScenarioPlannerScreen() {
     setScenarios(scenarios.filter(s => s.id !== id));
   }
 
+  function toggleSkill(skillId: string) {
+    setCurrentScenario(prev => {
+      const skills = prev.skills.includes(skillId)
+        ? prev.skills.filter(id => id !== skillId)
+        : [...prev.skills, skillId];
+      return { ...prev, skills };
+    });
+  }
+
   function renderScenario(scenario: Scenario) {
     if (!scenario.roadmap) return null;
 
@@ -150,18 +159,11 @@ export default function ScenarioPlannerScreen() {
 
         <Text style={styles.label}>Current Skills</Text>
         <View style={styles.skillsSelector}>
-          {SKILLS.slice(0, 10).map(skill => (
+          {SKILLS.map(skill => (
             <TouchableOpacity
               key={skill.id}
               style={[styles.skillOption, currentScenario.skills.includes(skill.id) && styles.selectedSkill]}
-              onPress={() => {
-                setCurrentScenario({
-                  ...currentScenario,
-                  skills: currentScenario.skills.includes(skill.id)
-                    ? currentScenario.skills.filter(s => s !== skill.id)
-                    : [...currentScenario.skills, skill.id]
-                });
-              }}
+              onPress={() => toggleSkill(skill.id)}
             >
               <Text>{skill.name}</Text>
             </TouchableOpacity>
@@ -183,19 +185,19 @@ export default function ScenarioPlannerScreen() {
         >
           <Text style={styles.addButtonText}>Add Scenario</Text>
         </TouchableOpacity>
-
-        {!isPremium && scenarios.length >= 2 && (
-          <View style={styles.premiumNotice}>
-            <Text style={styles.premiumText}>Premium users can compare unlimited scenarios</Text>
-            <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={() => router.push('/paywall')}
-            >
-              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
+
+      {!isPremium && scenarios.length >= 2 && (
+        <View style={styles.premiumNotice}>
+          <Text style={styles.premiumText}>Add unlimited scenarios with Premium</Text>
+          <TouchableOpacity
+            style={styles.premiumButton}
+            onPress={() => router.push('/paywall')}
+          >
+            <Text style={styles.premiumButtonText}>Upgrade Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -203,8 +205,8 @@ export default function ScenarioPlannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    padding: 16
+    padding: 20,
+    backgroundColor: '#f9fafb'
   },
   title: {
     fontSize: 28,
@@ -219,13 +221,12 @@ const styles = StyleSheet.create({
   },
   comparisonContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 24
+    marginBottom: 32
   },
   scenarioColumn: {
-    width: '48%',
-    marginBottom: 16
+    flex: 1,
+    marginHorizontal: 4
   },
   scenarioCard: {
     backgroundColor: '#fff',
@@ -249,7 +250,7 @@ const styles = StyleSheet.create({
     color: '#1f2937'
   },
   removeButton: {
-    fontSize: 24,
+    fontSize: 20,
     color: '#ef4444',
     fontWeight: 'bold'
   },
@@ -260,13 +261,11 @@ const styles = StyleSheet.create({
   },
   metricBox: {
     alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f3f4f6'
+    flex: 1
   },
   metricValue: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#1f2937'
   },
   metricLabel: {
@@ -276,7 +275,7 @@ const styles = StyleSheet.create({
   },
   metricCategory: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
     marginTop: 4
   },
   skillsSection: {
@@ -285,8 +284,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 8
+    marginBottom: 8,
+    color: '#1f2937'
   },
   skillItem: {
     flexDirection: 'row',
@@ -316,14 +315,15 @@ const styles = StyleSheet.create({
   formTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
-    marginBottom: 16
+    marginBottom: 16,
+    color: '#1f2937'
   },
   label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#374151',
-    marginBottom: 8
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#374151'
   },
   roleSelector: {
     flexDirection: 'row',
@@ -332,14 +332,15 @@ const styles = StyleSheet.create({
   },
   roleOption: {
     padding: 10,
-    borderRadius: 8,
     backgroundColor: '#f3f4f6',
+    borderRadius: 8,
     marginRight: 8,
     marginBottom: 8
   },
   selectedRole: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#2563eb'
+    backgroundColor: '#dbeafe',
+    borderColor: '#3b82f6',
+    borderWidth: 1
   },
   skillsSelector: {
     flexDirection: 'row',
@@ -348,14 +349,15 @@ const styles = StyleSheet.create({
   },
   skillOption: {
     padding: 8,
-    borderRadius: 6,
     backgroundColor: '#f3f4f6',
-    marginRight: 8,
-    marginBottom: 8
+    borderRadius: 6,
+    marginRight: 6,
+    marginBottom: 6
   },
   selectedSkill: {
-    backgroundColor: '#3b82f6',
-    borderColor: '#2563eb'
+    backgroundColor: '#dbeafe',
+    borderColor: '#3b82f6',
+    borderWidth: 1
   },
   input: {
     borderWidth: 1,
@@ -380,26 +382,28 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   premiumNotice: {
-    marginTop: 24,
-    padding: 16,
     backgroundColor: '#fef3c7',
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 24,
     alignItems: 'center'
   },
   premiumText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#92400e',
     marginBottom: 12,
     textAlign: 'center'
   },
-  upgradeButton: {
+  premiumButton: {
     backgroundColor: '#f59e0b',
-    padding: 10,
-    borderRadius: 6,
-    paddingHorizontal: 16
+    padding: 12,
+    borderRadius: 8,
+    width: '100%'
   },
-  upgradeButtonText: {
+  premiumButtonText: {
     color: '#fff',
-    fontWeight: '600'
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center'
   }
 });
