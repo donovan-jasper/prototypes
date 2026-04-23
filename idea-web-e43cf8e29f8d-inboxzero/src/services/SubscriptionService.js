@@ -5,7 +5,7 @@ let db;
 
 const initDatabase = async () => {
   db = await SQLite.openDatabaseAsync('subsync.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS subscriptions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -36,50 +36,50 @@ const initDatabase = async () => {
 
 const seedDatabase = async () => {
   const existing = await db.getAllAsync('SELECT COUNT(*) as count FROM subscriptions');
-  
+
   if (existing[0].count === 0) {
     const seedData = [
-      { 
-        name: 'Netflix', 
-        source: 'billing@netflix.com', 
-        category: 'email', 
-        cost: 15.99, 
+      {
+        name: 'Netflix',
+        source: 'billing@netflix.com',
+        category: 'email',
+        cost: 15.99,
         unsubscribe_url: 'https://www.netflix.com/cancelplan',
         billing_cycle: 'monthly',
         renewal_date: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
       },
-      { 
-        name: 'NY Times Newsletter', 
-        source: 'newsletters@nytimes.com', 
-        category: 'newsletter', 
-        cost: 0, 
+      {
+        name: 'NY Times Newsletter',
+        source: 'newsletters@nytimes.com',
+        category: 'newsletter',
+        cost: 0,
         unsubscribe_url: 'https://myaccount.nytimes.com/seg/settings',
         billing_cycle: null,
         renewal_date: null
       },
-      { 
-        name: 'Spotify', 
-        source: 'no-reply@spotify.com', 
-        category: 'email', 
-        cost: 9.99, 
+      {
+        name: 'Spotify',
+        source: 'no-reply@spotify.com',
+        category: 'email',
+        cost: 9.99,
         unsubscribe_url: 'https://www.spotify.com/account/subscription/',
         billing_cycle: 'monthly',
         renewal_date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
       },
-      { 
-        name: 'LinkedIn Updates', 
-        source: 'notifications@linkedin.com', 
-        category: 'social', 
-        cost: 0, 
+      {
+        name: 'LinkedIn Updates',
+        source: 'notifications@linkedin.com',
+        category: 'social',
+        cost: 0,
         unsubscribe_url: 'https://www.linkedin.com/psettings/email-frequency',
         billing_cycle: null,
         renewal_date: null
       },
-      { 
-        name: 'Medium Digest', 
-        source: 'digest@medium.com', 
-        category: 'newsletter', 
-        cost: 5.00, 
+      {
+        name: 'Medium Digest',
+        source: 'digest@medium.com',
+        category: 'newsletter',
+        cost: 5.00,
         unsubscribe_url: 'https://medium.com/me/settings',
         billing_cycle: 'monthly',
         renewal_date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString()
@@ -104,11 +104,11 @@ const addSubscription = async (subscription) => {
   const result = await db.runAsync(
     'INSERT INTO subscriptions (name, source, category, cost, unsubscribe_url, status, billing_cycle, renewal_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [
-      subscription.name, 
-      subscription.source, 
-      subscription.category, 
-      subscription.cost, 
-      subscription.unsubscribe_url || null, 
+      subscription.name,
+      subscription.source,
+      subscription.category,
+      subscription.cost,
+      subscription.unsubscribe_url || null,
       'active',
       subscription.billing_cycle || null,
       subscription.renewal_date || null
@@ -156,7 +156,7 @@ const markAsUnsubscribed = async (id) => {
 };
 
 const unsubscribe = async (id) => {
-  await db.runAsync('DELETE FROM subscriptions WHERE id = ?', [id]);
+  await db.runAsync('UPDATE subscriptions SET status = ? WHERE id = ?', ['unsubscribed', id]);
   await cancelRenewalNotification(id);
 };
 
@@ -166,19 +166,20 @@ const getSetting = async (key) => {
 };
 
 const setSetting = async (key, value) => {
-  await db.runAsync(
-    'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-    [key, value]
-  );
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [key, value]);
 };
 
-export { 
-  initDatabase, 
-  seedDatabase, 
-  getSubscriptions, 
-  addSubscription, 
+const initialize = async () => {
+  await initDatabase();
+  await seedDatabase();
+};
+
+export {
+  initialize,
+  getSubscriptions,
+  addSubscription,
   updateSubscription,
-  markAsUnsubscribed, 
+  markAsUnsubscribed,
   unsubscribe,
   getSetting,
   setSetting
