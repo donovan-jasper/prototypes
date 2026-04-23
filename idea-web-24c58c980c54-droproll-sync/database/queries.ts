@@ -1,192 +1,107 @@
 import * as SQLite from 'expo-sqlite';
-import { MediaItem } from '../types';
 
 const db = SQLite.openDatabase('mediamesh.db');
 
 export const initDatabase = async () => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        // Create media table
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS media (
-            id TEXT PRIMARY KEY,
-            cloudId TEXT,
-            source TEXT,
-            localPath TEXT,
-            hash TEXT,
-            metadata TEXT,
-            syncedAt INTEGER
-          );`
-        );
-
-        // Create clouds table
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS clouds (
-            id TEXT PRIMARY KEY,
-            service TEXT,
-            token TEXT,
-            lastSync INTEGER
-          );`
-        );
-
-        // Create sync_rules table
-        tx.executeSql(
-          `CREATE TABLE IF NOT EXISTS sync_rules (
-            id TEXT PRIMARY KEY,
-            cloudId TEXT,
-            filters TEXT
-          );`
-        );
-      },
-      (error) => {
-        console.error('Database initialization failed:', error);
-        reject(error);
-      },
-      () => {
-        resolve();
-      }
-    );
-  });
-};
-
-export const insertMedia = async (media: MediaItem) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `INSERT OR REPLACE INTO media (id, cloudId, source, localPath, hash, metadata, syncedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?);`,
-          [
-            media.id,
-            media.cloudId,
-            media.source,
-            media.localPath,
-            media.hash,
-            JSON.stringify(media.metadata || {}),
-            Date.now(),
-          ],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      },
-      (error) => {
-        console.error('Error inserting media:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-export const getAllMedia = async (): Promise<MediaItem[]> => {
   return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT * FROM media ORDER BY syncedAt DESC;`,
-          [],
-          (_, { rows }) => {
-            const media: MediaItem[] = rows._array.map((item) => ({
-              ...item,
-              metadata: item.metadata ? JSON.parse(item.metadata) : {},
-            }));
-            resolve(media);
-          },
-          (_, error) => reject(error)
-        );
-      },
-      (error) => {
-        console.error('Error getting media:', error);
-        reject(error);
-      }
-    );
+    db.transaction(tx => {
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS media (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          cloudId TEXT NOT NULL,
+          source TEXT NOT NULL,
+          localPath TEXT NOT NULL,
+          hash TEXT,
+          metadata TEXT,
+          syncedAt INTEGER NOT NULL
+        );`
+      );
+
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS clouds (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          service TEXT NOT NULL,
+          token TEXT NOT NULL,
+          lastSync INTEGER
+        );`
+      );
+
+      tx.executeSql(
+        `CREATE TABLE IF NOT EXISTS sync_rules (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          cloudId INTEGER NOT NULL,
+          filters TEXT,
+          FOREIGN KEY(cloudId) REFERENCES clouds(id)
+        );`
+      );
+
+      tx.executeSql(
+        `CREATE INDEX IF NOT EXISTS idx_media_source ON media(source);`
+      );
+
+      tx.executeSql(
+        `CREATE INDEX IF NOT EXISTS idx_media_hash ON media(hash);`
+      );
+    }, reject, resolve);
   });
 };
 
-export const getMediaBySource = async (source: string): Promise<MediaItem[]> => {
+export const insertMedia = async (media: {
+  cloudId: string;
+  source: string;
+  localPath: string;
+  hash?: string;
+  metadata?: string;
+  syncedAt: number;
+}) => {
   return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT * FROM media WHERE source = ? ORDER BY syncedAt DESC;`,
-          [source],
-          (_, { rows }) => {
-            const media: MediaItem[] = rows._array.map((item) => ({
-              ...item,
-              metadata: item.metadata ? JSON.parse(item.metadata) : {},
-            }));
-            resolve(media);
-          },
-          (_, error) => reject(error)
-        );
-      },
-      (error) => {
-        console.error('Error getting media by source:', error);
-        reject(error);
-      }
-    );
+    db.transaction(tx => {
+      tx.executeSql(
+        `INSERT INTO media (cloudId, source, localPath, hash, metadata, syncedAt)
+         VALUES (?, ?, ?, ?, ?, ?);`,
+        [media.cloudId, media.source, media.localPath, media.hash || '', media.metadata || '', media.syncedAt],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
   });
 };
 
-export const deleteMedia = async (id: string) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `DELETE FROM media WHERE id = ?;`,
-          [id],
-          () => resolve(),
-          (_, error) => reject(error)
-        );
-      },
-      (error) => {
-        console.error('Error deleting media:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-export const getDuplicates = async (): Promise<MediaItem[][]> => {
+export const getMediaBySource = async (source: string) => {
   return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT * FROM media WHERE hash IN (
-            SELECT hash FROM media GROUP BY hash HAVING COUNT(*) > 1
-          ) ORDER BY hash, syncedAt DESC;`,
-          [],
-          (_, { rows }) => {
-            const duplicates: MediaItem[][] = [];
-            const hashMap: Record<string, MediaItem[]> = {};
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM media WHERE source = ?;`,
+        [source],
+        (_, { rows }) => resolve(rows._array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
 
-            rows._array.forEach((item) => {
-              const mediaItem = {
-                ...item,
-                metadata: item.metadata ? JSON.parse(item.metadata) : {},
-              };
+export const getAllMedia = async () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM media;`,
+        [],
+        (_, { rows }) => resolve(rows._array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
 
-              if (!hashMap[item.hash]) {
-                hashMap[item.hash] = [];
-              }
-              hashMap[item.hash].push(mediaItem);
-            });
-
-            Object.values(hashMap).forEach((group) => {
-              if (group.length > 1) {
-                duplicates.push(group);
-              }
-            });
-
-            resolve(duplicates);
-          },
-          (_, error) => reject(error)
-        );
-      },
-      (error) => {
-        console.error('Error getting duplicates:', error);
-        reject(error);
-      }
-    );
+export const updateMediaHash = async (id: string, hash: string) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE media SET hash = ? WHERE id = ?;`,
+        [hash, id],
+        (_, result) => resolve(result.rowsAffected),
+        (_, error) => reject(error)
+      );
+    });
   });
 };
