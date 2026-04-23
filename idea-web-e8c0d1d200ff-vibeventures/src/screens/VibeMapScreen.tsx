@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
 import MapView, { Marker, Callout } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { Event, Coordinates } from '../types/event';
 import { encodeGeohash, getGeohashRange, calculateDistance } from '../utils/geohash';
@@ -40,78 +40,92 @@ const VibeMapScreen = () => {
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation<VibeMapScreenNavigationProp>();
 
-  useEffect(() => {
-    const fetchLocationAndEvents = async () => {
-      try {
-        // Get user location
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setError('Permission to access location was denied');
-          setLoading(false);
-          return;
-        }
+  const fetchEvents = useCallback(async (latitude: number, longitude: number) => {
+    try {
+      // Get geohash range for 5km radius
+      const geohashes = getGeohashRange(latitude, longitude, 5);
 
-        const location = await Location.getCurrentPositionAsync({});
-        const { latitude, longitude } = location.coords;
-        setUserLocation({ latitude, longitude });
-        setMapRegion({
+      // Query Firestore for events in nearby geohashes
+      const eventsQuery = query(
+        collection(db, 'events'),
+        where('geohash', 'in', geohashes)
+      );
+
+      const querySnapshot = await getDocs(eventsQuery);
+      const fetchedEvents: Event[] = [];
+
+      querySnapshot.forEach((doc) => {
+        const eventData = doc.data() as Event;
+        const distance = calculateDistance(
           latitude,
           longitude,
-          longitudeDelta: 0.05,
-          latitudeDelta: 0.05,
-        });
-
-        // Get geohash range for 5km radius
-        const geohashes = getGeohashRange(latitude, longitude, 5);
-
-        // Query Firestore for events in nearby geohashes
-        const eventsQuery = query(
-          collection(db, 'events'),
-          where('geohash', 'in', geohashes)
+          eventData.latitude,
+          eventData.longitude
         );
 
-        const querySnapshot = await getDocs(eventsQuery);
-        const fetchedEvents: Event[] = [];
-
-        querySnapshot.forEach((doc) => {
-          const eventData = doc.data() as Event;
-          const distance = calculateDistance(
-            latitude,
-            longitude,
-            eventData.latitude,
-            eventData.longitude
-          );
-
-          if (distance <= 5) { // Filter events within 5km
-            fetchedEvents.push({
-              ...eventData,
-              id: doc.id,
-              distance
-            });
-          }
-        });
-
-        setEvents(fetchedEvents);
-        setLoading(false);
-
-        // Animate map to user location
-        if (mapRef.current) {
-          mapRef.current.animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
+        if (distance <= 5) { // Filter events within 5km
+          fetchedEvents.push({
+            ...eventData,
+            id: doc.id,
+            distance
           });
         }
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load events');
-        setLoading(false);
-      }
-    };
+      });
 
-    fetchLocationAndEvents();
+      setEvents(fetchedEvents);
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setError('Failed to load events');
+    }
   }, []);
+
+  const fetchLocationAndEvents = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Get user location
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setError('Permission to access location was denied');
+        setLoading(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = location.coords;
+      setUserLocation({ latitude, longitude });
+      setMapRegion({
+        latitude,
+        longitude,
+        longitudeDelta: 0.05,
+        latitudeDelta: 0.05,
+      });
+
+      await fetchEvents(latitude, longitude);
+
+      // Animate map to user location
+      if (mapRef.current) {
+        mapRef.current.animateToRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching location:', err);
+      setError('Failed to get your location');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchEvents]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchLocationAndEvents();
+    }, [fetchLocationAndEvents])
+  );
 
   const handleMarkerPress = (eventId: string) => {
     navigation.navigate('Event', { eventId });
@@ -148,6 +162,9 @@ const VibeMapScreen = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity onPress={fetchLocationAndEvents} style={styles.retryButton}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -160,6 +177,9 @@ const VibeMapScreen = () => {
         region={mapRegion}
         showsUserLocation={true}
         showsMyLocationButton={false}
+        loadingEnabled={true}
+        loadingIndicatorColor="#007AFF"
+        loadingBackgroundColor="#ffffff"
       >
         {events.map((event) => {
           const markerSize = getMarkerSize(event.participants.length);
@@ -170,55 +190,29 @@ const VibeMapScreen = () => {
               key={event.id}
               coordinate={{
                 latitude: event.latitude,
-                longitude: event.longitude,
+                longitude: event.longitude
               }}
-              title={event.title}
               onPress={() => handleMarkerPress(event.id)}
+              tracksViewChanges={false}
             >
               <View style={[
                 styles.markerContainer,
                 {
                   width: markerSize,
                   height: markerSize,
-                  borderColor: markerColor,
-                  backgroundColor: `${markerColor}33` // Add transparency
+                  borderRadius: markerSize / 2,
+                  backgroundColor: markerColor
                 }
               ]}>
-                <Image
-                  source={{ uri: event.imageUrl || 'https://via.placeholder.com/40' }}
-                  style={[
-                    styles.markerImage,
-                    {
-                      width: markerSize * 0.7,
-                      height: markerSize * 0.7,
-                      borderRadius: markerSize * 0.35
-                    }
-                  ]}
-                />
-                <View style={[
-                  styles.markerBadge,
-                  {
-                    backgroundColor: markerColor,
-                    width: markerSize * 0.6,
-                    height: markerSize * 0.6,
-                    borderRadius: markerSize * 0.3,
-                    top: -markerSize * 0.3,
-                    right: -markerSize * 0.3
-                  }
-                ]}>
-                  <Text style={[
-                    styles.markerBadgeText,
-                    { fontSize: markerSize * 0.3 }
-                  ]}>
-                    {event.participants.length}
-                  </Text>
-                </View>
+                <Text style={styles.markerText}>
+                  {event.participants.length}
+                </Text>
               </View>
               <Callout tooltip>
                 <View style={styles.calloutContainer}>
                   <Text style={styles.calloutTitle}>{event.title}</Text>
                   <Text style={styles.calloutDistance}>
-                    {event.distance.toFixed(1)} km away
+                    {event.distance?.toFixed(1)} km away
                   </Text>
                 </View>
               </Callout>
@@ -227,21 +221,21 @@ const VibeMapScreen = () => {
         })}
       </MapView>
 
-      <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
+      <TouchableOpacity
+        style={styles.recenterButton}
+        onPress={handleRecenter}
+      >
         <Image
-          source={require('../../assets/location-arrow.png')}
+          source={require('../../assets/icons/location.png')}
           style={styles.recenterIcon}
         />
       </TouchableOpacity>
 
-      <View style={styles.legendContainer}>
-        {Object.entries(categoryColors).map(([category, color]) => (
-          <View key={category} style={styles.legendItem}>
-            <View style={[styles.legendColor, { backgroundColor: color }]} />
-            <Text style={styles.legendText}>{category}</Text>
-          </View>
-        ))}
-      </View>
+      {events.length === 0 && (
+        <View style={styles.noEventsContainer}>
+          <Text style={styles.noEventsText}>No events found nearby</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -270,49 +264,47 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#fff',
+    padding: 20,
   },
   errorText: {
-    color: 'red',
+    fontSize: 16,
+    color: '#d32f2f',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+  },
+  retryButtonText: {
+    color: '#fff',
     fontSize: 16,
   },
   markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderRadius: 50,
-    overflow: 'hidden',
+    borderColor: '#fff',
   },
-  markerImage: {
-    resizeMode: 'cover',
-  },
-  markerBadge: {
-    position: 'absolute',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
-  },
-  markerBadgeText: {
-    color: 'white',
+  markerText: {
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 12,
   },
   calloutContainer: {
     width: 150,
     padding: 10,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
+    borderColor: '#ddd',
+    borderWidth: 1,
   },
   calloutTitle: {
     fontWeight: 'bold',
     fontSize: 14,
     marginBottom: 4,
-    textAlign: 'center',
   },
   calloutDistance: {
     fontSize: 12,
@@ -325,46 +317,32 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
   },
   recenterIcon: {
     width: 24,
     height: 24,
   },
-  legendContainer: {
+  noEventsContainer: {
     position: 'absolute',
     top: 20,
-    left: 20,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  legendItem: {
-    flexDirection: 'row',
+    left: 0,
+    right: 0,
     alignItems: 'center',
-    marginBottom: 5,
   },
-  legendColor: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  legendText: {
-    fontSize: 12,
-    textTransform: 'capitalize',
+  noEventsText: {
+    backgroundColor: '#fff',
+    padding: 10,
+    borderRadius: 5,
+    fontSize: 16,
+    color: '#666',
   },
 });
 
