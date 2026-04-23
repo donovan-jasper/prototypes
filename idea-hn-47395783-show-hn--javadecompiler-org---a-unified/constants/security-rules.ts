@@ -136,95 +136,76 @@ export const SECURITY_RULES = {
   INSECURE_STORAGE: {
     patterns: [
       {
-        pattern: /SharedPreferences\.edit\(\)\.putString\(/g,
-        type: 'shared_prefs_storage',
-        description: 'Potentially insecure SharedPreferences usage detected',
-        remediation: 'Use Android Keystore or encrypted SharedPreferences for sensitive data.'
+        pattern: /SharedPreferences\.edit\(\)/g,
+        type: 'shared_preferences',
+        description: 'Insecure SharedPreferences usage detected',
+        remediation: 'Use Android Keystore or EncryptedSharedPreferences for sensitive data.'
       },
       {
-        pattern: /NSUserDefaults\.setObject:/g,
-        type: 'user_defaults_storage',
-        description: 'Potentially insecure NSUserDefaults usage detected',
-        remediation: 'Use Keychain for sensitive data storage on iOS.'
+        pattern: /NSUserDefaults/g,
+        type: 'nsuserdefaults',
+        description: 'Insecure NSUserDefaults usage detected',
+        remediation: 'Use Keychain Services or encrypted storage for sensitive data.'
       },
       {
-        pattern: /localStorage\.setItem\(/g,
-        type: 'local_storage',
-        description: 'Potentially insecure localStorage usage detected',
-        remediation: 'Use sessionStorage or encrypted storage for sensitive data.'
-      },
-      {
-        pattern: /AsyncStorage\.setItem\(/g,
-        type: 'async_storage',
-        description: 'Potentially insecure AsyncStorage usage detected',
-        remediation: 'Use encrypted storage or secure storage libraries for sensitive data.'
-      }
-    ],
-    severity: 'medium',
-    category: 'storage',
-    details: `Storing sensitive data in plaintext storage can lead to data leaks if the device is compromised.`
-  },
-  SQL_INJECTION: {
-    patterns: [
-      {
-        pattern: /String\.format\(.*%s.*SQL/g,
-        type: 'sql_injection',
-        description: 'Potential SQL injection vulnerability detected',
-        remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
-      },
-      {
-        pattern: /execSQL\(.*String\.format\(/g,
-        type: 'sql_injection',
-        description: 'Potential SQL injection vulnerability detected',
-        remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
-      },
-      {
-        pattern: /rawQuery\(.*String\.format\(/g,
-        type: 'sql_injection',
-        description: 'Potential SQL injection vulnerability detected',
-        remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
+        pattern: /sqlite3_exec\(/g,
+        type: 'plaintext_sql',
+        description: 'Plaintext SQL query detected',
+        remediation: 'Use parameterized queries to prevent SQL injection.'
       }
     ],
     severity: 'high',
-    category: 'database',
-    details: `String concatenation in SQL queries can lead to SQL injection attacks if user input is not properly sanitized.`
+    category: 'storage',
+    details: `Storing sensitive data in plaintext storage is a security risk that can lead to data exposure.`
   },
-  XML_PARSER_VULNERABILITIES: {
+  WEBVIEW_SECURITY: {
     patterns: [
       {
-        pattern: /XmlPullParserFactory\.newInstance\(\)/g,
-        type: 'xml_parser',
-        description: 'Potentially unsafe XML parser usage detected',
-        remediation: 'Use XML parsers with security features enabled or consider using a safer alternative.'
+        pattern: /setJavaScriptEnabled\(true\)/g,
+        type: 'javascript_enabled',
+        description: 'JavaScript enabled in WebView detected',
+        remediation: 'Disable JavaScript in WebView unless absolutely necessary.'
       },
       {
-        pattern: /DocumentBuilderFactory\.newInstance\(\)/g,
-        type: 'xml_parser',
-        description: 'Potentially unsafe XML parser usage detected',
-        remediation: 'Use XML parsers with security features enabled or consider using a safer alternative.'
+        pattern: /setAllowFileAccess\(true\)/g,
+        type: 'file_access',
+        description: 'File access enabled in WebView detected',
+        remediation: 'Disable file access in WebView unless absolutely necessary.'
+      },
+      {
+        pattern: /setAllowUniversalAccessFromFileURLs\(true\)/g,
+        type: 'universal_access',
+        description: 'Universal access from file URLs enabled in WebView detected',
+        remediation: 'Disable universal access from file URLs in WebView unless absolutely necessary.'
       }
     ],
     severity: 'medium',
-    category: 'parsing',
-    details: `Default XML parsers may be vulnerable to XXE (XML External Entity) attacks.`
+    category: 'webview',
+    details: `WebView configurations can introduce security vulnerabilities if not properly secured.`
   },
-  DEBUG_CONFIGURATIONS: {
+  DEBUGGING: {
     patterns: [
       {
         pattern: /android:debuggable="true"/g,
-        type: 'debug_flag',
-        description: 'Debuggable flag enabled in AndroidManifest',
+        type: 'debuggable_true',
+        description: 'Debuggable flag set to true in AndroidManifest',
         remediation: 'Set android:debuggable to false in production builds.'
       },
       {
-        pattern: /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/g,
-        type: 'ats_disabled',
-        description: 'App Transport Security disabled in Info.plist',
-        remediation: 'Enable App Transport Security and properly configure exceptions.'
+        pattern: /NSLog\(/g,
+        type: 'nslog',
+        description: 'NSLog statement detected',
+        remediation: 'Remove NSLog statements from production code.'
+      },
+      {
+        pattern: /console\.log\(/g,
+        type: 'console_log',
+        description: 'console.log statement detected',
+        remediation: 'Remove console.log statements from production code.'
       }
     ],
     severity: 'medium',
-    category: 'configuration',
-    details: `Debug configurations should be disabled in production builds for security and performance reasons.`
+    category: 'debugging',
+    details: `Debugging statements can expose sensitive information in production environments.`
   }
 };
