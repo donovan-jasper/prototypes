@@ -1,39 +1,22 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTaskStore } from '../store/taskStore';
-import * as Notifications from 'expo-notifications';
 
 export default function NotificationPermissionBanner() {
-  const { checkNotificationPermissions, requestNotificationPermissions } = useTaskStore();
-  const [showBanner, setShowBanner] = useState(false);
-  const [permissionStatus, setPermissionStatus] = useState<Notifications.PermissionStatus>('undetermined');
+  const { requestNotificationPermissions } = useTaskStore();
 
-  useEffect(() => {
-    const checkPermissions = async () => {
-      const status = await checkNotificationPermissions();
-      setPermissionStatus(status ? 'granted' : 'denied');
-      setShowBanner(!status);
-    };
-
-    checkPermissions();
-  }, []);
-
-  const handleRequestPermission = async () => {
-    const granted = await requestNotificationPermissions();
-    setPermissionStatus(granted ? 'granted' : 'denied');
-    setShowBanner(!granted);
+  const handleEnableNotifications = async () => {
+    await requestNotificationPermissions();
   };
 
-  if (!showBanner) return null;
-
   return (
-    <View style={styles.banner}>
+    <View style={styles.container}>
       <Text style={styles.message}>
         Enable notifications to get alerts when your tasks complete!
       </Text>
       <Pressable
         style={styles.button}
-        onPress={handleRequestPermission}
+        onPress={handleEnableNotifications}
       >
         <Text style={styles.buttonText}>Enable Notifications</Text>
       </Pressable>
@@ -42,7 +25,7 @@ export default function NotificationPermissionBanner() {
 }
 
 const styles = StyleSheet.create({
-  banner: {
+  container: {
     backgroundColor: '#2196F3',
     padding: 16,
     flexDirection: 'row',

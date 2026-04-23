@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, Pressable, AppState } from 'react-native';
 import { useTaskStore } from '../../store/taskStore';
 import TaskCard from '../../components/TaskCard';
 import NotificationPermissionBanner from '../../components/NotificationPermissionBanner';
@@ -7,15 +7,36 @@ import { TaskStatus } from '../../types';
 import { router } from 'expo-router';
 
 export default function TaskQueueScreen() {
-  const { tasks, addTask, cancelTask, initialize, subscription, checkNotificationPermissions } = useTaskStore();
+  const {
+    tasks,
+    addTask,
+    cancelTask,
+    initialize,
+    subscription,
+    checkNotificationPermissions,
+    backgroundTaskManager
+  } = useTaskStore();
   const [prompt, setPrompt] = useState('');
   const [showNotificationBanner, setShowNotificationBanner] = useState(false);
+  const [appState, setAppState] = useState(AppState.currentState);
 
   useEffect(() => {
     initialize();
     checkNotificationPermissions().then(hasPermission => {
       setShowNotificationBanner(!hasPermission);
     });
+
+    // Handle app state changes
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      setAppState(nextAppState);
+    });
+
+    return () => {
+      subscription.remove();
+      if (backgroundTaskManager) {
+        backgroundTaskManager.cleanup();
+      }
+    };
   }, []);
 
   const activeTasks = tasks.filter(

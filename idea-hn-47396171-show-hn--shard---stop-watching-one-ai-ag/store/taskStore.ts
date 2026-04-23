@@ -3,6 +3,7 @@ import { Task, TaskStatus, UserSubscription } from '../types';
 import { TaskQueue } from '../lib/taskQueue';
 import { Database } from '../lib/database';
 import { NotificationManager } from '../lib/notifications';
+import { BackgroundTaskManager } from '../lib/backgroundTaskManager';
 
 interface TaskStore {
   tasks: Task[];
@@ -10,6 +11,7 @@ interface TaskStore {
   db: Database;
   subscription: UserSubscription;
   notificationManager: NotificationManager;
+  backgroundTaskManager: BackgroundTaskManager | null;
 
   initialize: () => Promise<void>;
   addTask: (prompt: string, templateId?: string) => void;
@@ -25,6 +27,7 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   queue: new TaskQueue(2),
   db: new Database(),
   notificationManager: NotificationManager.getInstance(),
+  backgroundTaskManager: null,
   subscription: {
     isPro: false,
     maxParallelTasks: 2,
@@ -33,9 +36,13 @@ export const useTaskStore = create<TaskStore>((set, get) => ({
   },
 
   initialize: async () => {
-    const { db, notificationManager } = get();
+    const { db, notificationManager, queue } = get();
     await db.initialize();
     await get().loadHistory();
+
+    // Initialize background task manager
+    const backgroundTaskManager = new BackgroundTaskManager(queue);
+    set({ backgroundTaskManager });
 
     // Check notification permissions on app start
     const hasPermission = await notificationManager.checkNotificationPermissions();
