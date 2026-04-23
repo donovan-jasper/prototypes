@@ -6,6 +6,8 @@ export class AREngine {
   private scene: THREE.Scene | null = null;
   private camera: THREE.PerspectiveCamera | null = null;
   private targets: THREE.Mesh[] = [];
+  private targetGeometry: THREE.SphereGeometry | null = null;
+  private targetMaterial: THREE.MeshPhongMaterial | null = null;
 
   initialize(gl: WebGLRenderingContext) {
     if (!gl) return;
@@ -29,15 +31,25 @@ export class AREngine {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(0, 1, 1);
     this.scene.add(directionalLight);
+
+    // Create reusable geometry and material for targets
+    this.targetGeometry = new THREE.SphereGeometry(1, 32, 32);
+    this.targetMaterial = new THREE.MeshPhongMaterial({
+      color: 0xff0000,
+      shininess: 30,
+      specular: 0x111111
+    });
   }
 
-  addTarget(position: { x: number, y: number, z: number }, radius: number = 0.1, color: THREE.Color = new THREE.Color(Math.random(), Math.random(), Math.random())) {
-    if (!this.scene) return;
+  addTarget(position: { x: number, y: number, z: number }, radius: number = 0.1, color: THREE.Color = new THREE.Color(1, 0, 0)) {
+    if (!this.scene || !this.targetGeometry || !this.targetMaterial) return;
 
-    const geometry = new THREE.SphereGeometry(radius, 32, 32);
-    const material = new THREE.MeshPhongMaterial({ color });
-    const mesh = new THREE.Mesh(geometry, material);
+    // Create a new mesh using the shared geometry and material
+    const mesh = new THREE.Mesh(this.targetGeometry, this.targetMaterial);
     mesh.position.set(position.x, position.y, position.z);
+    mesh.scale.set(radius, radius, radius);
+    mesh.userData = { radius }; // Store radius for intersection testing
+
     this.scene.add(mesh);
     this.targets.push(mesh);
     return mesh;
@@ -54,7 +66,20 @@ export class AREngine {
     if (!this.scene || !this.camera) return null;
 
     const intersects = raycaster.intersectObjects(this.targets);
-    return intersects.length > 0 ? intersects[0].object : null;
+
+    if (intersects.length > 0) {
+      // Check if the intersection is within the target's radius
+      const intersect = intersects[0];
+      const target = intersect.object as THREE.Mesh;
+      const distance = intersect.distance;
+
+      // Calculate if the intersection is within the target's radius
+      if (distance <= target.userData.radius) {
+        return target;
+      }
+    }
+
+    return null;
   }
 
   render() {

@@ -8,6 +8,8 @@ import { savePerformance } from '../../lib/database';
 import { calculateScore, getAccuracyRating } from '../../lib/scoring';
 import { ARTargetOverlay } from '../../components/ARTargetOverlay';
 import { AREngine } from '../../lib/ar-engine';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import * as DeviceMotion from 'expo-sensors';
 
 const { width, height } = Dimensions.get('window');
 
@@ -18,19 +20,28 @@ const ARTargetPractice = () => {
   const [gameActive, setGameActive] = useState(false);
   const [timeLeft, setTimeLeft] = useState(30);
   const [score, setScore] = useState(null);
+  const [deviceOrientation, setDeviceOrientation] = useState({ alpha: 0, beta: 0, gamma: 0 });
   const cameraRef = useRef(null);
   const glViewRef = useRef(null);
   const arEngineRef = useRef(new AREngine());
   const { isPremium } = useStore();
+  const motionSubscription = useRef(null);
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
+
+      // Lock to portrait for better AR experience
+      await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT);
     })();
 
     return () => {
       arEngineRef.current.cleanup();
+      if (motionSubscription.current) {
+        motionSubscription.current.remove();
+      }
+      ScreenOrientation.unlockAsync();
     };
   }, []);
 
@@ -49,6 +60,23 @@ const ARTargetPractice = () => {
 
     return () => clearInterval(timer);
   }, [gameActive, timeLeft]);
+
+  useEffect(() => {
+    // Subscribe to device motion
+    motionSubscription.current = DeviceMotion.addListener((data) => {
+      setDeviceOrientation({
+        alpha: data.rotation.alpha,
+        beta: data.rotation.beta,
+        gamma: data.rotation.gamma
+      });
+    });
+
+    return () => {
+      if (motionSubscription.current) {
+        motionSubscription.current.remove();
+      }
+    };
+  }, []);
 
   const startGame = () => {
     if (!isPremium) {
@@ -91,14 +119,28 @@ const ARTargetPractice = () => {
     // Clear existing targets
     arEngineRef.current.cleanup();
 
-    // Spawn new targets
-    for (let i = 0; i < 5; i++) {
-      arEngineRef.current.addTarget({
-        x: (Math.random() * 2 - 1) * 0.5, // More centered
-        y: (Math.random() * 2 - 1) * 0.5,
-        z: -2
+    // Spawn new targets at random positions in 3D space
+    const targetCount = 5;
+    const targets = [];
+
+    for (let i = 0; i < targetCount; i++) {
+      // Random position in front of the camera
+      const x = (Math.random() - 0.5) * 2; // -1 to 1
+      const y = (Math.random() - 0.5) * 2; // -1 to 1
+      const z = -2 - Math.random() * 2; // -2 to -4 (closer to camera)
+
+      targets.push({
+        x,
+        y,
+        z,
+        radius: 0.1 + Math.random() * 0.1 // Random size
       });
     }
+
+    // Add targets to AR engine
+    targets.forEach(target => {
+      arEngineRef.current.addTarget(target);
+    });
   };
 
   const handleTap = (event) => {
@@ -124,11 +166,13 @@ const ARTargetPractice = () => {
       arEngineRef.current.removeTarget(hitTarget);
 
       // Spawn a new target
-      arEngineRef.current.addTarget({
-        x: (Math.random() * 2 - 1) * 0.5,
-        y: (Math.random() * 2 - 1) * 0.5,
-        z: -2
-      });
+      const newTarget = {
+        x: (Math.random() - 0.5) * 2,
+        y: (Math.random() - 0.5) * 2,
+        z: -2 - Math.random() * 2,
+        radius: 0.1 + Math.random() * 0.1
+      };
+      arEngineRef.current.addTarget(newTarget);
     } else {
       // Miss
       setMisses(prev => prev + 1);
@@ -145,6 +189,16 @@ const ARTargetPractice = () => {
     const animate = () => {
       if (glViewRef.current) {
         requestAnimationFrame(animate);
+
+        // Update camera orientation based on device motion
+        if (arEngineRef.current.camera) {
+          // Convert device orientation to camera rotation
+          // Note: This is simplified - real AR would use more complex calculations
+          arEngineRef.current.camera.rotation.x = THREE.MathUtils.degToRad(deviceOrientation.beta);
+          arEngineRef.current.camera.rotation.y = THREE.MathUtils.degToRad(deviceOrientation.alpha);
+          arEngineRef.current.camera.rotation.z = THREE.MathUtils.degToRad(deviceOrientation.gamma);
+        }
+
         arEngineRef.current.render();
         gl.endFrameEXP();
       }
@@ -183,7 +237,11 @@ const ARTargetPractice = () => {
 
         {!gameActive && (
           <View style={styles.startButtonContainer}>
-            <TouchableOpacity style={styles.startButton} onPress={startGame}>
+            <TouchableOpacity
+              style={styles.startButton}
+              onPress={startGame}
+              disabled={!isPremium}
+            >
               <Text style={styles.startButtonText}>Start AR Training</Text>
             </TouchableOpacity>
           </View>
@@ -208,7 +266,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     paddingVertical: 15,
     paddingHorizontal: 30,
-    borderRadius: 10,
+    borderRadius: 25,
   },
   startButtonText: {
     color: 'white',

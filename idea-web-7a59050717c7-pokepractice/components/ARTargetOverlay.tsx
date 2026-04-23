@@ -5,26 +5,32 @@ interface ARTargetOverlayProps {
   hits: number;
   misses: number;
   timeLeft: number;
-  score?: {
+  score: {
     score: number;
     accuracy: number;
     rating: string;
-  };
+  } | null;
 }
 
-export const ARTargetOverlay = ({ hits, misses, timeLeft, score }: ARTargetOverlayProps) => {
+export const ARTargetOverlay: React.FC<ARTargetOverlayProps> = ({
+  hits,
+  misses,
+  timeLeft,
+  score
+}) => {
   return (
-    <View style={styles.overlay}>
+    <View style={styles.container}>
       <View style={styles.statsContainer}>
-        <Text style={styles.timer}>Time: {timeLeft}s</Text>
-        <Text style={styles.score}>Hits: {hits} | Misses: {misses}</Text>
+        <Text style={styles.statText}>Hits: {hits}</Text>
+        <Text style={styles.statText}>Misses: {misses}</Text>
+        <Text style={styles.statText}>Time: {timeLeft}s</Text>
       </View>
 
       {score && (
-        <View style={styles.results}>
-          <Text style={styles.resultTitle}>Game Over!</Text>
-          <Text style={styles.resultScore}>Score: {score.score}</Text>
-          <Text style={styles.resultAccuracy}>Accuracy: {score.accuracy}% ({score.rating})</Text>
+        <View style={styles.scoreContainer}>
+          <Text style={styles.scoreTitle}>Score</Text>
+          <Text style={styles.scoreValue}>{score.score}</Text>
+          <Text style={styles.scoreAccuracy}>Accuracy: {score.accuracy}% ({score.rating})</Text>
         </View>
       )}
     </View>
@@ -32,56 +38,49 @@ export const ARTargetOverlay = ({ hits, misses, timeLeft, score }: ARTargetOverl
 };
 
 const styles = StyleSheet.create({
-  overlay: {
+  container: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     padding: 20,
-    alignItems: 'center',
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 20,
-  },
-  timer: {
-    fontSize: 20,
-    color: 'white',
-    fontWeight: 'bold',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     padding: 10,
     borderRadius: 10,
   },
-  score: {
-    fontSize: 20,
+  statText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 10,
   },
-  results: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  scoreContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 20,
     borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 20,
   },
-  resultTitle: {
-    fontSize: 24,
+  scoreTitle: {
     color: 'white',
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  resultScore: {
-    fontSize: 20,
-    color: 'white',
-    marginBottom: 5,
+  scoreValue: {
+    color: '#4CAF50',
+    fontSize: 48,
+    fontWeight: 'bold',
   },
-  resultAccuracy: {
-    fontSize: 16,
+  scoreAccuracy: {
     color: 'white',
+    fontSize: 18,
+    marginTop: 10,
   },
 });
