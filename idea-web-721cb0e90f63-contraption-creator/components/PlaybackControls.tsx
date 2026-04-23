@@ -39,7 +39,8 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
           setRecordingState(state);
           setIsRecording(state.isRecording);
           setRecordingTime(state.duration);
-        }
+        },
+        isPremium
       );
     }
 
@@ -48,7 +49,7 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
         videoRecorderRef.current?.stopRecording();
       }
     };
-  }, [canvasRef, permissionGranted]);
+  }, [canvasRef, permissionGranted, isPremium]);
 
   useEffect(() => {
     if (isRecording) {
@@ -166,25 +167,19 @@ export const PlaybackControls: React.FC<PlaybackControlsProps> = ({ canvasRef, o
             ]}
           />
         ) : (
-          <MaterialIcons name="fiber-manual-record" size={24} color={permissionGranted ? 'red' : 'gray'} />
+          <MaterialIcons name="fiber-manual-record" size={24} color="white" />
         )}
       </TouchableOpacity>
 
-      {isRecording && (
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>{formatTime(recordingTime)}</Text>
-        </View>
-      )}
+      <View style={styles.timeContainer}>
+        <Text style={styles.timeText}>
+          {isRecording ? formatTime(recordingTime) : '0:00'}
+        </Text>
+      </View>
 
       <TouchableOpacity style={styles.saveButton} onPress={onSave}>
         <MaterialIcons name="save" size={24} color="white" />
       </TouchableOpacity>
-
-      {!isPremium && (
-        <View style={styles.watermarkNotice}>
-          <Text style={styles.watermarkText}>Free users get watermarked videos</Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -212,7 +207,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'white',
+    backgroundColor: '#e74c3c',
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 8,
@@ -221,18 +216,15 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   recordingIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
-  timerContainer: {
-    marginLeft: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 4,
+  timeContainer: {
+    width: 60,
+    alignItems: 'center',
   },
-  timerText: {
+  timeText: {
     color: 'white',
     fontSize: 14,
   },
@@ -244,16 +236,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 8,
-  },
-  watermarkNotice: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  watermarkText: {
-    color: '#bdc3c7',
-    fontSize: 12,
   },
 });

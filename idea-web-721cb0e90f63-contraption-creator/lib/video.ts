@@ -3,6 +3,8 @@ import * as MediaLibrary from 'expo-media-library';
 import { RefObject } from 'react';
 import { captureRef } from 'react-native-view-shot';
 import { Platform } from 'react-native';
+import { Image } from 'react-native';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 interface RecordingState {
   isRecording: boolean;
@@ -25,14 +27,17 @@ export class VideoRecorder {
   private maxDuration: number = 15000; // 15 seconds max
   private video: Video | null = null;
   private frameRate: number = 30; // frames per second
+  private isPremium: boolean;
 
   constructor(
     canvasRef: RefObject<any>,
-    onRecordingStateChange: (state: RecordingState) => void
+    onRecordingStateChange: (state: RecordingState) => void,
+    isPremium: boolean
   ) {
     this.canvasRef = canvasRef;
     this.onRecordingStateChange = onRecordingStateChange;
     this.video = new Video();
+    this.isPremium = isPremium;
   }
 
   async startRecording(): Promise<void> {
@@ -48,19 +53,8 @@ export class VideoRecorder {
       duration: 0,
     };
 
-    // Start actual video recording using expo-av
-    try {
-      const recording = new Video.Recording();
-      await recording.prepareToRecordAsync();
-      await recording.startAsync();
-      this.recordingState.recording = recording;
-
-      // Start capturing frames
-      this.startFrameCapture();
-    } catch (error) {
-      console.error('Error starting video recording:', error);
-      throw error;
-    }
+    // Start capturing frames
+    this.startFrameCapture();
 
     // Start timer
     this.startTimer();
@@ -123,20 +117,12 @@ export class VideoRecorder {
         this.intervalId = null;
       }
 
-      // Stop actual video recording
-      if (this.recordingState.recording) {
-        const videoUri = await this.recordingState.recording.stopAndUnloadAsync();
-
-        // Process frames to create final video
-        // In a real implementation, you would use a video processing library
-        // to combine the frames into a proper video file
+      if (this.frames.length > 0) {
+        // Process frames into video
+        const videoUri = await this.createVideoFromFrames();
 
         // Save to media library
         const asset = await MediaLibrary.saveToLibraryAsync(videoUri);
-
-        // Add watermark for free users
-        // In a real implementation, you would use expo-gl or another video processing library
-        // to add the watermark before saving to the camera roll
 
         return asset.localUri || videoUri;
       }
@@ -153,6 +139,46 @@ export class VideoRecorder {
     }
 
     return null;
+  }
+
+  private async createVideoFromFrames(): Promise<string> {
+    // In a real implementation, you would use a proper video encoding library
+    // This is a simplified version that just combines frames with watermark
+
+    // For demo purposes, we'll just take the first frame and add watermark
+    const firstFrame = this.frames[0];
+
+    if (!firstFrame) {
+      throw new Error('No frames captured');
+    }
+
+    // Add watermark if not premium
+    if (!this.isPremium) {
+      const watermarkImage = await Image.resolveAssetSource(require('../assets/watermark.png'));
+      const watermarkUri = watermarkImage.uri;
+
+      const manipResult = await manipulateAsync(
+        firstFrame,
+        [
+          {
+            resize: { width: 300, height: 300 }
+          },
+          {
+            overlay: {
+              uri: watermarkUri,
+              width: 100,
+              height: 50,
+              position: { x: 10, y: 10 }
+            }
+          }
+        ],
+        { compress: 0.8, format: SaveFormat.JPEG }
+      );
+
+      return manipResult.uri;
+    }
+
+    return firstFrame;
   }
 
   getRecordingState(): RecordingState {
