@@ -18,7 +18,9 @@ import { getItems, addItem } from '@/lib/db';
 import { downloadMedia } from '@/lib/downloader';
 import { SavedItem } from '@/types';
 import ItemCard from '@/components/ItemCard';
+import DownloadProgress from '@/components/DownloadProgress';
 import { getSharedUrl, processSharedUrl, isValidUrl } from '@/lib/share-extension';
+import { useStore } from '@/store/useStore';
 
 export default function LibraryScreen() {
   const [items, setItems] = useState<SavedItem[]>([]);
@@ -29,7 +31,9 @@ export default function LibraryScreen() {
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
   const [progressMessage, setProgressMessage] = useState('');
+  const [currentItemId, setCurrentItemId] = useState<number | undefined>();
   const router = useRouter();
+  const { items: storeItems, setItems: setStoreItems } = useStore();
 
   useEffect(() => {
     loadItems();
@@ -52,13 +56,14 @@ export default function LibraryScreen() {
       }
     } catch (error) {
       console.error('Error checking for shared URL:', error);
-    }
+  }
   };
 
   const loadItems = async () => {
     try {
       const fetchedItems = await getItems();
       setItems(fetchedItems);
+      setStoreItems(fetchedItems);
     } catch (error) {
       console.error('Error loading items:', error);
       Alert.alert('Error', 'Failed to load items');
@@ -89,13 +94,17 @@ export default function LibraryScreen() {
     setProgressMessage('Starting download...');
 
     try {
-      const result = await processSharedUrl(url, (message) => {
+      const result = await processSharedUrl(url, (message, progress) => {
         setProgressMessage(message);
+        if (progress) {
+          setDownloadProgress(progress);
+        }
       });
 
       if (result.success) {
         setUrl('');
         setShowAddModal(false);
+        setCurrentItemId(result.itemId);
         await loadItems();
       } else {
         Alert.alert('Download Failed', result.error || 'Unknown error occurred');
@@ -108,8 +117,6 @@ export default function LibraryScreen() {
       );
     } finally {
       setDownloading(false);
-      setDownloadProgress({ current: 0, total: 0 });
-      setProgressMessage('');
     }
   };
 
@@ -146,25 +153,6 @@ export default function LibraryScreen() {
     />
   );
 
-  const renderProgressBar = () => {
-    if (!downloading || downloadProgress.total === 0) return null;
-
-    const progress = (downloadProgress.current / downloadProgress.total) * 100;
-    const currentMB = (downloadProgress.current / 1024 / 1024).toFixed(1);
-    const totalMB = (downloadProgress.total / 1024 / 1024).toFixed(1);
-
-    return (
-      <View style={styles.progressContainer}>
-        <Text style={styles.progressText}>
-          {progressMessage || `Downloading... ${currentMB}MB / ${totalMB}MB`}
-        </Text>
-        <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `${progress}%` }]} />
-        </View>
-      </View>
-    );
-  };
-
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -177,17 +165,17 @@ export default function LibraryScreen() {
     <View style={styles.container}>
       {items.length === 0 ? (
         <View style={styles.emptyState}>
-          <Ionicons name="cloud-download-outline" size={80} color="#ccc" />
-          <Text style={styles.emptyTitle}>No saved items yet</Text>
-          <Text style={styles.emptyText}>
-            Tap the + button to save your first video, article, or image
+          <Ionicons name="bookmark-outline" size={64} color="#8E8E93" />
+          <Text style={styles.emptyTitle}>Your library is empty</Text>
+          <Text style={styles.emptySubtitle}>
+            Save content from any app using the share sheet
           </Text>
-
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setShowAddModal(true)}
           >
             <Ionicons name="add" size={24} color="white" />
+            <Text style={styles.addButtonText}>Add Content</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -199,16 +187,20 @@ export default function LibraryScreen() {
             numColumns={2}
             columnWrapperStyle={styles.row}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="#007AFF"
+              />
             }
             ListHeaderComponent={
               <View style={styles.header}>
-                <Text style={styles.title}>Your Library</Text>
+                <Text style={styles.title}>Library</Text>
                 <TouchableOpacity
-                  style={styles.addButton}
+                  style={styles.addIcon}
                   onPress={() => setShowAddModal(true)}
                 >
-                  <Ionicons name="add" size={24} color="white" />
+                  <Ionicons name="add" size={24} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             }
@@ -218,13 +210,18 @@ export default function LibraryScreen() {
 
       <Modal
         visible={showAddModal}
+        transparent
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setShowAddModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Save New Item</Text>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Add Content</Text>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Ionicons name="close" size={24} color="#8E8E93" />
+              </TouchableOpacity>
+            </View>
 
             <TextInput
               style={styles.input}
@@ -234,35 +231,33 @@ export default function LibraryScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              autoFocus={true}
             />
 
-            {renderProgressBar()}
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
-                onPress={() => setShowAddModal(false)}
-                disabled={downloading}
-              >
-                <Text style={styles.buttonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.button, styles.saveButton]}
-                onPress={handleDownload}
-                disabled={downloading || !url.trim()}
-              >
-                {downloading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.buttonText}>Save</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.downloadButton}
+              onPress={handleDownload}
+              disabled={downloading}
+            >
+              {downloading ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.downloadButtonText}>Download</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      <DownloadProgress
+        visible={downloading}
+        progress={(downloadProgress.current / downloadProgress.total) * 100 || 0}
+        message={progressMessage}
+        itemId={currentItemId}
+        onClose={() => {
+          setDownloading(false);
+          setCurrentItemId(undefined);
+        }}
+      />
     </View>
   );
 }
@@ -270,7 +265,7 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F2F2F7',
   },
   centerContainer: {
     flex: 1,
@@ -285,116 +280,90 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginTop: 20,
-    marginBottom: 10,
-    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
   },
-  emptyText: {
+  emptySubtitle: {
     fontSize: 16,
-    color: '#666',
+    color: '#8E8E93',
     textAlign: 'center',
     marginBottom: 30,
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 10,
+  },
+  addButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#E5E5EA',
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '700',
+  },
+  addIcon: {
+    padding: 8,
   },
   row: {
     justifyContent: 'space-between',
-    paddingHorizontal: 10,
-    marginBottom: 10,
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 400,
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
     padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    fontWeight: '600',
   },
   input: {
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 20,
-    fontSize: 16,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  button: {
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
     padding: 12,
-    borderRadius: 5,
-    flex: 1,
-    marginHorizontal: 5,
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  downloadButton: {
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
   },
-  cancelButton: {
-    backgroundColor: '#f0f0f0',
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-  },
-  buttonText: {
+  downloadButtonText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
-  },
-  progressContainer: {
-    marginBottom: 20,
-  },
-  progressText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-    textAlign: 'center',
-  },
-  progressBar: {
-    height: 5,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2.5,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
+    fontWeight: '500',
   },
 });

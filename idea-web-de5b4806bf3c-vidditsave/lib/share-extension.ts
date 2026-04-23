@@ -3,6 +3,7 @@ import { parseUrl } from './parser';
 import { downloadMedia } from './downloader';
 import { addItem } from './db';
 import * as Notifications from 'expo-notifications';
+import { useStore } from '@/store/useStore';
 
 export interface ShareData {
   url: string;
@@ -38,7 +39,7 @@ export async function getSharedUrl(): Promise<string | null> {
 
 export async function processSharedUrl(
   url: string,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string, progress?: { current: number; total: number }) => void
 ): Promise<{ success: boolean; itemId?: number; error?: string }> {
   try {
     onProgress?.('Analyzing URL...');
@@ -47,11 +48,27 @@ export async function processSharedUrl(
     onProgress?.('Downloading content...');
     const result = await downloadMedia(url, (current, total) => {
       const percent = Math.round((current / total) * 100);
-      onProgress?.(`Downloading... ${percent}%`);
+      onProgress?.(`Downloading... ${percent}%`, { current, total });
     });
 
     onProgress?.('Saving to library...');
     const itemId = await addItem({
+      url,
+      title: result.title,
+      type: result.type,
+      fileUri: result.fileUri,
+      thumbnailUri: result.thumbnailUri || null,
+      source: result.source,
+      createdAt: Date.now(),
+      collectionId: null,
+      duration: result.duration,
+      fileSize: result.fileSize,
+    });
+
+    // Update store
+    const { addItem: addToStore } = useStore.getState();
+    addToStore({
+      id: itemId,
       url,
       title: result.title,
       type: result.type,
