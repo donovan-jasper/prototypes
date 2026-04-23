@@ -120,6 +120,16 @@ export const getDrillResults = async (drillId: string): Promise<DrillResult[]> =
   }));
 };
 
+export const updateDrillDifficulty = async (drillId: string, newDifficulty: number) => {
+  const database = await openDatabase();
+  await initDatabase();
+
+  await database.runAsync(
+    'UPDATE drills SET difficulty = ? WHERE id = ?',
+    [newDifficulty, drillId]
+  );
+};
+
 export const getUserStats = async (): Promise<UserStats> => {
   const database = await openDatabase();
   await initDatabase();
@@ -174,64 +184,63 @@ const calculateStreak = (dates: string[]): number => {
   mostRecent.setHours(0, 0, 0, 0);
 
   const daysDiff = Math.floor((today.getTime() - mostRecent.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysDiff > 1) return 0;
 
-  let streak = 1;
-  for (let i = 1; i < sortedDates.length; i++) {
-    const current = new Date(sortedDates[i]);
-    current.setHours(0, 0, 0, 0);
-    const previous = new Date(sortedDates[i - 1]);
-    previous.setHours(0, 0, 0, 0);
-
-    const diff = Math.floor((previous.getTime() - current.getTime()) / (1000 * 60 * 60 * 24));
-    if (diff === 1) {
-      streak++;
-    } else {
-      break;
-    }
+  if (daysDiff === 0) {
+    return dates.length;
+  } else if (daysDiff === 1) {
+    return dates.length;
+  } else {
+    return 0;
   }
-
-  return streak;
 };
 
-export const getAchievements = async (): Promise<Achievement[]> => {
+const getAchievements = async (): Promise<Achievement[]> => {
   const database = await openDatabase();
   await initDatabase();
 
-  const results = await database.getAllAsync('SELECT * FROM achievements WHERE unlocked = 1');
+  const achievements = await database.getAllAsync('SELECT * FROM achievements');
 
-  return results.map((row: any) => ({
+  if (achievements.length === 0) {
+    // Initialize default achievements if none exist
+    const defaultAchievements: Achievement[] = [
+      {
+        id: 'first-drill',
+        title: 'First Drill',
+        description: 'Complete your first practice drill',
+        icon: 'trophy',
+        unlocked: false,
+      },
+      {
+        id: 'streak-3',
+        title: '3-Day Streak',
+        description: 'Complete drills for 3 consecutive days',
+        icon: 'flame',
+        unlocked: false,
+      },
+      {
+        id: 'accuracy-90',
+        title: 'Precision Master',
+        description: 'Achieve 90%+ accuracy in a drill',
+        icon: 'bullseye',
+        unlocked: false,
+      },
+    ];
+
+    for (const achievement of defaultAchievements) {
+      await database.runAsync(
+        'INSERT INTO achievements (id, title, description, icon, unlocked) VALUES (?, ?, ?, ?, ?)',
+        [achievement.id, achievement.title, achievement.description, achievement.icon, achievement.unlocked]
+      );
+    }
+
+    return defaultAchievements;
+  }
+
+  return achievements.map((row: any) => ({
     id: row.id,
     title: row.title,
     description: row.description,
     icon: row.icon,
+    unlocked: row.unlocked === 1,
   }));
-};
-
-export const getAllDrills = async (): Promise<Drill[]> => {
-  const database = await openDatabase();
-  await initDatabase();
-
-  const results = await database.getAllAsync('SELECT * FROM drills');
-
-  return results.map((row: any) => ({
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    type: row.type,
-    difficulty: row.difficulty,
-    duration: row.duration,
-    bestScore: row.bestScore,
-    difficultyChange: row.difficultyChange,
-  }));
-};
-
-export const updateDrillDifficulty = async (drillId: string, difficulty: number, difficultyChange: number | null) => {
-  const database = await openDatabase();
-  await initDatabase();
-
-  await database.runAsync(
-    'UPDATE drills SET difficulty = ?, difficultyChange = ? WHERE id = ?',
-    [difficulty, difficultyChange, drillId]
-  );
 };

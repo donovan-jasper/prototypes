@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Drill, DrillResult, UserStats } from '../lib/types';
-import { saveDrillResult, getUserStats, getDrillResults } from '../lib/database';
+import { saveDrillResult, getUserStats, getDrillResults, updateDrillDifficulty } from '../lib/database';
 import { adjustDifficulty } from '../lib/adaptive';
 
 interface StoreState {
@@ -52,15 +52,22 @@ export const useStore = create<StoreState>((set, get) => ({
     // Adjust difficulty if needed
     const currentDrill = get().currentDrill;
     if (currentDrill) {
-      const updatedDrill = adjustDifficulty(currentDrill, allResults);
+      const { newDifficulty, shouldAdjust } = adjustDifficulty(currentDrill, allResults);
 
-      // Update the store
-      set(state => ({
-        currentSession: result,
-        drills: state.drills.map(d =>
-          d.id === updatedDrill.id ? updatedDrill : d
-        ),
-      }));
+      if (shouldAdjust) {
+        // Update the drill's difficulty in the database
+        await updateDrillDifficulty(currentDrill.id, newDifficulty);
+
+        // Update the store
+        set(state => ({
+          currentSession: result,
+          drills: state.drills.map(d =>
+            d.id === currentDrill.id ? { ...d, difficulty: newDifficulty } : d
+          ),
+        }));
+      } else {
+        set({ currentSession: result });
+      }
     }
 
     // Update user stats
