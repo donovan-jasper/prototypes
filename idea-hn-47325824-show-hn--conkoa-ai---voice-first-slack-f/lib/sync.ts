@@ -1,28 +1,29 @@
-import { db } from './db';
+import { db, updateMessageSyncedStatus } from './db';
 import NetInfo from '@react-native-community/netinfo';
-import { updateMessageSyncedStatus } from './db';
+import { Message } from '../types';
 
-export async function queueOfflineMessage(message: any) {
-  const id = message.id || Date.now().toString();
+export async function queueOfflineMessage(message: Message) {
+  // Ensure the message object stored in pending_messages has the correct synced status
+  const messageToQueue = { ...message, synced: false };
   await db.runAsync(
     'INSERT INTO pending_messages (id, data, created_at) VALUES (?, ?, ?)',
-    [id, JSON.stringify(message), Date.now()]
+    [messageToQueue.id, JSON.stringify(messageToQueue), Date.now()]
   );
 }
 
-export async function syncPendingMessages() {
+export async function syncPendingMessages(): Promise<number> {
   const netInfo = await NetInfo.fetch();
   if (!netInfo.isConnected) return 0;
 
   const pending = await db.getAllAsync('SELECT * FROM pending_messages ORDER BY created_at ASC');
 
-  let synced = 0;
+  let syncedCount = 0;
   for (const item of pending) {
     try {
-      const message = JSON.parse(item.data);
+      const message: Message = JSON.parse(item.data);
       console.log('Attempting to sync message:', message.id);
 
-      // Send to backend API
+      // Simulate sending to backend API
       const response = await fetch('https://api.voxcrew.com/messages', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -32,8 +33,8 @@ export async function syncPendingMessages() {
       if (response.ok) {
         // If successful, delete from pending and update local message status
         await db.runAsync('DELETE FROM pending_messages WHERE id = ?', [item.id]);
-        await updateMessageSyncedStatus(message.id, true);
-        synced++;
+        await updateMessageSyncedStatus(message.id, true); // Update DB
+        syncedCount++;
         console.log('Successfully synced message:', message.id);
       } else {
         console.warn(`Failed to sync message ${message.id} to backend (status: ${response.status}). Will retry later.`);
@@ -45,7 +46,7 @@ export async function syncPendingMessages() {
     }
   }
 
-  return synced;
+  return syncedCount;
 }
 
 export async function checkForConflicts(messageId: string) {

@@ -5,8 +5,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 interface MessageBubbleProps {
   message: Message;
-  currentUserId: string | null; // New prop for dynamic user ID
-  onConflictResolve?: () => void;
+  currentUserId: string; // New prop for dynamic user ID, guaranteed to be string
+  onConflictResolve?: () => void; // Kept for potential future use, not implemented in this task
 }
 
 const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId, onConflictResolve }) => {
@@ -16,7 +16,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId, o
   return (
     <View style={[
       styles.container,
-      isCurrentUser ? styles.currentUser : styles.otherUser // AI messages are also 'other'
+      isCurrentUser ? styles.currentUser : styles.otherUser
     ]}>
       {!isCurrentUser && (
         <Text style={styles.username}>
@@ -37,7 +37,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId, o
         )}
       </View>
 
-      <View style={styles.footer}>
+      <View style={[styles.footer, isCurrentUser ? styles.currentFooter : styles.otherFooter]}>
         <Text style={[
           styles.timestamp,
           isCurrentUser ? styles.currentTimestamp : styles.otherTimestamp
@@ -45,10 +45,11 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, currentUserId, o
           {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </Text>
 
-        {!message.synced && ( // Use message.synced directly from the message object
-          <TouchableOpacity onPress={onConflictResolve} style={styles.syncIndicator}>
+        {/* Visual indicator for pending sync */}
+        {!message.synced && (
+          <View style={styles.syncIndicator}>
             <Ionicons name="cloud-offline" size={16} color="#ff9500" />
-          </TouchableOpacity>
+          </View>
         )}
       </View>
     </View>
@@ -104,19 +105,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
+  currentFooter: {
+    alignSelf: 'flex-end', // Aligns the footer itself to the right
+  },
+  otherFooter: {
+    alignSelf: 'flex-start', // Aligns the footer itself to the left
+  },
   timestamp: {
     fontSize: 12,
   },
   currentTimestamp: {
     color: 'rgba(255, 255, 255, 0.7)',
-    marginRight: 8,
+    marginRight: 4,
   },
   otherTimestamp: {
     color: 'rgba(0, 0, 0, 0.5)',
-    marginRight: 8,
+    marginRight: 4,
   },
   syncIndicator: {
-    marginLeft: 4,
+    // No specific margin-left needed if it's the last item in a row
   },
 });
 

@@ -5,7 +5,7 @@ interface MessageStore {
   messages: Message[];
   addMessage: (message: Message) => void;
   setMessages: (messages: Message[]) => void;
-  updateMessage: (id: string, updates: Partial<Message>) => void; // New action
+  updateMessage: (messageId: string, updates: Partial<Message>) => void; // New action
 }
 
 export const useMessageStore = create<MessageStore>((set) => ({
@@ -14,9 +14,9 @@ export const useMessageStore = create<MessageStore>((set) => ({
     messages: [message, ...state.messages]
   })),
   setMessages: (messages) => set({ messages }),
-  updateMessage: (id, updates) => set((state) => ({
+  updateMessage: (messageId, updates) => set((state) => ({
     messages: state.messages.map((msg) =>
-      msg.id === id ? { ...msg, ...updates } : msg
+      msg.id === messageId ? { ...msg, ...updates } : msg
     ),
   })),
 }));
