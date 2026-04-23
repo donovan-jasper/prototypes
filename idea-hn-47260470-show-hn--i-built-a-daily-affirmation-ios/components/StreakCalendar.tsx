@@ -1,6 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth, addMonths, subMonths } from 'date-fns';
+import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameWeek, isSameMonth, addMonths, subMonths, isBefore, isAfter } from 'date-fns';
 import { MILESTONE_DAYS, STREAK_COLORS } from '../lib/constants';
 import { getGraceDaysUsedThisWeek } from '../lib/affirmations';
 
@@ -51,6 +51,99 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     setCurrentMonth(addMonths(currentMonth, 1));
   };
 
+  // Find consecutive days to draw connecting lines
+  const getConsecutiveDays = () => {
+    const consecutiveGroups: string[][] = [];
+    let currentGroup: string[] = [];
+
+    streakData.sort((a, b) => isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1);
+
+    streakData.forEach((day, index) => {
+      if (index === 0) {
+        currentGroup.push(day.date);
+        return;
+      }
+
+      const prevDay = parseISO(streakData[index - 1].date);
+      const currentDay = parseISO(day.date);
+
+      if (isSameDay(currentDay, new Date(prevDay.getTime() + 24 * 60 * 60 * 1000))) {
+        currentGroup.push(day.date);
+      } else {
+        if (currentGroup.length > 1) {
+          consecutiveGroups.push([...currentGroup]);
+        }
+        currentGroup = [day.date];
+      }
+    });
+
+    if (currentGroup.length > 1) {
+      consecutiveGroups.push([...currentGroup]);
+    }
+
+    return consecutiveGroups;
+  };
+
+  const consecutiveGroups = getConsecutiveDays();
+
+  const renderDay = (day: Date, index: number) => {
+    const dayString = format(day, 'yyyy-MM-dd');
+    const isStreakDay = streakMap.has(dayString);
+    const isGraceDay = streakMap.get(dayString);
+    const isMilestone = milestoneDates.includes(dayString);
+    const isToday = isSameDay(day, new Date());
+
+    // Check if this day is part of a consecutive streak
+    let isInConsecutiveGroup = false;
+    let isFirstInGroup = false;
+    let isLastInGroup = false;
+
+    consecutiveGroups.forEach(group => {
+      const firstDate = group[0];
+      const lastDate = group[group.length - 1];
+
+      if (dayString === firstDate) {
+        isInConsecutiveGroup = true;
+        isFirstInGroup = true;
+      } else if (dayString === lastDate) {
+        isInConsecutiveGroup = true;
+        isLastInGroup = true;
+      } else if (group.includes(dayString)) {
+        isInConsecutiveGroup = true;
+      }
+    });
+
+    return (
+      <View key={index} style={styles.dayContainer}>
+        {isInConsecutiveGroup && (
+          <View style={[
+            styles.connectorLine,
+            isFirstInGroup ? styles.firstConnector : null,
+            isLastInGroup ? styles.lastConnector : null
+          ]} />
+        )}
+        <View style={styles.dayContent}>
+          <Text style={[
+            styles.dayNumber,
+            isToday ? styles.today : null,
+            isMilestone ? styles.milestone : null
+          ]}>
+            {format(day, 'd')}
+          </Text>
+          {isStreakDay && (
+            <View style={[
+              styles.dot,
+              { backgroundColor: isGraceDay ? STREAK_COLORS.grace : STREAK_COLORS.regular }
+            ]} />
+          )}
+          {isMilestone && (
+            <Text style={styles.milestoneBadge}>🎉</Text>
+          )}
+        </View>
+      </View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -70,34 +163,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
       </View>
 
       <View style={styles.calendar}>
-        {daysInMonth.map((day, index) => {
-          const dayString = format(day, 'yyyy-MM-dd');
-          const isStreakDay = streakMap.has(dayString);
-          const isGraceDay = streakMap.get(dayString);
-          const isMilestone = milestoneDates.includes(dayString);
-          const isToday = isSameDay(day, new Date());
-
-          return (
-            <View key={index} style={styles.dayContainer}>
-              <Text style={[
-                styles.dayNumber,
-                isToday ? styles.today : null,
-                isMilestone ? styles.milestone : null
-              ]}>
-                {format(day, 'd')}
-              </Text>
-              {isStreakDay && (
-                <View style={[
-                  styles.dot,
-                  { backgroundColor: isGraceDay ? STREAK_COLORS.grace : STREAK_COLORS.regular }
-                ]} />
-              )}
-              {isMilestone && (
-                <Text style={styles.milestoneBadge}>🎉</Text>
-              )}
-            </View>
-          );
-        })}
+        {daysInMonth.map((day, index) => renderDay(day, index))}
       </View>
 
       <View style={styles.legend}>
@@ -158,9 +224,8 @@ const styles = StyleSheet.create({
   },
   weekday: {
     fontSize: 14,
-    fontWeight: 'bold',
     color: '#666',
-    width: 40,
+    width: Dimensions.get('window').width / 7,
     textAlign: 'center',
   },
   calendar: {
@@ -168,40 +233,56 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   dayContainer: {
-    width: '14.28%',
+    width: Dimensions.get('window').width / 7,
+    height: 60,
     alignItems: 'center',
-    paddingVertical: 8,
+    justifyContent: 'center',
     position: 'relative',
+  },
+  dayContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dayNumber: {
     fontSize: 16,
-    marginBottom: 4,
     color: '#333',
   },
   today: {
-    color: STREAK_COLORS.today,
     fontWeight: 'bold',
+    color: '#4CAF50',
   },
   milestone: {
-    color: '#0066cc',
-    fontWeight: 'bold',
+    color: '#FF5722',
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 2,
+    marginTop: 4,
   },
   milestoneBadge: {
     fontSize: 12,
+    marginTop: 2,
+  },
+  connectorLine: {
     position: 'absolute',
-    top: -5,
-    right: -5,
+    height: 2,
+    backgroundColor: '#4CAF50',
+    width: '100%',
+    top: '50%',
+    left: 0,
+  },
+  firstConnector: {
+    width: '50%',
+    left: '50%',
+  },
+  lastConnector: {
+    width: '50%',
   },
   legend: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 15,
+    marginTop: 20,
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#eee',
@@ -222,13 +303,12 @@ const styles = StyleSheet.create({
   },
   graceDayInfo: {
     marginTop: 15,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
   },
   graceDayText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -236,7 +316,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginTop: 5,
-    textAlign: 'center',
   },
 });
 
