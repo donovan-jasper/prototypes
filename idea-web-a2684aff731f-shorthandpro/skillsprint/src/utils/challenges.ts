@@ -32,8 +32,12 @@ export const completeChallenge = async (
   await updateStreak();
 
   let unlocked = '';
-  if (newTotalXP >= 100) {
+  if (newTotalXP >= 100 && newTotalXP < 200) {
     unlocked = 'level2';
+  } else if (newTotalXP >= 200 && newTotalXP < 300) {
+    unlocked = 'level3';
+  } else if (newTotalXP >= 300) {
+    unlocked = 'level4';
   }
 
   return { xp, unlocked, totalXP: newTotalXP };
