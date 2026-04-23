@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Memory, Space } from '../lib/types';
-import { getMemoriesForUser, getSpacesForUser } from '../lib/db';
+import { getMemoriesForUser, getSpacesForUser, createSpace as dbCreateSpace } from '../lib/db';
 import * as SecureStore from 'expo-secure-store';
 
 interface MemoryState {
@@ -18,6 +18,7 @@ interface MemoryState {
   clearUser: () => Promise<void>;
   addSpace: (space: Space) => void;
   updateSpace: (space: Space) => void;
+  createSpace: (name: string, members: string[]) => Promise<Space>;
 }
 
 export const useMemoryStore = create<MemoryState>((set, get) => ({
@@ -97,6 +98,17 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
         space.id === updatedSpace.id ? updatedSpace : space
       )
     }));
+  },
+
+  createSpace: async (name: string, members: string[]) => {
+    const { userId } = get();
+    if (!userId) throw new Error('User not authenticated');
+
+    const space = await dbCreateSpace(name, userId, members);
+    set(state => ({
+      spaces: [...state.spaces, space]
+    }));
+    return space;
   },
 }));
 

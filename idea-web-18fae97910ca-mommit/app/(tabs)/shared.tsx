@@ -163,15 +163,15 @@ export default function SharedSpacesScreen() {
           </View>
         </View>
       ) : (
-        <View style={styles.buttonContainer}>
+        <View style={styles.actionButtons}>
           <TouchableOpacity
-            style={[styles.button, styles.createButton]}
+            style={[styles.button, styles.primaryButton]}
             onPress={() => setIsCreating(true)}
           >
-            <Text style={styles.buttonText}>Create New Space</Text>
+            <Text style={styles.buttonText}>Create Space</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, styles.joinButton]}
+            style={[styles.button, styles.secondaryButton]}
             onPress={() => setIsJoining(true)}
           >
             <Text style={styles.buttonText}>Join Space</Text>
@@ -179,16 +179,16 @@ export default function SharedSpacesScreen() {
         </View>
       )}
 
+      <Text style={styles.sectionTitle}>Your Spaces</Text>
+
       {spaces.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No spaces yet. Create or join one to get started!</Text>
-        </View>
+        <Text style={styles.emptyText}>No spaces yet. Create or join one!</Text>
       ) : (
         <FlatList
           data={spaces}
           renderItem={renderSpaceItem}
           keyExtractor={(item) => item.id}
-          style={styles.spaceList}
+          scrollEnabled={false}
         />
       )}
     </ScrollView>
@@ -207,17 +207,49 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     color: '#333',
   },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 24,
+    marginBottom: 16,
+    color: '#444',
+  },
+  createForm: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
     marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  input: {
+    height: 40,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginBottom: 12,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   button: {
-    padding: 12,
-    borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
     alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  cancelButton: {
+    backgroundColor: '#999',
   },
   createButton: {
     backgroundColor: '#4CAF50',
@@ -225,59 +257,45 @@ const styles = StyleSheet.create({
   joinButton: {
     backgroundColor: '#2196F3',
   },
-  cancelButton: {
-    backgroundColor: '#f44336',
+  primaryButton: {
+    backgroundColor: '#4CAF50',
+    marginBottom: 8,
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  secondaryButton: {
+    backgroundColor: '#2196F3',
   },
-  createForm: {
+  actionButtons: {
     marginBottom: 24,
-  },
-  input: {
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  spaceList: {
-    marginTop: 16,
   },
   spaceItem: {
     backgroundColor: 'white',
-    padding: 16,
     borderRadius: 8,
+    padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   spaceName: {
     fontSize: 18,
-    fontWeight: 'bold',
+    fontWeight: '600',
     marginBottom: 4,
   },
   spaceMembers: {
+    fontSize: 14,
     color: '#666',
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyState: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#666',
-    fontSize: 16,
-    textAlign: 'center',
+    padding: 16,
   },
 });

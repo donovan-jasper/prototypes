@@ -173,7 +173,7 @@ export default function SpaceDetailScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Members ({space.members.length})</Text>
+          <Text style={styles.sectionTitle}>Members</Text>
           {space.owner_id === userId && (
             <TouchableOpacity
               style={styles.addButton}
@@ -188,7 +188,7 @@ export default function SpaceDetailScreen() {
           <View style={styles.addMemberForm}>
             <TextInput
               style={styles.input}
-              placeholder="Member email"
+              placeholder="Email address"
               value={newMemberEmail}
               onChangeText={setNewMemberEmail}
               keyboardType="email-address"
@@ -197,7 +197,10 @@ export default function SpaceDetailScreen() {
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
-                onPress={() => setIsAddingMember(false)}
+                onPress={() => {
+                  setIsAddingMember(false);
+                  setNewMemberEmail('');
+                }}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
@@ -221,7 +224,7 @@ export default function SpaceDetailScreen() {
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Memories ({memories.length})</Text>
+          <Text style={styles.sectionTitle}>Memories</Text>
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => setIsAddingMemory(true)}
@@ -234,7 +237,7 @@ export default function SpaceDetailScreen() {
           <View style={styles.addMemoryForm}>
             <TextInput
               style={styles.input}
-              placeholder="Describe the memory..."
+              placeholder="Describe your memory (e.g., 'Remind me to call mom every Sunday at 5 PM')"
               value={newMemoryText}
               onChangeText={setNewMemoryText}
               multiline
@@ -243,7 +246,10 @@ export default function SpaceDetailScreen() {
             <View style={styles.buttonRow}>
               <TouchableOpacity
                 style={[styles.button, styles.cancelButton]}
-                onPress={() => setIsAddingMemory(false)}
+                onPress={() => {
+                  setIsAddingMemory(false);
+                  setNewMemoryText('');
+                }}
               >
                 <Text style={styles.buttonText}>Cancel</Text>
               </TouchableOpacity>
@@ -258,9 +264,7 @@ export default function SpaceDetailScreen() {
         )}
 
         {memories.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No memories in this space yet. Add one to get started!</Text>
-          </View>
+          <Text style={styles.emptyText}>No memories in this space yet.</Text>
         ) : (
           <FlatList
             data={memories}
@@ -270,6 +274,20 @@ export default function SpaceDetailScreen() {
           />
         )}
       </View>
+
+      <View style={styles.inviteSection}>
+        <Text style={styles.inviteTitle}>Invite Link</Text>
+        <Text style={styles.inviteLink}>memorymate://space/{id}</Text>
+        <TouchableOpacity
+          style={styles.copyButton}
+          onPress={() => {
+            // Implement copy to clipboard
+            Alert.alert('Copied', 'Invite link copied to clipboard');
+          }}
+        >
+          <Text style={styles.copyButtonText}>Copy Link</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -277,21 +295,25 @@ export default function SpaceDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    margin: 16,
+    marginBottom: 24,
     color: '#333',
   },
   section: {
     backgroundColor: 'white',
-    margin: 16,
-    padding: 16,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -301,17 +323,18 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '600',
+    color: '#444',
   },
   addButton: {
     backgroundColor: '#4CAF50',
-    padding: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 4,
   },
   addButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   memberItem: {
     flexDirection: 'row',
@@ -326,7 +349,8 @@ const styles = StyleSheet.create({
   },
   removeButton: {
     backgroundColor: '#f44336',
-    padding: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 4,
   },
   removeButtonText: {
@@ -340,46 +364,76 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   input: {
-    backgroundColor: '#f9f9f9',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
+    height: 40,
     borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    marginBottom: 12,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    gap: 8,
   },
   button: {
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 4,
-    flex: 1,
-    marginHorizontal: 4,
     alignItems: 'center',
   },
+  buttonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
   cancelButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#999',
   },
   addButton: {
     backgroundColor: '#4CAF50',
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  emptyState: {
-    padding: 16,
-    alignItems: 'center',
-  },
   emptyText: {
     color: '#666',
-    fontSize: 16,
     textAlign: 'center',
+    marginTop: 16,
+  },
+  inviteSection: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inviteTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#444',
+  },
+  inviteLink: {
+    fontSize: 14,
+    color: '#2196F3',
+    marginBottom: 12,
+  },
+  copyButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  copyButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
 });
