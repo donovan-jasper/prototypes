@@ -1,8 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Friend, HealthStatus } from '@/lib/types';
-import { calculateHealthScore } from '@/lib/database';
-import { formatDistanceToNow } from 'date-fns';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Avatar } from 'react-native-paper';
+import { Friend } from '@/lib/types';
+import HealthIndicator from './HealthIndicator';
 
 interface FriendCardProps {
   friend: Friend;
@@ -10,104 +10,59 @@ interface FriendCardProps {
 }
 
 export default function FriendCard({ friend, onPress }: FriendCardProps) {
-  const healthStatus = calculateHealthScore(friend);
-  
-  const getHealthColor = (status: HealthStatus) => {
-    switch (status) {
-      case 'healthy':
-        return '#4CAF50';
-      case 'warning':
-        return '#FF9800';
-      case 'neglected':
-        return '#F44336';
-    }
-  };
+  const lastContacted = friend.lastContacted ? new Date(friend.lastContacted) : null;
 
   const getLastContactedText = () => {
-    if (!friend.lastContacted) {
-      return 'Never contacted';
-    }
-    try {
-      return formatDistanceToNow(new Date(friend.lastContacted), { addSuffix: true });
-    } catch {
-      return 'Unknown';
-    }
+    if (!lastContacted) return 'Never contacted';
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - lastContacted.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return 'Today';
+    if (diffDays === 1) return '1 day ago';
+    return `${diffDays} days ago`;
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.content}>
-        {friend.photoUri ? (
-          <Image source={{ uri: friend.photoUri }} style={styles.photo} />
-        ) : (
-          <View style={[styles.photo, styles.photoPlaceholder]}>
-            <Text style={styles.photoPlaceholderText}>
-              {friend.name.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-        )}
-        
-        <View style={styles.info}>
-          <Text style={styles.name}>{friend.name}</Text>
-          <Text style={styles.lastContacted}>{getLastContactedText()}</Text>
-        </View>
-
-        <View style={[styles.healthIndicator, { backgroundColor: getHealthColor(healthStatus) }]} />
+    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+      <Avatar.Image
+        size={56}
+        source={friend.photoUri ? { uri: friend.photoUri } : require('@/assets/images/default-avatar.png')}
+        style={styles.avatar}
+      />
+      <View style={styles.infoContainer}>
+        <Text style={styles.name}>{friend.name}</Text>
+        <Text style={styles.lastContacted}>{getLastContactedText()}</Text>
       </View>
+      <HealthIndicator friend={friend} size={16} />
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  content: {
+  container: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    marginBottom: 8,
+    elevation: 1,
   },
-  photo: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+  avatar: {
+    marginRight: 16,
   },
-  photoPlaceholder: {
-    backgroundColor: '#E0E0E0',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  photoPlaceholderText: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#757575',
-  },
-  info: {
+  infoContainer: {
     flex: 1,
-    marginLeft: 16,
   },
   name: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 4,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
   },
   lastContacted: {
     fontSize: 14,
-    color: '#757575',
-  },
-  healthIndicator: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginLeft: 12,
+    color: '#666',
+    marginTop: 4,
   },
 });

@@ -5,7 +5,7 @@ let db: SQLite.SQLiteDatabase;
 
 export async function initDatabase() {
   db = await SQLite.openDatabaseAsync('kinkeeper.db');
-  
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS friends (
       id TEXT PRIMARY KEY,
@@ -49,7 +49,7 @@ export async function initDatabase() {
 export async function addFriend(friend: Omit<Friend, 'id' | 'createdAt'>): Promise<Friend> {
   const id = `friend_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
-  
+
   const newFriend: Friend = {
     id,
     ...friend,
@@ -111,7 +111,7 @@ export async function deleteFriend(id: string): Promise<void> {
 export async function logInteraction(interaction: Omit<Interaction, 'id' | 'createdAt'>): Promise<Interaction> {
   const id = `interaction_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
-  
+
   const newInteraction: Interaction = {
     id,
     ...interaction,
@@ -148,7 +148,7 @@ export async function getInteractionsByFriend(friendId: string): Promise<Interac
 export async function createReminder(reminder: Omit<Reminder, 'id' | 'createdAt'>): Promise<Reminder> {
   const id = `reminder_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const createdAt = new Date().toISOString();
-  
+
   const newReminder: Reminder = {
     id,
     ...reminder,
@@ -171,11 +171,31 @@ export async function createReminder(reminder: Omit<Reminder, 'id' | 'createdAt'
   return newReminder;
 }
 
-export async function getUpcomingReminders(): Promise<Reminder[]> {
-  const result = await db.getAllAsync<Reminder>(
-    'SELECT * FROM reminders WHERE dismissed = 0 ORDER BY dueDate ASC'
-  );
+export async function getUpcomingReminders(): Promise<(Reminder & { friendName: string })[]> {
+  const now = new Date().toISOString();
+
+  const result = await db.getAllAsync<Reminder & { friendName: string }>(`
+    SELECT r.*, f.name as friendName
+    FROM reminders r
+    JOIN friends f ON r.friendId = f.id
+    WHERE (r.dueDate > ? OR r.snoozedUntil > ?) AND r.dismissed = 0
+    ORDER BY r.dueDate ASC
+  `, [now, now]);
+
   return result;
+}
+
+export async function dismissReminder(id: string): Promise<void> {
+  await db.runAsync('UPDATE reminders SET dismissed = 1 WHERE id = ?', [id]);
+}
+
+export async function snoozeReminder(id: string, days: number): Promise<void> {
+  const snoozedUntil = new Date();
+  snoozedUntil.setDate(snoozedUntil.getDate() + days);
+  await db.runAsync(
+    'UPDATE reminders SET snoozedUntil = ? WHERE id = ?',
+    [snoozedUntil.toISOString(), id]
+  );
 }
 
 export function calculateHealthScore(friend: Friend): HealthStatus {
@@ -186,12 +206,10 @@ export function calculateHealthScore(friend: Friend): HealthStatus {
   const lastContactDate = new Date(friend.lastContacted);
   const now = new Date();
   const daysSinceContact = Math.floor((now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24));
-  
-  const expectedFrequency = friend.reminderFrequency;
-  
-  if (daysSinceContact <= expectedFrequency) {
+
+  if (daysSinceContact <= friend.reminderFrequency * 0.7) {
     return 'healthy';
-  } else if (daysSinceContact <= expectedFrequency * 1.5) {
+  } else if (daysSinceContact <= friend.reminderFrequency * 1.5) {
     return 'warning';
   } else {
     return 'neglected';

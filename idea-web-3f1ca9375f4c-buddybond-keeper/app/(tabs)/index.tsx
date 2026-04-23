@@ -13,6 +13,9 @@ import { initDatabase, getUpcomingReminders, calculateHealthScore } from '@/lib/
 import { getDashboardStats, getFriendsNeedingAttention, FriendWithDaysSinceContact } from '@/lib/analytics';
 import { Reminder } from '@/lib/types';
 import { formatDistanceToNow } from 'date-fns';
+import { Card, Avatar, Button, FAB, Divider } from 'react-native-paper';
+import { MaterialIcons } from '@expo/vector-icons';
+import HealthIndicator from '@/components/HealthIndicator';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -29,7 +32,7 @@ export default function DashboardScreen() {
         getFriendsNeedingAttention(3),
         getUpcomingReminders(),
       ]);
-      
+
       setStats(dashboardStats);
       setNeedsAttention(friendsNeedingAttention);
       setUpcomingReminders(reminders.slice(0, 2));
@@ -66,16 +69,8 @@ export default function DashboardScreen() {
     router.push(`/friend/${friendId}`);
   };
 
-  const getHealthColor = (friend: FriendWithDaysSinceContact) => {
-    const healthStatus = calculateHealthScore(friend);
-    switch (healthStatus) {
-      case 'healthy':
-        return '#4CAF50';
-      case 'warning':
-        return '#FF9800';
-      case 'neglected':
-        return '#F44336';
-    }
+  const handleReminderPress = (friendId: string) => {
+    router.push(`/friend/${friendId}`);
   };
 
   const getDaysSinceContactText = (days: number) => {
@@ -89,6 +84,15 @@ export default function DashboardScreen() {
       return '1 day ago';
     }
     return `${days} days ago`;
+  };
+
+  const getReminderText = (reminder: Reminder) => {
+    const dueDate = new Date(reminder.dueDate);
+    const now = new Date();
+    if (dueDate < now) {
+      return 'Overdue!';
+    }
+    return `Due ${formatDistanceToNow(dueDate, { addSuffix: true })}`;
   };
 
   if (loading) {
@@ -108,73 +112,134 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={['#6200EE']} />
         }
       >
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Your Friendship Stats</Text>
-          <View style={styles.statsGrid}>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.totalFriends}</Text>
-              <Text style={styles.statLabel}>Total Friends</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.warningValue]}>{stats.friendsNeedingAttention}</Text>
-              <Text style={styles.statLabel}>Need Attention</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statValue}>{stats.interactionsThisMonth}</Text>
-              <Text style={styles.statLabel}>This Month</Text>
-            </View>
-          </View>
-        </View>
-
-        {needsAttention.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Friends Needing Attention</Text>
-            {needsAttention.map((friend) => (
-              <TouchableOpacity
-                key={friend.id}
-                style={styles.friendItem}
-                onPress={() => handleFriendPress(friend.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.friendInfo}>
-                  <Text style={styles.friendName}>{friend.name}</Text>
-                  <Text style={styles.friendSubtext}>{getDaysSinceContactText(friend.daysSinceContact)}</Text>
-                </View>
-                <View style={[styles.healthDot, { backgroundColor: getHealthColor(friend) }]} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
-        {upcomingReminders.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Upcoming Reminders</Text>
-            {upcomingReminders.map((reminder) => (
-              <View key={reminder.id} style={styles.reminderItem}>
-                <View style={styles.reminderInfo}>
-                  <Text style={styles.reminderText}>Check in reminder</Text>
-                  <Text style={styles.reminderDate}>
-                    {formatDistanceToNow(new Date(reminder.dueDate), { addSuffix: true })}
-                  </Text>
-                </View>
+        {/* Summary Card */}
+        <Card style={styles.statsCard} elevation={2}>
+          <Card.Content>
+            <Text style={styles.statsTitle}>Friendship Health Dashboard</Text>
+            <View style={styles.statsGrid}>
+              <View style={styles.statItem}>
+                <Avatar.Icon
+                  size={48}
+                  icon="account-group"
+                  color="#6200EE"
+                  style={styles.statIcon}
+                />
+                <Text style={styles.statValue}>{stats.totalFriends}</Text>
+                <Text style={styles.statLabel}>Total Friends</Text>
               </View>
-            ))}
-          </View>
+              <View style={styles.statItem}>
+                <Avatar.Icon
+                  size={48}
+                  icon="alert-circle"
+                  color="#FF9800"
+                  style={styles.statIcon}
+                />
+                <Text style={[styles.statValue, styles.warningValue]}>{stats.friendsNeedingAttention}</Text>
+                <Text style={styles.statLabel}>Need Attention</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Avatar.Icon
+                  size={48}
+                  icon="calendar-month"
+                  color="#4CAF50"
+                  style={styles.statIcon}
+                />
+                <Text style={styles.statValue}>{stats.interactionsThisMonth}</Text>
+                <Text style={styles.statLabel}>This Month</Text>
+              </View>
+            </View>
+          </Card.Content>
+        </Card>
+
+        {/* Friends Needing Attention */}
+        {needsAttention.length > 0 && (
+          <Card style={styles.sectionCard} elevation={2}>
+            <Card.Content>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Friends Needing Attention</Text>
+                <TouchableOpacity onPress={() => router.push('/friends')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              {needsAttention.map(friend => (
+                <TouchableOpacity
+                  key={friend.id}
+                  style={styles.friendItem}
+                  onPress={() => handleFriendPress(friend.id)}
+                >
+                  <Avatar.Image
+                    size={40}
+                    source={friend.photoUri ? { uri: friend.photoUri } : require('@/assets/images/default-avatar.png')}
+                    style={styles.friendAvatar}
+                  />
+                  <View style={styles.friendInfo}>
+                    <Text style={styles.friendName}>{friend.name}</Text>
+                    <Text style={styles.friendLastContacted}>
+                      Last contacted {getDaysSinceContactText(friend.daysSinceContact)}
+                    </Text>
+                  </View>
+                  <HealthIndicator friend={friend} size={16} />
+                </TouchableOpacity>
+              ))}
+            </Card.Content>
+          </Card>
         )}
 
-        {stats.totalFriends === 0 && (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Welcome to KinKeeper</Text>
-            <Text style={styles.emptyText}>
-              Start building your circle by adding your first friend
-            </Text>
-          </View>
+        {/* Upcoming Reminders */}
+        {upcomingReminders.length > 0 && (
+          <Card style={styles.sectionCard} elevation={2}>
+            <Card.Content>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming Reminders</Text>
+                <TouchableOpacity onPress={() => router.push('/reminders')}>
+                  <Text style={styles.viewAllText}>View All</Text>
+                </TouchableOpacity>
+              </View>
+              {upcomingReminders.map(reminder => (
+                <TouchableOpacity
+                  key={reminder.id}
+                  style={styles.reminderItem}
+                  onPress={() => handleReminderPress(reminder.friendId)}
+                >
+                  <View style={styles.reminderContent}>
+                    <Text style={styles.reminderText}>
+                      {reminder.friendName} - {getReminderText(reminder)}
+                    </Text>
+                  </View>
+                  <MaterialIcons name="chevron-right" size={24} color="#666" />
+                </TouchableOpacity>
+              ))}
+            </Card.Content>
+          </Card>
         )}
+
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <Button
+            mode="contained"
+            onPress={() => router.push('/log-interaction')}
+            icon="message-text"
+            style={styles.actionButton}
+          >
+            Log Interaction
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={() => router.push('/add-friend')}
+            icon="account-plus"
+            style={styles.actionButton}
+          >
+            Add Friend
+          </Button>
+        </View>
       </ScrollView>
 
-      <TouchableOpacity style={styles.fab} onPress={handleAddFriend}>
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        onPress={handleAddFriend}
+        color="white"
+      />
     </View>
   );
 }
@@ -182,83 +247,81 @@ export default function DashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
   },
   scrollView: {
     flex: 1,
   },
   content: {
     padding: 16,
-    paddingBottom: 80,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   statsCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 8,
   },
   statsTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#212121',
+    fontWeight: 'bold',
+    color: '#333',
     marginBottom: 16,
   },
   statsGrid: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
   },
   statItem: {
     alignItems: 'center',
+    flex: 1,
+  },
+  statIcon: {
+    backgroundColor: 'transparent',
   },
   statValue: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#6200EE',
-    marginBottom: 4,
+    marginTop: 8,
   },
   warningValue: {
     color: '#FF9800',
   },
   statLabel: {
     fontSize: 12,
-    color: '#757575',
+    color: '#666',
+    marginTop: 4,
     textAlign: 'center',
   },
-  section: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+  sectionCard: {
     marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    borderRadius: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 12,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  viewAllText: {
+    fontSize: 14,
+    color: '#6200EE',
   },
   friendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    paddingVertical: 8,
+  },
+  friendAvatar: {
+    marginRight: 12,
   },
   friendInfo: {
     flex: 1,
@@ -266,72 +329,39 @@ const styles = StyleSheet.create({
   friendName: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#212121',
-    marginBottom: 4,
+    color: '#333',
   },
-  friendSubtext: {
+  friendLastContacted: {
     fontSize: 14,
-    color: '#757575',
-  },
-  healthDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginLeft: 12,
+    color: '#666',
+    marginTop: 2,
   },
   reminderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
-  reminderInfo: {
+  reminderContent: {
     flex: 1,
   },
   reminderText: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#212121',
-    marginBottom: 4,
+    color: '#333',
   },
-  reminderDate: {
-    fontSize: 14,
-    color: '#757575',
+  quickActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 48,
-  },
-  emptyTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#212121',
-    marginBottom: 8,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#757575',
-    textAlign: 'center',
-    paddingHorizontal: 32,
+  actionButton: {
+    flex: 1,
+    marginHorizontal: 4,
   },
   fab: {
     position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    margin: 16,
+    right: 0,
+    bottom: 0,
     backgroundColor: '#6200EE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  fabText: {
-    color: '#fff',
-    fontSize: 32,
-    fontWeight: '300',
   },
 });
