@@ -3,9 +3,12 @@ import { useState, useEffect, useRef } from 'react';
 import { Accelerometer, Gyroscope } from 'expo-sensors';
 import { postureDetector } from '@/lib/motion';
 import { Ionicons } from '@expo/vector-icons';
+import { useStore } from '@/store/useStore';
 
 interface MotionDetectorProps {
   exerciseId: string;
+  requiredDuration: number;
+  onExerciseComplete: () => void;
   onCalibrationComplete?: () => void;
   onPostureCorrect?: () => void;
   onInitialCalibrationStatusLoaded?: (isCalibrated: boolean) => void;
@@ -13,6 +16,8 @@ interface MotionDetectorProps {
 
 export function MotionDetector({
   exerciseId,
+  requiredDuration,
+  onExerciseComplete,
   onCalibrationComplete,
   onPostureCorrect,
   onInitialCalibrationStatusLoaded
@@ -25,8 +30,12 @@ export function MotionDetector({
   const [calibrationOffset, setCalibrationOffset] = useState(0);
   const [isDetectorReady, setIsDetectorReady] = useState(false);
   const [showDebugInfo, setShowDebugInfo] = useState(false);
+  const [holdDuration, setHoldDuration] = useState(0);
+  const [isHolding, setIsHolding] = useState(false);
 
   const isMounted = useRef(true);
+  const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const { updateActiveRoutine } = useStore();
 
   useEffect(() => {
     isMounted.current = true;
@@ -80,6 +89,30 @@ export function MotionDetector({
 
           if (result.isCorrect) {
             onPostureCorrect?.();
+            if (!isHolding) {
+              setIsHolding(true);
+              holdTimerRef.current = setInterval(() => {
+                setHoldDuration(prev => {
+                  const newDuration = prev + 100;
+                  if (newDuration >= requiredDuration) {
+                    if (holdTimerRef.current) {
+                      clearInterval(holdTimerRef.current);
+                    }
+                    setIsHolding(false);
+                    updateActiveRoutine(exerciseId, true);
+                    onExerciseComplete();
+                    return requiredDuration;
+                  }
+                  return newDuration;
+                });
+              }, 100);
+            }
+          } else {
+            if (isHolding && holdTimerRef.current) {
+              clearInterval(holdTimerRef.current);
+              setIsHolding(false);
+              setHoldDuration(0);
+            }
           }
         });
       }
@@ -88,14 +121,23 @@ export function MotionDetector({
     return () => {
       isMounted.current = false;
       accelerometerSubscription.remove();
+      if (holdTimerRef.current) {
+        clearInterval(holdTimerRef.current);
+      }
     };
-  }, [isCalibrating, exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded]);
+  }, [isCalibrating, exerciseId, onCalibrationComplete, onPostureCorrect, onInitialCalibrationStatusLoaded, requiredDuration, onExerciseComplete, updateActiveRoutine]);
 
   const startCalibration = () => {
     postureDetector.startCalibration();
     setIsCalibrating(true);
     setFeedback("Hold your phone steady in your ideal posture for 5 seconds...");
     setCalibrationProgress(0);
+  };
+
+  const formatDuration = (ms: number) => {
+    const seconds = Math.floor(ms / 1000);
+    const milliseconds = ms % 1000;
+    return `${seconds}.${milliseconds.toString().padStart(3, '0')}`;
   };
 
   if (!isDetectorReady) {
@@ -113,11 +155,21 @@ export function MotionDetector({
         <View style={[styles.postureIndicator, isCorrect ? styles.correct : styles.incorrect]} />
         <Text style={styles.feedbackText}>{feedback}</Text>
 
+        <View style={styles.durationContainer}>
+          <Text style={styles.durationLabel}>Hold Duration:</Text>
+          <Text style={styles.durationValue}>{formatDuration(holdDuration)}s</Text>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${(holdDuration / requiredDuration) * 100}%` }]} />
+          </View>
+          <Text style={styles.durationTarget}>{formatDuration(requiredDuration)}s target</Text>
+        </View>
+
         {showDebugInfo && (
           <View style={styles.debugInfo}>
             <Text style={styles.debugText}>Angle: {angle.toFixed(1)}°</Text>
             <Text style={styles.debugText}>Calibration Offset: {calibrationOffset.toFixed(1)}°</Text>
             <Text style={styles.debugText}>Status: {isCorrect ? 'Correct' : 'Incorrect'}</Text>
+            <Text style={styles.debugText}>Hold Duration: {holdDuration}ms</Text>
           </View>
         )}
       </View>
@@ -132,24 +184,20 @@ export function MotionDetector({
               <View style={[styles.progressFill, { width: `${calibrationProgress}%` }]} />
             </View>
           )}
-          {!isCalibrating && (
+          {!isCalibrating && !postureDetector.getIsCalibrated() && (
             <TouchableOpacity style={styles.calibrateButton} onPress={startCalibration}>
               <Text style={styles.calibrateButtonText}>Start Calibration</Text>
             </TouchableOpacity>
           )}
         </View>
-      ) : (
-        <View style={styles.statusContainer}>
-          <Ionicons
-            name={isCorrect ? "checkmark-circle" : "alert-circle"}
-            size={30}
-            color={isCorrect ? "#4CAF50" : "#FF5252"}
-          />
-          <Text style={[styles.statusText, isCorrect ? styles.correctText : styles.incorrectText]}>
-            {isCorrect ? "Posture Correct!" : "Adjust Your Posture"}
-          </Text>
-        </View>
-      )}
+      ) : null}
+
+      <TouchableOpacity
+        style={styles.debugToggle}
+        onPress={() => setShowDebugInfo(!showDebugInfo)}
+      >
+        <Ionicons name={showDebugInfo ? "eye-off" : "eye"} size={24} color="#666" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -159,7 +207,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: '100%',
+    padding: 20,
   },
   detectionContainer: {
     alignItems: 'center',
@@ -169,75 +217,94 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    marginBottom: 15,
+    marginBottom: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   correct: {
     backgroundColor: '#4CAF50',
   },
   incorrect: {
-    backgroundColor: '#FF5252',
+    backgroundColor: '#F44336',
   },
   feedbackText: {
     fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  durationContainer: {
+    width: '100%',
+    marginTop: 20,
+  },
+  durationLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 5,
+  },
+  durationValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 10,
   },
-  debugInfo: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
+  progressBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
     borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 5,
   },
-  debugText: {
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2196F3',
+  },
+  durationTarget: {
     fontSize: 14,
     color: '#666',
+    textAlign: 'center',
   },
   calibrationContainer: {
+    width: '100%',
     alignItems: 'center',
     marginTop: 20,
   },
   calibrationText: {
     fontSize: 16,
+    fontWeight: '500',
     marginBottom: 10,
   },
-  progressBar: {
-    width: '80%',
-    height: 10,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 5,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-  },
   calibrateButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
+    backgroundColor: '#2196F3',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
     marginTop: 10,
   },
   calibrateButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: '600',
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  debugInfo: {
     marginTop: 20,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+    width: '100%',
   },
-  statusText: {
-    fontSize: 18,
-    marginLeft: 10,
+  debugText: {
+    fontSize: 14,
+    marginBottom: 5,
   },
-  correctText: {
-    color: '#4CAF50',
-  },
-  incorrectText: {
-    color: '#FF5252',
+  debugToggle: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
   },
   title: {
     fontSize: 18,
+    fontWeight: '600',
     marginTop: 10,
   },
 });

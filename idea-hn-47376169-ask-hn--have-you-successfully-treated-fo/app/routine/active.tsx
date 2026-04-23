@@ -8,26 +8,19 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function ActiveRoutineScreen() {
-  const { exercises, completeExercise, incrementStreak } = useStore();
+  const { exercises, completeExercise, incrementStreak, updateActiveRoutine } = useStore();
   const router = useRouter();
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
   const [showCalibrationModal, setShowCalibrationModal] = useState(false);
   const [hasCalibratedForSession, setHasCalibratedForSession] = useState(false);
-  const [holdTimer, setHoldTimer] = useState(0);
-  const [isHoldingCorrectly, setIsHoldingCorrectly] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isDetectorLoading, setIsDetectorLoading] = useState(true);
-  const [isExerciseComplete, setIsExerciseComplete] = useState(false);
 
   const currentExercise = exercises[currentExerciseIndex];
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current);
-      }
       if (sound) {
         sound.unloadAsync();
       }
@@ -64,12 +57,10 @@ export default function ActiveRoutineScreen() {
     }
   };
 
-  const handleNextExercise = useCallback(() => {
+  const handleExerciseComplete = useCallback(() => {
+    playSound('complete');
     if (currentExerciseIndex < exercises.length - 1) {
       setCurrentExerciseIndex(prevIndex => prevIndex + 1);
-      setHoldTimer(0);
-      setIsHoldingCorrectly(false);
-      setIsExerciseComplete(false);
       playSound('next');
     } else {
       setIsComplete(true);
@@ -78,35 +69,6 @@ export default function ActiveRoutineScreen() {
       playSound('complete');
     }
   }, [currentExerciseIndex, exercises, completeExercise, incrementStreak, playSound, currentExercise]);
-
-  const handlePostureCorrect = useCallback(() => {
-    if (!isHoldingCorrectly) {
-      setIsHoldingCorrectly(true);
-      playSound('start');
-
-      timerRef.current = setInterval(() => {
-        setHoldTimer(prev => {
-          const newTime = prev + 1;
-          const isComplete = postureDetector.isHoldingCorrectly(
-            newTime * 1000,
-            currentExercise.duration * 1000,
-            currentExercise.id
-          );
-
-          if (isComplete) {
-            if (timerRef.current) {
-              clearInterval(timerRef.current);
-            }
-            playSound('complete');
-            setIsExerciseComplete(true);
-            return currentExercise.duration;
-          }
-
-          return newTime;
-        });
-      }, 1000);
-    }
-  }, [isHoldingCorrectly, playSound, currentExercise]);
 
   const handleCalibrationComplete = useCallback(() => {
     setShowCalibrationModal(false);
@@ -122,12 +84,6 @@ export default function ActiveRoutineScreen() {
       setHasCalibratedForSession(true);
     }
   }, []);
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
-  };
 
   if (isComplete) {
     return (
@@ -149,7 +105,7 @@ export default function ActiveRoutineScreen() {
     return (
       <View style={styles.container}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading posture detector...</Text>
+        <Text style={styles.loadingText}>Loading exercise detector...</Text>
       </View>
     );
   }
@@ -157,38 +113,32 @@ export default function ActiveRoutineScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.progressText}>
+        <Text style={styles.exerciseTitle}>{currentExercise.name}</Text>
+        <Text style={styles.exerciseSubtitle}>
           Exercise {currentExerciseIndex + 1} of {exercises.length}
         </Text>
-        <Text style={styles.exerciseName}>{currentExercise.name}</Text>
       </View>
 
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerText}>{formatTime(holdTimer)}</Text>
-        <Text style={styles.durationText}>
-          Hold for {formatTime(currentExercise.duration)}
-        </Text>
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${((currentExerciseIndex + 1) / exercises.length) * 100}%` }]} />
+        </View>
       </View>
 
-      <View style={styles.motionDetectorContainer}>
+      <View style={styles.instructionsContainer}>
+        <Text style={styles.instructionsTitle}>Instructions:</Text>
+        <Text style={styles.instructionsText}>{currentExercise.instructions}</Text>
+      </View>
+
+      <View style={styles.detectorContainer}>
         <MotionDetector
           exerciseId={currentExercise.id}
+          requiredDuration={currentExercise.duration * 1000}
+          onExerciseComplete={handleExerciseComplete}
           onCalibrationComplete={handleCalibrationComplete}
-          onPostureCorrect={handlePostureCorrect}
           onInitialCalibrationStatusLoaded={handleInitialCalibrationStatusLoaded}
         />
       </View>
-
-      {isExerciseComplete && (
-        <TouchableOpacity
-          style={styles.nextButton}
-          onPress={handleNextExercise}
-        >
-          <Text style={styles.nextButtonText}>
-            {currentExerciseIndex === exercises.length - 1 ? 'Finish Routine' : 'Next Exercise'}
-          </Text>
-        </TouchableOpacity>
-      )}
 
       <Modal
         visible={showCalibrationModal}
@@ -208,7 +158,7 @@ export default function ActiveRoutineScreen() {
               style={styles.modalButton}
               onPress={() => setShowCalibrationModal(false)}
             >
-              <Text style={styles.modalButtonText}>Start Calibration</Text>
+              <Text style={styles.modalButtonText}>Got it!</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -220,52 +170,54 @@ export default function ActiveRoutineScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
+    padding: 20,
   },
   header: {
     marginBottom: 20,
+    alignItems: 'center',
   },
-  progressText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 5,
-  },
-  exerciseName: {
+  exerciseTitle: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 5,
     textAlign: 'center',
   },
-  timerContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  timerText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  durationText: {
+  exerciseSubtitle: {
     fontSize: 16,
     color: '#666',
   },
-  motionDetectorContainer: {
+  progressContainer: {
+    marginBottom: 20,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#2196F3',
+  },
+  instructionsContainer: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 10,
+  },
+  instructionsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 5,
+  },
+  instructionsText: {
+    fontSize: 16,
+    lineHeight: 22,
+  },
+  detectorContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  nextButton: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  nextButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   completionContainer: {
     flex: 1,
@@ -277,40 +229,41 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginTop: 20,
     marginBottom: 10,
+    textAlign: 'center',
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: 18,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 30,
     textAlign: 'center',
   },
   streakText: {
     fontSize: 18,
     color: '#4CAF50',
+    fontWeight: '600',
     marginBottom: 30,
   },
   button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    width: '80%',
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 5,
   },
   buttonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 16,
+    fontWeight: '600',
   },
   loadingText: {
     fontSize: 18,
+    marginTop: 10,
     textAlign: 'center',
-    marginTop: 20,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: 'white',
@@ -323,22 +276,23 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 15,
+    textAlign: 'center',
   },
   modalText: {
     fontSize: 16,
+    marginBottom: 10,
     textAlign: 'center',
-    marginBottom: 15,
   },
   modalButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
+    backgroundColor: '#2196F3',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
-    width: '100%',
-    alignItems: 'center',
+    marginTop: 20,
   },
   modalButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
