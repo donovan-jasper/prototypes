@@ -149,17 +149,20 @@ export async function executeRecoveryAction(serviceId: string, workflowId: strin
       // Send notification
       await sendLocalNotification(
         'Recovery Successful',
-        `Your ${service.name} service has been successfully recovered`,
-        'critical'
+        `Your ${service.name} service has been recovered`,
+        'info'
       );
 
-      return { success: true, message: 'Recovery workflow completed successfully' };
+      // Update Zustand store
+      useStore.getState().updateServiceStatus(service.id, 'healthy');
     }
+
+    return { success: true, message: 'Recovery workflow completed successfully' };
   } catch (error) {
     console.error('Recovery action failed:', error);
     return {
       success: false,
-      message: error instanceof Error ? error.message : 'Failed to execute recovery action'
+      message: error instanceof Error ? error.message : 'Unknown error during recovery'
     };
   }
 }

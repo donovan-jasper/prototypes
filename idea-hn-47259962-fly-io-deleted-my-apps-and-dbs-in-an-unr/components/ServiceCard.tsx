@@ -1,6 +1,8 @@
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { View, Text, StyleSheet, Pressable, TouchableOpacity } from 'react-native';
 import { formatDistanceToNow } from 'date-fns';
 import { useRouter } from 'expo-router';
+import { useStore } from '@/lib/store';
+import { executeRecoveryAction } from '@/lib/monitoring';
 
 interface ServiceCardProps {
   id: string;
@@ -14,6 +16,7 @@ export default function ServiceCard({ id, name, provider, status, lastCheck }: S
   const statusColor = status === 'healthy' ? '#10B981' : status === 'unhealthy' ? '#F59E0B' : '#EF4444';
   const statusText = status.charAt(0).toUpperCase() + status.slice(1);
   const router = useRouter();
+  const [isRecovering, setIsRecovering] = useState(false);
 
   const lastCheckText = lastCheck
     ? `Last checked ${formatDistanceToNow(lastCheck)} ago`
@@ -25,6 +28,23 @@ export default function ServiceCard({ id, name, provider, status, lastCheck }: S
         pathname: '/(tabs)/recovery',
         params: { serviceId: id }
       });
+    }
+  }
+
+  async function handleRecovery() {
+    setIsRecovering(true);
+    try {
+      // For demo purposes, we'll use a simple restart workflow
+      const result = await executeRecoveryAction(id, 'flyio-restart');
+
+      if (result.success) {
+        // Update local state immediately
+        useStore.getState().updateServiceStatus(id, 'healthy');
+      }
+    } catch (error) {
+      console.error('Recovery failed:', error);
+    } finally {
+      setIsRecovering(false);
     }
   }
 
@@ -42,9 +62,15 @@ export default function ServiceCard({ id, name, provider, status, lastCheck }: S
       <Text style={[styles.status, { color: statusColor }]}>{statusText}</Text>
       <Text style={styles.lastCheck}>{lastCheckText}</Text>
       {status !== 'healthy' && (
-        <View style={styles.recoveryButton}>
-          <Text style={styles.recoveryButtonText}>View Recovery Options</Text>
-        </View>
+        <TouchableOpacity
+          style={styles.recoveryButton}
+          onPress={handleRecovery}
+          disabled={isRecovering}
+        >
+          <Text style={styles.recoveryButtonText}>
+            {isRecovering ? 'Recovering...' : 'Quick Recovery'}
+          </Text>
+        </TouchableOpacity>
       )}
     </Pressable>
   );
@@ -96,12 +122,12 @@ const styles = StyleSheet.create({
   recoveryButton: {
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: '#3B82F6',
     borderRadius: 6,
     alignItems: 'center',
   },
   recoveryButtonText: {
-    color: '#3B82F6',
+    color: 'white',
     fontSize: 14,
     fontWeight: '500',
   },

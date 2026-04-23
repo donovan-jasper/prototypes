@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import ServiceCard from '@/components/ServiceCard';
 import { useStore } from '@/lib/store';
 import { openDatabase, getServices } from '@/lib/db';
-import { performHealthCheck } from '@/lib/monitoring';
+import { performHealthCheck, scheduleHealthChecks } from '@/lib/monitoring';
 
 export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
@@ -13,6 +13,8 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadServices();
+    // Start background health checks
+    scheduleHealthChecks();
   }, []);
 
   async function loadServices() {
@@ -69,6 +71,7 @@ export default function DashboardScreen() {
         services.map((service) => (
           <ServiceCard
             key={service.id}
+            id={service.id}
             name={service.name}
             provider={service.provider}
             status={service.status}
