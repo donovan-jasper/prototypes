@@ -1,5 +1,5 @@
 import { Stripe } from '@stripe/stripe-react-native';
-import { createPaymentIntent, confirmPaymentIntent } from './api/stripeApi';
+import { createPaymentIntent, confirmPaymentIntent, createTransfer } from './api/stripeApi';
 import { updateOrderStatus, updatePaymentStatus } from '../lib/database';
 
 export const calculateSplit = (order, splitType = 'equal', customRules = []) => {
@@ -149,72 +149,48 @@ export const createEphemeralKey = async (customerId) => {
       }),
     });
     return await response.json();
-  } catch (error) {
-    console.error('Error creating ephemeral key:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error creating ephemeral key:', err);
+    throw err;
   }
 };
 
-export const processReimbursement = async (orderId) => {
+export const processReimbursements = async (order, splitType = 'equal', customRules = []) => {
   try {
-    // Get order details from database
-    const order = await getOrderById(orderId);
+    const split = calculateSplit(order, splitType, customRules);
 
-    if (!order) {
-      throw new Error('Order not found');
-    }
-
-    // Calculate reimbursement amounts
-    const split = calculateSplit(order, order.splitType, order.customRules);
-
-    // Process reimbursements for each participant
+    // For each participant, create a transfer to their payment method
     for (const participant of split.participants) {
-      if (!participant.isOrganizer) {
-        // Create transfer to participant's bank account
-        const transfer = await createTransfer(
-          Math.round(participant.amount * 100),
-          participant.stripeCustomerId
-        );
+      if (!participant.isOrganizer && participant.stripeCustomerId) {
+        try {
+          // Create transfer to participant's payment method
+          const transfer = await createTransfer(
+            Math.round(participant.amount * 100),
+            'usd',
+            participant.stripeCustomerId
+          );
 
-        // Update payment status in database
-        await updatePaymentStatus(orderId, participant.id, {
-          status: 'reimbursed',
-          transferId: transfer.id,
-          amount: participant.amount
-        });
+          // Update payment status in database
+          await updatePaymentStatus(participant.id, order.id, 'paid', (response) => {
+            if (!response.success) {
+              console.error('Failed to update payment status for participant', participant.id);
+            }
+          });
+        } catch (error) {
+          console.error('Error processing transfer for participant', participant.id, error);
+          // Mark as failed but continue with other participants
+          await updatePaymentStatus(participant.id, order.id, 'failed', (response) => {
+            if (!response.success) {
+              console.error('Failed to update payment status for participant', participant.id);
+            }
+          });
+        }
       }
     }
 
-    // Update order status to completed
-    await updateOrderStatus(orderId, 'completed');
-
-    return {
-      success: true,
-      message: 'Reimbursements processed successfully',
-      orderId
-    };
+    return { success: true };
   } catch (error) {
-    console.error('Error processing reimbursement:', error);
-    throw error;
-  }
-};
-
-const createTransfer = async (amount, destination) => {
-  try {
-    const response = await fetch('https://your-backend-api.com/create-transfer', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        amount,
-        destination,
-        currency: 'usd',
-      }),
-    });
-    return await response.json();
-  } catch (error) {
-    console.error('Error creating transfer:', error);
+    console.error('Error processing reimbursements:', error);
     throw error;
   }
 };

@@ -26,6 +26,7 @@ export const initDatabase = () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         groupId INTEGER,
         name TEXT,
+        stripeCustomerId TEXT,
         FOREIGN KEY (groupId) REFERENCES groups (id)
       );`
     );
@@ -70,7 +71,7 @@ export const createOrder = (order, callback) => {
 export const fetchOrders = (callback) => {
   db.transaction(tx => {
     tx.executeSql(
-      `SELECT 
+      `SELECT
         orders.*,
         json_group_array(DISTINCT json_object(
           'id', cart_items.id,
@@ -81,7 +82,8 @@ export const fetchOrders = (callback) => {
         )) as items,
         json_group_array(DISTINCT json_object(
           'id', group_members.id,
-          'name', group_members.name
+          'name', group_members.name,
+          'stripeCustomerId', group_members.stripeCustomerId
         )) as participants
       FROM orders
       LEFT JOIN cart_items ON orders.id = cart_items.orderId
@@ -105,6 +107,22 @@ export const updateOrderPaymentStatus = (orderId, paymentStatus, callback) => {
     tx.executeSql(
       'UPDATE orders SET paymentStatus = ? WHERE id = ?;',
       [paymentStatus, orderId],
+      () => {
+        callback({ success: true });
+      },
+      (_, error) => {
+        console.error('Error updating payment status:', error);
+        callback({ success: false, error });
+      }
+    );
+  });
+};
+
+export const updatePaymentStatus = (participantId, orderId, status, callback) => {
+  db.transaction(tx => {
+    tx.executeSql(
+      'UPDATE payments SET status = ? WHERE participantId = ? AND orderId = ?;',
+      [status, participantId, orderId],
       () => {
         callback({ success: true });
       },
@@ -143,8 +161,8 @@ export const fetchGroups = (callback) => {
 export const addGroupMember = (member, callback) => {
   db.transaction(tx => {
     tx.executeSql(
-      'INSERT INTO group_members (groupId, name) VALUES (?, ?);',
-      [member.groupId, member.name],
+      'INSERT INTO group_members (groupId, name, stripeCustomerId) VALUES (?, ?, ?);',
+      [member.groupId, member.name, member.stripeCustomerId || null],
       (_, { insertId }) => {
         callback({ ...member, id: insertId });
       }
@@ -180,30 +198,6 @@ export const fetchCartItems = (orderId, callback) => {
   db.transaction(tx => {
     tx.executeSql(
       'SELECT * FROM cart_items WHERE orderId = ?;',
-      [orderId],
-      (_, { rows: { _array } }) => {
-        callback(_array);
-      }
-    );
-  });
-};
-
-export const createPayment = (payment, callback) => {
-  db.transaction(tx => {
-    tx.executeSql(
-      'INSERT INTO payments (orderId, participantId, amount, status) VALUES (?, ?, ?, ?);',
-      [payment.orderId, payment.participantId, payment.amount, payment.status],
-      (_, { insertId }) => {
-        callback({ ...payment, id: insertId });
-      }
-    );
-  });
-};
-
-export const fetchPayments = (orderId, callback) => {
-  db.transaction(tx => {
-    tx.executeSql(
-      'SELECT * FROM payments WHERE orderId = ?;',
       [orderId],
       (_, { rows: { _array } }) => {
         callback(_array);
