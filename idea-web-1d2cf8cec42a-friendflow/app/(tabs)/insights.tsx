@@ -1,14 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { BarChart } from 'react-native-chart-kit';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useContactStore } from '../../store/contactStore';
 import { getMonthlyCheckIns, getTopContactsByScore, getImprovementScore } from '../../lib/analytics';
 import { Contact, Interaction } from '../../types';
 import { format } from 'date-fns';
-import { Card, ProgressBar, Title, Subheading } from 'react-native-paper';
-import { Dimensions } from 'react-native';
-
-const screenWidth = Dimensions.get('window').width;
+import { Card, ProgressBar, Title, Subheading, Divider } from 'react-native-paper';
+import InsightChart from '../../components/InsightChart';
 
 const InsightsScreen = () => {
   const { contacts, interactions } = useContactStore();
@@ -46,8 +43,9 @@ const InsightsScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading insights...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4285F4" />
+        <Text style={styles.loadingText}>Loading insights...</Text>
       </View>
     );
   }
@@ -67,65 +65,46 @@ const InsightsScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Title style={styles.sectionTitle}>Monthly Check-in Frequency</Title>
-      <Card style={styles.chartCard}>
-        <BarChart
-          data={chartData}
-          width={screenWidth - 32}
-          height={220}
-          yAxisLabel=""
-          yAxisSuffix=""
-          chartConfig={{
-            backgroundColor: '#ffffff',
-            backgroundGradientFrom: '#ffffff',
-            backgroundGradientTo: '#ffffff',
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-            style: {
-              borderRadius: 16,
-            },
-            propsForDots: {
-              r: '6',
-              strokeWidth: '2',
-              stroke: '#ffa726',
-            },
-          }}
-          style={{
-            marginVertical: 8,
-            borderRadius: 16,
-          }}
-          verticalLabelRotation={30}
-        />
+      <Title style={styles.pageTitle}>Your Relationship Insights</Title>
+
+      <InsightChart
+        data={chartData}
+        title="Monthly Check-in Frequency"
+        yAxisSuffix=" interactions"
+      />
+
+      <Card style={styles.sectionCard}>
+        <Card.Content>
+          <Title style={styles.sectionTitle}>Top Relationships</Title>
+          {topContacts.length > 0 ? (
+            topContacts.map((contact, index) => (
+              <View key={contact.id}>
+                <View style={styles.contactCard}>
+                  <View style={styles.contactHeader}>
+                    <Text style={styles.contactName}>{contact.name}</Text>
+                    <Text style={styles.contactScore}>{contact.score?.toFixed(0) || 'N/A'}</Text>
+                  </View>
+                  <ProgressBar
+                    progress={((contact.score || 0) / 100)}
+                    color={contact.score && contact.score > 70 ? '#4CAF50' : contact.score && contact.score > 40 ? '#FFC107' : '#F44336'}
+                    style={styles.progressBar}
+                  />
+                  <Subheading style={styles.contactFrequency}>
+                    Check-in frequency: every {contact.frequency} days
+                  </Subheading>
+                </View>
+                {index < topContacts.length - 1 && <Divider style={styles.divider} />}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noDataText}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
+          )}
+        </Card.Content>
       </Card>
 
-      <Title style={styles.sectionTitle}>Top Relationships</Title>
-      {topContacts.length > 0 ? (
-        topContacts.map((contact, index) => (
-          <Card key={contact.id} style={styles.contactCard}>
-            <Card.Content>
-              <View style={styles.contactHeader}>
-                <Text style={styles.contactName}>{contact.name}</Text>
-                <Text style={styles.contactScore}>{contact.score?.toFixed(0) || 'N/A'}</Text>
-              </View>
-              <ProgressBar
-                progress={((contact.score || 0) / 100)}
-                color={contact.score && contact.score > 70 ? '#4CAF50' : contact.score && contact.score > 40 ? '#FFC107' : '#F44336'}
-                style={styles.progressBar}
-              />
-              <Subheading style={styles.contactFrequency}>
-                Check-in frequency: every {contact.frequency} days
-              </Subheading>
-            </Card.Content>
-          </Card>
-        ))
-      ) : (
-        <Text style={styles.noDataText}>No relationship data yet. Add some contacts and interactions to see insights!</Text>
-      )}
-
-      <Title style={styles.sectionTitle}>Your Improvement</Title>
-      <Card style={styles.improvementCard}>
+      <Card style={styles.sectionCard}>
         <Card.Content>
+          <Title style={styles.sectionTitle}>Your Improvement</Title>
           <View style={styles.improvementHeader}>
             <Text style={styles.improvementLabel}>Last 30 Days</Text>
             <Text style={styles.improvementScore}>{improvementScore.toFixed(0)}%</Text>
@@ -135,13 +114,13 @@ const InsightsScreen = () => {
             color={improvementScore > 50 ? '#4CAF50' : improvementScore > 30 ? '#FFC107' : '#F44336'}
             style={styles.progressBar}
           />
-          <Text style={styles.improvementText}>
+          <Subheading style={styles.improvementText}>
             {improvementScore > 50
               ? 'Great job! You\'re improving your relationship maintenance.'
               : improvementScore > 30
-              ? 'You\'re making progress. Keep it up!'
-              : 'Let\'s work on building more consistent connections.'}
-          </Text>
+                ? 'You\'re making progress. Keep it up!'
+                : 'Let\'s work on maintaining more consistent contact.'}
+          </Subheading>
         </Card.Content>
       </Card>
     </ScrollView>
@@ -154,25 +133,35 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  sectionTitle: {
-    marginTop: 24,
-    marginBottom: 16,
-    fontSize: 20,
-    fontWeight: 'bold',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
-  chartCard: {
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  pageTitle: {
     marginBottom: 24,
-    padding: 8,
+    textAlign: 'center',
+    fontSize: 24,
+  },
+  sectionCard: {
+    marginBottom: 24,
     elevation: 2,
   },
-  contactCard: {
+  sectionTitle: {
     marginBottom: 16,
-    elevation: 1,
+  },
+  contactCard: {
+    paddingVertical: 12,
   },
   contactHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
   contactName: {
@@ -182,7 +171,7 @@ const styles = StyleSheet.create({
   contactScore: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#4285F4',
   },
   contactFrequency: {
     marginTop: 8,
@@ -191,16 +180,15 @@ const styles = StyleSheet.create({
   progressBar: {
     height: 8,
     borderRadius: 4,
-    marginVertical: 8,
   },
-  improvementCard: {
-    marginBottom: 24,
-    elevation: 2,
+  noDataText: {
+    textAlign: 'center',
+    color: '#666',
+    marginVertical: 16,
   },
   improvementHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 8,
   },
   improvementLabel: {
@@ -208,19 +196,16 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   improvementScore: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#4285F4',
   },
   improvementText: {
-    marginTop: 8,
-    fontSize: 14,
+    marginTop: 16,
     color: '#666',
   },
-  noDataText: {
-    textAlign: 'center',
-    color: '#666',
-    marginVertical: 16,
+  divider: {
+    marginVertical: 12,
   },
 });
 
