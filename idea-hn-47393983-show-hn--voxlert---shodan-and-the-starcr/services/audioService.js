@@ -1,65 +1,63 @@
-import { Audio } from 'expo-av';
 import * as Speech from 'expo-speech';
-import { getCurrentCharacter } from '../utils/helpers';
+import { Audio } from 'expo-av';
+import { Platform } from 'react-native';
 
-let currentSound = null;
+const CHARACTER_VOICES = {
+  default: {
+    ios: 'com.apple.ttsbundle.siri_female_en-US_compact',
+    android: 'en-us-x-sfg#female_2-local'
+  },
+  sciFi: {
+    ios: 'com.apple.ttsbundle.siri_female_en-US_compact',
+    android: 'en-us-x-sfg#female_2-local'
+  },
+  gaming: {
+    ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
+    android: 'en-us-x-sfg#male_2-local'
+  },
+  friendly: {
+    ios: 'com.apple.ttsbundle.siri_female_en-US_compact',
+    android: 'en-us-x-sfg#female_2-local'
+  },
+  professional: {
+    ios: 'com.apple.ttsbundle.siri_male_en-US_compact',
+    android: 'en-us-x-sfg#male_2-local'
+  }
+};
 
-const playNarration = async (text, character = null) => {
+export const playNarration = async (text, characterVoice = 'default') => {
   try {
-    // Stop any currently playing sound
-    if (currentSound) {
-      await currentSound.unloadAsync();
-      currentSound = null;
-    }
+    // Stop any currently playing speech
+    Speech.stop();
 
-    const selectedCharacter = character || await getCurrentCharacter();
+    // Get the appropriate voice identifier based on platform
+    const voiceIdentifier = Platform.select({
+      ios: CHARACTER_VOICES[characterVoice]?.ios || CHARACTER_VOICES.default.ios,
+      android: CHARACTER_VOICES[characterVoice]?.android || CHARACTER_VOICES.default.android
+    });
 
-    // Use text-to-speech for default character
-    if (selectedCharacter === 'default') {
-      Speech.speak(text, {
-        language: 'en-US',
-        rate: 1.0,
-        pitch: 1.0,
-        onStart: () => console.log('Speech started'),
-        onDone: () => console.log('Speech finished'),
-        onStopped: () => console.log('Speech stopped'),
-        onError: (error) => console.error('Speech error:', error)
-      });
-      return true;
-    }
+    // Configure speech options
+    const options = {
+      language: 'en-US',
+      pitch: 1.0,
+      rate: 1.0,
+      voice: voiceIdentifier
+    };
 
-    // For other characters, use pre-recorded audio files
-    const soundObject = new Audio.Sound();
-    try {
-      await soundObject.loadAsync(
-        require(`../assets/voices/${selectedCharacter}.mp3`),
-        { shouldPlay: true }
-      );
-      currentSound = soundObject;
-      return true;
-    } catch (error) {
-      console.error('Error loading character voice:', error);
-      // Fallback to text-to-speech if character voice fails
-      Speech.speak(text, {
-        language: 'en-US',
-        rate: 1.0,
-        pitch: 1.0
-      });
-      return false;
-    }
+    // Speak the text
+    Speech.speak(text, options);
+
+    return true;
   } catch (error) {
-    console.error('Error in playNarration:', error);
+    console.error('Error playing narration:', error);
     return false;
   }
 };
 
-const generateVoiceSample = async (character) => {
+export const generateVoiceSample = async (characterVoice = 'default') => {
   try {
-    const soundObject = new Audio.Sound();
-    await soundObject.loadAsync(
-      require(`../assets/voices/${character}_sample.mp3`),
-      { shouldPlay: true }
-    );
+    const sampleText = "Hello, this is a sample of your selected voice.";
+    await playNarration(sampleText, characterVoice);
     return true;
   } catch (error) {
     console.error('Error generating voice sample:', error);
@@ -67,22 +65,6 @@ const generateVoiceSample = async (character) => {
   }
 };
 
-const stopAllAudio = async () => {
-  try {
-    if (currentSound) {
-      await currentSound.unloadAsync();
-      currentSound = null;
-    }
-    Speech.stop();
-    return true;
-  } catch (error) {
-    console.error('Error stopping audio:', error);
-    return false;
-  }
-};
-
-export {
-  playNarration,
-  generateVoiceSample,
-  stopAllAudio
+export const stopNarration = () => {
+  Speech.stop();
 };

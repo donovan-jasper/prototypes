@@ -1,229 +1,166 @@
 const generateNarrativeText = (notificationData) => {
-  const { app, action, details } = notificationData;
+  const { app, category, title, body, data } = notificationData;
 
-  // Handle different app categories with specific narratives
-  switch (app.toLowerCase()) {
+  // Handle different notification categories with specific narratives
+  switch (category) {
     case 'email':
-    case 'gmail':
-    case 'outlook':
-    case 'yahoo mail':
-    case 'apple mail':
-      return generateEmailNarrative(details);
+      return generateEmailNarrative({ app, title, body, data });
 
-    case 'whatsapp':
-    case 'messenger':
-    case 'telegram':
-    case 'signal':
-    case 'discord':
-    case 'slack':
-      return generateMessagingNarrative(details);
+    case 'messaging':
+      return generateMessagingNarrative({ app, title, body, data });
 
-    case 'facebook':
-    case 'instagram':
-    case 'twitter':
-    case 'linkedin':
-    case 'tiktok':
-      return generateSocialNarrative(details);
+    case 'social':
+      return generateSocialNarrative({ app, title, body, data });
 
-    case 'uber':
-    case 'lyft':
-    case 'bolt':
-    case 'grab':
-      return generateRideSharingNarrative(details);
+    case 'rideSharing':
+      return generateRideSharingNarrative({ app, title, body, data });
 
-    case 'uber eats':
-    case 'doordash':
-    case 'grubhub':
-    case 'postmates':
-    case 'deliveroo':
-      return generateFoodDeliveryNarrative(details);
+    case 'foodDelivery':
+      return generateFoodDeliveryNarrative({ app, title, body, data });
 
-    case 'chase':
-    case 'bank of america':
-    case 'wells fargo':
-    case 'paypal':
-    case 'venmo':
-      return generateBankingNarrative(details);
+    case 'banking':
+      return generateBankingNarrative({ app, title, body, data });
 
-    case 'myfitnesspal':
-    case 'strava':
-    case 'fitbit':
-    case 'apple health':
-      return generateHealthNarrative(details);
+    case 'health':
+      return generateHealthNarrative({ app, title, body, data });
 
-    case 'google calendar':
-    case 'todoist':
-    case 'notion':
-    case 'trello':
-      return generateProductivityNarrative(details);
+    case 'productivity':
+      return generateProductivityNarrative({ app, title, body, data });
 
-    case 'bbc news':
-    case 'cnn':
-    case 'reuters':
-    case 'nytimes':
-      return generateNewsNarrative(details);
+    case 'news':
+      return generateNewsNarrative({ app, title, body, data });
 
-    case 'spotify':
-    case 'apple music':
-    case 'pandora':
-    case 'youtube music':
-      return generateMusicNarrative(details);
+    case 'music':
+      return generateMusicNarrative({ app, title, body, data });
 
     default:
-      return generateDefaultNarrative(notificationData);
+      return generateDefaultNarrative({ app, title, body, data });
   }
 };
 
-const generateEmailNarrative = (details) => {
-  const sender = extractSender(details.title) || extractSender(details.body) || 'unknown sender';
-  const subject = extractSubject(details.title) || extractSubject(details.body) || 'no subject';
+const generateEmailNarrative = ({ app, title, body, data }) => {
+  const sender = extractSender(title) || extractSender(body) || 'unknown sender';
+  const subject = extractSubject(title) || extractSubject(body) || 'no subject';
 
-  return `You have a new email from ${sender} with the subject: ${subject}. The message says: ${details.body.substring(0, 100)}${details.body.length > 100 ? '...' : ''}`;
+  return `You have a new email from ${sender} with the subject: ${subject}. The message says: ${body.substring(0, 100)}${body.length > 100 ? '...' : ''}`;
 };
 
-const generateMessagingNarrative = (details) => {
-  const sender = extractSender(details.title) || extractSender(details.body) || 'unknown contact';
+const generateMessagingNarrative = ({ app, title, body, data }) => {
+  const sender = extractSender(title) || extractSender(body) || 'unknown contact';
 
-  return `New message from ${sender} on ${details.app}: ${details.body}`;
+  return `New message from ${sender} on ${app}: ${body}`;
 };
 
-const generateSocialNarrative = (details) => {
-  const action = extractAction(details.title) || extractAction(details.body) || 'new activity';
+const generateSocialNarrative = ({ app, title, body, data }) => {
+  const action = extractAction(title) || extractAction(body) || 'new activity';
 
-  return `You have ${action} on ${details.app}. ${details.body}`;
+  return `You have ${action} on ${app}. ${body}`;
 };
 
-const generateRideSharingNarrative = (details) => {
-  const time = extractTime(details.body);
-  const location = extractLocation(details.body);
+const generateRideSharingNarrative = ({ app, title, body, data }) => {
+  const time = extractTime(body);
+  const location = extractLocation(body);
 
   if (time && location) {
-    return `Your ride is arriving in ${time} minutes at ${location}`;
+    return `Your ${app} ride is arriving in ${time} minutes at ${location}`;
   } else if (time) {
-    return `Your ride is arriving in ${time} minutes`;
+    return `Your ${app} ride is arriving in ${time} minutes`;
   } else if (location) {
-    return `Your ride is at ${location}`;
+    return `Your ${app} ride is at ${location}`;
   } else {
-    return `New update from ${details.app}: ${details.body}`;
+    return `New update from ${app}: ${body}`;
   }
 };
 
-const generateFoodDeliveryNarrative = (details) => {
-  const time = extractTime(details.body);
-  const location = extractLocation(details.body);
+const generateFoodDeliveryNarrative = ({ app, title, body, data }) => {
+  const time = extractTime(body);
+  const location = extractLocation(body);
 
   if (time && location) {
-    return `Your food order will arrive in ${time} minutes at ${location}`;
+    return `Your ${app} order will arrive in ${time} minutes at ${location}`;
   } else if (time) {
-    return `Your food order will arrive in ${time} minutes`;
+    return `Your ${app} order will arrive in ${time} minutes`;
   } else if (location) {
-    return `Your food order is at ${location}`;
+    return `Your ${app} order is at ${location}`;
   } else {
-    return `New update from ${details.app}: ${details.body}`;
+    return `New update from ${app}: ${body}`;
   }
 };
 
-const generateBankingNarrative = (details) => {
-  const amount = extractAmount(details.body);
-  const transactionType = extractTransactionType(details.body);
+const generateBankingNarrative = ({ app, title, body, data }) => {
+  const amount = extractAmount(body);
+  const transactionType = extractTransactionType(body);
 
   if (amount && transactionType) {
-    return `You have a ${transactionType} transaction of $${amount} in your ${details.app} account`;
+    return `You have a ${transactionType} transaction of $${amount} in your ${app} account`;
   } else if (amount) {
-    return `You have a transaction of $${amount} in your ${details.app} account`;
+    return `You have a transaction of $${amount} in your ${app} account`;
   } else {
-    return `New update from ${details.app}: ${details.body}`;
+    return `New update from ${app}: ${body}`;
   }
 };
 
-const generateHealthNarrative = (details) => {
-  const metric = extractHealthMetric(details.body);
+const generateHealthNarrative = ({ app, title, body, data }) => {
+  const metric = extractHealthMetric(body);
 
   if (metric) {
     return `Your ${metric.type} has ${metric.change} to ${metric.value}`;
   } else {
-    return `New health update from ${details.app}: ${details.body}`;
+    return `New health update from ${app}: ${body}`;
   }
 };
 
-const generateProductivityNarrative = (details) => {
-  const event = extractEvent(details.title) || extractEvent(details.body);
+const generateProductivityNarrative = ({ app, title, body, data }) => {
+  const event = extractEvent(title) || extractEvent(body);
 
   if (event) {
     return `You have a ${event.type} scheduled for ${event.time} titled: ${event.title}`;
   } else {
-    return `New update from ${details.app}: ${details.body}`;
+    return `New update from ${app}: ${body}`;
   }
 };
 
-const generateNewsNarrative = (details) => {
-  const headline = extractHeadline(details.title) || extractHeadline(details.body);
+const generateNewsNarrative = ({ app, title, body, data }) => {
+  const headline = extractHeadline(title) || extractHeadline(body);
 
   if (headline) {
-    return `Breaking news: ${headline}. ${details.body.substring(0, 100)}${details.body.length > 100 ? '...' : ''}`;
+    return `Breaking news: ${headline}. ${body.substring(0, 100)}${body.length > 100 ? '...' : ''}`;
   } else {
-    return `New news update from ${details.app}: ${details.body}`;
+    return `New news update from ${app}: ${body}`;
   }
 };
 
-const generateMusicNarrative = (details) => {
-  const track = extractTrack(details.title) || extractTrack(details.body);
+const generateMusicNarrative = ({ app, title, body, data }) => {
+  const song = extractSongInfo(title) || extractSongInfo(body);
 
-  if (track) {
-    return `Now playing: ${track} on ${details.app}`;
+  if (song) {
+    return `Now playing ${song.title} by ${song.artist} on ${app}`;
   } else {
-    return `New music update from ${details.app}: ${details.body}`;
+    return `New music update from ${app}: ${body}`;
   }
 };
 
-const generateDefaultNarrative = (notificationData) => {
-  return `New notification from ${notificationData.app}: ${notificationData.details.body}`;
+const generateDefaultNarrative = ({ app, title, body, data }) => {
+  return `New notification from ${app}: ${title}. ${body}`;
 };
 
-// Helper functions for extracting information from notification content
+// Helper functions
 const extractSender = (text) => {
-  const patterns = [
-    /^([^:]+):/, // "John Doe: message"
-    /from:\s*([^\s]+)/i, // "from: John Doe"
-    /by:\s*([^\s]+)/i, // "by: John Doe"
-    /^([^-]+)-/ // "John Doe - message"
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return match[1].trim();
-  }
-  return null;
+  const match = text.match(/^([^-:]+)[:\s-]/);
+  return match ? match[1].trim() : null;
 };
 
 const extractSubject = (text) => {
-  const patterns = [
-    /subject:\s*(.+)/i,
-    /re:\s*(.+)/i,
-    /^([^-]+)-/ // "Subject - message"
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return match[1].trim();
-  }
-  return null;
+  const match = text.match(/^(?:from|re:)\s*(.+)/i);
+  return match ? match[1].trim() : null;
 };
 
 const extractAction = (text) => {
-  const patterns = [
-    /liked your post/i,
-    /commented on your post/i,
-    /mentioned you/i,
-    /followed you/i,
-    /shared your post/i
-  ];
-
-  for (const pattern of patterns) {
-    if (pattern.test(text)) {
-      return text.match(pattern)[0].toLowerCase();
-    }
-  }
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('like')) return 'a new like';
+  if (lowerText.includes('comment')) return 'a new comment';
+  if (lowerText.includes('follow')) return 'a new follower';
+  if (lowerText.includes('mention')) return 'a new mention';
   return null;
 };
 
@@ -246,94 +183,48 @@ const extractAmount = (text) => {
 };
 
 const extractTransactionType = (text) => {
-  const patterns = [
-    /deposit/i,
-    /withdrawal/i,
-    /payment/i,
-    /transfer/i,
-    /charge/i,
-    /refund/i
-  ];
-
-  for (const pattern of patterns) {
-    if (pattern.test(text)) {
-      return text.match(pattern)[0].toLowerCase();
-    }
-  }
-  return null;
+  const transactionMatch = text.match(/(deposit|withdrawal|payment|transfer|charge)/i);
+  return transactionMatch ? transactionMatch[1].toLowerCase() : 'transaction';
 };
 
 const extractHealthMetric = (text) => {
-  const patterns = [
-    { type: 'step count', pattern: /(\d+)\s*steps/i },
-    { type: 'calorie count', pattern: /(\d+)\s*calories/i },
-    { type: 'distance', pattern: /(\d+\.?\d*)\s*(km|kilometer|mile|miles)/i },
-    { type: 'heart rate', pattern: /(\d+)\s*bpm/i }
-  ];
-
-  for (const item of patterns) {
-    const match = text.match(item.pattern);
-    if (match) {
-      const value = match[1];
-      const change = text.includes('increased') ? 'increased' :
-                    text.includes('decreased') ? 'decreased' :
-                    'changed to';
-      return { type: item.type, value, change };
-    }
+  const stepsMatch = text.match(/(\d+)\s*(steps|calories|heart rate)/i);
+  if (stepsMatch) {
+    return {
+      type: stepsMatch[2].toLowerCase(),
+      value: stepsMatch[1],
+      change: 'changed to'
+    };
   }
   return null;
 };
 
 const extractEvent = (text) => {
-  const patterns = [
-    { type: 'meeting', pattern: /meeting\s*(?:at|on)\s*([\d:]+)/i },
-    { type: 'appointment', pattern: /appointment\s*(?:at|on)\s*([\d:]+)/i },
-    { type: 'task', pattern: /task\s*due\s*(?:at|on)\s*([\d:]+)/i },
-    { type: 'reminder', pattern: /reminder\s*(?:at|on)\s*([\d:]+)/i }
-  ];
-
-  for (const item of patterns) {
-    const match = text.match(item.pattern);
-    if (match) {
-      return {
-        type: item.type,
-        time: match[1],
-        title: text.replace(item.pattern, '').trim()
-      };
-    }
+  const eventMatch = text.match(/(meeting|appointment|event|task)\s*(?:at|on)\s*([^.,]+)/i);
+  if (eventMatch) {
+    return {
+      type: eventMatch[1].toLowerCase(),
+      time: eventMatch[2],
+      title: text
+    };
   }
   return null;
 };
 
 const extractHeadline = (text) => {
-  const patterns = [
-    /^([^.!?]+)[.!?]/, // First sentence
-    /"([^"]+)"/, // Quoted text
-    /^([^-]+)-/ // "Headline - rest of text"
-  ];
+  const headlineMatch = text.match(/^(?:breaking:?\s*)?(.+)/i);
+  return headlineMatch ? headlineMatch[1].trim() : null;
+};
 
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return match[1].trim();
+const extractSongInfo = (text) => {
+  const songMatch = text.match(/(.+)\s*-\s*(.+)/);
+  if (songMatch) {
+    return {
+      title: songMatch[1].trim(),
+      artist: songMatch[2].trim()
+    };
   }
   return null;
 };
 
-const extractTrack = (text) => {
-  const patterns = [
-    /now playing:\s*(.+)/i,
-    /playing:\s*(.+)/i,
-    /"([^"]+)"\s*by/i,
-    /^([^-]+)-/ // "Track - Artist"
-  ];
-
-  for (const pattern of patterns) {
-    const match = text.match(pattern);
-    if (match) return match[1].trim();
-  }
-  return null;
-};
-
-export {
-  generateNarrativeText
-};
+export { generateNarrativeText };

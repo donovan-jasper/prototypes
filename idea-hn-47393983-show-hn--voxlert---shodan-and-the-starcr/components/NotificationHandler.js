@@ -1,25 +1,57 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { setupNotificationListener, requestNotificationPermissions } from '../services/notificationService';
+import * as Notifications from 'expo-notifications';
+import { processNotification } from '../services/notificationService';
+import { generateNarrativeText } from '../services/contextService';
+import { playNarration } from '../services/audioService';
 
 const NotificationHandler = () => {
   useEffect(() => {
     const initializeNotifications = async () => {
       try {
-        const hasPermission = await requestNotificationPermissions();
-        if (hasPermission) {
-          setupNotificationListener();
+        // Request permissions
+        const { status } = await Notifications.requestPermissionsAsync();
+        if (status !== 'granted') {
+          console.log('Notification permissions not granted');
+          return;
         }
+
+        // Set notification handler
+        Notifications.setNotificationHandler({
+          handleNotification: async () => ({
+            shouldShowAlert: false,
+            shouldPlaySound: false,
+            shouldSetBadge: false,
+          }),
+        });
+
+        // Listen for incoming notifications
+        const subscription = Notifications.addNotificationReceivedListener(async (notification) => {
+          try {
+            // Process the notification
+            const processed = processNotification(notification);
+            if (processed) {
+              // Generate narrative text
+              const narrative = generateNarrativeText(processed);
+              // Play the narration
+              await playNarration(narrative, processed.characterVoice || 'default');
+            }
+          } catch (error) {
+            console.error('Error handling notification:', error);
+          }
+        });
+
+        return () => {
+          if (subscription) {
+            Notifications.removeNotificationSubscription(subscription);
+          }
+        };
       } catch (error) {
         console.error('Error initializing notifications:', error);
       }
     };
 
     initializeNotifications();
-
-    return () => {
-      // Cleanup if needed
-    };
   }, []);
 
   return (
