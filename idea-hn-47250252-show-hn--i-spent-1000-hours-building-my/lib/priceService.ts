@@ -12,8 +12,8 @@ const mockExternalApiPrices = {
   FB: 350,
   NVDA: 250,
   PYPL: 250,
-  GME: 25, // Base price for GME
-  DOGE: 0.15, // Base price for DOGE,
+  GME: 25,
+  DOGE: 0.15,
 };
 
 /**
@@ -128,77 +128,78 @@ export class PriceService {
    * If a price is cached and still valid according to the tier's cache duration, it's returned.
    * Otherwise, a new price is fetched from the external API and cached.
    * If fetching fails, it attempts to return an expired cached price as a fallback.
-   * @param symbol The asset symbol (e.g., 'AAPL', 'BTC').
-   * @returns The current price of the asset.
+   * @param symbol The asset symbol to fetch the price for.
+   * @returns A promise that resolves with the current price.
    */
   public async getPrice(symbol: string): Promise<number> {
-    const cacheDuration = this.isPremium
-      ? this.PREMIUM_TIER_CACHE_DURATION_MS
-      : this.FREE_TIER_CACHE_DURATION_MS;
-
-    const cached = this.cache.get(symbol);
+    const cacheKey = symbol.toUpperCase();
+    const cachedPrice = this.cache.get(cacheKey);
     const now = Date.now();
+    const cacheDuration = this.isPremium ? this.PREMIUM_TIER_CACHE_DURATION_MS : this.FREE_TIER_CACHE_DURATION_MS;
 
-    if (cached && (now - cached.timestamp < cacheDuration)) {
-      // console.log(`[PriceService] Cache hit for ${symbol} (Premium: ${this.isPremium})`);
-      return cached.price;
+    // Check if we have a valid cached price
+    if (cachedPrice && (now - cachedPrice.timestamp) < cacheDuration) {
+      return cachedPrice.price;
     }
 
-    // console.log(`[PriceService] Cache miss/expired for ${symbol} (Premium: ${this.isPremium}), fetching...`);
     try {
-      const price = await this.fetchApi(symbol);
-      this.cache.set(symbol, { price, timestamp: now });
+      // Fetch fresh price from API
+      const price = await this.fetchApi(cacheKey);
+
+      // Update cache
+      this.cache.set(cacheKey, {
+        price,
+        timestamp: now
+      });
+
+      // Notify subscribers if there's a callback
+      if (this.updateCallback) {
+        this.updateCallback();
+      }
+
       return price;
     } catch (error) {
-      console.error(`[PriceService] Failed to fetch price for ${symbol}:`, error);
-      // If fetching fails, return cached price if available, even if expired, to provide some data.
-      // Otherwise, re-throw the error.
-      if (cached) {
-        console.warn(`[PriceService] Returning expired cached price for ${symbol} due to fetch error.`);
-        return cached.price;
+      console.error(`Failed to fetch price for ${symbol}:`, error);
+
+      // If we have an expired cached price, return that as fallback
+      if (cachedPrice) {
+        console.log(`Returning expired cached price for ${symbol}`);
+        return cachedPrice.price;
       }
+
+      // If we have no cached price at all, throw the error
       throw error;
     }
   }
 
   /**
-   * Starts periodic price updates
-   * @param intervalMs Update interval in milliseconds
-   * @param callback Function to call after each update
+   * Starts periodic updates of all cached prices.
+   * @param intervalMs The interval in milliseconds between updates.
+   * @param callback Optional callback to be called after each update cycle.
    */
-  public startPeriodicUpdates(intervalMs: number, callback: () => void): void {
-    this.stopPeriodicUpdates(); // Clear any existing interval
-    this.updateCallback = callback;
+  public startPeriodicUpdates(intervalMs: number, callback?: () => void): void {
+    if (this.updateInterval) {
+      clearInterval(this.updateInterval);
+    }
 
+    this.updateCallback = callback;
     this.updateInterval = setInterval(async () => {
       try {
-        // Get all cached symbols
+        // Update all cached symbols
         const symbols = Array.from(this.cache.keys());
+        await Promise.all(symbols.map(symbol => this.getPrice(symbol)));
 
-        // Update prices for all cached symbols
-        await Promise.all(
-          symbols.map(async (symbol) => {
-            try {
-              const price = await this.fetchApi(symbol);
-              this.cache.set(symbol, { price, timestamp: Date.now() });
-            } catch (error) {
-              console.error(`[PriceService] Failed to update price for ${symbol}:`, error);
-            }
-          })
-        );
-
-        // Notify that updates are complete
         if (this.updateCallback) {
           this.updateCallback();
         }
       } catch (error) {
-        console.error('[PriceService] Error during periodic updates:', error);
+        console.error('Error during periodic price updates:', error);
       }
     }, intervalMs);
   }
 
   /**
-   * Stops periodic price updates
+   * Stops periodic updates.
    */
   public stopPeriodicUpdates(): void {
     if (this.updateInterval) {
@@ -208,19 +209,53 @@ export class PriceService {
   }
 
   /**
-   * Clears the price cache
+   * Clears the price cache.
    */
   public clearCache(): void {
     this.cache.clear();
   }
 
   /**
-   * Gets the last update time for a symbol
-   * @param symbol The asset symbol
-   * @returns The timestamp of the last update or null if never updated
+   * Gets the last update time for a symbol.
+   * @param symbol The asset symbol.
+   * @returns The timestamp of the last update, or null if never updated.
    */
   public getLastUpdateTime(symbol: string): number | null {
-    const cached = this.cache.get(symbol);
-    return cached ? cached.timestamp : null;
+    const cacheKey = symbol.toUpperCase();
+    const cachedPrice = this.cache.get(cacheKey);
+    return cachedPrice ? cachedPrice.timestamp : null;
+  }
+
+  /**
+   * Converts a price between currencies using CoinGecko's exchange rates API.
+   * @param amount The amount to convert.
+   * @param fromCurrency The currency to convert from (e.g., 'usd').
+   * @param toCurrency The currency to convert to (e.g., 'eur').
+   * @returns A promise that resolves with the converted amount.
+   */
+  public async convertCurrency(amount: number, fromCurrency: string, toCurrency: string): Promise<number> {
+    try {
+      const response = await fetch(`https://api.coingecko.com/api/v3/exchange_rates`);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch exchange rates: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const rates = data.rates;
+
+      if (!rates[fromCurrency] || !rates[toCurrency]) {
+        throw new Error(`Currency not found in exchange rates: ${fromCurrency} or ${toCurrency}`);
+      }
+
+      const fromRate = rates[fromCurrency].value;
+      const toRate = rates[toCurrency].value;
+
+      // Convert amount from fromCurrency to toCurrency
+      const convertedAmount = (amount / fromRate) * toRate;
+      return convertedAmount;
+    } catch (error) {
+      console.error('Error converting currency:', error);
+      throw error;
+    }
   }
 }
