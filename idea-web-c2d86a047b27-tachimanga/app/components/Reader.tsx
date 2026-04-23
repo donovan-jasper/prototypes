@@ -136,20 +136,24 @@ const Reader = ({ route }: any) => {
     }
   }, [content, scrollPosition, calculatePercentage]);
 
-  const handleBrightnessChange = useCallback((value: number) => {
-    setBrightness(value);
-    // In a real app, you would use NativeModules to adjust device brightness
-    // This is just a simulation
-    console.log(`Brightness set to ${value}%`);
-  }, []);
-
-  const handleFontSizeChange = useCallback((value: number) => {
+  const handleFontSizeChange = (value: number) => {
     setFontSize(value);
-  }, []);
+  };
 
-  const handleFontFamilyChange = useCallback((family: string) => {
+  const handleFontFamilyChange = (family: string) => {
     setFontFamily(family);
-  }, []);
+  };
+
+  const handleBrightnessChange = (value: number) => {
+    setBrightness(value);
+  };
+
+  const toggleControls = () => {
+    setShowControls(!showControls);
+    if (!showControls) {
+      resetControlsTimeout();
+    }
+  };
 
   if (!content) {
     return (
@@ -167,22 +171,21 @@ const Reader = ({ route }: any) => {
       <ScrollView
         ref={scrollViewRef}
         style={styles.scrollView}
+        contentContainerStyle={styles.contentContainer}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         {...panResponder.panHandlers}
       >
-        <View style={styles.contentContainer}>
-          <Text style={[styles.contentText, { fontSize, fontFamily }]}>
-            {content.text}
-          </Text>
-        </View>
+        <Text style={[styles.contentText, { fontSize, fontFamily }]}>
+          {content.text}
+        </Text>
       </ScrollView>
 
       {showControls && (
         <View style={styles.controlsContainer}>
           <View style={styles.topControls}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-              <Text style={styles.backButtonText}>← Back</Text>
+              <Text style={styles.backButtonText}>←</Text>
             </TouchableOpacity>
             <Text style={styles.titleText}>{content.title}</Text>
             <TouchableOpacity onPress={handleShareProgress} style={styles.shareButton}>
@@ -225,19 +228,19 @@ const Reader = ({ route }: any) => {
               <Text style={styles.sliderLabel}>Font Style</Text>
               <View style={styles.fontButtons}>
                 <TouchableOpacity
-                  style={[styles.fontButton, fontFamily === 'System' && styles.fontButtonActive]}
+                  style={[styles.fontButton, fontFamily === 'System' && styles.activeFontButton]}
                   onPress={() => handleFontFamilyChange('System')}
                 >
                   <Text style={styles.fontButtonText}>System</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.fontButton, fontFamily === 'serif' && styles.fontButtonActive]}
+                  style={[styles.fontButton, fontFamily === 'serif' && styles.activeFontButton]}
                   onPress={() => handleFontFamilyChange('serif')}
                 >
                   <Text style={styles.fontButtonText}>Serif</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.fontButton, fontFamily === 'sans-serif' && styles.fontButtonActive]}
+                  style={[styles.fontButton, fontFamily === 'sans-serif' && styles.activeFontButton]}
                   onPress={() => handleFontFamilyChange('sans-serif')}
                 >
                   <Text style={styles.fontButtonText}>Sans</Text>
@@ -247,6 +250,12 @@ const Reader = ({ route }: any) => {
           </View>
         </View>
       )}
+
+      <TouchableOpacity
+        style={styles.tapArea}
+        onPress={toggleControls}
+        activeOpacity={1}
+      />
     </View>
   );
 };
@@ -254,11 +263,11 @@ const Reader = ({ route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   scrollView: {
     flex: 1,
@@ -267,7 +276,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   contentText: {
-    color: '#fff',
+    color: '#333',
     lineHeight: 24,
   },
   controlsContainer: {
@@ -290,18 +299,20 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 20,
   },
   titleText: {
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    maxWidth: '60%',
+    textAlign: 'center',
   },
   shareButton: {
     padding: 10,
   },
   shareButtonText: {
-    color: '#007AFF',
+    color: '#fff',
     fontSize: 16,
   },
   bottomControls: {
@@ -330,23 +341,28 @@ const styles = StyleSheet.create({
   fontButton: {
     padding: 10,
     borderRadius: 5,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
   },
-  fontButtonActive: {
+  activeFontButton: {
     backgroundColor: '#007AFF',
   },
   fontButtonText: {
     color: '#fff',
+    fontSize: 14,
+  },
+  tapArea: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   loadingText: {
-    color: '#fff',
     fontSize: 18,
+    color: '#333',
   },
 });
 
