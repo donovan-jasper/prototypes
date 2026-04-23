@@ -1,5 +1,35 @@
 import { Friend } from './types';
-import { getAllFriends, getInteractionsByFriend, calculateHealthScore } from './database';
+import { differenceInDays } from 'date-fns';
+
+export type HealthStatus = 'healthy' | 'warning' | 'neglected';
+
+export function calculateHealthScore(friend: Friend): HealthStatus {
+  if (!friend.lastContacted || !friend.reminderFrequency) {
+    return 'neglected';
+  }
+
+  const lastContactedDate = new Date(friend.lastContacted);
+  const now = new Date();
+
+  // Handle invalid dates
+  if (isNaN(lastContactedDate.getTime())) {
+    return 'neglected';
+  }
+
+  const daysSinceContact = differenceInDays(now, lastContactedDate);
+
+  // Calculate thresholds based on reminder frequency
+  const healthyThreshold = friend.reminderFrequency * 1.5;
+  const warningThreshold = friend.reminderFrequency * 2;
+
+  if (daysSinceContact <= healthyThreshold) {
+    return 'healthy';
+  } else if (daysSinceContact <= warningThreshold) {
+    return 'warning';
+  } else {
+    return 'neglected';
+  }
+}
 
 export interface DashboardStats {
   totalFriends: number;
@@ -55,7 +85,7 @@ export async function getFriendsNeedingAttention(limit: number = 3): Promise<Fri
       if (friend.lastContacted) {
         const lastContactDate = new Date(friend.lastContacted);
         const now = new Date();
-        daysSinceContact = Math.floor((now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24));
+        daysSinceContact = differenceInDays(now, lastContactDate);
       }
 
       return {
