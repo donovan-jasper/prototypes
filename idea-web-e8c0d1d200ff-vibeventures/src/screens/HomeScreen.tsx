@@ -1,70 +1,34 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { Ionicons } from '@expo/vector-icons';
-import { getEvents } from '../utils/eventService';
+import React from 'react';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { StackNavigationProp } from '@react-navigation/stack';
 
-const HomeScreen = ({ navigation }) => {
-  const [location, setLocation] = useState(null);
-  const [events, setEvents] = useState([]);
+type RootStackParamList = {
+  VibeMap: undefined;
+  CreateEvent: undefined;
+};
 
-  useEffect(() => {
-    (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        console.error('Permission to access location was denied');
-        return;
-      }
+type HomeScreenNavigationProp = StackNavigationProp<RootStackParamList>;
 
-      let location = await Location.getCurrentPositionAsync({});
-      setLocation(location);
-
-      const fetchedEvents = await getEvents(location.coords);
-      setEvents(fetchedEvents);
-    })();
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', async () => {
-      if (location) {
-        const fetchedEvents = await getEvents(location.coords);
-        setEvents(fetchedEvents);
-      }
-    });
-
-    return unsubscribe;
-  }, [navigation, location]);
+const HomeScreen = () => {
+  const navigation = useNavigation<HomeScreenNavigationProp>();
 
   return (
     <View style={styles.container}>
-      <MapView
-        style={styles.map}
-        initialRegion={{
-          latitude: location?.coords.latitude || 35.5951,
-          longitude: location?.coords.longitude || -82.5515,
-          latitudeDelta: 0.0922,
-          longitudeDelta: 0.0421,
-        }}
-      >
-        {events.map((event) => (
-          <Marker
-            key={event.id}
-            coordinate={{
-              latitude: event.latitude,
-              longitude: event.longitude,
-            }}
-            title={event.title}
-            onPress={() => navigation.navigate('Event', { event })}
-          />
-        ))}
-      </MapView>
+      <Text style={styles.title}>Welcome to VibeHive</Text>
 
       <TouchableOpacity
-        style={styles.fab}
+        style={styles.button}
+        onPress={() => navigation.navigate('VibeMap')}
+      >
+        <Text style={styles.buttonText}>Explore Nearby Events</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={[styles.button, styles.secondaryButton]}
         onPress={() => navigation.navigate('CreateEvent')}
       >
-        <Ionicons name="add" size={32} color="#fff" />
+        <Text style={[styles.buttonText, styles.secondaryButtonText]}>Create New Event</Text>
       </TouchableOpacity>
     </View>
   );
@@ -73,26 +37,37 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-  },
-  fab: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 40,
+    color: '#333',
+  },
+  button: {
+    width: '100%',
+    padding: 15,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
+    marginBottom: 15,
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#007AFF',
+  },
+  secondaryButtonText: {
+    color: '#007AFF',
   },
 });
 
