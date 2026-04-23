@@ -113,6 +113,22 @@ export const scheduleMedicationReminder = async (medicationName: string, time: s
   });
 };
 
+export const scheduleSOSReminder = async () => {
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "Need quick relief?",
+      body: "Use the SOS button for immediate pain relief techniques.",
+      sound: true,
+      priority: Notifications.AndroidNotificationPriority.HIGH,
+    },
+    trigger: {
+      hour: 12, // 12 PM
+      minute: 0,
+      repeats: true,
+    },
+  });
+};
+
 export const cancelAllNotifications = async () => {
   await Notifications.cancelAllScheduledNotificationsAsync();
 };
