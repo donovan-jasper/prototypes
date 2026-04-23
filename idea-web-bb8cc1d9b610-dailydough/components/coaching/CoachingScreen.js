@@ -59,6 +59,15 @@ export default function CoachingScreen({ navigation }) {
     }
   }
 
+  function getInsightBackgroundColor(type) {
+    switch (type) {
+      case 'warning': return 'rgba(255, 149, 0, 0.1)';
+      case 'success': return 'rgba(52, 199, 89, 0.1)';
+      case 'tip': return 'rgba(0, 122, 255, 0.1)';
+      default: return 'rgba(142, 142, 147, 0.1)';
+    }
+  }
+
   return (
     <ScrollView
       style={styles.container}
@@ -82,7 +91,7 @@ export default function CoachingScreen({ navigation }) {
               key={index}
               style={[
                 styles.insightCard,
-                { borderLeftColor: getInsightColor(insight.type) }
+                { backgroundColor: getInsightBackgroundColor(insight.type) }
               ]}
             >
               <View style={styles.insightHeader}>
@@ -135,19 +144,14 @@ export default function CoachingScreen({ navigation }) {
           <View style={styles.trendCard}>
             {spendingTrends.map((trend, index) => {
               const maxAmount = Math.max(...spendingTrends.map(t => t.total));
-              const barHeight = maxAmount > 0 ? (trend.total / maxAmount) * 100 : 0;
+              const barWidth = (trend.total / maxAmount) * (width - 60);
 
               return (
-                <View key={index} style={styles.trendBar}>
-                  <View style={styles.trendBarContainer}>
-                    <View
-                      style={[
-                        styles.trendBarFill,
-                        { height: `${barHeight}%` }
-                      ]}
-                    />
-                  </View>
+                <View key={index} style={styles.trendRow}>
                   <Text style={styles.trendMonth}>{trend.month}</Text>
+                  <View style={styles.trendBarContainer}>
+                    <View style={[styles.trendBar, { width: barWidth }]} />
+                  </View>
                   <Text style={styles.trendAmount}>${trend.total.toFixed(2)}</Text>
                 </View>
               );
@@ -184,8 +188,8 @@ const styles = StyleSheet.create({
   refreshButton: {
     backgroundColor: '#007AFF',
     paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 5,
+    paddingHorizontal: 20,
+    borderRadius: 20,
     alignSelf: 'flex-start',
   },
   refreshButtonText: {
@@ -200,10 +204,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 10,
+    marginBottom: 15,
   },
   insightCard: {
-    backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
     marginBottom: 10,
@@ -212,7 +215,7 @@ const styles = StyleSheet.create({
   insightHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   insightIcon: {
     fontSize: 20,
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   insightCategory: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     marginBottom: 2,
   },
@@ -242,19 +245,16 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   priorityBadge: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '600',
     paddingVertical: 3,
     paddingHorizontal: 8,
-    borderRadius: 10,
+    borderRadius: 12,
+    fontSize: 12,
+    color: '#fff',
+    fontWeight: '600',
   },
   viewAllButton: {
-    backgroundColor: '#f0f0f0',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
     marginTop: 10,
+    alignSelf: 'flex-end',
   },
   viewAllButtonText: {
     color: '#007AFF',
@@ -264,6 +264,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -282,7 +287,7 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   categoryCount: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   categoryAmounts: {
@@ -294,40 +299,46 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   categoryPercent: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
   },
   trendCard: {
     backgroundColor: '#fff',
     borderRadius: 8,
     padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  trendRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  trendBar: {
     alignItems: 'center',
-    width: (width - 60) / 6,
-  },
-  trendBarContainer: {
-    height: 150,
-    justifyContent: 'flex-end',
-    width: '100%',
-  },
-  trendBarFill: {
-    backgroundColor: '#007AFF',
-    width: '60%',
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
+    marginBottom: 10,
   },
   trendMonth: {
-    fontSize: 12,
+    width: 60,
+    fontSize: 14,
     color: '#666',
-    marginTop: 5,
+  },
+  trendBarContainer: {
+    flex: 1,
+    height: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  trendBar: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
   },
   trendAmount: {
+    width: 80,
     fontSize: 14,
     fontWeight: '500',
     color: '#333',
-    marginTop: 2,
+    textAlign: 'right',
   },
 });
