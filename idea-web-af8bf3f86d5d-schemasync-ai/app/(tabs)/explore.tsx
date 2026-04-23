@@ -5,6 +5,7 @@ import { getSchema } from '@/lib/storage/cache';
 import SchemaTree from '@/components/SchemaTree';
 import { useNetworkStore } from '@/store/network-store';
 import { Button } from 'react-native-paper';
+import OfflineIndicator from '@/components/OfflineIndicator';
 
 export default function ExploreScreen() {
   const { databaseId } = useLocalSearchParams();
@@ -33,6 +34,7 @@ export default function ExploreScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
+        <OfflineIndicator />
         <ActivityIndicator size="large" />
         <Text>Loading schema...</Text>
       </View>
@@ -42,6 +44,7 @@ export default function ExploreScreen() {
   if (error) {
     return (
       <View style={styles.centered}>
+        <OfflineIndicator />
         <Text style={styles.errorText}>{error}</Text>
         {!isOnline && (
           <Text style={styles.offlineText}>You are currently offline</Text>
@@ -59,11 +62,7 @@ export default function ExploreScreen() {
 
   return (
     <View style={styles.container}>
-      {!isOnline && (
-        <View style={styles.offlineBanner}>
-          <Text style={styles.offlineText}>Working offline</Text>
-        </View>
-      )}
+      <OfflineIndicator />
       <SchemaTree schema={schema} />
     </View>
   );
@@ -92,12 +91,5 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 16,
-  },
-  offlineBanner: {
-    backgroundColor: '#f0f0f0',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 16,
-    alignItems: 'center',
   },
 });

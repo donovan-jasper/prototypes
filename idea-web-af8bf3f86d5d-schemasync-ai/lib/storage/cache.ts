@@ -1,57 +1,75 @@
 import * as SQLite from 'expo-sqlite';
-import { Database } from '../../types/database';
+import { fetchSchemaFromDatabase } from '@/lib/database/connectors';
 
 const db = SQLite.openDatabase('querypal.db');
 
-export const initCache = () => {
-  db.transaction(tx => {
-    tx.executeSql(
-      'CREATE TABLE IF NOT EXISTS cached_schemas (id TEXT PRIMARY KEY, schema TEXT, lastUpdated INTEGER);'
-    );
-  });
-};
+export async function getSchema(databaseId: string, forceRefresh = false): Promise<any> {
+  // Check if we have cached data
+  const cachedSchema = await getCachedSchema(databaseId);
 
-export const cacheSchema = (id: string, schema: any) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'INSERT OR REPLACE INTO cached_schemas (id, schema, lastUpdated) VALUES (?, ?, ?);',
-        [id, JSON.stringify(schema), Date.now()],
-        () => resolve(),
-        (_, error) => reject(error)
-      );
-    });
-  });
-};
+  if (cachedSchema && !forceRefresh) {
+    return cachedSchema;
+  }
 
-export const getSchema = (id: string): Promise<any> => {
+  // If we need to refresh or don't have cached data, fetch from database
+  try {
+    const schema = await fetchSchemaFromDatabase(databaseId);
+    await cacheSchema(databaseId, schema);
+    return schema;
+  } catch (error) {
+    // If we can't fetch fresh data but have cached data, return that
+    if (cachedSchema) {
+      return cachedSchema;
+    }
+    throw error;
+  }
+}
+
+async function getCachedSchema(databaseId: string): Promise<any | null> {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'SELECT schema FROM cached_schemas WHERE id = ?;',
-        [id],
-        (_, { rows }) => {
-          if (rows.length > 0) {
-            resolve(JSON.parse(rows.item(0).schema));
+        'SELECT schema_data, last_updated FROM cached_schemas WHERE database_id = ?',
+        [databaseId],
+        (_, result) => {
+          if (result.rows.length > 0) {
+            const row = result.rows.item(0);
+            resolve({
+              ...JSON.parse(row.schema_data),
+              lastUpdated: new Date(row.last_updated)
+            });
           } else {
-            reject(new Error('Schema not found in cache'));
+            resolve(null);
           }
         },
-        (_, error) => reject(error)
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
     });
   });
-};
+}
 
-export const clearCache = () => {
-  return new Promise<void>((resolve, reject) => {
+async function cacheSchema(databaseId: string, schema: any): Promise<void> {
+  return new Promise((resolve, reject) => {
     db.transaction(tx => {
+      // First delete any existing cache for this database
       tx.executeSql(
-        'DELETE FROM cached_schemas;',
-        [],
+        'DELETE FROM cached_schemas WHERE database_id = ?',
+        [databaseId]
+      );
+
+      // Then insert the new schema
+      tx.executeSql(
+        'INSERT INTO cached_schemas (database_id, schema_data, last_updated) VALUES (?, ?, ?)',
+        [databaseId, JSON.stringify(schema), new Date().toISOString()],
         () => resolve(),
-        (_, error) => reject(error)
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
     });
   });
-};
+}
