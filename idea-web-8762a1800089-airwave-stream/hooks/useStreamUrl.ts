@@ -3,6 +3,7 @@ import { buildStreamUrl, isOnHomeNetwork } from '../lib/streaming';
 
 export const useStreamUrl = (channelNumber: string) => {
   const [streamUrl, setStreamUrl] = useState<string>('');
+  const [isLocal, setIsLocal] = useState<boolean>(true);
 
   useEffect(() => {
     const getStreamUrl = async () => {
@@ -10,8 +11,9 @@ export const useStreamUrl = (channelNumber: string) => {
         setStreamUrl('');
         return;
       }
-      
+
       const onHomeNetwork = await isOnHomeNetwork();
+      setIsLocal(onHomeNetwork);
       const url = await buildStreamUrl(channelNumber, onHomeNetwork);
       setStreamUrl(url);
     };
@@ -19,5 +21,5 @@ export const useStreamUrl = (channelNumber: string) => {
     getStreamUrl();
   }, [channelNumber]);
 
-  return streamUrl;
+  return { streamUrl, isLocal };
 };

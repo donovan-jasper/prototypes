@@ -1,12 +1,13 @@
 import * as Network from 'expo-network';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Config } from '../constants/Config';
 
 export const buildStreamUrl = async (channelNumber: string, isLocal: boolean): Promise<string> => {
   if (isLocal) {
     // Get tuner IP from stored config
     const tunerConfig = await AsyncStorage.getItem('tunerConfig');
     let tunerIp = '192.168.1.100'; // Default fallback
-    
+
     if (tunerConfig) {
       try {
         const config = JSON.parse(tunerConfig);
@@ -15,30 +16,54 @@ export const buildStreamUrl = async (channelNumber: string, isLocal: boolean): P
         console.error('Error parsing tuner config:', error);
       }
     }
-    
+
     // Build HLS URL using channel number (e.g., '7.1', '2.1')
     return `http://${tunerIp}:5004/auto/v${channelNumber}`;
   } else {
     // For remote streaming, use the backend proxy
-    const userId = 'demo-user'; // In a real app, this would come from auth
-    return `https://api.tunelocal.app/stream/${userId}/${channelNumber}`;
+    const userId = await AsyncStorage.getItem('userId') || 'demo-user';
+    return `${Config.API_BASE_URL}/stream/${userId}/${channelNumber}`;
   }
 };
 
 export const isOnHomeNetwork = async (): Promise<boolean> => {
   try {
     const networkState = await Network.getNetworkStateAsync();
-    
+
     if (!networkState.isInternetReachable || !networkState.isConnected) {
       return false;
     }
-    
-    // In a real implementation, we would compare the WiFi SSID
-    // or check if we're on the same subnet as the tuner
-    // For demo purposes, we'll return true if connected to WiFi
+
+    // Check if we're on the same subnet as the tuner
+    const tunerConfig = await AsyncStorage.getItem('tunerConfig');
+    if (tunerConfig) {
+      try {
+        const config = JSON.parse(tunerConfig);
+        if (config.ip) {
+          const localIp = await Network.getIpAddressAsync();
+          if (localIp) {
+            // Simple check for same subnet (first 3 octets)
+            const localParts = localIp.split('.');
+            const tunerParts = config.ip.split('.');
+            return localParts[0] === tunerParts[0] &&
+                   localParts[1] === tunerParts[1] &&
+                   localParts[2] === tunerParts[2];
+          }
+        }
+      } catch (error) {
+        console.error('Error checking subnet:', error);
+      }
+    }
+
+    // Fallback to WiFi check
     return networkState.type === Network.NetworkStateType.WIFI;
   } catch (error) {
     console.error('Error checking network status:', error);
     return false;
   }
+};
+
+export const isRemoteStreamingEnabled = async (): Promise<boolean> => {
+  const subscriptionStatus = await AsyncStorage.getItem('subscriptionStatus');
+  return subscriptionStatus === 'premium' && Config.ENABLE_REMOTE_STREAMING;
 };
