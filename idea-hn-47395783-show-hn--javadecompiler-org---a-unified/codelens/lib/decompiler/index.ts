@@ -52,6 +52,11 @@ const detectFileType = (buffer: Buffer): string => {
     return 'jar';
   }
 
+  // Check for DEX files (dex\n)
+  if (buffer.length >= 4 && buffer.toString('ascii', 0, 4) === 'dex\n') {
+    return 'android-dex';
+  }
+
   // Check for Metro bundle format (JavaScript)
   const header = buffer.toString('utf8', 0, Math.min(200, buffer.length));
   if (header.includes('__d(function') || header.includes('__r(') || header.includes('__metro')) {
