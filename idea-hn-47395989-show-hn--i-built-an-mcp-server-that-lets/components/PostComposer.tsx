@@ -146,7 +146,7 @@ export default function PostComposer() {
           {isEnhancing ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.enhanceButtonText}>✨ Enhance with AI</Text>
+            <Text style={styles.buttonText}>Enhance</Text>
           )}
         </TouchableOpacity>
 
@@ -158,7 +158,7 @@ export default function PostComposer() {
           {isPosting ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.postButtonText}>Post Now</Text>
+            <Text style={styles.buttonText}>Post Now</Text>
           )}
         </TouchableOpacity>
 
@@ -170,7 +170,7 @@ export default function PostComposer() {
           {isScheduling ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.scheduleButtonText}>Schedule</Text>
+            <Text style={styles.buttonText}>Schedule</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -198,6 +198,7 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     borderRadius: 8,
     marginBottom: 8,
+    textAlignVertical: 'top',
   },
   charCountRow: {
     flexDirection: 'row',
@@ -217,7 +218,7 @@ const styles = StyleSheet.create({
   aiResponseLabel: {
     fontWeight: 'bold',
     marginBottom: 4,
-    color: '#1e90ff',
+    color: '#1a73e8',
   },
   aiResponseText: {
     fontSize: 14,
@@ -225,34 +226,30 @@ const styles = StyleSheet.create({
   },
   platformSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 16,
   },
   platformChip: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
   },
   platformChipActive: {
-    backgroundColor: '#1e90ff',
-    borderColor: '#1e90ff',
+    backgroundColor: '#1a73e8',
   },
   platformChipText: {
-    color: '#666',
-    fontSize: 14,
+    color: '#333',
   },
   platformChipTextActive: {
     color: '#fff',
-    fontWeight: 'bold',
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   enhanceButton: {
-    backgroundColor: '#1e90ff',
+    backgroundColor: '#1a73e8',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -260,7 +257,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   postButton: {
-    backgroundColor: '#28a745',
+    backgroundColor: '#34a853',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -268,7 +265,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scheduleButton: {
-    backgroundColor: '#ffc107',
+    backgroundColor: '#fbbc05',
     padding: 12,
     borderRadius: 8,
     flex: 1,
@@ -278,19 +275,8 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.5,
   },
-  enhanceButtonText: {
+  buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 14,
-  },
-  postButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  scheduleButtonText: {
-    color: '#333',
-    fontWeight: 'bold',
-    fontSize: 14,
   },
 });
