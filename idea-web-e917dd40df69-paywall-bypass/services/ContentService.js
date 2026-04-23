@@ -65,13 +65,11 @@ export const ContentService = {
         throw new Error('Invalid URL provided');
       }
 
-      // Validate URL format
       if (!url.startsWith('http://') && !url.startsWith('https://')) {
         throw new Error('URL must start with http:// or https://');
       }
 
-      // In a real app, you would call a backend service that handles paywall bypassing
-      // For this prototype, we'll simulate fetching article content
+      // Simulate fetching article content
       const response = await axios.get(`https://api.librio.com/fetch-article?url=${encodeURIComponent(url)}`);
 
       if (!response.data || !response.data.content) {
@@ -114,5 +112,18 @@ export const ContentService = {
       console.error('Error reading clipboard:', error);
       throw new Error('Failed to read clipboard content');
     }
+  },
+
+  async getFeaturedContent() {
+    try {
+      // Simulate fetching featured content
+      const response = await axios.get('https://api.librio.com/featured-content');
+      return response.data.articles || [];
+    } catch (error) {
+      console.error('Error fetching featured content:', error);
+      return [];
+    }
   }
 };
+
+export default ContentService;

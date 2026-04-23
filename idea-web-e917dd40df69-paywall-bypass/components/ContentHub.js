@@ -1,67 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, FlatList, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Dimensions, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { ContentService } from '../services/ContentService';
+import ContentService from '../services/ContentService';
 
 const { width } = Dimensions.get('window');
 
 const ContentHub = () => {
   const navigation = useNavigation();
   const [contentSources, setContentSources] = useState([]);
+  const [featuredContent, setFeaturedContent] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const predefinedSources = [
-    {
-      id: 'nytimes',
-      name: 'The New York Times',
-      description: 'Premium news and analysis from the world\'s leading newspaper',
-      logo: 'https://static01.nyt.com/images/icons/t_logo_291_black.png',
-      apiEndpoint: 'https://api.nytimes.com/svc/topstories/v2/home.json?api-key=YOUR_API_KEY'
-    },
-    {
-      id: 'wsj',
-      name: 'The Wall Street Journal',
-      description: 'Business news and financial analysis',
-      logo: 'https://www.wsj.com/apple-touch-icon.png',
-      apiEndpoint: 'https://newsapi.org/v2/top-headlines?sources=the-wall-street-journal&apiKey=YOUR_API_KEY'
-    },
-    {
-      id: 'medium',
-      name: 'Medium',
-      description: 'Stories and ideas from writers on any topic',
-      logo: 'https://miro.medium.com/max/1400/1*jJbQJXz5QJQJQJQJQJQJQJ.png',
-      apiEndpoint: 'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fmedium.com%2Ffeed%2F'
-    },
-    {
-      id: 'wired',
-      name: 'Wired',
-      description: 'The future of business, innovation, and culture',
-      logo: 'https://www.wired.com/wp-content/themes/wired/assets/images/wired-logo.png',
-      apiEndpoint: 'https://www.wired.com/feed/rss'
-    },
-    {
-      id: 'theatlantic',
-      name: 'The Atlantic',
-      description: 'Politics, culture, and ideas from America\'s leading magazine',
-      logo: 'https://cdn.theatlantic.com/assets/media/img/logo-default.png',
-      apiEndpoint: 'https://www.theatlantic.com/feed/all/'
-    },
-    {
-      id: 'npr',
-      name: 'NPR',
-      description: 'News, analysis, and commentary from NPR',
-      logo: 'https://media.npr.org/images/nprlogo_600x336.png',
-      apiEndpoint: 'https://feeds.npr.org/1001/rss.xml'
-    }
-  ];
-
   useEffect(() => {
-    const fetchContentSources = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        // In a real app, you would fetch this from your backend
-        setContentSources(predefinedSources);
+        const [sources, featured] = await Promise.all([
+          ContentService.getContentSources(),
+          ContentService.getFeaturedContent()
+        ]);
+        setContentSources(sources);
+        setFeaturedContent(featured);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -69,11 +29,15 @@ const ContentHub = () => {
       }
     };
 
-    fetchContentSources();
+    fetchData();
   }, []);
 
   const handleSourcePress = (source) => {
     navigation.navigate('ContentSource', { source });
+  };
+
+  const handleFeaturedPress = (article) => {
+    navigation.navigate('Article', { article });
   };
 
   const renderSource = ({ item }) => (
@@ -96,11 +60,31 @@ const ContentHub = () => {
     </TouchableOpacity>
   );
 
+  const renderFeaturedItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.featuredItem}
+      onPress={() => handleFeaturedPress(item)}
+      activeOpacity={0.8}
+    >
+      {item.image && (
+        <Image
+          source={{ uri: item.image }}
+          style={styles.featuredImage}
+          resizeMode="cover"
+        />
+      )}
+      <View style={styles.featuredContent}>
+        <Text style={styles.featuredTitle} numberOfLines={2}>{item.title}</Text>
+        <Text style={styles.featuredSource}>{item.source}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading premium content sources...</Text>
+        <Text style={styles.loadingText}>Loading premium content...</Text>
       </View>
     );
   }
@@ -108,26 +92,38 @@ const ContentHub = () => {
   if (error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error loading content sources: {error}</Text>
+        <Text style={styles.errorText}>Error loading content: {error}</Text>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.header}>Premium Content Sources</Text>
-      <Text style={styles.subHeader}>Explore top news outlets and magazines</Text>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      <View style={styles.section}>
+        <Text style={styles.sectionHeader}>Featured Content</Text>
+        <FlatList
+          data={featuredContent}
+          renderItem={renderFeaturedItem}
+          keyExtractor={(item) => item.id}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.featuredList}
+        />
+      </View>
 
-      <FlatList
-        data={contentSources}
-        renderItem={renderSource}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      />
-    </View>
+      <View style={styles.section}>
+        <Text style={styles.sectionHeader}>Premium Content Sources</Text>
+        <FlatList
+          data={contentSources}
+          renderItem={renderSource}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          columnWrapperStyle={styles.row}
+          contentContainerStyle={styles.listContent}
+          scrollEnabled={false}
+        />
+      </View>
+    </ScrollView>
   );
 };
 
@@ -135,22 +131,55 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f8f8',
-    padding: 16,
   },
-  header: {
-    fontSize: 24,
+  section: {
+    marginBottom: 24,
+    paddingHorizontal: 16,
+  },
+  sectionHeader: {
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 16,
     color: '#333',
   },
-  subHeader: {
+  featuredList: {
+    paddingVertical: 8,
+  },
+  featuredItem: {
+    width: width * 0.7,
+    marginRight: 16,
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  featuredImage: {
+    width: '100%',
+    height: 160,
+  },
+  featuredContent: {
+    padding: 12,
+  },
+  featuredTitle: {
     fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+    color: '#333',
+  },
+  featuredSource: {
+    fontSize: 14,
     color: '#666',
-    marginBottom: 20,
+  },
+  row: {
+    justifyContent: 'space-between',
   },
   sourceContainer: {
     flex: 1,
-    margin: 8,
+    marginBottom: 16,
   },
   sourceCard: {
     backgroundColor: 'white',
@@ -173,24 +202,20 @@ const styles = StyleSheet.create({
   sourceName: {
     fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
     marginBottom: 8,
     color: '#333',
+    textAlign: 'center',
   },
   sourceDescription: {
-    fontSize: 13,
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
-    lineHeight: 18,
-  },
-  row: {
-    justifyContent: 'space-between',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    padding: 20,
   },
   loadingText: {
     marginTop: 16,
@@ -207,9 +232,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#d32f2f',
     textAlign: 'center',
-  },
-  listContent: {
-    paddingBottom: 20,
   },
 });
 
