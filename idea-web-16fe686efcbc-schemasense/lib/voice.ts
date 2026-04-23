@@ -3,6 +3,7 @@ import { Audio } from 'expo-av';
 import { useState, useEffect } from 'react';
 import { Alert, Platform } from 'react-native';
 import { FileSystem } from 'expo-file-system';
+import { generateSQL } from './ai';
 
 interface VoiceResult {
   text: string;

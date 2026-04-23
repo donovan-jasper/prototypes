@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, ActivityIndicator, Text } from 'react-native';
 import { QueryInput } from '../../components/QueryInput';
 import { ResultsTable } from '../../components/ResultsTable';
 import { useQuery } from '../../hooks/useQuery';
@@ -14,6 +14,7 @@ export default function QueryScreen() {
   const { checkQueryLimit } = useSubscription();
   const [results, setResults] = useState<any[]>([]);
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   const handleQuerySubmit = async (queryText: string) => {
     if (!currentDatabase) {
@@ -21,18 +22,22 @@ export default function QueryScreen() {
       return;
     }
 
-    const canExecute = await checkQueryLimit();
-    if (!canExecute) {
-      router.push('/(tabs)/settings');
-      return;
-    }
+    setIsProcessing(true);
 
     try {
+      const canExecute = await checkQueryLimit();
+      if (!canExecute) {
+        router.push('/(tabs)/settings');
+        return;
+      }
+
       const queryResults = await executeQuery(currentDatabase.id, queryText);
       setResults(queryResults);
       setQueryHistory(prev => [queryText, ...prev.slice(0, 4)]);
     } catch (err) {
       console.error('Query execution failed:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -50,11 +55,15 @@ export default function QueryScreen() {
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
-        <QueryInput onSubmit={handleQuerySubmit} />
+        <QueryInput
+          onSubmit={handleQuerySubmit}
+          isProcessing={isProcessing}
+        />
 
-        {isLoading && (
-          <View style={styles.loadingContainer}>
+        {isProcessing && (
+          <View style={styles.processingContainer}>
             <ActivityIndicator size="large" color="#007AFF" />
+            <Text style={styles.processingText}>Processing your query...</Text>
           </View>
         )}
 
@@ -64,7 +73,7 @@ export default function QueryScreen() {
           </View>
         )}
 
-        {results.length > 0 && (
+        {results.length > 0 && !isProcessing && (
           <ResultsTable data={results} />
         )}
       </ScrollView>
@@ -80,9 +89,17 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  loadingContainer: {
+  processingContainer: {
     padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 10,
+  },
+  processingText: {
+    color: '#007AFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   errorContainer: {
     padding: 16,

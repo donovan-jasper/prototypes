@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { VoiceButton } from './VoiceButton';
 
 interface QueryInputProps {
   onSubmit: (query: string) => void;
   initialValue?: string;
+  isProcessing: boolean;
 }
 
-export const QueryInput = ({ onSubmit, initialValue = '' }: QueryInputProps) => {
+export const QueryInput = ({ onSubmit, initialValue = '', isProcessing }: QueryInputProps) => {
   const [query, setQuery] = useState(initialValue);
 
   const handleSubmit = () => {
-    if (query.trim()) {
+    if (query.trim() && !isProcessing) {
       onSubmit(query.trim());
     }
   };
@@ -35,20 +36,28 @@ export const QueryInput = ({ onSubmit, initialValue = '' }: QueryInputProps) => 
           multiline
           blurOnSubmit
           returnKeyType="search"
+          editable={!isProcessing}
         />
         <TouchableOpacity
           style={styles.sendButton}
           onPress={handleSubmit}
-          disabled={!query.trim()}
+          disabled={!query.trim() || isProcessing}
         >
-          <MaterialIcons
-            name="send"
-            size={24}
-            color={query.trim() ? '#007AFF' : '#CCC'}
-          />
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#007AFF" />
+          ) : (
+            <MaterialIcons
+              name="send"
+              size={24}
+              color={query.trim() ? '#007AFF' : '#CCC'}
+            />
+          )}
         </TouchableOpacity>
       </View>
-      <VoiceButton onTranscription={handleVoiceTranscription} />
+      <VoiceButton
+        onTranscription={handleVoiceTranscription}
+        isProcessing={isProcessing}
+      />
     </View>
   );
 };
