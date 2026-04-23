@@ -14,8 +14,11 @@ const WorkflowBuilder = ({ workflowId }) => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [nodeConfig, setNodeConfig] = useState({});
   const [availableActions, setAvailableActions] = useState([
-    { id: 'filter', label: 'Filter', color: '#4a6fa5' },
-    { id: 'sort', label: 'Sort', color: '#5cb85c' },
+    { id: 'contacts', label: 'Contacts', color: '#4a6fa5' },
+    { id: 'photos', label: 'Photos', color: '#5cb85c' },
+    { id: 'files', label: 'Files', color: '#f0ad4e' },
+    { id: 'filter', label: 'Filter', color: '#d9534f' },
+    { id: 'sort', label: 'Sort', color: '#5bc0de' },
     { id: 'transform', label: 'Transform', color: '#f0ad4e' },
     { id: 'aggregate', label: 'Aggregate', color: '#d9534f' }
   ]);
@@ -161,102 +164,89 @@ const WorkflowBuilder = ({ workflowId }) => {
           stroke="#666"
           strokeWidth="2"
           fill="none"
-          markerEnd="url(#arrowhead)"
         />
       );
     });
   };
 
   const renderNodes = () => {
-    return nodes.map(node => {
-      const action = availableActions.find(a => a.id === node.type);
-      const color = action ? action.color : '#666';
-
-      return (
-        <G key={node.id}>
-          <Circle
-            cx={node.x}
-            cy={node.y}
-            r="20"
-            fill={color}
-            onPress={() => openNodeConfig(node.id)}
-          />
-          <SvgText
-            x={node.x}
-            y={node.y + 5}
-            fontSize="10"
-            textAnchor="middle"
-            fill="white"
-          >
-            {node.label}
-          </SvgText>
-          <Circle
-            cx={node.x + 25}
-            cy={node.y}
-            r="8"
-            fill="#333"
-            onPress={() => startConnection(node.id)}
-          />
-        </G>
-      );
-    });
+    return nodes.map(node => (
+      <G key={node.id}>
+        <Circle
+          cx={node.x}
+          cy={node.y}
+          r="20"
+          fill={availableActions.find(a => a.id === node.type)?.color || '#ccc'}
+          onPress={() => openNodeConfig(node.id)}
+        />
+        <SvgText
+          x={node.x}
+          y={node.y + 5}
+          fontSize="10"
+          textAnchor="middle"
+          fill="white"
+        >
+          {node.label}
+        </SvgText>
+        <Circle
+          cx={node.x + 25}
+          cy={node.y}
+          r="8"
+          fill="#4CAF50"
+          onPress={() => startConnection(node.id)}
+        />
+        <Circle
+          cx={node.x - 25}
+          cy={node.y}
+          r="8"
+          fill="#F44336"
+          onPress={() => completeConnection(node.id)}
+        />
+      </G>
+    ));
   };
 
-  const renderActionPalette = () => {
-    return (
-      <View style={styles.paletteContainer}>
-        <Text style={styles.paletteTitle}>Available Actions</Text>
+  return (
+    <View style={styles.container}>
+      <View style={styles.toolbar}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {availableActions.map(action => (
             <TouchableOpacity
               key={action.id}
-              style={[styles.paletteItem, { backgroundColor: action.color }]}
+              style={[styles.actionButton, { backgroundColor: action.color }]}
               onPress={() => addNode(action.id)}
             >
-              <Text style={styles.paletteItemText}>{action.label}</Text>
+              <Text style={styles.actionText}>{action.label}</Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
       </View>
-    );
-  };
 
-  return (
-    <View style={styles.container} {...panResponder.panHandlers}>
-      <View style={styles.toolbar}>
-        <TouchableOpacity style={styles.toolbarButton} onPress={saveWorkflow}>
-          <Text style={styles.toolbarButtonText}>Save</Text>
-        </TouchableOpacity>
+      <View style={styles.canvas} {...panResponder.panHandlers}>
+        <Svg
+          ref={svgRef}
+          width={width}
+          height={height}
+          style={styles.svg}
+        >
+          {renderConnections()}
+          {renderNodes()}
+          {isConnecting && connectionStart && (
+            <Path
+              d={`M${connectionStart.x},${connectionStart.y} L${connectionStart.x + 50},${connectionStart.y}`}
+              stroke="#666"
+              strokeWidth="2"
+              strokeDasharray="5,5"
+            />
+          )}
+        </Svg>
       </View>
 
-      {renderActionPalette()}
-
-      <Svg style={styles.svgContainer} ref={svgRef}>
-        <defs>
-          <marker
-            id="arrowhead"
-            markerWidth="10"
-            markerHeight="7"
-            refX="9"
-            refY="3.5"
-            orient="auto"
-          >
-            <Path d="M0,0 V7 L10,3.5 Z" fill="#666" />
-          </marker>
-        </defs>
-
-        {renderConnections()}
-        {renderNodes()}
-
-        {isConnecting && connectionStart && (
-          <Path
-            d={`M${connectionStart.x},${connectionStart.y} L${connectionStart.x + 50},${connectionStart.y}`}
-            stroke="#666"
-            strokeWidth="2"
-            strokeDasharray="5,5"
-          />
-        )}
-      </Svg>
+      <View style={styles.bottomBar}>
+        <TouchableOpacity style={styles.saveButton} onPress={saveWorkflow}>
+          <Text style={styles.saveButtonText}>Save Workflow</Text>
+        </TouchableOpacity>
+      </View>
 
       <Modal
         visible={showConfigModal}
@@ -272,7 +262,7 @@ const WorkflowBuilder = ({ workflowId }) => {
               style={styles.input}
               placeholder="Configuration value"
               value={nodeConfig.value || ''}
-              onChangeText={(text) => setNodeConfig({ ...nodeConfig, value: text })}
+              onChangeText={(text) => setNodeConfig({...nodeConfig, value: text})}
             />
 
             <View style={styles.modalButtons}>
@@ -303,44 +293,47 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   toolbar: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    padding: 10,
+    height: 60,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
   },
-  toolbarButton: {
-    padding: 10,
-    backgroundColor: '#4a6fa5',
-    borderRadius: 5,
-  },
-  toolbarButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  paletteContainer: {
-    padding: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  paletteTitle: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  paletteItem: {
-    padding: 10,
+  actionButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
     marginRight: 10,
-    borderRadius: 5,
   },
-  paletteItemText: {
+  actionText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  svgContainer: {
+  canvas: {
     flex: 1,
-    backgroundColor: 'white',
+  },
+  svg: {
+    flex: 1,
+  },
+  bottomBar: {
+    height: 60,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    justifyContent: 'center',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
@@ -349,10 +342,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    width: '80%',
     backgroundColor: 'white',
-    borderRadius: 10,
     padding: 20,
+    borderRadius: 10,
+    width: '80%',
   },
   modalTitle: {
     fontSize: 18,
@@ -362,8 +355,8 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
     padding: 10,
+    borderRadius: 5,
     marginBottom: 15,
   },
   modalButtons: {
@@ -376,10 +369,10 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   cancelButton: {
-    backgroundColor: '#ddd',
+    backgroundColor: '#f44336',
   },
   saveButton: {
-    backgroundColor: '#4a6fa5',
+    backgroundColor: '#4CAF50',
   },
   modalButtonText: {
     color: 'white',
