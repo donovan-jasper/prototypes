@@ -22,34 +22,31 @@ const base32Decode = (base32) => {
 };
 
 // Generate TOTP code
-export const generateTOTP = (secret, timeStep = 30) => {
+const generateOTPInternal = (secret, timeStep = 30, timestamp = null) => {
   try {
-    // Decode base32 secret
     const key = base32Decode(secret);
-    
-    // Get current time counter (Unix timestamp / 30)
-    const epoch = Math.floor(Date.now() / 1000);
+    const epoch = timestamp ? Math.floor(timestamp / 1000) : Math.floor(Date.now() / 1000);
     const counter = Math.floor(epoch / timeStep);
-    
-    // Convert counter to 8-byte buffer
+
     const counterHex = counter.toString(16).padStart(16, '0');
     const counterBytes = CryptoJS.enc.Hex.parse(counterHex);
-    
-    // Generate HMAC-SHA1
+
     const hmac = CryptoJS.HmacSHA1(counterBytes, CryptoJS.enc.Latin1.parse(key));
     const hmacHex = hmac.toString(CryptoJS.enc.Hex);
-    
-    // Dynamic truncation
+
     const offset = parseInt(hmacHex.substring(hmacHex.length - 1), 16);
     const truncatedHash = hmacHex.substr(offset * 2, 8);
     const code = parseInt(truncatedHash, 16) & 0x7fffffff;
-    
-    // Return 6-digit code
+
     return (code % 1000000).toString().padStart(6, '0');
   } catch (error) {
     console.error('Error generating TOTP:', error);
     return '000000';
   }
+};
+
+export const generateOTP = (secret, timeStep = 30) => {
+  return generateOTPInternal(secret, timeStep);
 };
 
 // Calculate time remaining in current 30-second window
@@ -58,7 +55,12 @@ export const getTimeRemaining = () => {
   return 30 - (epoch % 30);
 };
 
-export const validateOTP = (secret, otp) => {
-  const currentOTP = generateTOTP(secret);
-  return currentOTP === otp;
+export const validateOTP = (secret, otp, timeStep = 30) => {
+  // Check current OTP
+  const currentOTP = generateOTPInternal(secret, timeStep);
+  if (currentOTP === otp) return true;
+
+  // Check previous OTP (in case of clock skew)
+  const previousOTP = generateOTPInternal(secret, timeStep, Date.now() - timeStep * 1000);
+  return previousOTP === otp;
 };
