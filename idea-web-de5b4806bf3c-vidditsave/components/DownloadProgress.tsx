@@ -1,138 +1,78 @@
 import React from 'react';
-import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useStore } from '@/store/useStore';
-import CollectionPicker from './CollectionPicker';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { ProgressBar } from 'react-native-paper';
 
 interface DownloadProgressProps {
-  visible: boolean;
-  progress: number;
   message: string;
-  itemId?: number;
-  onClose: () => void;
+  progress?: {
+    current: number;
+    total: number;
+  };
 }
 
-const DownloadProgress: React.FC<DownloadProgressProps> = ({
-  visible,
-  progress,
-  message,
-  itemId,
-  onClose,
-}) => {
-  const [showCollectionPicker, setShowCollectionPicker] = React.useState(false);
-  const { updateItem } = useStore();
-
-  const handleCollectionSelect = (collectionId: number) => {
-    if (itemId) {
-      updateItem(itemId, { collectionId });
-    }
-    setShowCollectionPicker(false);
-    onClose();
-  };
+export const DownloadProgress: React.FC<DownloadProgressProps> = ({ message, progress }) => {
+  const progressValue = progress ? progress.current / progress.total : 0;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalContainer}>
-        <View style={styles.modalContent}>
-          <View style={styles.progressContainer}>
-            <Text style={styles.progressText}>{message}</Text>
-            <View style={styles.progressBar}>
-              <View style={[styles.progressFill, { width: `${progress}%` }]} />
-            </View>
-            <Text style={styles.percentageText}>{Math.round(progress)}%</Text>
-          </View>
-
-          <View style={styles.actionsContainer}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => setShowCollectionPicker(true)}
-            >
-              <Ionicons name="folder-outline" size={20} color="#007AFF" />
-              <Text style={styles.actionText}>Add to Collection</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={onClose}
-            >
-              <Ionicons name="close" size={20} color="#FF3B30" />
-              <Text style={[styles.actionText, { color: '#FF3B30' }]}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
+    <View style={styles.container}>
+      <ActivityIndicator size="large" color="#6200ee" />
+      <Text style={styles.message}>{message}</Text>
+      {progress && (
+        <View style={styles.progressContainer}>
+          <ProgressBar
+            progress={progressValue}
+            color="#6200ee"
+            style={styles.progressBar}
+          />
+          <Text style={styles.progressText}>
+            {Math.round(progressValue * 100)}% of {formatBytes(progress.total)}
+          </Text>
         </View>
-      </View>
-
-      <CollectionPicker
-        visible={showCollectionPicker}
-        onSelect={handleCollectionSelect}
-        onClose={() => setShowCollectionPicker(false)}
-      />
-    </Modal>
+      )}
+    </View>
   );
 };
 
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '80%',
-    backgroundColor: 'white',
-    borderRadius: 12,
+  container: {
     padding: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    margin: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 5,
   },
-  progressContainer: {
-    marginBottom: 20,
-  },
-  progressText: {
+  message: {
+    marginTop: 16,
     fontSize: 16,
-    marginBottom: 10,
+    color: '#333',
     textAlign: 'center',
+  },
+  progressContainer: {
+    width: '100%',
+    marginTop: 16,
   },
   progressBar: {
     height: 8,
-    backgroundColor: '#E5E5EA',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
     borderRadius: 4,
   },
-  percentageText: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'right',
-    marginTop: 5,
-  },
-  actionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-  },
-  actionText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#007AFF',
+  progressText: {
+    marginTop: 8,
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 });
-
-export default DownloadProgress;

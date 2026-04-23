@@ -42,8 +42,16 @@ export async function processSharedUrl(
   onProgress?: (message: string, progress?: { current: number; total: number }) => void
 ): Promise<{ success: boolean; itemId?: number; error?: string }> {
   try {
+    if (!isValidUrl(url)) {
+      throw new Error('Invalid URL');
+    }
+
     onProgress?.('Analyzing URL...');
     const parsed = parseUrl(url);
+
+    if (!parsed) {
+      throw new Error('Could not parse URL');
+    }
 
     onProgress?.('Downloading content...');
     const result = await downloadMedia(url, (current, total) => {
