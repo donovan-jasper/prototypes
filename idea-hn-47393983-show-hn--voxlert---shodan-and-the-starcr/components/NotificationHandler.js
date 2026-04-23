@@ -4,8 +4,11 @@ import * as Notifications from 'expo-notifications';
 import { processNotification } from '../services/notificationService';
 import { generateNarrativeText } from '../services/contextService';
 import { playNarration } from '../services/audioService';
+import { useSettings } from '../context/SettingsContext';
 
 const NotificationHandler = () => {
+  const { selectedVoice, notificationVolume, notificationSpeed } = useSettings();
+
   useEffect(() => {
     const initializeNotifications = async () => {
       try {
@@ -33,8 +36,11 @@ const NotificationHandler = () => {
             if (processed) {
               // Generate narrative text
               const narrative = generateNarrativeText(processed);
-              // Play the narration
-              await playNarration(narrative, processed.characterVoice || 'default');
+              // Play the narration with user settings
+              await playNarration(narrative, selectedVoice, {
+                volume: notificationVolume,
+                rate: notificationSpeed
+              });
             }
           } catch (error) {
             console.error('Error handling notification:', error);
@@ -52,7 +58,7 @@ const NotificationHandler = () => {
     };
 
     initializeNotifications();
-  }, []);
+  }, [selectedVoice, notificationVolume, notificationSpeed]);
 
   return (
     <View style={styles.container}>

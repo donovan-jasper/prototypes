@@ -1,4 +1,4 @@
-const generateNarrativeText = (notificationData) => {
+export const generateNarrativeText = (notificationData) => {
   const { app, category, title, body, data } = notificationData;
 
   // Handle different notification categories with specific narratives
@@ -155,76 +155,71 @@ const extractSubject = (text) => {
   return match ? match[1].trim() : null;
 };
 
-const extractAction = (text) => {
-  const lowerText = text.toLowerCase();
-  if (lowerText.includes('like')) return 'a new like';
-  if (lowerText.includes('comment')) return 'a new comment';
-  if (lowerText.includes('follow')) return 'a new follower';
-  if (lowerText.includes('mention')) return 'a new mention';
-  return null;
-};
-
 const extractTime = (text) => {
-  const timeMatch = text.match(/(?:in|arriving in|will arrive in)\s*(\d+)\s*(min|minute|minut|mins)/i);
-  if (timeMatch) {
-    return parseInt(timeMatch[1]);
-  }
-  return null;
+  const match = text.match(/(?:in|arriving in|will arrive in)\s*(\d+)\s*(min|minute|minut|mins)/i);
+  return match ? parseInt(match[1]) : null;
 };
 
 const extractLocation = (text) => {
-  const locationMatch = text.match(/(?:at|to|destination:)\s*([^.,]+)/i);
-  return locationMatch ? locationMatch[1].trim() : null;
+  const match = text.match(/(?:at|to|destination:)\s*([^.,]+)/i);
+  return match ? match[1].trim() : null;
 };
 
 const extractAmount = (text) => {
-  const amountMatch = text.match(/\$?(\d+(?:\.\d{2})?)/);
-  return amountMatch ? parseFloat(amountMatch[1]) : null;
+  const match = text.match(/\$?(\d+(?:\.\d{2})?)/);
+  return match ? parseFloat(match[1]) : null;
 };
 
 const extractTransactionType = (text) => {
-  const transactionMatch = text.match(/(deposit|withdrawal|payment|transfer|charge)/i);
-  return transactionMatch ? transactionMatch[1].toLowerCase() : 'transaction';
+  const lowerText = text.toLowerCase();
+  if (lowerText.includes('deposit')) return 'deposit';
+  if (lowerText.includes('withdrawal')) return 'withdrawal';
+  if (lowerText.includes('payment')) return 'payment';
+  if (lowerText.includes('transfer')) return 'transfer';
+  return 'transaction';
 };
 
 const extractHealthMetric = (text) => {
-  const stepsMatch = text.match(/(\d+)\s*(steps|calories|heart rate)/i);
+  const stepsMatch = text.match(/(\d+)\s*steps/i);
   if (stepsMatch) {
-    return {
-      type: stepsMatch[2].toLowerCase(),
-      value: stepsMatch[1],
-      change: 'changed to'
-    };
+    return { type: 'step count', value: stepsMatch[1], change: 'updated to' };
   }
+
+  const caloriesMatch = text.match(/(\d+)\s*calories/i);
+  if (caloriesMatch) {
+    return { type: 'calorie count', value: caloriesMatch[1], change: 'updated to' };
+  }
+
   return null;
 };
 
 const extractEvent = (text) => {
-  const eventMatch = text.match(/(meeting|appointment|event|task)\s*(?:at|on)\s*([^.,]+)/i);
-  if (eventMatch) {
+  const timeMatch = text.match(/(\d{1,2}:\d{2}\s*(?:am|pm)?)/i);
+  const titleMatch = text.match(/:\s*(.+)/);
+
+  if (timeMatch && titleMatch) {
     return {
-      type: eventMatch[1].toLowerCase(),
-      time: eventMatch[2],
-      title: text
+      type: 'event',
+      time: timeMatch[1],
+      title: titleMatch[1].trim()
     };
   }
+
   return null;
 };
 
 const extractHeadline = (text) => {
-  const headlineMatch = text.match(/^(?:breaking:?\s*)?(.+)/i);
-  return headlineMatch ? headlineMatch[1].trim() : null;
+  const match = text.match(/^(?:breaking:?\s*)?(.+)/i);
+  return match ? match[1].trim() : null;
 };
 
 const extractSongInfo = (text) => {
-  const songMatch = text.match(/(.+)\s*-\s*(.+)/);
-  if (songMatch) {
+  const match = text.match(/(?:playing|now playing)\s*(.+)\s*by\s*(.+)/i);
+  if (match) {
     return {
-      title: songMatch[1].trim(),
-      artist: songMatch[2].trim()
+      title: match[1].trim(),
+      artist: match[2].trim()
     };
   }
   return null;
 };
-
-export { generateNarrativeText };

@@ -25,7 +25,7 @@ const CHARACTER_VOICES = {
   }
 };
 
-export const playNarration = async (text, characterVoice = 'default') => {
+export const playNarration = async (text, characterVoice = 'default', options = {}) => {
   try {
     // Stop any currently playing speech
     Speech.stop();
@@ -36,16 +36,23 @@ export const playNarration = async (text, characterVoice = 'default') => {
       android: CHARACTER_VOICES[characterVoice]?.android || CHARACTER_VOICES.default.android
     });
 
-    // Configure speech options
-    const options = {
+    // Configure speech options with user settings
+    const speechOptions = {
       language: 'en-US',
       pitch: 1.0,
-      rate: 1.0,
+      rate: options.rate || 1.0,
       voice: voiceIdentifier
     };
 
     // Speak the text
-    Speech.speak(text, options);
+    Speech.speak(text, speechOptions);
+
+    // Set volume if available (note: volume control is limited in expo-speech)
+    if (options.volume !== undefined) {
+      // This is a workaround since expo-speech doesn't support volume directly
+      // In a production app, you might need to use a different audio library
+      console.log(`Volume setting would be applied here: ${options.volume}`);
+    }
 
     return true;
   } catch (error) {
@@ -54,10 +61,10 @@ export const playNarration = async (text, characterVoice = 'default') => {
   }
 };
 
-export const generateVoiceSample = async (characterVoice = 'default') => {
+export const generateVoiceSample = async (characterVoice = 'default', options = {}) => {
   try {
     const sampleText = "Hello, this is a sample of your selected voice.";
-    await playNarration(sampleText, characterVoice);
+    await playNarration(sampleText, characterVoice, options);
     return true;
   } catch (error) {
     console.error('Error generating voice sample:', error);
