@@ -19,7 +19,7 @@ export default function GoalCard({ goal, index, onUpgradePress }: GoalCardProps)
   const [isEditing, setIsEditing] = useState(false);
   const [title, setTitle] = useState(goal.title);
   const { updateGoal, deleteGoal, toggleGoalCompletion } = useGoals();
-  const { isPremium } = useContext(SubscriptionContext);
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
 
   const handleSave = () => {
     if (title.trim() === '') {
@@ -46,7 +46,7 @@ export default function GoalCard({ goal, index, onUpgradePress }: GoalCardProps)
   };
 
   const handleEditPress = () => {
-    if (!isPremium && index >= 1) {
+    if (!isFeatureUnlocked('multipleGoals') && index >= 1) {
       onUpgradePress();
       return;
     }

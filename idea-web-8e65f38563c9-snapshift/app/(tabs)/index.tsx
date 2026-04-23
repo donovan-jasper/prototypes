@@ -39,14 +39,14 @@ export default function HomeScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Your Goals</Text>
-          <TouchableOpacity onPress={addGoal}>
+          <TouchableOpacity onPress={() => addGoal('New Goal')}>
             <Text style={styles.addButton}>Add Goal</Text>
           </TouchableOpacity>
         </View>
 
         {goals.length > 0 ? (
           goals.map((goal) => (
-            <GoalCard key={goal.id} goal={goal} />
+            <GoalCard key={goal.id} goal={goal} index={0} onUpgradePress={() => {}} />
           ))
         ) : (
           <Text style={styles.emptyText}>Add your first goal to get started!</Text>

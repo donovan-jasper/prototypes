@@ -1,47 +1,61 @@
 import { useState, useEffect, useContext } from 'react';
-import { getRandomClip, getClipsByMood } from '../services/voiceLibrary';
-import { playVoiceClip } from '../services/audio';
+import { scheduleVoicePrompt, cancelAllPrompts, getScheduledPrompts } from '../services/notifications';
+import { getRandomClip } from '../services/voiceLibrary';
 import { SubscriptionContext } from '../context/SubscriptionContext';
 
 export const useVoicePrompts = () => {
+  const { isFeatureUnlocked } = useContext(SubscriptionContext);
   const [promptsToday, setPromptsToday] = useState(0);
   const [promptLimitReached, setPromptLimitReached] = useState(false);
-  const [usedClips, setUsedClips] = useState<string[]>([]);
-  const { isFeatureUnlocked } = useContext(SubscriptionContext);
+  const [scheduledPrompts, setScheduledPrompts] = useState<any[]>([]);
 
   useEffect(() => {
-    // Load today's prompt count from storage
-    // This would be implemented with AsyncStorage or similar
-    const loadPromptCount = async () => {
-      // Mock implementation
-      setPromptsToday(0);
+    const loadScheduledPrompts = async () => {
+      const prompts = await getScheduledPrompts();
+      setScheduledPrompts(prompts);
     };
 
-    loadPromptCount();
+    loadScheduledPrompts();
   }, []);
 
-  const playRandomPrompt = async (mood?: string) => {
-    if (!isFeatureUnlocked('unlimitedPrompts') && promptsToday >= 3) {
-      setPromptLimitReached(true);
-      return;
+  const playRandomPrompt = async () => {
+    if (promptLimitReached && !isFeatureUnlocked('unlimitedPrompts')) {
+      return false;
     }
 
-    const clips = mood ? getClipsByMood(mood) : getRandomClip();
-    const clip = clips.find(c => !usedClips.includes(c.id)) || clips[0];
+    const clip = getRandomClip('all', []);
+    if (!clip) return false;
 
-    if (clip) {
-      await playVoiceClip(clip.audioFile);
+    try {
+      await scheduleVoicePrompt({
+        title: clip.title,
+        body: 'Your motivational prompt is ready!',
+        audioFile: clip.audioFile,
+        trigger: { seconds: 1 }
+      });
+
       setPromptsToday(prev => prev + 1);
-      setUsedClips(prev => [...prev, clip.id]);
+      if (!isFeatureUnlocked('unlimitedPrompts') && promptsToday + 1 >= 3) {
+        setPromptLimitReached(true);
+      }
 
-      // Save to storage
-      // await AsyncStorage.setItem('promptsToday', (promptsToday + 1).toString());
+      return true;
+    } catch (error) {
+      console.error('Error playing prompt:', error);
+      return false;
     }
+  };
+
+  const resetDailyPrompts = () => {
+    setPromptsToday(0);
+    setPromptLimitReached(false);
   };
 
   return {
     promptsToday,
     promptLimitReached,
+    scheduledPrompts,
     playRandomPrompt,
+    resetDailyPrompts
   };
 };

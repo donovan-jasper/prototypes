@@ -186,6 +186,5 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
     borderRadius: 12,
     fontSize: 12,
-    fontWeight: 'bold',
   },
 });

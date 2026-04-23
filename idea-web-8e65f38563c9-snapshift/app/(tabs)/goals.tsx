@@ -8,7 +8,7 @@ import { useNavigation } from '@react-navigation/native';
 
 const GoalsScreen = () => {
   const { goals, addGoal } = useGoals();
-  const { isPremium } = useContext(SubscriptionContext);
+  const { isPremium, isFeatureUnlocked, purchaseSubscription } = useContext(SubscriptionContext);
   const navigation = useNavigation();
   const [newGoalTitle, setNewGoalTitle] = useState('');
   const [showPaywall, setShowPaywall] = useState(false);
@@ -16,7 +16,7 @@ const GoalsScreen = () => {
   const handleAddGoal = () => {
     if (!newGoalTitle.trim()) return;
 
-    if (!isPremium && goals.length >= 1) {
+    if (!isFeatureUnlocked('multipleGoals') && goals.length >= 1) {
       setShowPaywall(true);
       return;
     }
@@ -29,13 +29,11 @@ const GoalsScreen = () => {
     setShowPaywall(true);
   };
 
-  const handlePurchase = async () => {
-    // In a real app, you would call the purchase function from your subscription service
-    // For this prototype, we'll just simulate a successful purchase
-    setTimeout(() => {
+  const handlePurchase = async (isAnnual: boolean = false) => {
+    const success = await purchaseSubscription(isAnnual);
+    if (success) {
       setShowPaywall(false);
-      // In a real app, you would update the subscription status here
-    }, 1000);
+    }
   };
 
   const handleNavigateToSettings = () => {
@@ -63,7 +61,7 @@ const GoalsScreen = () => {
         </TouchableOpacity>
       </View>
 
-      {!isPremium && goals.length >= 1 && (
+      {!isFeatureUnlocked('multipleGoals') && goals.length >= 1 && (
         <View style={styles.premiumNotice}>
           <Ionicons name="lock-closed" size={16} color="#FFD700" />
           <Text style={styles.premiumNoticeText}>Premium lets you add up to 5 goals</Text>
@@ -128,9 +126,17 @@ const GoalsScreen = () => {
 
             <TouchableOpacity
               style={styles.purchaseButton}
-              onPress={handlePurchase}
+              onPress={() => handlePurchase(false)}
             >
               <Text style={styles.purchaseButtonText}>Upgrade to Premium - $7.99/month</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.annualButton}
+              onPress={() => handlePurchase(true)}
+            >
+              <Text style={styles.annualButtonText}>Annual Plan - $59.99/year</Text>
+              <Text style={styles.annualDiscount}>Save 37%</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -155,7 +161,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   addGoalContainer: {
     flexDirection: 'row',
@@ -166,14 +172,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    fontSize: 16,
     marginRight: 8,
   },
   addButton: {
     backgroundColor: '#673ab7',
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -186,19 +191,19 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   premiumNoticeText: {
-    flex: 1,
     marginLeft: 8,
-    color: '#666',
+    flex: 1,
+    color: '#ff9800',
   },
   upgradeButton: {
-    backgroundColor: '#673ab7',
-    paddingHorizontal: 12,
+    backgroundColor: '#ff9800',
     paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 4,
   },
   upgradeButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontWeight: '600',
   },
   listContent: {
     paddingBottom: 20,
@@ -209,7 +214,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: '#666',
-    fontSize: 16,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -219,8 +224,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 12,
     padding: 20,
+    borderRadius: 10,
     width: '80%',
     maxWidth: 400,
   },
@@ -236,7 +241,9 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   featureText: {
     fontSize: 16,
@@ -246,20 +253,45 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
+    alignItems: 'center',
   },
   purchaseButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 16,
+  },
+  annualButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  annualButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  annualDiscount: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#FFD700',
+    color: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   closeButton: {
     padding: 12,
+    alignItems: 'center',
   },
   closeButtonText: {
-    color: '#673ab7',
+    color: '#666',
     fontSize: 16,
-    textAlign: 'center',
   },
 });
 

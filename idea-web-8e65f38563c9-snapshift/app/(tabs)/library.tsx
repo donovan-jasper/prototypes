@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput, Modal, ScrollView } from 'react-native';
-import { useSubscription } from '../../hooks/useSubscription';
+import { SubscriptionContext } from '../../context/SubscriptionContext';
 import { getVoiceClipsByCategory, getClipsByCategoryAndMood, getPremiumClips } from '../../services/voiceLibrary';
 import VoicePlayer from '../../components/VoicePlayer';
 import { VoiceClip } from '../../types';
@@ -11,7 +11,7 @@ const categories = ['all', 'morning', 'focus', 'energy', 'calm', 'celebrate'];
 const moods = ['struggling', 'neutral', 'crushing'];
 
 const LibraryScreen = () => {
-  const { isPremium } = useSubscription();
+  const { isPremium, purchaseSubscription } = useContext(SubscriptionContext);
   const navigation = useNavigation();
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedMood, setSelectedMood] = useState('neutral');
@@ -46,13 +46,11 @@ const LibraryScreen = () => {
     }
   };
 
-  const handlePurchase = async () => {
-    // In a real app, you would call the purchase function from your subscription service
-    // For this prototype, we'll just simulate a successful purchase
-    setTimeout(() => {
+  const handlePurchase = async (isAnnual: boolean = false) => {
+    const success = await purchaseSubscription(isAnnual);
+    if (success) {
       setShowPaywall(false);
-      // In a real app, you would update the subscription status here
-    }, 1000);
+    }
   };
 
   const handleNavigateToSettings = () => {
@@ -159,7 +157,7 @@ const LibraryScreen = () => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Unlock Premium Content</Text>
+            <Text style={styles.modalTitle}>Unlock Full Library</Text>
 
             <View style={styles.featureComparison}>
               <View style={styles.featureRow}>
@@ -169,7 +167,7 @@ const LibraryScreen = () => {
 
               <View style={styles.featureRow}>
                 <Text style={styles.featureText}>10 rotating clips</Text>
-                <Text style={styles.featureText}>Full library</Text>
+                <Text style={styles.featureText}>50+ clips</Text>
               </View>
 
               <View style={styles.featureRow}>
@@ -185,9 +183,17 @@ const LibraryScreen = () => {
 
             <TouchableOpacity
               style={styles.purchaseButton}
-              onPress={handlePurchase}
+              onPress={() => handlePurchase(false)}
             >
               <Text style={styles.purchaseButtonText}>Upgrade to Premium - $7.99/month</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.annualButton}
+              onPress={() => handlePurchase(true)}
+            >
+              <Text style={styles.annualButtonText}>Annual Plan - $59.99/year</Text>
+              <Text style={styles.annualDiscount}>Save 37%</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -207,13 +213,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 16,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
   },
   title: {
     fontSize: 24,
@@ -222,17 +227,19 @@ const styles = StyleSheet.create({
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#673ab7',
-    paddingHorizontal: 8,
+    backgroundColor: '#FFD700',
     paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 12,
   },
   premiumBadgeText: {
-    color: 'white',
     marginLeft: 4,
     fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
   },
   searchContainer: {
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
   searchInput: {
@@ -242,10 +249,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   filtersContainer: {
+    paddingHorizontal: 16,
     marginBottom: 16,
   },
   filterSection: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   filterTitle: {
     fontSize: 16,
@@ -257,12 +265,12 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   categoryButton: {
-    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: '#e0e0e0',
   },
   selectedCategoryButton: {
     backgroundColor: '#673ab7',
@@ -281,12 +289,12 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderRadius: 8,
-    marginRight: 8,
     backgroundColor: '#e0e0e0',
+    marginRight: 8,
     alignItems: 'center',
   },
   selectedMoodButton: {
-    backgroundColor: '#673ab7',
+    backgroundColor: '#4CAF50',
   },
   moodButtonText: {
     color: '#333',
@@ -295,6 +303,7 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   listContent: {
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
   emptyContainer: {
@@ -303,7 +312,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: '#666',
-    fontSize: 16,
+    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
@@ -313,8 +322,8 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 12,
     padding: 20,
+    borderRadius: 10,
     width: '80%',
     maxWidth: 400,
   },
@@ -330,7 +339,9 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   featureText: {
     fontSize: 16,
@@ -340,20 +351,45 @@ const styles = StyleSheet.create({
     padding: 16,
     borderRadius: 8,
     marginBottom: 12,
+    alignItems: 'center',
   },
   purchaseButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
-    textAlign: 'center',
+    fontSize: 16,
+  },
+  annualButton: {
+    backgroundColor: '#4CAF50',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  annualButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  annualDiscount: {
+    position: 'absolute',
+    top: -10,
+    right: -10,
+    backgroundColor: '#FFD700',
+    color: '#333',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   closeButton: {
     padding: 12,
+    alignItems: 'center',
   },
   closeButtonText: {
-    color: '#673ab7',
+    color: '#666',
     fontSize: 16,
-    textAlign: 'center',
   },
 });
 

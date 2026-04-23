@@ -1,29 +1,31 @@
 import React, { useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { SubscriptionContext } from '../context/SubscriptionContext';
+import { Ionicons } from '@expo/vector-icons';
 
 interface PremiumGateProps {
-  feature: string;
+  feature: 'unlimitedPrompts' | 'fullLibrary' | 'multipleGoals';
   children: React.ReactNode;
   renderLocked?: () => React.ReactNode;
 }
 
 export const PremiumGate: React.FC<PremiumGateProps> = ({ feature, children, renderLocked }) => {
-  const { isFeatureUnlocked } = useContext(SubscriptionContext);
+  const { isPremium, isFeatureUnlocked } = useContext(SubscriptionContext);
 
-  if (isFeatureUnlocked(feature)) {
+  if (isPremium || isFeatureUnlocked(feature)) {
     return <>{children}</>;
   }
 
   if (renderLocked) {
-    return renderLocked();
+    return <>{renderLocked()}</>;
   }
 
   return (
     <View style={styles.lockedContainer}>
+      <Ionicons name="lock-closed" size={24} color="#FFD700" />
       <Text style={styles.lockedText}>Premium Feature</Text>
       <TouchableOpacity style={styles.upgradeButton}>
-        <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
+        <Text style={styles.upgradeButtonText}>Upgrade to Unlock</Text>
       </TouchableOpacity>
     </View>
   );
@@ -35,15 +37,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     alignItems: 'center',
-    marginVertical: 16,
+    marginVertical: 8,
   },
   lockedText: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
+    fontWeight: 'bold',
+    marginVertical: 8,
   },
   upgradeButton: {
-    backgroundColor: '#FF9800',
+    backgroundColor: '#673ab7',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 4,

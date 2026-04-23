@@ -1,22 +1,22 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import { VoiceClip } from '../types';
+import { SubscriptionContext } from '../context/SubscriptionContext';
 
 interface VoicePlayerProps {
   clip: VoiceClip;
-  isPremiumUser: boolean;
   onUpgradePress: () => void;
   onPlaybackStatusUpdate?: (status: any) => void;
 }
 
 const VoicePlayer: React.FC<VoicePlayerProps> = ({
   clip,
-  isPremiumUser,
   onUpgradePress,
   onPlaybackStatusUpdate
 }) => {
+  const { isPremium } = useContext(SubscriptionContext);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -32,7 +32,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   }, [sound]);
 
   const loadSound = async () => {
-    if (!isPremiumUser && clip.isPremium) {
+    if (!isPremium && clip.isPremium) {
       onUpgradePress();
       return;
     }
@@ -64,7 +64,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
   };
 
   const togglePlayback = async () => {
-    if (!isPremiumUser && clip.isPremium) {
+    if (!isPremium && clip.isPremium) {
       onUpgradePress();
       return;
     }
@@ -88,7 +88,7 @@ const VoicePlayer: React.FC<VoicePlayerProps> = ({
     return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  if (!isPremiumUser && clip.isPremium) {
+  if (!isPremium && clip.isPremium) {
     return (
       <View style={styles.lockedContainer}>
         <View style={styles.lockIconContainer}>
@@ -185,43 +185,28 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 4,
   },
   category: {
     fontSize: 14,
     color: '#666',
   },
-  upgradeButton: {
-    backgroundColor: '#673ab7',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  upgradeButtonText: {
-    color: 'white',
-    fontSize: 12,
-  },
-  clipHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
     paddingVertical: 2,
+    paddingHorizontal: 6,
     borderRadius: 12,
+    alignSelf: 'flex-start',
+    marginTop: 4,
   },
   premiumBadgeText: {
-    color: '#333',
     marginLeft: 4,
     fontSize: 12,
     fontWeight: 'bold',
+    color: '#333',
   },
   controls: {
     flexDirection: 'row',
@@ -247,6 +232,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     textAlign: 'right',
+  },
+  upgradeButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  upgradeButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  clipHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
 });
 
