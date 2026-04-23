@@ -65,7 +65,7 @@ export const createGift = async (gift: Omit<Gift, 'id'>): Promise<Gift> => {
             gift.category,
             gift.price,
             gift.description || null,
-            gift.imageUrl || null,
+            gift.image_url || null,
           ],
           (_, result) => {
             const id = result.insertId;
@@ -95,7 +95,7 @@ export const getGiftById = async (id: number): Promise<Gift | null> => {
                 category: item.category,
                 price: item.price,
                 description: item.description,
-                imageUrl: item.image_url,
+                image_url: item.image_url,
               });
             } else {
               resolve(null);
@@ -126,7 +126,7 @@ export const getGiftsByCategory = async (category: string): Promise<Gift[]> => {
                 category: item.category,
                 price: item.price,
                 description: item.description,
-                imageUrl: item.image_url,
+                image_url: item.image_url,
               });
             }
             resolve(gifts);
@@ -158,38 +158,10 @@ export const searchGifts = async (query: string): Promise<Gift[]> => {
                 category: item.category,
                 price: item.price,
                 description: item.description,
-                imageUrl: item.image_url,
+                image_url: item.image_url,
               });
             }
             resolve(gifts);
-          },
-          (_, error) => reject(error)
-        );
-      },
-      (error) => reject(error)
-    );
-  });
-};
-
-export const recordSentGift = async (giftId: number, recipientId: number, message?: string): Promise<SentGift> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `INSERT INTO sent_gifts (gift_id, recipient_id, message)
-           VALUES (?, ?, ?);`,
-          [giftId, recipientId, message || null],
-          (_, result) => {
-            const id = result.insertId;
-            resolve({
-              id,
-              giftId,
-              recipientId,
-              message: message || null,
-              status: 'sent',
-              sentAt: new Date().toISOString(),
-              redeemedAt: null,
-            });
           },
           (_, error) => reject(error)
         );
@@ -209,20 +181,20 @@ export const getSentGiftsByRecipient = async (recipientId: number): Promise<Sent
            ORDER BY sent_at DESC;`,
           [recipientId],
           (_, { rows }) => {
-            const sentGifts: SentGift[] = [];
+            const gifts: SentGift[] = [];
             for (let i = 0; i < rows.length; i++) {
               const item = rows.item(i);
-              sentGifts.push({
+              gifts.push({
                 id: item.id,
-                giftId: item.gift_id,
-                recipientId: item.recipient_id,
+                gift_id: item.gift_id,
+                recipient_id: item.recipient_id,
                 message: item.message,
                 status: item.status,
-                sentAt: item.sent_at,
-                redeemedAt: item.redeemed_at,
+                sent_at: item.sent_at,
+                redeemed_at: item.redeemed_at,
               });
             }
-            resolve(sentGifts);
+            resolve(gifts);
           },
           (_, error) => reject(error)
         );
@@ -232,16 +204,25 @@ export const getSentGiftsByRecipient = async (recipientId: number): Promise<Sent
   });
 };
 
-export const updateGiftStatus = async (id: number, status: string, redeemedAt?: string): Promise<void> => {
+export const recordSentGift = async (gift: Omit<SentGift, 'id'>): Promise<SentGift> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          `UPDATE sent_gifts
-           SET status = ?, redeemed_at = ?
-           WHERE id = ?;`,
-          [status, redeemedAt || null, id],
-          () => resolve(),
+          `INSERT INTO sent_gifts (gift_id, recipient_id, message, status, sent_at, redeemed_at)
+           VALUES (?, ?, ?, ?, ?, ?);`,
+          [
+            gift.gift_id,
+            gift.recipient_id,
+            gift.message || null,
+            gift.status || 'sent',
+            gift.sent_at || new Date().toISOString(),
+            gift.redeemed_at || null,
+          ],
+          (_, result) => {
+            const id = result.insertId;
+            resolve({ ...gift, id });
+          },
           (_, error) => reject(error)
         );
       },
