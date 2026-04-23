@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabase('cogniquest.db');
@@ -178,7 +179,7 @@ export async function getPerformanceStats() {
       recentPerformance
     };
   } catch (error) {
-    console.error('Error calculating performance stats:', error);
+    console.error('Error getting performance stats:', error);
     return {
       totalSessions: 0,
       averageScore: 0,
@@ -195,4 +196,64 @@ export async function getPerformanceStats() {
       recentPerformance: []
     };
   }
+}
+
+export function useAdaptiveLogic() {
+  const [performanceHistory, setPerformanceHistory] = useState([]);
+  const [currentDifficulty, setCurrentDifficulty] = useState('medium');
+  const [currentDomain, setCurrentDomain] = useState('logic');
+
+  const loadPerformanceHistory = async () => {
+    try {
+      const history = await getPerformanceHistory();
+      setPerformanceHistory(history);
+    } catch (error) {
+      console.error('Error loading performance history:', error);
+    }
+  };
+
+  const updatePerformance = async (difficulty, correct, total, domain) => {
+    try {
+      const updatedHistory = await savePerformanceRecord(difficulty, correct, total, domain);
+      setPerformanceHistory(updatedHistory);
+
+      const newDifficulty = calculateAdaptiveDifficulty(
+        (correct / total) * 100,
+        difficulty
+      );
+
+      setCurrentDifficulty(newDifficulty);
+      setCurrentDomain(domain);
+
+      return newDifficulty;
+    } catch (error) {
+      console.error('Error updating performance:', error);
+      return difficulty;
+    }
+  };
+
+  const getNextProblemRecommendation = async () => {
+    try {
+      const { domain, difficulty } = await getProblemRecommendations();
+      setCurrentDomain(domain);
+      setCurrentDifficulty(difficulty);
+      return { domain, difficulty };
+    } catch (error) {
+      console.error('Error getting next problem recommendation:', error);
+      return { domain: 'logic', difficulty: 'medium' };
+    }
+  };
+
+  useEffect(() => {
+    loadPerformanceHistory();
+  }, []);
+
+  return {
+    performanceHistory,
+    currentDifficulty,
+    currentDomain,
+    updatePerformance,
+    getNextProblemRecommendation,
+    getPerformanceStats
+  };
 }

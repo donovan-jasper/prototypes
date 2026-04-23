@@ -3,16 +3,21 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { StatusBar } from 'expo-status-bar';
 import ProblemCard from '../components/ProblemCard';
 import { getRandomProblems } from '../data/problems';
-import { getProblemRecommendations, savePerformanceRecord, calculateAdaptiveDifficulty } from '../hooks/useAdaptiveLogic';
+import { useAdaptiveLogic } from '../hooks/useAdaptiveLogic';
 
 export default function DailyChallengesScreen({ navigation }) {
   const [problems, setProblems] = useState([]);
   const [currentProblemIndex, setCurrentProblemIndex] = useState(0);
   const [score, setScore] = useState({ correct: 0, incorrect: 0 });
-  const [currentDifficulty, setCurrentDifficulty] = useState('medium');
-  const [currentDomain, setCurrentDomain] = useState('logic');
   const [loading, setLoading] = useState(true);
   const [sessionStartTime, setSessionStartTime] = useState(null);
+
+  const {
+    currentDifficulty,
+    currentDomain,
+    updatePerformance,
+    getNextProblemRecommendation
+  } = useAdaptiveLogic();
 
   useEffect(() => {
     loadChallenges();
@@ -21,9 +26,7 @@ export default function DailyChallengesScreen({ navigation }) {
 
   const loadChallenges = async () => {
     try {
-      const { domain, difficulty } = await getProblemRecommendations();
-      setCurrentDomain(domain);
-      setCurrentDifficulty(difficulty);
+      const { domain, difficulty } = await getNextProblemRecommendation();
       setProblems(getRandomProblems(3, difficulty, domain));
     } catch (error) {
       console.error('Error loading challenges:', error);
@@ -50,11 +53,13 @@ export default function DailyChallengesScreen({ navigation }) {
       const totalProblems = problems.length;
       const sessionDuration = Math.floor((Date.now() - sessionStartTime) / 1000);
 
-      // Calculate new difficulty based on performance
-      const performanceScore = (totalCorrect / totalProblems) * 100;
-      const newDifficulty = calculateAdaptiveDifficulty(performanceScore, currentDifficulty);
-
-      await savePerformanceRecord(currentDifficulty, totalCorrect, totalProblems, currentDomain);
+      // Update performance and get new difficulty
+      const newDifficulty = await updatePerformance(
+        currentDifficulty,
+        totalCorrect,
+        totalProblems,
+        currentDomain
+      );
 
       setTimeout(() => {
         navigation.navigate('Results', {
@@ -163,39 +168,38 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   domainBadge: {
-    backgroundColor: '#e0f2fe',
+    backgroundColor: '#6366f1',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    borderRadius: 20,
   },
   domainText: {
-    color: '#0369a1',
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
   difficultyBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: '#10b981',
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 12,
-    alignSelf: 'flex-start',
-    marginBottom: 8,
+    borderRadius: 20,
   },
   difficultyText: {
-    color: '#b45309',
+    color: '#fff',
     fontSize: 12,
     fontWeight: '600',
   },
   progressBar: {
+    flex: 1,
     height: 8,
     backgroundColor: '#e5e7eb',
     borderRadius: 4,
-    marginVertical: 8,
-    overflow: 'hidden',
+    marginHorizontal: 16,
   },
   progressFill: {
     height: '100%',
@@ -203,11 +207,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   scoreText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
-    textAlign: 'center',
-    marginTop: 8,
+    fontSize: 14,
+    color: '#4b5563',
+    fontWeight: '500',
   },
   scrollView: {
     flex: 1,
