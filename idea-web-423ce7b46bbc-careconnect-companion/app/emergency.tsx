@@ -15,7 +15,7 @@ export default function EmergencyScreen() {
   const [error, setError] = useState<string | null>(null);
 
   // Get the first emergency contact
-  const primaryContact = emergencyContacts[0];
+  const primaryContact = emergencyContacts.find(contact => contact.isEmergency) || emergencyContacts[0];
 
   // Start countdown when component mounts
   useEffect(() => {

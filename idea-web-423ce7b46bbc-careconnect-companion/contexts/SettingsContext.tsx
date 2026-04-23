@@ -1,22 +1,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface Contact {
+interface EmergencyContact {
   id: string;
   name: string;
   phone: string;
-  photo?: string;
-  isFavorite: boolean;
   isEmergency: boolean;
 }
 
 interface SettingsContextType {
   theme: 'light' | 'dark' | 'high-contrast';
   textSize: number;
-  emergencyContacts: Contact[];
+  emergencyContacts: EmergencyContact[];
   setTheme: (theme: 'light' | 'dark' | 'high-contrast') => void;
   setTextSize: (size: number) => void;
-  setEmergencyContacts: (contacts: Contact[]) => void;
+  setEmergencyContacts: (contacts: EmergencyContact[]) => void;
+  addEmergencyContact: (contact: EmergencyContact) => void;
+  removeEmergencyContact: (id: string) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
@@ -24,7 +24,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<'light' | 'dark' | 'high-contrast'>('light');
   const [textSize, setTextSize] = useState(1);
-  const [emergencyContacts, setEmergencyContacts] = useState<Contact[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
 
   // Load settings from AsyncStorage on mount
   useEffect(() => {
@@ -32,11 +32,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         const savedTheme = await AsyncStorage.getItem('theme');
         const savedTextSize = await AsyncStorage.getItem('textSize');
-        const savedEmergencyContacts = await AsyncStorage.getItem('emergencyContacts');
+        const savedContacts = await AsyncStorage.getItem('emergencyContacts');
 
         if (savedTheme) setTheme(savedTheme as 'light' | 'dark' | 'high-contrast');
         if (savedTextSize) setTextSize(parseFloat(savedTextSize));
-        if (savedEmergencyContacts) setEmergencyContacts(JSON.parse(savedEmergencyContacts));
+        if (savedContacts) setEmergencyContacts(JSON.parse(savedContacts));
       } catch (error) {
         console.error('Failed to load settings:', error);
       }
@@ -60,6 +60,14 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     saveSettings();
   }, [theme, textSize, emergencyContacts]);
 
+  const addEmergencyContact = (contact: EmergencyContact) => {
+    setEmergencyContacts(prev => [...prev, contact]);
+  };
+
+  const removeEmergencyContact = (id: string) => {
+    setEmergencyContacts(prev => prev.filter(contact => contact.id !== id));
+  };
+
   return (
     <SettingsContext.Provider
       value={{
@@ -69,6 +77,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setTheme,
         setTextSize,
         setEmergencyContacts,
+        addEmergencyContact,
+        removeEmergencyContact,
       }}
     >
       {children}
