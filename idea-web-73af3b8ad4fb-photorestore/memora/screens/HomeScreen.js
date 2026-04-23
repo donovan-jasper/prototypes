@@ -3,14 +3,15 @@ import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Scr
 import * as ImagePicker from 'expo-image-picker';
 import { useDispatch, useSelector } from 'react-redux';
 import { incrementUsage } from '../store/userSlice';
-import { applyEnhancement } from '../services/RestorationService';
+import { restorePhoto } from '../services/RestorationService';
 
 const HomeScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const { isPremium, usageCount } = useSelector((state) => state.user);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [selectedEnhancement, setSelectedEnhancement] = useState('auto');
+  const [restoredImage, setRestoredImage] = useState(null);
+  const [qualityMetrics, setQualityMetrics] = useState(null);
 
   const pickImage = async () => {
     if (!isPremium && usageCount >= 3) {
@@ -27,7 +28,8 @@ const HomeScreen = ({ navigation }) => {
 
     if (!result.canceled) {
       setSelectedImage(result.assets[0].uri);
-      setSelectedEnhancement('auto');
+      setRestoredImage(null);
+      setQualityMetrics(null);
     }
   };
 
@@ -35,230 +37,230 @@ const HomeScreen = ({ navigation }) => {
     if (!selectedImage) return;
 
     setIsProcessing(true);
-    
+
     try {
-      const restoredImage = await applyEnhancement(selectedImage, selectedEnhancement);
+      const result = await restorePhoto(selectedImage);
       dispatch(incrementUsage());
-      setIsProcessing(false);
-      setSelectedImage(null);
-      navigation.navigate('Result', { 
-        originalImage: selectedImage,
-        restoredImage: restoredImage.uri,
-        quality: restoredImage.quality,
-        enhancement: restoredImage.enhancement,
+      setRestoredImage(result.uri);
+      setQualityMetrics({
+        quality: result.quality,
+        enhancement: result.enhancement
       });
     } catch (error) {
-      setIsProcessing(false);
       console.error('Failed to restore photo:', error);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const enhancementOptions = [
-    { id: 'auto', label: 'Auto', description: 'Balanced enhancement' },
-    { id: 'brighten', label: 'Brighten', description: 'Increase brightness' },
-    { id: 'sharpen', label: 'Sharpen', description: 'Enhance details' },
-    { id: 'vintage', label: 'Vintage', description: 'Classic film look' },
-    { id: 'modern', label: 'Modern', description: 'Clean & crisp' },
-  ];
+  const resetSelection = () => {
+    setSelectedImage(null);
+    setRestoredImage(null);
+    setQualityMetrics(null);
+  };
 
-  if (selectedImage) {
-    return (
-      <ScrollView contentContainerStyle={styles.enhancementContainer}>
-        <Text style={styles.title}>Choose Enhancement Style</Text>
-        
-        <Image source={{ uri: selectedImage }} style={styles.previewImage} />
-        
-        <View style={styles.optionsContainer}>
-          {enhancementOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.optionButton,
-                selectedEnhancement === option.id && styles.optionButtonSelected,
-              ]}
-              onPress={() => setSelectedEnhancement(option.id)}
-            >
-              <Text style={[
-                styles.optionLabel,
-                selectedEnhancement === option.id && styles.optionLabelSelected,
-              ]}>
-                {option.label}
-              </Text>
-              <Text style={[
-                styles.optionDescription,
-                selectedEnhancement === option.id && styles.optionDescriptionSelected,
-              ]}>
-                {option.description}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+  const saveResult = () => {
+    if (!restoredImage) return;
 
-        {isProcessing ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#007AFF" />
-            <Text style={styles.loadingText}>Applying {selectedEnhancement} enhancement...</Text>
-          </View>
-        ) : (
-          <View style={styles.actionButtons}>
-            <TouchableOpacity 
-              style={styles.cancelButton} 
-              onPress={() => setSelectedImage(null)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity 
-              style={styles.processButton} 
-              onPress={processImage}
-            >
-              <Text style={styles.processButtonText}>Process</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </ScrollView>
-    );
-  }
+    navigation.navigate('Result', {
+      originalImage: selectedImage,
+      restoredImage: restoredImage,
+      quality: qualityMetrics?.quality || 0.85,
+      enhancement: qualityMetrics?.enhancement || 'auto',
+    });
+  };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Restore Your Memories</Text>
       <Text style={styles.subtitle}>
         Transform old, damaged photos into stunning images
       </Text>
-      
+
       {!isPremium && (
         <Text style={styles.usageText}>
           Free restorations: {3 - usageCount} remaining
         </Text>
       )}
 
-      <TouchableOpacity style={styles.button} onPress={pickImage}>
-        <Text style={styles.buttonText}>Select Photo to Restore</Text>
-      </TouchableOpacity>
-    </View>
+      {!selectedImage && (
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
+          <Text style={styles.buttonText}>Select Photo to Restore</Text>
+        </TouchableOpacity>
+      )}
+
+      {selectedImage && !restoredImage && (
+        <View style={styles.imageContainer}>
+          <Image source={{ uri: selectedImage }} style={styles.previewImage} />
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.processButton} onPress={processImage}>
+              <Text style={styles.processButtonText}>Restore Photo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {isProcessing && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Restoring your photo...</Text>
+        </View>
+      )}
+
+      {restoredImage && (
+        <View style={styles.resultContainer}>
+          <Text style={styles.sectionTitle}>Restored Photo</Text>
+          <Image source={{ uri: restoredImage }} style={styles.resultImage} />
+
+          {qualityMetrics && (
+            <View style={styles.metricsContainer}>
+              <Text style={styles.metricsTitle}>Quality Metrics</Text>
+              <Text style={styles.metricsText}>Enhancement: {qualityMetrics.enhancement}</Text>
+              <Text style={styles.metricsText}>Quality Score: {(qualityMetrics.quality * 100).toFixed(1)}%</Text>
+            </View>
+          )}
+
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
+              <Text style={styles.cancelButtonText}>Start Over</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.processButton} onPress={saveResult}>
+              <Text style={styles.processButtonText}>Save Result</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  enhancementContainer: {
     flexGrow: 1,
     padding: 20,
     backgroundColor: '#f5f5f5',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
+    marginBottom: 10,
     textAlign: 'center',
+    color: '#333',
   },
   subtitle: {
     fontSize: 16,
     color: '#666',
+    marginBottom: 20,
     textAlign: 'center',
-    marginBottom: 32,
   },
   usageText: {
     fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 24,
+    color: '#666',
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    width: '100%',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  imageContainer: {
+    width: '100%',
+    marginBottom: 20,
   },
   previewImage: {
     width: '100%',
-    height: 250,
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 20,
     resizeMode: 'contain',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    marginBottom: 24,
-  },
-  optionsContainer: {
-    marginBottom: 24,
-  },
-  optionButton: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
-  },
-  optionButtonSelected: {
-    borderColor: '#007AFF',
-    backgroundColor: '#E8F4FF',
-  },
-  optionLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
-  },
-  optionLabelSelected: {
-    color: '#007AFF',
-  },
-  optionDescription: {
-    fontSize: 14,
-    color: '#666',
-  },
-  optionDescriptionSelected: {
-    color: '#0066CC',
+    backgroundColor: '#e0e0e0',
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    width: '100%',
   },
   cancelButton: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 16,
+    backgroundColor: '#e0e0e0',
+    padding: 15,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    flex: 1,
+    marginRight: 10,
+    alignItems: 'center',
   },
   cancelButtonText: {
-    color: '#007AFF',
-    fontSize: 18,
+    color: '#333',
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
   processButton: {
-    flex: 1,
     backgroundColor: '#007AFF',
-    paddingVertical: 16,
+    padding: 15,
     borderRadius: 8,
+    flex: 1,
+    marginLeft: 10,
+    alignItems: 'center',
   },
   processButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
-    textAlign: 'center',
   },
   loadingContainer: {
-    alignItems: 'center',
     marginTop: 20,
+    alignItems: 'center',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
-  button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 8,
+  resultContainer: {
+    width: '100%',
+    marginTop: 20,
   },
-  buttonText: {
-    color: '#fff',
+  sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  resultImage: {
+    width: '100%',
+    height: 300,
+    borderRadius: 8,
+    marginBottom: 20,
+    resizeMode: 'contain',
+    backgroundColor: '#e0e0e0',
+  },
+  metricsContainer: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  metricsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  metricsText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
   },
 });
 
