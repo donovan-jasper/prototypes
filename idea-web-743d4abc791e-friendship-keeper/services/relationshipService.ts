@@ -120,7 +120,9 @@ export const calculateHealth = (relationship: Relationship, lastInteractionTimes
   }
 
   // Adjust score based on importance (1-5 scale)
-  score = score * (0.8 + (relationship.importance * 0.04)); // Importance 1 = 80%, 5 = 100%
+  // Importance 1: 80% of base score, Importance 5: 100% of base score
+  const importanceFactor = 0.8 + (relationship.importance * 0.04);
+  score = score * importanceFactor;
 
   // Ensure score is between 0 and 100
   score = Math.min(100, Math.max(0, score));
@@ -143,47 +145,10 @@ const getFrequencyDays = (frequency: string): number => {
   switch (frequency.toLowerCase()) {
     case 'daily': return 1;
     case 'weekly': return 7;
-    case 'biweekly': return 14;
+    case 'bi-weekly': return 14;
     case 'monthly': return 30;
     case 'quarterly': return 90;
-    case 'biannually': return 180;
     case 'yearly': return 365;
-    default: return 30; // Default to monthly if unknown
-  }
-};
-
-export const getRelationshipById = async (id: number): Promise<RelationshipWithHealth | null> => {
-  try {
-    const relationship = await new Promise<Relationship | null>((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM relationships WHERE id = ?',
-          [id],
-          (_, { rows }) => resolve(rows._array[0] || null),
-          (_, error) => reject(error)
-        );
-      });
-    });
-
-    if (!relationship) return null;
-
-    const lastInteraction = await new Promise<{ timestamp: string } | null>((resolve, reject) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT timestamp FROM interactions WHERE relationshipId = ? ORDER BY timestamp DESC LIMIT 1',
-          [id],
-          (_, { rows }) => resolve(rows._array[0] || null),
-          (_, error) => reject(error)
-        );
-      });
-    });
-
-    return {
-      ...relationship,
-      health: calculateHealth(relationship, lastInteraction?.timestamp || null)
-    };
-  } catch (error) {
-    console.error('Error fetching relationship by ID:', error);
-    throw error;
+    default: return 30; // Default to monthly if unknown frequency
   }
 };

@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
 import { RelationshipWithHealth } from '../types';
 import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import * as Calendar from 'expo-calendar';
 
 interface RelationshipCardProps {
   relationship: RelationshipWithHealth;
@@ -48,6 +50,45 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
     return `${Math.floor(days / 365)} years ago`;
   };
 
+  const handleCall = () => {
+    // In a real app, you would get the phone number from the relationship data
+    const phoneNumber = '1234567890'; // Replace with actual phone number
+    Linking.openURL(`tel:${phoneNumber}`);
+  };
+
+  const handleText = () => {
+    // In a real app, you would get the phone number from the relationship data
+    const phoneNumber = '1234567890'; // Replace with actual phone number
+    Linking.openURL(`sms:${phoneNumber}`);
+  };
+
+  const handleSchedule = async () => {
+    try {
+      const { status } = await Calendar.requestCalendarPermissionsAsync();
+      if (status === 'granted') {
+        const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+        if (calendars.length > 0) {
+          const eventDetails = {
+            title: `Catch up with ${relationship.name}`,
+            startDate: new Date(Date.now() + 86400000), // Tomorrow
+            endDate: new Date(Date.now() + 90000000), // Tomorrow + 1 hour
+            timeZone: 'local',
+            location: 'To be determined',
+            notes: `Scheduled through Kinkeeper app`,
+          };
+
+          await Calendar.createEventAsync(calendars[0].id, eventDetails);
+          alert('Event added to your calendar!');
+        }
+      } else {
+        alert('Calendar permission is required to schedule events');
+      }
+    } catch (error) {
+      console.error('Error scheduling event:', error);
+      alert('Failed to schedule event');
+    }
+  };
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -72,6 +113,23 @@ export const RelationshipCard: React.FC<RelationshipCardProps> = ({ relationship
       <View style={styles.footer}>
         <Text style={styles.lastContact}>{formatDaysSince()}</Text>
         <Text style={styles.frequency}>Check-in: {relationship.frequency}</Text>
+      </View>
+
+      <View style={styles.actionButtons}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
+          <MaterialIcons name="phone" size={24} color="#4CAF50" />
+          <Text style={styles.actionText}>Call</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={handleText}>
+          <MaterialIcons name="message" size={24} color="#2196F3" />
+          <Text style={styles.actionText}>Text</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.actionButton} onPress={handleSchedule}>
+          <MaterialIcons name="event" size={24} color="#9C27B0" />
+          <Text style={styles.actionText}>Schedule</Text>
+        </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
@@ -135,6 +193,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 16,
   },
   lastContact: {
     fontSize: 14,
@@ -143,5 +202,20 @@ const styles = StyleSheet.create({
   frequency: {
     fontSize: 12,
     color: '#9E9E9E',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: '#EEEEEE',
+    paddingTop: 12,
+  },
+  actionButton: {
+    alignItems: 'center',
+  },
+  actionText: {
+    fontSize: 12,
+    color: '#757575',
+    marginTop: 4,
   },
 });
