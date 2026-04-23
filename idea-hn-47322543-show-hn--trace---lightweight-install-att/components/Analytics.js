@@ -143,16 +143,11 @@ const Analytics = () => {
             return (
               <View key={index} style={styles.sourceCard}>
                 <View style={styles.sourceHeader}>
-                  <Text style={styles.sourceName}>{item.source}</Text>
-                  <Text style={styles.sourceCount}>{item.count}</Text>
+                  <Text style={styles.sourceName}>{item.source || 'Unknown'}</Text>
+                  <Text style={styles.sourceCount}>{item.count} installs</Text>
                 </View>
-                <View style={styles.progressBar}>
-                  <View
-                    style={[
-                      styles.progressFill,
-                      { width: `${percentage}%` }
-                    ]}
-                  />
+                <View style={styles.progressBarContainer}>
+                  <View style={[styles.progressBar, { width: `${percentage}%` }]} />
                 </View>
                 <Text style={styles.percentageText}>{percentage}%</Text>
               </View>
@@ -167,8 +162,8 @@ const Analytics = () => {
           <Text style={styles.emptyText}>No recent installs</Text>
         ) : (
           recentInstalls.map((install, index) => (
-            <View key={index} style={styles.recentInstallItem}>
-              <Text style={styles.recentInstallSource}>{install.source}</Text>
+            <View key={index} style={styles.recentInstallCard}>
+              <Text style={styles.recentInstallSource}>{install.source || 'Unknown'}</Text>
               <Text style={styles.recentInstallTime}>{formatTimestamp(install.timestamp)}</Text>
             </View>
           ))
@@ -181,14 +176,14 @@ const Analytics = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
     padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
     color: '#333',
+    marginBottom: 24,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -223,8 +218,8 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
     color: '#333',
+    marginBottom: 12,
   },
   trendCard: {
     backgroundColor: 'white',
@@ -251,34 +246,34 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   trendIndicator: {
+    borderRadius: 12,
     paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 4,
     alignSelf: 'flex-start',
     marginTop: 8,
   },
   trendIndicatorText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   sourceCard: {
     backgroundColor: 'white',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     marginBottom: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   sourceHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   sourceName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     color: '#333',
   },
@@ -286,13 +281,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
-  progressBar: {
+  progressBarContainer: {
     height: 6,
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#e0e0e0',
     borderRadius: 3,
     marginBottom: 4,
   },
-  progressFill: {
+  progressBar: {
     height: '100%',
     backgroundColor: '#007AFF',
     borderRadius: 3,
@@ -302,15 +297,23 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'right',
   },
-  recentInstallItem: {
+  recentInstallCard: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 8,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   recentInstallSource: {
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '500',
     color: '#333',
   },
   recentInstallTime: {
@@ -327,7 +330,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   loadingText: {
     marginTop: 16,
@@ -338,7 +341,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   errorText: {
     fontSize: 16,
