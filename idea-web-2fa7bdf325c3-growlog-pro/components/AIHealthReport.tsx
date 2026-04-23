@@ -51,6 +51,12 @@ export default function AIHealthReport({ analysis, healthScore, issues, isLoadin
           ))}
         </View>
       )}
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          This analysis is provided by AI and should be used as a guide, not a definitive diagnosis.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -133,5 +139,16 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: '#555',
+  },
+  footer: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#888',
+    fontStyle: 'italic',
   },
 });
