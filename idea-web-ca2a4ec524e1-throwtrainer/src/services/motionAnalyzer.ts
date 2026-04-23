@@ -11,6 +11,8 @@ class MotionAnalyzer {
   private throwStartTime: number | null = null;
   private throwData: ThrowData | null = null;
   private calibrationData: { x: number; y: number; z: number } | null = null;
+  private gravityVector: { x: number; y: number; z: number } | null = null;
+  private deviceOrientation: { alpha: number; beta: number; gamma: number } | null = null;
 
   start() {
     if (this.isActive) return;
@@ -51,19 +53,28 @@ class MotionAnalyzer {
   calibrate() {
     // Get current gravity vector for calibration
     if (this.lastAcceleration) {
-      this.calibrationData = { ...this.lastAcceleration };
+      this.gravityVector = { ...this.lastAcceleration };
+    }
+
+    // Get device orientation from gyroscope
+    if (this.lastGyro) {
+      this.deviceOrientation = {
+        alpha: this.lastGyro.x,
+        beta: this.lastGyro.y,
+        gamma: this.lastGyro.z
+      };
     }
   }
 
   private handleAccelerometerData(data: { x: number; y: number; z: number }) {
     if (!this.isActive) return;
 
-    // Apply calibration if available
-    const calibratedData = this.calibrationData
+    // Apply gravity calibration if available
+    const calibratedData = this.gravityVector
       ? {
-          x: data.x - this.calibrationData.x,
-          y: data.y - this.calibrationData.y,
-          z: data.z - this.calibrationData.z
+          x: data.x - this.gravityVector.x,
+          y: data.y - this.gravityVector.y,
+          z: data.z - this.gravityVector.z
         }
       : data;
 
@@ -76,6 +87,7 @@ class MotionAnalyzer {
       this.throwData = {
         x: 0,
         y: 0,
+        z: 0,
         speed: 0,
         angle: 0,
         timestamp: Date.now()
@@ -110,6 +122,7 @@ class MotionAnalyzer {
     if (this.throwData) {
       this.throwData.x = data.x * 0.1;
       this.throwData.y = data.y * 0.1;
+      this.throwData.z = data.z * 0.1;
     }
 
     this.lastGyro = data;
@@ -118,10 +131,17 @@ class MotionAnalyzer {
   private finalizeThrow() {
     if (!this.throwData) return;
 
-    // Estimate impact position from last gyro data
-    if (this.lastGyro) {
-      this.throwData.x = this.lastGyro.x * 0.5;
-      this.throwData.y = this.lastGyro.y * 0.5;
+    // Apply device orientation correction
+    if (this.deviceOrientation) {
+      const { alpha, beta, gamma } = this.deviceOrientation;
+
+      // Simple orientation correction (in a real app, use proper rotation matrices)
+      this.throwData.x = this.throwData.x * Math.cos(alpha) - this.throwData.y * Math.sin(alpha);
+      this.throwData.y = this.throwData.x * Math.sin(alpha) + this.throwData.y * Math.cos(alpha);
+
+      // Apply pitch and roll corrections
+      this.throwData.z = this.throwData.z * Math.cos(beta) - this.throwData.y * Math.sin(beta);
+      this.throwData.y = this.throwData.z * Math.sin(beta) + this.throwData.y * Math.cos(beta);
     }
 
     // Notify listeners
@@ -130,6 +150,37 @@ class MotionAnalyzer {
     // Reset throw tracking
     this.throwStartTime = null;
     this.throwData = null;
+  }
+
+  private calculatePhysicsBasedTrajectory(): ThrowData | null {
+    if (!this.throwData || !this.gravityVector) return null;
+
+    const gravity = 9.8; // m/s²
+    const airDensity = 1.225; // kg/m³ at sea level
+    const dragCoefficient = 0.47; // for a sphere
+    const crossSectionalArea = 0.001; // m² (approximate for a ball)
+
+    // Calculate drag force
+    const speed = this.throwData.speed;
+    const dragForce = 0.5 * airDensity * dragCoefficient * crossSectionalArea * speed * speed;
+
+    // Calculate acceleration due to drag
+    const dragAcceleration = dragForce / 0.145; // mass of a baseball
+
+    // Calculate trajectory with physics
+    const timeOfFlight = (2 * speed * Math.sin(this.throwData.angle)) / gravity;
+    const horizontalDistance = speed * Math.cos(this.throwData.angle) * timeOfFlight;
+
+    // Apply drag effect to speed
+    const adjustedSpeed = speed - (dragAcceleration * timeOfFlight);
+
+    return {
+      ...this.throwData,
+      speed: adjustedSpeed,
+      x: this.throwData.x * horizontalDistance,
+      y: this.throwData.y * horizontalDistance,
+      z: this.throwData.z * horizontalDistance
+    };
   }
 }
 

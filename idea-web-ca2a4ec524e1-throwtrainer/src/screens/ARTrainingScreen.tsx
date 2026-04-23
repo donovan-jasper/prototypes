@@ -6,7 +6,7 @@ import { Renderer } from 'expo-three';
 import * as THREE from 'three';
 import { useSessionStore } from '../store/useSessionStore';
 import { useUserStore } from '../store/useUserStore';
-import { ThrowData, calculateAccuracy, screenToWorldCoordinates } from '../utils/calculations';
+import { ThrowData, calculateAccuracy, screenToWorldCoordinates, calculatePhysicsBasedTrajectory, checkCollisionWithTarget } from '../utils/calculations';
 import { motionAnalyzer } from '../services/motionAnalyzer';
 import { ARTargetOverlay } from '../components/ARTargetOverlay';
 import { SessionTimer } from '../components/SessionTimer';
@@ -16,7 +16,7 @@ const { width: viewportWidth, height: viewportHeight } = Dimensions.get('window'
 
 export default function ARTrainingScreen({ navigation }) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
-  const [targets, setTargets] = useState<Array<{ x: number; y: number; z: number; id: string }>>([]);
+  const [targets, setTargets] = useState<Array<{ position: THREE.Vector3; radius: number; id: string }>>([]);
   const [isSessionActive, setIsSessionActive] = useState(false);
   const [hits, setHits] = useState(0);
   const [totalAttempts, setTotalAttempts] = useState(0);
@@ -31,6 +31,7 @@ export default function ARTrainingScreen({ navigation }) {
   const targetGroupRef = useRef<THREE.Group>(new THREE.Group());
   const hitSoundRef = useRef<Audio.Sound | null>(null);
   const missSoundRef = useRef<Audio.Sound | null>(null);
+  const lastThrowTimeRef = useRef<number>(0);
 
   useEffect(() => {
     (async () => {
@@ -52,6 +53,11 @@ export default function ARTrainingScreen({ navigation }) {
 
     // Subscribe to throw events
     const subscription = motionAnalyzer.onThrowDetected((throwData: ThrowData) => {
+      // Debounce rapid throws
+      const now = Date.now();
+      if (now - lastThrowTimeRef.current < 500) return;
+      lastThrowTimeRef.current = now;
+
       handleThrowDetected(throwData);
     });
 
@@ -93,38 +99,78 @@ export default function ARTrainingScreen({ navigation }) {
   };
 
   const handleThrowDetected = (throwData: ThrowData) => {
-    if (!isSessionActive || targets.length === 0) return;
+    if (!isSessionActive || targets.length === 0 || !cameraRef.current) return;
 
     setTotalAttempts(prev => prev + 1);
 
-    // Calculate throw direction vector
-    const direction = new THREE.Vector3(throwData.x, throwData.y, -1).normalize();
+    // Calculate physics-based trajectory
+    const physicsThrowData = calculatePhysicsBasedTrajectory(throwData);
 
-    // Create ray for collision detection
-    const raycaster = new THREE.Raycaster();
-    raycaster.set(new THREE.Vector3(0, 0, 0), direction);
+    // Create trajectory points
+    const startPoint = new THREE.Vector3(0, 0, 0);
+    const endPoint = new THREE.Vector3(
+      physicsThrowData.x,
+      physicsThrowData.y,
+      physicsThrowData.z
+    );
 
-    // Check for intersections with targets
-    const intersects = raycaster.intersectObjects(targetMeshesRef.current);
+    const trajectoryPoints = [];
+    const gravity = 9.8;
+    const timeOfFlight = (2 * physicsThrowData.speed * Math.sin(physicsThrowData.angle * Math.PI / 180)) / gravity;
 
-    const hitTarget = intersects.length > 0;
+    for (let t = 0; t <= timeOfFlight; t += 0.1) {
+      const x = startPoint.x + (endPoint.x - startPoint.x) * (t / timeOfFlight);
+      const y = startPoint.y + (endPoint.y - startPoint.y) * (t / timeOfFlight);
+      const z = startPoint.z + (endPoint.z - startPoint.z) * (t / timeOfFlight);
+
+      // Parabolic height
+      const height = physicsThrowData.speed * Math.sin(physicsThrowData.angle * Math.PI / 180) * t - 0.5 * gravity * t * t;
+
+      trajectoryPoints.push(new THREE.Vector3(x, y + height, z));
+    }
+
+    // Check for collisions with targets
+    let hitTarget = false;
+    let hitPosition = new THREE.Vector3();
+
+    for (const target of targets) {
+      if (checkCollisionWithTarget(trajectoryPoints, target.position, target.radius)) {
+        hitTarget = true;
+        hitPosition = target.position;
+        break;
+      }
+    }
 
     if (hitTarget) {
       setHits(prev => prev + 1);
-      logAttempt({ success: true, speed: throwData.speed, angle: throwData.angle, x: throwData.x, y: throwData.y });
-      showFeedback(true, intersects[0].point);
+      logAttempt({
+        success: true,
+        speed: physicsThrowData.speed,
+        angle: physicsThrowData.angle,
+        x: physicsThrowData.x,
+        y: physicsThrowData.y,
+        z: physicsThrowData.z
+      });
+      showFeedback(true, hitPosition);
       hitSoundRef.current?.replayAsync();
     } else {
-      logAttempt({ success: false, speed: throwData.speed, angle: throwData.angle, x: throwData.x, y: throwData.y });
-      showFeedback(false, new THREE.Vector3(throwData.x, throwData.y, -1));
+      logAttempt({
+        success: false,
+        speed: physicsThrowData.speed,
+        angle: physicsThrowData.angle,
+        x: physicsThrowData.x,
+        y: physicsThrowData.y,
+        z: physicsThrowData.z
+      });
+      showFeedback(false, endPoint);
       missSoundRef.current?.replayAsync();
     }
 
     // Visualize trajectory
-    visualizeTrajectory(throwData);
+    visualizeTrajectory(trajectoryPoints);
   };
 
-  const visualizeTrajectory = (throwData: ThrowData) => {
+  const visualizeTrajectory = (points: THREE.Vector3[]) => {
     if (!sceneRef.current || !cameraRef.current) return;
 
     // Remove previous trajectory
@@ -132,64 +178,48 @@ export default function ARTrainingScreen({ navigation }) {
       sceneRef.current.remove(trajectoryLineRef.current);
     }
 
-    // Create trajectory line with physics-based arc
-    const points = [];
-    const startPoint = new THREE.Vector3(0, 0, 0);
-
-    // Calculate end point based on throw data
-    const endX = throwData.x * 5; // Scale for better visualization
-    const endY = throwData.y * 5;
-    const endZ = -5; // Fixed distance for visualization
-
-    // Create parabolic arc
-    for (let t = 0; t <= 1; t += 0.05) {
-      const x = startPoint.x + (endX - startPoint.x) * t;
-      const y = startPoint.y + (endY - startPoint.y) * t;
-      const z = startPoint.z + (endZ - startPoint.z) * t;
-
-      // Add parabolic curve
-      const height = Math.sin(t * Math.PI) * 2;
-      points.push(new THREE.Vector3(x, y + height, z));
-    }
-
+    // Create geometry from points
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-    const line = new THREE.Line(geometry, material);
+    const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 2 });
 
+    // Create line
+    const line = new THREE.Line(geometry, material);
     sceneRef.current.add(line);
     trajectoryLineRef.current = line;
 
-    // Fade out the line after 2 seconds
+    // Fade out after 2 seconds
     setTimeout(() => {
-      if (sceneRef.current && line) {
-        sceneRef.current.remove(line);
+      if (sceneRef.current && trajectoryLineRef.current) {
+        sceneRef.current.remove(trajectoryLineRef.current);
+        trajectoryLineRef.current = null;
       }
     }, 2000);
   };
 
-  const showFeedback = (hit: boolean, position: THREE.Vector3) => {
-    if (!sceneRef.current) return;
+  const showFeedback = (isHit: boolean, position: THREE.Vector3) => {
+    if (!sceneRef.current || !cameraRef.current) return;
 
-    const feedbackGeometry = new THREE.CircleGeometry(0.3, 32);
-    const feedbackMaterial = new THREE.MeshBasicMaterial({
-      color: hit ? 0x00ff00 : 0xff0000,
+    // Create feedback sphere
+    const geometry = new THREE.SphereGeometry(0.1, 16, 16);
+    const material = new THREE.MeshBasicMaterial({
+      color: isHit ? 0x00ff00 : 0xff0000,
       transparent: true,
       opacity: 0.8
     });
-    const feedback = new THREE.Mesh(feedbackGeometry, feedbackMaterial);
-    feedback.position.copy(position);
 
-    sceneRef.current.add(feedback);
+    const sphere = new THREE.Mesh(geometry, material);
+    sphere.position.copy(position);
+    sceneRef.current.add(sphere);
 
     // Animate feedback
-    let scale = 0.1;
     const animateFeedback = () => {
-      scale += 0.05;
-      feedback.scale.set(scale, scale, scale);
-      feedback.material.opacity -= 0.05;
+      sphere.scale.x += 0.05;
+      sphere.scale.y += 0.05;
+      sphere.scale.z += 0.05;
+      sphere.material.opacity -= 0.02;
 
-      if (feedback.material.opacity <= 0) {
-        sceneRef.current?.remove(feedback);
+      if (sphere.material.opacity <= 0) {
+        sceneRef.current?.remove(sphere);
       } else {
         requestAnimationFrame(animateFeedback);
       }
@@ -199,108 +229,99 @@ export default function ARTrainingScreen({ navigation }) {
   };
 
   const handlePlaceTarget = (event: any) => {
-    if (!isSessionActive) return;
+    if (!cameraRef.current) return;
 
     const { locationX, locationY } = event.nativeEvent;
-    const { x, y } = screenToWorldCoordinates(locationX, locationY, viewportWidth, viewportHeight);
+    const worldPosition = screenToWorldCoordinates(
+      locationX,
+      locationY,
+      cameraRef.current,
+      viewportWidth,
+      viewportHeight
+    );
 
-    const newTarget = {
-      x,
-      y,
-      z: -3, // Fixed distance from camera
-      id: Date.now().toString()
-    };
+    // Create target
+    const targetId = Date.now().toString();
+    const targetRadius = 0.3;
 
-    setTargets(prev => [...prev, newTarget]);
+    // Add to state
+    setTargets(prev => [...prev, {
+      position: worldPosition,
+      radius: targetRadius,
+      id: targetId
+    }]);
 
-    // Create and add target mesh to scene
-    if (sceneRef.current) {
-      const targetMesh = createTargetMesh(newTarget);
-      targetMeshesRef.current.push(targetMesh);
-      targetGroupRef.current.add(targetMesh);
-    }
-  };
-
-  const createTargetMesh = (target: { x: number; y: number; z: number }): THREE.Mesh => {
-    // Create target ring
-    const ringGeometry = new THREE.RingGeometry(0.5, 0.6, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({
-      color: 0x00ff00,
+    // Create 3D target mesh
+    const geometry = new THREE.CircleGeometry(targetRadius, 32);
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xff0000,
       side: THREE.DoubleSide,
       transparent: true,
       opacity: 0.7
     });
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
 
-    // Create center dot
-    const dotGeometry = new THREE.CircleGeometry(0.1, 32);
-    const dotMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
-    const dot = new THREE.Mesh(dotGeometry, dotMaterial);
+    const targetMesh = new THREE.Mesh(geometry, material);
+    targetMesh.position.copy(worldPosition);
+    targetMesh.rotation.x = -Math.PI / 2; // Rotate to face camera
 
-    // Combine into a group
-    const targetGroup = new THREE.Group();
-    targetGroup.add(ring);
-    targetGroup.add(dot);
-    targetGroup.position.set(target.x, target.y, target.z);
-
-    return targetGroup;
+    targetGroupRef.current.add(targetMesh);
+    targetMeshesRef.current.push(targetMesh);
   };
 
-  const startSession = () => {
+  const startTrainingSession = () => {
+    if (!isPremium && sessionCount >= 10) {
+      navigation.navigate('Paywall');
+      return;
+    }
+
+    startSession();
     setIsSessionActive(true);
     setHits(0);
     setTotalAttempts(0);
-    startSession();
+    motionAnalyzer.calibrate();
   };
 
-  const endCurrentSession = () => {
-    setIsSessionActive(false);
+  const endTrainingSession = () => {
     endSession();
-    setTargets([]);
-    targetMeshesRef.current.forEach(mesh => targetGroupRef.current.remove(mesh));
-    targetMeshesRef.current = [];
+    setIsSessionActive(false);
   };
 
   if (hasPermission === null) {
-    return <View />;
+    return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
   }
 
   if (hasPermission === false) {
-    return <Text>No access to camera</Text>;
+    return <View style={styles.container}><Text>No access to camera</Text></View>;
   }
 
   return (
     <View style={styles.container}>
-      <Camera
-        style={styles.camera}
-        type={Camera.Constants.Type.back}
-        onTouchEnd={handlePlaceTarget}
-      >
+      <Camera style={styles.camera} type={Camera.Constants.Type.back}>
         <GLView
           ref={glViewRef}
-          style={StyleSheet.absoluteFill}
+          style={styles.glView}
           onContextCreate={initializeScene}
         />
 
-        {isSessionActive && (
-          <View style={styles.overlay}>
-            <SessionTimer
-              hits={hits}
-              totalAttempts={totalAttempts}
-              onEndSession={endCurrentSession}
-            />
-            <Text style={styles.accuracyText}>
-              Accuracy: {calculateAccuracy(hits, totalAttempts)}%
-            </Text>
-          </View>
-        )}
+        <TouchableOpacity
+          style={styles.placeTargetButton}
+          onPress={handlePlaceTarget}
+        >
+          <Text style={styles.buttonText}>Place Target</Text>
+        </TouchableOpacity>
 
-        {!isSessionActive && (
+        {isSessionActive ? (
+          <SessionTimer
+            hits={hits}
+            totalAttempts={totalAttempts}
+            onEndSession={endTrainingSession}
+          />
+        ) : (
           <TouchableOpacity
-            style={styles.startButton}
-            onPress={startSession}
+            style={styles.startSessionButton}
+            onPress={startTrainingSession}
           >
-            <Text style={styles.startButtonText}>Start Session</Text>
+            <Text style={styles.buttonText}>Start Training</Text>
           </TouchableOpacity>
         )}
       </Camera>
@@ -315,32 +336,27 @@ const styles = StyleSheet.create({
   camera: {
     flex: 1,
   },
-  overlay: {
-    position: 'absolute',
-    top: 40,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+  glView: {
+    flex: 1,
   },
-  accuracyText: {
-    color: 'white',
-    fontSize: 18,
-    marginTop: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 8,
-    borderRadius: 8,
-  },
-  startButton: {
+  placeTargetButton: {
     position: 'absolute',
-    bottom: 40,
+    bottom: 120,
     alignSelf: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
   },
-  startButtonText: {
+  startSessionButton: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    padding: 15,
+    borderRadius: 10,
+  },
+  buttonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

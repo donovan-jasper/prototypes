@@ -7,6 +7,7 @@ export interface ThrowData {
   x: number;
   y: number;
   z: number;
+  timestamp: number;
 }
 
 export function calculateAccuracy(hits: number, total: number): number {
@@ -90,7 +91,40 @@ export function calculateThrowDirection(acceleration: { x: number; y: number; z:
     angle,
     x: acceleration.x + gyro.x * 0.5,
     y: acceleration.y + gyro.y * 0.5,
-    z: -1 // Fixed forward direction for simplicity
+    z: -1, // Fixed forward direction for simplicity
+    timestamp: Date.now()
+  };
+}
+
+export function calculatePhysicsBasedTrajectory(throwData: ThrowData): ThrowData {
+  const gravity = 9.8; // m/s²
+  const airDensity = 1.225; // kg/m³ at sea level
+  const dragCoefficient = 0.47; // for a sphere
+  const crossSectionalArea = 0.001; // m² (approximate for a ball)
+  const mass = 0.145; // kg (baseball mass)
+
+  // Calculate drag force
+  const dragForce = 0.5 * airDensity * dragCoefficient * crossSectionalArea * throwData.speed * throwData.speed;
+
+  // Calculate acceleration due to drag
+  const dragAcceleration = dragForce / mass;
+
+  // Calculate time of flight
+  const timeOfFlight = (2 * throwData.speed * Math.sin(throwData.angle * Math.PI / 180)) / gravity;
+
+  // Calculate horizontal distance
+  const horizontalDistance = throwData.speed * Math.cos(throwData.angle * Math.PI / 180) * timeOfFlight;
+
+  // Apply drag effect to speed
+  const adjustedSpeed = throwData.speed - (dragAcceleration * timeOfFlight);
+
+  // Calculate adjusted trajectory
+  return {
+    ...throwData,
+    speed: adjustedSpeed,
+    x: throwData.x * horizontalDistance,
+    y: throwData.y * horizontalDistance,
+    z: throwData.z * horizontalDistance
   };
 }
 
@@ -104,7 +138,7 @@ export function calculateTrajectoryPoints(start: THREE.Vector3, end: THREE.Vecto
     const x = start.x + (end.x - start.x) * (t / timeOfFlight);
     const y = start.y + (end.y - start.y) * (t / timeOfFlight);
 
-    // Parabolic height
+    // Parabolic height with physics-based adjustment
     const height = speed * Math.sin(angle * Math.PI / 180) * t - 0.5 * gravity * t * t;
 
     points.push(new THREE.Vector3(x, y + height, start.z - t * 2));
@@ -144,4 +178,20 @@ export function screenToWorldCoordinates(
   raycaster.ray.intersectPlane(plane, intersection);
 
   return intersection;
+}
+
+export function checkCollisionWithTarget(
+  trajectoryPoints: THREE.Vector3[],
+  targetPosition: THREE.Vector3,
+  targetRadius: number
+): boolean {
+  // Check if any point in the trajectory is within the target radius
+  for (const point of trajectoryPoints) {
+    const distance = point.distanceTo(targetPosition);
+    if (distance <= targetRadius) {
+      return true;
+    }
+  }
+
+  return false;
 }
