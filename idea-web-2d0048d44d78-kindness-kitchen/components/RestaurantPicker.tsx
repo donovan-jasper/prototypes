@@ -3,7 +3,7 @@ import { View, Text, TextInput, FlatList, Image, TouchableOpacity, StyleSheet, A
 import { getRestaurants } from '../services/api';
 import { Ionicons } from '@expo/vector-icons';
 
-const RestaurantPicker = ({ onSelectRestaurant }) => {
+const RestaurantPicker = ({ onSelectRestaurant, location }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCuisine, setSelectedCuisine] = useState(null);
   const [restaurants, setRestaurants] = useState([]);
@@ -15,7 +15,7 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const data = await getRestaurants();
+        const data = await getRestaurants(location);
         setRestaurants(data);
         setFilteredRestaurants(data);
       } catch (error) {
@@ -26,7 +26,7 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
     };
 
     fetchData();
-  }, []);
+  }, [location]);
 
   useEffect(() => {
     let results = [...restaurants];
@@ -123,6 +123,7 @@ const RestaurantPicker = ({ onSelectRestaurant }) => {
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No restaurants found</Text>
+              <Text style={styles.emptySubtext}>Try adjusting your search or location</Text>
             </View>
           }
         />
@@ -167,7 +168,8 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   cuisineButton: {
-    padding: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 20,
     backgroundColor: '#f0f0f0',
     marginRight: 10,
@@ -177,11 +179,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF6B6B',
   },
   cuisineButtonText: {
-    color: '#333',
+    fontSize: 14,
+    color: '#666',
   },
   selectedCuisineButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
@@ -199,46 +201,45 @@ const styles = StyleSheet.create({
   },
   restaurantItem: {
     flexDirection: 'row',
-    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 15,
+    overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-    backgroundColor: '#fff',
   },
   selectedRestaurant: {
     borderColor: '#FF6B6B',
-    backgroundColor: '#fff5f5',
+    borderWidth: 2,
   },
   restaurantImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    marginRight: 15,
+    width: 100,
+    height: 100,
   },
   restaurantInfo: {
     flex: 1,
+    padding: 15,
   },
   restaurantName: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 5,
+    color: '#333',
   },
   restaurantDetails: {
-    color: '#666',
     fontSize: 14,
+    color: '#666',
     marginBottom: 5,
   },
   restaurantPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#FF6B6B',
   },
   selectedIcon: {
     position: 'absolute',
-    top: 10,
     right: 10,
+    bottom: 10,
   },
   emptyContainer: {
     padding: 20,
@@ -246,6 +247,12 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  emptySubtext: {
+    fontSize: 14,
     color: '#666',
   },
 });

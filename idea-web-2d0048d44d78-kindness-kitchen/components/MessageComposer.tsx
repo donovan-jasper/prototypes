@@ -10,14 +10,19 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
   const [sound, setSound] = useState(null);
   const [voiceNoteUri, setVoiceNoteUri] = useState(null);
   const [voiceNoteDuration, setVoiceNoteDuration] = useState(0);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [recordingInterval, setRecordingInterval] = useState(null);
 
   useEffect(() => {
     return () => {
       if (sound) {
         sound.unloadAsync();
       }
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+      }
     };
-  }, [sound]);
+  }, [sound, recordingInterval]);
 
   const handleTextChange = (text) => {
     if (text.length <= maxLength) {
@@ -44,13 +49,25 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
       );
       setRecording(recording);
       setIsRecording(true);
+      setRecordingTime(0);
+
+      const interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+      setRecordingInterval(interval);
     } catch (err) {
       console.error('Failed to start recording', err);
+      Alert.alert('Error', 'Failed to start recording');
     }
   };
 
   const stopRecording = async () => {
     try {
+      if (recordingInterval) {
+        clearInterval(recordingInterval);
+        setRecordingInterval(null);
+      }
+
       await recording.stopAndUnloadAsync();
       const uri = recording.getURI();
       setVoiceNoteUri(uri);
@@ -63,12 +80,18 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
       setSound(sound);
     } catch (err) {
       console.error('Failed to stop recording', err);
+      Alert.alert('Error', 'Failed to stop recording');
     }
   };
 
   const playVoiceNote = async () => {
     if (sound) {
-      await sound.replayAsync();
+      try {
+        await sound.replayAsync();
+      } catch (err) {
+        console.error('Failed to play voice note', err);
+        Alert.alert('Error', 'Failed to play voice note');
+      }
     }
   };
 
@@ -82,6 +105,12 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
 
   const formatDuration = (millis) => {
     const seconds = Math.floor(millis / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+  };
+
+  const formatRecordingTime = (seconds) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
@@ -112,6 +141,7 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
             isRecording && styles.recordingButton
           ]}
           onPress={isRecording ? stopRecording : startRecording}
+          disabled={isRecording && recordingTime >= 60}
         >
           <Ionicons
             name={isRecording ? 'stop-circle' : 'mic'}
@@ -122,10 +152,17 @@ const MessageComposer = ({ onMessageChange, maxLength = 500 }) => {
             styles.voiceButtonText,
             isRecording && styles.recordingButtonText
           ]}>
-            {isRecording ? 'Stop Recording' : 'Add Voice Note'}
+            {isRecording ? `Stop (${formatRecordingTime(recordingTime)})` : 'Add Voice Note'}
           </Text>
         </TouchableOpacity>
       </View>
+
+      {isRecording && (
+        <View style={styles.recordingIndicator}>
+          <View style={styles.recordingDot} />
+          <Text style={styles.recordingText}>Recording...</Text>
+        </View>
+      )}
 
       {voiceNoteUri && (
         <View style={styles.voiceNoteContainer}>
@@ -183,41 +220,59 @@ const styles = StyleSheet.create({
   voiceButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#FF6B6B',
   },
   recordingButton: {
     backgroundColor: '#FF6B6B',
+    borderColor: '#FF6B6B',
   },
   voiceButtonText: {
+    marginLeft: 8,
     color: '#FF6B6B',
     fontSize: 14,
-    marginLeft: 5,
   },
   recordingButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 5,
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  recordingDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF6B6B',
+    marginRight: 5,
+  },
+  recordingText: {
+    color: '#FF6B6B',
+    fontSize: 14,
   },
   voiceNoteContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 15,
-    padding: 10,
+    marginTop: 20,
+    padding: 15,
     backgroundColor: '#f8f8f8',
     borderRadius: 8,
   },
   playButton: {
-    marginRight: 10,
+    marginRight: 15,
   },
   voiceNoteDuration: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
   },
   deleteButton: {
-    marginLeft: 10,
+    padding: 5,
   },
 });
 
