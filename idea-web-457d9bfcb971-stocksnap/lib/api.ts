@@ -175,53 +175,44 @@ export const fetchDailyDigest = async (): Promise<DigestHighlight[]> => {
     const randomTechStock = techStocks[Math.floor(Math.random() * techStocks.length)];
 
     const techStockData = await fetchStockData(randomTechStock);
+    const marketNews = await fetchMarketNews();
 
-    // Create a realistic digest with some market insights
-    return [
+    // Create digest highlights
+    const digest: DigestHighlight[] = [
       {
-        id: '1',
-        title: 'Tech Stocks Mixed',
-        explanation: `Technology stocks showed mixed performance today. ${techStockData.name} (${techStockData.symbol}) is ${techStockData.change > 0 ? 'up' : 'down'} ${Math.abs(techStockData.change).toFixed(2)}% at $${techStockData.price.toFixed(2)}. The sector is reacting to mixed earnings reports and concerns about inflation.`,
-        impact: techStockData.change > 0 ? 'positive' : techStockData.change < 0 ? 'negative' : 'neutral',
-        audioUrl: 'https://example.com/audio/tech-stocks.mp3'
+        id: 'tech-trends',
+        title: 'Tech Stocks Mixed After Earnings',
+        explanation: `Technology stocks showed mixed performance after earnings reports. ${techStockData.name} (${techStockData.symbol}) reported ${techStockData.change > 0 ? 'strong' : 'mixed'} results, driving the sector ${techStockData.change > 0 ? 'higher' : 'lower'}. Investors are watching for guidance on future growth prospects.`,
+        impact: techStockData.change > 0 ? 'positive' : 'negative',
+        audioUrl: 'https://example.com/audio/tech-trends.mp3'
       },
       {
-        id: '2',
-        title: 'Interest Rates Stable',
-        explanation: 'The Federal Reserve kept interest rates unchanged today, maintaining a cautious stance on inflation. This stability is supporting riskier assets like stocks and bonds.',
+        id: 'market-news',
+        title: 'Market Reacts to Central Bank Policy',
+        explanation: `Global markets reacted to the latest central bank policy statements. The Fed's decision to keep interest rates unchanged sent ${marketNews.impact === 'positive' ? 'bullish' : 'bearish'} signals through the market. Traders are now focusing on the next economic data releases.`,
+        impact: marketNews.impact,
+        audioUrl: 'https://example.com/audio/market-news.mp3'
+      },
+      {
+        id: 'sector-performance',
+        title: 'Energy Sector Shows Resilience',
+        explanation: 'The energy sector continued to show resilience amid global economic uncertainties. Companies like Exxon Mobil and Chevron reported stable performance, while oil prices remained relatively steady. Investors are keeping a close eye on geopolitical developments that could impact the sector.',
         impact: 'neutral',
-        audioUrl: 'https://example.com/audio/interest-rates.mp3'
-      },
-      {
-        id: '3',
-        title: 'Consumer Spending Up',
-        explanation: 'Retail sales data showed stronger-than-expected growth in April, indicating continued consumer confidence. This bodes well for companies in the retail and service sectors.',
-        impact: 'positive',
-        audioUrl: 'https://example.com/audio/consumer-spending.mp3'
+        audioUrl: 'https://example.com/audio/sector-performance.mp3'
       }
     ];
+
+    return digest;
   } catch (error) {
-    console.error('Daily digest API error:', error);
-    // Return fallback data if API fails
-    return [
-      {
-        id: '1',
-        title: 'Market Update',
-        explanation: 'The stock market showed mixed performance today. Tech stocks led the way higher, while energy companies declined. Investors are watching for further guidance from the Federal Reserve.',
-        impact: 'neutral'
-      },
-      {
-        id: '2',
-        title: 'Earnings Season',
-        explanation: 'Many major companies are reporting earnings this week. Analysts are expecting mixed results across sectors.',
-        impact: 'neutral'
-      },
-      {
-        id: '3',
-        title: 'Global Trends',
-        explanation: 'Geopolitical tensions in Europe are keeping investors on edge. The dollar remains strong against most currencies.',
-        impact: 'neutral'
-      }
-    ];
+    console.error('Error fetching daily digest:', error);
+    throw new Error('Failed to generate daily digest');
   }
+};
+
+const fetchMarketNews = async (): Promise<{ impact: 'positive' | 'negative' | 'neutral' }> => {
+  // Mock market news data
+  const impacts: ('positive' | 'negative' | 'neutral')[] = ['positive', 'negative', 'neutral'];
+  const randomImpact = impacts[Math.floor(Math.random() * impacts.length)];
+
+  return { impact: randomImpact };
 };

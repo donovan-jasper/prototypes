@@ -63,6 +63,9 @@ export const setupNotifications = async () => {
 
   // Schedule initial check
   await scheduleNextCheck();
+
+  // Schedule daily digest notification
+  await scheduleDailyDigestNotification();
 };
 
 export const scheduleDailyDigestNotification = async (hour: number = 7, minute: number = 0) => {

@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { useUserStore } from '../../store/useUserStore';
-import { fetchDailyDigest } from '../../lib/api';
-import { saveDigest, getSavedDigest } from '../../lib/database';
-import { Audio } from 'expo-av';
 import { Ionicons } from '@expo/vector-icons';
 import Colors from '../../constants/Colors';
+import { fetchDailyDigest } from '../../lib/api';
+import { useUserStore } from '../../store/useUserStore';
+import { Audio } from 'expo-av';
 
 interface DigestHighlight {
   id: string;
@@ -20,33 +19,12 @@ const DigestScreen = () => {
   const [digest, setDigest] = useState<DigestHighlight[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const { isPremium } = useUserStore();
   const navigation = useNavigation();
 
   useEffect(() => {
-    const loadDigest = async () => {
-      try {
-        // Try to get saved digest first
-        const savedDigest = await getSavedDigest();
-        if (savedDigest && savedDigest.length > 0) {
-          setDigest(savedDigest);
-          setIsLoading(false);
-          return;
-        }
-
-        // If no saved digest, fetch from API
-        const freshDigest = await fetchDailyDigest();
-        setDigest(freshDigest);
-        await saveDigest(freshDigest);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load digest');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     loadDigest();
 
     return () => {
@@ -56,9 +34,33 @@ const DigestScreen = () => {
     };
   }, []);
 
-  const playAudio = async (audioUrl: string) => {
+  const loadDigest = async () => {
+    try {
+      setIsLoading(true);
+      const digestData = await fetchDailyDigest();
+      setDigest(digestData);
+      setError(null);
+    } catch (err) {
+      setError('Failed to load daily digest. Please try again later.');
+      console.error('Error loading digest:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const playAudio = async (audioUrl: string, id: string) => {
     if (!isPremium) {
-      navigation.navigate('PremiumUpgrade');
+      Alert.alert(
+        'Premium Feature',
+        'Audio summaries are available to premium users only.',
+        [
+          { text: 'OK' },
+          {
+            text: 'Upgrade',
+            onPress: () => navigation.navigate('Profile'),
+          },
+        ]
+      );
       return;
     }
 
@@ -67,63 +69,56 @@ const DigestScreen = () => {
         await sound.unloadAsync();
       }
 
+      if (playingAudioId === id) {
+        setPlayingAudioId(null);
+        return;
+      }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }
       );
 
       setSound(newSound);
-      setIsPlaying(true);
+      setPlayingAudioId(id);
 
-      newSound.setOnPlaybackStatusUpdate((status) => {
+      newSound.setOnPlaybackStatusUpdate(status => {
         if (status.didJustFinish) {
-          setIsPlaying(false);
+          setPlayingAudioId(null);
         }
       });
     } catch (err) {
       console.error('Error playing audio:', err);
+      Alert.alert('Error', 'Failed to play audio. Please try again.');
     }
   };
 
-  const stopAudio = async () => {
-    if (sound) {
-      await sound.stopAsync();
-      setIsPlaying(false);
+  const getImpactColor = (impact: string) => {
+    switch (impact) {
+      case 'positive':
+        return Colors.success;
+      case 'negative':
+        return Colors.error;
+      default:
+        return Colors.textSecondary;
     }
   };
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={Colors.primary} />
+        <Text style={styles.loadingText}>Loading your daily digest...</Text>
       </View>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centered}>
+      <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={50} color={Colors.error} />
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity
-          style={styles.retryButton}
-          onPress={() => {
-            setIsLoading(true);
-            setError(null);
-            // Reload digest
-            const loadDigest = async () => {
-              try {
-                const freshDigest = await fetchDailyDigest();
-                setDigest(freshDigest);
-                await saveDigest(freshDigest);
-              } catch (err) {
-                setError(err instanceof Error ? err.message : 'Failed to load digest');
-              } finally {
-                setIsLoading(false);
-              }
-            };
-            loadDigest();
-          }}
-        >
+        <TouchableOpacity style={styles.retryButton} onPress={loadDigest}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -132,53 +127,45 @@ const DigestScreen = () => {
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Today's Market Digest</Text>
-      <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Daily Digest</Text>
+        <Text style={styles.subtitle}>{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</Text>
+      </View>
 
       {digest.map((highlight) => (
         <View key={highlight.id} style={styles.highlightCard}>
           <View style={styles.highlightHeader}>
-            <Text style={styles.highlightTitle}>{highlight.title}</Text>
-            {highlight.impact === 'positive' && (
-              <Ionicons name="arrow-up-circle" size={24} color={Colors.success} />
-            )}
-            {highlight.impact === 'negative' && (
-              <Ionicons name="arrow-down-circle" size={24} color={Colors.error} />
-            )}
-            {highlight.impact === 'neutral' && (
-              <Ionicons name="ellipse" size={24} color={Colors.warning} />
+            <Text style={[styles.highlightTitle, { color: getImpactColor(highlight.impact) }]}>
+              {highlight.title}
+            </Text>
+            {highlight.audioUrl && (
+              <TouchableOpacity
+                onPress={() => playAudio(highlight.audioUrl!, highlight.id)}
+                disabled={!isPremium}
+              >
+                <Ionicons
+                  name={playingAudioId === highlight.id ? 'pause-circle' : 'play-circle'}
+                  size={24}
+                  color={isPremium ? Colors.primary : Colors.gray}
+                />
+              </TouchableOpacity>
             )}
           </View>
-
           <Text style={styles.highlightExplanation}>{highlight.explanation}</Text>
-
-          {highlight.audioUrl && isPremium && (
-            <TouchableOpacity
-              style={styles.audioButton}
-              onPress={() => isPlaying ? stopAudio() : playAudio(highlight.audioUrl!)}
-            >
-              <Ionicons
-                name={isPlaying ? 'pause-circle' : 'play-circle'}
-                size={24}
-                color={Colors.primary}
-              />
-              <Text style={styles.audioButtonText}>
-                {isPlaying ? 'Pause Audio' : 'Listen to Explanation'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {!isPremium && highlight.audioUrl && (
-            <TouchableOpacity
-              style={styles.premiumAudioButton}
-              onPress={() => navigation.navigate('PremiumUpgrade')}
-            >
-              <Ionicons name="lock-closed" size={16} color={Colors.primary} />
-              <Text style={styles.premiumAudioButtonText}>Unlock Audio with Premium</Text>
-            </TouchableOpacity>
-          )}
         </View>
       ))}
+
+      {!isPremium && (
+        <View style={styles.premiumPrompt}>
+          <Text style={styles.premiumText}>Get audio summaries with Premium</Text>
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -186,31 +173,63 @@ const DigestScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: Colors.background,
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: Colors.background,
   },
+  loadingText: {
+    marginTop: 16,
+    color: Colors.text,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: Colors.background,
+  },
+  errorText: {
+    marginTop: 16,
+    color: Colors.error,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    backgroundColor: Colors.primary,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: Colors.white,
+    fontWeight: 'bold',
+  },
+  header: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  date: {
+  subtitle: {
     fontSize: 16,
     color: Colors.textSecondary,
-    marginBottom: 24,
   },
   highlightCard: {
     backgroundColor: Colors.cardBackground,
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -226,54 +245,34 @@ const styles = StyleSheet.create({
   highlightTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: Colors.text,
-    flex: 1,
   },
   highlightExplanation: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: Colors.text,
     lineHeight: 24,
-    marginBottom: 16,
   },
-  audioButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
+  premiumPrompt: {
     backgroundColor: Colors.primaryLight,
-    borderRadius: 4,
-  },
-  audioButtonText: {
-    color: Colors.primary,
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  premiumAudioButton: {
-    flexDirection: 'row',
+    padding: 16,
+    margin: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    padding: 8,
-    backgroundColor: Colors.primaryLight,
-    borderRadius: 4,
-    justifyContent: 'center',
   },
-  premiumAudioButtonText: {
+  premiumText: {
     color: Colors.primary,
-    marginLeft: 4,
     fontSize: 16,
+    marginBottom: 12,
+    fontWeight: '500',
   },
-  errorText: {
-    color: Colors.error,
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  retryButton: {
+  upgradeButton: {
     backgroundColor: Colors.primary,
-    padding: 12,
-    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
-  retryButtonText: {
+  upgradeButtonText: {
     color: Colors.white,
-    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

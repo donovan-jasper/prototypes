@@ -32,20 +32,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="watchlist"
-        options={{
-          title: 'Watchlist',
-          tabBarIcon: ({ color, focused }) => (
-            <TabBarIcon name={focused ? 'star' : 'star-outline'} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="digest"
         options={{
           title: 'Digest',
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon name={focused ? 'newspaper' : 'newspaper-outline'} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="watchlist"
+        options={{
+          title: 'Watchlist',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'star' : 'star-outline'} color={color} />
           ),
         }}
       />
