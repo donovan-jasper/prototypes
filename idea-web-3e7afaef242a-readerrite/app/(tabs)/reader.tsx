@@ -1,227 +1,82 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  ActivityIndicator,
-  Alert,
-  StatusBar,
-  TouchableOpacity,
-  Text,
-  Dimensions,
-  Animated,
-  Easing,
-  Platform
-} from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
-import { getBook, updateBook } from '../../lib/database';
-import { loadEpubContent, EpubContent } from '../../lib/epubParser';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import EpubRenderer from '../../components/EpubRenderer';
+import PdfRenderer from '../../components/PdfRenderer';
 import ReaderControls from '../../components/ReaderControls';
-
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+import { useLibraryStore } from '../../store/useLibraryStore';
+import { getBook } from '../../lib/database';
 
 export default function ReaderScreen() {
-  const router = useRouter();
-  const { id } = useLocalSearchParams();
-  const [loading, setLoading] = useState(true);
-  const [epubContent, setEpubContent] = useState<EpubContent | null>(null);
-  const [fontSize, setFontSize] = useState(18);
-  const [theme, setTheme] = useState<'light' | 'sepia' | 'dark'>('light');
-  const [marginSize, setMarginSize] = useState(20);
+  const { bookId } = useLocalSearchParams<{ bookId: string }>();
+  const [book, setBook] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [showControls, setShowControls] = useState(false);
-  const [currentChapter, setCurrentChapter] = useState(0);
-  const [scrollPosition, setScrollPosition] = useState(0);
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const { setCurrentBook } = useLibraryStore();
 
   useEffect(() => {
-    loadBook();
-    return () => {
-      if (saveTimerRef.current) {
-        clearInterval(saveTimerRef.current);
-      }
-      if (controlsTimeoutRef.current) {
-        clearTimeout(controlsTimeoutRef.current);
+    const loadBook = async () => {
+      try {
+        setIsLoading(true);
+        const id = parseInt(bookId as string);
+        const loadedBook = await getBook(id);
+        if (loadedBook) {
+          setBook(loadedBook);
+          setCurrentBook(loadedBook);
+        }
+      } catch (error) {
+        console.error('Failed to load book:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-  }, [id]);
 
-  useEffect(() => {
-    if (epubContent) {
-      saveTimerRef.current = setInterval(() => {
-        saveProgress();
-      }, 30000);
+    loadBook();
 
-      return () => {
-        if (saveTimerRef.current) {
-          clearInterval(saveTimerRef.current);
-        }
-      };
-    }
-  }, [epubContent, currentChapter, scrollPosition]);
+    return () => {
+      setCurrentBook(null);
+    };
+  }, [bookId]);
 
-  const loadBook = async () => {
-    try {
-      setLoading(true);
-      const bookId = parseInt(id as string);
-      const book = await getBook(bookId);
-
-      if (!book) {
-        Alert.alert('Error', 'Book not found');
-        router.back();
-        return;
-      }
-
-      if (book.format.toLowerCase() !== 'epub') {
-        Alert.alert('Unsupported Format', 'Only EPUB files are currently supported');
-        router.back();
-        return;
-      }
-
-      const content = await loadEpubContent(book.filePath, book.currentPage);
-      setEpubContent(content);
-      setCurrentChapter(content.currentChapter);
-
-      await updateBook(bookId, { lastOpened: Date.now() });
-    } catch (error) {
-      console.error('Failed to load book:', error);
-      Alert.alert('Error', 'Failed to load book content');
-      router.back();
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveProgress = async () => {
-    try {
-      const bookId = parseInt(id as string);
-      await updateBook(bookId, {
-        currentPage: currentChapter,
-        lastOpened: Date.now()
-      });
-    } catch (error) {
-      console.error('Failed to save progress:', error);
-    }
-  };
-
-  const handlePageChange = (chapterIndex: number) => {
-    setCurrentChapter(chapterIndex);
-    setScrollPosition(0);
-  };
-
-  const handleToggleControls = () => {
+  const toggleControls = () => {
     setShowControls(!showControls);
-
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-
-    if (!showControls) {
-      controlsTimeoutRef.current = setTimeout(() => {
-        setShowControls(false);
-      }, 3000);
-    }
   };
 
-  const handleBack = async () => {
-    await saveProgress();
-    router.back();
-  };
-
-  const calculateProgress = () => {
-    if (!epubContent) return 0;
-    return ((currentChapter + 1) / epubContent.chapters.length) * 100;
-  };
-
-  const handleFontSizeChange = (size: number) => {
-    setFontSize(size);
-  };
-
-  const handleThemeChange = (newTheme: 'light' | 'sepia' | 'dark') => {
-    setTheme(newTheme);
-  };
-
-  const handleMarginSizeChange = (size: number) => {
-    setMarginSize(size);
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
       </View>
     );
   }
 
-  if (!epubContent) {
+  if (!book) {
     return (
-      <View style={styles.centerContainer}>
-        <Text style={styles.errorText}>Failed to load book</Text>
+      <View style={styles.errorContainer}>
+        {/* Error message */}
       </View>
     );
   }
-
-  const themeBackgrounds = {
-    light: '#ffffff',
-    sepia: '#f4ecd8',
-    dark: '#1a1a1a'
-  };
 
   return (
-    <View style={[styles.container, { backgroundColor: themeBackgrounds[theme] }]}>
-      <StatusBar
-        barStyle={theme === 'dark' ? 'light-content' : 'dark-content'}
-        backgroundColor={themeBackgrounds[theme]}
-      />
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={handleBack}
-      >
-        <Text style={[styles.backButtonText, theme === 'dark' && styles.backButtonTextDark]}>
-          ← Library
-        </Text>
-      </TouchableOpacity>
-
-      <EpubRenderer
-        epubContent={epubContent}
-        fontSize={fontSize}
-        theme={theme}
-        marginSize={marginSize}
-        onPageChange={handlePageChange}
-        onToggleControls={handleToggleControls}
-      />
-
-      <Animated.View
-        style={[
-          styles.controlsContainer,
-          {
-            opacity: showControls ? 1 : 0,
-            transform: [
-              {
-                translateY: showControls ? 0 : 50,
-              },
-            ],
-          },
-        ]}
-      >
-        <ReaderControls
-          fontSize={fontSize}
-          onFontSizeChange={handleFontSizeChange}
-          theme={theme}
-          onThemeChange={handleThemeChange}
-          marginSize={marginSize}
-          onMarginSizeChange={handleMarginSizeChange}
-          progress={calculateProgress()}
-          onProgressChange={(progress) => {
-            if (epubContent) {
-              const chapterIndex = Math.floor((progress / 100) * epubContent.chapters.length);
-              handlePageChange(chapterIndex);
-            }
-          }}
+    <View style={styles.container}>
+      {book.format === 'epub' ? (
+        <EpubRenderer
+          filePath={book.filePath}
+          onToggleControls={toggleControls}
         />
-      </Animated.View>
+      ) : (
+        <PdfRenderer
+          filePath={book.filePath}
+          onToggleControls={toggleControls}
+        />
+      )}
+
+      {showControls && (
+        <ReaderControls
+          onClose={() => setShowControls(false)}
+        />
+      )}
     </View>
   );
 }
@@ -230,37 +85,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centerContainer: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  errorText: {
-    color: 'red',
-    fontSize: 18,
-  },
-  backButton: {
-    position: 'absolute',
-    top: Platform.OS === 'ios' ? 40 : 20,
-    left: 20,
-    zIndex: 10,
-    padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
-    borderRadius: 5,
-  },
-  backButtonText: {
-    color: '#000',
-    fontSize: 16,
-  },
-  backButtonTextDark: {
-    color: '#fff',
-  },
-  controlsContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

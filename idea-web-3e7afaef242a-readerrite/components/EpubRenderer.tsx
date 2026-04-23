@@ -1,15 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Dimensions, Platform, PanResponder } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { EpubContent } from '../lib/epubParser';
+import { loadEpubContent, EpubContent } from '../lib/epubParser';
+import { useLibraryStore } from '../store/useLibraryStore';
+import { updateBook } from '../lib/database';
 
 interface EpubRendererProps {
-  epubContent: EpubContent;
-  fontSize: number;
-  theme: 'light' | 'sepia' | 'dark';
-  marginSize: number;
-  onPageChange: (chapterIndex: number) => void;
-  onToggleControls: () => void;
+  filePath: string;
+  onPageChange?: (chapterIndex: number) => void;
+  onToggleControls?: () => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -17,32 +16,43 @@ const TAP_ZONE_WIDTH = SCREEN_WIDTH / 3;
 const SWIPE_THRESHOLD = 50;
 
 export default function EpubRenderer({
-  epubContent,
-  fontSize,
-  theme,
-  marginSize,
+  filePath,
   onPageChange,
   onToggleControls
 }: EpubRendererProps) {
-  const [currentChapter, setCurrentChapter] = useState(epubContent.currentChapter);
+  const [epubContent, setEpubContent] = useState<EpubContent | null>(null);
+  const [currentChapter, setCurrentChapter] = useState(0);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   const webViewRef = useRef<WebView>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx > SWIPE_THRESHOLD) {
-          goToPreviousChapter();
-        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
-          goToNextChapter();
-        }
-      },
-    })
-  ).current;
+
+  const { fontSize, theme, marginSize, currentBook, updateBook: updateStoreBook } = useLibraryStore();
+
+  useEffect(() => {
+    const loadContent = async () => {
+      try {
+        setIsLoading(true);
+        const content = await loadEpubContent(filePath, currentBook?.currentPage || 0);
+        setEpubContent(content);
+        setCurrentChapter(content.currentChapter);
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Failed to load EPUB content:', error);
+        setIsLoading(false);
+      }
+    };
+
+    loadContent();
+  }, [filePath]);
+
+  useEffect(() => {
+    if (currentBook && currentChapter !== currentBook.currentPage) {
+      updateBook(currentBook.id, { currentPage: currentChapter });
+      updateStoreBook(currentBook.id, { currentPage: currentChapter });
+      onPageChange?.(currentChapter);
+    }
+  }, [currentChapter]);
 
   const themeStyles = {
     light: {
@@ -165,27 +175,6 @@ export default function EpubRenderer({
               }
             });
 
-            window.addEventListener('message', function(event) {
-              const data = JSON.parse(event.data);
-              if (data.type === 'highlight') {
-                const selection = window.getSelection();
-                if (selection && selection.toString().length > 0) {
-                  const range = selection.getRangeAt(0);
-                  const rect = range.getBoundingClientRect();
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'highlight',
-                    text: selection.toString(),
-                    position: {
-                      x: rect.left,
-                      y: rect.top,
-                      width: rect.width,
-                      height: rect.height
-                    }
-                  }));
-                }
-              }
-            });
-
             // Restore scroll position if available
             if (window.scrollPosition) {
               window.scrollTo(0, window.scrollPosition);
@@ -196,25 +185,10 @@ export default function EpubRenderer({
     `;
   };
 
-  const goToPreviousChapter = () => {
-    if (currentChapter > 0) {
-      const newChapter = currentChapter - 1;
-      setCurrentChapter(newChapter);
-      onPageChange(newChapter);
-    }
-  };
-
-  const goToNextChapter = () => {
-    if (currentChapter < epubContent.chapters.length - 1) {
-      const newChapter = currentChapter + 1;
-      setCurrentChapter(newChapter);
-      onPageChange(newChapter);
-    }
-  };
-
-  const handleWebViewMessage = (event: any) => {
+  const handleMessage = (event: any) => {
     try {
       const data = JSON.parse(event.nativeEvent.data);
+
       if (data.type === 'scroll') {
         setScrollPosition(data.position);
 
@@ -223,41 +197,83 @@ export default function EpubRenderer({
         }
 
         scrollTimeoutRef.current = setTimeout(() => {
-          // Save scroll position to database
-          // This would be implemented in the parent component
-        }, 1000);
+          if (currentBook) {
+            updateBook(currentBook.id, { currentPage: currentChapter });
+            updateStoreBook(currentBook.id, { currentPage: currentChapter });
+          }
+        }, 3000);
       } else if (data.type === 'link') {
-        // Handle link navigation
+        // Handle link navigation if needed
         console.log('Link clicked:', data.href);
-      } else if (data.type === 'highlight') {
-        // Handle text selection
-        console.log('Text selected:', data.text);
       }
     } catch (error) {
       console.error('Error parsing WebView message:', error);
     }
   };
 
+  const goToPreviousChapter = () => {
+    if (currentChapter > 0) {
+      setCurrentChapter(currentChapter - 1);
+      webViewRef.current?.injectJavaScript(`
+        window.scrollPosition = 0;
+        window.scrollTo(0, 0);
+      `);
+    }
+  };
+
+  const goToNextChapter = () => {
+    if (epubContent && currentChapter < epubContent.chapters.length - 1) {
+      setCurrentChapter(currentChapter + 1);
+      webViewRef.current?.injectJavaScript(`
+        window.scrollPosition = 0;
+        window.scrollTo(0, 0);
+      `);
+    }
+  };
+
   const handleTap = (event: any) => {
     const { locationX } = event.nativeEvent;
+
     if (locationX < TAP_ZONE_WIDTH) {
       goToPreviousChapter();
     } else if (locationX > SCREEN_WIDTH - TAP_ZONE_WIDTH) {
       goToNextChapter();
     } else {
-      onToggleControls();
+      onToggleControls?.();
     }
   };
 
-  useEffect(() => {
-    // Update WebView content when chapter changes
-    if (webViewRef.current) {
-      webViewRef.current.injectJavaScript(`
-        window.scrollPosition = ${scrollPosition};
-        true;
-      `);
-    }
-  }, [currentChapter]);
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dx) > 10 || Math.abs(gestureState.dy) > 10;
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx > SWIPE_THRESHOLD) {
+          goToPreviousChapter();
+        } else if (gestureState.dx < -SWIPE_THRESHOLD) {
+          goToNextChapter();
+        }
+      },
+    })
+  ).current;
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
+        {/* Loading indicator */}
+      </View>
+    );
+  }
+
+  if (!epubContent) {
+    return (
+      <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
+        {/* Error message */}
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
@@ -270,14 +286,14 @@ export default function EpubRenderer({
           ref={webViewRef}
           originWhitelist={['*']}
           source={{ html: generateHtml(epubContent.chapters[currentChapter].content) }}
-          onMessage={handleWebViewMessage}
+          onMessage={handleMessage}
           javaScriptEnabled={true}
           domStorageEnabled={true}
           scalesPageToFit={false}
           style={styles.webView}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
-            console.warn('WebView error: ', nativeEvent);
+            console.error('WebView error:', nativeEvent);
           }}
         />
       </TouchableOpacity>

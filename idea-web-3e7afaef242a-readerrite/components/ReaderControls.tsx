@@ -1,127 +1,100 @@
 import React from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Slider, Platform } from 'react-native';
+import { useLibraryStore } from '../store/useLibraryStore';
 import { Ionicons } from '@expo/vector-icons';
 
 interface ReaderControlsProps {
-  fontSize: number;
-  onFontSizeChange: (size: number) => void;
-  theme: 'light' | 'sepia' | 'dark';
-  onThemeChange: (theme: 'light' | 'sepia' | 'dark') => void;
-  marginSize: number;
-  onMarginSizeChange: (size: number) => void;
-  progress: number;
-  onProgressChange: (progress: number) => void;
+  onClose: () => void;
 }
 
-export default function ReaderControls({
-  fontSize,
-  onFontSizeChange,
-  theme,
-  onThemeChange,
-  marginSize,
-  onMarginSizeChange,
-  progress,
-  onProgressChange
-}: ReaderControlsProps) {
-  const themeColors = {
-    light: '#000000',
-    sepia: '#5c4a3a',
-    dark: '#e0e0e0'
-  };
+export default function ReaderControls({ onClose }: ReaderControlsProps) {
+  const {
+    fontSize,
+    setFontSize,
+    theme,
+    setTheme,
+    marginSize,
+    setMarginSize,
+    currentBook
+  } = useLibraryStore();
 
-  const currentColor = themeColors[theme];
+  const themes = ['light', 'sepia', 'dark'] as const;
+
+  const handleThemeChange = (newTheme: typeof themes[number]) => {
+    setTheme(newTheme);
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.controlGroup}>
-        <Text style={[styles.label, { color: currentColor }]}>Font Size</Text>
-        <View style={styles.sliderContainer}>
-          <Text style={[styles.sliderValue, { color: currentColor }]}>A</Text>
+      <View style={styles.controlsContainer}>
+        <View style={styles.controlGroup}>
+          <Text style={styles.label}>Font Size: {fontSize}</Text>
           <Slider
             style={styles.slider}
             minimumValue={12}
             maximumValue={30}
             step={1}
             value={fontSize}
-            onValueChange={onFontSizeChange}
-            minimumTrackTintColor={currentColor}
-            maximumTrackTintColor={currentColor}
-            thumbTintColor={currentColor}
+            onValueChange={setFontSize}
+            minimumTrackTintColor="#007AFF"
+            maximumTrackTintColor="#d3d3d3"
+            thumbTintColor="#007AFF"
           />
-          <Text style={[styles.sliderValue, { color: currentColor }]}>A</Text>
         </View>
-      </View>
 
-      <View style={styles.controlGroup}>
-        <Text style={[styles.label, { color: currentColor }]}>Theme</Text>
-        <View style={styles.themeButtons}>
-          <TouchableOpacity
-            style={[
-              styles.themeButton,
-              theme === 'light' && styles.activeThemeButton,
-              { borderColor: currentColor }
-            ]}
-            onPress={() => onThemeChange('light')}
-          >
-            <Text style={[styles.themeButtonText, { color: currentColor }]}>Light</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.themeButton,
-              theme === 'sepia' && styles.activeThemeButton,
-              { borderColor: currentColor }
-            ]}
-            onPress={() => onThemeChange('sepia')}
-          >
-            <Text style={[styles.themeButtonText, { color: currentColor }]}>Sepia</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.themeButton,
-              theme === 'dark' && styles.activeThemeButton,
-              { borderColor: currentColor }
-            ]}
-            onPress={() => onThemeChange('dark')}
-          >
-            <Text style={[styles.themeButtonText, { color: currentColor }]}>Dark</Text>
-          </TouchableOpacity>
+        <View style={styles.controlGroup}>
+          <Text style={styles.label}>Theme</Text>
+          <View style={styles.themeSelector}>
+            {themes.map((t) => (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  styles.themeButton,
+                  theme === t && styles.activeThemeButton,
+                  t === 'light' && styles.lightTheme,
+                  t === 'sepia' && styles.sepiaTheme,
+                  t === 'dark' && styles.darkTheme
+                ]}
+                onPress={() => handleThemeChange(t)}
+              >
+                <Text style={[
+                  styles.themeButtonText,
+                  theme === t && styles.activeThemeButtonText
+                ]}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
 
-      <View style={styles.controlGroup}>
-        <Text style={[styles.label, { color: currentColor }]}>Margins</Text>
-        <View style={styles.sliderContainer}>
-          <Ionicons name="remove-outline" size={24} color={currentColor} />
+        <View style={styles.controlGroup}>
+          <Text style={styles.label}>Margins: {marginSize}</Text>
           <Slider
             style={styles.slider}
-            minimumValue={10}
-            maximumValue={40}
+            minimumValue={8}
+            maximumValue={32}
             step={1}
             value={marginSize}
-            onValueChange={onMarginSizeChange}
-            minimumTrackTintColor={currentColor}
-            maximumTrackTintColor={currentColor}
-            thumbTintColor={currentColor}
+            onValueChange={setMarginSize}
+            minimumTrackTintColor="#007AFF"
+            maximumTrackTintColor="#d3d3d3"
+            thumbTintColor="#007AFF"
           />
-          <Ionicons name="add-outline" size={24} color={currentColor} />
         </View>
-      </View>
 
-      <View style={styles.progressContainer}>
-        <Text style={[styles.progressText, { color: currentColor }]}>
-          {Math.round(progress)}%
-        </Text>
-        <Slider
-          style={styles.progressSlider}
-          minimumValue={0}
-          maximumValue={100}
-          step={1}
-          value={progress}
-          onValueChange={onProgressChange}
-          minimumTrackTintColor={currentColor}
-          maximumTrackTintColor={currentColor}
-          thumbTintColor={currentColor}
-        />
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressText}>
+            {currentBook?.currentPage || 0} / {currentBook?.totalPages || 0}
+          </Text>
+        </View>
+
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.actionButton} onPress={onClose}>
+            <Ionicons name="close" size={24} color="#007AFF" />
+            <Text style={styles.actionButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -129,59 +102,81 @@ export default function ReaderControls({
 
 const styles = StyleSheet.create({
   container: {
-    padding: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderTopLeftRadius: 10,
-    borderTopRightRadius: 10,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 16,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 16,
+  },
+  controlsContainer: {
+    flexDirection: 'column',
+    gap: 16,
   },
   controlGroup: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
     marginBottom: 8,
   },
-  sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  label: {
+    color: 'white',
+    fontSize: 16,
+    marginBottom: 8,
   },
   slider: {
-    flex: 1,
-    marginHorizontal: 10,
+    width: '100%',
+    height: 40,
   },
-  sliderValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  themeButtons: {
+  themeSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
   },
   themeButton: {
     padding: 8,
-    borderWidth: 1,
-    borderRadius: 5,
+    borderRadius: 4,
     flex: 1,
-    marginHorizontal: 5,
     alignItems: 'center',
   },
   activeThemeButton: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+    borderWidth: 2,
+    borderColor: '#007AFF',
+  },
+  lightTheme: {
+    backgroundColor: '#ffffff',
+  },
+  sepiaTheme: {
+    backgroundColor: '#f4ecd8',
+  },
+  darkTheme: {
+    backgroundColor: '#1a1a1a',
   },
   themeButtonText: {
-    fontSize: 14,
+    color: '#333333',
+  },
+  activeThemeButtonText: {
+    color: '#007AFF',
   },
   progressContainer: {
-    marginTop: 10,
+    alignItems: 'center',
+    marginVertical: 8,
   },
   progressText: {
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 5,
+    color: 'white',
+    fontSize: 16,
   },
-  progressSlider: {
-    width: '100%',
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  actionButtonText: {
+    color: 'white',
+    marginLeft: 8,
   },
 });
