@@ -9,33 +9,40 @@ const Analytics = () => {
   const [installSources, setInstallSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    const fetchAnalytics = async () => {
-      try {
-        setLoading(true);
-        const [count, deepLinkCount, trendData, sources] = await Promise.all([
-          getInstallCount(),
-          getDeepLinkCount(),
-          getInstallTrendData(),
-          getInstallsBySource()
-        ]);
-
-        setInstallCount(count);
-        setDeepLinkCount(deepLinkCount);
-        setTrendData(trendData);
-        setInstallSources(sources);
-        setError(null);
-      } catch (error) {
-        console.error('Error fetching analytics:', error);
-        setError('Failed to load analytics data. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchAnalytics();
   }, []);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      const [count, deepLinkCount, trendData, sources] = await Promise.all([
+        getInstallCount(),
+        getDeepLinkCount(),
+        getInstallTrendData(),
+        getInstallsBySource()
+      ]);
+
+      setInstallCount(count);
+      setDeepLinkCount(deepLinkCount);
+      setTrendData(trendData);
+      setInstallSources(sources);
+      setError(null);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setError('Failed to load analytics data. Please try again later.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchAnalytics();
+  };
 
   const renderTrendIndicator = () => {
     if (trendData.today > trendData.yesterday) {
@@ -66,7 +73,16 @@ const Analytics = () => {
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={handleRefresh}
+          colors={['#2c3e50']}
+        />
+      }
+    >
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Install Overview</Text>
         <View style={styles.statsRow}>
@@ -168,7 +184,10 @@ const styles = StyleSheet.create({
   statBox: {
     flex: 1,
     alignItems: 'center',
-    padding: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    marginHorizontal: 4,
   },
   statLabel: {
     fontSize: 14,
@@ -176,7 +195,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   statValue: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#2c3e50',
   },
@@ -187,7 +206,10 @@ const styles = StyleSheet.create({
   trendBox: {
     flex: 1,
     alignItems: 'center',
-    padding: 8,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    marginHorizontal: 4,
   },
   trendLabel: {
     fontSize: 14,
@@ -200,14 +222,17 @@ const styles = StyleSheet.create({
     color: '#2c3e50',
   },
   trendUp: {
+    fontSize: 16,
     color: '#27ae60',
     fontWeight: 'bold',
   },
   trendDown: {
+    fontSize: 16,
     color: '#e74c3c',
     fontWeight: 'bold',
   },
   trendNeutral: {
+    fontSize: 16,
     color: '#f39c12',
     fontWeight: 'bold',
   },
@@ -229,7 +254,7 @@ const styles = StyleSheet.create({
   },
   noDataText: {
     fontSize: 14,
-    color: '#666',
+    color: '#999',
     textAlign: 'center',
     padding: 16,
   },
