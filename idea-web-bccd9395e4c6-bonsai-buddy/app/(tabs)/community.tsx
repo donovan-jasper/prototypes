@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator } from 'react-native';
-import { Text, Button, Portal, Modal, useTheme } from 'react-native-paper';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { Text, Button, Portal, Modal, useTheme, IconButton } from 'react-native-paper';
 import { useCommunity } from '../../hooks/useCommunity';
 import CommunityPost from '../../components/CommunityPost';
 import { useAppContext } from '../../contexts/AppContext';
+import { useRouter } from 'expo-router';
 
 export default function CommunityScreen() {
   const { posts, loading, loadPosts, refreshPosts } = useCommunity();
@@ -11,6 +12,7 @@ export default function CommunityScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
   const theme = useTheme();
+  const router = useRouter();
 
   useEffect(() => {
     loadPosts();
@@ -24,7 +26,15 @@ export default function CommunityScreen() {
 
   const handleUpgrade = () => {
     setShowPaywall(false);
-    // Navigate to upgrade screen or show purchase modal
+    router.push('/upgrade');
+  };
+
+  const handlePost = () => {
+    if (!isPremium) {
+      setShowPaywall(true);
+      return;
+    }
+    router.push('/post/create');
   };
 
   return (
@@ -56,7 +66,7 @@ export default function CommunityScreen() {
       {!isPremium && (
         <Portal>
           <Modal
-            visible={!isPremium}
+            visible={showPaywall}
             onDismiss={() => setShowPaywall(false)}
             contentContainerStyle={styles.paywallModal}
           >
@@ -85,6 +95,18 @@ export default function CommunityScreen() {
           </Modal>
         </Portal>
       )}
+
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        onPress={handlePost}
+      >
+        <IconButton
+          icon="plus"
+          color="white"
+          size={24}
+          onPress={handlePost}
+        />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -131,5 +153,20 @@ const styles = StyleSheet.create({
   },
   dismissButton: {
     width: '100%',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });
