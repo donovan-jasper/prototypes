@@ -73,6 +73,9 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   setUserId: async (userId: string) => {
     await SecureStore.setItemAsync('userId', userId);
     set({ userId });
+    // Fetch initial data
+    await get().fetchMemories();
+    await get().fetchSpaces();
   },
 
   clearUser: async () => {
@@ -87,7 +90,7 @@ export const useMemoryStore = create<MemoryState>((set, get) => ({
   if (userId) {
     useMemoryStore.setState({ userId });
     // Fetch initial data
-    useMemoryStore.getState().fetchMemories();
-    useMemoryStore.getState().fetchSpaces();
+    await useMemoryStore.getState().fetchMemories();
+    await useMemoryStore.getState().fetchSpaces();
   }
 })();

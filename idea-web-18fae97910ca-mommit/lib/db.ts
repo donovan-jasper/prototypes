@@ -151,28 +151,33 @@ export const createSpace = async (name: string, ownerId: string, members: string
             [id, ownerId],
             () => {
               // Add additional members
-              const memberPromises = members.map(member =>
-                new Promise((resolveMember, rejectMember) => {
-                  tx.executeSql(
-                    `INSERT INTO space_members (space_id, user_id) VALUES (?, ?);`,
-                    [id, member],
-                    () => resolveMember(true),
-                    (_, error) => rejectMember(error)
-                  );
-                })
-              );
+              if (members.length > 0) {
+                const placeholders = members.map(() => '(?, ?)').join(',');
+                const values = members.flatMap(member => [id, member]);
 
-              Promise.all(memberPromises)
-                .then(() => {
-                  resolve({
-                    id,
-                    name,
-                    created_at: createdAt,
-                    owner_id: ownerId,
-                    members: [ownerId, ...members]
-                  });
-                })
-                .catch(error => reject(error));
+                tx.executeSql(
+                  `INSERT INTO space_members (space_id, user_id) VALUES ${placeholders};`,
+                  values,
+                  () => {
+                    resolve({
+                      id,
+                      name,
+                      created_at: createdAt,
+                      owner_id: ownerId,
+                      members: [ownerId, ...members]
+                    });
+                  },
+                  (_, error) => reject(error)
+                );
+              } else {
+                resolve({
+                  id,
+                  name,
+                  created_at: createdAt,
+                  owner_id: ownerId,
+                  members: [ownerId]
+                });
+              }
             },
             (_, error) => reject(error)
           );
@@ -216,7 +221,7 @@ export const getSpaceById = async (spaceId: string): Promise<Space> => {
       tx.executeSql(
         `SELECT s.*, GROUP_CONCAT(sm.user_id) as members
          FROM spaces s
-         JOIN space_members sm ON s.id = sm.space_id
+         LEFT JOIN space_members sm ON s.id = sm.space_id
          WHERE s.id = ?
          GROUP BY s.id;`,
         [spaceId],
@@ -243,7 +248,9 @@ export const addMemberToSpace = async (spaceId: string, userId: string): Promise
       tx.executeSql(
         `INSERT INTO space_members (space_id, user_id) VALUES (?, ?);`,
         [spaceId, userId],
-        () => resolve(),
+        () => {
+          resolve();
+        },
         (_, error) => reject(error)
       );
     });
@@ -256,7 +263,9 @@ export const removeMemberFromSpace = async (spaceId: string, userId: string): Pr
       tx.executeSql(
         `DELETE FROM space_members WHERE space_id = ? AND user_id = ?;`,
         [spaceId, userId],
-        () => resolve(),
+        () => {
+          resolve();
+        },
         (_, error) => reject(error)
       );
     });

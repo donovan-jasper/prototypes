@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, TextInput, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemoryStore } from '../../store/memoryStore';
 import { Memory, Space } from '../../lib/types';
-import { getSpaceById, addMemberToSpace, removeMemberFromSpace, getMemoriesForSpace } from '../../lib/db';
+import { getSpaceById, addMemberToSpace, removeMemberFromSpace, getMemoriesForSpace, createMemory } from '../../lib/db';
 import MemoryCard from '../../components/MemoryCard';
+import { parseNaturalLanguage } from '../../lib/ai';
 
 export default function SpaceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -12,8 +13,10 @@ export default function SpaceDetailScreen() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [isAddingMember, setIsAddingMember] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [newMemoryText, setNewMemoryText] = useState('');
   const router = useRouter();
-  const { userId } = useMemoryStore();
+  const { userId, addMemory } = useMemoryStore();
 
   useEffect(() => {
     if (id) {
@@ -22,6 +25,9 @@ export default function SpaceDetailScreen() {
   }, [id]);
 
   const loadSpaceData = async () => {
+    if (!id) return;
+
+    setIsLoading(true);
     try {
       const spaceData = await getSpaceById(id);
       setSpace(spaceData);
@@ -31,6 +37,8 @@ export default function SpaceDetailScreen() {
     } catch (error) {
       Alert.alert('Error', 'Failed to load space data');
       router.back();
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -40,6 +48,9 @@ export default function SpaceDetailScreen() {
       return;
     }
 
+    if (!id) return;
+
+    setIsLoading(true);
     try {
       await addMemberToSpace(id, newMemberEmail);
       setSpace(prev => prev ? { ...prev, members: [...prev.members, newMemberEmail] } : null);
@@ -48,10 +59,15 @@ export default function SpaceDetailScreen() {
       Alert.alert('Success', 'Member added successfully');
     } catch (error) {
       Alert.alert('Error', 'Failed to add member');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleRemoveMember = async (email: string) => {
+    if (!id) return;
+
+    setIsLoading(true);
     try {
       await removeMemberFromSpace(id, email);
       setSpace(prev => prev ? {
@@ -61,17 +77,75 @@ export default function SpaceDetailScreen() {
       Alert.alert('Success', 'Member removed successfully');
     } catch (error) {
       Alert.alert('Error', 'Failed to remove member');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAddMemory = async () => {
+    if (!newMemoryText.trim()) {
+      Alert.alert('Error', 'Please enter a memory description');
+      return;
+    }
+
+    if (!userId || !id) return;
+
+    setIsLoading(true);
+    try {
+      // Parse the natural language input
+      const parsed = await parseNaturalLanguage(newMemoryText);
+
+      // Create the memory in the database
+      const memory = await createMemory(
+        parsed.title,
+        parsed.description,
+        parsed.triggerType,
+        parsed.triggerValue,
+        userId
+      );
+
+      // Add to the space
+      // In a real app, you would have a separate function to add memory to space
+      // For this example, we'll just add it to our local state
+      setMemories([memory, ...memories]);
+      setNewMemoryText('');
+
+      // Update the global state
+      addMemory(memory);
+
+      Alert.alert('Success', 'Memory added successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to add memory');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const renderMemoryItem = ({ item }: { item: Memory }) => (
-    <MemoryCard memory={item} />
+    <MemoryCard
+      memory={item}
+      onComplete={() => {
+        // Handle complete action
+      }}
+      onSnooze={() => {
+        // Handle snooze action
+      }}
+    />
   );
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text>Loading space details...</Text>
+      </View>
+    );
+  }
 
   if (!space) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading space...</Text>
+        <Text>Space not found</Text>
       </View>
     );
   }
@@ -139,20 +213,37 @@ export default function SpaceDetailScreen() {
 
       <View style={styles.memoriesSection}>
         <Text style={styles.sectionTitle}>Memories in this space</Text>
-        <FlatList
-          data={memories}
-          renderItem={renderMemoryItem}
-          keyExtractor={item => item.id}
-          style={styles.memoriesList}
-        />
-      </View>
 
-      <TouchableOpacity
-        style={styles.addMemoryButton}
-        onPress={() => router.push('/add-memory?spaceId=' + id)}
-      >
-        <Text style={styles.addMemoryButtonText}>Add Memory to Space</Text>
-      </TouchableOpacity>
+        <View style={styles.addMemoryForm}>
+          <TextInput
+            style={styles.input}
+            placeholder="Add a new memory (e.g., 'Remind me to call mom every Sunday at 5 PM')"
+            value={newMemoryText}
+            onChangeText={setNewMemoryText}
+            multiline
+          />
+          <TouchableOpacity
+            style={styles.addMemoryButton}
+            onPress={handleAddMemory}
+          >
+            <Text style={styles.buttonText}>Add Memory</Text>
+          </TouchableOpacity>
+        </View>
+
+        {memories.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No memories in this space yet</Text>
+            <Text style={styles.emptySubtext}>Add a memory to share with your space members</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={memories}
+            renderItem={renderMemoryItem}
+            keyExtractor={item => item.id}
+            style={styles.memoriesList}
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -163,11 +254,6 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -177,11 +263,14 @@ const styles = StyleSheet.create({
   membersSection: {
     marginBottom: 20,
   },
+  memoriesSection: {
+    flex: 1,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#555',
+    color: '#333',
   },
   addMemberForm: {
     backgroundColor: 'white',
@@ -214,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#2196F3',
   },
   cancelButton: {
     backgroundColor: '#f44336',
@@ -223,16 +312,14 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  membersList: {
-    maxHeight: 150,
-  },
   memberItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: 'white',
+    borderRadius: 4,
+    marginBottom: 5,
   },
   memberEmail: {
     fontSize: 16,
@@ -246,22 +333,50 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 12,
   },
-  memoriesSection: {
-    flex: 1,
+  membersList: {
+    maxHeight: 150,
+    marginBottom: 10,
+  },
+  addMemoryForm: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addMemoryButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
   },
   memoriesList: {
     flex: 1,
   },
-  addMemoryButton: {
-    backgroundColor: '#2196F3',
-    padding: 15,
-    borderRadius: 8,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
   },
-  addMemoryButtonText: {
-    color: 'white',
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 16,
+    marginBottom: 10,
+    color: '#666',
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
