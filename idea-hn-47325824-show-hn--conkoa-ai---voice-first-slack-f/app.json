@@ -10,15 +10,27 @@
         {
           "microphonePermission": "Allow VoxCrew to access your microphone for voice messages."
         }
+      ],
+      [
+        "expo-background-fetch",
+        {
+          "backgroundFetch": {
+            "minimumInterval": 60 * 15,
+            "stopOnTerminate": false,
+            "startOnBoot": true
+          }
+        }
       ]
     ],
     "ios": {
       "bundleIdentifier": "com.voxcrew.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "backgroundMode": "fetch"
     },
     "android": {
       "package": "com.voxcrew.app",
-      "permissions": ["RECORD_AUDIO", "INTERNET"]
+      "permissions": ["RECORD_AUDIO", "INTERNET", "WAKE_LOCK"],
+      "backgroundMode": "fetch"
     }
   }
 }
