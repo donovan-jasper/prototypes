@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
 import { Video } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { insertSessionReport } from '../lib/database';
 
 interface VideoCallProps {
-  onEndCall: () => void;
-  onReportCall: () => void;
+  sessionId: string;
+  peerName?: string;
 }
 
-const VideoCall: React.FC<VideoCallProps> = ({ onEndCall, onReportCall }) => {
+const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName }) => {
+  const router = useRouter();
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(true);
@@ -41,6 +44,30 @@ const VideoCall: React.FC<VideoCallProps> = ({ onEndCall, onReportCall }) => {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleEndCall = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    router.back();
+  };
+
+  const handleReportCall = async () => {
+    try {
+      await insertSessionReport({
+        id: `report_${Date.now()}`,
+        sessionId,
+        timestamp: Date.now(),
+        reason: 'User initiated report',
+        status: 'pending'
+      });
+      Alert.alert('Report Submitted', 'Your report has been submitted to moderators.');
+      handleEndCall();
+    } catch (error) {
+      console.error('Error saving report:', error);
+      Alert.alert('Error', 'Failed to submit report. Please try again.');
+    }
+  };
+
   if (hasPermission === null) {
     return <View style={styles.container}><Text>Requesting camera permission...</Text></View>;
   }
@@ -65,6 +92,12 @@ const VideoCall: React.FC<VideoCallProps> = ({ onEndCall, onReportCall }) => {
         )}
       </View>
 
+      {peerName && (
+        <View style={styles.peerInfo}>
+          <Text style={styles.peerName}>{peerName}</Text>
+        </View>
+      )}
+
       <View style={styles.controls}>
         <TouchableOpacity
           style={styles.controlButton}
@@ -79,7 +112,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ onEndCall, onReportCall }) => {
 
         <TouchableOpacity
           style={[styles.controlButton, styles.endCallButton]}
-          onPress={onEndCall}
+          onPress={handleEndCall}
         >
           <MaterialIcons name="call-end" size={24} color="white" />
         </TouchableOpacity>
@@ -102,7 +135,7 @@ const VideoCall: React.FC<VideoCallProps> = ({ onEndCall, onReportCall }) => {
 
       <TouchableOpacity
         style={styles.safetyButton}
-        onPress={onReportCall}
+        onPress={handleReportCall}
       >
         <MaterialIcons name="report" size={24} color="white" />
       </TouchableOpacity>
@@ -132,6 +165,21 @@ const styles = StyleSheet.create({
   cameraOffText: {
     color: 'white',
     fontSize: 18,
+  },
+  peerInfo: {
+    position: 'absolute',
+    top: 50,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  peerName: {
+    color: 'white',
+    fontSize: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   controls: {
     flexDirection: 'row',
