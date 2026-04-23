@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, FlatList, Dimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SKILLS, ROLES } from '../constants/skills';
 import { generateSkillRoadmap } from '../lib/roadmap-generator';
 import { calculateAIResistanceScore } from '../lib/scoring';
 import { isPremiumUser } from '../lib/database';
 import { Roadmap } from '../types';
+import { LineChart } from 'react-native-chart-kit';
 
 interface Scenario {
   id: string;
@@ -55,7 +56,7 @@ export default function ScenarioPlannerScreen() {
 
     scenarios.forEach(scenario => {
       const roadmap = generateSkillRoadmap({
-        currentRole: 'current-role', // In real app, get from user profile
+        currentRole: 'current-role',
         targetRole: scenario.targetRole,
         currentSkills: scenario.skillsToLearn,
         experience: scenario.experience
@@ -68,29 +69,126 @@ export default function ScenarioPlannerScreen() {
   }
 
   function calculateSalaryPotential(role: string): number {
-    // Simplified salary calculation based on role
     const baseSalaries: Record<string, number> = {
       'software-engineer': 100000,
       'engineering-manager': 140000,
       'product-manager': 130000,
-      'senior-engineer': 120000
+      'senior-engineer': 120000,
+      'designer': 110000,
+      'data-scientist': 125000,
+      'devops-engineer': 130000,
+      'frontend-developer': 105000,
+      'backend-developer': 115000,
+      'tech-lead': 150000,
+      'qa-engineer': 95000
     };
     return baseSalaries[role] || 110000;
   }
 
   function calculateJobSecurity(role: string): number {
-    // Simplified job security calculation based on role
     const securityScores: Record<string, number> = {
       'software-engineer': 60,
       'engineering-manager': 85,
       'product-manager': 75,
-      'senior-engineer': 70
+      'senior-engineer': 70,
+      'designer': 70,
+      'data-scientist': 65,
+      'devops-engineer': 65,
+      'frontend-developer': 55,
+      'backend-developer': 60,
+      'tech-lead': 80,
+      'qa-engineer': 50
     };
     return securityScores[role] || 65;
   }
 
+  function renderScenarioCard(scenario: Scenario) {
+    const roadmap = roadmaps[scenario.id];
+    const score = calculateAIResistanceScore({
+      role: scenario.targetRole as any,
+      skills: scenario.skillsToLearn,
+      experience: scenario.experience,
+      timestamp: Date.now()
+    });
+
+    return (
+      <View key={scenario.id} style={styles.scenarioCard}>
+        <Text style={styles.cardTitle}>{ROLES[scenario.targetRole]?.name || scenario.targetRole}</Text>
+
+        <View style={styles.metricsRow}>
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>{score}</Text>
+            <Text style={styles.metricLabel}>AI Resistance</Text>
+          </View>
+
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>${calculateSalaryPotential(scenario.targetRole).toLocaleString()}</Text>
+            <Text style={styles.metricLabel}>Salary Potential</Text>
+          </View>
+
+          <View style={styles.metricBox}>
+            <Text style={styles.metricValue}>{calculateJobSecurity(scenario.targetRole)}%</Text>
+            <Text style={styles.metricLabel}>Job Security</Text>
+          </View>
+        </View>
+
+        {roadmap && (
+          <>
+            <Text style={styles.sectionTitle}>Recommended Skills</Text>
+            <View style={styles.skillsList}>
+              {roadmap.skills.slice(0, 5).map((skill, index) => (
+                <View key={index} style={styles.skillItem}>
+                  <Text style={styles.skillName}>{skill.skill}</Text>
+                  <Text style={styles.skillTime}>{skill.estimatedWeeks} weeks</Text>
+                </View>
+              ))}
+            </View>
+
+            <Text style={styles.sectionTitle}>Learning Timeline</Text>
+            <LineChart
+              data={{
+                labels: roadmap.skills.map(s => s.skill.substring(0, 3)),
+                datasets: [{
+                  data: roadmap.skills.map(s => s.estimatedWeeks),
+                  color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                  strokeWidth: 2
+                }]
+              }}
+              width={Dimensions.get('window').width - 40}
+              height={220}
+              yAxisLabel=""
+              yAxisSuffix="w"
+              yAxisInterval={1}
+              chartConfig={{
+                backgroundColor: '#ffffff',
+                backgroundGradientFrom: '#ffffff',
+                backgroundGradientTo: '#ffffff',
+                decimalPlaces: 0,
+                color: (opacity = 1) => `rgba(59, 130, 246, ${opacity})`,
+                labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+                style: {
+                  borderRadius: 16
+                },
+                propsForDots: {
+                  r: '4',
+                  strokeWidth: '2',
+                  stroke: '#3b82f6'
+                }
+              }}
+              bezier
+              style={{
+                marginVertical: 8,
+                borderRadius: 16
+              }}
+            />
+          </>
+        )}
+      </View>
+    );
+  }
+
   if (!isPremium) {
-    return null; // Will be redirected by checkPremiumStatus
+    return null;
   }
 
   return (
@@ -157,56 +255,15 @@ export default function ScenarioPlannerScreen() {
       </View>
 
       {scenarios.length > 0 && (
-        <View style={styles.comparisonSection}>
-          <TouchableOpacity
-            style={styles.generateButton}
-            onPress={generateRoadmaps}
-          >
-            <Text style={styles.generateButtonText}>Generate Comparison</Text>
-          </TouchableOpacity>
-
-          {Object.entries(roadmaps).map(([scenarioId, roadmap]) => {
-            const scenario = scenarios.find(s => s.id === scenarioId);
-            if (!scenario) return null;
-
-            const salary = calculateSalaryPotential(scenario.targetRole);
-            const security = calculateJobSecurity(scenario.targetRole);
-
-            return (
-              <View key={scenarioId} style={styles.scenarioCard}>
-                <Text style={styles.scenarioTitle}>{ROLES[scenario.targetRole as keyof typeof ROLES]?.name}</Text>
-
-                <View style={styles.metricsRow}>
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricValue}>{security}%</Text>
-                    <Text style={styles.metricLabel}>Job Security</Text>
-                  </View>
-
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricValue}>{roadmap.timeline} weeks</Text>
-                    <Text style={styles.metricLabel}>Learning Time</Text>
-                  </View>
-
-                  <View style={styles.metricBox}>
-                    <Text style={styles.metricValue}>${salary.toLocaleString()}</Text>
-                    <Text style={styles.metricLabel}>Salary Potential</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.recommendedSkills}>Recommended Skills:</Text>
-                <View style={styles.skillList}>
-                  {roadmap.skills.map((skill, index) => (
-                    <View key={index} style={styles.skillItem}>
-                      <Text style={styles.skillName}>{skill.skill}</Text>
-                      <Text style={styles.skillTime}>{skill.estimatedWeeks} weeks</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            );
-          })}
-        </View>
+        <TouchableOpacity
+          style={styles.generateButton}
+          onPress={generateRoadmaps}
+        >
+          <Text style={styles.generateButtonText}>Generate Comparison</Text>
+        </TouchableOpacity>
       )}
+
+      {scenarios.map(renderScenarioCard)}
     </ScrollView>
   );
 }
@@ -220,7 +277,8 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    marginBottom: 8
+    marginBottom: 8,
+    color: '#1f2937'
   },
   subtitle: {
     fontSize: 16,
@@ -231,55 +289,72 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 16,
-    marginBottom: 24
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    marginBottom: 16
+    marginBottom: 16,
+    color: '#1f2937'
   },
   label: {
     fontSize: 16,
     fontWeight: '500',
-    marginTop: 16,
-    marginBottom: 8
+    marginBottom: 12,
+    color: '#374151'
   },
   picker: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16
+    marginBottom: 20
   },
   pickerOption: {
     padding: 12,
     backgroundColor: '#f3f4f6',
     borderRadius: 8,
     marginRight: 8,
-    marginBottom: 8
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  selected: {
+    backgroundColor: '#e0f2fe',
+    borderColor: '#3b82f6'
   },
   skillsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 16
+    marginBottom: 20
   },
   skillChip: {
     padding: 8,
     backgroundColor: '#f3f4f6',
-    borderRadius: 16,
+    borderRadius: 20,
     marginRight: 8,
-    marginBottom: 8
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
   },
   skillText: {
     fontSize: 14
   },
   experienceSlider: {
     flexDirection: 'row',
-    marginBottom: 16
+    justifyContent: 'space-between',
+    marginBottom: 20
   },
   yearButton: {
     padding: 12,
     backgroundColor: '#f3f4f6',
     borderRadius: 8,
-    marginRight: 8
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    width: '15%'
   },
   addButton: {
     backgroundColor: '#3b82f6',
@@ -295,15 +370,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600'
   },
-  comparisonSection: {
-    marginBottom: 32
-  },
   generateButton: {
     backgroundColor: '#10b981',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 24
+    marginBottom: 20
   },
   generateButtonText: {
     color: '#fff',
@@ -314,12 +386,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     padding: 20,
     borderRadius: 16,
-    marginBottom: 16
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2
   },
-  scenarioTitle: {
+  cardTitle: {
     fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 16
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#1f2937'
   },
   metricsRow: {
     flexDirection: 'row',
@@ -328,24 +406,21 @@ const styles = StyleSheet.create({
   },
   metricBox: {
     alignItems: 'center',
-    flex: 1
+    flex: 1,
+    marginHorizontal: 4
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 4
+    color: '#1f2937'
   },
   metricLabel: {
-    fontSize: 14,
-    color: '#6b7280'
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center'
   },
-  recommendedSkills: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 12
-  },
-  skillList: {
-    marginTop: 8
+  skillsList: {
+    marginBottom: 20
   },
   skillItem: {
     flexDirection: 'row',
@@ -355,15 +430,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e5e7eb'
   },
   skillName: {
-    fontSize: 16
+    fontSize: 16,
+    fontWeight: '500'
   },
   skillTime: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#6b7280'
-  },
-  selected: {
-    backgroundColor: '#e0f2fe',
-    borderColor: '#3b82f6',
-    borderWidth: 1
   }
 });
