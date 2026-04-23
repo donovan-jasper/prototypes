@@ -46,6 +46,9 @@ export const useStore = create<StoreState>((set, get) => ({
 
   startSession: async (duration, voicePack) => {
     try {
+      // Check if we need to reset streak before starting a new session
+      await get().resetStreakIfNeeded();
+
       const sessionId = await createSession(duration, voicePack);
       set({
         currentSession: {
