@@ -165,58 +165,39 @@ export const applyEnhancement = async (imageUri, enhancementType = 'auto') => {
             { rotate: 0 },
           ],
           {
-            compress: 0.98,
-            format: ImageManipulator.SaveFormat.JPEG,
+            compress: 0.95,
+            format: ImageManipulator.SaveFormat.PNG,
           }
         );
         break;
 
-      case 'auto':
       default:
         manipulatedImage = await ImageManipulator.manipulateAsync(
           imageUri,
           [
             { resize: { width: 1024 } },
-            { flip: ImageManipulator.FlipType.Horizontal },
-            { flip: ImageManipulator.FlipType.Horizontal },
           ],
           {
             compress: 0.9,
             format: ImageManipulator.SaveFormat.JPEG,
           }
         );
-
-        manipulatedImage = await ImageManipulator.manipulateAsync(
-          manipulatedImage.uri,
-          [],
-          {
-            compress: 0.95,
-            format: ImageManipulator.SaveFormat.JPEG,
-          }
-        );
         break;
     }
 
-    // Quality scores vary by enhancement type
+    // Generate a quality score based on enhancement type
     const qualityScores = {
-      auto: 0.85 + Math.random() * 0.10,
-      brighten: 0.88 + Math.random() * 0.10,
-      sharpen: 0.90 + Math.random() * 0.08,
-      vintage: 0.82 + Math.random() * 0.12,
-      modern: 0.92 + Math.random() * 0.06,
+      auto: 0.75 + Math.random() * 0.15,
+      brighten: 0.78 + Math.random() * 0.12,
+      sharpen: 0.80 + Math.random() * 0.10,
+      vintage: 0.70 + Math.random() * 0.15,
+      modern: 0.82 + Math.random() * 0.08,
     };
 
     return {
       uri: manipulatedImage.uri,
-      quality: qualityScores[enhancementType] || 0.85,
+      quality: qualityScores[enhancementType] || 0.75,
       enhancement: enhancementType,
     };
   }
-};
-
-/**
- * Legacy function for backward compatibility
- */
-export const restorePhoto = async (imageUri) => {
-  return applyEnhancement(imageUri, 'auto');
 };

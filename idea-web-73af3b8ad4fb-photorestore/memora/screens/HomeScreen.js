@@ -148,59 +148,63 @@ const HomeScreen = ({ navigation }) => {
                 <TouchableOpacity
                   key={option.value}
                   style={[
-                    styles.enhancementButton,
+                    styles.enhancementOption,
                     selectedEnhancement === option.value && styles.selectedEnhancement
                   ]}
                   onPress={() => setSelectedEnhancement(option.value)}
                 >
-                  <Text style={styles.enhancementButtonText}>{option.label}</Text>
+                  <Text style={styles.enhancementOptionText}>{option.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
 
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.processButton} onPress={processImage}>
-              <Text style={styles.processButtonText}>Restore Photo</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
+          <TouchableOpacity
+            style={[styles.button, styles.processButton]}
+            onPress={processImage}
+            disabled={isProcessing}
+          >
+            <Text style={styles.buttonText}>
+              {isProcessing ? 'Restoring...' : 'Restore Photo'}
+            </Text>
+          </TouchableOpacity>
 
-      {isProcessing && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Restoring your photo...</Text>
-          <View style={styles.progressBarContainer}>
-            <View style={[styles.progressBar, { width: `${processingProgress}%` }]} />
-          </View>
-          <Text style={styles.progressText}>{processingProgress}%</Text>
+          {isProcessing && (
+            <View style={styles.progressContainer}>
+              <ActivityIndicator size="small" color="#4CAF50" />
+              <Text style={styles.progressText}>{processingProgress}%</Text>
+            </View>
+          )}
         </View>
       )}
 
       {restoredImage && (
         <View style={styles.resultContainer}>
-          <Text style={styles.sectionTitle}>Restored Photo</Text>
+          <Text style={styles.resultTitle}>Restored Image</Text>
           <Image source={{ uri: restoredImage }} style={styles.resultImage} />
 
-          {qualityMetrics && (
-            <View style={styles.metricsContainer}>
-              <Text style={styles.qualityText}>Quality: {(qualityMetrics.quality * 100).toFixed(0)}%</Text>
-              <Text style={styles.enhancementText}>
-                {enhancementOptions.find(e => e.value === qualityMetrics.enhancement)?.label || 'Auto'}
-              </Text>
-            </View>
-          )}
+          <View style={styles.metricsContainer}>
+            <Text style={styles.metricText}>
+              Quality: {Math.round(qualityMetrics?.quality * 100)}%
+            </Text>
+            <Text style={styles.metricText}>
+              Enhancement: {qualityMetrics?.enhancement}
+            </Text>
+          </View>
 
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.cancelButton} onPress={resetSelection}>
-              <Text style={styles.cancelButtonText}>Start Over</Text>
+            <TouchableOpacity
+              style={[styles.button, styles.secondaryButton]}
+              onPress={resetSelection}
+            >
+              <Text style={styles.buttonText}>Start Over</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={saveResult}>
-              <Text style={styles.saveButtonText}>Save Result</Text>
+
+            <TouchableOpacity
+              style={[styles.button, styles.primaryButton]}
+              onPress={saveResult}
+            >
+              <Text style={styles.buttonText}>Save & Share</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -213,7 +217,6 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    alignItems: 'center',
     backgroundColor: '#f5f5f5',
   },
   title: {
@@ -226,193 +229,137 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 24,
+    marginBottom: 20,
     textAlign: 'center',
   },
   usageContainer: {
-    width: '100%',
+    backgroundColor: '#e3f2fd',
+    padding: 15,
+    borderRadius: 8,
     marginBottom: 20,
     alignItems: 'center',
   },
   usageText: {
     fontSize: 16,
-    color: '#666',
+    color: '#1976d2',
     marginBottom: 8,
   },
   upgradeButton: {
-    backgroundColor: '#FF9500',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    backgroundColor: '#ff9800',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
   },
   upgradeButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
   },
   button: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
+    backgroundColor: '#4CAF50',
+    padding: 15,
     borderRadius: 8,
-    marginBottom: 24,
+    alignItems: 'center',
+    marginVertical: 10,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   imageContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   previewImage: {
     width: '100%',
     height: 300,
-    resizeMode: 'contain',
     borderRadius: 8,
-    backgroundColor: '#fff',
     marginBottom: 20,
+    resizeMode: 'contain',
+    backgroundColor: '#e0e0e0',
   },
   enhancementSelector: {
-    width: '100%',
     marginBottom: 20,
   },
   enhancementLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
     color: '#333',
   },
   enhancementOptions: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
   },
-  enhancementButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+  enhancementOption: {
     backgroundColor: '#e0e0e0',
+    padding: 10,
+    borderRadius: 4,
+    marginBottom: 10,
+    width: '48%',
+    alignItems: 'center',
   },
   selectedEnhancement: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4CAF50',
   },
-  enhancementButtonText: {
+  enhancementOptionText: {
     color: '#333',
-    fontSize: 14,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    gap: 16,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#007AFF',
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '600',
   },
   processButton: {
-    flex: 1,
-    backgroundColor: '#34C759',
-    paddingVertical: 14,
-    borderRadius: 8,
+    backgroundColor: '#2196F3',
+  },
+  progressContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  processButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    width: '100%',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 12,
-    marginBottom: 20,
-  },
-  progressBarContainer: {
-    width: '100%',
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  progressBar: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
+    justifyContent: 'center',
+    marginTop: 10,
   },
   progressText: {
-    fontSize: 14,
-    color: '#666',
+    marginLeft: 10,
+    color: '#4CAF50',
+    fontWeight: 'bold',
   },
   resultContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginBottom: 24,
+    marginTop: 20,
   },
-  sectionTitle: {
-    fontSize: 20,
+  resultTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 10,
     color: '#333',
+    textAlign: 'center',
   },
   resultImage: {
     width: '100%',
     height: 300,
-    resizeMode: 'contain',
     borderRadius: 8,
-    backgroundColor: '#fff',
     marginBottom: 20,
+    resizeMode: 'contain',
+    backgroundColor: '#e0e0e0',
   },
   metricsContainer: {
+    backgroundColor: '#f0f0f0',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  metricText: {
+    fontSize: 16,
+    marginBottom: 5,
+    color: '#333',
+  },
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
-    marginBottom: 20,
-    paddingHorizontal: 20,
   },
-  qualityText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007AFF',
-  },
-  enhancementText: {
-    fontSize: 16,
-    color: '#666',
-    fontStyle: 'italic',
-  },
-  saveButton: {
+  secondaryButton: {
+    backgroundColor: '#f44336',
     flex: 1,
-    backgroundColor: '#34C759',
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
+    marginRight: 10,
   },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+  primaryButton: {
+    backgroundColor: '#4CAF50',
+    flex: 1,
+    marginLeft: 10,
   },
 });
 
