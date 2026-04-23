@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, TextInput, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MotiView } from 'moti';
 import { Task } from '../../types';
@@ -11,6 +11,8 @@ export default function HomeScreen() {
   const [streakCount, setStreakCount] = useState(0);
   const [longestStreak, setLongestStreak] = useState(0);
   const [encouragementMessage, setEncouragementMessage] = useState('');
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [showAddTask, setShowAddTask] = useState(false);
 
   useEffect(() => {
     loadInitialData();
@@ -18,7 +20,7 @@ export default function HomeScreen() {
 
   const loadInitialData = async () => {
     const tasks = await loadTasks();
-    
+
     // Check if this is first launch (no tasks exist)
     if (tasks.length === 0) {
       // Create sample tasks
@@ -42,16 +44,16 @@ export default function HomeScreen() {
           created_at: new Date().toISOString(),
         },
       ];
-      
+
       // Save sample tasks
       await saveTasks(sampleTasks);
       setDailyTasks(sampleTasks);
-      
+
       // Initialize streak to 0
       await saveStreak(0, 0);
       setStreakCount(0);
       setLongestStreak(0);
-      
+
       // Initialize stats
       await saveStats(3, 0);
     } else {
@@ -61,7 +63,7 @@ export default function HomeScreen() {
       setStreakCount(currentStreak);
       setLongestStreak(longestStreak);
     }
-    
+
     generateEncouragementMessage(streakCount);
   };
 
@@ -115,10 +117,10 @@ export default function HomeScreen() {
   };
 
   const toggleTaskCompletion = async (taskId: number) => {
-    const updatedTasks = dailyTasks.map(task => 
+    const updatedTasks = dailyTasks.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     );
-    
+
     setDailyTasks(updatedTasks);
     await saveTasks(updatedTasks);
 
@@ -126,23 +128,47 @@ export default function HomeScreen() {
     if (task && !task.completed) {
       const newStreak = streakCount + 1;
       const newLongest = Math.max(newStreak, longestStreak);
-      
+
       setStreakCount(newStreak);
       setLongestStreak(newLongest);
       await saveStreak(newStreak, newLongest);
-      
+
       generateEncouragementMessage(newStreak);
 
       const { totalTasks, completedTasks } = await loadStats();
       const newCompletedTasks = completedTasks + 1;
       await saveStats(totalTasks, newCompletedTasks);
-      
+
       await checkAndUpdateAchievements(newCompletedTasks, newStreak);
     }
   };
 
+  const addNewTask = async () => {
+    if (!newTaskTitle.trim()) {
+      Alert.alert('Error', 'Please enter a task title');
+      return;
+    }
+
+    const newTask: Task = {
+      id: Date.now(),
+      title: newTaskTitle.trim(),
+      completed: false,
+      created_at: new Date().toISOString(),
+    };
+
+    const updatedTasks = [...dailyTasks, newTask];
+    setDailyTasks(updatedTasks);
+    await saveTasks(updatedTasks);
+
+    const { totalTasks, completedTasks } = await loadStats();
+    await saveStats(totalTasks + 1, completedTasks);
+
+    setNewTaskTitle('');
+    setShowAddTask(false);
+  };
+
   const renderTaskItem = ({ item }: { item: Task }) => (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[styles.taskItem, item.completed && styles.taskCompleted]}
       onPress={() => toggleTaskCompletion(item.id)}
     >
@@ -150,60 +176,70 @@ export default function HomeScreen() {
         <Text style={[styles.taskTitle, item.completed && styles.taskTitleCompleted]}>
           {item.title}
         </Text>
-        <View style={[styles.checkbox, item.completed && styles.checkboxChecked]}>
-          {item.completed && <Text style={styles.checkmark}>✓</Text>}
-        </View>
+        <Text style={styles.taskDate}>
+          {new Date(item.created_at).toLocaleDateString()}
+        </Text>
+      </View>
+      <View style={styles.taskStatus}>
+        {item.completed ? (
+          <Image
+            source={require('../../assets/images/check-circle.png')}
+            style={styles.checkIcon}
+          />
+        ) : (
+          <View style={styles.uncheckedCircle} />
+        )}
       </View>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
-      <MotiView 
-        from={{ opacity: 0, translateY: -20 }}
-        animate={{ opacity: 1, translateY: 0 }}
-        transition={{ type: 'timing', duration: 800 }}
-        style={styles.header}
-      >
-        <Image source={require('../../assets/images/logo.png')} style={styles.logo} />
-        <Text style={styles.welcomeText}>Welcome back!</Text>
-        <Text style={styles.streakText}>🔥 {streakCount} day streak</Text>
-      </MotiView>
+      <View style={styles.header}>
+        <Text style={styles.appTitle}>MotiMate</Text>
+        <Text style={styles.streakText}>Current Streak: {streakCount} days</Text>
+      </View>
 
-      <MotiView 
+      <MotiView
+        style={styles.encouragementCard}
         from={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 200, type: 'spring' }}
-        style={styles.encouragementCard}
+        transition={{ type: 'timing', duration: 500 }}
       >
         <Text style={styles.encouragementText}>{encouragementMessage}</Text>
       </MotiView>
 
-      <View style={styles.sectionHeader}>
+      <View style={styles.tasksHeader}>
         <Text style={styles.sectionTitle}>Today's Tasks</Text>
-        <TouchableOpacity onPress={() => router.push('/add-task')}>
-          <Text style={styles.addTaskButton}>+ Add Task</Text>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setShowAddTask(!showAddTask)}
+        >
+          <Text style={styles.addButtonText}>{showAddTask ? 'Cancel' : 'Add Task'}</Text>
         </TouchableOpacity>
       </View>
+
+      {showAddTask && (
+        <View style={styles.addTaskContainer}>
+          <TextInput
+            style={styles.taskInput}
+            placeholder="Enter task title"
+            value={newTaskTitle}
+            onChangeText={setNewTaskTitle}
+            autoFocus
+          />
+          <TouchableOpacity style={styles.submitButton} onPress={addNewTask}>
+            <Text style={styles.submitButtonText}>Add Task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
         data={dailyTasks}
         renderItem={renderTaskItem}
         keyExtractor={(item) => item.id.toString()}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No tasks yet. Add your first task to get started!</Text>
-          </View>
-        }
+        contentContainerStyle={styles.taskList}
       />
-
-      <TouchableOpacity 
-        style={styles.newTaskButton}
-        onPress={() => router.push('/add-task')}
-      >
-        <Text style={styles.newTaskButtonText}>Add New Task</Text>
-      </TouchableOpacity>
     </View>
   );
 }
@@ -211,44 +247,35 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 20,
-    paddingTop: 50,
+    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
-  logo: {
-    width: 50,
-    height: 50,
-    marginRight: 15,
-  },
-  welcomeText: {
-    fontSize: 24,
+  appTitle: {
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#333',
-    flex: 1,
+    marginBottom: 5,
   },
   streakText: {
     fontSize: 16,
-    color: '#ff6b6b',
-    fontWeight: '600',
+    color: '#666',
   },
   encouragementCard: {
-    backgroundColor: '#4ecdc4',
-    borderRadius: 15,
-    padding: 20,
-    marginBottom: 25,
+    backgroundColor: '#4CAF50',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
   },
   encouragementText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
-    lineHeight: 24,
+    fontWeight: '500',
     textAlign: 'center',
   },
-  sectionHeader: {
+  tasksHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -259,77 +286,96 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  addTaskButton: {
-    color: '#4ecdc4',
-    fontSize: 16,
-    fontWeight: '600',
+  addButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
   },
-  taskItem: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  addTaskContainer: {
+    marginBottom: 15,
     padding: 15,
-    marginBottom: 12,
+    backgroundColor: 'white',
+    borderRadius: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 2,
   },
-  taskCompleted: {
-    backgroundColor: '#e8f4f3',
+  taskInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
   },
-  taskContent: {
+  submitButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  submitButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  taskList: {
+    paddingBottom: 20,
+  },
+  taskItem: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  taskCompleted: {
+    backgroundColor: '#e8f5e9',
+  },
+  taskContent: {
+    flex: 1,
   },
   taskTitle: {
     fontSize: 16,
+    fontWeight: '500',
     color: '#333',
-    flex: 1,
+    marginBottom: 5,
   },
   taskTitleCompleted: {
     textDecorationLine: 'line-through',
-    color: '#aaa',
+    color: '#888',
   },
-  checkbox: {
+  taskDate: {
+    fontSize: 12,
+    color: '#999',
+  },
+  taskStatus: {
+    marginLeft: 10,
+  },
+  checkIcon: {
+    width: 24,
+    height: 24,
+    tintColor: '#4CAF50',
+  },
+  uncheckedCircle: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
     borderColor: '#ddd',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: '#4ecdc4',
-    borderColor: '#4ecdc4',
-  },
-  checkmark: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 14,
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#6c757d',
-    textAlign: 'center',
-  },
-  newTaskButton: {
-    backgroundColor: '#4ecdc4',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  newTaskButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
