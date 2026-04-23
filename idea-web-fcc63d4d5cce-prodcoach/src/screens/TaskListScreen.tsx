@@ -1,28 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
 import { Task } from '../types';
-import { loadTasks, saveTasks, loadStreak, saveStreak } from '../lib/storage';
+import { loadTasks, saveTasks } from '../lib/storage';
 import TaskItem from '../components/TaskItem';
-import EncouragementCard from '../components/EncouragementCard';
 
 const TaskListScreen = () => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskText, setNewTaskText] = useState('');
-  const [streak, setStreak] = useState({ currentStreak: 0, longestStreak: 0 });
-  const [showEncouragement, setShowEncouragement] = useState(false);
-  const [encouragementMessage, setEncouragementMessage] = useState('');
 
   useEffect(() => {
-    const loadData = async () => {
-      const loadedTasks = await loadTasks();
-      const loadedStreak = await loadStreak();
-      setTasks(loadedTasks);
-      setStreak(loadedStreak);
+    const loadInitialTasks = async () => {
+      const savedTasks = await loadTasks();
+      setTasks(savedTasks);
     };
-    loadData();
+    loadInitialTasks();
   }, []);
 
-  const addTask = async () => {
+  const handleAddTask = async () => {
     if (newTaskText.trim() === '') return;
 
     const newTask: Task = {
@@ -38,55 +32,23 @@ const TaskListScreen = () => {
     setNewTaskText('');
   };
 
-  const toggleTaskCompletion = async (taskId: string) => {
+  const handleToggleTask = async (taskId: string) => {
     const updatedTasks = tasks.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     );
-
     setTasks(updatedTasks);
     await saveTasks(updatedTasks);
-
-    // Check if all tasks are completed
-    const allCompleted = updatedTasks.every(task => task.completed);
-    if (allCompleted) {
-      // Update streak
-      const newCurrentStreak = streak.currentStreak + 1;
-      const newLongestStreak = Math.max(newCurrentStreak, streak.longestStreak);
-      setStreak({ currentStreak: newCurrentStreak, longestStreak: newLongestStreak });
-      await saveStreak(newCurrentStreak, newLongestStreak);
-
-      // Show encouragement
-      setEncouragementMessage(getEncouragementMessage(newCurrentStreak));
-      setShowEncouragement(true);
-      setTimeout(() => setShowEncouragement(false), 3000);
-    }
   };
 
-  const getEncouragementMessage = (streakCount: number): string => {
-    const messages = [
-      "Great job! You're on fire!",
-      "Amazing! Keep up the momentum!",
-      "Incredible! You're unstoppable!",
-      "Fantastic! Your consistency is inspiring!",
-      "You're crushing it! Keep going!"
-    ];
-
-    return messages[Math.min(streakCount - 1, messages.length - 1)] || messages[0];
+  const handleDeleteTask = async (taskId: string) => {
+    const updatedTasks = tasks.filter(task => task.id !== taskId);
+    setTasks(updatedTasks);
+    await saveTasks(updatedTasks);
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Your Tasks</Text>
-        <View style={styles.streakContainer}>
-          <Text style={styles.streakText}>Current Streak: {streak.currentStreak}</Text>
-          <Text style={styles.streakText}>Longest Streak: {streak.longestStreak}</Text>
-        </View>
-      </View>
-
-      {showEncouragement && (
-        <EncouragementCard message={encouragementMessage} />
-      )}
+      <Text style={styles.title}>Your Tasks</Text>
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -94,9 +56,9 @@ const TaskListScreen = () => {
           placeholder="Add a new task..."
           value={newTaskText}
           onChangeText={setNewTaskText}
-          onSubmitEditing={addTask}
+          onSubmitEditing={handleAddTask}
         />
-        <TouchableOpacity style={styles.addButton} onPress={addTask}>
+        <TouchableOpacity style={styles.addButton} onPress={handleAddTask}>
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
@@ -107,10 +69,13 @@ const TaskListScreen = () => {
         renderItem={({ item }) => (
           <TaskItem
             task={item}
-            onToggle={() => toggleTaskCompletion(item.id)}
+            onToggle={() => handleToggleTask(item.id)}
+            onDelete={() => handleDeleteTask(item.id)}
           />
         )}
-        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No tasks yet. Add one above!</Text>
+        }
       />
     </View>
   );
@@ -119,25 +84,14 @@ const TaskListScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    padding: 20,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 20,
     color: '#333',
-    marginBottom: 8,
-  },
-  streakContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  streakText: {
-    fontSize: 16,
-    color: '#666',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -146,11 +100,11 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     padding: 12,
-    backgroundColor: '#fff',
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginRight: 8,
+    borderRadius: 8,
+    backgroundColor: '#fff',
+    marginRight: 10,
   },
   addButton: {
     backgroundColor: '#4CAF50',
@@ -160,11 +114,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   addButtonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
   },
-  listContent: {
-    paddingBottom: 20,
+  emptyText: {
+    textAlign: 'center',
+    marginTop: 20,
+    color: '#666',
   },
 });
 
