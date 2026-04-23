@@ -1,44 +1,46 @@
 import React, { useEffect } from 'react';
-import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
-import QuickLaunchBar from '@/components/QuickLaunchBar';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { useAppsStore } from '@/store/apps';
-import { usePredictionsStore } from '@/store/predictions';
-import { useSettingsStore } from '@/store/settings';
+import { QuickLaunchBar } from '@/components/QuickLaunchBar';
+import { ErrorMessage } from '@/components/ErrorMessage';
+import { Colors } from '@/constants/Colors';
+import { useColorScheme } from '@/hooks/useColorScheme';
 
 export default function HomeScreen() {
-  const apps = useAppsStore((state) => state.apps);
-  const isLoading = useAppsStore((state) => state.isLoading);
-  const loadApps = useAppsStore((state) => state.loadApps);
-  const predictedApps = usePredictionsStore((state) => state.predictedApps);
-  const loadPredictions = usePredictionsStore((state) => state.loadPredictions);
-  const theme = useSettingsStore((state) => state.theme);
+  const colorScheme = useColorScheme();
+  const { apps, isLoading, error, loadApps } = useAppsStore();
 
   useEffect(() => {
-    loadApps();
-    loadPredictions();
+    if (apps.length === 0 && !isLoading && !error) {
+      loadApps();
+    }
   }, []);
 
-  const filteredApps = apps.filter((app) => 
-    predictedApps.includes(app.packageName)
-  ).sort((a, b) => {
-    const indexA = predictedApps.indexOf(a.packageName);
-    const indexB = predictedApps.indexOf(b.packageName);
-    return indexA - indexB;
-  });
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <ActivityIndicator size="large" color={Colors[colorScheme ?? 'light'].tint} />
+        <Text style={[styles.loadingText, { color: Colors[colorScheme ?? 'light'].text }]}>
+          Loading your apps...
+        </Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+        <ErrorMessage
+          message={error}
+          onRetry={loadApps}
+        />
+      </View>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>FlowHome</Text>
-        {isLoading ? (
-          <ActivityIndicator size="large" color={theme.text} />
-        ) : apps.length === 0 ? (
-          <Text style={[styles.emptyText, { color: theme.text }]}>
-            No apps found. Pull down to refresh.
-          </Text>
-        ) : null}
-      </View>
-      <QuickLaunchBar apps={filteredApps} />
+    <View style={[styles.container, { backgroundColor: Colors[colorScheme ?? 'light'].background }]}>
+      <QuickLaunchBar />
     </View>
   );
 }
@@ -46,20 +48,11 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  content: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  emptyText: {
+  loadingText: {
+    marginTop: 20,
     fontSize: 16,
-    textAlign: 'center',
   },
 });
