@@ -1,13 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, Platform } from 'react-native';
 import StreakCalendar from '../../components/StreakCalendar';
-import { getStreakDataForCalendar, getGraceDaysUsedThisWeek } from '../../lib/affirmations';
+import { getStreakDataForCalendar, getGraceDaysUsedThisWeek, shouldShowMilestone } from '../../lib/affirmations';
 import { useStore } from '../../store/useStore';
+import { captureRef } from 'react-native-view-shot';
+import * as Sharing from 'expo-sharing';
+import { format } from 'date-fns';
 
 const StreakScreen = () => {
   const [streakData, setStreakData] = useState([]);
   const [graceDaysUsed, setGraceDaysUsed] = useState(0);
+  const [isSharing, setIsSharing] = useState(false);
   const { streakCount } = useStore();
+  const calendarRef = React.useRef();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -22,14 +27,58 @@ const StreakScreen = () => {
     fetchData();
   }, []);
 
+  const handleShareMilestone = async () => {
+    if (!calendarRef.current) return;
+
+    setIsSharing(true);
+
+    try {
+      const uri = await captureRef(calendarRef, {
+        format: 'png',
+        quality: 0.8,
+      });
+
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/png',
+        dialogTitle: 'Share your streak',
+        UTI: 'public.png' // for iOS
+      });
+    } catch (error) {
+      console.error('Error sharing:', error);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const nextMilestone = React.useMemo(() => {
+    const next = [7, 30, 100, 365].find(day => day > streakCount);
+    return next || 365;
+  }, [streakCount]);
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Streak</Text>
         <Text style={styles.streakCount}>{streakCount} days</Text>
+        {shouldShowMilestone(streakCount) && (
+          <View style={styles.milestoneContainer}>
+            <Text style={styles.milestoneText}>🎉 Milestone Reached!</Text>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={handleShareMilestone}
+              disabled={isSharing}
+            >
+              <Text style={styles.shareButtonText}>
+                {isSharing ? 'Sharing...' : 'Share Milestone'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
-      <StreakCalendar streakData={streakData} />
+      <View ref={calendarRef} collapsable={false}>
+        <StreakCalendar streakData={streakData} />
+      </View>
 
       <View style={styles.statsContainer}>
         <View style={styles.statBox}>
@@ -41,6 +90,16 @@ const StreakScreen = () => {
           <Text style={styles.statLabel}>Grace Days Used</Text>
           <Text style={styles.statValue}>{graceDaysUsed}/2</Text>
         </View>
+      </View>
+
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressTitle}>Next Milestone: {nextMilestone} days</Text>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${Math.min((streakCount / nextMilestone) * 100, 100)}%` }]} />
+        </View>
+        <Text style={styles.progressText}>
+          {streakCount} of {nextMilestone} days
+        </Text>
       </View>
 
       <View style={styles.infoBox}>
@@ -76,6 +135,26 @@ const styles = StyleSheet.create({
     color: '#4CAF50',
     marginTop: 5,
   },
+  milestoneContainer: {
+    marginTop: 15,
+    alignItems: 'center',
+  },
+  milestoneText: {
+    fontSize: 18,
+    color: '#FF5722',
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  shareButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 20,
+  },
+  shareButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
@@ -103,6 +182,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+  },
+  progressContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  progressTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#eee',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 5,
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
   },
   infoBox: {
     backgroundColor: 'white',

@@ -1,7 +1,7 @@
 import { initDatabase, seedAffirmations, getCurrentStreak, getStreakData, calculateStreakWithGraceDays, updateStreak } from './database';
 import affirmationsData from '../assets/affirmations.json';
-import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek } from 'date-fns';
-import { MILESTONE_DAYS } from './constants';
+import { format, startOfWeek, endOfWeek, differenceInDays, isSameWeek, parseISO } from 'date-fns';
+import { MILESTONE_DAYS, MAX_GRACE_DAYS_PER_WEEK } from './constants';
 
 let initialized = false;
 
@@ -49,11 +49,7 @@ export const shouldShowMilestone = (streakCount: number) => {
 export const getStreakDataForCalendar = async () => {
   await initDatabase();
 
-  // Get all streak records for the current month
-  const today = new Date();
-  const monthStart = format(startOfWeek(today), 'yyyy-MM-dd');
-  const monthEnd = format(endOfWeek(today), 'yyyy-MM-dd');
-
+  // Get all streak records
   const streaks = await getStreakData();
 
   // Format for calendar display
@@ -77,11 +73,52 @@ export const getGraceDaysUsedThisWeek = async (date: Date) => {
 
   const streaks = await getStreakData();
   const graceDays = streaks.filter(streak => {
-    const streakDate = new Date(streak.date);
+    const streakDate = parseISO(streak.date);
     return streak.is_grace_day === 1 &&
            streakDate >= weekStart &&
            streakDate <= weekEnd;
   });
 
   return graceDays.length;
+};
+
+export const calculateStreakWithGraceDays = async (currentDate: Date) => {
+  const streaks = await getStreakData();
+  const today = format(currentDate, 'yyyy-MM-dd');
+
+  // If no streaks yet, start a new one
+  if (streaks.length === 0) {
+    return { streakCount: 1, isGraceDay: false };
+  }
+
+  // Sort streaks by date
+  const sortedStreaks = [...streaks].sort((a, b) =>
+    isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1
+  );
+
+  // Get the most recent streak record
+  const lastStreak = sortedStreaks[sortedStreaks.length - 1];
+  const lastDate = parseISO(lastStreak.date);
+
+  // Calculate days difference
+  const daysDiff = differenceInDays(currentDate, lastDate);
+
+  if (daysDiff === 1) {
+    // Consecutive day - increment streak
+    return { streakCount: lastStreak.streak_count + 1, isGraceDay: false };
+  } else if (daysDiff > 1) {
+    // Check if we can use a grace day
+    const graceDaysUsed = await getGraceDaysUsedThisWeek(currentDate);
+
+    if (graceDaysUsed < MAX_GRACE_DAYS_PER_WEEK) {
+      // Use a grace day - don't break streak
+      return { streakCount: lastStreak.streak_count, isGraceDay: true };
+    } else {
+      // No grace days left - reset streak
+      return { streakCount: 1, isGraceDay: false };
+    }
+  }
+
+  // Same day - return current streak
+  return { streakCount: lastStreak.streak_count, isGraceDay: lastStreak.is_grace_day === 1 };
 };

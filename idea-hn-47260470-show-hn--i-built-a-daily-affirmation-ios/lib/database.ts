@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
-import { format, differenceInDays, isSameWeek, startOfWeek, endOfWeek } from 'date-fns';
+import { format, differenceInDays, isSameWeek, startOfWeek, endOfWeek, parseISO, isBefore } from 'date-fns';
+import { MAX_GRACE_DAYS_PER_WEEK } from './constants';
 
 const db = SQLite.openDatabase('motimorph.db');
 
@@ -164,68 +165,79 @@ export const updateStreak = async (date: string, isGraceDay: boolean, streakCoun
 };
 
 export const getGraceDaysUsedThisWeek = async (date: Date) => {
-  const weekStart = format(startOfWeek(date), 'yyyy-MM-dd');
-  const weekEnd = format(endOfWeek(date), 'yyyy-MM-dd');
+  const weekStart = startOfWeek(date);
+  const weekEnd = endOfWeek(date);
 
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
         'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date BETWEEN ? AND ?',
-        [weekStart, weekEnd],
-        (_, { rows }) => {
-          resolve(rows._array[0].count);
-        },
+        [format(weekStart, 'yyyy-MM-dd'), format(weekEnd, 'yyyy-MM-dd')],
+        (_, { rows }) => resolve(rows._array[0].count),
         (_, error) => reject(error)
       );
     });
   });
 };
 
-export const canUseGraceDay = async (date: Date) => {
-  const graceDaysUsed = await getGraceDaysUsedThisWeek(date);
-  return graceDaysUsed < 2;
-};
+export const calculateStreakWithGraceDays = async (currentDate: Date) => {
+  const today = format(currentDate, 'yyyy-MM-dd');
 
-export const getLastStreakDate = async () => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
+      // Get all streak records
       tx.executeSql(
-        'SELECT date FROM streaks ORDER BY date DESC LIMIT 1',
+        'SELECT * FROM streaks ORDER BY date ASC',
         [],
         (_, { rows }) => {
-          if (rows.length > 0) {
-            resolve(rows._array[0].date);
+          const streaks = rows._array;
+
+          // If no streaks yet, start a new one
+          if (streaks.length === 0) {
+            resolve({ streakCount: 1, isGraceDay: false });
+            return;
+          }
+
+          // Sort streaks by date
+          const sortedStreaks = [...streaks].sort((a, b) =>
+            isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1
+          );
+
+          // Get the most recent streak record
+          const lastStreak = sortedStreaks[sortedStreaks.length - 1];
+          const lastDate = parseISO(lastStreak.date);
+
+          // Calculate days difference
+          const daysDiff = differenceInDays(currentDate, lastDate);
+
+          if (daysDiff === 1) {
+            // Consecutive day - increment streak
+            resolve({ streakCount: lastStreak.streak_count + 1, isGraceDay: false });
+          } else if (daysDiff > 1) {
+            // Check if we can use a grace day
+            tx.executeSql(
+              'SELECT COUNT(*) as count FROM streaks WHERE is_grace_day = 1 AND date BETWEEN ? AND ?',
+              [format(startOfWeek(currentDate), 'yyyy-MM-dd'), format(endOfWeek(currentDate), 'yyyy-MM-dd')],
+              (_, { rows: graceRows }) => {
+                const graceDaysUsed = graceRows._array[0].count;
+
+                if (graceDaysUsed < MAX_GRACE_DAYS_PER_WEEK) {
+                  // Use a grace day - don't break streak
+                  resolve({ streakCount: lastStreak.streak_count, isGraceDay: true });
+                } else {
+                  // No grace days left - reset streak
+                  resolve({ streakCount: 1, isGraceDay: false });
+                }
+              },
+              (_, error) => reject(error)
+            );
           } else {
-            resolve(null);
+            // Same day - return current streak
+            resolve({ streakCount: lastStreak.streak_count, isGraceDay: lastStreak.is_grace_day === 1 });
           }
         },
         (_, error) => reject(error)
       );
     });
   });
-};
-
-export const calculateStreakWithGraceDays = async (date: Date) => {
-  const lastStreakDate = await getLastStreakDate();
-  const today = format(date, 'yyyy-MM-dd');
-
-  if (!lastStreakDate) {
-    // First session ever
-    return { streakCount: 1, isGraceDay: false };
-  }
-
-  const daysDiff = differenceInDays(date, new Date(lastStreakDate));
-
-  if (daysDiff === 1) {
-    // Consecutive day
-    const currentStreak = await getCurrentStreak();
-    return { streakCount: currentStreak + 1, isGraceDay: false };
-  } else if (daysDiff > 1 && daysDiff <= 3 && await canUseGraceDay(date)) {
-    // Grace day used
-    const currentStreak = await getCurrentStreak();
-    return { streakCount: currentStreak + 1, isGraceDay: true };
-  } else {
-    // Streak broken
-    return { streakCount: 1, isGraceDay: false };
-  }
 };

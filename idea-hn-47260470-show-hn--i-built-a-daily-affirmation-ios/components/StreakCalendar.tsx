@@ -38,7 +38,7 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
 
   // Get all milestone dates in the current month
   const milestoneDates = MILESTONE_DAYS.map(days => {
-    const milestoneDate = new Date();
+    const milestoneDate = new Date(currentMonth);
     milestoneDate.setDate(currentMonth.getDate() - days);
     return format(milestoneDate, 'yyyy-MM-dd');
   });
@@ -56,15 +56,17 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
     const consecutiveGroups: string[][] = [];
     let currentGroup: string[] = [];
 
-    streakData.sort((a, b) => isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1);
+    const sortedStreakData = [...streakData].sort((a, b) =>
+      isBefore(parseISO(a.date), parseISO(b.date)) ? -1 : 1
+    );
 
-    streakData.forEach((day, index) => {
+    sortedStreakData.forEach((day, index) => {
       if (index === 0) {
         currentGroup.push(day.date);
         return;
       }
 
-      const prevDay = parseISO(streakData[index - 1].date);
+      const prevDay = parseISO(sortedStreakData[index - 1].date);
       const currentDay = parseISO(day.date);
 
       if (isSameDay(currentDay, new Date(prevDay.getTime() + 24 * 60 * 60 * 1000))) {
@@ -156,44 +158,48 @@ const StreakCalendar: React.FC<StreakCalendarProps> = ({ streakData }) => {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.weekdays}>
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <Text key={day} style={styles.weekday}>{day}</Text>
+      <View style={styles.weekdaysHeader}>
+        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day, index) => (
+          <Text key={index} style={styles.weekday}>{day}</Text>
         ))}
       </View>
 
-      <View style={styles.calendar}>
-        {daysInMonth.map((day, index) => renderDay(day, index))}
+      <View style={styles.calendarGrid}>
+        {daysInMonth.map((day, index) => (
+          <View key={index} style={styles.dayWrapper}>
+            {renderDay(day, index)}
+          </View>
+        ))}
       </View>
 
-      <View style={styles.legend}>
+      <View style={styles.legendContainer}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.regular }]} />
-          <Text style={styles.legendText}>Regular Day</Text>
+          <Text style={styles.legendText}>Completed Day</Text>
         </View>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: STREAK_COLORS.grace }]} />
           <Text style={styles.legendText}>Grace Day</Text>
         </View>
         <View style={styles.legendItem}>
-          <Text style={styles.legendText}>🎉 Milestone</Text>
+          <Text style={styles.legendBadge}>🎉</Text>
+          <Text style={styles.legendText}>Milestone</Text>
         </View>
       </View>
 
-      <View style={styles.graceDayInfo}>
-        <Text style={styles.graceDayText}>Grace Days Used This Week: {graceDaysUsed}/2</Text>
-        <Text style={styles.graceDaySubtext}>You can use up to 2 grace days per week</Text>
-      </View>
+      <Text style={styles.graceDaysInfo}>
+        Grace Days Used This Week: {graceDaysUsed}/2
+      </Text>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 20,
     backgroundColor: 'white',
     borderRadius: 10,
     padding: 15,
+    margin: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -207,44 +213,49 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   monthHeader: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
     color: '#333',
   },
   navButton: {
     fontSize: 20,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
     color: '#4CAF50',
   },
-  weekdays: {
+  weekdaysHeader: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     marginBottom: 10,
   },
   weekday: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
     width: Dimensions.get('window').width / 7,
     textAlign: 'center',
   },
-  calendar: {
+  calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
-  dayContainer: {
+  dayWrapper: {
     width: Dimensions.get('window').width / 7,
-    height: 60,
-    alignItems: 'center',
+    height: 50,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dayContainer: {
     position: 'relative',
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dayContent: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'relative',
+    zIndex: 1,
   },
   dayNumber: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#333',
   },
   today: {
@@ -258,31 +269,30 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 4,
-  },
-  milestoneBadge: {
-    fontSize: 12,
-    marginTop: 2,
+    marginTop: 3,
   },
   connectorLine: {
     position: 'absolute',
     height: 2,
     backgroundColor: '#4CAF50',
-    width: '100%',
-    top: '50%',
-    left: 0,
+    zIndex: 0,
   },
   firstConnector: {
     width: '50%',
-    left: '50%',
+    right: 0,
   },
   lastConnector: {
     width: '50%',
+    left: 0,
   },
-  legend: {
+  milestoneBadge: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  legendContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 20,
+    marginTop: 15,
     paddingVertical: 10,
     borderTopWidth: 1,
     borderTopColor: '#eee',
@@ -297,25 +307,19 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     marginRight: 5,
   },
+  legendBadge: {
+    fontSize: 12,
+    marginRight: 5,
+  },
   legendText: {
     fontSize: 12,
     color: '#666',
   },
-  graceDayInfo: {
-    marginTop: 15,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 5,
-  },
-  graceDayText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  graceDaySubtext: {
+  graceDaysInfo: {
+    marginTop: 10,
+    textAlign: 'center',
     fontSize: 12,
     color: '#666',
-    marginTop: 5,
   },
 });
 
