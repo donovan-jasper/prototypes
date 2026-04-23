@@ -44,16 +44,24 @@ const EventScreen = ({ route, navigation }: Props) => {
 
       await addDoc(eventsRef, eventData);
 
-      Alert.alert(
-        'Event Scheduled',
-        `You've scheduled a ${eventType} event with ${user.name}!`,
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('MatchScreen'),
-          },
-        ]
-      );
+      if (eventType === 'virtual') {
+        navigation.navigate('VideoCall', {
+          userId: currentUser.uid,
+          matchedUserId: user.id,
+          eventId: (await addDoc(eventsRef, eventData)).id
+        });
+      } else {
+        Alert.alert(
+          'Event Scheduled',
+          `You've scheduled an in-person event with ${user.name}!`,
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('MatchScreen'),
+            },
+          ]
+        );
+      }
     } catch (error) {
       console.error('Error scheduling event:', error);
       Alert.alert('Error', 'Failed to schedule event. Please try again.');
