@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Platform } from 'react-native';
 import { useSleepDetection } from '../hooks/useSleepDetection';
 import { AudioController } from '../services/audioControl';
 import { dbToLinear } from '../utils/audioAnalysis';
 import { smoothMotionData } from '../utils/motionAnalysis';
+import * as Notifications from 'expo-notifications';
 
 interface SleepDetectorProps {
   confidenceThreshold?: number;
@@ -34,18 +35,35 @@ export const SleepDetector: React.FC<SleepDetectorProps> = ({
   } = useSleepDetection(confidenceThreshold, fadeDuration, rewindAmount);
 
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState<Notifications.PermissionStatus | null>(null);
 
   useEffect(() => {
     if (isSleeping && onSleepDetected) {
       onSleepDetected();
     }
+
+    // Request notification permissions
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setNotificationPermission(status);
+    });
   }, [isSleeping, onSleepDetected]);
 
   const handleStartDetection = async () => {
     try {
+      // Check notification permissions
+      if (notificationPermission !== 'granted') {
+        const { status } = await Notifications.requestPermissionsAsync();
+        setNotificationPermission(status);
+        if (status !== 'granted') {
+          alert('Notification permissions are required for sleep detection alerts.');
+          return;
+        }
+      }
+
       await startDetection();
     } catch (err) {
       console.error('Failed to start detection:', err);
+      alert('Failed to start sleep detection. Please check permissions and try again.');
     }
   };
 
@@ -54,6 +72,7 @@ export const SleepDetector: React.FC<SleepDetectorProps> = ({
       await stopDetection();
     } catch (err) {
       console.error('Failed to stop detection:', err);
+      alert('Failed to stop sleep detection.');
     }
   };
 
@@ -62,6 +81,7 @@ export const SleepDetector: React.FC<SleepDetectorProps> = ({
       await resumeAudio();
     } catch (err) {
       console.error('Failed to resume audio:', err);
+      alert('Failed to resume audio playback.');
     }
   };
 
@@ -157,72 +177,120 @@ export const SleepDetector: React.FC<SleepDetectorProps> = ({
           >
             <Text style={styles.buttonText}>Resume Audio</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.stopButton]}
+            onPress={handleStopDetection}
+          >
+            <Text style={styles.buttonText}>Stop Detection</Text>
+          </TouchableOpacity>
         </View>
       ) : (
-        <>
-          {renderMotionIndicator()}
-          {renderAudioIndicator()}
-          {renderCombinedIndicator()}
+        <View style={styles.detectionContainer}>
+          {isDetecting ? (
+            <>
+              <ActivityIndicator size="large" color="#4CAF50" />
+              <Text style={styles.detectingText}>Detecting sleep...</Text>
 
-          <View style={styles.controlsContainer}>
-            {isDetecting ? (
+              {renderMotionIndicator()}
+              {renderAudioIndicator()}
+              {renderCombinedIndicator()}
+
               <TouchableOpacity
                 style={[styles.button, styles.stopButton]}
                 onPress={handleStopDetection}
               >
                 <Text style={styles.buttonText}>Stop Detection</Text>
               </TouchableOpacity>
-            ) : (
+            </>
+          ) : (
+            <>
+              <Text style={styles.instructions}>
+                Place your device on a flat surface and let SleepCue monitor your sleep patterns.
+              </Text>
+
               <TouchableOpacity
                 style={[styles.button, styles.startButton]}
                 onPress={handleStartDetection}
               >
                 <Text style={styles.buttonText}>Start Detection</Text>
               </TouchableOpacity>
-            )}
 
-            {!showAdvanced && (
               <TouchableOpacity
                 style={styles.advancedButton}
-                onPress={() => setShowAdvanced(true)}
+                onPress={() => setShowAdvanced(!showAdvanced)}
               >
-                <Text style={styles.advancedButtonText}>Advanced Settings</Text>
+                <Text style={styles.advancedButtonText}>
+                  {showAdvanced ? 'Hide Advanced' : 'Show Advanced Settings'}
+                </Text>
               </TouchableOpacity>
-            )}
-          </View>
-
-          {showAdvanced && renderAdvancedControls()}
-        </>
+            </>
+          )}
+        </View>
       )}
+
+      {showAdvanced && renderAdvancedControls()}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 20,
     backgroundColor: '#f5f5f5',
-    borderRadius: 10,
-    margin: 10,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   errorText: {
     color: 'red',
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 15,
+  },
+  sleepingContainer: {
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+  sleepingText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2e7d32',
+    marginBottom: 10,
+  },
+  confidenceText: {
+    fontSize: 16,
+    color: '#388e3c',
+    marginBottom: 20,
+  },
+  detectingText: {
+    fontSize: 18,
+    marginVertical: 20,
+    color: '#424242',
+  },
+  instructions: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#424242',
+    lineHeight: 24,
   },
   indicatorContainer: {
-    marginBottom: 15,
+    width: '100%',
+    marginVertical: 10,
   },
   indicatorLabel: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 5,
+    color: '#424242',
   },
   indicatorBarContainer: {
     height: 20,
@@ -236,21 +304,16 @@ const styles = StyleSheet.create({
   },
   indicatorValue: {
     fontSize: 14,
-    marginTop: 5,
     textAlign: 'right',
-  },
-  controlsContainer: {
-    marginTop: 20,
+    marginTop: 5,
+    color: '#616161',
   },
   button: {
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    marginVertical: 10,
+    width: '100%',
   },
   startButton: {
     backgroundColor: '#4CAF50',
@@ -260,53 +323,44 @@ const styles = StyleSheet.create({
   },
   resumeButton: {
     backgroundColor: '#2196F3',
-    marginTop: 20,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   advancedButton: {
-    marginTop: 10,
-    alignItems: 'center',
+    marginTop: 15,
+    padding: 10,
   },
   advancedButtonText: {
-    color: '#6200ee',
-    textDecorationLine: 'underline',
-  },
-  sleepingContainer: {
-    alignItems: 'center',
-    padding: 20,
-  },
-  sleepingText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#f44336',
-    marginBottom: 10,
-  },
-  confidenceText: {
-    fontSize: 18,
-    marginBottom: 20,
+    color: '#2196F3',
+    textAlign: 'center',
   },
   advancedContainer: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: '#e8e8e8',
+    backgroundColor: '#e3f2fd',
     borderRadius: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
+    color: '#1976d2',
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   settingLabel: {
     fontSize: 16,
+    color: '#424242',
   },
   settingValue: {
     fontSize: 16,
     fontWeight: '600',
+    color: '#1976d2',
   },
 });
-
-export default SleepDetector;
