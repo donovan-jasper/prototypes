@@ -128,55 +128,18 @@ export class NightShiftTask {
     if (this.schedule.requiresCharging) {
       const batteryState = await Battery.getBatteryStateAsync();
       if (batteryState !== Battery.BatteryState.CHARGING) {
-        console.log('Night Shift: Requires charging, but device is not charging.');
+        console.log('Night Shift: Req');
         return false;
       }
     }
 
-    // Check battery level
+    // Check if battery level is above the minimum threshold
     const batteryLevel = await Battery.getBatteryLevelAsync();
-    if (batteryLevel * 100 < this.schedule.minBatteryLevel) {
-      console.log(`Night Shift: Battery level (${(batteryLevel * 100).toFixed(0)}%) below minimum required (${this.schedule.minBatteryLevel}%).`);
+    if (batteryLevel < this.schedule.minBatteryLevel) {
+      console.log('Night Shift: Battery level too low.');
       return false;
     }
 
     return true;
   }
 }
-
-// Define the background task
-TaskManager.defineTask(NIGHT_SHIFT_TASK_NAME, async (taskData) => {
-  console.log('Night Shift Task: Background task triggered.');
-  try {
-    // Create instances of the required services
-    const database = new Database();
-    await database.init();
-
-    const notificationService = new NotificationService();
-
-    // 1. Instantiating TaskExecutor
-    const taskExecutor = new TaskExecutor();
-
-    // 2. Loading the NightShiftSchedule object from expo-secure-store
-    const scheduleJson = await SecureStore.getItemAsync(NIGHT_SHIFT_SCHEDULE_KEY);
-    const schedule: NightShiftSchedule = scheduleJson
-      ? JSON.parse(scheduleJson)
-      : { enabled: false, startHour: 2, endHour: 6, requiresCharging: true, minBatteryLevel: 20 }; // Default schedule if not found
-
-    // 3. Creating an instance of NightShiftTask
-    const nightShiftTask = new NightShiftTask(
-      taskExecutor,
-      database,
-      notificationService,
-      schedule
-    );
-
-    // 4. Calling the execute() method on the created NightShiftTask instance and returning its BackgroundFetchResult
-    const result = await nightShiftTask.execute();
-    console.log(`Night Shift Task: Background task finished with result: ${result}`);
-    return result;
-  } catch (error) {
-    console.error('Night Shift Task: Error in TaskManager.defineTask callback:', error);
-    return BackgroundFetch.BackgroundFetchResult.Failed;
-  }
-});

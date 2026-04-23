@@ -1,4 +1,3 @@
-// services/storage/database.ts
 import * as SQLite from 'expo-sqlite';
 import { Task, TaskType } from '@/types';
 
