@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import * as ExpoCalendar from 'expo-calendar';
 import { getTasks } from '../utils/database';
@@ -10,6 +10,8 @@ const CalendarScreen = () => {
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [hasCalendarPermission, setHasCalendarPermission] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [permissionError, setPermissionError] = useState(null);
 
   useEffect(() => {
     requestCalendarPermissions();
@@ -23,11 +25,14 @@ const CalendarScreen = () => {
   }, [selectedDate, hasCalendarPermission]);
 
   const requestCalendarPermissions = async () => {
+    setIsLoading(true);
     try {
       const { status } = await ExpoCalendar.requestCalendarPermissionsAsync();
       if (status === 'granted') {
         setHasCalendarPermission(true);
+        setPermissionError(null);
       } else {
+        setPermissionError('Calendar access is needed to show your events. You can enable it in settings.');
         Alert.alert(
           'Calendar Permission',
           'Calendar access is needed to show your events. You can enable it in settings.',
@@ -36,14 +41,23 @@ const CalendarScreen = () => {
       }
     } catch (error) {
       console.error('Error requesting calendar permissions:', error);
+      setPermissionError('Failed to request calendar permissions. Please try again.');
+      Alert.alert(
+        'Permission Error',
+        'Failed to request calendar permissions. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const loadTasks = async () => {
+    setIsLoading(true);
     try {
       const loadedTasks = await getTasks();
       setTasks(loadedTasks);
-      
+
       const marked = {};
       loadedTasks.forEach(task => {
         if (task.dueDate) {
@@ -55,19 +69,27 @@ const CalendarScreen = () => {
           };
         }
       });
-      
+
       setMarkedDates(marked);
     } catch (error) {
       console.error('Error loading tasks:', error);
+      Alert.alert(
+        'Data Error',
+        'Failed to load tasks. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const loadCalendarEvents = async (date) => {
     if (!hasCalendarPermission) return;
 
+    setIsLoading(true);
     try {
       const calendars = await ExpoCalendar.getCalendarsAsync(ExpoCalendar.EntityTypes.EVENT);
-      
+
       if (calendars.length === 0) {
         setCalendarEvents([]);
         return;
@@ -75,7 +97,7 @@ const CalendarScreen = () => {
 
       const startDate = new Date(date);
       startDate.setHours(0, 0, 0, 0);
-      
+
       const endDate = new Date(date);
       endDate.setHours(23, 59, 59, 999);
 
@@ -89,6 +111,13 @@ const CalendarScreen = () => {
     } catch (error) {
       console.error('Error loading calendar events:', error);
       setCalendarEvents([]);
+      Alert.alert(
+        'Calendar Error',
+        'Failed to load calendar events. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -107,10 +136,10 @@ const CalendarScreen = () => {
   const formatTime = (dateString) => {
     if (!dateString) return '';
     const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: true 
+      hour12: true
     });
   };
 
@@ -119,6 +148,15 @@ const CalendarScreen = () => {
       return (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>Select a date to view events and tasks</Text>
+        </View>
+      );
+    }
+
+    if (isLoading) {
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Loading...</Text>
         </View>
       );
     }
@@ -164,13 +202,17 @@ const CalendarScreen = () => {
             <Text style={styles.sectionTitle}>Tasks</Text>
             {dateTasks.map((task, index) => (
               <View key={index} style={[styles.item, styles.taskItem]}>
-                <View style={styles.taskIndicator} />
+                <View style={[styles.taskIndicator, { backgroundColor: task.priority === 'high' ? '#FF3B30' : task.priority === 'medium' ? '#FF9500' : '#34C759' }]} />
                 <View style={styles.itemContent}>
                   <Text style={styles.itemTitle}>{task.title}</Text>
+                  {task.dueDate && (
+                    <Text style={styles.itemTime}>
+                      Due: {formatTime(task.dueDate)}
+                    </Text>
+                  )}
                   {task.notes && (
                     <Text style={styles.itemNotes}>{task.notes}</Text>
                   )}
-                  <Text style={styles.itemCategory}>{task.category || 'General'}</Text>
                 </View>
               </View>
             ))}
@@ -187,32 +229,28 @@ const CalendarScreen = () => {
         markedDates={{
           ...markedDates,
           [selectedDate]: {
+            ...(markedDates[selectedDate] || {}),
             selected: true,
-            selectedColor: '#007AFF',
-            ...(markedDates[selectedDate] || {})
+            selectedColor: '#007AFF'
           }
         }}
         theme={{
           selectedDayBackgroundColor: '#007AFF',
           todayTextColor: '#007AFF',
-          dotColor: '#007AFF',
           arrowColor: '#007AFF',
         }}
       />
-      
-      <View style={styles.contentContainer}>
-        {selectedDate && (
-          <Text style={styles.selectedDateText}>
-            {new Date(selectedDate).toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              year: 'numeric', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </Text>
-        )}
-        {renderSelectedDateContent()}
-      </View>
+
+      {permissionError && (
+        <View style={styles.permissionError}>
+          <Text style={styles.permissionErrorText}>{permissionError}</Text>
+          <TouchableOpacity onPress={requestCalendarPermissions} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {renderSelectedDateContent()}
     </View>
   );
 };
@@ -222,101 +260,113 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  contentContainer: {
+  contentScroll: {
     flex: 1,
-    padding: 15,
+    padding: 16,
   },
-  selectedDateText: {
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 15,
-  },
-  contentScroll: {
-    flex: 1,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    marginBottom: 12,
   },
   item: {
     flexDirection: 'row',
+    alignItems: 'center',
     padding: 12,
     borderRadius: 8,
     marginBottom: 8,
+    backgroundColor: '#F8F8F8',
   },
   eventItem: {
-    backgroundColor: '#f0f8ff',
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  taskItem: {
-    backgroundColor: '#f5f5f5',
     borderLeftWidth: 4,
     borderLeftColor: '#007AFF',
   },
+  taskItem: {
+    borderLeftWidth: 4,
+    borderLeftColor: '#34C759',
+  },
   eventIndicator: {
     width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#4CAF50',
+    height: '100%',
+    backgroundColor: '#007AFF',
     marginRight: 12,
-    marginTop: 6,
+    borderRadius: 4,
   },
   taskIndicator: {
     width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#007AFF',
+    height: '100%',
     marginRight: 12,
-    marginTop: 6,
+    borderRadius: 4,
   },
   itemContent: {
     flex: 1,
   },
   itemTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     color: '#333',
     marginBottom: 4,
   },
   itemTime: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   itemLocation: {
     fontSize: 14,
-    color: '#888',
+    color: '#666',
     fontStyle: 'italic',
   },
   itemNotes: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
-  },
-  itemCategory: {
-    fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '500',
+    marginTop: 4,
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    padding: 24,
   },
   emptyStateText: {
     fontSize: 16,
     color: '#999',
     textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
+    color: '#666',
+  },
+  permissionError: {
+    padding: 16,
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    margin: 16,
+  },
+  permissionErrorText: {
+    color: '#C62828',
+    marginBottom: 8,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    padding: 8,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
 });
 
