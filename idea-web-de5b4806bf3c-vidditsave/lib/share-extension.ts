@@ -1,7 +1,8 @@
-import { Platform, Linking } from 'react-native';
+import { Platform, Linking, ToastAndroid, Alert } from 'react-native';
 import { parseUrl } from './parser';
 import { downloadMedia } from './downloader';
 import { addItem } from './db';
+import * as Notifications from 'expo-notifications';
 
 export interface ShareData {
   url: string;
@@ -10,7 +11,7 @@ export interface ShareData {
 export async function getSharedUrl(): Promise<string | null> {
   try {
     const initialUrl = await Linking.getInitialURL();
-    
+
     if (!initialUrl) {
       return null;
     }
@@ -63,6 +64,9 @@ export async function processSharedUrl(
       fileSize: result.fileSize,
     });
 
+    // Show success notification
+    await showSuccessNotification(result.title);
+
     return { success: true, itemId };
   } catch (error) {
     console.error('Error processing shared URL:', error);
@@ -70,6 +74,25 @@ export async function processSharedUrl(
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save content',
     };
+  }
+}
+
+export async function showSuccessNotification(title: string) {
+  try {
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(`Saved: ${title}`, ToastAndroid.SHORT);
+    } else {
+      await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'SaveStack',
+          body: `Saved: ${title}`,
+          sound: true,
+        },
+        trigger: null,
+      });
+    }
+  } catch (error) {
+    console.error('Error showing notification:', error);
   }
 }
 

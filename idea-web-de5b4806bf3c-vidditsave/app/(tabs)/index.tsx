@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   RefreshControl,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -17,6 +18,7 @@ import { getItems, addItem } from '@/lib/db';
 import { downloadMedia } from '@/lib/downloader';
 import { SavedItem } from '@/types';
 import ItemCard from '@/components/ItemCard';
+import { getSharedUrl, processSharedUrl, isValidUrl } from '@/lib/share-extension';
 
 export default function LibraryScreen() {
   const [items, setItems] = useState<SavedItem[]>([]);
@@ -26,10 +28,12 @@ export default function LibraryScreen() {
   const [url, setUrl] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  const [progressMessage, setProgressMessage] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     loadItems();
+    checkForSharedUrl();
   }, []);
 
   useFocusEffect(
@@ -37,6 +41,19 @@ export default function LibraryScreen() {
       loadItems();
     }, [])
   );
+
+  const checkForSharedUrl = async () => {
+    try {
+      const sharedUrl = await getSharedUrl();
+      if (sharedUrl && isValidUrl(sharedUrl)) {
+        setUrl(sharedUrl);
+        setShowAddModal(true);
+        handleDownload();
+      }
+    } catch (error) {
+      console.error('Error checking for shared URL:', error);
+    }
+  };
 
   const loadItems = async () => {
     try {
@@ -62,39 +79,27 @@ export default function LibraryScreen() {
       return;
     }
 
-    try {
-      new URL(url);
-    } catch {
+    if (!isValidUrl(url)) {
       Alert.alert('Error', 'Please enter a valid URL');
       return;
     }
 
     setDownloading(true);
     setDownloadProgress({ current: 0, total: 0 });
+    setProgressMessage('Starting download...');
 
     try {
-      const result = await downloadMedia(url, (current, total) => {
-        setDownloadProgress({ current, total });
+      const result = await processSharedUrl(url, (message) => {
+        setProgressMessage(message);
       });
 
-      const itemId = await addItem({
-        url,
-        title: result.title,
-        type: result.type,
-        fileUri: result.fileUri,
-        thumbnailUri: result.thumbnailUri || null,
-        source: result.source,
-        createdAt: Date.now(),
-        collectionId: null,
-        duration: result.duration,
-        fileSize: result.fileSize,
-      });
-
-      setUrl('');
-      setShowAddModal(false);
-      await loadItems();
-      
-      Alert.alert('Success', `${result.title} saved successfully!`);
+      if (result.success) {
+        setUrl('');
+        setShowAddModal(false);
+        await loadItems();
+      } else {
+        Alert.alert('Download Failed', result.error || 'Unknown error occurred');
+      }
     } catch (error) {
       console.error('Download error:', error);
       Alert.alert(
@@ -104,6 +109,7 @@ export default function LibraryScreen() {
     } finally {
       setDownloading(false);
       setDownloadProgress({ current: 0, total: 0 });
+      setProgressMessage('');
     }
   };
 
@@ -123,7 +129,7 @@ export default function LibraryScreen() {
               onPress: async () => {
                 const { deleteItem } = await import('@/lib/db');
                 const { deleteFile } = await import('@/lib/storage');
-                
+
                 if (item.fileUri) {
                   await deleteFile(item.fileUri);
                 }
@@ -150,7 +156,7 @@ export default function LibraryScreen() {
     return (
       <View style={styles.progressContainer}>
         <Text style={styles.progressText}>
-          Downloading... {currentMB}MB / {totalMB}MB
+          {progressMessage || `Downloading... ${currentMB}MB / ${totalMB}MB`}
         </Text>
         <View style={styles.progressBar}>
           <View style={[styles.progressFill, { width: `${progress}%` }]} />
@@ -176,49 +182,49 @@ export default function LibraryScreen() {
           <Text style={styles.emptyText}>
             Tap the + button to save your first video, article, or image
           </Text>
-          <Text style={styles.emptyHint}>
-            Or share any URL to SaveStack from other apps
-          </Text>
+
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowAddModal(true)}
+          >
+            <Ionicons name="add" size={24} color="white" />
+          </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={items}
-          keyExtractor={item => item.id.toString()}
-          renderItem={renderItem}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        />
+        <>
+          <FlatList
+            data={items}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.row}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListHeaderComponent={
+              <View style={styles.header}>
+                <Text style={styles.title}>Your Library</Text>
+                <TouchableOpacity
+                  style={styles.addButton}
+                  onPress={() => setShowAddModal(true)}
+                >
+                  <Ionicons name="add" size={24} color="white" />
+                </TouchableOpacity>
+              </View>
+            }
+          />
+        </>
       )}
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setShowAddModal(true)}
-        disabled={downloading}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowAddModal(false)}
       >
-        <Ionicons name="add" size={32} color="#fff" />
-      </TouchableOpacity>
-
-      <Modal visible={showAddModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Save Content</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  if (!downloading) {
-                    setShowAddModal(false);
-                    setUrl('');
-                  }
-                }}
-                disabled={downloading}
-              >
-                <Ionicons name="close" size={28} color="#333" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.modalTitle}>Save New Item</Text>
 
             <TextInput
               style={styles.input}
@@ -228,27 +234,32 @@ export default function LibraryScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
-              editable={!downloading}
-              multiline
+              autoFocus={true}
             />
 
             {renderProgressBar()}
 
-            <TouchableOpacity
-              style={[styles.downloadButton, downloading && styles.downloadButtonDisabled]}
-              onPress={handleDownload}
-              disabled={downloading}
-            >
-              {downloading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.downloadButtonText}>Download & Save</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => setShowAddModal(false)}
+                disabled={downloading}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
 
-            <Text style={styles.hint}>
-              Supports direct video/image URLs. YouTube and social media require additional setup.
-            </Text>
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton]}
+                onPress={handleDownload}
+                disabled={downloading || !url.trim()}
+              >
+                {downloading ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.buttonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -259,134 +270,131 @@ export default function LibraryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
-  },
-  listContent: {
-    padding: 16,
-  },
-  row: {
-    justifyContent: 'space-between',
   },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 20,
   },
   emptyTitle: {
     fontSize: 20,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
     color: '#333',
-    marginTop: 16,
-    marginBottom: 8,
   },
   emptyText: {
-    fontSize: 14,
-    color: '#999',
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: 30,
   },
-  emptyHint: {
-    fontSize: 12,
-    color: '#007AFF',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  fab: {
-    position: 'absolute',
-    right: 16,
-    bottom: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    padding: 24,
-    minHeight: 300,
-  },
-  modalHeader: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    padding: 15,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  row: {
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    marginBottom: 10,
+  },
+  addButton: {
+    backgroundColor: '#007AFF',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
   },
   modalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 20,
     fontSize: 16,
-    backgroundColor: '#f8f8f8',
-    marginBottom: 16,
-    minHeight: 80,
-    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  button: {
+    padding: 12,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   progressContainer: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   progressText: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 5,
     textAlign: 'center',
   },
   progressBar: {
-    height: 8,
+    height: 5,
     backgroundColor: '#e0e0e0',
-    borderRadius: 4,
+    borderRadius: 2.5,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#007AFF',
-  },
-  downloadButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  downloadButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  downloadButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  hint: {
-    fontSize: 12,
-    color: '#999',
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });
