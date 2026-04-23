@@ -40,6 +40,15 @@ export class NotificationManager {
           lightColor: '#FF231F7C',
         });
       }
+
+      // Handle notification responses
+      Notifications.setNotificationHandler({
+        handleNotification: async () => ({
+          shouldShowAlert: true,
+          shouldPlaySound: true,
+          shouldSetBadge: false,
+        }),
+      });
     }
   }
 
@@ -51,6 +60,7 @@ export class NotificationManager {
         title: 'Task Completed',
         body: `Your task "${task.prompt.substring(0, 30)}..." has finished processing`,
         data: { taskId: task.id },
+        sound: 'default',
       },
       trigger: null, // Show immediately
     });
@@ -62,6 +72,7 @@ export class NotificationManager {
         title: 'Background Task Processing',
         body: `Your task "${task.prompt.substring(0, 30)}..." is still running in the background`,
         data: { taskId: task.id },
+        sound: 'default',
       },
       trigger: null,
     });
@@ -75,5 +86,10 @@ export class NotificationManager {
   public async requestNotificationPermissions(): Promise<boolean> {
     const { status } = await Notifications.requestPermissionsAsync();
     return status === 'granted';
+  }
+
+  public async getNotificationPermissionsStatus(): Promise<Notifications.PermissionStatus> {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status;
   }
 }

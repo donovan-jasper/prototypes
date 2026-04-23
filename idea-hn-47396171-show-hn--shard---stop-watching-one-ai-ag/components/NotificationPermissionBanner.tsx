@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { useTaskStore } from '../store/taskStore';
+import * as Notifications from 'expo-notifications';
 
 export default function NotificationPermissionBanner() {
   const { checkNotificationPermissions, requestNotificationPermissions } = useTaskStore();
   const [showBanner, setShowBanner] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<Notifications.PermissionStatus>('undetermined');
 
   useEffect(() => {
     const checkPermissions = async () => {
-      const hasPermission = await checkNotificationPermissions();
-      setShowBanner(!hasPermission);
+      const status = await checkNotificationPermissions();
+      setPermissionStatus(status ? 'granted' : 'denied');
+      setShowBanner(!status);
     };
 
     checkPermissions();
   }, []);
 
   const handleRequestPermission = async () => {
-    await requestNotificationPermissions();
-    setShowBanner(false);
+    const granted = await requestNotificationPermissions();
+    setPermissionStatus(granted ? 'granted' : 'denied');
+    setShowBanner(!granted);
   };
 
   if (!showBanner) return null;
@@ -27,8 +31,11 @@ export default function NotificationPermissionBanner() {
       <Text style={styles.message}>
         Enable notifications to get alerts when your tasks complete!
       </Text>
-      <Pressable style={styles.button} onPress={handleRequestPermission}>
-        <Text style={styles.buttonText}>Allow Notifications</Text>
+      <Pressable
+        style={styles.button}
+        onPress={handleRequestPermission}
+      >
+        <Text style={styles.buttonText}>Enable Notifications</Text>
       </Pressable>
     </View>
   );
@@ -36,28 +43,26 @@ export default function NotificationPermissionBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#2196F3',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   message: {
+    color: 'white',
     fontSize: 14,
-    color: '#333',
     flex: 1,
-    marginRight: 12,
+    marginRight: 16,
   },
   button: {
-    backgroundColor: '#2196F3',
+    backgroundColor: 'white',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 4,
   },
   buttonText: {
-    color: 'white',
+    color: '#2196F3',
     fontSize: 14,
     fontWeight: '600',
   },

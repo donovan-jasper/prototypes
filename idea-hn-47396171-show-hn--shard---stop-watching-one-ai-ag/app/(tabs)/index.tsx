@@ -7,11 +7,15 @@ import { TaskStatus } from '../../types';
 import { router } from 'expo-router';
 
 export default function TaskQueueScreen() {
-  const { tasks, addTask, cancelTask, initialize, subscription } = useTaskStore();
+  const { tasks, addTask, cancelTask, initialize, subscription, checkNotificationPermissions } = useTaskStore();
   const [prompt, setPrompt] = useState('');
+  const [showNotificationBanner, setShowNotificationBanner] = useState(false);
 
   useEffect(() => {
     initialize();
+    checkNotificationPermissions().then(hasPermission => {
+      setShowNotificationBanner(!hasPermission);
+    });
   }, []);
 
   const activeTasks = tasks.filter(
@@ -29,7 +33,7 @@ export default function TaskQueueScreen() {
 
   return (
     <View style={styles.container}>
-      <NotificationPermissionBanner />
+      {showNotificationBanner && <NotificationPermissionBanner />}
 
       <View style={styles.header}>
         <Text style={styles.title}>Active Tasks</Text>
