@@ -1,6 +1,14 @@
 import { Attempt } from '../types';
 import * as THREE from 'three';
 
+export interface ThrowData {
+  speed: number;
+  angle: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
 export function calculateAccuracy(hits: number, total: number): number {
   if (total === 0) return 0;
   return Math.round((hits / total) * 100);
@@ -68,14 +76,41 @@ export function calculateStreak(sessions: Array<{ date: Date; accuracy: number }
   return streak;
 }
 
-export function calculateThrowDirection(acceleration: { x: number; y: number; z: number }, gyro: { x: number; y: number; z: number }): { x: number; y: number; z: number } {
+export function calculateThrowDirection(acceleration: { x: number; y: number; z: number }, gyro: { x: number; y: number; z: number }): ThrowData {
+  // Calculate speed from acceleration magnitude
+  const speed = Math.sqrt(acceleration.x ** 2 + acceleration.y ** 2 + acceleration.z ** 2);
+
+  // Calculate angle from gyroscope data
+  const angle = Math.atan2(gyro.y, gyro.x) * (180 / Math.PI);
+
   // Simple direction calculation from sensor data
   // In a real app, this would use more sophisticated physics
   return {
+    speed,
+    angle,
     x: acceleration.x + gyro.x * 0.5,
     y: acceleration.y + gyro.y * 0.5,
     z: -1 // Fixed forward direction for simplicity
   };
+}
+
+export function calculateTrajectoryPoints(start: THREE.Vector3, end: THREE.Vector3, speed: number, angle: number): THREE.Vector3[] {
+  const points = [];
+  const gravity = 9.8; // m/s²
+  const timeOfFlight = (2 * speed * Math.sin(angle * Math.PI / 180)) / gravity;
+
+  // Calculate points along the trajectory
+  for (let t = 0; t <= timeOfFlight; t += 0.1) {
+    const x = start.x + (end.x - start.x) * (t / timeOfFlight);
+    const y = start.y + (end.y - start.y) * (t / timeOfFlight);
+
+    // Parabolic height
+    const height = speed * Math.sin(angle * Math.PI / 180) * t - 0.5 * gravity * t * t;
+
+    points.push(new THREE.Vector3(x, y + height, start.z - t * 2));
+  }
+
+  return points;
 }
 
 export function screenToWorldCoordinates(
