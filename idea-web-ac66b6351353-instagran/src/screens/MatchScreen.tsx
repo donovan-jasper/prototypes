@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, RefreshControl, Image } from 'react-native';
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../../App';
 import { getMatchingScore } from '../utils/matching';
@@ -25,7 +25,7 @@ const MatchScreen = ({ navigation }: Props) => {
     if (!currentUser) return;
 
     const mockUsers = generateMockUsers(25);
-    
+
     const usersWithScores: MatchedUser[] = mockUsers
       .map(user => ({
         ...user,
@@ -56,7 +56,7 @@ const MatchScreen = ({ navigation }: Props) => {
     return (
       <View style={styles.container}>
         <Text style={styles.emptyText}>Please create your profile first</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button}
           onPress={() => navigation.navigate('ProfileScreen')}
         >
@@ -73,13 +73,13 @@ const MatchScreen = ({ navigation }: Props) => {
         <Text style={styles.emptySubtext}>
           Try adding more hobbies to your profile or refresh to see new users
         </Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.button}
           onPress={handleRefresh}
         >
           <Text style={styles.buttonText}>Refresh Matches</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.button, styles.secondaryButton]}
           onPress={() => navigation.navigate('ProfileScreen')}
         >
@@ -93,7 +93,7 @@ const MatchScreen = ({ navigation }: Props) => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Your Top Matches</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.refreshButton}
           onPress={handleRefresh}
         >
@@ -108,12 +108,16 @@ const MatchScreen = ({ navigation }: Props) => {
         }
         renderItem={({ item }) => (
           <View style={styles.userCard}>
+            <Image
+              source={{ uri: item.avatar }}
+              style={styles.avatar}
+            />
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{item.name}</Text>
               <Text style={styles.hobbies}>{item.hobbies.join(', ')}</Text>
               <Text style={styles.score}>Match Score: {item.matchScore}%</Text>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.matchButton}
               onPress={() => handleMatch(item)}
             >
@@ -178,7 +182,7 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     backgroundColor: '#fff',
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: '#007AFF',
   },
   buttonText: {
@@ -191,24 +195,29 @@ const styles = StyleSheet.create({
   },
   userCard: {
     backgroundColor: '#fff',
-    padding: 15,
     borderRadius: 12,
+    padding: 15,
     marginBottom: 15,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 5,
   },
@@ -220,12 +229,12 @@ const styles = StyleSheet.create({
   score: {
     fontSize: 14,
     color: '#007AFF',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   matchButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
     borderRadius: 8,
   },
   matchButtonText: {
