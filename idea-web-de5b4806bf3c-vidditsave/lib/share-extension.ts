@@ -95,6 +95,20 @@ export async function processSharedUrl(
     return { success: true, itemId };
   } catch (error) {
     console.error('Error processing shared URL:', error);
+
+    // Show error notification
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(
+        error instanceof Error ? error.message : 'Failed to save content',
+        ToastAndroid.LONG
+      );
+    } else {
+      Alert.alert(
+        'Save Failed',
+        error instanceof Error ? error.message : 'Failed to save content'
+      );
+    }
+
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to save content',
