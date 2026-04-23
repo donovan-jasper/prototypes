@@ -30,6 +30,7 @@ export default function ProximityFeedScreen() {
   const [hangouts, setHangouts] = useState<Hangout[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Load hangouts from database
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function ProximityFeedScreen() {
 
   const loadHangouts = async () => {
     try {
+      setError(null);
       if (!location) {
         await requestLocationPermission();
         return;
@@ -55,7 +57,7 @@ export default function ProximityFeedScreen() {
       setHangouts(nearbyHangouts);
     } catch (error) {
       console.error('Error loading hangouts:', error);
-      Alert.alert('Error', 'Failed to load hangouts. Please try again.');
+      setError('Failed to load hangouts. Please check your connection and try again.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,6 +82,17 @@ export default function ProximityFeedScreen() {
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
         <Text style={styles.loadingText}>Loading nearby hangouts...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={loadHangouts}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -136,6 +149,30 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   listContent: {
     padding: 16,
