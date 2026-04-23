@@ -1,41 +1,68 @@
 import { DatabaseSchema } from '../types/database';
+import { OpenAI } from 'openai';
+import { queryTemplates } from '../constants/queryTemplates';
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || 'your-api-key';
 
+const openai = new OpenAI({
+  apiKey: OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+});
+
 export const generateSQL = async (naturalLanguageQuery: string, schema: DatabaseSchema): Promise<string> => {
   try {
-    // In a real implementation, this would call OpenAI's API
-    // This is a simplified version that demonstrates the concept
+    // First try to match with offline templates
+    const offlineMatch = queryTemplates.find(template =>
+      naturalLanguageQuery.toLowerCase().includes(template.keyword)
+    );
 
-    // Convert schema to a string representation
+    if (offlineMatch) {
+      return offlineMatch.sql;
+    }
+
+    // If no offline match, use OpenAI API
     const schemaDescription = `Database schema:
 Tables: ${schema.tables.join(', ')}
 Columns:
 ${Object.entries(schema.columns).map(([table, columns]) =>
   `- ${table}: ${columns.join(', ')}`).join('\n')}`;
 
-    // Create a prompt for the AI
     const prompt = `Convert this natural language query to SQL:
 Query: "${naturalLanguageQuery}"
 ${schemaDescription}
 
 SQL:`;
 
-    // In a real app, you would make an API call to OpenAI here
-    // For this example, we'll simulate a response
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that converts natural language queries to SQL." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 150,
+      temperature: 0.3,
+    });
 
-    // Simple pattern matching for demonstration
-    if (naturalLanguageQuery.toLowerCase().includes('customers')) {
-      return 'SELECT * FROM customers WHERE orders > 100';
-    } else if (naturalLanguageQuery.toLowerCase().includes('orders')) {
-      return 'SELECT * FROM orders WHERE date > date("now", "-30 days")';
-    } else {
-      return 'SELECT * FROM products WHERE stock < 10';
+    const sql = completion.choices[0].message.content?.trim() || '';
+
+    if (!sql) {
+      throw new Error('No SQL generated from OpenAI');
     }
+
+    return sql;
   } catch (error) {
     console.error('AI query generation failed:', error);
-    throw new Error('Failed to generate SQL query');
+
+    // Fallback to offline templates if API fails
+    const fallbackTemplate = queryTemplates.find(template =>
+      template.keyword === 'default'
+    );
+
+    if (fallbackTemplate) {
+      return fallbackTemplate.sql;
+    }
+
+    throw new Error('Failed to generate SQL query and no offline fallback available');
   }
 };
 
@@ -60,21 +87,42 @@ export const validateQuery = (sql: string): boolean => {
 
 export const explainQuery = async (sql: string): Promise<string> => {
   try {
-    // In a real implementation, this would call OpenAI's API
-    // to explain the SQL in natural language
+    const prompt = `Explain this SQL query in simple terms:
+SQL: "${sql}"
 
-    // For this example, we'll provide a simple explanation
-    await new Promise(resolve => setTimeout(resolve, 800));
+Explanation:`;
 
-    if (sql.includes('SELECT * FROM customers')) {
-      return 'This query retrieves all customer records from the database.';
-    } else if (sql.includes('WHERE orders > 100')) {
-      return 'This query finds customers who have placed more than 100 orders.';
-    } else {
-      return 'This query retrieves information from the database based on your request.';
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: "You are a helpful assistant that explains SQL queries in simple terms." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 100,
+      temperature: 0.5,
+    });
+
+    const explanation = completion.choices[0].message.content?.trim() || '';
+
+    if (!explanation) {
+      throw new Error('No explanation generated from OpenAI');
     }
+
+    return explanation;
   } catch (error) {
     console.error('Failed to explain query:', error);
-    throw new Error('Failed to generate query explanation');
+
+    // Fallback explanation
+    if (sql.includes('SELECT')) {
+      return 'This query retrieves data from the database.';
+    } else if (sql.includes('INSERT')) {
+      return 'This query adds new data to the database.';
+    } else if (sql.includes('UPDATE')) {
+      return 'This query modifies existing data in the database.';
+    } else if (sql.includes('DELETE')) {
+      return 'This query removes data from the database.';
+    }
+
+    return 'This query performs an operation on the database.';
   }
 };
