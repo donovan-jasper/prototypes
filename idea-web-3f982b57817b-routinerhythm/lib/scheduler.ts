@@ -169,29 +169,47 @@ export function adaptRoutine(
       return aDistance - bDistance;
     });
 
-    if (allSlots.length > 0) {
-      return allSlots[0].start;
-    }
-    return null;
+    return allSlots.length > 0 ? allSlots[0].start : null;
   }
 
   // Find the slot that best fits the routine duration
-  const routineDuration = routine.tasks.length * 15 * 60 * 1000; // Assuming 15 min per task
+  const routineDuration = routine.tasks.length * 15; // Assuming 15 minutes per task
   const bestSlot = slotsInWindow.find((slot) => {
-    const slotDuration = slot.end.getTime() - slot.start.getTime();
+    const slotDuration = differenceInMinutes(slot.end, slot.start);
     return slotDuration >= routineDuration;
   });
 
-  if (bestSlot) {
-    return bestSlot.start;
-  }
+  return bestSlot ? bestSlot.start : slotsInWindow[0].start;
+}
 
-  // If no perfect fit, return the largest available slot
-  const largestSlot = slotsInWindow.reduce((prev, current) => {
-    const prevDuration = prev.end.getTime() - prev.start.getTime();
-    const currentDuration = current.end.getTime() - current.start.getTime();
-    return currentDuration > prevDuration ? current : prev;
+/**
+ * Calculates energy score based on completion history
+ */
+export function calculateEnergyScore(
+  completions: RoutineCompletion[],
+  date: Date = new Date()
+): number {
+  if (completions.length === 0) return 0.5; // Neutral score if no data
+
+  // Filter completions from the same day of week
+  const dayOfWeek = date.getDay();
+  const sameDayCompletions = completions.filter((comp) => {
+    return comp.completedAt.getDay() === dayOfWeek;
   });
 
-  return largestSlot.start;
+  if (sameDayCompletions.length === 0) return 0.5;
+
+  // Calculate average completion time
+  const totalMinutes = sameDayCompletions.reduce((sum, comp) => {
+    return sum + comp.completedAt.getHours() * 60 + comp.completedAt.getMinutes();
+  }, 0);
+
+  const avgMinutes = totalMinutes / sameDayCompletions.length;
+  const avgHour = Math.floor(avgMinutes / 60);
+
+  // Score based on time of day (0-1 scale)
+  if (avgHour >= 6 && avgHour < 12) return 0.9; // Morning
+  if (avgHour >= 12 && avgHour < 18) return 0.7; // Afternoon
+  if (avgHour >= 18 && avgHour < 22) return 0.5; // Evening
+  return 0.3; // Night
 }
