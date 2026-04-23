@@ -1,20 +1,37 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Clipboard, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Clipboard, ActivityIndicator, ScrollView } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { generateConversationStarters } from '../../lib/ai/conversationGenerator';
 import { useMatches } from '../../hooks/useMatches';
 import { useBehaviorTracking } from '../../hooks/useBehaviorTracking';
 import Colors from '../../constants/Colors';
 
-const ConversationStarterModal = ({ visible, onClose, starters, onRefresh }) => {
-  const [copiedIndex, setCopiedIndex] = useState(null);
+const ConversationStarter = ({ starter, onSend, onCopy }) => {
+  const [copied, setCopied] = useState(false);
 
-  const handleCopy = (text, index) => {
-    Clipboard.setString(text);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 2000);
+  const handleCopy = () => {
+    Clipboard.setString(starter);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    onCopy();
   };
 
+  return (
+    <View style={styles.starterContainer}>
+      <Text style={styles.starterText}>{starter}</Text>
+      <View style={styles.starterActions}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
+          <Text style={styles.actionButtonText}>{copied ? 'Copied!' : 'Copy'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.actionButton, styles.sendButton]} onPress={() => onSend(starter)}>
+          <Text style={[styles.actionButtonText, styles.sendButtonText]}>Send</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const ConversationStarterModal = ({ visible, onClose, starters, onRefresh, onSend }) => {
   return (
     <Modal
       visible={visible}
@@ -26,19 +43,16 @@ const ConversationStarterModal = ({ visible, onClose, starters, onRefresh }) => 
         <View style={styles.modalContent}>
           <Text style={styles.modalTitle}>Conversation Starters</Text>
 
-          {starters.map((starter, index) => (
-            <View key={index} style={styles.starterItem}>
-              <Text style={styles.starterText}>{starter}</Text>
-              <TouchableOpacity
-                style={styles.copyButton}
-                onPress={() => handleCopy(starter, index)}
-              >
-                <Text style={styles.copyButtonText}>
-                  {copiedIndex === index ? 'Copied!' : 'Copy'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          ))}
+          <ScrollView style={styles.startersList}>
+            {starters.map((starter, index) => (
+              <ConversationStarter
+                key={index}
+                starter={starter}
+                onSend={onSend}
+                onCopy={() => {}}
+              />
+            ))}
+          </ScrollView>
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.refreshButton} onPress={onRefresh}>
@@ -56,7 +70,7 @@ const ConversationStarterModal = ({ visible, onClose, starters, onRefresh }) => 
 
 export default function MatchDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { matches, loading } = useMatches();
+  const { matches, loading, sendMessage } = useMatches();
   const { trackInteraction } = useBehaviorTracking();
   const [showStartersModal, setShowStartersModal] = useState(false);
   const [conversationStarters, setConversationStarters] = useState([]);
@@ -75,15 +89,12 @@ export default function MatchDetailScreen() {
 
     setIsGenerating(true);
     try {
-      // In a real app, you would get the user's and match's behavior vectors
-      // For this example, we'll use mock vectors
       const userVector = match.userBehaviorVector || new Array(128).fill(0.5);
       const matchVector = match.matchBehaviorVector || new Array(128).fill(0.5);
 
       const starters = generateConversationStarters(userVector, matchVector);
       setConversationStarters(starters);
 
-      // Track that the user viewed conversation starters
       trackInteraction('view_conversation_starters', {
         matchId: match.id,
         count: starters.length
@@ -92,6 +103,17 @@ export default function MatchDetailScreen() {
       console.error('Error generating conversation starters:', error);
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleSendStarter = (message) => {
+    if (match) {
+      sendMessage(match.id, message);
+      trackInteraction('send_conversation_starter', {
+        matchId: match.id,
+        message
+      });
+      setShowStartersModal(false);
     }
   };
 
@@ -145,6 +167,7 @@ export default function MatchDetailScreen() {
         onClose={() => setShowStartersModal(false)}
         starters={conversationStarters}
         onRefresh={generateStarters}
+        onSend={handleSendStarter}
       />
     </View>
   );
@@ -153,7 +176,7 @@ export default function MatchDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: Colors.background,
   },
   loadingContainer: {
@@ -162,40 +185,46 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: Colors.background,
   },
+  errorText: {
+    color: Colors.error,
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
+  },
   header: {
-    marginBottom: 20,
+    marginBottom: 24,
     alignItems: 'center',
   },
   matchName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 5,
+    marginBottom: 8,
   },
   compatibilityScore: {
     fontSize: 18,
     color: Colors.primary,
   },
   insightsContainer: {
-    marginBottom: 20,
+    marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: 10,
+    marginBottom: 16,
   },
   insightItem: {
-    backgroundColor: Colors.cardBackground,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
+    backgroundColor: Colors.card,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
   },
   insightTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: Colors.text,
-    marginBottom: 5,
+    marginBottom: 4,
   },
   insightDescription: {
     fontSize: 14,
@@ -203,95 +232,102 @@ const styles = StyleSheet.create({
   },
   startersButton: {
     backgroundColor: Colors.primary,
-    padding: 15,
-    borderRadius: 10,
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 16,
   },
   startersButtonText: {
-    color: Colors.textLight,
+    color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
-  },
-  errorText: {
-    fontSize: 18,
-    color: Colors.error,
-    textAlign: 'center',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
     backgroundColor: Colors.background,
+    borderRadius: 12,
     width: '90%',
-    maxWidth: 500,
-    borderRadius: 15,
+    maxHeight: '80%',
     padding: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: Colors.text,
-    marginBottom: 20,
+    marginBottom: 16,
     textAlign: 'center',
   },
-  starterItem: {
-    backgroundColor: Colors.cardBackground,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  startersList: {
+    maxHeight: '70%',
+  },
+  starterContainer: {
+    backgroundColor: Colors.card,
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
   },
   starterText: {
     fontSize: 16,
     color: Colors.text,
-    flex: 1,
-    marginRight: 10,
+    marginBottom: 12,
   },
-  copyButton: {
-    backgroundColor: Colors.primary,
+  starterActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
     padding: 8,
-    borderRadius: 5,
-    minWidth: 60,
+    borderRadius: 4,
+    backgroundColor: Colors.secondary,
+    flex: 1,
+    marginRight: 8,
+    alignItems: 'center',
   },
-  copyButtonText: {
-    color: Colors.textLight,
+  sendButton: {
+    backgroundColor: Colors.primary,
+    marginRight: 0,
+  },
+  actionButtonText: {
+    color: Colors.white,
     fontSize: 14,
-    textAlign: 'center',
+    fontWeight: '600',
+  },
+  sendButtonText: {
+    color: Colors.white,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
+    marginTop: 16,
   },
   refreshButton: {
     backgroundColor: Colors.secondary,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     flex: 1,
-    marginRight: 10,
+    marginRight: 8,
     alignItems: 'center',
   },
   refreshButtonText: {
-    color: Colors.textLight,
+    color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
   closeButton: {
     backgroundColor: Colors.error,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 8,
     flex: 1,
-    marginLeft: 10,
+    marginLeft: 8,
     alignItems: 'center',
   },
   closeButtonText: {
-    color: Colors.textLight,
+    color: Colors.white,
     fontSize: 16,
     fontWeight: '600',
   },
