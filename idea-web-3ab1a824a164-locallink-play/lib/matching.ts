@@ -157,6 +157,7 @@ export async function checkForMutualInterest(chatId: string, userId: string) {
       (chat.interested_user_id === userId && chat.creator_user_id !== userId);
 
     if (isMutualInterest && !chat.is_unlocked) {
+      // Unlock the chat if mutual interest
       const { error: unlockError } = await supabase
         .from('chats')
         .update({ is_unlocked: true })
@@ -181,7 +182,7 @@ export async function checkForMutualInterest(chatId: string, userId: string) {
 
     return chat.is_unlocked;
   } catch (error) {
-    console.error('Error checking for mutual interest:', error);
+    console.error('Error checking mutual interest:', error);
     throw error;
   }
 }
