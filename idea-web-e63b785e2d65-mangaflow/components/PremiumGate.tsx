@@ -1,32 +1,33 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useUserStore } from '../store/user';
-import { validateSubscription } from '../lib/premium';
+import { purchasePremium } from '../lib/premium';
 
 interface PremiumGateProps {
   visible: boolean;
   onClose: () => void;
-  onUpgrade: () => void;
 }
 
-const PremiumGate: React.FC<PremiumGateProps> = ({ visible, onClose, onUpgrade }) => {
-  const { isPremium, setPremiumStatus } = useUserStore();
+const PremiumGate: React.FC<PremiumGateProps> = ({ visible, onClose }) => {
+  const { isPremium, expirationDate, setPremiumStatus, initializePremiumStatus } = useUserStore();
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   const handleUpgrade = async () => {
     try {
-      // In a real app, this would trigger the purchase flow
-      // For now, we'll simulate a successful purchase
-      const success = await validateSubscription('valid_receipt_123');
+      setIsPurchasing(true);
+      const success = await purchasePremium();
 
       if (success) {
-        setPremiumStatus(true, Date.now() + (30 * 24 * 60 * 60 * 1000));
+        await initializePremiumStatus();
         Alert.alert('Success', 'Your premium subscription is active!');
         onClose();
       } else {
-        Alert.alert('Error', 'Failed to validate subscription. Please try again.');
+        Alert.alert('Error', 'Failed to complete purchase. Please try again.');
       }
     } catch (error) {
       Alert.alert('Error', 'An error occurred during purchase. Please try again.');
+    } finally {
+      setIsPurchasing(false);
     }
   };
 
@@ -64,8 +65,16 @@ const PremiumGate: React.FC<PremiumGateProps> = ({ visible, onClose, onUpgrade }
             </View>
           </View>
 
-          <TouchableOpacity style={styles.upgradeButton} onPress={handleUpgrade}>
-            <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+          <TouchableOpacity
+            style={styles.upgradeButton}
+            onPress={handleUpgrade}
+            disabled={isPurchasing}
+          >
+            {isPurchasing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.upgradeButtonText}>Upgrade Now</Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
@@ -139,6 +148,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 48,
   },
   upgradeButtonText: {
     color: 'white',

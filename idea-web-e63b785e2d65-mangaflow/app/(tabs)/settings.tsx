@@ -1,10 +1,10 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { useUserStore } from '../../store/user';
 import { clearPremiumStatus } from '../../lib/premium';
 
 const SettingsScreen = () => {
-  const { isPremium, expirationDate, initializePremiumStatus } = useUserStore();
+  const { isPremium, expirationDate, isLoading, initializePremiumStatus } = useUserStore();
 
   useEffect(() => {
     initializePremiumStatus();
@@ -26,6 +26,14 @@ const SettingsScreen = () => {
       Alert.alert('Error', 'Failed to reset premium status');
     }
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
@@ -71,6 +79,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   section: {
     backgroundColor: 'white',

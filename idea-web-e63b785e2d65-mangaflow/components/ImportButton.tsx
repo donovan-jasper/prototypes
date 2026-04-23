@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import { extractMangaArchive } from '../lib/manga-parser';
 import { savePage } from '../lib/storage';
-import { addManga } from '../lib/db';
+import { addManga, getMangaCount } from '../lib/db';
 import { useUserStore } from '../store/user';
 import { canAddManga } from '../lib/premium';
 import PremiumGate from './PremiumGate';
@@ -18,7 +18,7 @@ const ImportButton = () => {
       setIsLoading(true);
 
       // Check if user can add more manga
-      const mangaCount = await getMangaCount(); // You'll need to implement this
+      const mangaCount = await getMangaCount();
       const canAdd = await canAddManga(mangaCount, isPremium);
 
       if (!canAdd) {
@@ -86,18 +86,16 @@ const ImportButton = () => {
         onPress={handleImport}
         disabled={isLoading}
       >
-        <Text style={styles.buttonText}>
-          {isLoading ? 'Importing...' : 'Import Manga'}
-        </Text>
+        {isLoading ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Import Manga</Text>
+        )}
       </TouchableOpacity>
 
       <PremiumGate
         visible={showPremiumModal}
         onClose={() => setShowPremiumModal(false)}
-        onUpgrade={() => {
-          setShowPremiumModal(false);
-          // In a real app, this would trigger the purchase flow
-        }}
       />
     </>
   );
@@ -111,6 +109,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+    minHeight: 48,
   },
   buttonText: {
     color: 'white',
