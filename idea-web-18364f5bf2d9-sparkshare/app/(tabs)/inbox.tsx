@@ -14,9 +14,14 @@ const FeedbackInbox = () => {
   useEffect(() => {
     const fetchNotifications = async () => {
       if (user) {
-        const data = await getFeedbackNotifications(user.id);
-        setNotifications(data);
-        setLoading(false);
+        try {
+          const data = await getFeedbackNotifications(user.id);
+          setNotifications(data);
+        } catch (error) {
+          console.error('Error fetching notifications:', error);
+        } finally {
+          setLoading(false);
+        }
       }
     };
 
@@ -24,13 +29,17 @@ const FeedbackInbox = () => {
   }, [user]);
 
   const handleNotificationPress = async (notification) => {
-    if (notification.unread) {
-      await markNotificationAsRead(notification.id);
-      setNotifications(prev => prev.map(n =>
-        n.id === notification.id ? { ...n, unread: false } : n
-      ));
+    try {
+      if (notification.unread) {
+        await markNotificationAsRead(notification.id);
+        setNotifications(prev => prev.map(n =>
+          n.id === notification.id ? { ...n, unread: false } : n
+        ));
+      }
+      router.push(`/idea/${notification.idea_id}`);
+    } catch (error) {
+      console.error('Error handling notification press:', error);
     }
-    router.push(`/idea/${notification.idea_id}`);
   };
 
   const renderNotification = ({ item }) => (
