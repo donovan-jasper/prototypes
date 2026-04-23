@@ -1,16 +1,17 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
-import { Text, Button, Portal, Modal, useTheme, IconButton } from 'react-native-paper';
+import { View, FlatList, StyleSheet, RefreshControl, ActivityIndicator, TouchableOpacity, Alert } from 'react-native';
+import { Text, Button, Portal, Modal, useTheme, IconButton, FAB } from 'react-native-paper';
 import { useCommunity } from '../../hooks/useCommunity';
 import CommunityPost from '../../components/CommunityPost';
 import { useAppContext } from '../../contexts/AppContext';
 import { useRouter } from 'expo-router';
 
 export default function CommunityScreen() {
-  const { posts, loading, loadPosts, refreshPosts } = useCommunity();
-  const { isPremium } = useAppContext();
+  const { posts, loading, loadPosts, refreshPosts, createPost } = useCommunity();
+  const { isPremium, userId } = useAppContext();
   const [refreshing, setRefreshing] = useState(false);
   const [showPaywall, setShowPaywall] = useState(false);
+  const [showCreatePost, setShowCreatePost] = useState(false);
   const theme = useTheme();
   const router = useRouter();
 
@@ -34,7 +35,24 @@ export default function CommunityScreen() {
       setShowPaywall(true);
       return;
     }
-    router.push('/post/create');
+    setShowCreatePost(true);
+  };
+
+  const handleCreatePost = async (photoUri: string, caption: string) => {
+    try {
+      await createPost({
+        userId,
+        plantId: '', // Will be set in the post creation screen
+        photoUri,
+        caption,
+        likes: 0,
+        createdAt: new Date().toISOString()
+      });
+      setShowCreatePost(false);
+      await refreshPosts();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to create post. Please try again.');
+    }
   };
 
   return (
@@ -96,17 +114,27 @@ export default function CommunityScreen() {
         </Portal>
       )}
 
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+      {isPremium && (
+        <Portal>
+          <Modal
+            visible={showCreatePost}
+            onDismiss={() => setShowCreatePost(false)}
+            contentContainerStyle={styles.createPostModal}
+          >
+            <CreatePostForm
+              onSubmit={handleCreatePost}
+              onCancel={() => setShowCreatePost(false)}
+            />
+          </Modal>
+        </Portal>
+      )}
+
+      <FAB
+        icon="plus"
+        style={styles.fab}
         onPress={handlePost}
-      >
-        <IconButton
-          icon="plus"
-          color="white"
-          size={24}
-          onPress={handlePost}
-        />
-      </TouchableOpacity>
+        color="white"
+      />
     </View>
   );
 }
@@ -154,19 +182,139 @@ const styles = StyleSheet.create({
   dismissButton: {
     width: '100%',
   },
+  createPostModal: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 8,
+    maxHeight: '80%',
+  },
   fab: {
     position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    margin: 16,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#4caf50',
+  },
+});
+
+function CreatePostForm({ onSubmit, onCancel }: { onSubmit: (photoUri: string, caption: string) => void, onCancel: () => void }) {
+  const [photoUri, setPhotoUri] = useState('');
+  const [caption, setCaption] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleTakePhoto = async () => {
+    setIsLoading(true);
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setPhotoUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to take photo. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!photoUri) {
+      Alert.alert('Error', 'Please take a photo first');
+      return;
+    }
+    onSubmit(photoUri, caption);
+  };
+
+  return (
+    <View style={styles.formContainer}>
+      <Text variant="headlineSmall" style={styles.formTitle}>Create Post</Text>
+
+      {photoUri ? (
+        <Image source={{ uri: photoUri }} style={styles.previewImage} />
+      ) : (
+        <View style={styles.placeholderImage}>
+          <Text>No photo selected</Text>
+        </View>
+      )}
+
+      <Button
+        mode="outlined"
+        onPress={handleTakePhoto}
+        style={styles.photoButton}
+        loading={isLoading}
+        disabled={isLoading}
+      >
+        Take Photo
+      </Button>
+
+      <TextInput
+        label="Caption"
+        value={caption}
+        onChangeText={setCaption}
+        multiline
+        numberOfLines={3}
+        style={styles.captionInput}
+      />
+
+      <View style={styles.formActions}>
+        <Button mode="text" onPress={onCancel} style={styles.cancelButton}>
+          Cancel
+        </Button>
+        <Button
+          mode="contained"
+          onPress={handleSubmit}
+          disabled={!photoUri}
+          style={styles.submitButton}
+        >
+          Post
+        </Button>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  formContainer: {
+    padding: 16,
+  },
+  formTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  placeholderImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 16,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+  },
+  photoButton: {
+    marginBottom: 16,
+  },
+  captionInput: {
+    marginBottom: 16,
+  },
+  formActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  cancelButton: {
+    marginRight: 8,
+  },
+  submitButton: {
+    backgroundColor: '#4caf50',
   },
 });

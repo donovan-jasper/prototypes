@@ -1,32 +1,46 @@
 import React, { useState } from 'react';
-import { View, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { Card, Text, IconButton, Avatar, useTheme, TextInput } from 'react-native-paper';
+import { View, Image, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { Card, Text, IconButton, Avatar, useTheme, TextInput, Button } from 'react-native-paper';
 import { useCommunity } from '../hooks/useCommunity';
 import { useAppContext } from '../contexts/AppContext';
 
 export default function CommunityPost({ post }: { post: any }) {
   const { likePost, commentOnPost } = useCommunity();
-  const { isPremium } = useAppContext();
+  const { isPremium, userId } = useAppContext();
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState('');
+  const [isLiked, setIsLiked] = useState(post.liked || false);
+  const [likeCount, setLikeCount] = useState(post.likes || 0);
   const theme = useTheme();
 
-  const handleLike = () => {
+  const handleLike = async () => {
     if (!isPremium) {
-      // Show paywall or toast message
+      Alert.alert('Premium Feature', 'Upgrade to premium to like posts');
       return;
     }
-    likePost(post.id);
+
+    try {
+      const newLikeCount = await likePost(post.id, userId);
+      setIsLiked(!isLiked);
+      setLikeCount(newLikeCount);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update like status');
+    }
   };
 
-  const handleComment = () => {
+  const handleComment = async () => {
     if (!isPremium) {
-      // Show paywall or toast message
+      Alert.alert('Premium Feature', 'Upgrade to premium to comment');
       return;
     }
+
     if (commentText.trim()) {
-      commentOnPost(post.id, commentText);
-      setCommentText('');
+      try {
+        await commentOnPost(post.id, userId, commentText);
+        setCommentText('');
+      } catch (error) {
+        Alert.alert('Error', 'Failed to post comment');
+      }
     }
   };
 
@@ -48,12 +62,12 @@ export default function CommunityPost({ post }: { post: any }) {
         <View style={styles.actions}>
           <View style={styles.actionGroup}>
             <IconButton
-              icon={post.liked ? "heart" : "heart-outline"}
+              icon={isLiked ? "heart" : "heart-outline"}
               onPress={handleLike}
               size={20}
-              iconColor={post.liked ? theme.colors.error : undefined}
+              iconColor={isLiked ? theme.colors.error : undefined}
             />
-            <Text variant="bodySmall">{post.likes}</Text>
+            <Text variant="bodySmall">{likeCount}</Text>
           </View>
 
           <View style={styles.actionGroup}>
@@ -68,12 +82,16 @@ export default function CommunityPost({ post }: { post: any }) {
 
         {showComments && (
           <View style={styles.commentsSection}>
-            {post.comments?.map((comment: any, index: number) => (
-              <View key={index} style={styles.comment}>
-                <Text variant="bodySmall" style={styles.commentUser}>{comment.userId}</Text>
-                <Text variant="bodySmall">{comment.text}</Text>
-              </View>
-            ))}
+            {post.comments?.length > 0 ? (
+              post.comments.map((comment: any, index: number) => (
+                <View key={index} style={styles.comment}>
+                  <Text variant="bodySmall" style={styles.commentUser}>{comment.userId}</Text>
+                  <Text variant="bodySmall">{comment.text}</Text>
+                </View>
+              ))
+            ) : (
+              <Text variant="bodySmall" style={styles.noComments}>No comments yet. Be the first to comment!</Text>
+            )}
 
             {isPremium && (
               <View style={styles.commentInput}>
@@ -82,12 +100,16 @@ export default function CommunityPost({ post }: { post: any }) {
                   value={commentText}
                   onChangeText={setCommentText}
                   style={styles.input}
+                  multiline
                 />
-                <IconButton
-                  icon="send"
+                <Button
+                  mode="contained"
                   onPress={handleComment}
                   disabled={!commentText.trim()}
-                />
+                  style={styles.commentButton}
+                >
+                  Post
+                </Button>
               </View>
             )}
           </View>
@@ -137,10 +159,18 @@ const styles = StyleSheet.create({
   },
   comment: {
     marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 4,
   },
   commentUser: {
     fontWeight: 'bold',
     marginBottom: 2,
+  },
+  noComments: {
+    textAlign: 'center',
+    marginVertical: 12,
+    color: '#666',
   },
   commentInput: {
     flexDirection: 'row',
@@ -150,5 +180,9 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     marginRight: 8,
+    backgroundColor: 'transparent',
+  },
+  commentButton: {
+    backgroundColor: '#4caf50',
   },
 });

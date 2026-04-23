@@ -56,6 +56,14 @@ export const initDatabase = async () => {
       createdAt TEXT NOT NULL,
       FOREIGN KEY (postId) REFERENCES community_posts (id)
     );
+
+    CREATE TABLE IF NOT EXISTS post_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      postId TEXT NOT NULL,
+      userId TEXT NOT NULL,
+      UNIQUE(postId, userId),
+      FOREIGN KEY (postId) REFERENCES community_posts (id)
+    );
   `);
 };
 
