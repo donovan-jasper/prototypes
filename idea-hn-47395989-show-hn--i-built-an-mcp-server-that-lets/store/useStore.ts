@@ -1,47 +1,95 @@
 import { create } from 'zustand';
-import { DraftPost } from '../types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import * as SecureStore from 'expo-secure-store';
+import { Account, DraftPost, ScheduledPost } from '../types';
 
-interface StoreState {
+interface AppState {
+  accounts: Account[];
   draftPosts: DraftPost[];
-  currentDraft: string;
-  setCurrentDraft: (content: string) => void;
-  saveDraft: () => void;
-  clearDraft: () => void;
-  deleteDraft: (id: string) => void;
+  scheduledPosts: ScheduledPost[];
+  currentAccountId: string | null;
+  addAccount: (account: Account) => void;
+  removeAccount: (accountId: string) => void;
+  setCurrentAccount: (accountId: string) => void;
+  addDraftPost: (post: DraftPost) => void;
+  removeDraftPost: (postId: string) => void;
+  addScheduledPost: (post: ScheduledPost) => void;
+  updateScheduledPost: (postId: string, updates: Partial<ScheduledPost>) => void;
+  removeScheduledPost: (postId: string) => void;
 }
 
-export const useStore = create<StoreState>((set, get) => ({
-  draftPosts: [],
-  currentDraft: '',
-  
-  setCurrentDraft: (content: string) => {
-    set({ currentDraft: content });
+const secureStorage = {
+  getItem: async (key: string) => {
+    return await SecureStore.getItemAsync(key);
   },
-  
-  saveDraft: () => {
-    const { currentDraft, draftPosts } = get();
-    if (!currentDraft.trim()) return;
-    
-    const newDraft: DraftPost = {
-      id: Date.now().toString(),
-      content: currentDraft,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    
-    set({
-      draftPosts: [newDraft, ...draftPosts],
-      currentDraft: '',
-    });
+  setItem: async (key: string, value: string) => {
+    await SecureStore.setItemAsync(key, value);
   },
-  
-  clearDraft: () => {
-    set({ currentDraft: '' });
+  removeItem: async (key: string) => {
+    await SecureStore.deleteItemAsync(key);
   },
-  
-  deleteDraft: (id: string) => {
-    set((state) => ({
-      draftPosts: state.draftPosts.filter((draft) => draft.id !== id),
-    }));
-  },
-}));
+};
+
+export const useStore = create<AppState>()(
+  persist(
+    (set) => ({
+      accounts: [],
+      draftPosts: [],
+      scheduledPosts: [],
+      currentAccountId: null,
+
+      addAccount: (account) =>
+        set((state) => ({
+          accounts: [...state.accounts, account],
+          currentAccountId: account.id,
+        })),
+
+      removeAccount: (accountId) =>
+        set((state) => ({
+          accounts: state.accounts.filter((acc) => acc.id !== accountId),
+          currentAccountId: state.currentAccountId === accountId ? null : state.currentAccountId,
+        })),
+
+      setCurrentAccount: (accountId) =>
+        set(() => ({
+          currentAccountId: accountId,
+        })),
+
+      addDraftPost: (post) =>
+        set((state) => ({
+          draftPosts: [...state.draftPosts, post],
+        })),
+
+      removeDraftPost: (postId) =>
+        set((state) => ({
+          draftPosts: state.draftPosts.filter((post) => post.id !== postId),
+        })),
+
+      addScheduledPost: (post) =>
+        set((state) => ({
+          scheduledPosts: [...state.scheduledPosts, post],
+        })),
+
+      updateScheduledPost: (postId, updates) =>
+        set((state) => ({
+          scheduledPosts: state.scheduledPosts.map((post) =>
+            post.id === postId ? { ...post, ...updates } : post
+          ),
+        })),
+
+      removeScheduledPost: (postId) =>
+        set((state) => ({
+          scheduledPosts: state.scheduledPosts.filter((post) => post.id !== postId),
+        })),
+    }),
+    {
+      name: 'threadflow-storage',
+      storage: createJSONStorage(() => secureStorage),
+      partialize: (state) => ({
+        accounts: state.accounts,
+        currentAccountId: state.currentAccountId,
+        // Don't persist drafts and scheduled posts to avoid clutter
+      }),
+    }
+  )
+);
