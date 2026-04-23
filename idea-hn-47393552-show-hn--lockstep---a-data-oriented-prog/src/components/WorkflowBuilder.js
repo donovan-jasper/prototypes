@@ -13,6 +13,12 @@ const WorkflowBuilder = ({ workflowId }) => {
   const [connectionStart, setConnectionStart] = useState(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [nodeConfig, setNodeConfig] = useState({});
+  const [availableActions, setAvailableActions] = useState([
+    { id: 'filter', label: 'Filter', color: '#4a6fa5' },
+    { id: 'sort', label: 'Sort', color: '#5cb85c' },
+    { id: 'transform', label: 'Transform', color: '#f0ad4e' },
+    { id: 'aggregate', label: 'Aggregate', color: '#d9534f' }
+  ]);
   const svgRef = useRef(null);
 
   useEffect(() => {
@@ -162,81 +168,95 @@ const WorkflowBuilder = ({ workflowId }) => {
   };
 
   const renderNodes = () => {
-    return nodes.map(node => (
-      <G key={node.id}>
-        <Circle
-          cx={node.x}
-          cy={node.y}
-          r="20"
-          fill={node.type === 'filter' ? '#4a6fa5' :
-                node.type === 'transform' ? '#5cb85c' : '#d9534f'}
-          onPress={() => startConnection(node.id)}
-          onPressOut={() => completeConnection(node.id)}
-        />
-        <SvgText
-          x={node.x}
-          y={node.y + 5}
-          fontSize="10"
-          fill="white"
-          textAnchor="middle"
-        >
-          {node.label}
-        </SvgText>
-        <Circle
-          cx={node.x + 25}
-          cy={node.y - 25}
-          r="10"
-          fill="#f0ad4e"
-          onPress={() => openNodeConfig(node.id)}
-        />
-        <SvgText
-          x={node.x + 25}
-          y={node.y - 22}
-          fontSize="8"
-          fill="white"
-          textAnchor="middle"
-        >
-          ⚙️
-        </SvgText>
-      </G>
-    ));
+    return nodes.map(node => {
+      const action = availableActions.find(a => a.id === node.type);
+      const color = action ? action.color : '#666';
+
+      return (
+        <G key={node.id}>
+          <Circle
+            cx={node.x}
+            cy={node.y}
+            r="20"
+            fill={color}
+            onPress={() => openNodeConfig(node.id)}
+          />
+          <SvgText
+            x={node.x}
+            y={node.y + 5}
+            fontSize="10"
+            textAnchor="middle"
+            fill="white"
+          >
+            {node.label}
+          </SvgText>
+          <Circle
+            cx={node.x + 25}
+            cy={node.y}
+            r="8"
+            fill="#333"
+            onPress={() => startConnection(node.id)}
+          />
+        </G>
+      );
+    });
+  };
+
+  const renderActionPalette = () => {
+    return (
+      <View style={styles.paletteContainer}>
+        <Text style={styles.paletteTitle}>Available Actions</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {availableActions.map(action => (
+            <TouchableOpacity
+              key={action.id}
+              style={[styles.paletteItem, { backgroundColor: action.color }]}
+              onPress={() => addNode(action.id)}
+            >
+              <Text style={styles.paletteItemText}>{action.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
   };
 
   return (
-    <View style={styles.container}>
+    <View style={styles.container} {...panResponder.panHandlers}>
       <View style={styles.toolbar}>
-        <TouchableOpacity style={styles.button} onPress={() => addNode('filter')}>
-          <Text style={styles.buttonText}>+ Filter</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => addNode('transform')}>
-          <Text style={styles.buttonText}>+ Transform</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={() => addNode('output')}>
-          <Text style={styles.buttonText}>+ Output</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.saveButton} onPress={saveWorkflow}>
-          <Text style={styles.saveButtonText}>Save Workflow</Text>
+        <TouchableOpacity style={styles.toolbarButton} onPress={saveWorkflow}>
+          <Text style={styles.toolbarButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.canvas} {...panResponder.panHandlers}>
-        <Svg style={StyleSheet.absoluteFill} ref={svgRef}>
-          <defs>
-            <marker
-              id="arrowhead"
-              markerWidth="10"
-              markerHeight="7"
-              refX="9"
-              refY="3.5"
-              orient="auto"
-            >
-              <polygon points="0 0, 10 3.5, 0 7" fill="#666" />
-            </marker>
-          </defs>
-          {renderConnections()}
-          {renderNodes()}
-        </Svg>
-      </View>
+      {renderActionPalette()}
+
+      <Svg style={styles.svgContainer} ref={svgRef}>
+        <defs>
+          <marker
+            id="arrowhead"
+            markerWidth="10"
+            markerHeight="7"
+            refX="9"
+            refY="3.5"
+            orient="auto"
+          >
+            <Path d="M0,0 V7 L10,3.5 Z" fill="#666" />
+          </marker>
+        </defs>
+
+        {renderConnections()}
+        {renderNodes()}
+
+        {isConnecting && connectionStart && (
+          <Path
+            d={`M${connectionStart.x},${connectionStart.y} L${connectionStart.x + 50},${connectionStart.y}`}
+            stroke="#666"
+            strokeWidth="2"
+            strokeDasharray="5,5"
+          />
+        )}
+      </Svg>
 
       <Modal
         visible={showConfigModal}
@@ -247,47 +267,27 @@ const WorkflowBuilder = ({ workflowId }) => {
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Configure {selectedNode?.label}</Text>
-            <ScrollView style={styles.configScroll}>
-              {selectedNode?.type === 'filter' && (
-                <View style={styles.configItem}>
-                  <Text style={styles.configLabel}>Filter Condition:</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    value={nodeConfig.condition || ''}
-                    onChangeText={(text) => setNodeConfig({...nodeConfig, condition: text})}
-                    placeholder="Enter filter condition"
-                  />
-                </View>
-              )}
-              {selectedNode?.type === 'transform' && (
-                <View style={styles.configItem}>
-                  <Text style={styles.configLabel}>Transformation:</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    value={nodeConfig.transformation || ''}
-                    onChangeText={(text) => setNodeConfig({...nodeConfig, transformation: text})}
-                    placeholder="Enter transformation"
-                  />
-                </View>
-              )}
-              {selectedNode?.type === 'output' && (
-                <View style={styles.configItem}>
-                  <Text style={styles.configLabel}>Output Destination:</Text>
-                  <TextInput
-                    style={styles.configInput}
-                    value={nodeConfig.destination || ''}
-                    onChangeText={(text) => setNodeConfig({...nodeConfig, destination: text})}
-                    placeholder="Enter output destination"
-                  />
-                </View>
-              )}
-            </ScrollView>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Configuration value"
+              value={nodeConfig.value || ''}
+              onChangeText={(text) => setNodeConfig({ ...nodeConfig, value: text })}
+            />
+
             <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowConfigModal(false)}>
-                <Text style={styles.buttonText}>Cancel</Text>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowConfigModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={saveNodeConfig}>
-                <Text style={styles.saveButtonText}>Save</Text>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={saveNodeConfig}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -300,35 +300,45 @@ const WorkflowBuilder = ({ workflowId }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   toolbar: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     padding: 10,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
   },
-  button: {
+  toolbarButton: {
+    padding: 10,
     backgroundColor: '#4a6fa5',
-    padding: 10,
     borderRadius: 5,
+  },
+  toolbarButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  paletteContainer: {
+    padding: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+  },
+  paletteTitle: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  paletteItem: {
+    padding: 10,
     marginRight: 10,
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  saveButton: {
-    backgroundColor: '#5cb85c',
-    padding: 10,
     borderRadius: 5,
-    marginLeft: 'auto',
   },
-  saveButtonText: {
+  paletteItemText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  canvas: {
+  svgContainer: {
     flex: 1,
     backgroundColor: 'white',
   },
@@ -339,43 +349,41 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
     width: '80%',
-    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
   },
-  configScroll: {
-    maxHeight: 300,
-  },
-  configItem: {
-    marginBottom: 15,
-  },
-  configLabel: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  configInput: {
+  input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    padding: 10,
     borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: 20,
   },
-  cancelButton: {
-    backgroundColor: '#d9534f',
+  modalButton: {
     padding: 10,
     borderRadius: 5,
-    marginRight: 10,
+    marginLeft: 10,
+  },
+  cancelButton: {
+    backgroundColor: '#ddd',
+  },
+  saveButton: {
+    backgroundColor: '#4a6fa5',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
 
