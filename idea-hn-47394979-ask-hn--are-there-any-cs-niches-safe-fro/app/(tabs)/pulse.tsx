@@ -8,6 +8,7 @@ export default function PulseScreen() {
   const [isPremium, setIsPremium] = useState(false);
   const [trends, setTrends] = useState(PULSE_TRENDS);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(Date.now());
   const router = useRouter();
 
   useEffect(() => {
@@ -25,9 +26,14 @@ export default function PulseScreen() {
     // Simulate API call with a delay
     setTimeout(() => {
       // In a real app, this would fetch new data from an API
-      // For now, we'll just shuffle the existing trends
-      const shuffled = [...PULSE_TRENDS].sort(() => Math.random() - 0.5);
+      // For now, we'll shuffle the existing trends and update timestamps
+      const shuffled = [...PULSE_TRENDS].map(trend => ({
+        ...trend,
+        timestamp: Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)
+      })).sort((a, b) => b.timestamp - a.timestamp);
+
       setTrends(shuffled);
+      setLastUpdated(Date.now());
       setIsLoading(false);
     }, 1000);
   }
@@ -55,6 +61,12 @@ export default function PulseScreen() {
         Weekly trends showing which tech skills and roles are heating up or cooling down
       </Text>
 
+      {isPremium && (
+        <Text style={styles.lastUpdated}>
+          Last updated: {new Date(lastUpdated).toLocaleString()}
+        </Text>
+      )}
+
       <View style={styles.trendsContainer}>
         {visibleTrends.map((trend) => (
           <View key={trend.id} style={styles.trendCard}>
@@ -73,13 +85,15 @@ export default function PulseScreen() {
 
             <Text style={styles.insight}>{trend.insight}</Text>
 
-            <Text style={styles.timestamp}>
-              {new Date(trend.timestamp).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              })}
-            </Text>
+            {isPremium && (
+              <Text style={styles.timestamp}>
+                {new Date(trend.timestamp).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })}
+              </Text>
+            )}
           </View>
         ))}
       </View>
@@ -131,8 +145,14 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 16,
     color: '#6b7280',
-    marginBottom: 24,
+    marginBottom: 16,
     lineHeight: 22
+  },
+  lastUpdated: {
+    fontSize: 14,
+    color: '#6b7280',
+    marginBottom: 16,
+    textAlign: 'right'
   },
   trendsContainer: {
     gap: 16
@@ -188,28 +208,30 @@ const styles = StyleSheet.create({
   timestamp: {
     fontSize: 13,
     color: '#6b7280',
-    textAlign: 'right'
+    textAlign: 'right',
+    marginTop: 8
   },
   paywallCard: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 12,
+    padding: 24,
+    borderRadius: 16,
     marginTop: 24,
     borderWidth: 2,
-    borderColor: '#8b5cf6',
+    borderColor: '#e5e7eb',
     alignItems: 'center'
   },
   paywallTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#111827',
     marginBottom: 8
   },
   paywallText: {
-    fontSize: 15,
+    fontSize: 16,
     color: '#4b5563',
     textAlign: 'center',
-    marginBottom: 16
+    marginBottom: 20,
+    lineHeight: 24
   },
   upgradeButton: {
     backgroundColor: '#8b5cf6',
@@ -219,7 +241,7 @@ const styles = StyleSheet.create({
   },
   upgradeButtonText: {
     color: '#fff',
-    fontWeight: '600',
-    fontSize: 15
+    fontSize: 16,
+    fontWeight: '600'
   }
 });
