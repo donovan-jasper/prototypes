@@ -16,7 +16,6 @@ export interface EpubContent {
   };
   chapters: EpubChapter[];
   currentChapter: number;
-  css: string;
 }
 
 export async function loadEpubContent(filePath: string, currentPage: number = 0): Promise<EpubContent> {
@@ -26,56 +25,65 @@ export async function loadEpubContent(filePath: string, currentPage: number = 0)
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // Convert base64 to binary
-    const binaryString = atob(fileContent);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    // Unzip the EPUB
+    // Unzip the EPUB file
     const zip = new JSZip();
-    const zipContent = await zip.loadAsync(bytes);
+    const unzipped = await zip.loadAsync(fileContent, { base64: true });
 
-    // Find the container file
-    const containerFile = zipContent.file('META-INF/container.xml');
-    if (!containerFile) {
+    // Find the container file to locate the OPF file
+    const containerXml = await unzipped.file('META-INF/container.xml')?.async('text');
+    if (!containerXml) {
       throw new Error('Invalid EPUB: container.xml not found');
     }
 
-    const containerXml = await containerFile.async('text');
+    // Extract the path to the OPF file
     const opfPathMatch = containerXml.match(/full-path="([^"]+)"/);
     if (!opfPathMatch) {
       throw new Error('Invalid EPUB: OPF path not found in container.xml');
     }
-
     const opfPath = opfPathMatch[1];
-    const opfFile = zipContent.file(opfPath);
-    if (!opfFile) {
-      throw new Error(`Invalid EPUB: OPF file not found at ${opfPath}`);
+
+    // Read the OPF file
+    const opfContent = await unzipped.file(opfPath)?.async('text');
+    if (!opfContent) {
+      throw new Error('Invalid EPUB: OPF file not found');
     }
 
-    const opfXml = await opfFile.async('text');
-    const parser = new DOMParser();
-    const opfDoc = parser.parseFromString(opfXml, 'application/xml');
+    // Parse metadata from OPF
+    const metadata = parseMetadata(opfContent);
 
-    // Extract metadata
-    const metadata = extractMetadata(opfDoc);
+    // Parse spine (reading order) from OPF
+    const spine = parseSpine(opfContent);
 
-    // Extract CSS
-    const css = await extractCss(opfDoc, zipContent);
+    // Extract chapters
+    const chapters: EpubChapter[] = [];
+    for (const item of spine) {
+      const chapterPath = item.href;
+      const chapterContent = await unzipped.file(chapterPath)?.async('text');
+      if (chapterContent) {
+        chapters.push({
+          id: item.id,
+          href: chapterPath,
+          content: chapterContent,
+        });
+      }
+    }
 
-    // Extract chapters from spine
-    const chapters = await extractChapters(opfDoc, zipContent);
-
-    // Ensure currentPage is within bounds
-    const safeCurrentPage = Math.min(Math.max(currentPage, 0), chapters.length - 1);
+    // Find cover image if available
+    if (metadata.coverId) {
+      const coverItem = spine.find(item => item.id === metadata.coverId);
+      if (coverItem) {
+        const coverPath = coverItem.href;
+        const coverContent = await unzipped.file(coverPath)?.async('base64');
+        if (coverContent) {
+          metadata.coverPath = `data:image/jpeg;base64,${coverContent}`;
+        }
+      }
+    }
 
     return {
       metadata,
       chapters,
-      currentChapter: safeCurrentPage,
-      css,
+      currentChapter: Math.min(currentPage, chapters.length - 1),
     };
   } catch (error) {
     console.error('Error loading EPUB:', error);
@@ -83,100 +91,50 @@ export async function loadEpubContent(filePath: string, currentPage: number = 0)
   }
 }
 
-function extractMetadata(opfDoc: Document): EpubContent['metadata'] {
-  const titleElement = opfDoc.querySelector('dc\\:title, title');
-  const authorElement = opfDoc.querySelector('dc\\:creator, creator');
-  const languageElement = opfDoc.querySelector('dc\\:language, language');
-  const coverElement = opfDoc.querySelector('meta[name="cover"]');
-
-  let coverPath = undefined;
-  if (coverElement) {
-    const coverId = coverElement.getAttribute('content');
-    if (coverId) {
-      const itemElement = opfDoc.querySelector(`item[id="${coverId}"]`);
-      if (itemElement) {
-        coverPath = itemElement.getAttribute('href');
-      }
-    }
-  }
+function parseMetadata(opfContent: string): {
+  title: string;
+  author: string;
+  language?: string;
+  coverId?: string;
+} {
+  const titleMatch = opfContent.match(/<dc:title[^>]*>([^<]+)<\/dc:title>/);
+  const authorMatch = opfContent.match(/<dc:creator[^>]*>([^<]+)<\/dc:creator>/);
+  const languageMatch = opfContent.match(/<dc:language[^>]*>([^<]+)<\/dc:language>/);
+  const coverMatch = opfContent.match(/<meta[^>]*name="cover"[^>]*content="([^"]+)"/);
 
   return {
-    title: titleElement?.textContent || 'Unknown Title',
-    author: authorElement?.textContent || 'Unknown Author',
-    language: languageElement?.textContent,
-    coverPath,
+    title: titleMatch ? titleMatch[1] : 'Unknown Title',
+    author: authorMatch ? authorMatch[1] : 'Unknown Author',
+    language: languageMatch ? languageMatch[1] : undefined,
+    coverId: coverMatch ? coverMatch[1] : undefined,
   };
 }
 
-async function extractCss(opfDoc: Document, zipContent: JSZip): Promise<string> {
-  const manifest = opfDoc.querySelector('manifest');
-  if (!manifest) {
-    return '';
+function parseSpine(opfContent: string): Array<{ id: string; href: string }> {
+  const spineMatch = opfContent.match(/<spine[^>]*>([\s\S]*?)<\/spine>/);
+  if (!spineMatch) {
+    return [];
   }
 
-  let cssContent = '';
-  const cssItems = Array.from(manifest.querySelectorAll('item[media-type="text/css"]'));
+  const spineContent = spineMatch[1];
+  const itemRefs = spineContent.match(/<itemref[^>]*idref="([^"]+)"[^>]*>/g) || [];
 
-  for (const item of cssItems) {
-    const href = item.getAttribute('href');
-    if (!href) continue;
+  const items: Array<{ id: string; href: string }> = [];
 
-    // Get the full path by combining with the OPF directory
-    const opfPath = opfDoc.documentURI || '';
-    const opfDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
-    const fullPath = opfDir + href;
+  itemRefs.forEach(itemRef => {
+    const idMatch = itemRef.match(/idref="([^"]+)"/);
+    if (idMatch) {
+      const id = idMatch[1];
+      // Find the corresponding item in the manifest
+      const manifestMatch = opfContent.match(new RegExp(`<item[^>]*id="${id}"[^>]*href="([^"]+)"`));
+      if (manifestMatch) {
+        items.push({
+          id,
+          href: manifestMatch[1],
+        });
+      }
+    }
+  });
 
-    const cssFile = zipContent.file(fullPath);
-    if (!cssFile) continue;
-
-    const content = await cssFile.async('text');
-    cssContent += content + '\n';
-  }
-
-  return cssContent;
-}
-
-async function extractChapters(opfDoc: Document, zipContent: JSZip): Promise<EpubChapter[]> {
-  const spine = opfDoc.querySelector('spine');
-  if (!spine) {
-    throw new Error('Invalid EPUB: spine not found in OPF');
-  }
-
-  const manifest = opfDoc.querySelector('manifest');
-  if (!manifest) {
-    throw new Error('Invalid EPUB: manifest not found in OPF');
-  }
-
-  const chapters: EpubChapter[] = [];
-  const itemRefs = Array.from(spine.querySelectorAll('itemref'));
-
-  for (const itemRef of itemRefs) {
-    const idref = itemRef.getAttribute('idref');
-    if (!idref) continue;
-
-    const item = manifest.querySelector(`item[id="${idref}"]`);
-    if (!item) continue;
-
-    const href = item.getAttribute('href');
-    if (!href) continue;
-
-    // Get the full path by combining with the OPF directory
-    const opfPath = opfDoc.documentURI || '';
-    const opfDir = opfPath.substring(0, opfPath.lastIndexOf('/') + 1);
-    const fullPath = opfDir + href;
-
-    const chapterFile = zipContent.file(fullPath);
-    if (!chapterFile) continue;
-
-    const content = await chapterFile.async('text');
-    const id = item.getAttribute('id') || href;
-
-    chapters.push({
-      id,
-      href,
-      content
-    });
-  }
-
-  return chapters;
+  return items;
 }
