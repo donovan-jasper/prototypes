@@ -46,6 +46,10 @@ export default function FriendCard({ friend, onPress }: FriendCardProps) {
       <Avatar.Image
         size={56}
         source={friend.photoUri ? { uri: friend.photoUri } : require('@/assets/images/default-avatar.png')}
+        onError={(e) => {
+          // Fallback to default avatar if photoUri fails to load
+          e.currentTarget.source = require('@/assets/images/default-avatar.png');
+        }}
         style={styles.avatar}
       />
       <View style={styles.infoContainer}>
