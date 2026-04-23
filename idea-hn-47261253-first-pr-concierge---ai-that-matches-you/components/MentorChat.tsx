@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Modal, Alert } from 'react-native';
-import { askMentor } from '../lib/ai';
+import { askMentor, logQuestion, getRemainingQuestions } from '../lib/ai';
 import { Issue } from '../types';
 import { useAuthStore } from '../store/authStore';
 
@@ -21,7 +21,7 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
   const [inputText, setInputText] = useState('');
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [showPaywall, setShowPaywall] = useState(false);
-  const [questionCount, setQuestionCount] = useState(0);
+  const [remainingQuestions, setRemainingQuestions] = useState(5);
   const { user } = useAuthStore();
 
   useEffect(() => {
@@ -34,12 +34,17 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
         timestamp: new Date()
       }]);
     }
-  }, []);
+
+    // Update remaining questions count
+    if (user?.id) {
+      setRemainingQuestions(getRemainingQuestions(user.id));
+    }
+  }, [user]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    if (!isSubscribed && questionCount >= 5) {
+    if (!isSubscribed && remainingQuestions <= 0) {
       setShowPaywall(true);
       return;
     }
@@ -84,9 +89,12 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
         }];
       });
 
-      // Increment question count for free users
-      if (!isSubscribed) {
-        setQuestionCount(prev => prev + 1);
+      // Log the question for free users
+      if (!isSubscribed && user?.id) {
+        const success = logQuestion(user.id);
+        if (success) {
+          setRemainingQuestions(prev => Math.max(0, prev - 1));
+        }
       }
     } catch (error) {
       console.error('Error getting AI response:', error);
@@ -132,13 +140,48 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
     </View>
   );
 
+  const renderPaywallModal = () => (
+    <Modal
+      visible={showPaywall}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setShowPaywall(false)}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalContent}>
+          <Text style={styles.modalTitle}>Upgrade to Unlimited Questions</Text>
+          <Text style={styles.modalText}>
+            You've reached your free question limit. Upgrade to ask unlimited questions and get code reviews before submitting PRs.
+          </Text>
+          <View style={styles.modalButtons}>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.cancelButton]}
+              onPress={() => setShowPaywall(false)}
+            >
+              <Text style={styles.modalButtonText}>Maybe Later</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modalButton, styles.upgradeButton]}
+              onPress={() => {
+                // Navigate to subscription screen
+                setShowPaywall(false);
+              }}
+            >
+              <Text style={styles.modalButtonText}>Upgrade Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>AI Mentor</Text>
         {!isSubscribed && (
           <Text style={styles.usageText}>
-            Free questions remaining: {Math.max(0, 5 - questionCount)}
+            Questions remaining: {remainingQuestions}
           </Text>
         )}
       </View>
@@ -162,7 +205,10 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
           multiline
         />
         <TouchableOpacity
-          style={styles.sendButton}
+          style={[
+            styles.sendButton,
+            (!inputText.trim() || !selectedIssue) && styles.disabledButton
+          ]}
           onPress={handleSend}
           disabled={!inputText.trim() || !selectedIssue}
         >
@@ -170,38 +216,7 @@ const MentorChat: React.FC<MentorChatProps> = ({ claimedIssues, isSubscribed }) 
         </TouchableOpacity>
       </View>
 
-      <Modal
-        visible={showPaywall}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowPaywall(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Upgrade to Pro</Text>
-            <Text style={styles.modalText}>
-              You've reached your free question limit. Upgrade to ask unlimited questions and get code reviews before submitting PRs.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setShowPaywall(false)}
-              >
-                <Text style={styles.modalButtonText}>Maybe Later</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.upgradeButton]}
-                onPress={() => {
-                  setShowPaywall(false);
-                  // Navigate to subscription screen
-                }}
-              >
-                <Text style={[styles.modalButtonText, styles.upgradeButtonText]}>Upgrade Now</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {renderPaywallModal()}
     </View>
   );
 };
@@ -214,24 +229,24 @@ const styles = StyleSheet.create({
   header: {
     padding: 16,
     backgroundColor: '#6200ee',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
+    color: 'white',
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 4,
   },
   usageText: {
     color: 'white',
     fontSize: 14,
   },
   issueSelector: {
-    padding: 12,
-    backgroundColor: '#e3f2fd',
+    padding: 16,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: '#e0e0e0',
   },
   selectorLabel: {
     fontSize: 16,
@@ -244,36 +259,32 @@ const styles = StyleSheet.create({
   },
   issueButton: {
     padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 16,
     marginRight: 8,
     marginBottom: 8,
-    backgroundColor: '#bbdefb',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#90caf9',
   },
   selectedIssue: {
-    backgroundColor: '#64b5f6',
-    borderColor: '#2196f3',
+    backgroundColor: '#6200ee',
   },
   issueText: {
-    fontSize: 14,
+    color: '#333',
   },
   noIssuesText: {
-    fontSize: 14,
     color: '#666',
-  },
-  messagesContainer: {
-    padding: 16,
-    paddingBottom: 80,
+    fontStyle: 'italic',
   },
   messagesList: {
     flex: 1,
   },
+  messagesContainer: {
+    padding: 16,
+  },
   messageContainer: {
-    maxWidth: '80%',
     padding: 12,
     borderRadius: 16,
-    marginBottom: 12,
+    marginBottom: 8,
+    maxWidth: '80%',
   },
   userMessage: {
     alignSelf: 'flex-end',
@@ -281,35 +292,35 @@ const styles = StyleSheet.create({
   },
   aiMessage: {
     alignSelf: 'flex-start',
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#e0e0e0',
   },
   messageText: {
-    fontSize: 16,
-    color: '#333',
+    color: 'white',
   },
   inputContainer: {
     flexDirection: 'row',
-    padding: 12,
-    backgroundColor: '#fff',
+    padding: 16,
     borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    alignItems: 'center',
+    borderTopColor: '#e0e0e0',
+    backgroundColor: 'white',
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
     padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 24,
     marginRight: 8,
-    backgroundColor: '#f9f9f9',
+    maxHeight: 100,
   },
   sendButton: {
     padding: 12,
     backgroundColor: '#6200ee',
-    borderRadius: 20,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
   },
   sendButtonText: {
     color: 'white',
@@ -319,49 +330,44 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    width: '80%',
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    alignItems: 'center',
+    padding: 24,
+    borderRadius: 8,
+    width: '80%',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#6200ee',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   modalText: {
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 24,
     textAlign: 'center',
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: '100%',
   },
   modalButton: {
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 4,
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f0f0f0',
   },
   upgradeButton: {
     backgroundColor: '#6200ee',
   },
   modalButtonText: {
     fontWeight: 'bold',
-  },
-  upgradeButtonText: {
-    color: 'white',
   },
 });
 
