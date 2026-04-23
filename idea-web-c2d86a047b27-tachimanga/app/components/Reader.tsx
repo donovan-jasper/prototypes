@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, PanResponder, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, PanResponder, StatusBar, Animated, Easing } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getContent, saveReadingProgress, getReadingProgress } from '../utils/offlineLibrary';
 import Slider from '@react-native-community/slider';
@@ -20,6 +20,7 @@ const Reader = ({ route }: any) => {
   const scrollViewRef = useRef<ScrollView>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   const panResponder = useRef(
     PanResponder.create({
@@ -86,6 +87,16 @@ const Reader = ({ route }: any) => {
     resetControlsTimeout();
   }, [showControls, resetControlsTimeout]);
 
+  useEffect(() => {
+    // Animate brightness change
+    Animated.timing(fadeAnim, {
+      toValue: brightness / 100,
+      duration: 300,
+      easing: Easing.linear,
+      useNativeDriver: true,
+    }).start();
+  }, [brightness]);
+
   const calculatePercentage = useCallback((scrollY: number) => {
     if (contentHeight <= scrollViewHeight) return 100;
     const maxScroll = contentHeight - scrollViewHeight;
@@ -132,24 +143,26 @@ const Reader = ({ route }: any) => {
     console.log(`Brightness set to ${value}%`);
   }, []);
 
-  const toggleControls = useCallback(() => {
-    setShowControls(prev => !prev);
-    if (!showControls) {
-      resetControlsTimeout();
-    }
-  }, [showControls, resetControlsTimeout]);
+  const handleFontSizeChange = useCallback((value: number) => {
+    setFontSize(value);
+  }, []);
+
+  const handleFontFamilyChange = useCallback((family: string) => {
+    setFontFamily(family);
+  }, []);
 
   if (!content) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading...</Text>
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: `rgba(0, 0, 0, ${1 - brightness/100})` }]}>
+    <View style={styles.container}>
       <StatusBar hidden={!showControls} />
+      <Animated.View style={[styles.overlay, { opacity: fadeAnim }]} />
 
       <ScrollView
         ref={scrollViewRef}
@@ -159,13 +172,9 @@ const Reader = ({ route }: any) => {
         {...panResponder.panHandlers}
       >
         <View style={styles.contentContainer}>
-          {content.pages.map((page: any, index: number) => (
-            <View key={index} style={styles.pageContainer}>
-              <Text style={[styles.pageText, { fontSize, fontFamily }]}>
-                {page.text}
-              </Text>
-            </View>
-          ))}
+          <Text style={[styles.contentText, { fontSize, fontFamily }]}>
+            {content.text}
+          </Text>
         </View>
       </ScrollView>
 
@@ -175,29 +184,30 @@ const Reader = ({ route }: any) => {
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
               <Text style={styles.backButtonText}>← Back</Text>
             </TouchableOpacity>
-            <Text style={styles.title}>{content.title}</Text>
+            <Text style={styles.titleText}>{content.title}</Text>
             <TouchableOpacity onPress={handleShareProgress} style={styles.shareButton}>
               <Text style={styles.shareButtonText}>Share</Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.bottomControls}>
-            <View style={styles.fontControls}>
-              <Text style={styles.controlLabel}>Font Size</Text>
+            <View style={styles.sliderContainer}>
+              <Text style={styles.sliderLabel}>Font Size</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={12}
                 maximumValue={24}
                 step={1}
                 value={fontSize}
-                onValueChange={setFontSize}
-                minimumTrackTintColor="#FFFFFF"
-                maximumTrackTintColor="#000000"
+                onValueChange={handleFontSizeChange}
+                minimumTrackTintColor="#007AFF"
+                maximumTrackTintColor="#d3d3d3"
+                thumbTintColor="#007AFF"
               />
             </View>
 
-            <View style={styles.brightnessControls}>
-              <Text style={styles.controlLabel}>Brightness</Text>
+            <View style={styles.sliderContainer}>
+              <Text style={styles.sliderLabel}>Brightness</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={20}
@@ -205,25 +215,38 @@ const Reader = ({ route }: any) => {
                 step={1}
                 value={brightness}
                 onValueChange={handleBrightnessChange}
-                minimumTrackTintColor="#FFFFFF"
-                maximumTrackTintColor="#000000"
+                minimumTrackTintColor="#007AFF"
+                maximumTrackTintColor="#d3d3d3"
+                thumbTintColor="#007AFF"
               />
             </View>
 
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>
-                {Math.round(calculatePercentage(scrollPosition))}% complete
-              </Text>
+            <View style={styles.fontFamilyContainer}>
+              <Text style={styles.sliderLabel}>Font Style</Text>
+              <View style={styles.fontButtons}>
+                <TouchableOpacity
+                  style={[styles.fontButton, fontFamily === 'System' && styles.fontButtonActive]}
+                  onPress={() => handleFontFamilyChange('System')}
+                >
+                  <Text style={styles.fontButtonText}>System</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.fontButton, fontFamily === 'serif' && styles.fontButtonActive]}
+                  onPress={() => handleFontFamilyChange('serif')}
+                >
+                  <Text style={styles.fontButtonText}>Serif</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.fontButton, fontFamily === 'sans-serif' && styles.fontButtonActive]}
+                  onPress={() => handleFontFamilyChange('sans-serif')}
+                >
+                  <Text style={styles.fontButtonText}>Sans</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
       )}
-
-      <TouchableOpacity
-        style={styles.tapArea}
-        onPress={toggleControls}
-        activeOpacity={1}
-      />
     </View>
   );
 };
@@ -231,11 +254,11 @@ const Reader = ({ route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   scrollView: {
     flex: 1,
@@ -243,11 +266,8 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 20,
   },
-  pageContainer: {
-    marginBottom: 30,
-  },
-  pageText: {
-    color: '#FFFFFF',
+  contentText: {
+    color: '#fff',
     lineHeight: 24,
   },
   controlsContainer: {
@@ -269,11 +289,11 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   backButtonText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 16,
   },
-  title: {
-    color: '#FFFFFF',
+  titleText: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -281,20 +301,17 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   shareButtonText: {
-    color: '#FFFFFF',
+    color: '#007AFF',
     fontSize: 16,
   },
   bottomControls: {
     paddingBottom: 20,
   },
-  fontControls: {
+  sliderContainer: {
     marginBottom: 20,
   },
-  brightnessControls: {
-    marginBottom: 20,
-  },
-  controlLabel: {
-    color: '#FFFFFF',
+  sliderLabel: {
+    color: '#fff',
     marginBottom: 5,
     fontSize: 14,
   },
@@ -302,19 +319,34 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 40,
   },
-  progressContainer: {
+  fontFamilyContainer: {
+    marginTop: 20,
+  },
+  fontButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  fontButton: {
+    padding: 10,
+    borderRadius: 5,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  fontButtonActive: {
+    backgroundColor: '#007AFF',
+  },
+  fontButtonText: {
+    color: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#000',
   },
-  progressText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-  },
-  tapArea: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+  loadingText: {
+    color: '#fff',
+    fontSize: 18,
   },
 });
 
