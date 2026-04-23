@@ -173,23 +173,21 @@ const CalendarScreen = () => {
     }
 
     return (
-      <ScrollView style={styles.contentScroll}>
+      <ScrollView style={styles.contentContainer}>
         {calendarEvents.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Calendar Events</Text>
             {calendarEvents.map((event, index) => (
-              <View key={index} style={[styles.item, styles.eventItem]}>
-                <View style={styles.eventIndicator} />
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>{event.title}</Text>
-                  {event.startDate && (
-                    <Text style={styles.itemTime}>
-                      {formatTime(event.startDate)}
-                      {event.endDate && ` - ${formatTime(event.endDate)}`}
-                    </Text>
-                  )}
+              <View key={`event-${index}`} style={styles.eventItem}>
+                <View style={styles.eventTimeContainer}>
+                  <Text style={styles.eventTime}>
+                    {formatTime(event.startDate)} - {formatTime(event.endDate)}
+                  </Text>
+                </View>
+                <View style={styles.eventDetails}>
+                  <Text style={styles.eventTitle}>{event.title}</Text>
                   {event.location && (
-                    <Text style={styles.itemLocation}>{event.location}</Text>
+                    <Text style={styles.eventLocation}>{event.location}</Text>
                   )}
                 </View>
               </View>
@@ -201,17 +199,15 @@ const CalendarScreen = () => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Tasks</Text>
             {dateTasks.map((task, index) => (
-              <View key={index} style={[styles.item, styles.taskItem]}>
-                <View style={[styles.taskIndicator, { backgroundColor: task.priority === 'high' ? '#FF3B30' : task.priority === 'medium' ? '#FF9500' : '#34C759' }]} />
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>{task.title}</Text>
-                  {task.dueDate && (
-                    <Text style={styles.itemTime}>
-                      Due: {formatTime(task.dueDate)}
-                    </Text>
-                  )}
+              <View key={`task-${index}`} style={styles.taskItem}>
+                <View style={[
+                  styles.taskPriorityIndicator,
+                  { backgroundColor: getPriorityColor(task.priority) }
+                ]} />
+                <View style={styles.taskDetails}>
+                  <Text style={styles.taskTitle}>{task.title}</Text>
                   {task.notes && (
-                    <Text style={styles.itemNotes}>{task.notes}</Text>
+                    <Text style={styles.taskNotes}>{task.notes}</Text>
                   )}
                 </View>
               </View>
@@ -220,6 +216,15 @@ const CalendarScreen = () => {
         )}
       </ScrollView>
     );
+  };
+
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return '#FF3B30';
+      case 'medium': return '#FF9500';
+      case 'low': return '#34C759';
+      default: return '#8E8E93';
+    }
   };
 
   return (
@@ -244,8 +249,11 @@ const CalendarScreen = () => {
       {permissionError && (
         <View style={styles.permissionError}>
           <Text style={styles.permissionErrorText}>{permissionError}</Text>
-          <TouchableOpacity onPress={requestCalendarPermissions} style={styles.retryButton}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+          <TouchableOpacity
+            style={styles.permissionButton}
+            onPress={requestCalendarPermissions}
+          >
+            <Text style={styles.permissionButtonText}>Retry Permission</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -258,9 +266,9 @@ const CalendarScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
-  contentScroll: {
+  contentContainer: {
     flex: 1,
     padding: 16,
   },
@@ -269,62 +277,72 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
     marginBottom: 12,
-  },
-  item: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    backgroundColor: '#F8F8F8',
+    color: '#333',
   },
   eventItem: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  taskItem: {
-    borderLeftWidth: 4,
-    borderLeftColor: '#34C759',
-  },
-  eventIndicator: {
-    width: 8,
-    height: '100%',
-    backgroundColor: '#007AFF',
+  eventTimeContainer: {
     marginRight: 12,
-    borderRadius: 4,
+    width: 80,
   },
-  taskIndicator: {
-    width: 8,
-    height: '100%',
-    marginRight: 12,
-    borderRadius: 4,
+  eventTime: {
+    fontSize: 14,
+    color: '#666',
   },
-  itemContent: {
+  eventDetails: {
     flex: 1,
   },
-  itemTitle: {
+  eventTitle: {
     fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
+    fontWeight: '600',
     marginBottom: 4,
   },
-  itemTime: {
+  eventLocation: {
     fontSize: 14,
     color: '#666',
+  },
+  taskItem: {
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  taskPriorityIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 12,
+  },
+  taskDetails: {
+    flex: 1,
+  },
+  taskTitle: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 4,
   },
-  itemLocation: {
+  taskNotes: {
     fontSize: 14,
     color: '#666',
-    fontStyle: 'italic',
-  },
-  itemNotes: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
   },
   emptyState: {
     flex: 1,
@@ -334,7 +352,7 @@ const styles = StyleSheet.create({
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#999',
+    color: '#666',
     textAlign: 'center',
   },
   loadingContainer: {
@@ -349,24 +367,24 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   permissionError: {
-    padding: 16,
     backgroundColor: '#FFEBEE',
-    borderRadius: 8,
+    padding: 16,
     margin: 16,
+    borderRadius: 8,
   },
   permissionErrorText: {
     color: '#C62828',
     marginBottom: 8,
   },
-  retryButton: {
+  permissionButton: {
     backgroundColor: '#007AFF',
     padding: 8,
     borderRadius: 4,
     alignSelf: 'flex-start',
   },
-  retryButtonText: {
+  permissionButtonText: {
     color: 'white',
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 
