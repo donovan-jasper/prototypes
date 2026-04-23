@@ -166,119 +166,23 @@ export const initDatabase = async () => {
         'INSERT INTO attendees (hangoutId, userId, status) VALUES ($hangoutId, $userId, $status)'
       );
 
-      // Add creator as attendee for each hangout
-      sampleHangouts.forEach(hangout => {
-        insertAttendee.executeSync({
-          $hangoutId: hangout.id,
-          $userId: hangout.creatorId,
-          $status: 'going'
-        });
+      // Add current user to some hangouts
+      insertAttendee.executeSync({
+        $hangoutId: '1',
+        $userId: 'currentUser',
+        $status: 'going'
       });
 
-      // Add some additional attendees
-      const additionalAttendees = [
-        { hangoutId: '1', userId: 'user2', status: 'going' },
-        { hangoutId: '1', userId: 'user3', status: 'going' },
-        { hangoutId: '2', userId: 'user1', status: 'going' },
-        { hangoutId: '2', userId: 'user3', status: 'going' },
-        { hangoutId: '3', userId: 'user1', status: 'going' },
-        { hangoutId: '3', userId: 'user2', status: 'going' },
-        { hangoutId: '4', userId: 'user5', status: 'going' },
-        { hangoutId: '5', userId: 'user1', status: 'going' },
-        { hangoutId: '5', userId: 'user2', status: 'going' },
-        { hangoutId: '5', userId: 'user3', status: 'going' }
-      ];
-
-      additionalAttendees.forEach(attendee => {
-        insertAttendee.executeSync({
-          $hangoutId: attendee.hangoutId,
-          $userId: attendee.userId,
-          $status: attendee.status
-        });
+      insertAttendee.executeSync({
+        $hangoutId: '3',
+        $userId: 'currentUser',
+        $status: 'going'
       });
 
       insertAttendee.finalizeSync();
     }
   } catch (error) {
     console.error('Error initializing database:', error);
-    throw error;
-  }
-};
-
-// Get hangouts nearby with optional filters
-export const getHangoutsNearby = async (
-  latitude: number,
-  longitude: number,
-  radius: number,
-  hobbies?: string[],
-  timeRange?: { start: Date; end: Date }
-) => {
-  try {
-    // Convert radius from miles to degrees (approximate)
-    const radiusInDegrees = radius / 69;
-
-    // Build the base query
-    let query = `
-      SELECT
-        h.*,
-        COUNT(a.id) as attendees,
-        (69 * ACOS(COS(RADIANS($latitude)) * COS(RADIANS(h.latitude)) *
-          COS(RADIANS(h.longitude) - RADIANS($longitude)) +
-          SIN(RADIANS($latitude)) * SIN(RADIANS(h.latitude)))) as distance
-      FROM hangouts h
-      LEFT JOIN attendees a ON h.id = a.hangoutId
-      WHERE
-        (69 * ACOS(COS(RADIANS($latitude)) * COS(RADIANS(h.latitude)) *
-          COS(RADIANS(h.longitude) - RADIANS($longitude)) +
-          SIN(RADIANS($latitude)) * SIN(RADIANS(h.latitude)))) <= $radius
-    `;
-
-    // Add hobby filter if provided
-    if (hobbies && hobbies.length > 0) {
-      query += ` AND h.hobby IN (${hobbies.map(() => '?').join(', ')})`;
-    }
-
-    // Add time range filter if provided
-    if (timeRange) {
-      query += ` AND h.startTime BETWEEN ? AND ?`;
-    }
-
-    query += `
-      GROUP BY h.id
-      ORDER BY distance ASC, h.startTime ASC
-    `;
-
-    // Prepare parameters
-    const params: any[] = [latitude, longitude, radius];
-
-    // Add hobby parameters if needed
-    if (hobbies && hobbies.length > 0) {
-      params.push(...hobbies);
-    }
-
-    // Add time range parameters if needed
-    if (timeRange) {
-      params.push(timeRange.start.toISOString(), timeRange.end.toISOString());
-    }
-
-    // Execute the query
-    const result = await db.getAllAsync<any>(query, params);
-
-    // Format the results
-    return result.map((row: any) => ({
-      id: row.id,
-      title: row.title,
-      hobby: row.hobby,
-      distance: parseFloat(row.distance.toFixed(1)),
-      startTime: row.startTime,
-      attendees: row.attendees,
-      maxAttendees: row.maxAttendees,
-      latitude: row.latitude,
-      longitude: row.longitude,
-    }));
-  } catch (error) {
-    console.error('Error getting nearby hangouts:', error);
-    throw error;
   }
 };
 
@@ -323,94 +227,74 @@ export const createHangout = async (hangoutData: {
   }
 };
 
-// Get hangout details by ID
-export const getHangoutById = async (id: string) => {
+// Get hangouts near a location
+export const getHangoutsNearby = async (latitude: number, longitude: number, radius: number = 5) => {
   try {
-    const hangout = await db.getFirstAsync<any>(
-      'SELECT * FROM hangouts WHERE id = ?',
-      [id]
+    const hangouts = await db.getAllAsync<{
+      id: string;
+      title: string;
+      hobby: string;
+      latitude: number;
+      longitude: number;
+      startTime: string;
+      maxAttendees: number;
+      creatorId: string;
+    }>(
+      'SELECT * FROM hangouts WHERE startTime > datetime("now") ORDER BY startTime'
     );
 
-    if (!hangout) return null;
-
-    const attendees = await db.getAllAsync<any>(
-      'SELECT a.*, u.name FROM attendees a JOIN users u ON a.userId = u.id WHERE a.hangoutId = ?',
-      [id]
-    );
-
-    return {
-      ...hangout,
-      attendees: attendees.map((a: any) => ({
-        id: a.userId,
-        name: a.name,
-        status: a.status
-      }))
-    };
+    // Filter by distance (in a real app, we'd use a spatial query)
+    return hangouts.filter(hangout => {
+      const distance = calculateDistance(
+        { latitude, longitude },
+        { latitude: hangout.latitude, longitude: hangout.longitude }
+      );
+      return distance <= radius;
+    });
   } catch (error) {
-    console.error('Error getting hangout by ID:', error);
+    console.error('Error getting nearby hangouts:', error);
     throw error;
   }
 };
 
-// Join a hangout
-export const joinHangout = async (hangoutId: string, userId: string) => {
+// Get hangout details
+export const getHangoutDetails = async (hangoutId: string) => {
   try {
-    // Check if user is already attending
-    const existing = await db.getFirstAsync<any>(
-      'SELECT * FROM attendees WHERE hangoutId = ? AND userId = ?',
-      [hangoutId, userId]
-    );
-
-    if (existing) {
-      // Update status if needed
-      if (existing.status !== 'going') {
-        await db.runAsync(
-          'UPDATE attendees SET status = ? WHERE hangoutId = ? AND userId = ?',
-          ['going', hangoutId, userId]
-        );
-      }
-      return;
-    }
-
-    // Check if hangout has space
-    const hangout = await db.getFirstAsync<any>(
-      'SELECT maxAttendees FROM hangouts WHERE id = ?',
-      [hangoutId]
-    );
+    const hangout = await db.getFirstAsync<{
+      id: string;
+      title: string;
+      hobby: string;
+      latitude: number;
+      longitude: number;
+      startTime: string;
+      maxAttendees: number;
+      creatorId: string;
+    }>('SELECT * FROM hangouts WHERE id = ?', [hangoutId]);
 
     if (!hangout) {
       throw new Error('Hangout not found');
     }
 
-    const currentAttendees = await db.getFirstAsync<any>(
-      'SELECT COUNT(*) as count FROM attendees WHERE hangoutId = ?',
-      [hangoutId]
-    );
+    // Get attendees
+    const attendees = await db.getAllAsync<{
+      userId: string;
+      status: string;
+    }>('SELECT userId, status FROM attendees WHERE hangoutId = ?', [hangoutId]);
 
-    if (currentAttendees.count >= hangout.maxAttendees) {
-      throw new Error('Hangout is full');
-    }
+    // Get hobby details
+    const hobby = await db.getFirstAsync<{
+      name: string;
+      icon: string;
+    }>('SELECT name, icon FROM hobbies WHERE id = ?', [hangout.hobby]);
 
-    // Add attendee
-    await db.runAsync(
-      'INSERT INTO attendees (hangoutId, userId, status) VALUES (?, ?, ?)',
-      [hangoutId, userId, 'going']
-    );
+    return {
+      ...hangout,
+      attendees: attendees.length,
+      hobbyName: hobby?.name || hangout.hobby,
+      hobbyIcon: hobby?.icon || 'help-circle',
+    };
   } catch (error) {
-    console.error('Error joining hangout:', error);
-    throw error;
-  }
-};
-
-// Leave a hangout
-export const leaveHangout = async (hangoutId: string, userId: string) => {
-  try {
-    await db.runAsync(
-      'DELETE FROM attendees WHERE hangoutId = ? AND userId = ?',
-      [hangoutId, userId]
-    );
-  } catch (error) {
-    console.error('Error leaving hangout:', error);
+    console.error('Error getting hangout details:', error);
     throw error;
   }
 };

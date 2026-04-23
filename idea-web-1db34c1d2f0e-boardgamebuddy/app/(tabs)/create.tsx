@@ -152,7 +152,7 @@ export default function CreateHangoutScreen() {
       setShowSuccessModal(true);
     } catch (error) {
       console.error('Error creating hangout:', error);
-      Alert.alert('Error', 'Failed to create hangout. Please try again.');
+      Alert.alert('Error', 'Could not create hangout. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -161,7 +161,7 @@ export default function CreateHangoutScreen() {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join me for ${title} at ${location} on ${date.toLocaleString()}!`,
+        message: `Join me for ${title} at ${date.toLocaleString()}!`,
         url: `hobbyhub://hangout/${newHangoutId}`,
       });
     } catch (error) {
@@ -169,8 +169,13 @@ export default function CreateHangoutScreen() {
     }
   };
 
+  const handleViewHangout = () => {
+    setShowSuccessModal(false);
+    router.push(`/hangout/${newHangoutId}`);
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardAvoidingView}
@@ -185,7 +190,7 @@ export default function CreateHangoutScreen() {
               placeholder="e.g. Board Game Night"
               value={title}
               onChangeText={setTitle}
-              autoCapitalize="words"
+              maxLength={50}
             />
           </View>
 
@@ -197,26 +202,33 @@ export default function CreateHangoutScreen() {
                 onValueChange={(itemValue) => setHobby(itemValue)}
                 style={styles.picker}
               >
-                {hobbies.map((hobbyItem) => (
-                  <Picker.Item
-                    key={hobbyItem.id}
-                    label={hobbyItem.name}
-                    value={hobbyItem.id}
-                  />
+                {hobbies.map((h) => (
+                  <Picker.Item key={h.id} label={h.name} value={h.id} />
                 ))}
               </Picker>
             </View>
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Date</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.dateText}>{date.toLocaleDateString()}</Text>
-              <Ionicons name="calendar" size={20} color="#666" />
-            </TouchableOpacity>
+            <Text style={styles.label}>Date & Time</Text>
+            <View style={styles.dateTimeContainer}>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={styles.dateTimeText}>
+                  {date.toLocaleDateString()}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dateTimeButton}
+                onPress={() => setShowTimePicker(true)}
+              >
+                <Text style={styles.dateTimeText}>
+                  {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             {showDatePicker && (
               <DateTimePicker
@@ -226,17 +238,6 @@ export default function CreateHangoutScreen() {
                 onChange={handleDateChange}
               />
             )}
-          </View>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Time</Text>
-            <TouchableOpacity
-              style={styles.dateButton}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={styles.dateText}>{date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Text>
-              <Ionicons name="time" size={20} color="#666" />
-            </TouchableOpacity>
 
             {showTimePicker && (
               <DateTimePicker
@@ -252,26 +253,37 @@ export default function CreateHangoutScreen() {
             <Text style={styles.label}>Location</Text>
             <View style={styles.locationToggle}>
               <TouchableOpacity
-                style={[styles.toggleButton, useCurrentLocation && styles.toggleButtonActive]}
+                style={[
+                  styles.toggleButton,
+                  useCurrentLocation && styles.toggleButtonActive
+                ]}
                 onPress={() => setUseCurrentLocation(true)}
               >
-                <Text style={[styles.toggleText, useCurrentLocation && styles.toggleTextActive]}>Current Location</Text>
+                <Text style={[
+                  styles.toggleButtonText,
+                  useCurrentLocation && styles.toggleButtonTextActive
+                ]}>Current Location</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.toggleButton, !useCurrentLocation && styles.toggleButtonActive]}
+                style={[
+                  styles.toggleButton,
+                  !useCurrentLocation && styles.toggleButtonActive
+                ]}
                 onPress={() => setUseCurrentLocation(false)}
               >
-                <Text style={[styles.toggleText, !useCurrentLocation && styles.toggleTextActive]}>Custom Location</Text>
+                <Text style={[
+                  styles.toggleButtonText,
+                  !useCurrentLocation && styles.toggleButtonTextActive
+                ]}>Custom Location</Text>
               </TouchableOpacity>
             </View>
 
             {!useCurrentLocation && (
               <TextInput
                 style={[styles.input, styles.locationInput]}
-                placeholder="Enter address or venue name"
+                placeholder="Enter address or location name"
                 value={location}
                 onChangeText={setLocation}
-                autoCapitalize="words"
               />
             )}
 
@@ -301,6 +313,7 @@ export default function CreateHangoutScreen() {
           <View style={styles.formGroup}>
             <Text style={styles.label}>Max Attendees</Text>
             <View style={styles.sliderContainer}>
+              <Text style={styles.sliderValue}>{maxAttendees}</Text>
               <Slider
                 style={styles.slider}
                 minimumValue={2}
@@ -308,11 +321,14 @@ export default function CreateHangoutScreen() {
                 step={1}
                 value={maxAttendees}
                 onValueChange={setMaxAttendees}
-                minimumTrackTintColor="#007AFF"
-                maximumTrackTintColor="#ddd"
-                thumbTintColor="#007AFF"
+                minimumTrackTintColor="#4CAF50"
+                maximumTrackTintColor="#E0E0E0"
+                thumbTintColor="#4CAF50"
               />
-              <Text style={styles.sliderValue}>{maxAttendees}</Text>
+              <View style={styles.sliderLabels}>
+                <Text style={styles.sliderLabel}>2</Text>
+                <Text style={styles.sliderLabel}>20</Text>
+              </View>
             </View>
           </View>
 
@@ -322,7 +338,7 @@ export default function CreateHangoutScreen() {
             disabled={loading}
           >
             {loading ? (
-              <ActivityIndicator color="white" />
+              <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.submitButtonText}>Create Hangout</Text>
             )}
@@ -332,42 +348,31 @@ export default function CreateHangoutScreen() {
 
       <Modal
         visible={showSuccessModal}
-        animationType="slide"
         transparent={true}
+        animationType="slide"
         onRequestClose={() => setShowSuccessModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Ionicons name="checkmark-circle" size={60} color="#34C759" />
+            <Ionicons name="checkmark-circle" size={64} color="#4CAF50" />
             <Text style={styles.modalTitle}>Hangout Created!</Text>
-            <Text style={styles.modalText}>Your hangout has been successfully created and is now visible in the proximity feed.</Text>
+            <Text style={styles.modalText}>Your hangout has been successfully created.</Text>
 
             <View style={styles.modalActions}>
               <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonPrimary]}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  router.push(`/hangout/${newHangoutId}`);
-                }}
-              >
-                <Text style={styles.modalButtonText}>View Details</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonSecondary]}
-                onPress={() => {
-                  setShowSuccessModal(false);
-                  router.push('/');
-                }}
-              >
-                <Text style={styles.modalButtonText}>Back to Feed</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalButtonTertiary]}
+                style={[styles.modalButton, styles.shareButton]}
                 onPress={handleShare}
               >
+                <Ionicons name="share-social" size={20} color="#4CAF50" />
                 <Text style={styles.modalButtonText}>Share</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.viewButton]}
+                onPress={handleViewHangout}
+              >
+                <Ionicons name="eye" size={20} color="#fff" />
+                <Text style={[styles.modalButtonText, styles.viewButtonText]}>View Hangout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -380,18 +385,19 @@ export default function CreateHangoutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
   },
   keyboardAvoidingView: {
     flex: 1,
   },
   scrollView: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 20,
     color: '#333',
   },
   formGroup: {
@@ -404,96 +410,106 @@ const styles = StyleSheet.create({
     color: '#444',
   },
   input: {
-    backgroundColor: 'white',
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#fff',
   },
   pickerContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   picker: {
     height: 50,
+    width: '100%',
   },
-  dateButton: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#ddd',
+  dateTimeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  dateText: {
+  dateTimeButton: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginHorizontal: 4,
+    backgroundColor: '#fff',
+  },
+  dateTimeText: {
     fontSize: 16,
+    textAlign: 'center',
   },
   locationToggle: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   toggleButton: {
     flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
+    padding: 10,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    marginRight: 8,
+    marginHorizontal: 4,
+    backgroundColor: '#f5f5f5',
   },
   toggleButtonActive: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
   },
-  toggleText: {
-    color: '#666',
-    fontSize: 14,
-  },
-  toggleTextActive: {
-    color: 'white',
+  toggleButtonText: {
+    textAlign: 'center',
     fontWeight: '600',
+    color: '#666',
+  },
+  toggleButtonTextActive: {
+    color: '#fff',
   },
   locationInput: {
-    marginTop: 8,
+    marginTop: 10,
   },
   mapContainer: {
     height: 200,
     borderRadius: 8,
     overflow: 'hidden',
-    marginTop: 12,
+    marginTop: 10,
   },
   map: {
     flex: 1,
   },
   sliderContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 10,
   },
   slider: {
-    flex: 1,
+    width: '100%',
     height: 40,
   },
   sliderValue: {
-    marginLeft: 12,
-    fontSize: 16,
-    fontWeight: '600',
-    minWidth: 30,
     textAlign: 'center',
+    fontSize: 16,
+    marginBottom: 5,
+  },
+  sliderLabels: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
+  sliderLabel: {
+    color: '#666',
   },
   submitButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
+    backgroundColor: '#4CAF50',
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 20,
   },
   submitButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -501,50 +517,56 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
+    padding: 30,
     borderRadius: 12,
-    padding: 24,
     width: '85%',
     alignItems: 'center',
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: 15,
+    marginBottom: 10,
     color: '#333',
   },
   modalText: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
+    color: '#666',
   },
   modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     width: '100%',
   },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+    marginHorizontal: 5,
   },
-  modalButtonPrimary: {
-    backgroundColor: '#007AFF',
-  },
-  modalButtonSecondary: {
-    backgroundColor: '#f5f5f5',
+  shareButton: {
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#4CAF50',
   },
-  modalButtonTertiary: {
-    backgroundColor: '#e0e0e0',
+  viewButton: {
+    backgroundColor: '#4CAF50',
   },
   modalButtonText: {
+    marginLeft: 5,
     fontSize: 16,
     fontWeight: '600',
+    color: '#4CAF50',
+  },
+  viewButtonText: {
+    color: '#fff',
   },
 });
