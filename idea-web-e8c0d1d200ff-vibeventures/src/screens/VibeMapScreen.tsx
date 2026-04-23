@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity, Image, Dimensions, Switch } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -39,6 +39,15 @@ const VibeMapScreen = () => {
     latitudeDelta: 0.05,
     longitudeDelta: 0.05,
   });
+  const [filters, setFilters] = useState({
+    sports: true,
+    music: true,
+    food: true,
+    arts: true,
+    social: true,
+    other: true
+  });
+  const [showFilters, setShowFilters] = useState(false);
   const mapRef = useRef<MapView>(null);
   const navigation = useNavigation<VibeMapScreenNavigationProp>();
 
@@ -156,6 +165,15 @@ const VibeMapScreen = () => {
     return baseSize + (participantCount / 20) * (maxSize - baseSize);
   };
 
+  const toggleFilter = (category: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [category]: !prev[category]
+    }));
+  };
+
+  const filteredEvents = events.filter(event => filters[event.category as keyof typeof filters]);
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -182,40 +200,40 @@ const VibeMapScreen = () => {
         ref={mapRef}
         style={styles.map}
         provider={PROVIDER_GOOGLE}
-        initialRegion={mapRegion}
+        region={mapRegion}
         showsUserLocation={true}
         followsUserLocation={true}
+        onRegionChangeComplete={(region) => setMapRegion(region)}
       >
-        {events.map((event) => (
+        {filteredEvents.map((event) => (
           <Marker
             key={event.id}
             coordinate={{
               latitude: event.latitude,
-              longitude: event.longitude,
+              longitude: event.longitude
             }}
-            pinColor={categoryColors[event.category] || categoryColors.other}
             onPress={() => handleMarkerPress(event.id)}
+            pinColor={categoryColors[event.category as keyof typeof categoryColors] || categoryColors.other}
+            tracksViewChanges={false}
           >
             <View style={[
               styles.markerContainer,
-              {
-                width: getMarkerSize(event.participantsCount || 0),
-                height: getMarkerSize(event.participantsCount || 0),
-                borderRadius: getMarkerSize(event.participantsCount || 0) / 2,
-                backgroundColor: categoryColors[event.category] || categoryColors.other,
-              }
+              { width: getMarkerSize(event.participants.length), height: getMarkerSize(event.participants.length) }
             ]}>
-              <Text style={styles.markerText}>{event.participantsCount || 0}</Text>
+              <Image
+                source={require('../../assets/icons/pin.png')}
+                style={[
+                  styles.markerIcon,
+                  { tintColor: categoryColors[event.category as keyof typeof categoryColors] || categoryColors.other }
+                ]}
+              />
+              <Text style={styles.markerText}>{event.participants.length}</Text>
             </View>
             <Callout tooltip>
               <View style={styles.calloutContainer}>
                 <Text style={styles.calloutTitle}>{event.title}</Text>
-                <Text style={styles.calloutDistance}>
-                  {event.distance?.toFixed(1)} km away
-                </Text>
-                <Text style={styles.calloutParticipants}>
-                  {event.participantsCount || 0} people going
-                </Text>
+                <Text style={styles.calloutDistance}>{event.distance?.toFixed(1)} km away</Text>
+                <Text style={styles.calloutParticipants}>{event.participants.length} going</Text>
               </View>
             </Callout>
           </Marker>
@@ -223,16 +241,27 @@ const VibeMapScreen = () => {
       </MapView>
 
       <TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
-        <Image
-          source={require('../../assets/location-arrow.png')}
-          style={styles.recenterIcon}
-        />
+        <Image source={require('../../assets/icons/location.png')} style={styles.recenterIcon} />
       </TouchableOpacity>
 
-      {events.length === 0 && (
-        <View style={styles.noEventsContainer}>
-          <Text style={styles.noEventsText}>No events found nearby</Text>
-          <Text style={styles.noEventsSubtext}>Try moving to a different location</Text>
+      <TouchableOpacity style={styles.filterButton} onPress={() => setShowFilters(!showFilters)}>
+        <Image source={require('../../assets/icons/filter.png')} style={styles.filterIcon} />
+      </TouchableOpacity>
+
+      {showFilters && (
+        <View style={styles.filterPanel}>
+          <Text style={styles.filterTitle}>Filter Events</Text>
+          {Object.keys(filters).map((category) => (
+            <View key={category} style={styles.filterItem}>
+              <Text style={styles.filterLabel}>{category.charAt(0).toUpperCase() + category.slice(1)}</Text>
+              <Switch
+                value={filters[category as keyof typeof filters]}
+                onValueChange={() => toggleFilter(category)}
+                trackColor={{ false: '#767577', true: categoryColors[category as keyof typeof categoryColors] || '#81b0ff' }}
+                thumbColor={filters[category as keyof typeof filters] ? '#f5dd4b' : '#f4f3f4'}
+              />
+            </View>
+          ))}
         </View>
       )}
     </View>
@@ -251,10 +280,9 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
@@ -263,18 +291,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#f5f5f5',
   },
   errorText: {
     fontSize: 16,
-    color: '#d32f2f',
+    color: 'red',
     marginBottom: 20,
     textAlign: 'center',
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    padding: 10,
     borderRadius: 5,
   },
   retryButtonText: {
@@ -284,34 +310,35 @@ const styles = StyleSheet.create({
   markerContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'white',
+  },
+  markerIcon: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
   },
   markerText: {
+    position: 'absolute',
     color: 'white',
     fontWeight: 'bold',
     fontSize: 12,
   },
   calloutContainer: {
-    width: 180,
+    width: 150,
     padding: 10,
     backgroundColor: 'white',
-    borderRadius: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+    borderRadius: 10,
+    borderColor: '#ddd',
+    borderWidth: 1,
   },
   calloutTitle: {
-    fontSize: 14,
     fontWeight: 'bold',
-    marginBottom: 4,
+    fontSize: 14,
+    marginBottom: 5,
   },
   calloutDistance: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 3,
   },
   calloutParticipants: {
     fontSize: 12,
@@ -327,35 +354,64 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    elevation: 5,
   },
   recenterIcon: {
     width: 20,
     height: 20,
   },
-  noEventsContainer: {
+  filterButton: {
     position: 'absolute',
-    top: 20,
-    left: 0,
-    right: 0,
+    top: 60,
+    right: 20,
+    backgroundColor: 'white',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 15,
-    marginHorizontal: 20,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  filterIcon: {
+    width: 20,
+    height: 20,
+  },
+  filterPanel: {
+    position: 'absolute',
+    top: 120,
+    right: 20,
+    width: 200,
+    backgroundColor: 'white',
     borderRadius: 10,
+    padding: 15,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
-  noEventsText: {
-    fontSize: 16,
+  filterTitle: {
     fontWeight: 'bold',
-    marginBottom: 5,
+    fontSize: 16,
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  noEventsSubtext: {
+  filterItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  filterLabel: {
     fontSize: 14,
-    color: '#666',
   },
 });
 
