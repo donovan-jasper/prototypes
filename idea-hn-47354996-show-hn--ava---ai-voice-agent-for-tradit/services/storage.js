@@ -11,6 +11,7 @@ let MOCK_CALL_DATA = [ // Changed to `let` so it can be modified
     summary: 'Discussed project updates and next steps.',
     transcript: 'Hello, this is John. How are you? I am good. We need to talk about the project. Okay, let\'s discuss the next steps. Sounds good.',
     type: 'answered', // Added type for consistency
+    confidence: 0.85
   },
   {
     id: '2',
@@ -20,6 +21,7 @@ let MOCK_CALL_DATA = [ // Changed to `let` so it can be modified
     summary: 'Confirmed meeting schedule for next week.',
     transcript: 'Hi Sarah, just confirming our meeting for next Tuesday. Yes, confirmed. See you then.',
     type: 'answered', // Added type for consistency
+    confidence: 0.92
   },
 ];
 
@@ -42,6 +44,7 @@ const storage = {
           ...call,
           id: call.id || String(MOCK_CALL_DATA.length + 1), // Ensure unique ID if not provided
           call_time: call.call_time || new Date().toISOString(), // Ensure timestamp if not provided
+          confidence: call.confidence || Math.random() * 0.5 + 0.5 // Add confidence if not provided
         };
         MOCK_CALL_DATA.unshift(newCall); // Add to the beginning for most recent first
         resolve(true);

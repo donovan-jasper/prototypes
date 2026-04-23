@@ -15,6 +15,14 @@ const mockAiService = {
       "unknown": {
         transcript: "Hello, this is a generic call. I'm calling to discuss some important information.",
         summary: "Unknown caller discussing important information."
+      },
+      "mom": {
+        transcript: "Hi, this is your mom. Just checking in. How's everything going?",
+        summary: "Motherly call - casual check-in about daily life."
+      },
+      "bank": {
+        transcript: "This is the bank. We've noticed unusual activity on your account. Please verify your information.",
+        summary: "Bank call - account security verification required."
       }
     };
 
@@ -38,7 +46,8 @@ const callScreeningService = {
       return {
         transcript: result.transcript,
         summary: result.summary,
-        status: 'completed'
+        status: 'completed',
+        confidence: Math.random() * 0.5 + 0.5 // Random confidence score between 0.5-1.0
       };
     } catch (error) {
       console.error('Call screening failed:', error);
@@ -46,7 +55,8 @@ const callScreeningService = {
       return {
         transcript: 'Error processing call',
         summary: 'Call screening failed',
-        status: 'failed'
+        status: 'failed',
+        confidence: 0
       };
     }
   }

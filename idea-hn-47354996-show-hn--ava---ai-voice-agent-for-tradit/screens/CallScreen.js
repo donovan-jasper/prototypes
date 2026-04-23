@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, Button, StyleSheet, ScrollView, ActivityIndicator, Alert, Platform, TouchableOpacity } from 'react-native';
 import callHandler from '../services/callHandler';
 import callScreeningService from '../services/callScreeningService';
 import storage from '../services/storage';
@@ -8,6 +8,7 @@ function CallScreen() {
   const [callData, setCallData] = useState(callHandler.getCurrentCallState());
   const [pastCalls, setPastCalls] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     callHandler.init();
@@ -50,7 +51,8 @@ function CallScreen() {
       callHandler.updateCallData({
         transcript: screeningResult.transcript,
         summary: screeningResult.summary,
-        status: 'screening'
+        status: 'screening',
+        confidence: screeningResult.confidence
       });
 
       // Save the screened call to history
@@ -62,6 +64,7 @@ function CallScreen() {
         summary: screeningResult.summary,
         transcript: screeningResult.transcript,
         type: 'screened',
+        confidence: screeningResult.confidence
       };
 
       await storage.saveCallData(callToSave);
@@ -74,7 +77,12 @@ function CallScreen() {
 
   const renderCallStatus = () => {
     if (!callData || callData.status === 'idle') {
-      return <Text style={styles.statusText}>No active call.</Text>;
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No active call.</Text>
+          <Text style={styles.emptySubtext}>When a call comes in, you'll see options here.</Text>
+        </View>
+      );
     }
 
     let statusMessage = '';
@@ -121,12 +129,29 @@ function CallScreen() {
 
         {canAnswerOrScreen && (
           <View style={styles.buttonRow}>
-            <Button title="Screen Call" onPress={handleScreenCall} color="#673AB7" disabled={callData.isScreening} />
-            <Button title="Answer Call" onPress={handleAnswerCall} color="#4CAF50" disabled={callData.isScreening} />
+            <TouchableOpacity
+              style={[styles.actionButton, styles.screenButton]}
+              onPress={handleScreenCall}
+              disabled={callData.isScreening}
+            >
+              <Text style={styles.buttonText}>Screen Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.actionButton, styles.answerButton]}
+              onPress={handleAnswerCall}
+              disabled={callData.isScreening}
+            >
+              <Text style={styles.buttonText}>Answer Call</Text>
+            </TouchableOpacity>
           </View>
         )}
         {canEnd && (
-          <Button title="End Call" onPress={handleEndCall} color="#F44336" />
+          <TouchableOpacity
+            style={[styles.actionButton, styles.endButton]}
+            onPress={handleEndCall}
+          >
+            <Text style={styles.buttonText}>End Call</Text>
+          </TouchableOpacity>
         )}
 
         {(callData.status === 'offhook' || callData.status === 'screening' || callData.transcript) && (
@@ -141,44 +166,62 @@ function CallScreen() {
           <>
             <Text style={styles.summaryLabel}>Summary:</Text>
             <Text style={styles.summaryText}>{callData.summary || 'Generating summary...'}</Text>
+            {callData.confidence && (
+              <Text style={styles.confidenceText}>Confidence: {(callData.confidence * 100).toFixed(0)}%</Text>
+            )}
           </>
-        )}
-        {Platform.OS === 'ios' && callData.status === 'ringing' && callData.callerId === 'Unknown' && (
-          <Text style={styles.limitationText}>
-            (Caller ID for cellular calls is not available on iOS for third-party apps.)
-          </Text>
-        )}
-        {Platform.OS === 'android' && (callData.status === 'ringing' || callData.status === 'screening') && (
-          <Text style={styles.limitationText}>
-            (Note: Call screening may not work on all Android devices due to system restrictions.)
-          </Text>
         )}
       </View>
     );
   };
 
+  const renderCallHistory = () => {
+    if (isLoading) {
+      return <ActivityIndicator size="large" style={styles.loadingIndicator} />;
+    }
+
+    if (pastCalls.length === 0) {
+      return (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>No call history yet</Text>
+          <Text style={styles.emptySubtext}>Screened calls will appear here.</Text>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.historyContainer}>
+        {pastCalls.map((call) => (
+          <View key={call.id} style={styles.callItem}>
+            <View style={styles.callHeader}>
+              <Text style={styles.callerId}>{call.caller_id || 'Unknown'}</Text>
+              <Text style={styles.callTime}>{new Date(call.call_time).toLocaleString()}</Text>
+            </View>
+            <Text style={styles.callSummary}>{call.summary}</Text>
+            {call.confidence && (
+              <Text style={styles.confidenceText}>Confidence: {(call.confidence * 100).toFixed(0)}%</Text>
+            )}
+          </View>
+        ))}
+      </ScrollView>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {renderCallStatus()}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>CallGuard</Text>
+        <TouchableOpacity
+          style={styles.historyToggle}
+          onPress={() => setShowHistory(!showHistory)}
+        >
+          <Text style={styles.historyToggleText}>
+            {showHistory ? 'Hide History' : 'Show History'}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-        <Text style={styles.sectionTitle}>Past Calls</Text>
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#673AB7" />
-        ) : pastCalls.length > 0 ? (
-          <View style={styles.pastCallsContainer}>
-            {pastCalls.map((call, index) => (
-              <View key={index} style={styles.callItem}>
-                <Text style={styles.callItemTitle}>{call.caller_id || 'Unknown'}</Text>
-                <Text style={styles.callItemTime}>{new Date(call.call_time).toLocaleString()}</Text>
-                <Text style={styles.callItemSummary}>{call.summary || 'No summary available'}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.noCallsText}>No past calls available.</Text>
-        )}
-      </ScrollView>
+      {showHistory ? renderCallHistory() : renderCallStatus()}
     </View>
   );
 }
@@ -187,15 +230,36 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
-  scrollContent: {
-    padding: 20,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  historyToggle: {
+    padding: 8,
+    backgroundColor: '#673AB7',
+    borderRadius: 4,
+  },
+  historyToggleText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   callStatusContainer: {
+    flex: 1,
+    padding: 16,
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
+    borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -204,98 +268,132 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 12,
+    textAlign: 'center',
   },
   durationText: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 10,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  screeningIndicator: {
+    marginVertical: 20,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginVertical: 15,
+    justifyContent: 'space-around',
+    marginVertical: 20,
+  },
+  actionButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  screenButton: {
+    backgroundColor: '#673AB7',
+  },
+  answerButton: {
+    backgroundColor: '#4CAF50',
+  },
+  endButton: {
+    backgroundColor: '#F44336',
+    marginTop: 20,
+  },
+  buttonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   transcriptLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 15,
-    marginBottom: 5,
+    marginTop: 20,
+    marginBottom: 8,
+    color: '#333',
   },
   transcriptScroll: {
     maxHeight: 150,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 16,
   },
   transcriptText: {
     fontSize: 14,
-    lineHeight: 20,
+    color: '#555',
   },
   summaryLabel: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
+    marginTop: 12,
+    marginBottom: 8,
+    color: '#333',
   },
   summaryText: {
     fontSize: 14,
-    lineHeight: 20,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    color: '#555',
+    marginBottom: 8,
   },
-  limitationText: {
+  confidenceText: {
     fontSize: 12,
     color: '#666',
-    marginTop: 10,
     fontStyle: 'italic',
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
-  },
-  pastCallsContainer: {
-    marginBottom: 20,
+  historyContainer: {
+    flex: 1,
   },
   callItem: {
     backgroundColor: 'white',
+    padding: 16,
+    marginBottom: 12,
     borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
   },
-  callItemTitle: {
+  callHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  callerId: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    color: '#333',
   },
-  callItemTime: {
+  callTime: {
     fontSize: 12,
     color: '#666',
-    marginBottom: 5,
   },
-  callItemSummary: {
+  callSummary: {
     fontSize: 14,
-    color: '#444',
+    color: '#555',
+    marginBottom: 4,
   },
-  noCallsText: {
-    fontSize: 16,
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 18,
     color: '#666',
+    marginBottom: 8,
     textAlign: 'center',
-    marginTop: 20,
   },
-  screeningIndicator: {
-    marginVertical: 15,
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+  },
+  loadingIndicator: {
+    marginTop: 20,
   },
 });
 
