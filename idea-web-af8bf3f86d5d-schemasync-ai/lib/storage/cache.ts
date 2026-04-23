@@ -1,81 +1,57 @@
-import { getCachedSchema, cacheSchema } from './sqlite';
-import { DatabaseConnector } from '../database/connectors';
-import { parsePostgresSchema, parseTableRelationships } from '../database/schema-parser';
-import { useDatabaseStore } from '../../store/database-store';
-import { useNetworkStore } from '../../store/network-store';
+import * as SQLite from 'expo-sqlite';
+import { Database } from '../../types/database';
 
-export const fetchAndCacheSchema = async (database: any) => {
-  const connector = new DatabaseConnector(database.type);
-  await connector.connect(database.connectionString);
+const db = SQLite.openDatabase('querypal.db');
 
-  try {
-    // Get schema metadata
-    const schemaData = await connector.query(`
-      SELECT table_name, column_name, data_type, is_nullable
-      FROM information_schema.columns
-      WHERE table_schema = 'public'
-      ORDER BY table_name, ordinal_position
-    `);
-
-    // Get foreign key relationships
-    const constraints = await connector.query(`
-      SELECT
-        tc.table_name AS table,
-        kcu.column_name AS column,
-        ccu.table_name AS foreign_table,
-        ccu.column_name AS foreign_column
-      FROM
-        information_schema.table_constraints AS tc
-        JOIN information_schema.key_column_usage AS kcu
-          ON tc.constraint_name = kcu.constraint_name
-        JOIN information_schema.constraint_column_usage AS ccu
-          ON ccu.constraint_name = tc.constraint_name
-      WHERE constraint_type = 'FOREIGN KEY'
-    `);
-
-    const schema = {
-      tables: parsePostgresSchema(schemaData),
-      relationships: parseTableRelationships(constraints),
-    };
-
-    await cacheSchema(database.id, schema);
-    return schema;
-  } finally {
-    await connector.disconnect();
-  }
+export const initCache = () => {
+  db.transaction(tx => {
+    tx.executeSql(
+      'CREATE TABLE IF NOT EXISTS cached_schemas (id TEXT PRIMARY KEY, schema TEXT, lastUpdated INTEGER);'
+    );
+  });
 };
 
-export const getSchema = async (databaseId: string, forceRefresh = false) => {
-  // Check network status first
-  const { isOnline } = useNetworkStore.getState();
+export const cacheSchema = (id: string, schema: any) => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT OR REPLACE INTO cached_schemas (id, schema, lastUpdated) VALUES (?, ?, ?);',
+        [id, JSON.stringify(schema), Date.now()],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
 
-  // If offline and not forcing refresh, try to get from cache
-  if (!isOnline && !forceRefresh) {
-    const cachedSchema = await getCachedSchema(databaseId);
-    if (cachedSchema) {
-      return cachedSchema;
-    }
-    throw new Error('No cached schema available and offline');
-  }
+export const getSchema = (id: string): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT schema FROM cached_schemas WHERE id = ?;',
+        [id],
+        (_, { rows }) => {
+          if (rows.length > 0) {
+            resolve(JSON.parse(rows.item(0).schema));
+          } else {
+            reject(new Error('Schema not found in cache'));
+          }
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
 
-  // If forcing refresh or online, try to fetch fresh schema
-  try {
-    const { databases } = useDatabaseStore.getState();
-    const database = databases.find(db => db.id === databaseId);
-
-    if (!database) {
-      throw new Error('Database not found');
-    }
-
-    return await fetchAndCacheSchema(database);
-  } catch (error) {
-    // If online but fetch fails, fall back to cache if available
-    if (isOnline) {
-      const cachedSchema = await getCachedSchema(databaseId);
-      if (cachedSchema) {
-        return cachedSchema;
-      }
-    }
-    throw error;
-  }
+export const clearCache = () => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'DELETE FROM cached_schemas;',
+        [],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
 };
