@@ -8,10 +8,3 @@ export interface Manga {
   lastRead: number;
   isFavorite: boolean;
 }
-
-export interface Page {
-  id: string;
-  mangaId: string;
-  pageNumber: number;
-  uri: string;
-}
