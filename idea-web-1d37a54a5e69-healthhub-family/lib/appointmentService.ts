@@ -3,16 +3,16 @@ import { Appointment } from '../types';
 
 export const addAppointment = async (data: Omit<Appointment, 'id' | 'createdAt' | 'completed'>): Promise<Appointment> => {
   const result = await db.runAsync(
-    'INSERT INTO appointments (family_member_id, type, provider, date, location, notes) VALUES (?, ?, ?, ?, ?, ?)',
+    'INSERT INTO appointments (familyMemberId, type, provider, date, location, notes) VALUES (?, ?, ?, ?, ?, ?)',
     [data.familyMemberId, data.type, data.provider, data.date, data.location || null, data.notes || null]
   );
-  
+
   return (await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [result.lastInsertRowId]))!;
 };
 
 export const getAppointmentsByMember = async (familyMemberId: number): Promise<Appointment[]> => {
   return await db.getAllAsync<Appointment>(
-    'SELECT * FROM appointments WHERE family_member_id = ? ORDER BY date DESC',
+    'SELECT * FROM appointments WHERE familyMemberId = ? ORDER BY date DESC',
     [familyMemberId]
   );
 };
@@ -24,12 +24,24 @@ export const getAllAppointments = async (): Promise<Appointment[]> => {
 export const updateAppointment = async (id: number, data: Partial<Appointment>): Promise<Appointment> => {
   const fields = Object.keys(data).map(key => `${key} = ?`).join(', ');
   const values = [...Object.values(data), id];
-  
+
   await db.runAsync(`UPDATE appointments SET ${fields} WHERE id = ?`, values);
-  
+
   return (await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [id]))!;
 };
 
 export const deleteAppointment = async (id: number): Promise<void> => {
   await db.runAsync('DELETE FROM appointments WHERE id = ?', [id]);
+};
+
+export const getAppointmentWithDocuments = async (id: number): Promise<Appointment & { documents: Document[] }> => {
+  const appointment = await db.getFirstAsync<Appointment>('SELECT * FROM appointments WHERE id = ?', [id]);
+  if (!appointment) throw new Error('Appointment not found');
+
+  const documents = await db.getAllAsync<Document>(
+    'SELECT * FROM documents WHERE appointmentId = ? ORDER BY uploadDate DESC',
+    [id]
+  );
+
+  return { ...appointment, documents };
 };

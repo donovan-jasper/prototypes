@@ -35,6 +35,7 @@ export interface Reminder {
 export interface Document {
   id: number;
   familyMemberId: number;
+  appointmentId?: number;
   title: string;
   type: string;
   fileUri: string;

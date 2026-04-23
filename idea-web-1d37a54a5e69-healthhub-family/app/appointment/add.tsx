@@ -175,10 +175,10 @@ export default function AddAppointment() {
             value={date}
             mode="time"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={(event, selectedDate) => {
+            onChange={(event, selectedTime) => {
               setShowTimePicker(Platform.OS === 'ios');
-              if (selectedDate) {
-                setDate(selectedDate);
+              if (selectedTime) {
+                setDate(selectedTime);
               }
             }}
           />
@@ -191,7 +191,7 @@ export default function AddAppointment() {
           style={styles.input}
           value={location}
           onChangeText={setLocation}
-          placeholder="e.g., Main Street Clinic"
+          placeholder="e.g., 123 Main St, Clinic Name"
           placeholderTextColor="#C7C7CC"
         />
       </View>
@@ -202,23 +202,24 @@ export default function AddAppointment() {
           style={[styles.input, styles.textArea]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Any additional information"
+          placeholder="Any special instructions or notes"
           placeholderTextColor="#C7C7CC"
           multiline
           numberOfLines={4}
-          textAlignVertical="top"
         />
       </View>
 
-      <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        <Text style={styles.saveButtonText}>
-          {saving ? 'Saving...' : 'Add Appointment'}
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.saveButton, saving && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Text style={styles.saveButtonText}>
+            {saving ? 'Saving...' : 'Save Appointment'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -226,107 +227,106 @@ export default function AddAppointment() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#fff',
   },
   content: {
-    padding: 16,
+    padding: 20,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   label: {
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#000',
     marginBottom: 8,
+    color: '#333',
   },
   input: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 16,
-    fontSize: 17,
-    color: '#000',
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f8f8f8',
   },
   textArea: {
-    minHeight: 100,
+    height: 100,
+    textAlignVertical: 'top',
   },
   dateText: {
-    fontSize: 17,
-    color: '#000',
+    fontSize: 16,
+    color: '#333',
   },
   memberSelector: {
-    gap: 8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -4,
   },
   memberButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    padding: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    margin: 4,
   },
   memberButtonActive: {
     backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
-  },
-  memberAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#E5F1FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
   },
   memberButtonText: {
-    fontSize: 15,
-    color: '#000',
+    fontSize: 14,
+    color: '#333',
   },
   memberButtonTextActive: {
     color: '#fff',
-    fontWeight: '600',
+  },
+  memberAvatar: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   typeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    marginHorizontal: -4,
   },
   typeButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    padding: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    backgroundColor: '#f0f0f0',
+    margin: 4,
   },
   typeButtonActive: {
     backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
   },
   typeText: {
-    fontSize: 15,
-    color: '#000',
+    fontSize: 14,
+    color: '#333',
   },
   typeTextActive: {
     color: '#fff',
-    fontWeight: '600',
+  },
+  actions: {
+    marginTop: 20,
   },
   saveButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 10,
     padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
   },
   saveButtonDisabled: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
   saveButtonText: {
     color: '#fff',
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
   },
 });
