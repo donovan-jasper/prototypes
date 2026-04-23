@@ -1,40 +1,41 @@
 export interface Transaction {
-  id: number;
+  id?: number;
   amount: number;
   category: string;
   date: string; // ISO string
   type: 'income' | 'expense';
   note?: string;
-  receiptUri?: string;
+  receiptPhoto?: string;
 }
 
 export interface Holding {
-  id: number;
+  id?: number;
   symbol: string;
   shares: number;
-  costBasis: number;
-  purchaseDate: string; // ISO string
-  currentPrice?: number;
-  gain?: number;
-  percentGain?: number;
-  currentValue?: number;
+  costBasis: number; // Price per share when purchased
+  assetType: 'stock' | 'crypto' | 'real-estate' | 'other';
+  currentPrice?: number; // Will be fetched from API
+  currentValue?: number; // shares * currentPrice
+  gain?: number; // currentValue - (shares * costBasis)
+  percentGain?: number; // (gain / (shares * costBasis)) * 100
 }
 
 export interface Asset {
-  id: number;
+  id?: number;
   name: string;
   value: number;
-  type: 'cash' | 'investment' | 'real_estate' | 'other';
+  type: 'cash' | 'investment' | 'property' | 'other';
 }
 
 export interface Liability {
-  id: number;
+  id?: number;
   name: string;
   value: number;
-  type: 'loan' | 'mortgage' | 'credit_card' | 'other';
+  type: 'loan' | 'credit-card' | 'mortgage' | 'other';
 }
 
 export interface Category {
+  id: string;
   name: string;
   icon: string;
   color: string;
@@ -55,5 +56,13 @@ export interface NetWorth {
 
 export interface CachedPrice {
   price: number;
-  timestamp: number;
+  timestamp: number; // Unix timestamp in milliseconds
+}
+
+export interface PriceService {
+  getPrice(symbol: string): Promise<number>;
+  startPeriodicUpdates(intervalMs: number, callback: () => void): void;
+  stopPeriodicUpdates(): void;
+  clearCache(): void;
+  getLastUpdateTime(symbol: string): number | null;
 }

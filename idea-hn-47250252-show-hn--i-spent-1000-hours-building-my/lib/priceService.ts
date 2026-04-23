@@ -13,7 +13,71 @@ const mockExternalApiPrices = {
   NVDA: 250,
   PYPL: 250,
   GME: 25, // Base price for GME
-  DOGE: 0.15, // Base price for DOGE
+  DOGE: 0.15, // Base price for DOGE,
+};
+
+/**
+ * Fetches prices from CoinGecko API
+ * @param symbol The asset symbol (e.g., 'BTC', 'ETH')
+ * @returns Promise with the current price
+ */
+const fetchFromCoinGecko = async (symbol: string): Promise<number> => {
+  try {
+    // CoinGecko API endpoints
+    const endpoints = {
+      'BTC': 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd',
+      'ETH': 'https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd',
+      'SOL': 'https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd',
+      'ADA': 'https://api.coingecko.com/api/v3/simple/price?ids=cardano&vs_currencies=usd',
+      'DOT': 'https://api.coingecko.com/api/v3/simple/price?ids=polkadot&vs_currencies=usd',
+      'AAPL': 'https://api.coingecko.com/api/v3/simple/price?ids=apple&vs_currencies=usd',
+      'MSFT': 'https://api.coingecko.com/api/v3/simple/price?ids=microsoft&vs_currencies=usd',
+      'GOOGL': 'https://api.coingecko.com/api/v3/simple/price?ids=alphabet&vs_currencies=usd',
+      'AMZN': 'https://api.coingecko.com/api/v3/simple/price?ids=amazon&vs_currencies=usd',
+      'TSLA': 'https://api.coingecko.com/api/v3/simple/price?ids=tesla&vs_currencies=usd',
+    };
+
+    const endpoint = endpoints[symbol];
+    if (!endpoint) {
+      throw new Error(`No CoinGecko endpoint configured for symbol: ${symbol}`);
+    }
+
+    const response = await fetch(endpoint);
+    if (!response.ok) {
+      throw new Error(`CoinGecko API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Map the response to the expected format
+    const priceData = {
+      'BTC': data.bitcoin?.usd,
+      'ETH': data.ethereum?.usd,
+      'SOL': data.solana?.usd,
+      'ADA': data.cardano?.usd,
+      'DOT': data.polkadot?.usd,
+      'AAPL': data.apple?.usd,
+      'MSFT': data.microsoft?.usd,
+      'GOOGL': data.alphabet?.usd,
+      'AMZN': data.amazon?.usd,
+      'TSLA': data.tesla?.usd,
+    };
+
+    const price = priceData[symbol];
+    if (!price) {
+      throw new Error(`No price data found for symbol: ${symbol}`);
+    }
+
+    return price;
+  } catch (error) {
+    console.error(`Error fetching price from CoinGecko for ${symbol}:`, error);
+    // Fallback to mock data if API fails
+    if (mockExternalApiPrices[symbol]) {
+      console.log(`Falling back to mock price for ${symbol}`);
+      return mockExternalApiPrices[symbol];
+    }
+    throw error;
+  }
 };
 
 /**
@@ -51,9 +115,9 @@ export class PriceService {
   /**
    * Initializes the PriceService.
    * @param isPremium Boolean indicating if the user has a premium subscription.
-   * @param fetchApi Optional. A function to fetch prices from an external API. Defaults to a mock implementation.
+   * @param fetchApi Optional. A function to fetch prices from an external API. Defaults to CoinGecko implementation.
    */
-  constructor(isPremium: boolean, fetchApi: (symbol: string) => Promise<number> = defaultFetchFromExternalApi) {
+  constructor(isPremium: boolean, fetchApi: (symbol: string) => Promise<number> = fetchFromCoinGecko) {
     this.isPremium = isPremium;
     this.cache = new Map<string, CachedPrice>();
     this.fetchApi = fetchApi;
@@ -141,36 +205,22 @@ export class PriceService {
       clearInterval(this.updateInterval);
       this.updateInterval = null;
     }
-    this.updateCallback = null;
   }
 
   /**
-   * Clears the price cache for a specific symbol or all symbols.
-   * @param symbol Optional. If provided, only clears the cache for this symbol. Otherwise, clears all.
+   * Clears the price cache
    */
-  public clearCache(symbol?: string): void {
-    if (symbol) {
-      this.cache.delete(symbol);
-      // console.log(`[PriceService] Cache cleared for ${symbol}`);
-    } else {
-      this.cache.clear();
-      // console.log('[PriceService] All cache cleared');
-    }
+  public clearCache(): void {
+    this.cache.clear();
   }
 
   /**
-   * Updates the premium status of the service. If the status changes, the cache is cleared
-   * to ensure new price fetches adhere to the updated tier's caching rules immediately.
-   * @param isPremium New premium status.
+   * Gets the last update time for a symbol
+   * @param symbol The asset symbol
+   * @returns The timestamp of the last update or null if never updated
    */
-  public setPremiumStatus(isPremium: boolean): void {
-    if (this.isPremium !== isPremium) {
-      this.isPremium = isPremium;
-      this.clearCache(); // Clear cache to apply new refresh rates immediately
-      // console.log(`[PriceService] Premium status updated to: ${isPremium}`);
-    }
+  public getLastUpdateTime(symbol: string): number | null {
+    const cached = this.cache.get(symbol);
+    return cached ? cached.timestamp : null;
   }
 }
-
-// Singleton instance for the app to use
-export const priceService = new PriceService(false);
