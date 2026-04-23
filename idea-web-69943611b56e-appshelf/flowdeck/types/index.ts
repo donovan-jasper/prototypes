@@ -1,7 +1,15 @@
+export interface App {
+  packageName: string;
+  label: string;
+  icon: string;
+  lastUsed?: string;
+}
+
 export interface Mode {
   id: string;
   name: string;
   color: string;
+  icon?: string;
   appIds: string[];
   triggers?: {
     time?: {
@@ -17,21 +25,11 @@ export interface Mode {
   createdAt: string;
 }
 
-export interface App {
-  packageName: string;
-  label: string;
-  icon: string;
-  lastUsed?: string;
-}
-
 export interface Gesture {
   id: string;
   pattern: { x: number; y: number }[];
-  action: string;
-}
-
-declare global {
-  type Mode = import('./index').Mode;
-  type App = import('./index').App;
-  type Gesture = import('./index').Gesture;
+  action: {
+    type: 'mode' | 'app';
+    id: string;
+  };
 }
