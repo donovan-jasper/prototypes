@@ -7,6 +7,7 @@ import * as Location from 'expo-location';
 import { format, parse, isValid, addDays, addWeeks, addMonths } from 'date-fns';
 import { MaterialIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { parseNaturalLanguage } from '../lib/natural-language';
 
 export default function AddReminderScreen() {
   const [title, setTitle] = useState('');
@@ -22,6 +23,7 @@ export default function AddReminderScreen() {
   const [recurrence, setRecurrence] = useState<'none' | 'daily' | 'weekly' | 'monthly'>('none');
   const [recurrenceEnd, setRecurrenceEnd] = useState<Date | null>(null);
   const [showRecurrenceEndPicker, setShowRecurrenceEndPicker] = useState(false);
+  const [naturalLanguageInput, setNaturalLanguageInput] = useState('');
   const { addReminder } = useReminders();
   const router = useRouter();
 
@@ -65,6 +67,25 @@ export default function AddReminderScreen() {
     }
   };
 
+  const handleNaturalLanguageInput = () => {
+    if (!naturalLanguageInput.trim()) return;
+
+    try {
+      const parsed = parseNaturalLanguage(naturalLanguageInput);
+
+      setTitle(parsed.title);
+      setDate(parsed.date);
+      setTime(parsed.time);
+      if (parsed.location) setLocation(parsed.location);
+      if (parsed.category) setCategory(parsed.category);
+
+      // Show success feedback
+      Alert.alert('Success', 'Reminder details extracted from your input!');
+    } catch (error) {
+      Alert.alert('Error', 'Could not parse your input. Please try again or enter details manually.');
+    }
+  };
+
   const handleVoiceInput = async () => {
     try {
       setIsProcessing(true);
@@ -89,105 +110,13 @@ export default function AddReminderScreen() {
       // In a real app, you would use a speech recognition API here
       // For demo purposes, we'll simulate it
       const simulatedSpeech = `Remind me to ${title || 'do something'} ${location ? `when I'm near ${location}` : ''}`;
-      parseNaturalLanguage(simulatedSpeech);
+      setNaturalLanguageInput(simulatedSpeech);
+      handleNaturalLanguageInput();
     } catch (error) {
       console.error('Voice input error:', error);
       Alert.alert('Error', 'Failed to process voice input');
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const parseNaturalLanguage = (text: string) => {
-    // Simple NLP parsing - in a real app, use a proper NLP library
-    const lowerText = text.toLowerCase();
-
-    // Extract date/time
-    const dateRegex = /(tomorrow|today|next week|in \d+ days|at \d+:\d+)/;
-    const dateMatch = lowerText.match(dateRegex);
-    if (dateMatch) {
-      const now = new Date();
-      if (dateMatch[0].includes('tomorrow')) {
-        now.setDate(now.getDate() + 1);
-      } else if (dateMatch[0].includes('next week')) {
-        now.setDate(now.getDate() + 7);
-      } else if (dateMatch[0].includes('in ')) {
-        const days = parseInt(dateMatch[0].split(' ')[1]);
-        now.setDate(now.getDate() + days);
-      }
-
-      const timeRegex = /at (\d+):(\d+)/;
-      const timeMatch = lowerText.match(timeRegex);
-      if (timeMatch) {
-        now.setHours(parseInt(timeMatch[1]));
-        now.setMinutes(parseInt(timeMatch[2]));
-      }
-
-      if (isValid(now)) {
-        setDate(now);
-        setTime(now);
-      }
-    }
-
-    // Extract location
-    const locationRegex = /near (.*?)(?= at|$)/;
-    const locationMatch = lowerText.match(locationRegex);
-    if (locationMatch) {
-      setLocation(locationMatch[1]);
-    }
-
-    // Extract title
-    const titleRegex = /remind me to (.*?)(?= at| near|$)/;
-    const titleMatch = lowerText.match(titleRegex);
-    if (titleMatch) {
-      setTitle(titleMatch[1]);
-    }
-
-    // Categorize
-    const workKeywords = ['meeting', 'project', 'deadline', 'call', 'email'];
-    const healthKeywords = ['exercise', 'medication', 'doctor', 'appointment'];
-    const financeKeywords = ['pay', 'bill', 'budget', 'investment'];
-
-    if (workKeywords.some(keyword => lowerText.includes(keyword))) {
-      setCategory('work');
-    } else if (healthKeywords.some(keyword => lowerText.includes(keyword))) {
-      setCategory('health');
-    } else if (financeKeywords.some(keyword => lowerText.includes(keyword))) {
-      setCategory('finance');
-    }
-
-    // Extract recurrence
-    const recurrenceRegex = /(every day|daily|every week|weekly|every month|monthly)/;
-    const recurrenceMatch = lowerText.match(recurrenceRegex);
-    if (recurrenceMatch) {
-      if (recurrenceMatch[0].includes('day')) {
-        setRecurrence('daily');
-      } else if (recurrenceMatch[0].includes('week')) {
-        setRecurrence('weekly');
-      } else if (recurrenceMatch[0].includes('month')) {
-        setRecurrence('monthly');
-      }
-    }
-  };
-
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setDate(selectedDate);
-    }
-  };
-
-  const onTimeChange = (event: any, selectedTime?: Date) => {
-    setShowTimePicker(false);
-    if (selectedTime) {
-      setTime(selectedTime);
-    }
-  };
-
-  const onRecurrenceEndChange = (event: any, selectedDate?: Date) => {
-    setShowRecurrenceEndPicker(false);
-    if (selectedDate) {
-      setRecurrenceEnd(selectedDate);
     }
   };
 
@@ -199,176 +128,202 @@ export default function AddReminderScreen() {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <Text style={styles.title}>Add Reminder</Text>
-          <TouchableOpacity onPress={() => router.back()}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.closeButton}>
             <MaterialIcons name="close" size={24} color="#666" />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.inputContainer}>
+        <View style={styles.naturalLanguageSection}>
+          <Text style={styles.sectionTitle}>Natural Language Input</Text>
           <TextInput
-            style={styles.input}
-            placeholder="What do you need to remember?"
-            value={title}
-            onChangeText={setTitle}
-            autoFocus
+            style={styles.naturalLanguageInput}
+            placeholder="Try: 'Remind me to call mom tomorrow at 3pm'"
+            value={naturalLanguageInput}
+            onChangeText={setNaturalLanguageInput}
+            multiline
           />
+          <TouchableOpacity
+            style={styles.parseButton}
+            onPress={handleNaturalLanguageInput}
+            disabled={!naturalLanguageInput.trim()}
+          >
+            <Text style={styles.parseButtonText}>Parse Input</Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.voiceButton}
             onPress={handleVoiceInput}
             disabled={isProcessing}
           >
-            <MaterialIcons
-              name="mic"
-              size={24}
-              color={isProcessing ? '#ccc' : '#4CAF50'}
+            <MaterialIcons name="mic" size={24} color="#fff" />
+            <Text style={styles.voiceButtonText}>Voice Input</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.formSection}>
+          <Text style={styles.sectionTitle}>Reminder Details</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Title</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="What do you need to remember?"
+              value={title}
+              onChangeText={setTitle}
             />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.dateTimeContainer}>
-          <TouchableOpacity
-            style={styles.dateTimeButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <MaterialIcons name="calendar-today" size={20} color="#666" />
-            <Text style={styles.dateTimeText}>{format(date, 'MMM d, yyyy')}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.dateTimeButton}
-            onPress={() => setShowTimePicker(true)}
-          >
-            <MaterialIcons name="access-time" size={20} color="#666" />
-            <Text style={styles.dateTimeText}>{format(time, 'h:mm a')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {showDatePicker && (
-          <DateTimePicker
-            value={date}
-            mode="date"
-            display="default"
-            onChange={onDateChange}
-          />
-        )}
-
-        {showTimePicker && (
-          <DateTimePicker
-            value={time}
-            mode="time"
-            display="default"
-            onChange={onTimeChange}
-          />
-        )}
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Category</Text>
-          <View style={styles.categoryContainer}>
-            {categories.map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.categoryButton,
-                  category === cat && styles.selectedCategory
-                ]}
-                onPress={() => setCategory(cat)}
-              >
-                <Text style={[
-                  styles.categoryText,
-                  category === cat && styles.selectedCategoryText
-                ]}>
-                  {cat.charAt(0).toUpperCase() + cat.slice(1)}
-                </Text>
-              </TouchableOpacity>
-            ))}
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Add location (optional)"
-            value={location || ''}
-            onChangeText={setLocation}
-          />
-        </View>
-
-        <TouchableOpacity
-          style={styles.advancedOptionsButton}
-          onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
-        >
-          <Text style={styles.advancedOptionsText}>
-            {showAdvancedOptions ? 'Hide Advanced Options' : 'Show Advanced Options'}
-          </Text>
-          <MaterialIcons
-            name={showAdvancedOptions ? 'expand-less' : 'expand-more'}
-            size={20}
-            color="#666"
-          />
-        </TouchableOpacity>
-
-        {showAdvancedOptions && (
-          <View style={styles.advancedOptionsContainer}>
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recurrence</Text>
-              <View style={styles.recurrenceContainer}>
-                {recurrenceOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={[
-                      styles.recurrenceButton,
-                      recurrence === option && styles.selectedRecurrence
-                    ]}
-                    onPress={() => setRecurrence(option as any)}
-                  >
-                    <Text style={[
-                      styles.recurrenceText,
-                      recurrence === option && styles.selectedRecurrenceText
-                    ]}>
-                      {option === 'none' ? 'None' : option.charAt(0).toUpperCase() + option.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {recurrence !== 'none' && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>Recurrence End Date</Text>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowRecurrenceEndPicker(true)}
-                >
-                  <MaterialIcons name="calendar-today" size={20} color="#666" />
-                  <Text style={styles.dateTimeText}>
-                    {recurrenceEnd ? format(recurrenceEnd, 'MMM d, yyyy') : 'Never'}
-                  </Text>
-                </TouchableOpacity>
-
-                {showRecurrenceEndPicker && (
-                  <DateTimePicker
-                    value={recurrenceEnd || new Date()}
-                    mode="date"
-                    display="default"
-                    onChange={onRecurrenceEndChange}
-                  />
-                )}
-              </View>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Date</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text style={styles.dateText}>{format(date, 'MMMM d, yyyy')}</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={date}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowDatePicker(false);
+                  if (selectedDate) setDate(selectedDate);
+                }}
+              />
             )}
           </View>
-        )}
 
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={handleAddReminder}
-          disabled={isProcessing}
-        >
-          <Text style={styles.addButtonText}>
-            {isProcessing ? 'Saving...' : 'Add Reminder'}
-          </Text>
-        </TouchableOpacity>
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Time</Text>
+            <TouchableOpacity
+              style={styles.dateButton}
+              onPress={() => setShowTimePicker(true)}
+            >
+              <Text style={styles.dateText}>{format(time, 'h:mm a')}</Text>
+            </TouchableOpacity>
+            {showTimePicker && (
+              <DateTimePicker
+                value={time}
+                mode="time"
+                display="default"
+                onChange={(event, selectedTime) => {
+                  setShowTimePicker(false);
+                  if (selectedTime) setTime(selectedTime);
+                }}
+              />
+            )}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Category</Text>
+            <View style={styles.categoryContainer}>
+              {categories.map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.categoryButton,
+                    category === cat && styles.categoryButtonActive
+                  ]}
+                  onPress={() => setCategory(cat)}
+                >
+                  <Text style={[
+                    styles.categoryText,
+                    category === cat && styles.categoryTextActive
+                  ]}>
+                    {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.advancedButton}
+            onPress={() => setShowAdvancedOptions(!showAdvancedOptions)}
+          >
+            <Text style={styles.advancedButtonText}>
+              {showAdvancedOptions ? 'Hide' : 'Show'} Advanced Options
+            </Text>
+            <MaterialIcons
+              name={showAdvancedOptions ? 'expand-less' : 'expand-more'}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+
+          {showAdvancedOptions && (
+            <View style={styles.advancedOptions}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Location</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Where should this be triggered?"
+                  value={location || ''}
+                  onChangeText={setLocation}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.label}>Recurrence</Text>
+                <View style={styles.recurrenceContainer}>
+                  {recurrenceOptions.map((option) => (
+                    <TouchableOpacity
+                      key={option}
+                      style={[
+                        styles.recurrenceButton,
+                        recurrence === option && styles.recurrenceButtonActive
+                      ]}
+                      onPress={() => setRecurrence(option as any)}
+                    >
+                      <Text style={[
+                        styles.recurrenceText,
+                        recurrence === option && styles.recurrenceTextActive
+                      ]}>
+                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {recurrence !== 'none' && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.label}>Recurrence End Date</Text>
+                  <TouchableOpacity
+                    style={styles.dateButton}
+                    onPress={() => setShowRecurrenceEndPicker(true)}
+                  >
+                    <Text style={styles.dateText}>
+                      {recurrenceEnd ? format(recurrenceEnd, 'MMMM d, yyyy') : 'Never'}
+                    </Text>
+                  </TouchableOpacity>
+                  {showRecurrenceEndPicker && (
+                    <DateTimePicker
+                      value={recurrenceEnd || new Date()}
+                      mode="date"
+                      display="default"
+                      onChange={(event, selectedDate) => {
+                        setShowRecurrenceEndPicker(false);
+                        if (selectedDate) setRecurrenceEnd(selectedDate);
+                      }}
+                    />
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={handleAddReminder}
+            disabled={isProcessing || !title.trim()}
+          >
+            <Text style={styles.addButtonText}>
+              {isProcessing ? 'Adding...' : 'Add Reminder'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal
@@ -376,10 +331,10 @@ export default function AddReminderScreen() {
         visible={showSuccess}
         animationType="fade"
       >
-        <View style={styles.successModal}>
-          <View style={styles.successContent}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
             <MaterialIcons name="check-circle" size={50} color="#4CAF50" />
-            <Text style={styles.successText}>Reminder Added!</Text>
+            <Text style={styles.modalText}>Reminder Added!</Text>
           </View>
         </View>
       </Modal>
@@ -407,175 +362,188 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
+  closeButton: {
+    padding: 8,
   },
-  input: {
-    flex: 1,
+  naturalLanguageSection: {
     backgroundColor: '#fff',
-    padding: 15,
     borderRadius: 10,
-    fontSize: 16,
+    padding: 15,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-  },
-  voiceButton: {
-    marginLeft: 10,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateTimeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  dateTimeButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginHorizontal: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  dateTimeText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  section: {
-    marginBottom: 20,
   },
   sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  naturalLanguageInput: {
+    height: 100,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    textAlignVertical: 'top',
+    backgroundColor: '#f9f9f9',
+  },
+  parseButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  parseButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  voiceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2196F3',
+    padding: 12,
+    borderRadius: 8,
+  },
+  voiceButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  formSection: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputGroup: {
+    marginBottom: 15,
+  },
+  label: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#666',
-    marginBottom: 10,
+    marginBottom: 8,
+    color: '#555',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#333',
   },
   categoryContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 5,
   },
   categoryButton: {
     paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#e0e0e0',
-    marginRight: 10,
-    marginBottom: 10,
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
+    marginBottom: 8,
   },
-  selectedCategory: {
+  categoryButtonActive: {
     backgroundColor: '#4CAF50',
   },
   categoryText: {
     color: '#666',
   },
-  selectedCategoryText: {
+  categoryTextActive: {
     color: '#fff',
   },
-  advancedOptionsButton: {
+  advancedButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginTop: 10,
   },
-  advancedOptionsText: {
+  advancedButtonText: {
     fontSize: 16,
-    color: '#333',
+    color: '#666',
   },
-  advancedOptionsContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  advancedOptions: {
+    marginTop: 15,
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   recurrenceContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    marginTop: 5,
   },
   recurrenceButton: {
     paddingVertical: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#e0e0e0',
-    marginRight: 10,
-    marginBottom: 10,
+    backgroundColor: '#f0f0f0',
+    marginRight: 8,
+    marginBottom: 8,
   },
-  selectedRecurrence: {
+  recurrenceButtonActive: {
     backgroundColor: '#2196F3',
   },
   recurrenceText: {
     color: '#666',
   },
-  selectedRecurrenceText: {
+  recurrenceTextActive: {
     color: '#fff',
   },
   addButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
-    borderRadius: 10,
+    borderRadius: 8,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    marginTop: 20,
   },
   addButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  successModal: {
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  successContent: {
+  modalContent: {
     backgroundColor: '#fff',
     padding: 30,
     borderRadius: 10,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
-  successText: {
-    marginTop: 15,
+  modalText: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    marginTop: 15,
+    fontWeight: '600',
   },
 });
