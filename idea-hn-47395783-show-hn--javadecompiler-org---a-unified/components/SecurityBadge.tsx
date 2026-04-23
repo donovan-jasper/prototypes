@@ -2,11 +2,11 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface SecurityBadgeProps {
-  score: number;
   severity: 'low' | 'medium' | 'high' | 'critical';
+  score?: number;
 }
 
-const SecurityBadge: React.FC<SecurityBadgeProps> = ({ score, severity }) => {
+const SecurityBadge: React.FC<SecurityBadgeProps> = ({ severity, score }) => {
   const getColor = () => {
     switch (severity) {
       case 'critical':
@@ -22,10 +22,25 @@ const SecurityBadge: React.FC<SecurityBadgeProps> = ({ score, severity }) => {
     }
   };
 
+  const getLabel = () => {
+    switch (severity) {
+      case 'critical':
+        return 'Critical';
+      case 'high':
+        return 'High';
+      case 'medium':
+        return 'Medium';
+      case 'low':
+        return 'Low';
+      default:
+        return 'Unknown';
+    }
+  };
+
   return (
     <View style={[styles.badge, { backgroundColor: getColor() }]}>
-      <Text style={styles.scoreText}>{score}</Text>
-      <Text style={styles.severityText}>{severity}</Text>
+      {score !== undefined && <Text style={styles.scoreText}>{score}</Text>}
+      <Text style={styles.severityText}>{getLabel()}</Text>
     </View>
   );
 };

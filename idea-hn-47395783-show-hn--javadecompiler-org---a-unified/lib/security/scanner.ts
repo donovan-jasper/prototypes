@@ -142,16 +142,16 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
       remediation: 'Use AES-256 instead of DES for encryption.'
     },
     {
-      pattern: /Cipher\.getInstance\("AES\/ECB/g,
-      type: 'aes_ecb',
-      description: 'AES ECB mode detected',
-      remediation: 'Use AES-GCM or AES-CBC with proper initialization vectors instead of ECB mode.'
+      pattern: /Cipher\.getInstance\("AES\/ECB\//g,
+      type: 'ecb_mode',
+      description: 'ECB encryption mode detected',
+      remediation: 'Use CBC or GCM mode instead of ECB for better security.'
     },
     {
-      pattern: /Cipher\.getInstance\("RSA\/ECB/g,
+      pattern: /Cipher\.getInstance\("RSA\/ECB\//g,
       type: 'rsa_ecb',
-      description: 'RSA ECB mode detected',
-      remediation: 'Use RSA-OAEP or RSA-PSS with proper padding instead of ECB mode.'
+      description: 'RSA with ECB mode detected',
+      remediation: 'Use RSA with OAEP padding or switch to ECDSA for better security.'
     }
   ];
 
@@ -159,14 +159,58 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
     const matches = code.matchAll(pattern);
     for (const match of matches) {
       findings.push({
-        type: 'weak_cryptography',
+        type: 'weak_encryption',
         severity: 'high',
         filePath,
         lineNumber: code.substring(0, match.index).split('\n').length,
         codeSnippet: match[0],
         description,
         remediation,
-        details: `This cryptographic algorithm is considered weak and vulnerable to attacks.`,
+        details: `Weak cryptographic algorithms are vulnerable to various attacks and should be replaced with stronger alternatives.`,
+      });
+    }
+  });
+
+  // Insecure storage detection
+  const insecureStoragePatterns = [
+    {
+      pattern: /SharedPreferences\.edit\(\)\.putString\(/g,
+      type: 'shared_prefs_storage',
+      description: 'Potentially insecure SharedPreferences usage detected',
+      remediation: 'Use Android Keystore or encrypted SharedPreferences for sensitive data.'
+    },
+    {
+      pattern: /NSUserDefaults\.setObject:/g,
+      type: 'user_defaults_storage',
+      description: 'Potentially insecure NSUserDefaults usage detected',
+      remediation: 'Use Keychain for sensitive data storage on iOS.'
+    },
+    {
+      pattern: /localStorage\.setItem\(/g,
+      type: 'local_storage',
+      description: 'Potentially insecure localStorage usage detected',
+      remediation: 'Use sessionStorage or encrypted storage for sensitive data.'
+    },
+    {
+      pattern: /AsyncStorage\.setItem\(/g,
+      type: 'async_storage',
+      description: 'Potentially insecure AsyncStorage usage detected',
+      remediation: 'Use encrypted storage or secure storage libraries for sensitive data.'
+    }
+  ];
+
+  insecureStoragePatterns.forEach(({ pattern, type, description, remediation }) => {
+    const matches = code.matchAll(pattern);
+    for (const match of matches) {
+      findings.push({
+        type: 'insecure_storage',
+        severity: 'medium',
+        filePath,
+        lineNumber: code.substring(0, match.index).split('\n').length,
+        codeSnippet: match[0],
+        description,
+        remediation,
+        details: `Storing sensitive data in plaintext storage can lead to data leaks if the device is compromised.`,
       });
     }
   });
@@ -174,25 +218,19 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
   // SQL injection risks
   const sqlInjectionPatterns = [
     {
-      pattern: /String\.format\("SELECT/g,
+      pattern: /String\.format\(.*%s.*SQL/g,
       type: 'sql_injection',
       description: 'Potential SQL injection vulnerability detected',
       remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
     },
     {
-      pattern: /"SELECT " \+ variable/g,
+      pattern: /execSQL\(.*String\.format\(/g,
       type: 'sql_injection',
       description: 'Potential SQL injection vulnerability detected',
       remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
     },
     {
-      pattern: /"INSERT INTO " \+ tableName/g,
-      type: 'sql_injection',
-      description: 'Potential SQL injection vulnerability detected',
-      remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
-    },
-    {
-      pattern: /query\s*=\s*"[^"]*?"\s*\+\s*userInput/g,
+      pattern: /rawQuery\(.*String\.format\(/g,
       type: 'sql_injection',
       description: 'Potential SQL injection vulnerability detected',
       remediation: 'Use parameterized queries or prepared statements instead of string concatenation.'
@@ -203,49 +241,63 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
     const matches = code.matchAll(pattern);
     for (const match of matches) {
       findings.push({
-        type: 'sql_injection_risk',
+        type: 'sql_injection',
         severity: 'high',
         filePath,
         lineNumber: code.substring(0, match.index).split('\n').length,
         codeSnippet: match[0],
         description,
         remediation,
-        details: `This code appears to construct SQL queries by concatenating strings, which can lead to SQL injection attacks.`,
+        details: `String concatenation in SQL queries can lead to SQL injection attacks if user input is not properly sanitized.`,
       });
     }
   });
 
-  // Debug logging detection
+  // XML parsing vulnerabilities
+  const xmlParsingPatterns = [
+    {
+      pattern: /XmlPullParserFactory\.newInstance\(\)/g,
+      type: 'xml_parser',
+      description: 'Potentially unsafe XML parser usage detected',
+      remediation: 'Use XML parsers with security features enabled or consider using a safer alternative.'
+    },
+    {
+      pattern: /DocumentBuilderFactory\.newInstance\(\)/g,
+      type: 'xml_parser',
+      description: 'Potentially unsafe XML parser usage detected',
+      remediation: 'Use XML parsers with security features enabled or consider using a safer alternative.'
+    }
+  ];
+
+  xmlParsingPatterns.forEach(({ pattern, type, description, remediation }) => {
+    const matches = code.matchAll(pattern);
+    for (const match of matches) {
+      findings.push({
+        type: 'xml_parser_vulnerability',
+        severity: 'medium',
+        filePath,
+        lineNumber: code.substring(0, match.index).split('\n').length,
+        codeSnippet: match[0],
+        description,
+        remediation,
+        details: `Default XML parsers may be vulnerable to XXE (XML External Entity) attacks.`,
+      });
+    }
+  });
+
+  // Debug flags detection
   const debugPatterns = [
     {
-      pattern: /console\.log\(/g,
-      type: 'debug_logging',
-      description: 'Debug logging statement detected',
-      remediation: 'Remove debug logging statements or use a proper logging framework with appropriate log levels.'
+      pattern: /android:debuggable="true"/g,
+      type: 'debug_flag',
+      description: 'Debuggable flag enabled in AndroidManifest',
+      remediation: 'Set android:debuggable to false in production builds.'
     },
     {
-      pattern: /System\.out\.println\(/g,
-      type: 'debug_logging',
-      description: 'Debug logging statement detected',
-      remediation: 'Remove debug logging statements or use a proper logging framework with appropriate log levels.'
-    },
-    {
-      pattern: /Log\.d\(/g,
-      type: 'debug_logging',
-      description: 'Debug logging statement detected',
-      remediation: 'Remove debug logging statements or use a proper logging framework with appropriate log levels.'
-    },
-    {
-      pattern: /Log\.v\(/g,
-      type: 'debug_logging',
-      description: 'Debug logging statement detected',
-      remediation: 'Remove debug logging statements or use a proper logging framework with appropriate log levels.'
-    },
-    {
-      pattern: /NSLog\(/g,
-      type: 'debug_logging',
-      description: 'Debug logging statement detected',
-      remediation: 'Remove debug logging statements or use a proper logging framework with appropriate log levels.'
+      pattern: /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsArbitraryLoads<\/key>\s*<true\/>/g,
+      type: 'ats_disabled',
+      description: 'App Transport Security disabled in Info.plist',
+      remediation: 'Enable App Transport Security and properly configure exceptions.'
     }
   ];
 
@@ -253,102 +305,14 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
     const matches = code.matchAll(pattern);
     for (const match of matches) {
       findings.push({
-        type: 'debug_logging',
+        type: 'debug_configuration',
         severity: 'medium',
         filePath,
         lineNumber: code.substring(0, match.index).split('\n').length,
         codeSnippet: match[0],
         description,
         remediation,
-        details: `Debug logging statements can expose sensitive information and should be removed from production code.`,
-      });
-    }
-  });
-
-  // Insecure storage detection
-  const insecureStoragePatterns = [
-    {
-      pattern: /SharedPreferences\.edit\(\)\.putString\(/g,
-      type: 'insecure_storage',
-      description: 'Potentially insecure storage of sensitive data',
-      remediation: 'Use Android Keystore or encrypted SharedPreferences for sensitive data storage.'
-    },
-    {
-      pattern: /NSUserDefaults\.setObject:/g,
-      type: 'insecure_storage',
-      description: 'Potentially insecure storage of sensitive data',
-      remediation: 'Use Keychain for sensitive data storage on iOS.'
-    },
-    {
-      pattern: /AsyncStorage\.setItem\(/g,
-      type: 'insecure_storage',
-      description: 'Potentially insecure storage of sensitive data',
-      remediation: 'Use encrypted storage solutions for sensitive data in React Native.'
-    },
-    {
-      pattern: /localStorage\.setItem\(/g,
-      type: 'insecure_storage',
-      description: 'Potentially insecure storage of sensitive data',
-      remediation: 'Use encrypted storage solutions for sensitive data in web contexts.'
-    }
-  ];
-
-  insecureStoragePatterns.forEach(({ pattern, type, description, remediation }) => {
-    const matches = code.matchAll(pattern);
-    for (const match of matches) {
-      findings.push({
-        type: 'insecure_data_storage',
-        severity: 'high',
-        filePath,
-        lineNumber: code.substring(0, match.index).split('\n').length,
-        codeSnippet: match[0],
-        description,
-        remediation,
-        details: `Storing sensitive data in plaintext storage mechanisms can lead to data exposure if the device is compromised.`,
-      });
-    }
-  });
-
-  // Insecure permissions detection
-  const insecurePermissionsPatterns = [
-    {
-      pattern: /<uses-permission android:name="android.permission.INTERNET" \/>/g,
-      type: 'insecure_permission',
-      description: 'Internet permission detected',
-      remediation: 'Ensure this permission is necessary and properly justified in your app\'s privacy policy.'
-    },
-    {
-      pattern: /<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>/g,
-      type: 'insecure_permission',
-      description: 'External storage read permission detected',
-      remediation: 'Request this permission only when necessary and handle sensitive data appropriately.'
-    },
-    {
-      pattern: /<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" \/>/g,
-      type: 'insecure_permission',
-      description: 'External storage write permission detected',
-      remediation: 'Request this permission only when necessary and handle sensitive data appropriately.'
-    },
-    {
-      pattern: /<uses-permission android:name="android.permission.READ_CONTACTS" \/>/g,
-      type: 'insecure_permission',
-      description: 'Contacts read permission detected',
-      remediation: 'Request this permission only when necessary and handle sensitive data appropriately.'
-    }
-  ];
-
-  insecurePermissionsPatterns.forEach(({ pattern, type, description, remediation }) => {
-    const matches = code.matchAll(pattern);
-    for (const match of matches) {
-      findings.push({
-        type: 'insecure_permission',
-        severity: 'medium',
-        filePath,
-        lineNumber: code.substring(0, match.index).split('\n').length,
-        codeSnippet: match[0],
-        description,
-        remediation,
-        details: `Overly permissive Android permissions can increase the attack surface of your app.`,
+        details: `Debug configurations should be disabled in production builds for security and performance reasons.`,
       });
     }
   });
@@ -357,45 +321,46 @@ export const scanForVulnerabilities = (code: string, filePath: string): Security
 };
 
 export const calculateSecurityScore = (findings: SecurityFinding[]): SecurityScanResult => {
-  if (findings.length === 0) {
-    return {
-      findings: [],
-      score: 100,
-      severity: 'low'
-    };
-  }
-
-  const severityWeights = {
-    critical: 4,
-    high: 3,
-    medium: 2,
-    low: 1
-  };
-
-  let totalWeight = 0;
-  let maxWeight = 0;
+  let score = 100;
+  let highestSeverity: 'low' | 'medium' | 'high' | 'critical' = 'low';
 
   findings.forEach(finding => {
-    const weight = severityWeights[finding.severity];
-    totalWeight += weight;
-    if (weight > maxWeight) {
-      maxWeight = weight;
+    switch (finding.severity) {
+      case 'critical':
+        score -= 20;
+        if (highestSeverity !== 'critical') highestSeverity = 'critical';
+        break;
+      case 'high':
+        score -= 10;
+        if (highestSeverity === 'low' || highestSeverity === 'medium') highestSeverity = 'high';
+        break;
+      case 'medium':
+        score -= 5;
+        if (highestSeverity === 'low') highestSeverity = 'medium';
+        break;
+      case 'low':
+        score -= 2;
+        break;
     }
   });
 
-  // Calculate score based on total weight and max severity
-  const baseScore = Math.max(0, 100 - (totalWeight * 5));
-  const adjustedScore = Math.max(0, baseScore - (maxWeight * 10));
-
-  // Determine overall severity
-  let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
-  if (maxWeight >= 4) severity = 'critical';
-  else if (maxWeight >= 3) severity = 'high';
-  else if (maxWeight >= 2) severity = 'medium';
+  // Ensure score doesn't go below 0
+  score = Math.max(0, score);
 
   return {
     findings,
-    score: Math.round(adjustedScore),
-    severity
+    score: Math.round(score),
+    severity: highestSeverity
   };
+};
+
+export const scanDecompiledCode = async (decompiledFiles: Record<string, string>): Promise<SecurityScanResult> => {
+  const allFindings: SecurityFinding[] = [];
+
+  for (const [filePath, code] of Object.entries(decompiledFiles)) {
+    const findings = scanForVulnerabilities(code, filePath);
+    allFindings.push(...findings);
+  }
+
+  return calculateSecurityScore(allFindings);
 };

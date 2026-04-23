@@ -2,128 +2,86 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import SyntaxHighlighter from 'react-native-syntax-highlighter';
 import { docco } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { SecurityFinding } from '../lib/security/scanner';
 
 interface CodeViewerProps {
   code: string;
   language: string;
-  securityFindings?: SecurityFinding[];
-  onLinePress?: (lineNumber: number) => void;
+  showLineNumbers?: boolean;
+  startingLineNumber?: number;
 }
 
 const CodeViewer: React.FC<CodeViewerProps> = ({
   code,
   language,
-  securityFindings = [],
-  onLinePress
+  showLineNumbers = true,
+  startingLineNumber = 1
 }) => {
-  const lines = code.split('\n');
-  const findingsByLine = securityFindings.reduce((acc, finding) => {
-    if (finding.lineNumber) {
-      acc[finding.lineNumber] = finding;
+  const renderLineNumbers = () => {
+    if (!showLineNumbers) return null;
+
+    const lineCount = code.split('\n').length;
+    const lines = [];
+
+    for (let i = 0; i < lineCount; i++) {
+      lines.push(
+        <Text key={`line-${i}`} style={styles.lineNumber}>
+          {startingLineNumber + i}
+        </Text>
+      );
     }
-    return acc;
-  }, {} as Record<number, SecurityFinding>);
+
+    return <View style={styles.lineNumbers}>{lines}</View>;
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-    >
-      {lines.map((line, index) => {
-        const lineNumber = index + 1;
-        const finding = findingsByLine[lineNumber];
-        const isVulnerable = !!finding;
-
-        return (
-          <View
-            key={index}
-            style={[
-              styles.lineContainer,
-              isVulnerable && styles.vulnerableLine
-            ]}
-          >
-            <Text
-              style={[
-                styles.lineNumber,
-                isVulnerable && styles.vulnerableLineNumber
-              ]}
-              onPress={() => onLinePress?.(lineNumber)}
-            >
-              {lineNumber}
-            </Text>
-            <View style={styles.codeContent}>
-              <SyntaxHighlighter
-                language={language}
-                style={docco}
-                customStyle={styles.syntaxHighlighter}
-                highlighter={"hljs"}
-              >
-                {line}
-              </SyntaxHighlighter>
-            </View>
-            {isVulnerable && (
-              <View style={styles.vulnerabilityIndicator}>
-                <Text style={styles.vulnerabilityText}>{finding.type}</Text>
-              </View>
-            )}
-          </View>
-        );
-      })}
-    </ScrollView>
+    <View style={styles.container}>
+      {renderLineNumbers()}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.codeContainer}
+      >
+        <SyntaxHighlighter
+          language={language}
+          style={docco}
+          customStyle={styles.syntaxHighlighter}
+          highlighter="hljs"
+        >
+          {code}
+        </SyntaxHighlighter>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#f8f8f8',
-  },
-  contentContainer: {
-    padding: 16,
-  },
-  lineContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 4,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
   },
-  vulnerableLine: {
-    backgroundColor: '#fff0f0',
-    borderLeftWidth: 3,
-    borderLeftColor: '#ff4444',
+  lineNumbers: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: '#eee',
+    borderRightWidth: 1,
+    borderRightColor: '#ddd',
   },
   lineNumber: {
-    width: 40,
-    textAlign: 'right',
-    color: '#999',
     fontFamily: 'monospace',
     fontSize: 12,
-    paddingRight: 8,
+    color: '#999',
+    textAlign: 'right',
+    lineHeight: 20,
   },
-  vulnerableLineNumber: {
-    color: '#ff4444',
-    fontWeight: 'bold',
-  },
-  codeContent: {
+  codeContainer: {
     flex: 1,
   },
   syntaxHighlighter: {
-    margin: 0,
-    padding: 0,
-    backgroundColor: 'transparent',
+    fontFamily: 'monospace',
     fontSize: 12,
-  },
-  vulnerabilityIndicator: {
-    backgroundColor: '#ff4444',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginLeft: 8,
-  },
-  vulnerabilityText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: 'bold',
+    padding: 8,
+    backgroundColor: 'transparent',
   },
 });
 

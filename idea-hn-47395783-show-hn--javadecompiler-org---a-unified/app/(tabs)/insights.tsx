@@ -1,14 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useDecompilation } from '../../hooks/useDecompilation';
 import { useSecurityScan } from '../../hooks/useSecurityScan';
 import { SecurityFinding } from '../../lib/security/scanner';
 import { Ionicons } from '@expo/vector-icons';
+import SecurityBadge from '../../components/SecurityBadge';
+import CodeViewer from '../../components/CodeViewer';
 
 const InsightsScreen = () => {
   const { currentDecompilation } = useDecompilation();
-  const { scanResults, isScanning, scanError } = useSecurityScan();
+  const { scanResults, isScanning, scanError, startScan } = useSecurityScan();
   const [selectedSeverity, setSelectedSeverity] = useState<'all' | 'critical' | 'high' | 'medium' | 'low'>('all');
+  const [expandedFinding, setExpandedFinding] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (currentDecompilation && !scanResults.length && !isScanning) {
+      startScan();
+    }
+  }, [currentDecompilation]);
 
   const severityFilters = [
     { label: 'All', value: 'all' },
@@ -32,29 +41,65 @@ const InsightsScreen = () => {
     }
   };
 
-  const renderFinding = ({ item }: { item: SecurityFinding }) => (
-    <View style={styles.findingCard}>
-      <View style={styles.findingHeader}>
-        <Text style={[styles.severityBadge, { backgroundColor: getSeverityColor(item.severity) }]}>
-          {item.severity}
-        </Text>
-        <Text style={styles.findingType}>{item.type}</Text>
-      </View>
-      <Text style={styles.findingFile}>{item.filePath}</Text>
-      <Text style={styles.findingDescription}>{item.description}</Text>
-      <View style={styles.codeSnippet}>
-        <Text style={styles.codeLineNumber}>{item.lineNumber}</Text>
-        <Text style={styles.codeContent}>{item.codeSnippet}</Text>
-      </View>
-      <Text style={styles.remediationTitle}>Remediation:</Text>
-      <Text style={styles.remediationText}>{item.remediation}</Text>
-    </View>
-  );
+  const toggleFinding = (id: string) => {
+    setExpandedFinding(expandedFinding === id ? null : id);
+  };
+
+  const renderFinding = ({ item }: { item: SecurityFinding }) => {
+    const findingId = `${item.filePath}-${item.lineNumber}`;
+    const isExpanded = expandedFinding === findingId;
+
+    return (
+      <TouchableOpacity
+        style={styles.findingCard}
+        onPress={() => toggleFinding(findingId)}
+        activeOpacity={0.9}
+      >
+        <View style={styles.findingHeader}>
+          <SecurityBadge severity={item.severity} score={0} />
+          <Text style={styles.findingType}>{item.type}</Text>
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color="#666"
+            style={styles.expandIcon}
+          />
+        </View>
+        <Text style={styles.findingFile}>{item.filePath}</Text>
+        <Text style={styles.findingDescription}>{item.description}</Text>
+
+        {isExpanded && (
+          <View style={styles.expandedContent}>
+            <Text style={styles.sectionTitle}>Code Context</Text>
+            <View style={styles.codeContainer}>
+              <CodeViewer
+                code={item.codeSnippet}
+                language="java"
+                showLineNumbers={true}
+                startingLineNumber={item.lineNumber}
+              />
+            </View>
+
+            <Text style={styles.sectionTitle}>Remediation</Text>
+            <Text style={styles.remediationText}>{item.remediation}</Text>
+
+            {item.details && (
+              <>
+                <Text style={styles.sectionTitle}>Details</Text>
+                <Text style={styles.detailsText}>{item.details}</Text>
+              </>
+            )}
+          </View>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   if (!currentDecompilation) {
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No decompilation selected</Text>
+        <Ionicons name="document-outline" size={48} color="#999" />
+        <Text style={styles.emptyText}>Select a decompilation to analyze</Text>
       </View>
     );
   }
@@ -62,7 +107,11 @@ const InsightsScreen = () => {
   if (isScanning) {
     return (
       <View style={styles.loadingContainer}>
-        <Text style={styles.loadingText}>Scanning for vulnerabilities...</Text>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text style={styles.loadingText}>Analyzing code for vulnerabilities...</Text>
+        <Text style={styles.progressText}>
+          {scanResults.length} findings detected so far
+        </Text>
       </View>
     );
   }
@@ -70,7 +119,11 @@ const InsightsScreen = () => {
   if (scanError) {
     return (
       <View style={styles.errorContainer}>
+        <Ionicons name="alert-circle-outline" size={48} color="#d32f2f" />
         <Text style={styles.errorText}>Error: {scanError}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={startScan}>
+          <Text style={styles.retryButtonText}>Retry Scan</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -78,11 +131,14 @@ const InsightsScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.summaryContainer}>
-        <Text style={styles.summaryTitle}>Security Overview</Text>
-        <View style={styles.scoreContainer}>
-          <Text style={styles.scoreValue}>{scanResults.length}</Text>
-          <Text style={styles.scoreLabel}>Vulnerabilities</Text>
+        <View style={styles.summaryHeader}>
+          <Text style={styles.summaryTitle}>Security Insights</Text>
+          <SecurityBadge
+            severity={scanResults.length > 0 ? 'critical' : 'low'}
+            score={scanResults.length}
+          />
         </View>
+
         <View style={styles.filterContainer}>
           {severityFilters.map(filter => (
             <TouchableOpacity
@@ -113,6 +169,9 @@ const InsightsScreen = () => {
           <View style={styles.emptyFindingsContainer}>
             <Ionicons name="checkmark-circle" size={48} color="#4CAF50" />
             <Text style={styles.emptyFindingsText}>No vulnerabilities found</Text>
+            <Text style={styles.emptyFindingsSubtext}>
+              Your code appears to be secure based on our analysis
+            </Text>
           </View>
         }
       />
@@ -129,30 +188,53 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
+    marginTop: 16,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
   },
   loadingText: {
     fontSize: 16,
     color: '#666',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  progressText: {
+    fontSize: 14,
+    color: '#999',
+    marginTop: 8,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 24,
   },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
     textAlign: 'center',
+    marginTop: 16,
+  },
+  retryButton: {
+    marginTop: 24,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   summaryContainer: {
     padding: 16,
@@ -160,44 +242,38 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
+  summaryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
   summaryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  scoreContainer: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  scoreValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  scoreLabel: {
-    fontSize: 16,
-    color: '#666',
   },
   filterContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
+    flexWrap: 'wrap',
+    marginTop: 8,
   },
   filterButton: {
-    paddingVertical: 8,
     paddingHorizontal: 12,
-    borderRadius: 20,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+    marginBottom: 8,
     backgroundColor: '#f0f0f0',
   },
   activeFilterButton: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#4CAF50',
   },
   filterText: {
-    fontSize: 14,
     color: '#666',
+    fontSize: 14,
   },
   activeFilterText: {
-    color: '#2196f3',
+    color: 'white',
     fontWeight: 'bold',
   },
   listContainer: {
@@ -219,19 +295,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  severityBadge: {
-    color: 'white',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginRight: 8,
-  },
   findingType: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    marginLeft: 8,
+    flex: 1,
+  },
+  expandIcon: {
+    marginLeft: 8,
   },
   findingFile: {
     fontSize: 14,
@@ -240,45 +311,51 @@ const styles = StyleSheet.create({
   },
   findingDescription: {
     fontSize: 14,
-    color: '#444',
+    color: '#333',
     marginBottom: 12,
   },
-  codeSnippet: {
-    flexDirection: 'row',
+  expandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#444',
+  },
+  codeContainer: {
     backgroundColor: '#f5f5f5',
     borderRadius: 4,
     padding: 8,
-    marginBottom: 12,
-  },
-  codeLineNumber: {
-    color: '#999',
-    marginRight: 8,
-    fontFamily: 'monospace',
-  },
-  codeContent: {
-    flex: 1,
-    fontFamily: 'monospace',
-    fontSize: 12,
-  },
-  remediationTitle: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
+    marginBottom: 16,
   },
   remediationText: {
     fontSize: 14,
-    color: '#444',
+    color: '#333',
+    marginBottom: 16,
+  },
+  detailsText: {
+    fontSize: 14,
+    color: '#555',
   },
   emptyFindingsContainer: {
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 32,
   },
   emptyFindingsText: {
-    fontSize: 16,
-    color: '#666',
+    fontSize: 18,
+    fontWeight: 'bold',
     marginTop: 16,
+    color: '#4CAF50',
+  },
+  emptyFindingsSubtext: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

@@ -1,49 +1,38 @@
-import { useState, useEffect } from 'react';
-import { scanForVulnerabilities, calculateSecurityScore, SecurityScanResult } from '../lib/security/scanner';
+import { useState, useCallback } from 'react';
+import { scanDecompiledCode } from '../lib/security/scanner';
 import { useDecompilation } from './useDecompilation';
+import { SecurityFinding, SecurityScanResult } from '../lib/security/scanner';
 
 export const useSecurityScan = () => {
   const { currentDecompilation } = useDecompilation();
-  const [scanResults, setScanResults] = useState<SecurityScanResult>({
-    findings: [],
-    score: 100,
-    severity: 'low',
-  });
+  const [scanResults, setScanResults] = useState<SecurityFinding[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!currentDecompilation) return;
+  const startScan = useCallback(async () => {
+    if (!currentDecompilation?.decompiledFiles) {
+      setScanError('No decompiled files available');
+      return;
+    }
 
-    const performScan = async () => {
-      setIsScanning(true);
-      setScanError(null);
+    setIsScanning(true);
+    setScanError(null);
 
-      try {
-        // In a real app, we would scan all files in the decompilation
-        // For this example, we'll just scan the first file
-        const firstFile = currentDecompilation.files[0];
-        if (!firstFile) {
-          throw new Error('No files found in decompilation');
-        }
-
-        const findings = scanForVulnerabilities(firstFile.content, firstFile.path);
-        const result = calculateSecurityScore(findings);
-
-        setScanResults(result);
-      } catch (error) {
-        setScanError(error instanceof Error ? error.message : 'Unknown error occurred');
-      } finally {
-        setIsScanning(false);
-      }
-    };
-
-    performScan();
+    try {
+      const result = await scanDecompiledCode(currentDecompilation.decompiledFiles);
+      setScanResults(result.findings);
+    } catch (error) {
+      setScanError(error instanceof Error ? error.message : 'Unknown error occurred');
+      console.error('Security scan failed:', error);
+    } finally {
+      setIsScanning(false);
+    }
   }, [currentDecompilation]);
 
   return {
     scanResults,
     isScanning,
     scanError,
+    startScan,
   };
 };
