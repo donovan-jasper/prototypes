@@ -1,56 +1,74 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Switch, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, Switch, StyleSheet, TouchableOpacity, Platform, Alert } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { NightShiftSchedule } from '@/types';
 import * as SecureStore from 'expo-secure-store';
 import * as TaskManager from 'expo-task-manager';
 import { registerNightShiftTask } from '@/services/background/nightShiftTask';
+import { useNightShift } from '@/hooks/useNightShift';
 
 const NIGHT_SHIFT_TASK_NAME = 'night-shift-task';
 
 const NightShiftScheduler = () => {
-  const [schedule, setSchedule] = useState<NightShiftSchedule>({
-    enabled: false,
-    startHour: 2,
-    endHour: 6,
-    requiresCharging: true,
-    minBatteryLevel: 20,
-  });
+  const { schedule, saveSchedule, isInWindow } = useNightShift();
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
+  const [nextRunTime, setNextRunTime] = useState<string | null>(null);
 
   useEffect(() => {
-    loadSchedule();
-  }, []);
+    calculateNextRunTime();
+  }, [schedule]);
 
-  const loadSchedule = async () => {
-    try {
-      const storedSchedule = await SecureStore.getItemAsync('nightShiftSchedule');
-      if (storedSchedule) {
-        const parsedSchedule = JSON.parse(storedSchedule);
-        setSchedule(parsedSchedule);
-        if (parsedSchedule.enabled) {
-          await registerNightShiftTask();
-        }
+  const calculateNextRunTime = () => {
+    if (!schedule.enabled) {
+      setNextRunTime(null);
+      return;
+    }
+
+    const now = new Date();
+    const currentHour = now.getHours();
+
+    if (schedule.startHour < schedule.endHour) {
+      // Window doesn't cross midnight
+      if (currentHour < schedule.startHour) {
+        // Next run is today at start hour
+        const nextRun = new Date(now);
+        nextRun.setHours(schedule.startHour, 0, 0, 0);
+        setNextRunTime(formatDateTime(nextRun));
+      } else if (currentHour < schedule.endHour) {
+        // Currently in window
+        setNextRunTime('Now');
+      } else {
+        // Next run is tomorrow at start hour
+        const nextRun = new Date(now);
+        nextRun.setDate(nextRun.getDate() + 1);
+        nextRun.setHours(schedule.startHour, 0, 0, 0);
+        setNextRunTime(formatDateTime(nextRun));
       }
-    } catch (error) {
-      console.error('Error loading schedule:', error);
+    } else {
+      // Window crosses midnight
+      if (currentHour < schedule.endHour) {
+        // Currently in window (before midnight)
+        setNextRunTime('Now');
+      } else if (currentHour >= schedule.startHour) {
+        // Currently in window (after midnight)
+        setNextRunTime('Now');
+      } else {
+        // Next run is today at start hour
+        const nextRun = new Date(now);
+        nextRun.setHours(schedule.startHour, 0, 0, 0);
+        setNextRunTime(formatDateTime(nextRun));
+      }
     }
   };
 
-  const saveSchedule = async (newSchedule: NightShiftSchedule) => {
-    try {
-      await SecureStore.setItemAsync('nightShiftSchedule', JSON.stringify(newSchedule));
-      setSchedule(newSchedule);
-
-      if (newSchedule.enabled) {
-        await registerNightShiftTask();
-      } else {
-        await TaskManager.unregisterTaskAsync(NIGHT_SHIFT_TASK_NAME);
-      }
-    } catch (error) {
-      console.error('Error saving schedule:', error);
-    }
+  const formatDateTime = (date: Date) => {
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const toggleEnabled = () => {
@@ -62,6 +80,14 @@ const NightShiftScheduler = () => {
     setShowStartTimePicker(Platform.OS === 'ios');
     if (selectedTime) {
       const newStartHour = selectedTime.getHours();
+      if (newStartHour >= schedule.endHour) {
+        Alert.alert(
+          'Invalid Time',
+          'Start time must be before end time',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       saveSchedule({ ...schedule, startHour: newStartHour });
     }
   };
@@ -70,6 +96,14 @@ const NightShiftScheduler = () => {
     setShowEndTimePicker(Platform.OS === 'ios');
     if (selectedTime) {
       const newEndHour = selectedTime.getHours();
+      if (newEndHour <= schedule.startHour) {
+        Alert.alert(
+          'Invalid Time',
+          'End time must be after start time',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
       saveSchedule({ ...schedule, endHour: newEndHour });
     }
   };
@@ -99,6 +133,13 @@ const NightShiftScheduler = () => {
           thumbColor={schedule.enabled ? '#f5dd4b' : '#f4f3f4'}
         />
       </View>
+
+      {schedule.enabled && nextRunTime && (
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusLabel}>Status: Active</Text>
+          <Text style={styles.nextRunLabel}>Next Run: {nextRunTime}</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Time Window</Text>
@@ -158,28 +199,9 @@ const NightShiftScheduler = () => {
         <View style={styles.row}>
           <Text style={styles.label}>Minimum Battery Level:</Text>
           <View style={styles.batteryLevelContainer}>
-            {[20, 30, 40, 50].map(level => (
-              <TouchableOpacity
-                key={level}
-                style={[
-                  styles.batteryLevelButton,
-                  schedule.minBatteryLevel === level && styles.selectedBatteryLevel
-                ]}
-                onPress={() => updateMinBatteryLevel(level)}
-              >
-                <Text style={styles.batteryLevelText}>{level}%</Text>
-              </TouchableOpacity>
-            ))}
+            <Text style={styles.batteryLevelText}>{schedule.minBatteryLevel}%</Text>
           </View>
         </View>
-      </View>
-
-      <View style={styles.statusContainer}>
-        <Text style={styles.statusText}>
-          {schedule.enabled
-            ? `Night Shift is active from ${formatTime(schedule.startHour)} to ${formatTime(schedule.endHour)}`
-            : 'Night Shift is currently disabled'}
-        </Text>
       </View>
     </View>
   );
@@ -187,90 +209,82 @@ const NightShiftScheduler = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  section: {
-    backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
-    marginBottom: 15,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  title: {
     fontSize: 18,
+    fontWeight: 'bold',
+  },
+  statusContainer: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f0f8ff',
+    borderRadius: 8,
+  },
+  statusLabel: {
+    fontSize: 16,
+    color: '#2e8b57',
+    marginBottom: 4,
+  },
+  nextRunLabel: {
+    fontSize: 14,
+    color: '#555',
+  },
+  section: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 10,
-    color: '#444',
+    marginBottom: 8,
+    color: '#333',
   },
   timeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
+  },
+  label: {
+    fontSize: 14,
+    color: '#555',
+    flex: 1,
+  },
+  timeButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+  },
+  timeText: {
+    fontSize: 14,
+    color: '#333',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 16,
-    color: '#555',
-    marginRight: 10,
-    flex: 1,
-  },
-  timeButton: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-  },
-  timeText: {
-    fontSize: 16,
-    color: '#333',
+    marginBottom: 12,
   },
   batteryLevelContainer: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  batteryLevelButton: {
     padding: 8,
-    marginLeft: 5,
-    borderRadius: 5,
     backgroundColor: '#f0f0f0',
-  },
-  selectedBatteryLevel: {
-    backgroundColor: '#81b0ff',
+    borderRadius: 4,
   },
   batteryLevelText: {
     fontSize: 14,
     color: '#333',
-  },
-  statusContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 10,
-  },
-  statusText: {
-    fontSize: 16,
-    color: '#1976d2',
-    textAlign: 'center',
   },
 });
 
