@@ -20,7 +20,6 @@ import { Recipient, SentGift } from '../../types';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import RecipientList from '../../components/RecipientList';
 
 export default function VaultScreen() {
   const router = useRouter();
@@ -180,84 +179,44 @@ export default function VaultScreen() {
     }
   };
 
-  const handleDateChange = (type: 'birthday' | 'anniversary', date: Date) => {
-    if (type === 'birthday') {
-      setNewRecipient({
-        ...newRecipient,
-        preferences: {
-          ...newRecipient.preferences,
-          birthday: date.toISOString(),
-        },
-      });
-      setShowBirthdayPicker(false);
-    } else {
-      setNewRecipient({
-        ...newRecipient,
-        preferences: {
-          ...newRecipient.preferences,
-          anniversary: date.toISOString(),
-        },
-      });
-      setShowAnniversaryPicker(false);
-    }
-  };
-
-  const handleEditDateChange = (type: 'birthday' | 'anniversary', date: Date) => {
-    if (!currentRecipient) return;
-
-    setCurrentRecipient({
-      ...currentRecipient,
-      preferences: {
-        ...currentRecipient.preferences,
-        [type]: date.toISOString(),
-      },
-    });
-
-    if (type === 'birthday') {
-      setShowBirthdayPicker(false);
-    } else {
-      setShowAnniversaryPicker(false);
-    }
+  const handleEditRecipient = (recipient: Recipient) => {
+    setCurrentRecipient(recipient);
+    setShowEditModal(true);
   };
 
   const renderRecipientItem = ({ item }: { item: Recipient }) => (
-    <TouchableOpacity
-      style={styles.recipientItem}
-      onPress={() => {
-        setCurrentRecipient(item);
-        setShowEditModal(true);
-      }}
-      activeOpacity={0.7}
-    >
-      <View style={styles.avatarContainer}>
-        <Text style={styles.avatarText}>{item.name.charAt(0).toUpperCase()}</Text>
-      </View>
+    <View style={styles.recipientItem}>
       <View style={styles.recipientInfo}>
         <Text style={styles.recipientName}>{item.name}</Text>
-        {item.lastGift && (
-          <Text style={styles.lastGiftText}>
-            Last gift sent: {formatDate(item.lastGift.sentAt)}
-          </Text>
-        )}
         {item.email && <Text style={styles.recipientContact}>{item.email}</Text>}
         {item.phone && <Text style={styles.recipientContact}>{item.phone}</Text>}
+        {item.preferences?.birthday && (
+          <Text style={styles.recipientDate}>
+            Birthday: {formatDate(item.preferences.birthday)}
+          </Text>
+        )}
+        {item.lastGift && (
+          <Text style={styles.lastGiftDate}>
+            Last gift sent: {new Date(item.lastGift.sent_at).toLocaleDateString()}
+          </Text>
+        )}
       </View>
-      <TouchableOpacity
-        onPress={() => handleDeleteRecipient(item)}
-        style={styles.deleteButton}
-      >
-        <Ionicons name="trash-outline" size={24} color="#ff3b30" />
-      </TouchableOpacity>
-    </TouchableOpacity>
+      <View style={styles.recipientActions}>
+        <TouchableOpacity
+          style={styles.editButton}
+          onPress={() => handleEditRecipient(item)}
+        >
+          <Ionicons name="create-outline" size={24} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.deleteButton}
+          onPress={() => handleDeleteRecipient(item)}
+        >
+          <Ionicons name="trash-outline" size={24} color="#ff3b30" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -267,23 +226,25 @@ export default function VaultScreen() {
           style={styles.addButton}
           onPress={() => setShowAddModal(true)}
         >
-          <Ionicons name="add" size={24} color="white" />
+          <Ionicons name="add" size={24} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {recipients.length === 0 ? (
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={styles.loading} />
+      ) : recipients.length === 0 ? (
         <View style={styles.emptyState}>
-          <Text style={styles.emptyStateText}>No recipients yet</Text>
-          <Text style={styles.emptyStateSubtext}>
-            Add your first recipient to start sending gifts
-          </Text>
+          <Text style={styles.emptyText}>No recipients yet</Text>
+          <Text style={styles.emptySubtext}>Add your first recipient to get started</Text>
         </View>
       ) : (
-        <RecipientList
-          data={recipients}
-          renderItem={renderRecipientItem}
-          keyExtractor={(item) => item.id.toString()}
-        />
+        <ScrollView style={styles.recipientList}>
+          {recipients.map((recipient) => (
+            <View key={recipient.id} style={styles.recipientItemContainer}>
+              {renderRecipientItem({ item: recipient })}
+            </View>
+          ))}
+        </ScrollView>
       )}
 
       {/* Add Recipient Modal */}
@@ -323,36 +284,37 @@ export default function VaultScreen() {
               keyboardType="phone-pad"
             />
 
-            <View style={styles.datePickerContainer}>
-              <Text style={styles.datePickerLabel}>Birthday</Text>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowBirthdayPicker(true)}
-              >
-                <Text style={styles.datePickerText}>
-                  {newRecipient.preferences.birthday
-                    ? formatDate(newRecipient.preferences.birthday)
-                    : 'Select date'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowBirthdayPicker(true)}
+            >
+              <Text style={styles.datePickerText}>
+                Birthday: {formatDate(newRecipient.preferences.birthday)}
+              </Text>
+            </TouchableOpacity>
 
-            <View style={styles.datePickerContainer}>
-              <Text style={styles.datePickerLabel}>Anniversary</Text>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowAnniversaryPicker(true)}
-              >
-                <Text style={styles.datePickerText}>
-                  {newRecipient.preferences.anniversary
-                    ? formatDate(newRecipient.preferences.anniversary)
-                    : 'Select date'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            {showBirthdayPicker && (
+              <DateTimePicker
+                value={newRecipient.preferences.birthday ? new Date(newRecipient.preferences.birthday) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowBirthdayPicker(false);
+                  if (selectedDate) {
+                    setNewRecipient({
+                      ...newRecipient,
+                      preferences: {
+                        ...newRecipient.preferences,
+                        birthday: selectedDate.toISOString(),
+                      },
+                    });
+                  }
+                }}
+              />
+            )}
 
-            <View style={styles.switchContainer}>
-              <Text style={styles.switchLabel}>Reminders</Text>
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>Birthday Reminders</Text>
               <Switch
                 value={newRecipient.preferences.notificationsEnabled}
                 onValueChange={(value) =>
@@ -367,17 +329,13 @@ export default function VaultScreen() {
               />
             </View>
 
-            <View style={styles.buttonRow}>
+            <View style={styles.modalActions}>
               <TouchableOpacity
                 style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowAddModal(false);
-                  resetNewRecipient();
-                }}
+                onPress={() => setShowAddModal(false)}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
-
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={handleAddRecipient}
@@ -386,40 +344,6 @@ export default function VaultScreen() {
               </TouchableOpacity>
             </View>
           </ScrollView>
-
-          {showBirthdayPicker && (
-            <DateTimePicker
-              value={newRecipient.preferences.birthday
-                ? new Date(newRecipient.preferences.birthday)
-                : new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, date) => {
-                if (date) {
-                  handleDateChange('birthday', date);
-                } else {
-                  setShowBirthdayPicker(false);
-                }
-              }}
-            />
-          )}
-
-          {showAnniversaryPicker && (
-            <DateTimePicker
-              value={newRecipient.preferences.anniversary
-                ? new Date(newRecipient.preferences.anniversary)
-                : new Date()}
-              mode="date"
-              display="default"
-              onChange={(event, date) => {
-                if (date) {
-                  handleDateChange('anniversary', date);
-                } else {
-                  setShowAnniversaryPicker(false);
-                }
-              }}
-            />
-          )}
         </KeyboardAvoidingView>
       </Modal>
 
@@ -461,36 +385,41 @@ export default function VaultScreen() {
                 keyboardType="phone-pad"
               />
 
-              <View style={styles.datePickerContainer}>
-                <Text style={styles.datePickerLabel}>Birthday</Text>
-                <TouchableOpacity
-                  style={styles.datePickerButton}
-                  onPress={() => setShowBirthdayPicker(true)}
-                >
-                  <Text style={styles.datePickerText}>
-                    {currentRecipient.preferences?.birthday
-                      ? formatDate(currentRecipient.preferences.birthday)
-                      : 'Select date'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={styles.datePickerButton}
+                onPress={() => setShowBirthdayPicker(true)}
+              >
+                <Text style={styles.datePickerText}>
+                  Birthday: {formatDate(currentRecipient.preferences?.birthday || '')}
+                </Text>
+              </TouchableOpacity>
 
-              <View style={styles.datePickerContainer}>
-                <Text style={styles.datePickerLabel}>Anniversary</Text>
-                <TouchableOpacity
-                  style={styles.datePickerButton}
-                  onPress={() => setShowAnniversaryPicker(true)}
-                >
-                  <Text style={styles.datePickerText}>
-                    {currentRecipient.preferences?.anniversary
-                      ? formatDate(currentRecipient.preferences.anniversary)
-                      : 'Select date'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              {showBirthdayPicker && (
+                <DateTimePicker
+                  value={
+                    currentRecipient.preferences?.birthday
+                      ? new Date(currentRecipient.preferences.birthday)
+                      : new Date()
+                  }
+                  mode="date"
+                  display="default"
+                  onChange={(event, selectedDate) => {
+                    setShowBirthdayPicker(false);
+                    if (selectedDate && currentRecipient) {
+                      setCurrentRecipient({
+                        ...currentRecipient,
+                        preferences: {
+                          ...currentRecipient.preferences,
+                          birthday: selectedDate.toISOString(),
+                        },
+                      });
+                    }
+                  }}
+                />
+              )}
 
-              <View style={styles.switchContainer}>
-                <Text style={styles.switchLabel}>Reminders</Text>
+              <View style={styles.toggleContainer}>
+                <Text style={styles.toggleLabel}>Birthday Reminders</Text>
                 <Switch
                   value={currentRecipient.preferences?.notificationsEnabled || false}
                   onValueChange={(value) =>
@@ -505,56 +434,21 @@ export default function VaultScreen() {
                 />
               </View>
 
-              <View style={styles.buttonRow}>
+              <View style={styles.modalActions}>
                 <TouchableOpacity
                   style={[styles.modalButton, styles.cancelButton]}
                   onPress={() => setShowEditModal(false)}
                 >
                   <Text style={styles.modalButtonText}>Cancel</Text>
                 </TouchableOpacity>
-
                 <TouchableOpacity
                   style={[styles.modalButton, styles.saveButton]}
                   onPress={handleUpdateRecipient}
                 >
-                  <Text style={styles.modalButtonText}>Save</Text>
+                  <Text style={styles.modalButtonText}>Update</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
-
-            {showBirthdayPicker && (
-              <DateTimePicker
-                value={currentRecipient.preferences?.birthday
-                  ? new Date(currentRecipient.preferences.birthday)
-                  : new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  if (date) {
-                    handleEditDateChange('birthday', date);
-                  } else {
-                    setShowBirthdayPicker(false);
-                  }
-                }}
-              />
-            )}
-
-            {showAnniversaryPicker && (
-              <DateTimePicker
-                value={currentRecipient.preferences?.anniversary
-                  ? new Date(currentRecipient.preferences.anniversary)
-                  : new Date()}
-                mode="date"
-                display="default"
-                onChange={(event, date) => {
-                  if (date) {
-                    handleEditDateChange('anniversary', date);
-                  } else {
-                    setShowAnniversaryPicker(false);
-                  }
-                }}
-              />
-            )}
           </KeyboardAvoidingView>
         </Modal>
       )}
@@ -567,19 +461,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 24,
@@ -594,70 +483,78 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 20,
   },
-  emptyStateText: {
+  emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 8,
-    textAlign: 'center',
   },
-  emptyStateSubtext: {
-    fontSize: 16,
+  emptySubtext: {
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
   },
+  recipientList: {
+    flex: 1,
+  },
+  recipientItemContainer: {
+    marginBottom: 8,
+  },
   recipientItem: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
+    borderBottomColor: '#eee',
   },
   recipientInfo: {
     flex: 1,
   },
   recipientName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
-  },
-  lastGiftText: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+    marginBottom: 4,
   },
   recipientContact: {
     fontSize: 14,
     color: '#666',
-    marginTop: 2,
+    marginBottom: 2,
   },
-  deleteButton: {
-    padding: 8,
+  recipientDate: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
+  lastGiftDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  recipientActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  editButton: {
+    marginRight: 16,
+  },
+  deleteButton: {},
   modalContainer: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
   },
   modalContent: {
     padding: 20,
@@ -671,64 +568,55 @@ const styles = StyleSheet.create({
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 12,
     marginBottom: 16,
     fontSize: 16,
-  },
-  datePickerContainer: {
-    marginBottom: 16,
-  },
-  datePickerLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 8,
   },
   datePickerButton: {
     height: 50,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#ddd',
     borderRadius: 8,
     paddingHorizontal: 12,
+    marginBottom: 16,
     justifyContent: 'center',
   },
   datePickerText: {
     fontSize: 16,
     color: '#333',
   },
-  switchContainer: {
+  toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  switchLabel: {
+  toggleLabel: {
     fontSize: 16,
     color: '#333',
   },
-  buttonRow: {
+  modalActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 20,
   },
   modalButton: {
-    flex: 1,
-    height: 50,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 4,
+    marginLeft: 10,
   },
   cancelButton: {
-    backgroundColor: '#e0e0e0',
+    backgroundColor: '#f0f0f0',
   },
   saveButton: {
     backgroundColor: '#007AFF',
   },
   modalButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });

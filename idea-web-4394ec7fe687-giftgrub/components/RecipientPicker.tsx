@@ -169,18 +169,8 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.addNewButton}
-        onPress={() => setShowAddModal(true)}
-      >
-        <Ionicons name="add-circle" size={24} color="#007AFF" />
-        <Text style={styles.addNewText}>Add New Recipient</Text>
-      </TouchableOpacity>
-
       {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-        </View>
+        <ActivityIndicator size="large" color="#007AFF" style={styles.loading} />
       ) : filteredRecipients.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -189,6 +179,7 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
           renderItem={renderRecipientItem}
           keyExtractor={(item) => item.id.toString()}
           contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
 
@@ -196,7 +187,6 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
       <Modal
         visible={showAddModal}
         animationType="slide"
-        presentationStyle="pageSheet"
         onRequestClose={() => setShowAddModal(false)}
       >
         <KeyboardAvoidingView
@@ -204,16 +194,11 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
           style={styles.modalContainer}
         >
           <ScrollView contentContainerStyle={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Recipient</Text>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Ionicons name="close" size={24} color="#000" />
-              </TouchableOpacity>
-            </View>
+            <Text style={styles.modalTitle}>Add New Recipient</Text>
 
             <TextInput
               style={styles.input}
-              placeholder="Full Name"
+              placeholder="Name*"
               value={newRecipient.name}
               onChangeText={(text) => setNewRecipient({ ...newRecipient, name: text })}
               autoFocus
@@ -221,7 +206,7 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
 
             <TextInput
               style={styles.input}
-              placeholder="Email (optional)"
+              placeholder="Email"
               value={newRecipient.email}
               onChangeText={(text) => setNewRecipient({ ...newRecipient, email: text })}
               keyboardType="email-address"
@@ -229,80 +214,43 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
 
             <TextInput
               style={styles.input}
-              placeholder="Phone (optional)"
+              placeholder="Phone"
               value={newRecipient.phone}
               onChangeText={(text) => setNewRecipient({ ...newRecipient, phone: text })}
               keyboardType="phone-pad"
             />
 
-            <View style={styles.datePickerContainer}>
-              <Text style={styles.label}>Birthday</Text>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowBirthdayPicker(true)}
-              >
-                <Text style={styles.dateText}>
-                  {newRecipient.preferences.birthday
-                    ? formatDate(newRecipient.preferences.birthday)
-                    : 'Select date'}
-                </Text>
-              </TouchableOpacity>
-              {showBirthdayPicker && (
-                <DateTimePicker
-                  value={new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowBirthdayPicker(false);
-                    if (date) {
-                      setNewRecipient({
-                        ...newRecipient,
-                        preferences: {
-                          ...newRecipient.preferences,
-                          birthday: date.toISOString(),
-                        },
-                      });
-                    }
-                  }}
-                />
-              )}
-            </View>
+            <TouchableOpacity
+              style={styles.datePickerButton}
+              onPress={() => setShowBirthdayPicker(true)}
+            >
+              <Text style={styles.datePickerText}>
+                Birthday: {formatDate(newRecipient.preferences.birthday)}
+              </Text>
+            </TouchableOpacity>
 
-            <View style={styles.datePickerContainer}>
-              <Text style={styles.label}>Anniversary</Text>
-              <TouchableOpacity
-                style={styles.datePickerButton}
-                onPress={() => setShowAnniversaryPicker(true)}
-              >
-                <Text style={styles.dateText}>
-                  {newRecipient.preferences.anniversary
-                    ? formatDate(newRecipient.preferences.anniversary)
-                    : 'Select date'}
-                </Text>
-              </TouchableOpacity>
-              {showAnniversaryPicker && (
-                <DateTimePicker
-                  value={new Date()}
-                  mode="date"
-                  display="default"
-                  onChange={(event, date) => {
-                    setShowAnniversaryPicker(false);
-                    if (date) {
-                      setNewRecipient({
-                        ...newRecipient,
-                        preferences: {
-                          ...newRecipient.preferences,
-                          anniversary: date.toISOString(),
-                        },
-                      });
-                    }
-                  }}
-                />
-              )}
-            </View>
+            {showBirthdayPicker && (
+              <DateTimePicker
+                value={newRecipient.preferences.birthday ? new Date(newRecipient.preferences.birthday) : new Date()}
+                mode="date"
+                display="default"
+                onChange={(event, selectedDate) => {
+                  setShowBirthdayPicker(false);
+                  if (selectedDate) {
+                    setNewRecipient({
+                      ...newRecipient,
+                      preferences: {
+                        ...newRecipient.preferences,
+                        birthday: selectedDate.toISOString(),
+                      },
+                    });
+                  }
+                }}
+              />
+            )}
 
-            <View style={styles.switchContainer}>
-              <Text style={styles.label}>Enable Notifications</Text>
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>Birthday Reminders</Text>
               <Switch
                 value={newRecipient.preferences.notificationsEnabled}
                 onValueChange={(value) =>
@@ -317,17 +265,25 @@ export default function RecipientPicker({ onSelect, onAddNew }: RecipientPickerP
               />
             </View>
 
-            <TouchableOpacity
-              style={styles.saveButton}
-              onPress={handleAddRecipient}
-              disabled={saving}
-            >
-              {saving ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.saveButtonText}>Add Recipient</Text>
-              )}
-            </TouchableOpacity>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowAddModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleAddRecipient}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.modalButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </ScrollView>
         </KeyboardAvoidingView>
       </Modal>
@@ -343,45 +299,30 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    margin: 16,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
     fontSize: 16,
+    color: '#333',
   },
-  addNewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  addNewText: {
-    marginLeft: 8,
-    fontSize: 16,
-    color: '#007AFF',
-  },
-  loadingContainer: {
+  loading: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
   listContent: {
-    paddingBottom: 16,
+    paddingVertical: 8,
   },
   recipientItem: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   avatarContainer: {
     width: 40,
@@ -402,18 +343,24 @@ const styles = StyleSheet.create({
   },
   recipientName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: '#333',
   },
   recipientContact: {
     fontSize: 14,
     color: '#666',
     marginTop: 2,
   },
+  separator: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginLeft: 72,
+  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 20,
   },
   emptyStateText: {
     fontSize: 16,
@@ -423,74 +370,80 @@ const styles = StyleSheet.create({
   },
   addButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
+    borderRadius: 8,
   },
   addButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
     backgroundColor: '#fff',
   },
   modalContent: {
-    padding: 16,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
+    padding: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
   },
   input: {
+    height: 50,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
     marginBottom: 16,
     fontSize: 16,
   },
-  datePickerContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-  },
   datePickerButton: {
+    height: 50,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    justifyContent: 'center',
   },
-  dateText: {
+  datePickerText: {
     fontSize: 16,
     color: '#333',
   },
-  switchContainer: {
+  toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  modalButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
   },
   saveButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
   },
-  saveButtonText: {
+  modalButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
