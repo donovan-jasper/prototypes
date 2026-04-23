@@ -7,6 +7,7 @@ import {
   getCompletedSessions as dbGetCompletedSessions,
 } from '../database/queries';
 import { SessionRecord } from '../database/schema';
+import { cueScheduler } from './cueScheduler';
 
 export interface Session {
   id: string;
@@ -22,7 +23,7 @@ class SessionManager {
   async createSession(durationMinutes: number, soundscapeId?: string): Promise<Session> {
     const id = Date.now().toString();
     await dbCreateSession(id, durationMinutes, soundscapeId || null);
-    
+
     const session: Session = {
       id,
       durationMinutes,
@@ -30,22 +31,37 @@ class SessionManager {
       status: 'pending',
       soundscapeId,
     };
-    
+
     return session;
   }
 
   async startSession(sessionId: string): Promise<Session | null> {
+    const session = await this.getSession(sessionId);
+    if (!session) return null;
+
+    // Initialize cue scheduler with the session
+    cueScheduler.initialize(session);
+
     await updateSessionStatus(sessionId, 'active');
-    return this.getSession(sessionId);
+    const updatedSession = await this.getSession(sessionId);
+
+    if (updatedSession) {
+      // Start the cue scheduler
+      cueScheduler.start();
+    }
+
+    return updatedSession;
   }
 
   async pauseSession(sessionId: string): Promise<Session | null> {
     await updateSessionStatus(sessionId, 'paused');
+    cueScheduler.pause();
     return this.getSession(sessionId);
   }
 
   async resumeSession(sessionId: string): Promise<Session | null> {
     await updateSessionStatus(sessionId, 'active');
+    cueScheduler.resume();
     return this.getSession(sessionId);
   }
 
@@ -53,19 +69,21 @@ class SessionManager {
     const endTime = Date.now();
     await updateSessionStatus(sessionId, 'completed', endTime);
     await updateSessionEnergyRating(sessionId, energyRating);
+    cueScheduler.stop();
     return this.getSession(sessionId);
   }
 
   async interruptSession(sessionId: string): Promise<Session | null> {
     const endTime = Date.now();
     await updateSessionStatus(sessionId, 'interrupted', endTime);
+    cueScheduler.stop();
     return this.getSession(sessionId);
   }
 
   async getSession(sessionId: string): Promise<Session | null> {
     const record = await dbGetSession(sessionId);
     if (!record) return null;
-    
+
     return this.recordToSession(record);
   }
 
