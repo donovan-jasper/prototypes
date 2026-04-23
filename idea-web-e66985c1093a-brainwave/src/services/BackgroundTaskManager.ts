@@ -11,10 +11,11 @@ const BACKGROUND_TASK_NAME = 'flowguard-drowsiness-monitor';
 export class BackgroundTaskManager {
   private detectionEngine: DetectionEngine;
   private alertService: AlertService;
-  private databaseService: DatabaseService;
+  public databaseService: DatabaseService;
   private sensorService: SensorService;
   private alertManager: AlertManager;
   private isInitialized: boolean = false;
+  private isTaskRegistered: boolean = false;
 
   constructor() {
     this.detectionEngine = new DetectionEngine('study');
@@ -47,6 +48,8 @@ export class BackgroundTaskManager {
       await this.initialize();
     }
 
+    if (this.isTaskRegistered) return;
+
     // Define the background task
     TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
       try {
@@ -76,16 +79,22 @@ export class BackgroundTaskManager {
       stopOnTerminate: false,
       startOnBoot: true,
     });
+
+    this.isTaskRegistered = true;
   }
 
   async unregisterBackgroundTask(): Promise<void> {
+    if (!this.isTaskRegistered) return;
+
     await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TASK_NAME);
+    this.isTaskRegistered = false;
   }
 
   async cleanup(): Promise<void> {
     await this.sensorService.stopMonitoring();
     await this.alertService.cleanup();
     await this.databaseService.close();
+    await this.unregisterBackgroundTask();
   }
 
   async startMonitoring(): Promise<void> {

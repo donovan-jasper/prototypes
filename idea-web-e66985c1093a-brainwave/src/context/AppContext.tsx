@@ -14,6 +14,8 @@ interface AppContextType {
   stopSession: () => void;
   recordDrowsinessEvent: () => void;
   setActiveProfile: (profile: ActivityProfile) => void;
+  startBackgroundTask: () => Promise<void>;
+  stopBackgroundTask: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -36,9 +38,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const manager = new BackgroundTaskManager();
       await manager.initialize();
       backgroundTaskManagerRef.current = manager;
-
-      // Register background task
-      await manager.registerBackgroundTask();
     };
 
     initialize();
@@ -53,6 +52,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     };
   }, []);
+
+  const startBackgroundTask = async () => {
+    if (backgroundTaskManagerRef.current) {
+      await backgroundTaskManagerRef.current.registerBackgroundTask();
+    }
+  };
+
+  const stopBackgroundTask = async () => {
+    if (backgroundTaskManagerRef.current) {
+      await backgroundTaskManagerRef.current.unregisterBackgroundTask();
+    }
+  };
 
   const startSession = async (profile: ActivityProfile) => {
     if (isMonitoring) return;
@@ -69,6 +80,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (backgroundTaskManagerRef.current) {
       await backgroundTaskManagerRef.current.startMonitoring();
     }
+
+    // Start background task
+    await startBackgroundTask();
 
     // Start timer for elapsed time
     timerRef.current = setInterval(() => {
@@ -88,6 +102,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (backgroundTaskManagerRef.current) {
       await backgroundTaskManagerRef.current.stopMonitoring();
     }
+
+    // Stop background task
+    await stopBackgroundTask();
 
     // Clear timer
     if (timerRef.current) {
@@ -130,6 +147,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         stopSession,
         recordDrowsinessEvent,
         setActiveProfile,
+        startBackgroundTask,
+        stopBackgroundTask,
       }}
     >
       {children}

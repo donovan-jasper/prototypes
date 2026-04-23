@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useAppContext } from '../context/AppContext';
 
 interface SessionTimerProps {
   isActive: boolean;
@@ -16,7 +17,6 @@ export const SessionTimer: React.FC<SessionTimerProps> = ({
   onStart,
   onStop,
 }) => {
-  // Format seconds to HH:MM:SS
   const formatTime = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -31,18 +31,27 @@ export const SessionTimer: React.FC<SessionTimerProps> = ({
 
   return (
     <View style={styles.container}>
-      <View style={styles.timerContainer}>
-        <Text style={styles.timerText}>{formatTime(elapsedSeconds)}</Text>
-        <Text style={styles.eventsText}>Drowsiness Events: {drowsinessEvents}</Text>
+      <Text style={styles.timerText}>{formatTime(elapsedSeconds)}</Text>
+
+      <View style={styles.statsContainer}>
+        <Text style={styles.statsText}>Drowsiness Events: {drowsinessEvents}</Text>
       </View>
 
       <TouchableOpacity
         style={[styles.button, isActive ? styles.stopButton : styles.startButton]}
         onPress={isActive ? onStop : onStart}
-        disabled={!isActive && elapsedSeconds > 0}
+        disabled={isActive && !elapsedSeconds}
       >
-        <Text style={styles.buttonText}>{isActive ? 'Stop Session' : 'Start Session'}</Text>
+        {isActive ? (
+          <Text style={styles.buttonText}>Stop Session</Text>
+        ) : (
+          <Text style={styles.buttonText}>Start Session</Text>
+        )}
       </TouchableOpacity>
+
+      {isActive && !elapsedSeconds && (
+        <ActivityIndicator size="small" color="#4CAF50" style={styles.loadingIndicator} />
+      )}
     </View>
   );
 };
@@ -52,24 +61,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginVertical: 20,
   },
-  timerContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
   timerText: {
     fontSize: 48,
     fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
   },
-  eventsText: {
+  statsContainer: {
+    marginBottom: 20,
+  },
+  statsText: {
     fontSize: 16,
     color: '#666',
-    marginTop: 5,
   },
   button: {
-    paddingVertical: 15,
+    paddingVertical: 12,
     paddingHorizontal: 30,
-    borderRadius: 30,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -84,93 +92,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-});
-
-
-+++++ src/components/ActivityProfileCard.tsx
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ActivityProfile } from '../types';
-
-interface ActivityProfileCardProps {
-  profile: ActivityProfile;
-  isSelected: boolean;
-  isDisabled: boolean;
-  onSelect: (profile: ActivityProfile) => void;
-}
-
-export const ActivityProfileCard: React.FC<ActivityProfileCardProps> = ({
-  profile,
-  isSelected,
-  isDisabled,
-  onSelect,
-}) => {
-  return (
-    <TouchableOpacity
-      style={[
-        styles.card,
-        isSelected ? styles.selectedCard : styles.unselectedCard,
-        isDisabled && styles.disabledCard,
-      ]}
-      onPress={() => onSelect(profile)}
-      disabled={isDisabled}
-    >
-      <Text style={styles.icon}>{profile.icon}</Text>
-      <Text style={styles.name}>{profile.name}</Text>
-      <View style={styles.sensitivityContainer}>
-        <Text style={styles.sensitivityLabel}>Sensitivity:</Text>
-        <Text style={styles.sensitivityValue}>{profile.sensitivity.toFixed(1)}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
-const styles = StyleSheet.create({
-  card: {
-    width: 100,
-    height: 120,
-    borderRadius: 10,
-    padding: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 5,
-  },
-  selectedCard: {
-    backgroundColor: '#4CAF50',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  unselectedCard: {
-    backgroundColor: '#E0E0E0',
-  },
-  disabledCard: {
-    opacity: 0.7,
-  },
-  icon: {
-    fontSize: 24,
-    marginBottom: 5,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: 'white',
-  },
-  sensitivityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sensitivityLabel: {
-    fontSize: 10,
-    color: 'white',
-    marginRight: 3,
-  },
-  sensitivityValue: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: 'white',
+  loadingIndicator: {
+    marginTop: 10,
   },
 });
