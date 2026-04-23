@@ -156,60 +156,106 @@ export function adaptRoutine(
   });
 
   if (slotsInWindow.length === 0) {
-    // No available slots in preferred window, find closest alternative
-    const allSlots = [...availableSlots].sort((a, b) => {
-      const aDistance = Math.min(
-        Math.abs(a.start.getTime() - windowStart.getTime()),
-        Math.abs(a.end.getTime() - windowEnd.getTime())
-      );
-      const bDistance = Math.min(
-        Math.abs(b.start.getTime() - windowStart.getTime()),
-        Math.abs(b.end.getTime() - windowEnd.getTime())
-      );
-      return aDistance - bDistance;
-    });
-
-    return allSlots.length > 0 ? allSlots[0].start : null;
+    return null;
   }
 
-  // Find the slot that best fits the routine duration
-  const routineDuration = routine.tasks.length * 15; // Assuming 15 minutes per task
-  const bestSlot = slotsInWindow.find((slot) => {
-    const slotDuration = differenceInMinutes(slot.end, slot.start);
-    return slotDuration >= routineDuration;
+  // Find the largest available slot in the preferred window
+  const largestSlot = slotsInWindow.reduce((prev, current) => {
+    const prevDuration = prev.end.getTime() - prev.start.getTime();
+    const currentDuration = current.end.getTime() - current.start.getTime();
+    return currentDuration > prevDuration ? current : prev;
   });
 
-  return bestSlot ? bestSlot.start : slotsInWindow[0].start;
+  // Calculate how much of the routine can fit in this slot
+  const routineDuration = routine.tasks.length * 15 * 60 * 1000; // Assuming 15 min per task
+  const slotDuration = largestSlot.end.getTime() - largestSlot.start.getTime();
+
+  if (slotDuration >= routineDuration) {
+    // Routine fits in this slot - suggest the start time
+    return largestSlot.start;
+  } else {
+    // Routine doesn't fit - suggest the earliest possible time in the window
+    return windowStart;
+  }
 }
 
 /**
- * Calculates energy score based on completion history
+ * Calculates an energy score for each hour of the day based on completion history
  */
 export function calculateEnergyScore(
   completions: RoutineCompletion[],
   date: Date = new Date()
-): number {
-  if (completions.length === 0) return 0.5; // Neutral score if no data
+): Record<number, number> {
+  const energyScores: Record<number, number> = {};
 
-  // Filter completions from the same day of week
-  const dayOfWeek = date.getDay();
-  const sameDayCompletions = completions.filter((comp) => {
-    return comp.completedAt.getDay() === dayOfWeek;
+  // Initialize all hours with base score of 50
+  for (let hour = 0; hour < 24; hour++) {
+    energyScores[hour] = 50;
+  }
+
+  // Group completions by hour
+  const completionsByHour: Record<number, RoutineCompletion[]> = {};
+
+  completions.forEach(completion => {
+    const hour = completion.completedAt.getHours();
+    if (!completionsByHour[hour]) {
+      completionsByHour[hour] = [];
+    }
+    completionsByHour[hour].push(completion);
   });
 
-  if (sameDayCompletions.length === 0) return 0.5;
+  // Calculate energy score for each hour
+  for (const hour in completionsByHour) {
+    const hourCompletions = completionsByHour[hour];
+    const successfulCompletions = hourCompletions.filter(c => c.successful);
+    const successRate = successfulCompletions.length / hourCompletions.length;
 
-  // Calculate average completion time
-  const totalMinutes = sameDayCompletions.reduce((sum, comp) => {
-    return sum + comp.completedAt.getHours() * 60 + comp.completedAt.getMinutes();
-  }, 0);
+    // Adjust score based on success rate
+    // 100% success = 100, 0% success = 0
+    energyScores[parseInt(hour)] = Math.round(successRate * 100);
+  }
 
-  const avgMinutes = totalMinutes / sameDayCompletions.length;
-  const avgHour = Math.floor(avgMinutes / 60);
+  return energyScores;
+}
 
-  // Score based on time of day (0-1 scale)
-  if (avgHour >= 6 && avgHour < 12) return 0.9; // Morning
-  if (avgHour >= 12 && avgHour < 18) return 0.7; // Afternoon
-  if (avgHour >= 18 && avgHour < 22) return 0.5; // Evening
-  return 0.3; // Night
+/**
+ * Suggests optimal times for all tasks in a queue based on priority and schedule
+ */
+export function suggestTaskTimes(
+  tasks: Task[],
+  schedule: ScheduleBlock[],
+  date: Date = new Date(),
+  energyPatterns?: RoutineCompletion[]
+): Record<string, Date | null> {
+  const suggestions: Record<string, Date | null> = {};
+
+  // Sort tasks by priority (high to low)
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const priorityOrder = { high: 3, medium: 2, low: 1 };
+    return priorityOrder[b.priority] - priorityOrder[a.priority];
+  });
+
+  // Create a working copy of the schedule to track allocations
+  const allocatedSchedule = [...schedule];
+
+  for (const task of sortedTasks) {
+    // Find the best time for this task
+    const suggestedTime = suggestTaskTime(task, date, allocatedSchedule, energyPatterns);
+
+    if (suggestedTime) {
+      // Add this task to the schedule to block that time for other tasks
+      const taskEndTime = addMinutes(suggestedTime, task.estimatedMinutes);
+      allocatedSchedule.push({
+        id: `task-${task.id}`,
+        title: task.title,
+        startTime: suggestedTime,
+        endTime: taskEndTime,
+        type: 'task',
+      });
+    }
+
+    suggestions[task.id] = suggestedTime;
+  }
+
+  return suggestions;
 }
