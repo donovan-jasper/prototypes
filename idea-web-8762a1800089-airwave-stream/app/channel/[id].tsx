@@ -1,12 +1,13 @@
-import React from 'react';
-import { View, StyleSheet, Text, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { View, StyleSheet, Text, Platform, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import PiPController from '../../components/PiPController';
+import VideoPlayer from '../../components/VideoPlayer';
 import { useStreamUrl } from '../../hooks/useStreamUrl';
 
 export default function ChannelScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { streamUrl, isLocal } = useStreamUrl(id);
+  const [isPiPActive, setIsPiPActive] = useState(false);
 
   if (!id) {
     return (
@@ -18,7 +19,10 @@ export default function ChannelScreen() {
 
   return (
     <View style={styles.container}>
-      <PiPController channelNumber={id} isLocal={isLocal} />
+      <VideoPlayer
+        channelNumber={id}
+        isLocal={isLocal}
+      />
     </View>
   );
 }

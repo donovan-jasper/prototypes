@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, Dimensions, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, StyleSheet, Text, Dimensions, ActivityIndicator, TouchableOpacity, Platform } from 'react-native';
 import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import { useStreamUrl } from '../hooks/useStreamUrl';
 import { isRemoteStreamingEnabled } from '../lib/streaming';
 import { useNavigation } from '@react-navigation/native';
+import PiPController from './PiPController';
 
 interface Props {
   channelNumber: string;
@@ -15,8 +16,10 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showControls, setShowControls] = useState(false);
-  const streamUrl = useStreamUrl(channelNumber);
+  const [isPiPActive, setIsPiPActive] = useState(false);
+  const { streamUrl } = useStreamUrl(channelNumber);
   const navigation = useNavigation();
+  const videoRef = useRef<Video>(null);
 
   useEffect(() => {
     const checkRemoteAccess = async () => {
@@ -48,6 +51,39 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
     setShowControls(!showControls);
   };
 
+  const enterPiPMode = async () => {
+    if (Platform.OS === 'android' && videoRef.current) {
+      try {
+        await videoRef.current.presentFullscreenPlayer();
+        setIsPiPActive(true);
+      } catch (error) {
+        console.error('Failed to enter PiP mode:', error);
+      }
+    } else if (Platform.OS === 'ios' && videoRef.current) {
+      try {
+        await videoRef.current.presentPictureInPictureAsync();
+        setIsPiPActive(true);
+      } catch (error) {
+        console.error('Failed to enter PiP mode:', error);
+      }
+    }
+  };
+
+  const exitPiPMode = async () => {
+    if (videoRef.current) {
+      try {
+        if (Platform.OS === 'android') {
+          await videoRef.current.dismissFullscreenPlayer();
+        } else if (Platform.OS === 'ios') {
+          await videoRef.current.stopPictureInPictureAsync();
+        }
+        setIsPiPActive(false);
+      } catch (error) {
+        console.error('Failed to exit PiP mode:', error);
+      }
+    }
+  };
+
   if (error) {
     return (
       <View style={styles.container}>
@@ -73,6 +109,10 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
     );
   }
 
+  if (isPiPActive) {
+    return <PiPController channelNumber={channelNumber} isLocal={isLocal} />;
+  }
+
   return (
     <TouchableOpacity
       style={styles.container}
@@ -80,6 +120,7 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
       onPress={toggleControls}
     >
       <Video
+        ref={videoRef}
         style={styles.video}
         source={{ uri: streamUrl }}
         useNativeControls={false}
@@ -105,6 +146,13 @@ export default function VideoPlayer({ channelNumber, isLocal }: Props) {
             <Text style={styles.controlButtonText}>
               {status?.isPlaying ? 'Pause' : 'Play'}
             </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.pipButton}
+            onPress={enterPiPMode}
+          >
+            <Text style={styles.controlButtonText}>PiP</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -140,8 +188,15 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
   },
   controlButton: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 10,
+  },
+  pipButton: {
     backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 10,
     borderRadius: 5,
