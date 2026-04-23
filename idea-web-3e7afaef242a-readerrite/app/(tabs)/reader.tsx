@@ -9,7 +9,8 @@ import {
   Text,
   Dimensions,
   Animated,
-  Easing
+  Easing,
+  Platform
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { getBook, updateBook } from '../../lib/database';
@@ -192,7 +193,19 @@ export default function ReaderScreen() {
         onToggleControls={handleToggleControls}
       />
 
-      {showControls && (
+      <Animated.View
+        style={[
+          styles.controlsContainer,
+          {
+            opacity: showControls ? 1 : 0,
+            transform: [
+              {
+                translateY: showControls ? 0 : 50,
+              },
+            ],
+          },
+        ]}
+      >
         <ReaderControls
           fontSize={fontSize}
           onFontSizeChange={handleFontSizeChange}
@@ -201,9 +214,14 @@ export default function ReaderScreen() {
           marginSize={marginSize}
           onMarginSizeChange={handleMarginSizeChange}
           progress={calculateProgress()}
-          onClose={handleToggleControls}
+          onProgressChange={(progress) => {
+            if (epubContent) {
+              const chapterIndex = Math.floor((progress / 100) * epubContent.chapters.length);
+              handlePageChange(chapterIndex);
+            }
+          }}
         />
-      )}
+      </Animated.View>
     </View>
   );
 }
@@ -223,19 +241,26 @@ const styles = StyleSheet.create({
   },
   backButton: {
     position: 'absolute',
-    top: 40,
+    top: Platform.OS === 'ios' ? 40 : 20,
     left: 20,
     zIndex: 10,
     padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 5,
   },
   backButtonText: {
     color: '#000',
     fontSize: 16,
-    fontWeight: '600',
   },
   backButtonTextDark: {
     color: '#fff',
+  },
+  controlsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
 });

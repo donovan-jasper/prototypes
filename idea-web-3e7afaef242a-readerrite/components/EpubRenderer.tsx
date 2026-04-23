@@ -165,75 +165,35 @@ export default function EpubRenderer({
               }
             });
 
-            // Handle tap zones
-            document.addEventListener('click', function(e) {
-              const x = e.clientX;
-              const width = window.innerWidth;
-
-              if (x < width / 3) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'tap',
-                  zone: 'left'
-                }));
-              } else if (x > width * 2 / 3) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'tap',
-                  zone: 'right'
-                }));
-              } else {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'tap',
-                  zone: 'center'
-                }));
+            window.addEventListener('message', function(event) {
+              const data = JSON.parse(event.data);
+              if (data.type === 'highlight') {
+                const selection = window.getSelection();
+                if (selection && selection.toString().length > 0) {
+                  const range = selection.getRangeAt(0);
+                  const rect = range.getBoundingClientRect();
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'highlight',
+                    text: selection.toString(),
+                    position: {
+                      x: rect.left,
+                      y: rect.top,
+                      width: rect.width,
+                      height: rect.height
+                    }
+                  }));
+                }
               }
             });
 
-            // Restore scroll position
-            window.addEventListener('load', function() {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'ready'
-              }));
-            });
+            // Restore scroll position if available
+            if (window.scrollPosition) {
+              window.scrollTo(0, window.scrollPosition);
+            }
           </script>
         </body>
       </html>
     `;
-  };
-
-  const handleMessage = (event: any) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-
-      if (message.type === 'scroll') {
-        setScrollPosition(message.position);
-
-        if (scrollTimeoutRef.current) {
-          clearTimeout(scrollTimeoutRef.current);
-        }
-
-        scrollTimeoutRef.current = setTimeout(() => {
-          onPageChange(currentChapter);
-        }, 1000);
-      } else if (message.type === 'tap') {
-        if (message.zone === 'left') {
-          goToPreviousChapter();
-        } else if (message.zone === 'right') {
-          goToNextChapter();
-        } else if (message.zone === 'center') {
-          onToggleControls();
-        }
-      } else if (message.type === 'ready') {
-        // Restore scroll position if available
-        if (scrollPosition > 0) {
-          webViewRef.current?.injectJavaScript(`
-            window.scrollTo(0, ${scrollPosition});
-            true;
-          `);
-        }
-      }
-    } catch (error) {
-      console.error('Error handling WebView message:', error);
-    }
   };
 
   const goToPreviousChapter = () => {
@@ -241,7 +201,6 @@ export default function EpubRenderer({
       const newChapter = currentChapter - 1;
       setCurrentChapter(newChapter);
       onPageChange(newChapter);
-      setScrollPosition(0);
     }
   };
 
@@ -250,36 +209,78 @@ export default function EpubRenderer({
       const newChapter = currentChapter + 1;
       setCurrentChapter(newChapter);
       onPageChange(newChapter);
-      setScrollPosition(0);
+    }
+  };
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      if (data.type === 'scroll') {
+        setScrollPosition(data.position);
+
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+        }
+
+        scrollTimeoutRef.current = setTimeout(() => {
+          // Save scroll position to database
+          // This would be implemented in the parent component
+        }, 1000);
+      } else if (data.type === 'link') {
+        // Handle link navigation
+        console.log('Link clicked:', data.href);
+      } else if (data.type === 'highlight') {
+        // Handle text selection
+        console.log('Text selected:', data.text);
+      }
+    } catch (error) {
+      console.error('Error parsing WebView message:', error);
+    }
+  };
+
+  const handleTap = (event: any) => {
+    const { locationX } = event.nativeEvent;
+    if (locationX < TAP_ZONE_WIDTH) {
+      goToPreviousChapter();
+    } else if (locationX > SCREEN_WIDTH - TAP_ZONE_WIDTH) {
+      goToNextChapter();
+    } else {
+      onToggleControls();
     }
   };
 
   useEffect(() => {
     // Update WebView content when chapter changes
     if (webViewRef.current) {
-      const chapterContent = epubContent.chapters[currentChapter].content;
-      const html = generateHtml(chapterContent);
       webViewRef.current.injectJavaScript(`
-        document.open();
-        document.write(${JSON.stringify(html)});
-        document.close();
+        window.scrollPosition = ${scrollPosition};
         true;
       `);
     }
-  }, [currentChapter, fontSize, theme, marginSize]);
+  }, [currentChapter]);
 
   return (
     <View style={styles.container} {...panResponder.panHandlers}>
-      <WebView
-        ref={webViewRef}
-        originWhitelist={['*']}
-        source={{ html: generateHtml(epubContent.chapters[currentChapter].content) }}
-        onMessage={handleMessage}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-        scalesPageToFit={false}
-        style={styles.webview}
-      />
+      <TouchableOpacity
+        style={styles.webViewContainer}
+        activeOpacity={1}
+        onPress={handleTap}
+      >
+        <WebView
+          ref={webViewRef}
+          originWhitelist={['*']}
+          source={{ html: generateHtml(epubContent.chapters[currentChapter].content) }}
+          onMessage={handleWebViewMessage}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          scalesPageToFit={false}
+          style={styles.webView}
+          onError={(syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            console.warn('WebView error: ', nativeEvent);
+          }}
+        />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -288,7 +289,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  webview: {
+  webViewContainer: {
+    flex: 1,
+  },
+  webView: {
     flex: 1,
   },
 });
