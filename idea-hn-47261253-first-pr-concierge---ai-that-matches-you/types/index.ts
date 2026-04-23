@@ -1,33 +1,43 @@
-export interface Issue {
+export interface GitHubUser {
   id: number;
-  title: string;
-  url: string;
-  labels: string[];
-  repository: {
-    name: string;
-    owner: string;
-    url: string;
-  };
-  difficulty: number;
-  claimedAt?: string;
-  completedAt?: string;
-  prUrl?: string;
+  login: string;
+  name: string | null;
+  avatarUrl: string;
+  bio: string | null;
+  publicRepos: number;
+  followers: number;
+  following: number;
+  createdAt: string;
 }
 
 export interface Repository {
   id: number;
   name: string;
-  full_name: string;
-  owner: {
-    login: string;
-    id: number;
-  };
-  html_url: string;
+  fullName: string;
+  owner: string;
   description: string | null;
+  htmlUrl: string;
+  stargazersCount: number;
+  forksCount: number;
+  openIssuesCount: number;
   language: string | null;
-  stargazers_count: number;
-  forks_count: number;
-  open_issues_count: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Issue {
+  id: number;
+  title: string;
+  body: string | null;
+  htmlUrl: string;
+  state: 'open' | 'closed';
+  createdAt: string;
+  updatedAt: string;
+  labels: string[];
+  repository: Repository;
+  claimedAt?: string;
+  completedAt?: string;
+  prUrl?: string;
 }
 
 export interface Contribution {
@@ -41,17 +51,9 @@ export interface Contribution {
 export interface Achievement {
   id: number;
   type: string;
-  unlockedAt: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlockedAt: string | null;
   shared: boolean;
-}
-
-export interface GitHubUser {
-  login: string;
-  id: number;
-  avatar_url: string;
-  name: string | null;
-  bio: string | null;
-  public_repos: number;
-  followers: number;
-  following: number;
 }
