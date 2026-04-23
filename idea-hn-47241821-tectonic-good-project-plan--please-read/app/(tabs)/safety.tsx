@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Alert, Switch, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
-import { scheduleSafetyCheckIn, cancelSafetyCheckIn, processOfflineMessages } from '../../services/sms';
+import { scheduleSafetyCheckIn, cancelSafetyCheckIn, processOfflineMessages, checkForExpiredTimers } from '../../services/sms';
 import { getCurrentLocation, startBackgroundLocationUpdates, stopBackgroundLocationUpdates } from '../../services/location';
 import { initDatabase } from '../../services/database';
 
@@ -38,6 +38,7 @@ export default function SafetyCheckInScreen() {
     checkActiveCheckIn();
     setupNotifications();
     processOfflineMessages();
+    checkForExpiredTimers();
 
     const interval = setInterval(() => {
       checkActiveCheckIn();
@@ -175,18 +176,14 @@ export default function SafetyCheckInScreen() {
       };
 
       await scheduleSafetyCheckIn(checkIn);
+      await startBackgroundLocationUpdates();
+
       setIsActive(true);
       setShowConfirmation(true);
 
-      // Show success notification
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Safety Check-In Started',
-          body: `Your location will be shared in ${timerDuration} minutes if you don't check in.`,
-          sound: 'default',
-        },
-        trigger: null,
-      });
+      setTimeout(() => {
+        setShowConfirmation(false);
+      }, 3000);
     } catch (error) {
       console.error('Error starting check-in:', error);
       Alert.alert('Error', 'Failed to start safety check-in');
@@ -199,18 +196,10 @@ export default function SafetyCheckInScreen() {
     try {
       setIsLoading(true);
       await cancelSafetyCheckIn();
-      setIsActive(false);
-      setShowConfirmation(false);
+      await stopBackgroundLocationUpdates();
 
-      // Show cancellation notification
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Safety Check-In Canceled',
-          body: 'Your safety check-in has been canceled.',
-          sound: 'default',
-        },
-        trigger: null,
-      });
+      setIsActive(false);
+      setRemainingTime(0);
     } catch (error) {
       console.error('Error canceling check-in:', error);
       Alert.alert('Error', 'Failed to cancel safety check-in');
@@ -223,20 +212,12 @@ export default function SafetyCheckInScreen() {
     try {
       setIsLoading(true);
       await cancelSafetyCheckIn();
+      await stopBackgroundLocationUpdates();
+
       setIsActive(false);
-      setShowConfirmation(false);
+      setRemainingTime(0);
 
-      // Show manual check-in notification
-      await Notifications.scheduleNotificationAsync({
-        content: {
-          title: 'Manual Check-In',
-          body: 'You have manually checked in. Your safety check-in has been canceled.',
-          sound: 'default',
-        },
-        trigger: null,
-      });
-
-      Alert.alert('Success', 'You have manually checked in. Your safety check-in has been canceled.');
+      Alert.alert('Success', 'You have successfully checked in. Your safety check-in has been canceled.');
     } catch (error) {
       console.error('Error with manual check-in:', error);
       Alert.alert('Error', 'Failed to process manual check-in');
@@ -248,48 +229,34 @@ export default function SafetyCheckInScreen() {
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours > 0 ? `${hours}h ` : ''}${mins}m`;
+    return `${hours}h ${mins}m`;
   };
-
-  const renderContactItem = ({ item }: { item: TrustedContact }) => (
-    <View style={styles.contactItem}>
-      <View style={styles.contactInfo}>
-        <Text style={styles.contactName}>{item.name}</Text>
-        <Text style={styles.contactPhone}>{item.phoneNumber}</Text>
-      </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() => removeContact(item.id)}
-      >
-        <Text style={styles.removeButtonText}>Remove</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <ScrollView style={styles.container}>
-      <Text style={styles.title}>Safety Check-In</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Safety Check-In</Text>
+        <Text style={styles.subtitle}>
+          Set a timer to automatically share your location with trusted contacts if you don't check in.
+        </Text>
+      </View>
 
       {isActive ? (
         <View style={styles.activeContainer}>
-          <Text style={styles.activeTitle}>Active Safety Check-In</Text>
+          <Text style={styles.activeTitle}>Active Check-In</Text>
           <Text style={styles.timerText}>
-            Time remaining: {formatTime(remainingTime)}
+            {formatTime(remainingTime)}
           </Text>
-
-          <View style={styles.messageContainer}>
-            <Text style={styles.sectionTitle}>Your Message</Text>
-            <Text style={styles.messageText}>{message}</Text>
-          </View>
+          <Text style={styles.messageText}>{message}</Text>
 
           <View style={styles.contactsContainer}>
             <Text style={styles.sectionTitle}>Trusted Contacts</Text>
-            <FlatList
-              data={contacts}
-              renderItem={renderContactItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
+            {contacts.map(contact => (
+              <View key={contact.id} style={styles.contactItem}>
+                <Text style={styles.contactName}>{contact.name}</Text>
+                <Text style={styles.contactPhone}>{contact.phoneNumber}</Text>
+              </View>
+            ))}
           </View>
 
           <View style={styles.buttonContainer}>
@@ -306,7 +273,7 @@ export default function SafetyCheckInScreen() {
               onPress={manualCheckIn}
               disabled={isLoading}
             >
-              <Text style={styles.buttonText}>I'm Safe</Text>
+              <Text style={styles.buttonText}>Manual Check-In</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -315,16 +282,21 @@ export default function SafetyCheckInScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Timer Duration</Text>
             <View style={styles.timerOptions}>
-              {[15, 30, 60, 120].map((duration) => (
+              {[15, 30, 60, 120].map(duration => (
                 <TouchableOpacity
                   key={duration}
                   style={[
-                    styles.timerButton,
-                    timerDuration === duration && styles.selectedTimer
+                    styles.timerOption,
+                    timerDuration === duration && styles.timerOptionSelected
                   ]}
                   onPress={() => setTimerDuration(duration)}
                 >
-                  <Text style={styles.timerButtonText}>{formatTime(duration)}</Text>
+                  <Text style={[
+                    styles.timerOptionText,
+                    timerDuration === duration && styles.timerOptionTextSelected
+                  ]}>
+                    {formatTime(duration)}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -332,73 +304,87 @@ export default function SafetyCheckInScreen() {
             <View style={styles.customTimerContainer}>
               <TextInput
                 style={styles.customTimerInput}
-                placeholder="Custom minutes"
+                placeholder="Custom (minutes)"
                 keyboardType="numeric"
                 value={customDuration}
                 onChangeText={setCustomDuration}
-              />
-              <TouchableOpacity
-                style={styles.customTimerButton}
-                onPress={() => {
-                  const num = parseInt(customDuration);
-                  if (!isNaN(num) && num > 0) {
-                    setTimerDuration(num);
+                onBlur={() => {
+                  if (customDuration) {
+                    const minutes = parseInt(customDuration);
+                    if (!isNaN(minutes) && minutes > 0) {
+                      setTimerDuration(minutes);
+                    }
                   }
                 }}
-              >
-                <Text style={styles.customTimerButtonText}>Set</Text>
-              </TouchableOpacity>
+              />
             </View>
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Message to Contacts</Text>
+            <Text style={styles.sectionTitle}>Message</Text>
             <TextInput
               style={styles.messageInput}
               multiline
               numberOfLines={4}
               value={message}
               onChangeText={setMessage}
+              placeholder="Write a message to be sent with your location"
             />
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Trusted Contacts</Text>
-            <FlatList
-              data={contacts}
-              renderItem={renderContactItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
+            {contacts.length > 0 ? (
+              <FlatList
+                data={contacts}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.contactItem}>
+                    <View style={styles.contactInfo}>
+                      <Text style={styles.contactName}>{item.name}</Text>
+                      <Text style={styles.contactPhone}>{item.phoneNumber}</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.removeContactButton}
+                      onPress={() => removeContact(item.id)}
+                    >
+                      <Text style={styles.removeContactText}>Remove</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+            ) : (
+              <Text style={styles.noContactsText}>No contacts added yet</Text>
+            )}
 
             <View style={styles.addContactContainer}>
               <TextInput
-                style={styles.input}
+                style={styles.contactInput}
                 placeholder="Name"
                 value={newContactName}
                 onChangeText={setNewContactName}
               />
               <TextInput
-                style={styles.input}
+                style={styles.contactInput}
                 placeholder="Phone Number"
                 value={newContactPhone}
                 onChangeText={setNewContactPhone}
                 keyboardType="phone-pad"
               />
               <TouchableOpacity
-                style={styles.addButton}
+                style={styles.addContactButton}
                 onPress={addContact}
                 disabled={isLoading}
               >
-                <Text style={styles.addButtonText}>Add Contact</Text>
+                <Text style={styles.addContactButtonText}>Add Contact</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <TouchableOpacity
-            style={[styles.startButton, isLoading && styles.disabledButton]}
+            style={styles.startButton}
             onPress={startCheckIn}
-            disabled={isLoading || contacts.length === 0}
+            disabled={isLoading}
           >
             {isLoading ? (
               <ActivityIndicator color="#fff" />
@@ -410,10 +396,13 @@ export default function SafetyCheckInScreen() {
       )}
 
       {showConfirmation && (
-        <View style={styles.confirmationContainer}>
-          <Text style={styles.confirmationText}>
-            Your safety check-in is active. You will be automatically notified if you don't check in within {formatTime(timerDuration)}.
-          </Text>
+        <View style={styles.confirmationOverlay}>
+          <View style={styles.confirmationBox}>
+            <Text style={styles.confirmationText}>Safety Check-In Started!</Text>
+            <Text style={styles.confirmationSubtext}>
+              Your location will be shared if you don't check in within {formatTime(timerDuration)}.
+            </Text>
+          </View>
         </View>
       )}
     </ScrollView>
@@ -426,17 +415,24 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
+  header: {
+    marginBottom: 20,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
     color: '#333',
+    marginBottom: 8,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
   },
   section: {
-    marginBottom: 20,
-    backgroundColor: '#fff',
-    padding: 15,
+    backgroundColor: 'white',
     borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -446,97 +442,56 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333',
     marginBottom: 10,
-    color: '#444',
   },
   timerOptions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    marginBottom: 10,
   },
-  timerButton: {
+  timerOption: {
     padding: 10,
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
     width: '23%',
     alignItems: 'center',
   },
-  selectedTimer: {
+  timerOptionSelected: {
     backgroundColor: '#4CAF50',
     borderColor: '#4CAF50',
   },
-  timerButtonText: {
+  timerOptionText: {
     color: '#333',
   },
+  timerOptionTextSelected: {
+    color: 'white',
+  },
   customTimerContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 10,
   },
   customTimerInput: {
-    flex: 1,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
-    marginRight: 10,
-  },
-  customTimerButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-  },
-  customTimerButtonText: {
-    color: '#fff',
+    fontSize: 16,
   },
   messageInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 5,
     padding: 10,
+    fontSize: 16,
     minHeight: 100,
     textAlignVertical: 'top',
-  },
-  addContactContainer: {
-    marginTop: 10,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 10,
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  startButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  disabledButton: {
-    opacity: 0.7,
-  },
-  startButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   contactItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -546,47 +501,90 @@ const styles = StyleSheet.create({
   contactName: {
     fontSize: 16,
     fontWeight: '500',
+    color: '#333',
   },
   contactPhone: {
+    fontSize: 14,
     color: '#666',
+    marginTop: 2,
   },
-  removeButton: {
-    backgroundColor: '#f44336',
-    padding: 8,
+  removeContactButton: {
+    padding: 5,
+  },
+  removeContactText: {
+    color: '#ff3b30',
+    fontSize: 14,
+  },
+  noContactsText: {
+    color: '#999',
+    textAlign: 'center',
+    padding: 10,
+  },
+  addContactContainer: {
+    marginTop: 10,
+  },
+  contactInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
   },
-  removeButtonText: {
-    color: '#fff',
+  addContactButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  addContactButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  startButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  startButtonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   activeContainer: {
-    backgroundColor: '#fff',
-    padding: 15,
+    backgroundColor: 'white',
     borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    marginBottom: 20,
   },
   activeTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#333',
     marginBottom: 10,
-    color: '#4CAF50',
+    textAlign: 'center',
   },
   timerText: {
-    fontSize: 18,
-    marginBottom: 20,
-    color: '#333',
-  },
-  messageContainer: {
-    marginBottom: 20,
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+    textAlign: 'center',
+    marginBottom: 15,
   },
   messageText: {
     fontSize: 16,
-    color: '#555',
-    lineHeight: 22,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   contactsContainer: {
     marginBottom: 20,
@@ -603,23 +601,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#ff3b30',
   },
   checkInButton: {
     backgroundColor: '#4CAF50',
   },
   buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
   },
-  confirmationContainer: {
-    backgroundColor: '#e8f5e9',
-    padding: 15,
-    borderRadius: 5,
-    marginTop: 10,
+  confirmationOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  confirmationBox: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    alignItems: 'center',
   },
   confirmationText: {
-    color: '#2e7d32',
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  confirmationSubtext: {
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
   },
 });

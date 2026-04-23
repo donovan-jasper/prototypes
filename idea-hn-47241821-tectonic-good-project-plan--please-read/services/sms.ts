@@ -188,7 +188,7 @@ export const sendSMS = async (to: string, body: string) => {
     });
 
     if (response.status !== 200) {
-      throw new Error(`Failed to send SMS: ${response.statusText}`);
+      throw new Error(`Failed to send SMS: ${response.status}`);
     }
 
     return response.data;
@@ -202,7 +202,7 @@ export const storeOfflineMessage = async (message: OfflineMessage) => {
   try {
     const db = await initDatabase();
     await db.runAsync(
-      'INSERT INTO offline_messages (to, body, timestamp) VALUES (?, ?, ?)',
+      'INSERT INTO offline_messages (to_phone, body, timestamp) VALUES (?, ?, ?)',
       [message.to, message.body, message.timestamp]
     );
   } catch (error) {
@@ -211,29 +211,55 @@ export const storeOfflineMessage = async (message: OfflineMessage) => {
   }
 };
 
-export const retryOfflineMessages = async () => {
+export const processOfflineMessages = async () => {
   try {
     const db = await initDatabase();
 
     // Get all offline messages
-    const messages = await db.getAllAsync<OfflineMessage>(
-      'SELECT * FROM offline_messages ORDER BY timestamp ASC'
-    );
+    const messages = await db.getAllAsync<{
+      id: number;
+      to_phone: string;
+      body: string;
+      timestamp: string;
+    }>('SELECT * FROM offline_messages');
 
+    // Try to send each message
     for (const message of messages) {
       try {
-        await sendSMS(message.to, message.body);
+        await sendSMS(message.to_phone, message.body);
         // If successful, delete the message
-        await db.runAsync('DELETE FROM offline_messages WHERE timestamp = ?', [message.timestamp]);
+        await db.runAsync('DELETE FROM offline_messages WHERE id = ?', [message.id]);
       } catch (error) {
-        console.error(`Failed to retry message to ${message.to}:`, error);
-        // Keep the message for next retry
+        console.error(`Failed to send offline message to ${message.to_phone}:`, error);
       }
     }
-
-    return messages.length;
   } catch (error) {
-    console.error('Error retrying offline messages:', error);
-    throw error;
+    console.error('Error processing offline messages:', error);
+  }
+};
+
+export const checkForExpiredTimers = async () => {
+  try {
+    const db = await initDatabase();
+
+    // Get all active check-ins
+    const checkIns = await db.getAllAsync<{
+      id: string;
+      timer_duration: number;
+      created_at: string;
+    }>('SELECT id, timer_duration, created_at FROM check_ins');
+
+    const now = Date.now();
+
+    for (const checkIn of checkIns) {
+      const createdAt = new Date(checkIn.created_at).getTime();
+      const expirationTime = createdAt + (checkIn.timer_duration * 60 * 1000);
+
+      if (now >= expirationTime) {
+        await handleSafetyCheckInExpiration(checkIn.id);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking for expired timers:', error);
   }
 };
