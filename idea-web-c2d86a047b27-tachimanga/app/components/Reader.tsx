@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share } from 'react-native';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Share, Dimensions, PanResponder, Animated, Easing } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getContent, saveReadingProgress, getReadingProgress } from '../utils/offlineLibrary';
+
+const { width, height } = Dimensions.get('window');
 
 const Reader = ({ route }: any) => {
   const { contentId } = route.params;
@@ -11,23 +13,60 @@ const Reader = ({ route }: any) => {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const [scrollViewHeight, setScrollViewHeight] = useState(0);
+  const [brightness, setBrightness] = useState(100);
+  const [showControls, setShowControls] = useState(true);
   const navigation = useNavigation();
   const scrollViewRef = useRef<ScrollView>(null);
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        setShowControls(true);
+        resetControlsTimeout();
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        // Handle swipe gestures for page turning
+        if (gestureState.dx > 50) {
+          // Swipe right - go to previous page
+          scrollViewRef.current?.scrollTo({ y: Math.max(0, scrollPosition - scrollViewHeight), animated: true });
+        } else if (gestureState.dx < -50) {
+          // Swipe left - go to next page
+          scrollViewRef.current?.scrollTo({ y: Math.min(contentHeight - scrollViewHeight, scrollPosition + scrollViewHeight), animated: true });
+        }
+      },
+    })
+  ).current;
+
+  const resetControlsTimeout = useCallback(() => {
+    if (controlsTimeoutRef.current) {
+      clearTimeout(controlsTimeoutRef.current);
+    }
+    controlsTimeoutRef.current = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+  }, []);
 
   useEffect(() => {
     const loadContent = async () => {
-      const result = await getContent(contentId);
-      setContent(result);
-      
-      // Load saved progress
-      const progress = await getReadingProgress(contentId);
-      if (progress && progress.scroll_position > 0) {
-        setScrollPosition(progress.scroll_position);
-        // Restore scroll position after a short delay to ensure layout is complete
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({ y: progress.scroll_position, animated: false });
-        }, 100);
+      try {
+        const result = await getContent(contentId);
+        setContent(result);
+
+        // Load saved progress
+        const progress = await getReadingProgress(contentId);
+        if (progress && progress.scroll_position > 0) {
+          setScrollPosition(progress.scroll_position);
+          // Restore scroll position after a short delay to ensure layout is complete
+          setTimeout(() => {
+            scrollViewRef.current?.scrollTo({ y: progress.scroll_position, animated: false });
+          }, 100);
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Failed to load content');
       }
     };
     loadContent();
@@ -36,16 +75,23 @@ const Reader = ({ route }: any) => {
       if (saveTimerRef.current) {
         clearTimeout(saveTimerRef.current);
       }
+      if (controlsTimeoutRef.current) {
+        clearTimeout(controlsTimeoutRef.current);
+      }
     };
   }, [contentId]);
 
-  const calculatePercentage = (scrollY: number) => {
+  useEffect(() => {
+    resetControlsTimeout();
+  }, [showControls, resetControlsTimeout]);
+
+  const calculatePercentage = useCallback((scrollY: number) => {
     if (contentHeight <= scrollViewHeight) return 100;
     const maxScroll = contentHeight - scrollViewHeight;
     return Math.min(100, Math.max(0, (scrollY / maxScroll) * 100));
-  };
+  }, [contentHeight, scrollViewHeight]);
 
-  const handleScroll = (event: any) => {
+  const handleScroll = useCallback((event: any) => {
     const { contentOffset, contentSize, layoutMeasurement } = event.nativeEvent;
     const newScrollPosition = contentOffset.y;
     setScrollPosition(newScrollPosition);
@@ -56,19 +102,19 @@ const Reader = ({ route }: any) => {
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
     }
-    
+
     saveTimerRef.current = setTimeout(() => {
       const percentage = calculatePercentage(newScrollPosition);
       saveReadingProgress(contentId, newScrollPosition, percentage);
     }, 2000);
-  };
+  }, [contentId, calculatePercentage]);
 
-  const handleShareProgress = async () => {
+  const handleShareProgress = useCallback(async () => {
     if (!content) return;
-    
+
     const percentage = calculatePercentage(scrollPosition);
     const message = `I'm ${Math.round(percentage)}% through ${content.title} on PageTurner Pro!`;
-    
+
     try {
       await Share.share({
         message: message,
@@ -76,7 +122,30 @@ const Reader = ({ route }: any) => {
     } catch (error) {
       Alert.alert('Error', 'Failed to share progress');
     }
-  };
+  }, [content, scrollPosition, calculatePercentage]);
+
+  const handleBrightnessChange = useCallback((value: number) => {
+    setBrightness(value);
+    // In a real app, you would use NativeModules to adjust device brightness
+    // This is just a simulation
+    console.log(`Brightness set to ${value}%`);
+  }, []);
+
+  const toggleControls = useCallback(() => {
+    setShowControls(prev => !prev);
+  }, []);
+
+  const increaseFontSize = useCallback(() => {
+    setFontSize(prev => Math.min(32, prev + 2));
+  }, []);
+
+  const decreaseFontSize = useCallback(() => {
+    setFontSize(prev => Math.max(12, prev - 2));
+  }, []);
+
+  const changeFontFamily = useCallback(() => {
+    setFontFamily(prev => prev === 'System' ? 'serif' : 'System');
+  }, []);
 
   if (!content) {
     return <View style={styles.container}><Text>Loading...</Text></View>;
@@ -85,42 +154,53 @@ const Reader = ({ route }: any) => {
   const currentPercentage = calculatePercentage(scrollPosition);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.progressHeader}>
-        <View style={styles.progressBarContainer}>
-          <View style={styles.progressBarBackground}>
-            <View style={[styles.progressBarFill, { width: `${currentPercentage}%` }]} />
-          </View>
-          <Text style={styles.progressPercentage}>{Math.round(currentPercentage)}%</Text>
-        </View>
-        <TouchableOpacity onPress={handleShareProgress} style={styles.shareButton}>
-          <Text style={styles.shareButtonText}>Share Progress</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView 
+    <View style={[styles.container, { backgroundColor: `rgba(0, 0, 0, ${brightness / 100})` }]} {...panResponder.panHandlers}>
+      <ScrollView
         ref={scrollViewRef}
-        contentContainerStyle={styles.scrollView}
+        style={styles.scrollView}
         onScroll={handleScroll}
-        scrollEventThrottle={100}
+        scrollEventThrottle={16}
+        onContentSizeChange={(w, h) => setContentHeight(h)}
+        onLayout={(event) => setScrollViewHeight(event.nativeEvent.layout.height)}
       >
-        <Text style={[styles.text, { fontSize, fontFamily }]}>{content.text}</Text>
+        <View style={styles.contentContainer}>
+          <Text style={[styles.title, { fontSize: fontSize + 4, fontFamily }]}>{content.title}</Text>
+          <Text style={[styles.text, { fontSize, fontFamily }]}>{content.text}</Text>
+        </View>
       </ScrollView>
-      
-      <View style={styles.controls}>
-        <TouchableOpacity onPress={() => setFontSize(Math.max(12, fontSize - 2))} style={styles.controlButton}>
-          <Text style={styles.controlText}>A-</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFontSize(Math.min(32, fontSize + 2))} style={styles.controlButton}>
-          <Text style={styles.controlText}>A+</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFontFamily('System')} style={styles.controlButton}>
-          <Text style={[styles.controlText, fontFamily === 'System' && styles.activeControl]}>System</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setFontFamily('monospace')} style={styles.controlButton}>
-          <Text style={[styles.controlText, fontFamily === 'monospace' && styles.activeControl]}>Mono</Text>
-        </TouchableOpacity>
-      </View>
+
+      {showControls && (
+        <Animated.View style={styles.controlsContainer}>
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>{Math.round(currentPercentage)}%</Text>
+          </View>
+
+          <View style={styles.fontControls}>
+            <TouchableOpacity style={styles.controlButton} onPress={decreaseFontSize}>
+              <Text style={styles.controlButtonText}>A-</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.controlButton} onPress={increaseFontSize}>
+              <Text style={styles.controlButtonText}>A+</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.controlButton} onPress={changeFontFamily}>
+              <Text style={styles.controlButtonText}>Font</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.actionButton} onPress={handleShareProgress}>
+              <Text style={styles.actionButtonText}>Share</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionButton} onPress={() => navigation.goBack()}>
+              <Text style={styles.actionButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
+      {!showControls && (
+        <TouchableOpacity style={styles.tapArea} onPress={toggleControls} activeOpacity={1} />
+      )}
     </View>
   );
 };
@@ -128,76 +208,74 @@ const Reader = ({ route }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-  },
-  progressHeader: {
-    padding: 12,
-    backgroundColor: '#f8f8f8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  progressBarContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  progressBarBackground: {
-    flex: 1,
-    height: 8,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 4,
-  },
-  progressPercentage: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    width: 45,
-    textAlign: 'right',
-  },
-  shareButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 6,
-    alignSelf: 'flex-start',
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
   },
   scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
     padding: 20,
   },
+  title: {
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#fff',
+  },
   text: {
+    color: '#fff',
     lineHeight: 24,
   },
-  controls: {
+  controlsContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: 15,
+  },
+  progressContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  progressText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  fontControls: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 12,
-    backgroundColor: '#f8f8f8',
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    justifyContent: 'center',
+    marginBottom: 15,
   },
   controlButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    backgroundColor: '#333',
+    padding: 10,
+    borderRadius: 5,
+    marginHorizontal: 5,
   },
-  controlText: {
-    fontSize: 16,
-    color: '#333',
+  controlButtonText: {
+    color: '#fff',
   },
-  activeControl: {
-    color: '#007AFF',
-    fontWeight: '600',
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
+  actionButton: {
+    backgroundColor: '#4a90e2',
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  tapArea: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
 

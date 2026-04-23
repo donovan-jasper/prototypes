@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
-export const downloadContent = async (content: { 
-  title: string; 
+export const downloadContent = async (content: {
+  title: string;
   text: string;
   seriesId?: string;
   seriesTitle?: string;
@@ -10,7 +10,7 @@ export const downloadContent = async (content: {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS content (
-      id INTEGER PRIMARY KEY AUTOINCREMENT, 
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
       title TEXT,
       text TEXT,
       series_id TEXT,
@@ -49,12 +49,12 @@ export const downloadContent = async (content: {
     'INSERT INTO content (title, text, series_id, series_title, chapter_number) VALUES (?, ?, ?, ?, ?);',
     [content.title, content.text, content.seriesId || null, content.seriesTitle || null, content.chapterNumber || null]
   );
-  
+
   await db.runAsync(
     'INSERT INTO reading_progress (content_id, scroll_position, percentage_complete, last_updated) VALUES (?, 0, 0, ?);',
     [result.lastInsertRowId, Date.now()]
   );
-  
+
   return { ...content, localPath: result.lastInsertRowId };
 };
 
@@ -95,7 +95,7 @@ export const getReadingProgress = async (contentId: number) => {
 export const getAllContentWithProgress = async () => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   const result = await db.getAllAsync(`
-    SELECT 
+    SELECT
       c.id,
       c.title,
       c.text,
@@ -114,7 +114,7 @@ export const getAllContentWithProgress = async () => {
 export const getSeriesChapters = async (seriesId: string) => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   const result = await db.getAllAsync(`
-    SELECT 
+    SELECT
       c.id,
       c.title,
       c.text,
@@ -135,7 +135,7 @@ export const getSeriesChapters = async (seriesId: string) => {
 export const getInProgressContent = async () => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   const result = await db.getAllAsync(`
-    SELECT 
+    SELECT
       c.id,
       c.title,
       c.text,
@@ -170,74 +170,75 @@ export const getComments = async (contentId: number) => {
   return result;
 };
 
-export const getAllContent = async () => {
-  const db = await SQLite.openDatabaseAsync('pageturner.db');
-  const result = await db.getAllAsync('SELECT id, title FROM content ORDER BY id DESC;');
-  return result;
-};
-
 export const getAutoDownloadSettings = async () => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
-  await db.runAsync(
-    'INSERT OR IGNORE INTO user_settings (id, auto_download_enabled, max_auto_downloads) VALUES (1, 0, 3);'
+  const result = await db.getFirstAsync(
+    'SELECT * FROM user_settings WHERE id = 1;'
   );
-  const result = await db.getFirstAsync('SELECT * FROM user_settings WHERE id = 1;');
-  return result as { auto_download_enabled: number; max_auto_downloads: number };
+  return result || { auto_download_enabled: 0, max_auto_downloads: 3 };
 };
 
 export const setAutoDownloadEnabled = async (enabled: boolean) => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   await db.runAsync(
-    'UPDATE user_settings SET auto_download_enabled = ? WHERE id = 1;',
+    'INSERT OR REPLACE INTO user_settings (id, auto_download_enabled) VALUES (1, ?);',
     [enabled ? 1 : 0]
   );
 };
 
-export const setMaxAutoDownloads = async (max: number) => {
+export const triggerAutoDownload = async (contentId: number) => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
-  await db.runAsync(
-    'UPDATE user_settings SET max_auto_downloads = ? WHERE id = 1;',
-    [max]
-  );
+  const settings = await getAutoDownloadSettings();
+
+  if (settings.auto_download_enabled) {
+    // Get the series ID of the current content
+    const currentContent = await getContent(contentId);
+    if (!currentContent || !currentContent.series_id) return;
+
+    // Get all chapters in the series
+    const chapters = await getSeriesChapters(currentContent.series_id);
+
+    // Find the next chapters to download
+    const currentChapterIndex = chapters.findIndex(ch => ch.id === contentId);
+    if (currentChapterIndex === -1) return;
+
+    const nextChapters = chapters.slice(currentChapterIndex + 1, currentChapterIndex + 1 + settings.max_auto_downloads);
+
+    // Download each chapter
+    for (const chapter of nextChapters) {
+      // Check if already downloaded
+      const isDownloaded = await db.getFirstAsync(
+        'SELECT 1 FROM content WHERE id = ?',
+        [chapter.id]
+      );
+
+      if (!isDownloaded) {
+        // In a real app, you would fetch the chapter content from a server
+        // For this example, we'll just mark it as downloaded
+        await db.runAsync(
+          'INSERT INTO auto_download_queue (content_id, downloaded_at) VALUES (?, ?)',
+          [chapter.id, Date.now()]
+        );
+      }
+    }
+  }
 };
 
 export const getAutoDownloadedContent = async () => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   const result = await db.getAllAsync(`
-    SELECT 
+    SELECT
       c.id,
       c.title,
-      adq.downloaded_at
-    FROM auto_download_queue adq
-    INNER JOIN content c ON adq.content_id = c.id
-    ORDER BY adq.downloaded_at DESC;
+      ad.downloaded_at
+    FROM auto_download_queue ad
+    JOIN content c ON ad.content_id = c.id
+    ORDER BY ad.downloaded_at DESC;
   `);
   return result;
 };
 
-export const clearAutoDownloadQueue = async () => {
+export const clearAutoDownloadNotifications = async () => {
   const db = await SQLite.openDatabaseAsync('pageturner.db');
   await db.runAsync('DELETE FROM auto_download_queue;');
-};
-
-const triggerAutoDownload = async (currentContentId: number) => {
-  const settings = await getAutoDownloadSettings();
-  if (!settings.auto_download_enabled) return;
-
-  const db = await SQLite.openDatabaseAsync('pageturner.db');
-  const queueCount = await db.getFirstAsync(
-    'SELECT COUNT(*) as count FROM auto_download_queue;'
-  ) as { count: number };
-
-  if (queueCount.count >= settings.max_auto_downloads) {
-    const oldest = await db.getFirstAsync(
-      'SELECT id FROM auto_download_queue ORDER BY downloaded_at ASC LIMIT 1;'
-    ) as { id: number };
-    await db.runAsync('DELETE FROM auto_download_queue WHERE id = ?;', [oldest.id]);
-  }
-
-  await db.runAsync(
-    'INSERT INTO auto_download_queue (content_id, downloaded_at) VALUES (?, ?);',
-    [currentContentId, Date.now()]
-  );
 };
