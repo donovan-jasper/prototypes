@@ -162,16 +162,25 @@ export default function RequestBoard() {
       </View>
 
       <View style={styles.header}>
-        <View>
-          <Text style={styles.title}>Nearby Requests</Text>
-          <Text style={styles.subtitle}>{requests.length} requests within {radius} miles</Text>
-        </View>
+        <Text style={styles.title}>Nearby Requests</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={handleCreateRequest}
+        >
+          <Text style={styles.createButtonText}>+ New Request</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#6366f1" />
           <Text style={styles.loadingText}>Loading requests...</Text>
+        </View>
+      ) : requests.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <Ionicons name="search-outline" size={48} color="#9ca3af" />
+          <Text style={styles.emptyText}>No requests found</Text>
+          <Text style={styles.emptySubtext}>Try increasing your search radius or create a new request</Text>
         </View>
       ) : (
         <FlatList
@@ -186,23 +195,15 @@ export default function RequestBoard() {
           )}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No requests nearby</Text>
-              <Text style={styles.emptySubtext}>Try increasing your radius or create a new request</Text>
-            </View>
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={['#6366f1']}
+              tintColor="#6366f1"
+            />
           }
         />
       )}
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleCreateRequest}
-      >
-        <Ionicons name="add" size={28} color="white" />
-      </TouchableOpacity>
     </View>
   );
 }
@@ -210,19 +211,11 @@ export default function RequestBoard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    padding: 20,
+    backgroundColor: '#f3f4f6',
   },
   mapContainer: {
     height: 250,
     width: '100%',
-    marginBottom: 10,
   },
   map: {
     flex: 1,
@@ -239,14 +232,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   radiusSliderContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 10,
+    padding: 16,
     backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
   },
   radiusLabel: {
-    fontSize: 14,
-    color: '#4b5563',
-    marginBottom: 5,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginBottom: 8,
   },
   slider: {
     width: '100%',
@@ -256,8 +251,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    padding: 16,
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -265,81 +259,79 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: '#1f2937',
   },
-  subtitle: {
-    fontSize: 14,
-    color: '#6b7280',
-    marginTop: 2,
+  createButton: {
+    backgroundColor: '#6366f1',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  createButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
   listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    padding: 16,
   },
-  emptyContainer: {
-    padding: 20,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#4b5563',
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
+    padding: 24,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 24,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1f2937',
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  emptySubtext: {
     fontSize: 14,
     color: '#6b7280',
+    marginTop: 8,
+    textAlign: 'center',
   },
   permissionButton: {
     backgroundColor: '#6366f1',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 20,
+    marginTop: 24,
   },
   permissionButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
+    fontSize: 16,
   },
   loginButton: {
     backgroundColor: '#6366f1',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 20,
+    marginTop: 24,
   },
   loginButtonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#6366f1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    fontSize: 16,
   },
 });

@@ -19,6 +19,7 @@ export function useRequests({ latitude, longitude, radius }: UseRequestsParams) 
 
   async function loadRequests() {
     try {
+      setLoading(true);
       const data = await getRequests(latitude, longitude, radius);
       // Filter by actual distance
       const filtered = data.filter(req => {
@@ -28,6 +29,7 @@ export function useRequests({ latitude, longitude, radius }: UseRequestsParams) 
       setRequests(filtered);
     } catch (error) {
       console.error('Error loading requests:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }
