@@ -167,7 +167,7 @@ export default function RequestBoard() {
           style={styles.createButton}
           onPress={handleCreateRequest}
         >
-          <Text style={styles.createButtonText}>+ New Request</Text>
+          <Text style={styles.createButtonText}>+ New</Text>
         </TouchableOpacity>
       </View>
 
@@ -193,7 +193,6 @@ export default function RequestBoard() {
               onPress={() => router.push(`/request/${item.id}`)}
             />
           )}
-          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -202,6 +201,7 @@ export default function RequestBoard() {
               tintColor="#6366f1"
             />
           }
+          contentContainerStyle={styles.listContent}
         />
       )}
     </View>
@@ -213,34 +213,38 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f3f4f6',
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   mapContainer: {
-    height: 250,
+    height: 200,
     width: '100%',
+    marginBottom: 16,
   },
   map: {
-    flex: 1,
+    ...StyleSheet.absoluteFillObject,
   },
   marker: {
     backgroundColor: '#6366f1',
     padding: 8,
     borderRadius: 20,
     borderWidth: 2,
-    borderColor: 'white',
+    borderColor: '#fff',
   },
   markerText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
   },
   radiusSliderContainer: {
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   radiusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontSize: 14,
+    color: '#4b5563',
     marginBottom: 8,
   },
   slider: {
@@ -251,15 +255,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#1f2937',
+    color: '#111827',
   },
   createButton: {
     backgroundColor: '#6366f1',
@@ -268,39 +270,28 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   createButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-  },
-  listContent: {
-    padding: 16,
-  },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 12,
     color: '#6b7280',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1f2937',
+    color: '#374151',
     marginTop: 16,
     textAlign: 'center',
   },
@@ -315,23 +306,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 24,
+    marginTop: 20,
   },
   permissionButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16,
   },
   loginButton: {
     backgroundColor: '#6366f1',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
-    marginTop: 24,
+    marginTop: 20,
   },
   loginButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: '600',
-    fontSize: 16,
+  },
+  listContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
 });
