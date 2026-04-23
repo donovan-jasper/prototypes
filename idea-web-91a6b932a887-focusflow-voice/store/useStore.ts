@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createSession, completeSession, getStreak, getLastSessionDate, resetStreak } from '../lib/database';
 import { isSameDay, subDays } from 'date-fns';
+import { scheduleStreakWarning } from '../lib/notifications';
 
 interface Session {
   id: number;
@@ -30,6 +31,7 @@ interface StoreState {
   setPremiumStatus: (isPremium: boolean) => void;
   setVoicePack: (voicePack: string) => void;
   resetStreakIfNeeded: () => Promise<void>;
+  checkStreakContinuity: () => Promise<void>;
 }
 
 export const useStore = create<StoreState>((set, get) => ({
@@ -58,6 +60,9 @@ export const useStore = create<StoreState>((set, get) => ({
           voicePack,
         },
       });
+
+      // Check streak continuity after starting session
+      await get().checkStreakContinuity();
     } catch (error) {
       console.error('Failed to start session', error);
     }
@@ -79,6 +84,9 @@ export const useStore = create<StoreState>((set, get) => ({
         await completeSession(get().currentSession.id);
         await get().updateStats();
         set({ currentSession: null });
+
+        // Check streak continuity after completing session
+        await get().checkStreakContinuity();
       } catch (error) {
         console.error('Failed to complete session', error);
       }
@@ -135,6 +143,26 @@ export const useStore = create<StoreState>((set, get) => ({
       }
     } catch (error) {
       console.error('Failed to reset streak', error);
+    }
+  },
+
+  checkStreakContinuity: async () => {
+    try {
+      const lastSessionDate = await getLastSessionDate();
+      const today = new Date();
+
+      if (lastSessionDate) {
+        const lastDate = new Date(lastSessionDate);
+        const yesterday = subDays(today, 1);
+
+        // If last session was yesterday, schedule warning for today
+        if (isSameDay(lastDate, yesterday)) {
+          const streak = await getStreak();
+          await scheduleStreakWarning(streak);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check streak continuity', error);
     }
   },
 

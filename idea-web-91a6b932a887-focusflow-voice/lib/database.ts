@@ -1,12 +1,13 @@
 import * as SQLite from 'expo-sqlite';
-import { format, isSameDay, subDays } from 'date-fns';
+import { format, isSameDay, parseISO } from 'date-fns';
 
 const db = SQLite.openDatabase('zensprint.db');
 
 export const initDatabase = async () => {
   return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
+        // Create sessions table
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -18,6 +19,7 @@ export const initDatabase = async () => {
           );`
         );
 
+        // Create streaks table
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS streaks (
             date TEXT PRIMARY KEY,
@@ -25,6 +27,17 @@ export const initDatabase = async () => {
           );`
         );
 
+        // Create pods table
+        tx.executeSql(
+          `CREATE TABLE IF NOT EXISTS pods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            members TEXT NOT NULL,
+            createdAt TEXT NOT NULL
+          );`
+        );
+
+        // Create rewards table
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS rewards (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -33,28 +46,19 @@ export const initDatabase = async () => {
             unlocked INTEGER DEFAULT 0
           );`
         );
-
-        // Initialize rewards if empty
-        tx.executeSql(
-          `INSERT OR IGNORE INTO rewards (name, pointsRequired) VALUES
-            ('Bronze Badge', 100),
-            ('Silver Badge', 500),
-            ('Gold Badge', 1000),
-            ('Diamond Badge', 2000);`
-        );
       },
-      (error) => reject(error),
+      error => reject(error),
       () => resolve(true)
     );
   });
 };
 
 export const createSession = async (duration: number, voicePack: string) => {
-  return new Promise<number>((resolve, reject) => {
-    const startTime = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  return new Promise((resolve, reject) => {
+    const startTime = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
 
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
           'INSERT INTO sessions (duration, startTime, voicePack) VALUES (?, ?, ?);',
           [duration, startTime, voicePack],
@@ -62,109 +66,81 @@ export const createSession = async (duration: number, voicePack: string) => {
           (_, error) => reject(error)
         );
       },
-      (error) => reject(error)
+      error => reject(error)
     );
   });
 };
 
 export const completeSession = async (sessionId: number) => {
-  return new Promise<void>((resolve, reject) => {
-    const endTime = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss'Z'");
+  return new Promise((resolve, reject) => {
+    const endTime = format(new Date(), "yyyy-MM-dd'T'HH:mm:ss.SSSxxx");
     const today = format(new Date(), 'yyyy-MM-dd');
 
     db.transaction(
-      (tx) => {
+      tx => {
         // Update session as completed
         tx.executeSql(
-          'UPDATE sessions SET endTime = ?, completed = 1 WHERE id = ?;',
-          [endTime, sessionId]
-        );
-
-        // Update or create streak for today
-        tx.executeSql(
-          `INSERT OR REPLACE INTO streaks (date, sessionsCompleted)
-           VALUES (?, COALESCE((SELECT sessionsCompleted + 1 FROM streaks WHERE date = ?), 1));`,
-          [today, today]
+          'UPDATE sessions SET completed = 1, endTime = ? WHERE id = ?;',
+          [endTime, sessionId],
+          () => {
+            // Update or create streak record
+            tx.executeSql(
+              `INSERT OR REPLACE INTO streaks (date, sessionsCompleted)
+               VALUES (?, COALESCE((SELECT sessionsCompleted FROM streaks WHERE date = ?), 0) + 1);`,
+              [today, today],
+              () => resolve(true),
+              (_, error) => reject(error)
+            );
+          },
+          (_, error) => reject(error)
         );
       },
-      (error) => reject(error),
-      () => resolve()
+      error => reject(error)
     );
   });
 };
 
 export const getStreak = async () => {
-  return new Promise<number>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     const today = new Date();
-    let streakCount = 0;
+    let streak = 0;
 
     db.transaction(
-      (tx) => {
-        // Get all streak dates in descending order
+      tx => {
         tx.executeSql(
-          `SELECT date FROM streaks ORDER BY date DESC;`,
+          'SELECT date FROM streaks ORDER BY date DESC;',
           [],
-          (_, result) => {
-            let previousDate = today;
-            let currentDate = today;
+          (_, { rows }) => {
+            for (let i = 0; i < rows.length; i++) {
+              const sessionDate = parseISO(rows.item(i).date);
+              const daysDiff = Math.floor((today.getTime() - sessionDate.getTime()) / (1000 * 60 * 60 * 24));
 
-            for (let i = 0; i < result.rows.length; i++) {
-              currentDate = new Date(result.rows.item(i).date);
-
-              // Check if current date is consecutive with previous date
-              if (isSameDay(currentDate, subDays(previousDate, 1))) {
-                streakCount++;
-                previousDate = currentDate;
+              if (daysDiff === streak) {
+                streak++;
               } else {
-                // Break if we find a gap
                 break;
               }
             }
-
-            resolve(streakCount);
+            resolve(streak);
           },
           (_, error) => reject(error)
         );
       },
-      (error) => reject(error)
-    );
-  });
-};
-
-export const getTotalPoints = async () => {
-  return new Promise<number>((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT SUM(duration) as totalPoints
-           FROM sessions
-           WHERE completed = 1;`,
-          [],
-          (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0).totalPoints || 0);
-            } else {
-              resolve(0);
-            }
-          },
-          (_, error) => reject(error)
-        );
-      },
-      (error) => reject(error)
+      error => reject(error)
     );
   });
 };
 
 export const getLastSessionDate = async () => {
-  return new Promise<string | null>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
-          `SELECT date FROM streaks ORDER BY date DESC LIMIT 1;`,
+          'SELECT date FROM streaks ORDER BY date DESC LIMIT 1;',
           [],
-          (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0).date);
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              resolve(rows.item(0).date);
             } else {
               resolve(null);
             }
@@ -172,23 +148,41 @@ export const getLastSessionDate = async () => {
           (_, error) => reject(error)
         );
       },
-      (error) => reject(error)
+      error => reject(error)
     );
   });
 };
 
 export const resetStreak = async () => {
-  return new Promise<void>((resolve, reject) => {
+  return new Promise((resolve, reject) => {
     db.transaction(
-      (tx) => {
+      tx => {
         tx.executeSql(
-          `DELETE FROM streaks;`,
+          'DELETE FROM streaks;',
           [],
-          () => resolve(),
+          () => resolve(true),
           (_, error) => reject(error)
         );
       },
-      (error) => reject(error)
+      error => reject(error)
+    );
+  });
+};
+
+export const getTotalPoints = async () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        tx.executeSql(
+          'SELECT SUM(duration) as totalPoints FROM sessions WHERE completed = 1;',
+          [],
+          (_, { rows }) => {
+            resolve(rows.item(0).totalPoints || 0);
+          },
+          (_, error) => reject(error)
+        );
+      },
+      error => reject(error)
     );
   });
 };
