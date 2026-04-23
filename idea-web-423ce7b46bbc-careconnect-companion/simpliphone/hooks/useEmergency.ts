@@ -1,34 +1,39 @@
-import { useState, useEffect } from 'react';
-import { getEmergencyContacts } from '../database/contacts';
+import { useContext, useEffect } from 'react';
+import { SettingsContext } from '../contexts/SettingsContext';
 import { triggerEmergencyCall, sendEmergencySMS, detectShakeGesture } from '../services/emergency';
+import { getCurrentLocation } from '../services/location';
+import { useRouter } from 'expo-router';
 
 export const useEmergency = () => {
-  const [emergencyContact, setEmergencyContact] = useState(null);
+  const { emergencyContact } = useContext(SettingsContext);
+  const router = useRouter();
 
-  useEffect(() => {
-    const loadEmergencyContact = async () => {
-      const contacts = await getEmergencyContacts();
-      if (contacts.length > 0) {
-        setEmergencyContact(contacts[0]);
-      }
-    };
-    loadEmergencyContact();
-  }, []);
-
-  const handleEmergency = async () => {
-    if (emergencyContact) {
-      await triggerEmergencyCall(emergencyContact.phone);
-      await sendEmergencySMS(emergencyContact.phone, 'Emergency! Please call me.');
-    }
+  const handleShakeDetected = () => {
+    router.push('/emergency');
   };
 
   useEffect(() => {
-    const subscription = detectShakeGesture(handleEmergency);
+    const subscription = detectShakeGesture(handleShakeDetected);
     return () => subscription.remove();
-  }, [emergencyContact]);
+  }, []);
+
+  const triggerEmergencyCallAction = async () => {
+    if (emergencyContact?.phone) {
+      await triggerEmergencyCall(emergencyContact.phone);
+    }
+  };
+
+  const sendEmergencySMSAction = async (location) => {
+    if (emergencyContact?.phone) {
+      const message = `EMERGENCY! I need help. My location: ${location.coords.latitude},${location.coords.longitude}`;
+      await sendEmergencySMS(emergencyContact.phone, message);
+    }
+  };
 
   return {
     emergencyContact,
-    triggerEmergency: handleEmergency,
+    triggerEmergencyCall: triggerEmergencyCallAction,
+    sendEmergencySMS: sendEmergencySMSAction,
+    getCurrentLocation,
   };
 };
