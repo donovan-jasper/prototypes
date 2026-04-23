@@ -9,6 +9,13 @@ interface User {
   lon: number;
   distance?: number;
   compatibilityScore?: number;
+  skills?: string[];
+  learningInterests?: string[];
+  availability?: {
+    days: string[];
+    times: string[];
+  };
+  connectionGoal?: string;
 }
 
 interface Location {

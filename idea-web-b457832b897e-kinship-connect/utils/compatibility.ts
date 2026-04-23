@@ -8,6 +8,8 @@ interface User {
     times: string[];
   };
   connectionGoal?: string;
+  skills?: string[];
+  learningInterests?: string[];
 }
 
 export const calculateCompatibilityScore = (user1: User, user2: User): number => {
@@ -16,12 +18,14 @@ export const calculateCompatibilityScore = (user1: User, user2: User): number =>
   const ageGapScore = calculateAgeGapScore(user1.age, user2.age);
   const availabilityScore = calculateAvailabilityScore(user1.availability, user2.availability);
   const goalAlignmentScore = calculateGoalAlignmentScore(user1.connectionGoal, user2.connectionGoal);
+  const skillExchangeScore = calculateSkillExchangeScore(user1, user2);
 
-  // Weighted average (40% interests, 20% age gap, 20% availability, 20% goals)
-  const totalScore = (interestScore * 0.4) +
+  // Weighted average (30% interests, 20% age gap, 20% availability, 20% goals, 10% skill exchange)
+  const totalScore = (interestScore * 0.3) +
                     (ageGapScore * 0.2) +
                     (availabilityScore * 0.2) +
-                    (goalAlignmentScore * 0.2);
+                    (goalAlignmentScore * 0.2) +
+                    (skillExchangeScore * 0.1);
 
   // Round to nearest integer
   return Math.round(totalScore);
@@ -95,4 +99,32 @@ export const calculateGoalAlignmentScore = (goal1: string | undefined, goal2: st
   );
 
   return isComplementary ? 100 : 0;
+};
+
+export const calculateSkillExchangeScore = (user1: User, user2: User): number => {
+  if (!user1.skills?.length || !user2.learningInterests?.length) {
+    return 0;
+  }
+
+  // Check if user1's skills match user2's learning interests
+  const matchingSkills = user1.skills.filter(skill =>
+    user2.learningInterests?.some(interest =>
+      interest.toLowerCase().includes(skill.toLowerCase())
+    )
+  );
+
+  // Check if user2's skills match user1's learning interests
+  const reverseMatchingSkills = user2.skills?.filter(skill =>
+    user1.learningInterests?.some(interest =>
+      interest.toLowerCase().includes(skill.toLowerCase())
+    )
+  ) || [];
+
+  const totalMatching = matchingSkills.length + reverseMatchingSkills.length;
+  const totalPossible = Math.max(user1.skills.length, user2.learningInterests?.length || 0) +
+                        Math.max(user2.skills?.length || 0, user1.learningInterests?.length || 0);
+
+  if (totalPossible === 0) return 0;
+
+  return (totalMatching / totalPossible) * 100;
 };
