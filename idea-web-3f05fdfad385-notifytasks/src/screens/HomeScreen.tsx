@@ -188,18 +188,15 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   listContent: {
-    paddingBottom: 20,
+    paddingBottom: 16,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
+    padding: 16,
     alignItems: 'center',
-    padding: 20,
   },
   emptyText: {
     color: Colors.textSecondary,
     fontSize: 16,
-    textAlign: 'center',
   },
 });
 
