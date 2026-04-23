@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { format } from 'date-fns';
+import { format, isSameDay, subDays } from 'date-fns';
 
 const db = SQLite.openDatabase('zensprint.db');
 
@@ -95,22 +95,33 @@ export const completeSession = async (sessionId: number) => {
 
 export const getStreak = async () => {
   return new Promise<number>((resolve, reject) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
+    const today = new Date();
+    let streakCount = 0;
 
     db.transaction(
       (tx) => {
+        // Get all streak dates in descending order
         tx.executeSql(
-          `SELECT COUNT(*) as streak
-           FROM streaks
-           WHERE date >= date('now', '-6 days')
-           AND date <= ?;`,
-          [today],
+          `SELECT date FROM streaks ORDER BY date DESC;`,
+          [],
           (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0).streak);
-            } else {
-              resolve(0);
+            let previousDate = today;
+            let currentDate = today;
+
+            for (let i = 0; i < result.rows.length; i++) {
+              currentDate = new Date(result.rows.item(i).date);
+
+              // Check if current date is consecutive with previous date
+              if (isSameDay(currentDate, subDays(previousDate, 1))) {
+                streakCount++;
+                previousDate = currentDate;
+              } else {
+                // Break if we find a gap
+                break;
+              }
             }
+
+            resolve(streakCount);
           },
           (_, error) => reject(error)
         );
@@ -136,6 +147,44 @@ export const getTotalPoints = async () => {
               resolve(0);
             }
           },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
+export const getLastSessionDate = async () => {
+  return new Promise<string | null>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `SELECT date FROM streaks ORDER BY date DESC LIMIT 1;`,
+          [],
+          (_, result) => {
+            if (result.rows.length > 0) {
+              resolve(result.rows.item(0).date);
+            } else {
+              resolve(null);
+            }
+          },
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
+export const resetStreak = async () => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          `DELETE FROM streaks;`,
+          [],
+          () => resolve(),
           (_, error) => reject(error)
         );
       },

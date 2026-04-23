@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { createSession } from '../lib/database';
+import { createSession, completeSession, getStreak, getLastSessionDate, resetStreak } from '../lib/database';
+import { isSameDay, subDays } from 'date-fns';
 
 interface Session {
   id: number;
@@ -24,14 +25,14 @@ interface StoreState {
   startSession: (duration: number, voicePack: string) => Promise<void>;
   pauseSession: () => void;
   resumeSession: () => void;
-  completeSession: () => void;
-  updateStats: (duration: number) => void;
+  completeSession: () => Promise<void>;
+  updateStats: () => Promise<void>;
   setPremiumStatus: (isPremium: boolean) => void;
   setVoicePack: (voicePack: string) => void;
-  resetStreakIfNeeded: () => void;
+  resetStreakIfNeeded: () => Promise<void>;
 }
 
-export const useStore = create<StoreState>((set) => ({
+export const useStore = create<StoreState>((set, get) => ({
   currentSession: null,
   isPremium: false,
   selectedVoicePack: 'default',
@@ -69,75 +70,69 @@ export const useStore = create<StoreState>((set) => ({
     // This would be connected to the SessionTimer component
   },
 
-  completeSession: () => {
-    set({ currentSession: null });
+  completeSession: async () => {
+    if (get().currentSession) {
+      try {
+        await completeSession(get().currentSession.id);
+        await get().updateStats();
+        set({ currentSession: null });
+      } catch (error) {
+        console.error('Failed to complete session', error);
+      }
+    }
   },
 
-  updateStats: (duration) => {
-    set((state) => {
-      const today = new Date().toISOString().split('T')[0];
-      let newStreak = state.userStats.currentStreak + 1;
-      let newLongestStreak = state.userStats.longestStreak;
+  updateStats: async () => {
+    try {
+      const [streak, lastSessionDate] = await Promise.all([
+        getStreak(),
+        getLastSessionDate()
+      ]);
 
-      // Check if this is a new day
-      if (state.userStats.lastSessionDate !== today) {
-        // If it's the next day after a break, reset streak
-        if (state.userStats.lastSessionDate) {
-          const lastDate = new Date(state.userStats.lastSessionDate);
-          const currentDate = new Date(today);
-          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays > 1) {
-            newStreak = 1;
-          }
-        } else {
-          newStreak = 1;
-        }
-      }
-
-      // Update longest streak if needed
-      if (newStreak > state.userStats.longestStreak) {
-        newLongestStreak = newStreak;
-      }
-
-      return {
-        userStats: {
+      set((state) => {
+        const newStats = {
+          ...state.userStats,
+          currentStreak: streak,
+          lastSessionDate: lastSessionDate,
           totalSessions: state.userStats.totalSessions + 1,
-          totalFocusTime: state.userStats.totalFocusTime + duration,
-          currentStreak: newStreak,
-          longestStreak: newLongestStreak,
-          lastSessionDate: today,
-        },
-      };
-    });
+          totalFocusTime: state.userStats.totalFocusTime + (state.currentSession?.duration || 0),
+        };
+
+        // Update longest streak if needed
+        if (streak > state.userStats.longestStreak) {
+          newStats.longestStreak = streak;
+        }
+
+        return { userStats: newStats };
+      });
+    } catch (error) {
+      console.error('Failed to update stats', error);
+    }
   },
 
-  resetStreakIfNeeded: () => {
-    set((state) => {
-      const today = new Date().toISOString().split('T')[0];
+  resetStreakIfNeeded: async () => {
+    try {
+      const lastSessionDate = await getLastSessionDate();
+      const today = new Date();
 
-      if (state.userStats.lastSessionDate !== today) {
-        const lastDate = state.userStats.lastSessionDate ? new Date(state.userStats.lastSessionDate) : null;
-        const currentDate = new Date(today);
+      if (lastSessionDate) {
+        const lastDate = new Date(lastSessionDate);
+        const yesterday = subDays(today, 1);
 
-        if (lastDate) {
-          const diffTime = Math.abs(currentDate.getTime() - lastDate.getTime());
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays > 1) {
-            return {
-              userStats: {
-                ...state.userStats,
-                currentStreak: 0,
-              },
-            };
-          }
+        // If last session was not yesterday or today, reset streak
+        if (!isSameDay(lastDate, yesterday) && !isSameDay(lastDate, today)) {
+          await resetStreak();
+          set((state) => ({
+            userStats: {
+              ...state.userStats,
+              currentStreak: 0,
+            },
+          }));
         }
       }
-
-      return state;
-    });
+    } catch (error) {
+      console.error('Failed to reset streak', error);
+    }
   },
 
   setPremiumStatus: (isPremium) => set({ isPremium }),

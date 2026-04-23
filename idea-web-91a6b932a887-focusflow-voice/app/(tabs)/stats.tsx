@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import StreakCalendar from '../../components/StreakCalendar';
 import { useStore } from '../../store/useStore';
-import { getStreak, getTotalPoints } from '../../lib/database';
-import { format } from 'date-fns';
+import { getTotalPoints } from '../../lib/database';
 
 const StatsScreen = () => {
-  const { userStats } = useStore();
-  const [streak, setStreak] = useState(0);
+  const { userStats, resetStreakIfNeeded } = useStore();
   const [totalPoints, setTotalPoints] = useState(0);
 
   useEffect(() => {
-    const loadStats = async () => {
-      const currentStreak = await getStreak();
-      const points = await getTotalPoints();
-      setStreak(currentStreak);
-      setTotalPoints(points);
+    const fetchData = async () => {
+      try {
+        await resetStreakIfNeeded();
+        const points = await getTotalPoints();
+        setTotalPoints(points);
+      } catch (error) {
+        console.error('Failed to fetch stats data', error);
+      }
     };
 
-    loadStats();
+    fetchData();
   }, []);
 
   return (
@@ -26,13 +28,15 @@ const StatsScreen = () => {
         <Text style={styles.cardTitle}>Your Stats</Text>
 
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Current Streak</Text>
-          <Text style={styles.statValue}>{streak} days</Text>
+          <Text style={styles.statLabel}>Total Sessions</Text>
+          <Text style={styles.statValue}>{userStats.totalSessions}</Text>
         </View>
 
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Longest Streak</Text>
-          <Text style={styles.statValue}>{userStats.longestStreak} days</Text>
+          <Text style={styles.statLabel}>Total Focus Time</Text>
+          <Text style={styles.statValue}>
+            {Math.floor(userStats.totalFocusTime / 60)} hours
+          </Text>
         </View>
 
         <View style={styles.statRow}>
@@ -41,30 +45,14 @@ const StatsScreen = () => {
         </View>
 
         <View style={styles.statRow}>
-          <Text style={styles.statLabel}>Total Focus Time</Text>
-          <Text style={styles.statValue}>{userStats.totalFocusTime} minutes</Text>
+          <Text style={styles.statLabel}>Longest Streak</Text>
+          <Text style={styles.statValue}>{userStats.longestStreak} days</Text>
         </View>
       </View>
 
-      <View style={styles.calendarContainer}>
-        <Text style={styles.sectionTitle}>Streak Calendar</Text>
-        <View style={styles.calendar}>
-          {/* Simplified calendar - in a real app, you'd render actual days */}
-          {[...Array(30)].map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.calendarDay,
-                i < streak && styles.completedDay,
-              ]}
-            />
-          ))}
-        </View>
-      </View>
+      <StreakCalendar currentStreak={userStats.currentStreak} />
 
-      <TouchableOpacity style={styles.exportButton}>
-        <Text style={styles.exportButtonText}>Export Data (Premium)</Text>
-      </TouchableOpacity>
+      {/* Additional stats components would go here */}
     </ScrollView>
   );
 };
@@ -72,14 +60,13 @@ const StatsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
   },
   statsCard: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 10,
-    padding: 20,
-    marginBottom: 20,
+    padding: 16,
+    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -89,13 +76,13 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 16,
     color: '#333',
   },
   statRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   statLabel: {
     fontSize: 16,
@@ -104,40 +91,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  calendarContainer: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
     color: '#333',
-  },
-  calendar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  calendarDay: {
-    width: '13%',
-    aspectRatio: 1,
-    margin: '0.5%',
-    backgroundColor: '#e0e0e0',
-    borderRadius: 4,
-  },
-  completedDay: {
-    backgroundColor: '#4CAF50',
-  },
-  exportButton: {
-    backgroundColor: '#2196F3',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  exportButtonText: {
-    color: 'white',
-    fontSize: 16,
   },
 });
 
