@@ -1,6 +1,6 @@
 import create from 'zustand';
-import { fetchNewsForSymbol } from '../services/news';
-import { analyzeArticleSentiment } from '../services/sentiment';
+import { fetchNewsForSymbols } from '../services/news';
+import { analyzeArticleSentiment, getSentimentLabel } from '../services/sentiment';
 import { NewsArticle } from '../types/news';
 
 interface FeedState {
@@ -9,46 +9,71 @@ interface FeedState {
   error: string | null;
   fetchFeed: (symbols: string[]) => Promise<void>;
   dismissArticle: (id: string) => void;
+  filterSentiment: (sentiment: 'all' | 'bullish' | 'bearish' | 'neutral') => void;
+  filteredArticles: NewsArticle[];
+  currentSentimentFilter: 'all' | 'bullish' | 'bearish' | 'neutral';
 }
 
-export const useFeedStore = create<FeedState>((set) => ({
+export const useFeedStore = create<FeedState>((set, get) => ({
   articles: [],
+  filteredArticles: [],
   isLoading: false,
   error: null,
+  currentSentimentFilter: 'all',
 
   fetchFeed: async (symbols: string[]) => {
     set({ isLoading: true, error: null });
 
     try {
-      // Fetch news for all symbols in parallel
-      const newsPromises = symbols.map(symbol => fetchNewsForSymbol(symbol));
-      const newsResults = await Promise.all(newsPromises);
+      // Fetch news for all symbols
+      const allArticles = await fetchNewsForSymbols(symbols);
 
-      // Flatten all articles and analyze sentiment
-      const allArticles = newsResults.flat();
-      const articlesWithSentiment = allArticles.map(article => ({
-        ...article,
-        sentiment: analyzeArticleSentiment(article)
-      }));
-
-      // Sort by published date (newest first)
-      articlesWithSentiment.sort((a, b) =>
-        new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+      // Analyze sentiment for each article
+      const articlesWithSentiment = await Promise.all(
+        allArticles.map(async (article) => {
+          const sentimentScore = await analyzeArticleSentiment(article);
+          return {
+            ...article,
+            sentiment: sentimentScore,
+            sentimentLabel: getSentimentLabel(sentimentScore),
+          };
+        })
       );
 
-      set({ articles: articlesWithSentiment, isLoading: false });
+      set({
+        articles: articlesWithSentiment,
+        filteredArticles: articlesWithSentiment,
+        isLoading: false,
+      });
     } catch (error) {
       console.error('Error fetching feed:', error);
       set({
         error: 'Failed to load news feed',
-        isLoading: false
+        isLoading: false,
       });
     }
   },
 
   dismissArticle: (id: string) => {
     set((state) => ({
-      articles: state.articles.filter(article => article.id !== id)
+      articles: state.articles.filter(article => article.id !== id),
+      filteredArticles: state.filteredArticles.filter(article => article.id !== id),
     }));
+  },
+
+  filterSentiment: (sentiment: 'all' | 'bullish' | 'bearish' | 'neutral') => {
+    const { articles } = get();
+
+    if (sentiment === 'all') {
+      set({
+        filteredArticles: articles,
+        currentSentimentFilter: sentiment,
+      });
+    } else {
+      set({
+        filteredArticles: articles.filter(article => article.sentimentLabel === sentiment),
+        currentSentimentFilter: sentiment,
+      });
+    }
   },
 }));

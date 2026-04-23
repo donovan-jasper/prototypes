@@ -2,37 +2,41 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 interface SentimentBadgeProps {
-  sentiment: number;
+  sentiment: 'bullish' | 'bearish' | 'neutral';
 }
 
 const SentimentBadge: React.FC<SentimentBadgeProps> = ({ sentiment }) => {
   const getBadgeStyle = () => {
-    if (sentiment > 0.5) {
-      return {
-        backgroundColor: '#E6F7EE',
-        color: '#2E7D32',
-        text: 'Bullish',
-      };
-    } else if (sentiment < -0.5) {
-      return {
-        backgroundColor: '#FFEBEE',
-        color: '#C62828',
-        text: 'Bearish',
-      };
-    } else {
-      return {
-        backgroundColor: '#F5F5F5',
-        color: '#616161',
-        text: 'Neutral',
-      };
+    switch (sentiment) {
+      case 'bullish':
+        return {
+          backgroundColor: '#e6f7ee',
+          color: '#2e7d32',
+          text: 'Bullish',
+        };
+      case 'bearish':
+        return {
+          backgroundColor: '#fff0f0',
+          color: '#c62828',
+          text: 'Bearish',
+        };
+      case 'neutral':
+      default:
+        return {
+          backgroundColor: '#f5f5f5',
+          color: '#666',
+          text: 'Neutral',
+        };
     }
   };
 
-  const { backgroundColor, color, text } = getBadgeStyle();
+  const badgeStyle = getBadgeStyle();
 
   return (
-    <View style={[styles.badge, { backgroundColor }]}>
-      <Text style={[styles.text, { color }]}>{text}</Text>
+    <View style={[styles.badge, { backgroundColor: badgeStyle.backgroundColor }]}>
+      <Text style={[styles.badgeText, { color: badgeStyle.color }]}>
+        {badgeStyle.text}
+      </Text>
     </View>
   );
 };
@@ -42,10 +46,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    alignSelf: 'flex-start',
   },
-  text: {
+  badgeText: {
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

@@ -31,6 +31,27 @@ export const fetchNewsForSymbol = async (symbol: string): Promise<NewsArticle[]>
     }));
   } catch (error) {
     console.error('Error fetching news:', error);
-    return [];
+    throw new Error('Failed to fetch news articles');
+  }
+};
+
+export const fetchNewsForSymbols = async (symbols: string[]): Promise<NewsArticle[]> => {
+  try {
+    // Fetch news for all symbols in parallel
+    const newsPromises = symbols.map(symbol => fetchNewsForSymbol(symbol));
+    const newsResults = await Promise.all(newsPromises);
+
+    // Flatten all articles
+    const allArticles = newsResults.flat();
+
+    // Sort by published date (newest first)
+    allArticles.sort((a, b) =>
+      new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+    );
+
+    return allArticles;
+  } catch (error) {
+    console.error('Error fetching news for symbols:', error);
+    throw new Error('Failed to fetch news for symbols');
   }
 };
