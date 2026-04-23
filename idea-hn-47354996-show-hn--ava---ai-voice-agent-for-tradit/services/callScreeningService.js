@@ -27,6 +27,16 @@ const mockAiService = {
         transcript: "This is the bank. We've noticed unusual activity on your account. Please verify your information.",
         summary: "Bank call - account security verification required.",
         confidence: 0.78
+      },
+      "sales": {
+        transcript: "Hello, this is Sarah from XYZ Insurance. I wanted to discuss your current policy and see if there are any better options available.",
+        summary: "This is a sales call about your insurance policy. The caller is offering to discuss policy options.",
+        confidence: 0.88
+      },
+      "tech": {
+        transcript: "Hi, this is the tech support team. We've detected some issues with your account. Please hold while we transfer you.",
+        summary: "Technical support call regarding account issues. The caller is transferring the call to a specialist.",
+        confidence: 0.75
       }
     };
 
