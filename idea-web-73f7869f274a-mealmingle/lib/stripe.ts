@@ -149,48 +149,113 @@ export const createEphemeralKey = async (customerId) => {
       }),
     });
     return await response.json();
-  } catch (err) {
-    console.error('Error creating ephemeral key:', err);
-    throw err;
+  } catch (error) {
+    console.error('Error creating ephemeral key:', error);
+    throw error;
   }
 };
 
-export const processReimbursements = async (order, splitType = 'equal', customRules = []) => {
+export const processReimbursement = async (orderId) => {
   try {
-    const split = calculateSplit(order, splitType, customRules);
+    // Fetch the order details
+    const order = await new Promise((resolve, reject) => {
+      fetchOrders((orders) => {
+        const foundOrder = orders.find(o => o.id === orderId);
+        if (foundOrder) {
+          resolve(foundOrder);
+        } else {
+          reject(new Error('Order not found'));
+        }
+      });
+    });
 
-    // For each participant, create a transfer to their payment method
+    if (order.status !== 'delivered') {
+      throw new Error('Order must be delivered before processing reimbursement');
+    }
+
+    // Calculate the split amounts
+    const split = calculateSplit(order);
+
+    // Get the organizer (who paid upfront)
+    const organizer = order.participants.find(p => p.isOrganizer);
+
+    // Process transfers from organizer to each participant
+    const transferResults = [];
     for (const participant of split.participants) {
-      if (!participant.isOrganizer && participant.stripeCustomerId) {
+      if (participant.id !== organizer.id) {
         try {
-          // Create transfer to participant's payment method
           const transfer = await createTransfer(
             Math.round(participant.amount * 100),
             'usd',
-            participant.stripeCustomerId
+            participant.stripeCustomerId,
+            organizer.stripeCustomerId
           );
 
           // Update payment status in database
-          await updatePaymentStatus(participant.id, order.id, 'paid', (response) => {
-            if (!response.success) {
-              console.error('Failed to update payment status for participant', participant.id);
-            }
+          await new Promise((resolve, reject) => {
+            updatePaymentStatus(participant.id, orderId, 'reimbursed', (result) => {
+              if (result.success) {
+                resolve();
+              } else {
+                reject(new Error('Failed to update payment status'));
+              }
+            });
+          });
+
+          transferResults.push({
+            participantId: participant.id,
+            amount: participant.amount,
+            transferId: transfer.id,
+            status: 'success'
           });
         } catch (error) {
-          console.error('Error processing transfer for participant', participant.id, error);
-          // Mark as failed but continue with other participants
-          await updatePaymentStatus(participant.id, order.id, 'failed', (response) => {
-            if (!response.success) {
-              console.error('Failed to update payment status for participant', participant.id);
-            }
+          console.error(`Error processing transfer for participant ${participant.id}:`, error);
+          transferResults.push({
+            participantId: participant.id,
+            amount: participant.amount,
+            status: 'failed',
+            error: error.message
           });
         }
       }
     }
 
+    // Update order status to completed
+    await new Promise((resolve, reject) => {
+      updateOrderStatus(orderId, 'completed', (result) => {
+        if (result.success) {
+          resolve();
+        } else {
+          reject(new Error('Failed to update order status'));
+        }
+      });
+    });
+
+    // Send push notifications to participants
+    await sendReimbursementNotifications(order.participants, orderId);
+
+    return {
+      success: true,
+      message: 'Reimbursement processed successfully',
+      transfers: transferResults
+    };
+  } catch (error) {
+    console.error('Error processing reimbursement:', error);
+    throw error;
+  }
+};
+
+const sendReimbursementNotifications = async (participants, orderId) => {
+  try {
+    // In a real app, this would use Expo's push notification service
+    console.log(`Sending reimbursement notifications for order ${orderId} to participants:`, participants.map(p => p.id));
+
+    // Simulate sending notifications
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
     return { success: true };
   } catch (error) {
-    console.error('Error processing reimbursements:', error);
+    console.error('Error sending notifications:', error);
     throw error;
   }
 };

@@ -27,6 +27,7 @@ export const initDatabase = () => {
         groupId INTEGER,
         name TEXT,
         stripeCustomerId TEXT,
+        isOrganizer INTEGER DEFAULT 0,
         FOREIGN KEY (groupId) REFERENCES groups (id)
       );`
     );
@@ -83,7 +84,8 @@ export const fetchOrders = (callback) => {
         json_group_array(DISTINCT json_object(
           'id', group_members.id,
           'name', group_members.name,
-          'stripeCustomerId', group_members.stripeCustomerId
+          'stripeCustomerId', group_members.stripeCustomerId,
+          'isOrganizer', group_members.isOrganizer
         )) as participants
       FROM orders
       LEFT JOIN cart_items ON orders.id = cart_items.orderId
@@ -97,6 +99,22 @@ export const fetchOrders = (callback) => {
           participants: JSON.parse(order.participants).filter(participant => participant.id !== null)
         }));
         callback(parsedOrders);
+      }
+    );
+  });
+};
+
+export const updateOrderStatus = (orderId, status, callback) => {
+  db.transaction(tx => {
+    tx.executeSql(
+      'UPDATE orders SET status = ? WHERE id = ?;',
+      [status, orderId],
+      () => {
+        callback({ success: true });
+      },
+      (_, error) => {
+        console.error('Error updating order status:', error);
+        callback({ success: false, error });
       }
     );
   });
@@ -161,8 +179,8 @@ export const fetchGroups = (callback) => {
 export const addGroupMember = (member, callback) => {
   db.transaction(tx => {
     tx.executeSql(
-      'INSERT INTO group_members (groupId, name, stripeCustomerId) VALUES (?, ?, ?);',
-      [member.groupId, member.name, member.stripeCustomerId || null],
+      'INSERT INTO group_members (groupId, name, stripeCustomerId, isOrganizer) VALUES (?, ?, ?, ?);',
+      [member.groupId, member.name, member.stripeCustomerId || null, member.isOrganizer ? 1 : 0],
       (_, { insertId }) => {
         callback({ ...member, id: insertId });
       }

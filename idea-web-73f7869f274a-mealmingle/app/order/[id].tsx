@@ -25,7 +25,7 @@ export default function OrderDetailScreen() {
 
     setIsProcessingReimbursement(true);
     try {
-      const result = await processReimbursement(id);
+      const result = await processReimbursement(order.id);
       Alert.alert('Success', result.message);
       await refreshOrder();
     } catch (error) {
@@ -69,7 +69,7 @@ export default function OrderDetailScreen() {
     <ScrollView style={styles.container}>
       <Card style={styles.orderCard}>
         <Card.Title
-          title={order.restaurantName}
+          title={order.restaurant}
           subtitle={`Order #${order.id}`}
           right={() => (
             <Chip
@@ -174,11 +174,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   statusChip: {
-    marginRight: 8,
     backgroundColor: '#e3f2fd',
+    marginRight: 8,
   },
   statusText: {
-    color: '#1976d2',
+    color: '#0d47a1',
   },
   deliveryCard: {
     marginTop: 16,
@@ -187,11 +187,11 @@ const styles = StyleSheet.create({
     marginTop: 16,
     padding: 16,
     backgroundColor: '#e8f5e9',
-    borderRadius: 8,
+    borderRadius: 4,
   },
   completedText: {
-    fontSize: 16,
     color: '#2e7d32',
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   receiptButton: {
