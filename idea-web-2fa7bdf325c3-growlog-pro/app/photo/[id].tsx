@@ -1,20 +1,19 @@
-import { View, Text, Image, StyleSheet, ActivityIndicator, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { useStore } from '../../store/useStore';
-import { getPhotosForPlant } from '../../lib/photos';
+import { getPhotoById } from '../../lib/photos';
 import { analyzePhotoHealth } from '../../lib/ai';
 import AIHealthReport from '../../components/AIHealthReport';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function PhotoDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { db, aiChecksRemaining, decrementAIChecks } = useStore();
+  const { db, isPremium, aiChecksRemaining, decrementAIChecks } = useStore();
   const [photo, setPhoto] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysis, setAnalysis] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (db && id) {
@@ -23,91 +22,103 @@ export default function PhotoDetailScreen() {
   }, [db, id]);
 
   async function loadPhoto() {
-    if (!db || !id) return;
+    if (!db) return;
+    const photoData = await getPhotoById(db, Number(id));
+    setPhoto(photoData);
 
-    try {
-      const photos = await getPhotosForPlant(db, Number(id));
-      if (photos.length > 0) {
-        setPhoto(photos[0]);
+    // If photo already has analysis, load it
+    if (photoData?.aiAnalysis) {
+      try {
+        setAnalysis(JSON.parse(photoData.aiAnalysis));
+      } catch (e) {
+        console.error('Error parsing saved analysis:', e);
       }
-    } catch (err) {
-      setError('Failed to load photo');
     }
   }
 
-  async function runAIAnalysis() {
-    if (!photo || !photo.uri) return;
+  async function handleAnalyzePhoto() {
+    if (!photo?.uri) return;
 
-    if (aiChecksRemaining <= 0) {
-      setError('You have used all your free AI checks. Upgrade to Premium for unlimited checks.');
+    // Check if user has remaining AI checks or is premium
+    if (!isPremium && aiChecksRemaining <= 0) {
+      Alert.alert(
+        'AI Checks Limit Reached',
+        'You\'ve used all your free AI checks this month. Upgrade to Premium to get unlimited checks!',
+        [
+          { text: 'Cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/settings/subscription') }
+        ]
+      );
       return;
     }
 
-    setIsLoading(true);
-    setError(null);
+    setIsAnalyzing(true);
 
     try {
       const result = await analyzePhotoHealth(photo.uri);
       setAnalysis(result);
-      decrementAIChecks();
-    } catch (err) {
-      setError('Failed to analyze photo. Please try again.');
+
+      // Save analysis to database
+      if (db) {
+        await db.runAsync(
+          'UPDATE photos SET ai_analysis = ?, health_score = ? WHERE id = ?',
+          [JSON.stringify(result), result.healthScore, photo.id]
+        );
+      }
+
+      // Decrement remaining checks if not premium
+      if (!isPremium) {
+        decrementAIChecks();
+      }
+    } catch (error) {
+      console.error('Error analyzing photo:', error);
+      Alert.alert('Error', 'Failed to analyze photo. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
   }
 
   if (!photo) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" />
+      <View style={styles.loadingContainer}>
+        <Text>Loading photo...</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container}>
-      <Image source={{ uri: photo.uri }} style={styles.photo} resizeMode="contain" />
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.analyzeButton}
-          onPress={runAIAnalysis}
-          disabled={isLoading || !!analysis}
-        >
-          <Ionicons name="scan" size={20} color="white" />
-          <Text style={styles.analyzeButtonText}>
-            {analysis ? 'Analysis Complete' : 'Analyze with AI'}
-          </Text>
-        </TouchableOpacity>
-
-        {aiChecksRemaining > 0 && (
-          <Text style={styles.checksRemaining}>
-            {aiChecksRemaining} AI checks remaining
-          </Text>
-        )}
+      <View style={styles.imageContainer}>
+        <Image
+          source={{ uri: photo.uri }}
+          style={styles.image}
+          resizeMode="contain"
+        />
       </View>
 
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-          <Text style={styles.loadingText}>Analyzing your plant...</Text>
-        </View>
-      )}
+      <View style={styles.infoContainer}>
+        <Text style={styles.dateText}>
+          Taken on {new Date(photo.takenAt).toLocaleDateString()}
+        </Text>
 
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      {analysis && (
-        <AIHealthReport
-          analysis={analysis.analysis}
-          healthScore={analysis.healthScore}
-          issues={analysis.issues}
-        />
-      )}
+        {!analysis ? (
+          <TouchableOpacity
+            style={styles.analyzeButton}
+            onPress={handleAnalyzePhoto}
+            disabled={isAnalyzing}
+          >
+            <MaterialIcons name="visibility" size={20} color="white" />
+            <Text style={styles.analyzeButtonText}>Analyze with AI</Text>
+          </TouchableOpacity>
+        ) : (
+          <AIHealthReport
+            analysis={analysis.analysis}
+            healthScore={analysis.healthScore}
+            issues={analysis.issues}
+            isLoading={isAnalyzing}
+          />
+        )}
+      </View>
     </ScrollView>
   );
 }
@@ -115,58 +126,46 @@ export default function PhotoDetailScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#f5f5f5',
   },
-  centered: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  photo: {
-    width: '100%',
+  imageContainer: {
     height: 300,
+    backgroundColor: 'white',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 16,
   },
-  actions: {
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  infoContainer: {
     padding: 16,
-    alignItems: 'center',
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 16,
+    textAlign: 'center',
   },
   analyzeButton: {
     flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
   },
   analyzeButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  checksRemaining: {
-    color: '#666',
-    fontSize: 14,
-  },
-  loadingContainer: {
-    padding: 16,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    padding: 16,
-    backgroundColor: '#FFEBEE',
-    borderRadius: 8,
-    margin: 16,
-  },
-  errorText: {
-    color: '#F44336',
-    fontSize: 16,
   },
 });

@@ -5,9 +5,7 @@ import { Photo } from '../types';
 
 export async function takePhoto(): Promise<string | null> {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
-  if (status !== 'granted') {
-    throw new Error('Camera permission not granted');
-  }
+  if (status !== 'granted') return null;
 
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -16,7 +14,7 @@ export async function takePhoto(): Promise<string | null> {
     aspect: [4, 3],
   });
 
-  if (!result.canceled && result.assets.length > 0) {
+  if (!result.canceled) {
     return result.assets[0].uri;
   }
   return null;
@@ -30,14 +28,10 @@ export async function savePhoto(
   const filename = `${Date.now()}.jpg`;
   const directory = `${FileSystem.documentDirectory}photos/`;
 
-  // Ensure directory exists
   await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
-
-  // Copy the image to our app's directory
   const newUri = `${directory}${filename}`;
   await FileSystem.copyAsync({ from: uri, to: newUri });
 
-  // Save to database
   const result = await db.runAsync(
     `INSERT INTO photos (plant_id, uri, taken_at) VALUES (?, ?, ?)`,
     [plantId, newUri, new Date().toISOString()]
@@ -56,20 +50,27 @@ export async function getPhotosForPlant(
   );
 }
 
+export async function getPhotoById(
+  db: SQLite.SQLiteDatabase,
+  id: number
+): Promise<Photo | null> {
+  const result = await db.getFirstAsync<Photo>(
+    'SELECT * FROM photos WHERE id = ?',
+    [id]
+  );
+  return result || null;
+}
+
 export async function deletePhoto(
   db: SQLite.SQLiteDatabase,
-  photoId: number
+  id: number
 ): Promise<void> {
-  // First get the photo URI to delete the file
-  const photo = await db.getFirstAsync<Photo>(
-    'SELECT uri FROM photos WHERE id = ?',
-    [photoId]
-  );
-
-  if (photo?.uri) {
+  // First get the photo to delete the file
+  const photo = await getPhotoById(db, id);
+  if (photo && photo.uri) {
     await FileSystem.deleteAsync(photo.uri, { idempotent: true });
   }
 
   // Then delete from database
-  await db.runAsync('DELETE FROM photos WHERE id = ?', [photoId]);
+  await db.runAsync('DELETE FROM photos WHERE id = ?', [id]);
 }
