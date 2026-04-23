@@ -165,8 +165,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 16,
+    marginVertical: 12,
   },
   loadingText: {
     marginLeft: 8,
