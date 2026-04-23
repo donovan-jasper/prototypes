@@ -5,6 +5,7 @@ import { Video } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { insertSessionReport } from '../lib/database';
+import { RTCPeerConnection, RTCView, mediaDevices, RTCIceCandidate, RTCSessionDescription } from 'react-native-webrtc';
 
 interface VideoCallProps {
   sessionId: string;
@@ -19,19 +20,23 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName, onEndCall })
   const [isCameraOn, setIsCameraOn] = useState(true);
   const [callDuration, setCallDuration] = useState(0);
   const [isConnecting, setIsConnecting] = useState(true);
+  const [localStream, setLocalStream] = useState<any>(null);
+  const [remoteStream, setRemoteStream] = useState<any>(null);
+  const [peerConnection, setPeerConnection] = useState<RTCPeerConnection | null>(null);
   const cameraRef = useRef<Camera>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const signalingServerUrl = 'ws://localhost:8080'; // Mock signaling server
 
   useEffect(() => {
     (async () => {
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
-    })();
 
-    // Simulate connection delay
-    const connectionTimer = setTimeout(() => {
-      setIsConnecting(false);
-    }, 3000);
+      if (status === 'granted') {
+        await setupLocalStream();
+        await setupPeerConnection();
+      }
+    })();
 
     // Start call duration timer
     timerRef.current = setInterval(() => {
@@ -42,9 +47,81 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName, onEndCall })
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
-      clearTimeout(connectionTimer);
+      if (peerConnection) {
+        peerConnection.close();
+      }
+      if (localStream) {
+        localStream.getTracks().forEach((track: any) => track.stop());
+      }
     };
   }, []);
+
+  const setupLocalStream = async () => {
+    try {
+      const stream = await mediaDevices.getUserMedia({
+        audio: true,
+        video: {
+          width: 640,
+          height: 480,
+          frameRate: 30,
+          facingMode: 'user'
+        }
+      });
+      setLocalStream(stream);
+    } catch (error) {
+      console.error('Error getting local stream:', error);
+      Alert.alert('Error', 'Could not access camera/microphone');
+    }
+  };
+
+  const setupPeerConnection = async () => {
+    const configuration = {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        // Add TURN server configuration here for production
+      ]
+    };
+
+    const pc = new RTCPeerConnection(configuration);
+    setPeerConnection(pc);
+
+    // Add local stream to peer connection
+    if (localStream) {
+      localStream.getTracks().forEach((track: any) => {
+        pc.addTrack(track, localStream);
+      });
+    }
+
+    // Handle remote stream
+    pc.ontrack = (event) => {
+      setRemoteStream(event.streams[0]);
+      setIsConnecting(false);
+    };
+
+    // ICE candidate handling
+    pc.onicecandidate = (event) => {
+      if (event.candidate) {
+        // Send candidate to signaling server
+        console.log('Sending ICE candidate:', event.candidate);
+      }
+    };
+
+    // Connection state changes
+    pc.onconnectionstatechange = () => {
+      console.log('Connection state:', pc.connectionState);
+      if (pc.connectionState === 'failed') {
+        Alert.alert('Connection Error', 'Failed to connect to peer');
+      }
+    };
+
+    // Create and send offer
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    console.log('Created offer:', offer);
+
+    // In a real app, you would send this offer to the signaling server
+    // and receive an answer from the remote peer
+  };
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -55,6 +132,12 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName, onEndCall })
   const handleEndCall = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
+    }
+    if (peerConnection) {
+      peerConnection.close();
+    }
+    if (localStream) {
+      localStream.getTracks().forEach((track: any) => track.stop());
     }
     onEndCall();
   };
@@ -94,18 +177,32 @@ const VideoCall: React.FC<VideoCallProps> = ({ sessionId, peerName, onEndCall })
   return (
     <View style={styles.container}>
       <View style={styles.videoContainer}>
-        {isCameraOn ? (
-          <Camera
-            ref={cameraRef}
-            style={styles.camera}
-            type={Camera.Constants.Type.front}
-            ratio="16:9"
+        {remoteStream ? (
+          <RTCView
+            streamURL={remoteStream.toURL()}
+            style={styles.remoteVideo}
+            objectFit="cover"
           />
         ) : (
-          <View style={[styles.camera, styles.cameraOff]}>
-            <Text style={styles.cameraOffText}>Camera Off</Text>
+          <View style={styles.remoteVideoPlaceholder}>
+            <Text style={styles.placeholderText}>Waiting for peer...</Text>
           </View>
         )}
+
+        <View style={styles.localVideoContainer}>
+          {isCameraOn && localStream ? (
+            <RTCView
+              streamURL={localStream.toURL()}
+              style={styles.localVideo}
+              objectFit="cover"
+              mirror={true}
+            />
+          ) : (
+            <View style={[styles.localVideo, styles.cameraOff]}>
+              <Text style={styles.cameraOffText}>Camera Off</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       {peerName && (
@@ -169,7 +266,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  camera: {
+  remoteVideo: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: 'black',
+  },
+  remoteVideoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#1a1a1a',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  localVideoContainer: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    width: 120,
+    height: 180,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  localVideo: {
     width: '100%',
     height: '100%',
   },
@@ -180,39 +304,41 @@ const styles = StyleSheet.create({
   },
   cameraOffText: {
     color: 'white',
-    fontSize: 18,
+    fontSize: 12,
   },
   peerInfo: {
     position: 'absolute',
-    top: 50,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
+    top: 40,
+    left: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 8,
+    borderRadius: 4,
   },
   peerName: {
     color: 'white',
-    fontSize: 18,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   controls: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   controlButton: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    marginHorizontal: 10,
   },
   endCallButton: {
-    backgroundColor: '#ff3b30',
+    backgroundColor: '#FF3B30',
   },
   durationContainer: {
     position: 'absolute',
@@ -224,27 +350,20 @@ const styles = StyleSheet.create({
   durationText: {
     color: 'white',
     fontSize: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-    borderRadius: 15,
+    fontWeight: 'bold',
   },
   safetyButton: {
     position: 'absolute',
-    bottom: 30,
+    top: 20,
     right: 20,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#ff3b30',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: 'rgba(255, 59, 48, 0.7)',
+    padding: 10,
+    borderRadius: 20,
   },
   connectingText: {
     color: 'white',
     fontSize: 18,
     textAlign: 'center',
-    marginTop: 50,
   },
 });
 
