@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import VideoCall from '../../components/VideoCall';
 import { getSessionById, updateSessionStatus, getUserById } from '../../lib/database';
@@ -79,7 +79,8 @@ const CallScreen = () => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Loading call...</Text>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Connecting to call...</Text>
       </View>
     );
   }
@@ -131,12 +132,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: 'black',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 20,
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: 'black',
   },
   errorText: {
     fontSize: 18,
@@ -146,8 +154,9 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
+    paddingHorizontal: 20,
   },
   retryButtonText: {
     color: 'white',
