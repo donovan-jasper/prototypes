@@ -88,13 +88,7 @@ export const searchRestaurants = async (query: string): Promise<Restaurant[]> =>
     return restaurants;
   } catch (error) {
     console.error('Error searching restaurants:', error);
-    // Fallback to mock data if API fails
-    return mockRestaurants.filter(
-      restaurant =>
-        restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
-        restaurant.address.toLowerCase().includes(query.toLowerCase()) ||
-        restaurant.cuisine.toLowerCase().includes(query.toLowerCase())
-    );
+    throw new Error('Failed to search restaurants. Please check your connection.');
   }
 };
 
@@ -139,37 +133,20 @@ export const getRestaurantsByLocation = async (
     return restaurants;
   } catch (error) {
     console.error('Error fetching restaurants by location:', error);
-    // Fallback to mock data if API fails
-    return mockRestaurants.filter(restaurant => {
-      const distance = Math.sqrt(
-        Math.pow(restaurant.latitude - latitude, 2) +
-        Math.pow(restaurant.longitude - longitude, 2)
-      );
-      return distance <= radius;
-    });
+    throw new Error('Failed to fetch nearby restaurants. Please check your connection.');
   }
 };
 
-export const getRestaurantDetails = async (restaurantId: string): Promise<Restaurant> => {
+export const getRestaurantDetails = async (id: string): Promise<Restaurant> => {
   try {
     // First try to get from cache
-    if (restaurantCache.has(restaurantId)) {
-      return restaurantCache.get(restaurantId)!;
+    if (restaurantCache.has(id)) {
+      return restaurantCache.get(id)!;
     }
 
     // If not in cache, fetch from API
-    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
-      params: {
-        business_id: restaurantId,
-        $limit: 1,
-      },
-    });
-
-    if (response.data.length === 0) {
-      throw new Error('Restaurant not found');
-    }
-
-    const restaurant = transformRestaurantData(response.data[0]);
+    const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}/${id}`);
+    const restaurant = transformRestaurantData(response.data);
 
     // Cache the result
     restaurantCache.set(restaurant.id, restaurant);
@@ -177,12 +154,7 @@ export const getRestaurantDetails = async (restaurantId: string): Promise<Restau
     return restaurant;
   } catch (error) {
     console.error('Error fetching restaurant details:', error);
-    // Fallback to mock data if API fails
-    const mockRestaurant = mockRestaurants.find(r => r.id === restaurantId);
-    if (mockRestaurant) {
-      return mockRestaurant;
-    }
-    throw error;
+    throw new Error('Failed to fetch restaurant details. Please check your connection.');
   }
 };
 
@@ -197,8 +169,8 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
     const response = await axios.get(`${SAN_FRANCISCO_API_BASE}${SAN_FRANCISCO_DATASET}`, {
       params: {
         business_id: restaurantId,
-        $limit: 10,
         $order: 'inspection_date DESC',
+        $limit: 10,
       },
     });
 
@@ -210,90 +182,6 @@ export const getInspectionsForRestaurant = async (restaurantId: string): Promise
     return inspections;
   } catch (error) {
     console.error('Error fetching inspections:', error);
-    // Fallback to mock data if API fails
-    return mockInspections.filter(i => i.restaurantId === restaurantId);
+    throw new Error('Failed to fetch inspection history. Please check your connection.');
   }
 };
-
-// Mock data for when API fails
-const mockRestaurants: Restaurant[] = [
-  {
-    id: '1',
-    name: 'The Golden Bear',
-    address: '123 University Ave, San Francisco, CA 94132',
-    latitude: 37.7249,
-    longitude: -122.4696,
-    safetyScore: 88,
-    lastInspectionDate: '2023-05-15',
-    violationCount: 1,
-    cuisine: 'American',
-  },
-  {
-    id: '2',
-    name: 'Tacos El Gordo',
-    address: '456 Mission St, San Francisco, CA 94105',
-    latitude: 37.7908,
-    longitude: -122.4012,
-    safetyScore: 92,
-    lastInspectionDate: '2023-06-20',
-    violationCount: 0,
-    cuisine: 'Mexican',
-  },
-  {
-    id: '3',
-    name: 'The Cheese Steak Shop',
-    address: '789 South Park Ave, San Francisco, CA 94108',
-    latitude: 37.7749,
-    longitude: -122.4194,
-    safetyScore: 76,
-    lastInspectionDate: '2023-04-10',
-    violationCount: 3,
-    cuisine: 'American',
-  },
-];
-
-const mockInspections: Inspection[] = [
-  {
-    id: '1',
-    restaurantId: '1',
-    date: '2023-05-15',
-    score: 88,
-    violations: [
-      {
-        id: 'v1',
-        description: 'Improper food storage',
-        severity: 'medium',
-      },
-    ],
-  },
-  {
-    id: '2',
-    restaurantId: '2',
-    date: '2023-06-20',
-    score: 92,
-    violations: [],
-  },
-  {
-    id: '3',
-    restaurantId: '3',
-    date: '2023-04-10',
-    score: 76,
-    violations: [
-      {
-        id: 'v2',
-        description: 'Inadequate handwashing facilities',
-        severity: 'medium',
-      },
-      {
-        id: 'v3',
-        description: 'Expired food items',
-        severity: 'high',
-      },
-      {
-        id: 'v4',
-        description: 'Insects in food prep area',
-        severity: 'high',
-      },
-    ],
-  },
-];

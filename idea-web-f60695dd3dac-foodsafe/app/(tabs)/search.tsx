@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, TextInput, FlatList, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { useRestaurants } from '@/hooks/useRestaurants';
 import { Restaurant } from '@/types';
@@ -12,7 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 export default function SearchScreen() {
   const router = useRouter();
   const { isPremium } = useSubscription();
-  const { restaurants, isLoading, error, search, refresh } = useRestaurants();
+  const { restaurants, isLoading, error, searchRestaurants, refresh } = useRestaurants();
   const [query, setQuery] = useState('');
   const [isFilterSheetVisible, setIsFilterSheetVisible] = useState(false);
   const [filters, setFilters] = useState({
@@ -24,8 +24,10 @@ export default function SearchScreen() {
   });
 
   const handleSearch = useCallback(async () => {
-    await search(query);
-  }, [query, search]);
+    if (query.trim()) {
+      await searchRestaurants(query);
+    }
+  }, [query, searchRestaurants]);
 
   const handleFilterChange = useCallback((newFilters: typeof filters) => {
     setFilters(newFilters);
@@ -67,7 +69,7 @@ export default function SearchScreen() {
     if (error) {
       return (
         <View style={styles.emptyContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text style={styles.errorText}>{error.message}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={refresh}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
@@ -75,12 +77,20 @@ export default function SearchScreen() {
       );
     }
 
+    if (query.trim() && restaurants.length === 0) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No restaurants found for "{query}". Try a different search.</Text>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No restaurants found. Try a different search.</Text>
+        <Text style={styles.emptyText}>Search for restaurants by name or cuisine</Text>
       </View>
     );
-  }, [isLoading, error, refresh]);
+  }, [isLoading, error, refresh, query, restaurants.length]);
 
   return (
     <View style={styles.container}>
@@ -93,6 +103,7 @@ export default function SearchScreen() {
           onChangeText={setQuery}
           onSubmitEditing={handleSearch}
           returnKeyType="search"
+          autoFocus
         />
         <TouchableOpacity
           style={styles.filterButton}
@@ -154,6 +165,10 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     justifyContent: 'center',
     alignItems: 'center',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.background,
   },
   listContent: {
     padding: 16,
@@ -167,7 +182,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   emptyText: {
     fontSize: 16,
@@ -183,9 +198,9 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: Colors.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 5,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: Colors.white,

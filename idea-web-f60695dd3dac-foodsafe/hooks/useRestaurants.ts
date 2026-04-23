@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import * as Location from 'expo-location';
 import { Restaurant, Inspection } from '@/types';
-import { getRestaurantsByLocation, getRestaurantDetails, getInspectionsForRestaurant } from '@/services/api';
+import { searchRestaurants, getRestaurantsByLocation, getRestaurantDetails, getInspectionsForRestaurant } from '@/services/api';
 import { cacheRestaurants, getCachedRestaurants, cacheInspections, getCachedInspections } from '@/services/database';
 
 interface UseRestaurantsResult {
@@ -9,16 +9,17 @@ interface UseRestaurantsResult {
   isLoading: boolean;
   error: Error | null;
   refresh: () => Promise<void>;
+  searchRestaurants: (query: string) => Promise<void>;
   getRestaurantById: (id: string) => Promise<Restaurant | null>;
   getInspectionsByRestaurantId: (id: string) => Promise<Inspection[]>;
 }
 
 export const useRestaurants = (): UseRestaurantsResult => {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error | null>(null);
 
-  const fetchRestaurants = useCallback(async () => {
+  const fetchRestaurantsByLocation = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -47,6 +48,40 @@ export const useRestaurants = (): UseRestaurantsResult => {
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to fetch restaurants'));
       console.error('Error fetching restaurants:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleSearchRestaurants = useCallback(async (query: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // First try to get from cache
+      const cachedRestaurants = await getCachedRestaurants();
+      const cachedResults = cachedRestaurants.filter(
+        restaurant =>
+          restaurant.name.toLowerCase().includes(query.toLowerCase()) ||
+          restaurant.address.toLowerCase().includes(query.toLowerCase()) ||
+          restaurant.cuisine.toLowerCase().includes(query.toLowerCase())
+      );
+
+      if (cachedResults.length > 0) {
+        setRestaurants(cachedResults);
+        setIsLoading(false);
+        return;
+      }
+
+      // If not in cache, fetch from API
+      const apiRestaurants = await searchRestaurants(query);
+      setRestaurants(apiRestaurants);
+
+      // Cache the results
+      await cacheRestaurants(apiRestaurants);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error('Failed to search restaurants'));
+      console.error('Error searching restaurants:', err);
     } finally {
       setIsLoading(false);
     }
@@ -90,14 +125,15 @@ export const useRestaurants = (): UseRestaurantsResult => {
   }, []);
 
   useEffect(() => {
-    fetchRestaurants();
-  }, [fetchRestaurants]);
+    fetchRestaurantsByLocation();
+  }, [fetchRestaurantsByLocation]);
 
   return {
     restaurants,
     isLoading,
     error,
-    refresh: fetchRestaurants,
+    refresh: fetchRestaurantsByLocation,
+    searchRestaurants: handleSearchRestaurants,
     getRestaurantById,
     getInspectionsByRestaurantId,
   };
