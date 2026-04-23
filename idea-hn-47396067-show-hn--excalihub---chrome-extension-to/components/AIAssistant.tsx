@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { generateDiagram } from '../lib/ai';
 import { useDrawingStore } from '../store/useDrawingStore';
 
@@ -20,11 +20,16 @@ const AIAssistant = () => {
 
     try {
       const diagramData = await generateDiagram(prompt);
-      addElements(diagramData.elements);
-      setPrompt('');
+      if (diagramData.elements && diagramData.elements.length > 0) {
+        addElements(diagramData.elements);
+        setPrompt('');
+      } else {
+        throw new Error('No elements generated');
+      }
     } catch (err) {
-      setError('Failed to generate diagram. Please try again.');
       console.error('AI generation error:', err);
+      setError('Failed to generate diagram. Please try again.');
+      Alert.alert('Error', 'Failed to generate diagram. Please check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -41,6 +46,7 @@ const AIAssistant = () => {
         multiline
         numberOfLines={3}
         editable={!isLoading}
+        placeholderTextColor="#999"
       />
 
       {error && <Text style={styles.error}>{error}</Text>}
@@ -49,6 +55,7 @@ const AIAssistant = () => {
         style={[styles.button, isLoading && styles.buttonDisabled]}
         onPress={handleGenerate}
         disabled={isLoading}
+        activeOpacity={0.7}
       >
         {isLoading ? (
           <ActivityIndicator color="#fff" />
@@ -70,6 +77,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     margin: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   title: {
     fontSize: 18,
@@ -86,10 +95,11 @@ const styles = StyleSheet.create({
     borderColor: '#ddd',
     minHeight: 80,
     textAlignVertical: 'top',
+    fontSize: 16,
   },
   button: {
     backgroundColor: '#6200ee',
-    padding: 12,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 12,
@@ -100,15 +110,18 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   error: {
-    color: 'red',
+    color: '#d32f2f',
     marginBottom: 12,
+    fontSize: 14,
   },
   hint: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
     marginTop: 8,
+    lineHeight: 20,
   },
 });
 

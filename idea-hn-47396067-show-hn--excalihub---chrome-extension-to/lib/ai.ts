@@ -17,7 +17,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
     // Create a simple flowchart with boxes and arrows
     elements = [
       {
-        id: 'box1',
+        id: `box-${Date.now()}`,
         type: 'rect',
         x: 100,
         y: 100,
@@ -25,9 +25,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#4CAF50',
         text: 'Start',
+        strokeWidth: 2,
       },
       {
-        id: 'box2',
+        id: `box-${Date.now() + 1}`,
         type: 'rect',
         x: 300,
         y: 100,
@@ -35,9 +36,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#2196F3',
         text: 'Process',
+        strokeWidth: 2,
       },
       {
-        id: 'arrow1',
+        id: `arrow-${Date.now()}`,
         type: 'line',
         x1: 250,
         y1: 140,
@@ -47,7 +49,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         strokeWidth: 2,
       },
       {
-        id: 'box3',
+        id: `box-${Date.now() + 2}`,
         type: 'rect',
         x: 500,
         y: 100,
@@ -55,9 +57,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#FFC107',
         text: 'End',
+        strokeWidth: 2,
       },
       {
-        id: 'arrow2',
+        id: `arrow-${Date.now() + 1}`,
         type: 'line',
         x1: 450,
         y1: 140,
@@ -71,16 +74,17 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
     // Create a simple mind map with a central circle and branches
     elements = [
       {
-        id: 'center',
+        id: `center-${Date.now()}`,
         type: 'circle',
         x: 300,
         y: 200,
         radius: 80,
         color: '#FF5722',
         text: 'Main Idea',
+        strokeWidth: 2,
       },
       {
-        id: 'branch1',
+        id: `branch-${Date.now()}`,
         type: 'line',
         x1: 300,
         y1: 280,
@@ -90,7 +94,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         strokeWidth: 2,
       },
       {
-        id: 'idea1',
+        id: `idea-${Date.now()}`,
         type: 'rect',
         x: 100,
         y: 350,
@@ -98,9 +102,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 60,
         color: '#9C27B0',
         text: 'Sub Idea 1',
+        strokeWidth: 2,
       },
       {
-        id: 'branch2',
+        id: `branch-${Date.now() + 1}`,
         type: 'line',
         x1: 300,
         y1: 280,
@@ -110,7 +115,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         strokeWidth: 2,
       },
       {
-        id: 'idea2',
+        id: `idea-${Date.now() + 1}`,
         type: 'rect',
         x: 350,
         y: 350,
@@ -118,13 +123,14 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 60,
         color: '#9C27B0',
         text: 'Sub Idea 2',
+        strokeWidth: 2,
       },
     ];
   } else if (lowerPrompt.includes('org chart') || lowerPrompt.includes('team')) {
     // Create a simple org chart with boxes and connecting lines
     elements = [
       {
-        id: 'ceo',
+        id: `ceo-${Date.now()}`,
         type: 'rect',
         x: 300,
         y: 100,
@@ -132,9 +138,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#E91E63',
         text: 'CEO',
+        strokeWidth: 2,
       },
       {
-        id: 'manager1',
+        id: `manager-${Date.now()}`,
         type: 'rect',
         x: 150,
         y: 250,
@@ -142,9 +149,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#3F51B5',
         text: 'Manager 1',
+        strokeWidth: 2,
       },
       {
-        id: 'manager2',
+        id: `manager-${Date.now() + 1}`,
         type: 'rect',
         x: 450,
         y: 250,
@@ -152,9 +160,10 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 80,
         color: '#3F51B5',
         text: 'Manager 2',
+        strokeWidth: 2,
       },
       {
-        id: 'line1',
+        id: `line-${Date.now()}`,
         type: 'line',
         x1: 375,
         y1: 180,
@@ -164,7 +173,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         strokeWidth: 2,
       },
       {
-        id: 'line2',
+        id: `line-${Date.now() + 1}`,
         type: 'line',
         x1: 375,
         y1: 180,
@@ -178,7 +187,7 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
     // Default to a simple rectangle and circle
     elements = [
       {
-        id: 'rect1',
+        id: `rect-${Date.now()}`,
         type: 'rect',
         x: 100,
         y: 100,
@@ -186,15 +195,17 @@ export async function generateDiagram(prompt: string): Promise<DiagramResponse> 
         height: 150,
         color: '#FF5722',
         text: 'Rectangle',
+        strokeWidth: 2,
       },
       {
-        id: 'circle1',
+        id: `circle-${Date.now()}`,
         type: 'circle',
         x: 400,
         y: 200,
         radius: 80,
         color: '#4CAF50',
         text: 'Circle',
+        strokeWidth: 2,
       },
     ];
   }

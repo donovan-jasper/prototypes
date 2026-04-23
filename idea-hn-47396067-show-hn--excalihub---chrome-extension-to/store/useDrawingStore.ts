@@ -17,6 +17,7 @@ type DrawingState = {
   setTool: (tool: DrawingState['currentTool']) => void;
   setColor: (color: string) => void;
   setStrokeWidth: (width: number) => void;
+  clearCanvas: () => void;
 };
 
 export const useDrawingStore = create<DrawingState>((set) => ({
@@ -83,6 +84,13 @@ export const useDrawingStore = create<DrawingState>((set) => ({
         redoStack: state.redoStack.slice(0, -1),
       };
     }),
+
+  clearCanvas: () =>
+    set((state) => ({
+      elements: [],
+      undoStack: [...state.undoStack, state.elements],
+      redoStack: [],
+    })),
 
   setTool: (tool) => set({ currentTool: tool }),
   setColor: (color) => set({ currentColor: color }),
