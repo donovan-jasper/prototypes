@@ -14,7 +14,7 @@ export const initDB = () => {
       lastSynced INTEGER,
       createdAt INTEGER DEFAULT (strftime('%s', 'now'))
     );
-    
+
     CREATE TABLE IF NOT EXISTS sync_queue (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       bookId TEXT,
