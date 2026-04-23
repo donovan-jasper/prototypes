@@ -167,7 +167,7 @@ export async function checkForMutualInterest(chatId: string, userId: string) {
 
     return chat.is_unlocked;
   } catch (error) {
-    console.error('Error checking mutual interest:', error);
+    console.error('Error checking for mutual interest:', error);
     throw error;
   }
 }

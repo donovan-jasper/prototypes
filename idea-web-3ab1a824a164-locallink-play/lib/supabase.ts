@@ -32,7 +32,22 @@ export async function fetchNearbyBroadcasts(latitude: number, longitude: number,
 
     if (error) throw error;
 
-    return data;
+    // Calculate distance for each broadcast
+    const broadcastsWithDistance = data.map(broadcast => ({
+      ...broadcast,
+      distance: calculateDistance(
+        { lat: latitude, lng: longitude },
+        { lat: broadcast.lat, lng: broadcast.lng }
+      )
+    }));
+
+    // Sort by distance (closest first) and then by recency (newest first)
+    return broadcastsWithDistance.sort((a, b) => {
+      if (a.distance !== b.distance) {
+        return a.distance - b.distance;
+      }
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    });
   } catch (error) {
     console.error('Error fetching nearby broadcasts:', error);
     throw error;
@@ -160,10 +175,61 @@ export async function sendPushNotification(userId: string, title: string, body: 
           title,
           body,
           data,
+          _displayInForeground: true,
         }),
       });
     }
   } catch (error) {
     console.error('Error sending push notification:', error);
   }
+}
+
+/**
+ * Subscribes to real-time updates for broadcasts within a radius
+ * @param location User's location
+ * @param radius Search radius in miles
+ * @param callback Function to call when new broadcasts are received
+ * @returns Subscription object with unsubscribe method
+ */
+export function subscribeToBroadcasts(
+  location: { lat: number; lng: number },
+  radius: number,
+  callback: (broadcasts: any[]) => void
+) {
+  const channel = supabase
+    .channel('broadcasts')
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'broadcasts',
+      },
+      (payload) => {
+        const newBroadcast = payload.new;
+        const distance = calculateDistance(
+          location,
+          { lat: newBroadcast.lat, lng: newBroadcast.lng }
+        );
+
+        if (distance <= radius) {
+          // Fetch all broadcasts within radius to maintain proper ordering
+          fetchNearbyBroadcasts(location.lat, location.lng, radius)
+            .then(broadcasts => callback(broadcasts))
+            .catch(console.error);
+        }
+      }
+    )
+    .subscribe();
+
+  // Initial fetch
+  fetchNearbyBroadcasts(location.lat, location.lng, radius)
+    .then(broadcasts => callback(broadcasts))
+    .catch(console.error);
+
+  return {
+    unsubscribe: () => {
+      supabase.removeChannel(channel);
+    }
+  };
 }

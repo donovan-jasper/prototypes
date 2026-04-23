@@ -15,6 +15,7 @@ import { getCurrentLocation } from '../../lib/location';
 import { fetchNearbyBroadcasts, expressInterest } from '../../lib/supabase';
 import { useAuthStore } from '../../store/authStore';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function FeedScreen() {
   const { user } = useAuthStore();
@@ -182,22 +183,10 @@ export default function FeedScreen() {
         </View>
       </View>
 
-      {loading && !refreshing ? (
+      {loading && broadcasts.length === 0 ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-        </View>
-      ) : broadcasts.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No broadcasts nearby</Text>
-          <Text style={styles.emptySubtext}>
-            Be the first to create one!
-          </Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => router.push('/create')}
-          >
-            <Text style={styles.createButtonText}>Create Broadcast</Text>
-          </TouchableOpacity>
+          <Text style={styles.loadingText}>Loading broadcasts...</Text>
         </View>
       ) : (
         <FlatList
@@ -211,7 +200,25 @@ export default function FeedScreen() {
           )}
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={['#007AFF']}
+              tintColor="#007AFF"
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>No broadcasts nearby</Text>
+              <Text style={styles.emptySubtext}>Try increasing your radius or create your own broadcast</Text>
+              <TouchableOpacity
+                style={styles.createButton}
+                onPress={() => router.push('/(tabs)/create')}
+              >
+                <Text style={styles.createButtonText}>Create Broadcast</Text>
+              </TouchableOpacity>
+            </View>
           }
         />
       )}
@@ -222,7 +229,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     padding: 16,
@@ -243,22 +250,27 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   radiusButtonActive: {
     backgroundColor: '#007AFF',
   },
   radiusButtonText: {
-    color: '#333',
-    fontWeight: '500',
+    color: '#007AFF',
+    fontWeight: '600',
   },
   radiusButtonTextActive: {
     color: 'white',
+  },
+  listContent: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   loadingText: {
     marginTop: 10,
@@ -271,8 +283,8 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    color: '#d32f2f',
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
   },
@@ -284,10 +296,7 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: 'bold',
-  },
-  listContent: {
-    padding: 12,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,
@@ -297,14 +306,16 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '500',
+    fontWeight: '600',
+    marginTop: 16,
     marginBottom: 8,
     color: '#333',
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 20,
+    textAlign: 'center',
+    marginBottom: 24,
   },
   createButton: {
     backgroundColor: '#007AFF',
@@ -314,6 +325,7 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
   },
 });

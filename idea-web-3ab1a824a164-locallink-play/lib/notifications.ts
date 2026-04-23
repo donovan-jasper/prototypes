@@ -1,46 +1,58 @@
 import * as Notifications from 'expo-notifications';
-import * as Device from 'expo-device';
-import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-export async function registerForPushNotificationsAsync() {
-  let token;
-  if (Device.isDevice) {
+/**
+ * Registers for push notifications and gets the push token
+ * @returns Promise with the push token
+ */
+export async function registerForPushNotificationsAsync(): Promise<string | null> {
+  try {
+    // Request permission
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
+
     if (finalStatus !== 'granted') {
-      alert('Failed to get push token for push notification!');
-      return;
+      console.log('Failed to get push token for push notification!');
+      return null;
     }
-    token = (await Notifications.getExpoPushTokenAsync()).data;
-  } else {
-    alert('Must use physical device for Push Notifications');
-  }
 
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
+    // Get the push token
+    const token = (await Notifications.getExpoPushTokenAsync()).data;
 
-  return token;
+    // Save the token to the user's profile
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          push_token: token,
+        });
+    }
+
+    return token;
+  } catch (error) {
+    console.error('Error registering for push notifications:', error);
+    return null;
+  }
 }
 
-export async function sendPushNotification(
-  userId: string,
-  title: string,
-  body: string,
-  data: Record<string, unknown> = {}
-) {
+/**
+ * Sends a push notification to a user
+ * @param userId ID of the user to notify
+ * @param title Notification title
+ * @param body Notification body
+ * @param data Additional data to include
+ */
+export async function sendPushNotification(userId: string, title: string, body: string, data: any) {
   try {
-    // Get the user's push token from the database
+    // Get the user's push token
     const { data: user, error } = await supabase
       .from('profiles')
       .select('push_token')
@@ -49,36 +61,33 @@ export async function sendPushNotification(
 
     if (error) throw error;
 
-    if (!user?.push_token) {
-      console.log('No push token for user:', userId);
-      return;
+    if (user.push_token) {
+      // Use Expo's push notification service
+      await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          to: user.push_token,
+          sound: 'default',
+          title,
+          body,
+          data,
+          _displayInForeground: true,
+        }),
+      });
     }
-
-    // Send the notification
-    const message = {
-      to: user.push_token,
-      sound: 'default',
-      title,
-      body,
-      data,
-    };
-
-    await fetch('https://exp.host/--/api/v2/push/send', {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Accept-encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(message),
-    });
   } catch (error) {
     console.error('Error sending push notification:', error);
   }
 }
 
-export function setupNotificationHandlers() {
-  // Handle notifications when app is in foreground
+/**
+ * Configures notification handlers
+ */
+export function configureNotificationHandlers() {
+  // Handle notifications when the app is in the foreground
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -89,14 +98,14 @@ export function setupNotificationHandlers() {
 
   // Handle notification responses
   const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-    const { type, chatId, broadcastId } = response.notification.request.content.data;
+    const { data } = response.notification.request.content;
 
-    if (type === 'interest' && broadcastId) {
-      // Navigate to the broadcast detail
-      // This would be handled by the navigation system
-    } else if (type === 'chat_unlocked' && chatId) {
-      // Navigate to the chat
-      // This would be handled by the navigation system
+    if (data?.type === 'interest') {
+      // Handle interest notification
+      console.log('Interest notification received:', data);
+    } else if (data?.type === 'chat_unlocked') {
+      // Handle chat unlocked notification
+      console.log('Chat unlocked notification received:', data);
     }
   });
 
