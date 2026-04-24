@@ -150,91 +150,130 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.eventLocation}>{item.location}</Text>
           </View>
           <View style={styles.eventDetails}>
+            <Text style={styles.eventTime}>{item.time}</Text>
             <Text style={styles.eventDistance}>{item.distance} mi</Text>
-            <Text style={styles.eventTime}>
-              {item.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Text>
           </View>
         </View>
         <View style={styles.eventFooter}>
           <Text style={styles.eventParticipants}>
-            {item.participants} {item.participants === 1 ? 'person' : 'people'} going
+            {item.currentParticipants}/{item.maxCapacity} spots
           </Text>
-          {item.isPopular && <Text style={styles.popularBadge}>Popular</Text>}
-          {item.isNew && <Text style={styles.newBadge}>New</Text>}
+          <TouchableOpacity
+            style={styles.joinButton}
+            onPress={() => handleJoinEvent(item)}
+          >
+            <Text style={styles.joinButtonText}>Join</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const renderActivityFilter = () => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.activityFilterContainer}
-    >
-      <TouchableOpacity
-        style={[
-          styles.activityFilterItem,
-          !selectedActivity && styles.activityFilterItemSelected
-        ]}
-        onPress={() => setSelectedActivity(null)}
-      >
-        <Text style={styles.activityFilterText}>All</Text>
-      </TouchableOpacity>
-      {ACTIVITY_TYPES.map((activity) => (
-        <TouchableOpacity
-          key={activity.name}
-          style={[
-            styles.activityFilterItem,
-            selectedActivity === activity.name && styles.activityFilterItemSelected
-          ]}
-          onPress={() => setSelectedActivity(activity.name)}
-        >
-          <Text style={styles.activityFilterText}>{activity.emoji} {activity.name}</Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
+  const handleJoinEvent = async (event) => {
+    try {
+      // Check if event is full
+      if (event.currentParticipants >= event.maxCapacity) {
+        Alert.alert('Event Full', 'This event has reached its maximum capacity.');
+        return;
+      }
+
+      // Update participant count
+      const updatedEvent = {
+        ...event,
+        currentParticipants: event.currentParticipants + 1
+      };
+
+      // Update in AsyncStorage if it's a user-created event
+      if (event.createdBy === 'user') {
+        const storedEvents = await AsyncStorage.getItem('userEvents');
+        const userEvents = storedEvents ? JSON.parse(storedEvents) : [];
+        const updatedEvents = userEvents.map(e =>
+          e.id === event.id ? updatedEvent : e
+        );
+        await AsyncStorage.setItem('userEvents', JSON.stringify(updatedEvents));
+      }
+
+      // Update local state
+      setEvents(prevEvents =>
+        prevEvents.map(e => e.id === event.id ? updatedEvent : e)
+      );
+
+      Alert.alert('Success', 'You have joined the event!');
+    } catch (error) {
+      console.error('Error joining event:', error);
+      Alert.alert('Error', 'Could not join the event. Please try again.');
+    }
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Finding events near you...</Text>
+        <Text style={styles.loadingText}>Loading events...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>SpontaPlay</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => navigation.navigate('CreateEvent')}
+        >
+          <Text style={styles.createButtonText}>+ Create Event</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search events or locations"
+          placeholder="Search events..."
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
       </View>
 
-      {renderActivityFilter()}
+      <View style={styles.filtersContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <TouchableOpacity
+            style={[
+              styles.filterButton,
+              !selectedActivity && styles.selectedFilter
+            ]}
+            onPress={() => setSelectedActivity(null)}
+          >
+            <Text style={styles.filterText}>All</Text>
+          </TouchableOpacity>
+          {ACTIVITY_TYPES.map(activity => (
+            <TouchableOpacity
+              key={activity.name}
+              style={[
+                styles.filterButton,
+                selectedActivity === activity.name && styles.selectedFilter
+              ]}
+              onPress={() => setSelectedActivity(activity.name)}
+            >
+              <Text style={styles.filterText}>{activity.emoji} {activity.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
 
-      <View style={styles.distanceFilterContainer}>
-        <Text style={styles.distanceFilterLabel}>Distance: {distanceFilter} miles</Text>
-        <View style={styles.distanceSlider}>
-          <TouchableOpacity
-            style={styles.distanceButton}
-            onPress={() => setDistanceFilter(Math.max(1, distanceFilter - 1))}
-          >
-            <Text style={styles.distanceButtonText}>-</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.distanceButton}
-            onPress={() => setDistanceFilter(Math.min(20, distanceFilter + 1))}
-          >
-            <Text style={styles.distanceButtonText}>+</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.distanceFilter}>
+        <Text style={styles.distanceText}>Distance: Within {distanceFilter} miles</Text>
+        <TextInput
+          style={styles.distanceInput}
+          value={distanceFilter.toString()}
+          onChangeText={(text) => {
+            const num = parseFloat(text);
+            if (!isNaN(num) && num >= 0) {
+              setDistanceFilter(num);
+            }
+          }}
+          keyboardType="numeric"
+        />
       </View>
 
       <FlatList
@@ -242,7 +281,7 @@ const HomeScreen = ({ navigation }) => {
         data={filteredEvents}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContainer}
+        contentContainerStyle={styles.listContent}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -262,7 +301,7 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
   loadingContainer: {
     flex: 1,
@@ -274,87 +313,99 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  searchContainer: {
-    padding: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  searchInput: {
-    height: 40,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    fontSize: 16,
-  },
-  activityFilterContainer: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-  },
-  activityFilterItem: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 20,
-    marginRight: 8,
-  },
-  activityFilterItemSelected: {
-    backgroundColor: '#007AFF',
-  },
-  activityFilterText: {
-    color: '#333',
-    fontSize: 14,
-  },
-  distanceFilterContainer: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E0E0E0',
   },
-  distanceFilterLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  distanceSlider: {
-    flexDirection: 'row',
-  },
-  distanceButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
-  },
-  distanceButtonText: {
-    fontSize: 18,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
-  listContainer: {
-    padding: 15,
+  createButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  createButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  searchContainer: {
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+  },
+  searchInput: {
+    backgroundColor: '#F0F0F0',
+    padding: 10,
+    borderRadius: 8,
+    fontSize: 16,
+  },
+  filtersContainer: {
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  filterButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 5,
+    borderRadius: 20,
+    backgroundColor: '#F0F0F0',
+  },
+  selectedFilter: {
+    backgroundColor: '#007AFF',
+  },
+  filterText: {
+    color: '#333',
+    fontSize: 14,
+  },
+  distanceFilter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  distanceText: {
+    fontSize: 14,
+    color: '#555',
+  },
+  distanceInput: {
+    width: 50,
+    padding: 5,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 4,
+    textAlign: 'center',
+  },
+  listContent: {
+    padding: 10,
   },
   eventItem: {
-    backgroundColor: 'white',
-    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     padding: 15,
-    marginBottom: 15,
+    marginBottom: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 2,
     elevation: 2,
   },
   eventHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 10,
   },
   eventEmoji: {
     fontSize: 24,
@@ -364,8 +415,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eventTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
   },
   eventLocation: {
@@ -376,43 +427,36 @@ const styles = StyleSheet.create({
   eventDetails: {
     alignItems: 'flex-end',
   },
-  eventDistance: {
-    fontSize: 14,
-    color: '#666',
-  },
   eventTime: {
     fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  eventDistance: {
+    fontSize: 12,
     color: '#666',
     marginTop: 2,
   },
   eventFooter: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginTop: 10,
   },
   eventParticipants: {
     fontSize: 14,
-    color: '#666',
+    color: '#555',
   },
-  popularBadge: {
-    backgroundColor: '#FFD700',
-    color: '#333',
-    fontSize: 12,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 10,
+  joinButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
   },
-  newBadge: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    fontSize: 12,
-    fontWeight: 'bold',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-    marginLeft: 10,
+  joinButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
   emptyContainer: {
     flex: 1,

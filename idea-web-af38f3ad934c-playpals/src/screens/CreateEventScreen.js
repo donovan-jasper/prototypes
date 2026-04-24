@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Picker,
 } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -170,11 +171,11 @@ const CreateEventScreen = ({ navigation }) => {
       events.push(event);
       await AsyncStorage.setItem('userEvents', JSON.stringify(events));
 
-      // Navigate back to HomeScreen with the new event
-      navigation.navigate('Home', { newEvent: event });
+      Alert.alert('Success', 'Your event has been created!');
+      navigation.goBack();
     } catch (error) {
-      console.error('Error creating event:', error);
-      Alert.alert('Error', 'Failed to create event. Please try again.');
+      console.error('Error saving event:', error);
+      Alert.alert('Error', 'Could not create your event. Please try again.');
     } finally {
       setCreating(false);
     }
@@ -184,82 +185,92 @@ const CreateEventScreen = ({ navigation }) => {
     <ScrollView style={styles.container}>
       <Text style={styles.title}>Create a New Event</Text>
 
-      {/* Activity Selection */}
-      <Text style={styles.sectionTitle}>Activity Type</Text>
-      <View style={styles.activityGrid}>
-        {ACTIVITY_TYPES.map((activity) => (
-          <TouchableOpacity
-            key={activity.name}
-            style={[
-              styles.activityButton,
-              selectedActivity?.name === activity.name && styles.selectedActivity,
-            ]}
-            onPress={() => setSelectedActivity(activity)}
-          >
-            <Text style={styles.activityEmoji}>{activity.emoji}</Text>
-            <Text style={styles.activityText}>{activity.name}</Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Activity Type</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activityContainer}>
+          {ACTIVITY_TYPES.map((activity) => (
+            <TouchableOpacity
+              key={activity.name}
+              style={[
+                styles.activityButton,
+                selectedActivity?.name === activity.name && styles.selectedActivity
+              ]}
+              onPress={() => setSelectedActivity(activity)}
+            >
+              <Text style={styles.activityEmoji}>{activity.emoji}</Text>
+              <Text style={styles.activityText}>{activity.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Location */}
-      <Text style={styles.sectionTitle}>Location</Text>
-      <View style={styles.locationContainer}>
-        <TouchableOpacity
-          style={styles.locationToggle}
-          onPress={() => setUseCurrentLocation(!useCurrentLocation)}
-        >
-          <Text style={styles.locationToggleText}>
-            {useCurrentLocation ? 'Using Current Location' : 'Use Current Location'}
-          </Text>
-        </TouchableOpacity>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Location</Text>
+        <View style={styles.locationContainer}>
+          <TextInput
+            style={styles.input}
+            value={location}
+            onChangeText={setLocation}
+            placeholder="Enter location"
+            editable={!useCurrentLocation}
+          />
+          <TouchableOpacity
+            style={styles.locationToggle}
+            onPress={() => setUseCurrentLocation(!useCurrentLocation)}
+          >
+            <Text style={styles.locationToggleText}>
+              {useCurrentLocation ? 'Use Custom Location' : 'Use Current Location'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {loadingLocation && <ActivityIndicator size="small" color="#007AFF" />}
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Start Time</Text>
+        <View style={styles.timePickerContainer}>
+          <Picker
+            selectedValue={startTime}
+            style={styles.timePicker}
+            onValueChange={(itemValue) => setStartTime(itemValue)}
+          >
+            {getTimeOptions().map((option) => (
+              <Picker.Item key={option.value} label={option.label} value={option.label} />
+            ))}
+          </Picker>
+        </View>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Max Capacity</Text>
         <TextInput
           style={styles.input}
-          value={location}
-          onChangeText={setLocation}
-          placeholder="Enter location"
-          editable={!useCurrentLocation}
+          value={maxCapacity}
+          onChangeText={setMaxCapacity}
+          keyboardType="numeric"
+          placeholder="Enter max capacity"
         />
-        {loadingLocation && <ActivityIndicator style={styles.loadingIndicator} />}
       </View>
 
-      {/* Time */}
-      <Text style={styles.sectionTitle}>Start Time</Text>
-      <View style={styles.timeContainer}>
-        <Text style={styles.timeText}>{startTime}</Text>
-        <TouchableOpacity style={styles.timeButton} onPress={() => generateTimeOptions()}>
-          <Text style={styles.timeButtonText}>Now</Text>
-        </TouchableOpacity>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Description</Text>
+        <TextInput
+          style={[styles.input, styles.descriptionInput]}
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Briefly describe the event"
+          multiline
+          numberOfLines={4}
+        />
       </View>
 
-      {/* Capacity */}
-      <Text style={styles.sectionTitle}>Max Capacity</Text>
-      <TextInput
-        style={styles.input}
-        value={maxCapacity}
-        onChangeText={setMaxCapacity}
-        keyboardType="numeric"
-        placeholder="8"
-      />
-
-      {/* Description */}
-      <Text style={styles.sectionTitle}>Description</Text>
-      <TextInput
-        style={[styles.input, styles.descriptionInput]}
-        value={description}
-        onChangeText={setDescription}
-        placeholder="Briefly describe the event"
-        multiline
-      />
-
-      {/* Create Button */}
       <TouchableOpacity
         style={styles.createButton}
         onPress={handleCreateEvent}
         disabled={creating}
       >
         {creating ? (
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator size="small" color="#FFFFFF" />
         ) : (
           <Text style={styles.createButtonText}>Create Event</Text>
         )}
@@ -272,7 +283,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
   title: {
     fontSize: 24,
@@ -280,98 +291,83 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#333',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
-    color: '#444',
+  section: {
+    marginBottom: 20,
   },
-  activityGrid: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#555',
+  },
+  activityContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    paddingVertical: 10,
   },
   activityButton: {
-    width: '30%',
-    aspectRatio: 1,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    justifyContent: 'center',
+    padding: 10,
+    marginRight: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 10,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   selectedActivity: {
-    backgroundColor: '#e3f2fd',
-    borderWidth: 2,
-    borderColor: '#2196f3',
+    borderColor: '#007AFF',
+    backgroundColor: '#E6F0FF',
   },
   activityEmoji: {
-    fontSize: 30,
+    fontSize: 24,
     marginBottom: 5,
   },
   activityText: {
     fontSize: 12,
-    textAlign: 'center',
+    color: '#555',
   },
   locationContainer: {
-    marginBottom: 20,
-  },
-  locationToggle: {
-    marginBottom: 10,
-  },
-  locationToggleText: {
-    color: '#2196f3',
-    fontWeight: '600',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 15,
+    flex: 1,
+    padding: 12,
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     fontSize: 16,
-    elevation: 1,
+  },
+  locationToggle: {
+    marginLeft: 10,
+  },
+  locationToggleText: {
+    color: '#007AFF',
+    fontSize: 14,
+  },
+  timePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  timePicker: {
+    width: '100%',
   },
   descriptionInput: {
     height: 100,
     textAlignVertical: 'top',
   },
-  loadingIndicator: {
-    position: 'absolute',
-    right: 15,
-    top: 15,
-  },
-  timeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  timeText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginRight: 15,
-  },
-  timeButton: {
-    backgroundColor: '#2196f3',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 5,
-  },
-  timeButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
   createButton: {
-    backgroundColor: '#2196f3',
+    backgroundColor: '#007AFF',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 30,
-    elevation: 3,
+    marginTop: 10,
   },
   createButtonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#FFFFFF',
+    fontSize: 16,
     fontWeight: '600',
   },
 });
