@@ -39,16 +39,19 @@ export const postProduct = async (product: any, apiKey: string, pageId: string):
   try {
     const formattedProduct = formatProductForFacebook(product);
 
-    const response = await axios.post(`${API_BASE_URL}/v12.0/${pageId}/products`, formattedProduct, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    // Mock API call for development
+    console.log('Mock Facebook API call:', formattedProduct);
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // Simulate successful response
     return {
       success: true,
-      data: response.data
+      data: {
+        id: formattedProduct.id,
+        status: 'published'
+      }
     };
   } catch (error) {
     console.error('Error posting product to Facebook:', error);
@@ -61,19 +64,31 @@ export const postProduct = async (product: any, apiKey: string, pageId: string):
 
 export const fetchMessages = async (apiKey: string, pageId: string): Promise<FacebookResponse> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/v12.0/${pageId}/conversations`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      },
-      params: {
-        fields: 'id,snippet,senders,updated_time',
-        limit: 20
-      }
-    });
+    // Mock API call for development
+    console.log('Mock Facebook fetch messages call');
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Simulate successful response
     return {
       success: true,
-      data: response.data
+      data: {
+        messages: [
+          {
+            id: 'msg1',
+            from: 'buyer1',
+            message: 'Is this still available?',
+            timestamp: Date.now() - 3600000
+          },
+          {
+            id: 'msg2',
+            from: 'buyer2',
+            message: 'When will this ship?',
+            timestamp: Date.now() - 7200000
+          }
+        ]
+      }
     };
   } catch (error) {
     console.error('Error fetching messages from Facebook:', error);
@@ -86,28 +101,27 @@ export const fetchMessages = async (apiKey: string, pageId: string): Promise<Fac
 
 export const recordSale = async (productId: string, apiKey: string, amount: number): Promise<FacebookResponse> => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/v12.0/${productId}/orders`, {
-    amount: amount.toFixed(2),
-    currency: 'USD',
-    timestamp: Math.floor(Date.now() / 1000)
-  }, {
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    }
-  });
+    // Mock API call for development
+    console.log(`Mock Facebook record sale call for product ${productId}: $${amount}`);
 
-  return {
-    success: true,
-    data: response.data
-  };
-} catch (error) {
-  console.error('Error recording sale on Facebook:', error);
-  return {
-    success: false,
-    error: handleFacebookError(error)
-  };
-}
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 700));
+
+    // Simulate successful response
+    return {
+      success: true,
+      data: {
+        order_id: `order-${Date.now()}`,
+        status: 'completed'
+      }
+    };
+  } catch (error) {
+    console.error('Error recording sale on Facebook:', error);
+    return {
+      success: false,
+      error: handleFacebookError(error)
+    };
+  }
 };
 
 export const handleFacebookError = (error: any): string => {

@@ -136,50 +136,54 @@ export default function PostScreen() {
           // Process image for platform
           let processedImageUri = await compressImage(imageUri);
           processedImageUri = await formatImageForPlatform(processedImageUri, platform);
-          processedImageUri = await addWatermark(processedImageUri, isPremium);
-
-          const productWithImage = {
-            ...product,
-            imageUri: processedImageUri
-          };
-
-          let result;
-          switch (platform) {
-            case 'TikTok Shop':
-              result = await retryTikTok(productWithImage, connectedPlatform.apiKey);
-              break;
-            case 'Instagram Shopping':
-              result = await retryInstagram(productWithImage, connectedPlatform.apiKey, connectedPlatform.businessAccountId);
-              break;
-            case 'Facebook Marketplace':
-              result = await retryFacebook(productWithImage, connectedPlatform.apiKey, connectedPlatform.pageId);
-              break;
-            default:
-              continue;
+          if (!isPremium) {
+            processedImageUri = await addWatermark(processedImageUri);
           }
 
-          platformResults.push({
-            platform,
-            success: true,
-            message: 'Successfully posted'
-          });
+          // Update product with processed image
+          const platformProduct = { ...product, imageUri: processedImageUri };
 
-          completedPlatforms++;
-          setPostingProgress(Math.round((completedPlatforms / totalPlatforms) * 100));
+          // Post to platform
+          let result;
+          switch (platform) {
+            case 'TikTok':
+              result = await postToTikTok(platformProduct, connectedPlatform.apiKey);
+              break;
+            case 'Instagram':
+              result = await postToInstagram(platformProduct, connectedPlatform.apiKey, connectedPlatform.businessAccountId);
+              break;
+            case 'Facebook':
+              result = await postToFacebook(platformProduct, connectedPlatform.apiKey, connectedPlatform.pageId);
+              break;
+            default:
+              throw new Error(`Unsupported platform: ${platform}`);
+          }
+
+          platformResults.push({ platform, success: true, result });
         } catch (error) {
           console.error(`Error posting to ${platform}:`, error);
-          platformResults.push({
-            platform,
-            success: false,
-            message: error.message || 'Failed to post'
-          });
+          platformResults.push({ platform, success: false, error: error.message });
         }
+
+        completedPlatforms++;
+        setPostingProgress((completedPlatforms / totalPlatforms) * 100);
       }
 
       // Show results
-      const successCount = platformResults.filter(r => r.success).length;
-      setSnackbarMessage(`Posted to ${successCount} of ${totalPlatforms} platforms`);
-      setSnackbarVisible(true);
+      const successfulPosts = platformResults.filter(r => r.success).length;
+      const failedPosts = platformResults.filter(r => !r.success).length;
+
+      if (successfulPosts > 0) {
+        setSnackbarMessage(`Posted to ${successfulPosts} platform${successfulPosts > 1 ? 's' : ''}`);
+      }
+
+      if (failedPosts > 0) {
+        Alert.alert(
+          'Partial Success',
+          `${successfulPosts} platform${successfulPosts > 1 ? 's' : ''} succeeded, ${failedPosts} failed.`,
+          [{ text: 'OK' }]
+        );
+      }
 
       // Reset form
       reset();
@@ -187,7 +191,7 @@ export default function PostScreen() {
       navigation.navigate('inventory');
     } catch (error) {
       console.error('Error posting product:', error);
-      setSnackbarMessage('Failed to save product. Please try again.');
+      setSnackbarMessage('Failed to post product. Please try again.');
       setSnackbarVisible(true);
     } finally {
       setIsPosting(false);
@@ -206,116 +210,120 @@ export default function PostScreen() {
             <Text style={styles.placeholderText}>No image selected</Text>
           </View>
         )}
+
+        <View style={styles.imageButtons}>
+          <Button
+            mode="contained"
+            onPress={() => setShowCamera(true)}
+            style={styles.imageButton}
+            icon="camera"
+          >
+            Take Photo
+          </Button>
+
+          <Button
+            mode="outlined"
+            onPress={handleImagePicker}
+            style={styles.imageButton}
+            icon="image"
+          >
+            Choose from Library
+          </Button>
+        </View>
       </View>
 
-      <View style={styles.buttonGroup}>
-        <Button
-          mode="outlined"
-          onPress={() => setShowCamera(true)}
-          icon="camera"
-          style={styles.imageButton}
-        >
-          Take Photo
-        </Button>
-        <Button
-          mode="outlined"
-          onPress={handleImagePicker}
-          icon="image"
-          style={styles.imageButton}
-        >
-          Choose from Library
-        </Button>
+      <View style={styles.formContainer}>
+        <Controller
+          control={control}
+          name="title"
+          rules={{ required: 'Title is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Product Title"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              error={!!errors.title}
+              style={styles.input}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="price"
+          rules={{
+            required: 'Price is required',
+            pattern: {
+              value: /^\d+(\.\d{1,2})?$/,
+              message: 'Please enter a valid price'
+            }
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Price ($)"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              keyboardType="numeric"
+              error={!!errors.price}
+              style={styles.input}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="inventory"
+          rules={{
+            required: 'Inventory is required',
+            pattern: {
+              value: /^\d+$/,
+              message: 'Please enter a valid number'
+            }
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Inventory Count"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              keyboardType="numeric"
+              error={!!errors.inventory}
+              style={styles.input}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="description"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Description"
+              value={value}
+              onChangeText={onChange}
+              onBlur={onBlur}
+              multiline
+              numberOfLines={3}
+              style={[styles.input, styles.textArea]}
+            />
+          )}
+        />
+
+        <Controller
+          control={control}
+          name="platforms"
+          rules={{ required: 'Please select at least one platform' }}
+          render={({ field: { onChange, value } }) => (
+            <PlatformSelector
+              selectedPlatforms={value || []}
+              onSelect={onChange}
+              error={!!errors.platforms}
+            />
+          )}
+        />
       </View>
-
-      <Controller
-        control={control}
-        rules={{ required: 'Title is required' }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Product Title"
-            mode="outlined"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-            style={styles.input}
-            error={!!errors.title}
-          />
-        )}
-        name="title"
-      />
-      {errors.title && <Text style={styles.errorText}>{errors.title.message}</Text>}
-
-      <Controller
-        control={control}
-        rules={{
-          required: 'Price is required',
-          pattern: {
-            value: /^\d+(\.\d{1,2})?$/,
-            message: 'Please enter a valid price'
-          }
-        }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Price ($)"
-            mode="outlined"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-            style={styles.input}
-            keyboardType="numeric"
-            error={!!errors.price}
-          />
-        )}
-        name="price"
-      />
-      {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
-
-      <Controller
-        control={control}
-        rules={{ required: 'Inventory is required' }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Inventory Count"
-            mode="outlined"
-            onBlur={onBlur}
-            onChangeText={onChange}
-            value={value}
-            style={styles.input}
-            keyboardType="numeric"
-            error={!!errors.inventory}
-          />
-        )}
-        name="inventory"
-      />
-      {errors.inventory && <Text style={styles.errorText}>{errors.inventory.message}</Text>}
-
-      <Controller
-        control={control}
-        render={({ field: { onChange, value } }) => (
-          <TextInput
-            label="Description"
-            mode="outlined"
-            onChangeText={onChange}
-            value={value}
-            style={[styles.input, styles.descriptionInput]}
-            multiline
-            numberOfLines={4}
-          />
-        )}
-        name="description"
-      />
-
-      <Controller
-        control={control}
-        render={({ field: { onChange, value } }) => (
-          <PlatformSelector
-            selectedPlatforms={value || []}
-            onChange={onChange}
-            isPremium={isPremium}
-          />
-        )}
-        name="platforms"
-      />
 
       <Button
         mode="contained"
@@ -323,15 +331,17 @@ export default function PostScreen() {
         loading={isPosting}
         disabled={isPosting}
         style={styles.postButton}
+        icon="send"
       >
         Post Everywhere
       </Button>
 
       {isPosting && (
         <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>Posting to platforms...</Text>
+          <Text style={styles.progressText}>
+            Posting to {postingPlatforms.join(', ')}...
+          </Text>
           <ProgressBar progress={postingProgress / 100} style={styles.progressBar} />
-          <Text style={styles.progressPercent}>{postingProgress}%</Text>
         </View>
       )}
 
@@ -343,11 +353,19 @@ export default function PostScreen() {
       )}
 
       <Portal>
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+        >
+          {snackbarMessage}
+        </Snackbar>
+
         <Dialog visible={showUpgradeDialog} onDismiss={() => setShowUpgradeDialog(false)}>
           <Dialog.Title>Upgrade Required</Dialog.Title>
           <Dialog.Content>
             <Paragraph>
-              Free users can only post to 2 platforms. Upgrade to Premium to post to all platforms.
+              You can only post to 2 platforms on the free tier. Upgrade to post to all selected platforms.
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions>
@@ -358,18 +376,6 @@ export default function PostScreen() {
             }}>Upgrade</Button>
           </Dialog.Actions>
         </Dialog>
-
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-          action={{
-            label: 'Dismiss',
-            onPress: () => setSnackbarVisible(false),
-          }}
-        >
-          {snackbarMessage}
-        </Snackbar>
       </Portal>
     </ScrollView>
   );
@@ -378,7 +384,7 @@ export default function PostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   contentContainer: {
     padding: 16,
@@ -390,74 +396,64 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   imageContainer: {
-    width: '100%',
-    aspectRatio: 4/3,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    marginBottom: 16,
-    justifyContent: 'center',
+    marginBottom: 24,
     alignItems: 'center',
-    overflow: 'hidden',
   },
   productImage: {
     width: '100%',
-    height: '100%',
+    height: 250,
+    borderRadius: 8,
+    marginBottom: 16,
     resizeMode: 'cover',
   },
   placeholderImage: {
     width: '100%',
-    height: '100%',
+    height: 250,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   placeholderText: {
-    color: '#999',
-    fontSize: 16,
+    color: '#757575',
   },
-  buttonGroup: {
+  imageButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    width: '100%',
   },
   imageButton: {
     flex: 1,
     marginHorizontal: 4,
   },
+  formContainer: {
+    marginBottom: 24,
+  },
   input: {
     marginBottom: 16,
+    backgroundColor: 'white',
   },
-  descriptionInput: {
+  textArea: {
     height: 100,
   },
-  errorText: {
-    color: 'red',
-    marginTop: -12,
-    marginBottom: 12,
-    fontSize: 12,
-  },
   postButton: {
-    marginTop: 8,
+    marginBottom: 16,
     paddingVertical: 8,
   },
   progressContainer: {
     marginTop: 16,
     padding: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderRadius: 8,
   },
   progressText: {
-    fontSize: 16,
     marginBottom: 8,
+    fontSize: 16,
     textAlign: 'center',
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-  },
-  progressPercent: {
-    textAlign: 'center',
-    marginTop: 4,
-    fontSize: 12,
-    color: '#666',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -15,6 +15,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   const [type, setType] = useState(Camera.Constants.Type.back);
   const [isFlashOn, setIsFlashOn] = useState(false);
   const [isReady, setIsReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const cameraRef = useRef<Camera>(null);
 
   useEffect(() => {
@@ -25,7 +26,8 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   }, []);
 
   const takePicture = async () => {
-    if (cameraRef.current) {
+    if (cameraRef.current && !isCapturing) {
+      setIsCapturing(true);
       try {
         const photo = await cameraRef.current.takePictureAsync({
           quality: 0.7,
@@ -40,6 +42,8 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to capture image. Please try again.');
+      } finally {
+        setIsCapturing(false);
       }
     }
   };
@@ -99,9 +103,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.captureButton, !isReady && styles.disabledButton]}
+            style={[styles.captureButton, (!isReady || isCapturing) && styles.disabledButton]}
             onPress={takePicture}
-            disabled={!isReady}
+            disabled={!isReady || isCapturing}
           />
 
           <TouchableOpacity
@@ -195,11 +199,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'white',
   },
   loadingText: {
-    color: 'white',
     marginTop: 10,
     fontSize: 16,
+    color: '#666',
   },
 });

@@ -40,24 +40,20 @@ export const postProduct = async (product: any, apiKey: string): Promise<TikTokR
   try {
     const formattedProduct = formatProductForTikTok(product);
 
-    const response = await axios.post(`${API_BASE_URL}/product/create`, formattedProduct, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-TikTok-Client-Key': CLIENT_KEY,
-        'X-TikTok-Access-Token': apiKey
-      },
-      params: {
-        app_id: 'your-app-id',
-        timestamp: Math.floor(Date.now() / 1000),
-        version: 'v1.0'
-      }
-    });
+    // Mock API call for development
+    console.log('Mock TikTok API call:', formattedProduct);
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Simulate successful response
     return {
-      code: response.data.code,
-      message: response.data.message,
-      data: response.data.data
+      code: 0,
+      message: 'Success',
+      data: {
+        product_id: formattedProduct.product_id,
+        status: 'published'
+      }
     };
   } catch (error) {
     console.error('Error posting product to TikTok:', error);
@@ -67,24 +63,32 @@ export const postProduct = async (product: any, apiKey: string): Promise<TikTokR
 
 export const fetchMessages = async (apiKey: string): Promise<TikTokResponse> => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/message/inbox`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'X-TikTok-Client-Key': CLIENT_KEY,
-        'X-TikTok-Access-Token': apiKey
-      },
-      params: {
-        app_id: 'your-app-id',
-        timestamp: Math.floor(Date.now() / 1000),
-        version: 'v1.0',
-        page_size: 20
-      }
-    });
+    // Mock API call for development
+    console.log('Mock TikTok fetch messages call');
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // Simulate successful response
     return {
-      code: response.data.code,
-      message: response.data.message,
-      data: response.data.data
+      code: 0,
+      message: 'Success',
+      data: {
+        messages: [
+          {
+            id: 'msg1',
+            from: 'buyer1',
+            message: 'Hi, is this still available?',
+            timestamp: Date.now() - 3600000
+          },
+          {
+            id: 'msg2',
+            from: 'buyer2',
+            message: 'When will this ship?',
+            timestamp: Date.now() - 7200000
+          }
+        ]
+      }
     };
   } catch (error) {
     console.error('Error fetching messages from TikTok:', error);
@@ -94,27 +98,20 @@ export const fetchMessages = async (apiKey: string): Promise<TikTokResponse> => 
 
 export const recordSale = async (productId: string, apiKey: string, amount: number): Promise<TikTokResponse> => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/order/create`, {
-      product_id: productId,
-      amount: amount,
-      timestamp: Math.floor(Date.now() / 1000)
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'X-TikTok-Client-Key': CLIENT_KEY,
-        'X-TikTok-Access-Token': apiKey
-      },
-      params: {
-        app_id: 'your-app-id',
-        version: 'v1.0'
-      }
-    });
+    // Mock API call for development
+    console.log(`Mock TikTok record sale call for product ${productId}: $${amount}`);
 
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Simulate successful response
     return {
-      code: response.data.code,
-      message: response.data.message,
-      data: response.data.data
+      code: 0,
+      message: 'Success',
+      data: {
+        order_id: `order-${Date.now()}`,
+        status: 'completed'
+      }
     };
   } catch (error) {
     console.error('Error recording sale on TikTok:', error);

@@ -10,6 +10,7 @@ interface Product {
   imageUri: string;
   createdAt: string;
   updatedAt: string;
+  platforms: string[];
 }
 
 interface ProductStore {
