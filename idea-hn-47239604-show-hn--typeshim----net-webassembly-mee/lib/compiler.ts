@@ -175,7 +175,6 @@ class WebViewCompiler {
             });
           }
 
-          this.isProcessing = false;
           this.processQueue();
         }
       }
@@ -185,7 +184,7 @@ class WebViewCompiler {
   }
 
   private processQueue() {
-    if (!this.webViewReady || this.isProcessing || this.queue.length === 0) {
+    if (this.isProcessing || !this.webViewReady || this.queue.length === 0) {
       return;
     }
 
@@ -199,9 +198,10 @@ class WebViewCompiler {
     }));
   }
 
-  public async compile(code: string): Promise<CompilationResult> {
+  public async compileTypeScriptToWasm(code: string): Promise<CompilationResult> {
     return new Promise((resolve, reject) => {
       const requestId = uuidv4();
+
       this.queue.push({
         code,
         requestId,
@@ -217,34 +217,14 @@ class WebViewCompiler {
     return this.compilationProgress[requestId] || 0;
   }
 
-  public cleanup() {
-    this.queue = [];
-    this.isProcessing = false;
-    this.webViewReady = false;
-    this.compilationProgress = {};
+  public validateWasmOutput(wasmBytes: Uint8Array): boolean {
+    // Check for WASM magic number (0x00 0x61 0x73 0x6d)
+    return wasmBytes.length >= 4 &&
+           wasmBytes[0] === 0x00 &&
+           wasmBytes[1] === 0x61 &&
+           wasmBytes[2] === 0x73 &&
+           wasmBytes[3] === 0x6d;
   }
 }
 
-export const compileTypeScriptToWasm = async (code: string): Promise<CompilationResult> => {
-  const compiler = WebViewCompiler.getInstance();
-  return compiler.compile(code);
-};
-
-export const getCompilationProgress = (requestId: string): number => {
-  const compiler = WebViewCompiler.getInstance();
-  return compiler.getCompilationProgress(requestId);
-};
-
-export const cleanupCompiler = () => {
-  const compiler = WebViewCompiler.getInstance();
-  compiler.cleanup();
-};
-
-export const validateWasmOutput = (wasmBytes: Uint8Array): boolean => {
-  // Check for WASM magic number (0x00 0x61 0x73 0x6d)
-  if (wasmBytes.length < 4) return false;
-  return wasmBytes[0] === 0x00 &&
-         wasmBytes[1] === 0x61 &&
-         wasmBytes[2] === 0x73 &&
-         wasmBytes[3] === 0x6d;
-};
+export default WebViewCompiler.getInstance();
