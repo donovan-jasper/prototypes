@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useDirectories } from '@/hooks/useDirectories';
 import DirectoryCard from '@/components/DirectoryCard';
 import FilterSheet from '@/components/FilterSheet';
+import RecommendationsList from '@/components/RecommendationsList';
 import { Category } from '@/constants/categories';
 
 export default function DirectoryBrowserScreen() {
@@ -22,15 +23,16 @@ export default function DirectoryBrowserScreen() {
   const [selectedCategories, setSelectedCategories] = useState<Category[]>([]);
   const [showFilters, setShowFilters] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
   const filteredDirectories = directories.filter(dir => {
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       dir.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       dir.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesCategory = selectedCategories.length === 0 || 
+
+    const matchesCategory = selectedCategories.length === 0 ||
       selectedCategories.includes(dir.category as Category);
-    
+
     return matchesSearch && matchesCategory;
   });
 
@@ -47,6 +49,13 @@ export default function DirectoryBrowserScreen() {
   const handleApplyFilters = (categories: Category[]) => {
     setSelectedCategories(categories);
     setShowFilters(false);
+
+    // Set the first selected category for recommendations
+    if (categories.length > 0) {
+      setSelectedCategory(categories[0]);
+    } else {
+      setSelectedCategory(null);
+    }
   };
 
   if (loading && directories.length === 0) {
@@ -84,6 +93,10 @@ export default function DirectoryBrowserScreen() {
           </Text>
         </TouchableOpacity>
       </View>
+
+      {selectedCategory && (
+        <RecommendationsList category={selectedCategory} />
+      )}
 
       <FlatList
         data={filteredDirectories}
@@ -141,4 +154,60 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 20,
     paddingTop: 60,
-    pad
+    paddingBottom: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    backgroundColor: '#FFF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  filterButton: {
+    marginLeft: 8,
+    height: 40,
+    paddingHorizontal: 16,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  filterButtonText: {
+    color: '#FFF',
+    fontWeight: '600',
+  },
+  listContent: {
+    paddingBottom: 32,
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#999',
+  },
+});
