@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 import { useFriends, useInteractions } from '../../hooks';
 import { PremiumGate } from '../../components/PremiumGate';
 import { usePremium } from '../../hooks/usePremium';
 import { calculateConnectionScore, getConnectionStatus } from '../../lib/scoring';
 import { Friend } from '../../types';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -21,52 +22,47 @@ const InsightsScreen = () => {
   const [interactionData, setInteractionData] = useState<number[]>([]);
   const [atRiskFriends, setAtRiskFriends] = useState<Friend[]>([]);
   const [personalizedSuggestions, setPersonalizedSuggestions] = useState<string[]>([]);
+  const [timePeriod, setTimePeriod] = useState<'week' | 'month'>('week');
 
   useEffect(() => {
     if (friends.length > 0) {
-      calculateMonthlyStats();
+      calculateStats();
       calculateInteractionTrends();
       identifyAtRiskFriends();
       generatePersonalizedSuggestions();
     }
-  }, [friends, interactions]);
+  }, [friends, interactions, timePeriod]);
 
-  const calculateMonthlyStats = () => {
+  const calculateStats = () => {
     const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
-    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+    const currentPeriod = timePeriod === 'week' ? 7 : 30;
+    const previousPeriod = currentPeriod * 2;
 
-    const currentMonthInteractions = interactions.filter(interaction => {
+    const currentPeriodInteractions = interactions.filter(interaction => {
       const interactionDate = new Date(interaction.date);
-      return (
-        interactionDate.getMonth() === currentMonth &&
-        interactionDate.getFullYear() === currentYear
-      );
+      const daysDiff = Math.floor((now.getTime() - interactionDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff <= currentPeriod;
     });
 
-    const lastMonthInteractions = interactions.filter(interaction => {
+    const previousPeriodInteractions = interactions.filter(interaction => {
       const interactionDate = new Date(interaction.date);
-      return (
-        interactionDate.getMonth() === lastMonth &&
-        interactionDate.getFullYear() === lastMonthYear
-      );
+      const daysDiff = Math.floor((now.getTime() - interactionDate.getTime()) / (1000 * 60 * 60 * 24));
+      return daysDiff > currentPeriod && daysDiff <= previousPeriod;
     });
 
-    const uniqueCurrentMonthFriends = new Set(
-      currentMonthInteractions.map(i => i.friendId)
+    const uniqueCurrentPeriodFriends = new Set(
+      currentPeriodInteractions.map(i => i.friendId)
     ).size;
 
-    const uniqueLastMonthFriends = new Set(
-      lastMonthInteractions.map(i => i.friendId)
+    const uniquePreviousPeriodFriends = new Set(
+      previousPeriodInteractions.map(i => i.friendId)
     ).size;
 
-    const trend = uniqueCurrentMonthFriends - uniqueLastMonthFriends;
+    const trend = uniqueCurrentPeriodFriends - uniquePreviousPeriodFriends;
 
     setMonthlyStats({
-      totalConnections: uniqueCurrentMonthFriends,
-      lastMonthConnections: uniqueLastMonthFriends,
+      totalConnections: uniqueCurrentPeriodFriends,
+      lastMonthConnections: uniquePreviousPeriodFriends,
       trend
     });
   };
@@ -74,23 +70,31 @@ const InsightsScreen = () => {
   const calculateInteractionTrends = () => {
     const now = new Date();
     const dataPoints = [];
+    const labels = [];
 
-    // Calculate for last 6 months
-    for (let i = 5; i >= 0; i--) {
-      const month = now.getMonth() - i;
-      const year = month < 0 ? now.getFullYear() - 1 : now.getFullYear();
-      const adjustedMonth = month < 0 ? 12 + month : month;
+    const periodCount = timePeriod === 'week' ? 7 : 30;
 
-      const monthInteractions = interactions.filter(interaction => {
+    for (let i = periodCount - 1; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+
+      const dayInteractions = interactions.filter(interaction => {
         const interactionDate = new Date(interaction.date);
         return (
-          interactionDate.getMonth() === adjustedMonth &&
-          interactionDate.getFullYear() === year
+          interactionDate.getDate() === date.getDate() &&
+          interactionDate.getMonth() === date.getMonth() &&
+          interactionDate.getFullYear() === date.getFullYear()
         );
       });
 
-      const uniqueFriends = new Set(monthInteractions.map(i => i.friendId)).size;
+      const uniqueFriends = new Set(dayInteractions.map(i => i.friendId)).size;
       dataPoints.push(uniqueFriends);
+
+      if (timePeriod === 'week') {
+        labels.push(date.toLocaleDateString('en-US', { weekday: 'short' }));
+      } else {
+        labels.push(date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+      }
     }
 
     setInteractionData(dataPoints);
@@ -98,6 +102,8 @@ const InsightsScreen = () => {
 
   const identifyAtRiskFriends = () => {
     const now = new Date();
+    const riskThreshold = timePeriod === 'week' ? 30 : 90; // 30 days for week, 90 for month
+
     const riskFriends = friends.filter(friend => {
       if (!friend.lastContact) return true;
 
@@ -106,8 +112,7 @@ const InsightsScreen = () => {
         (now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24)
       );
 
-      // Friends with score below 40 or haven't been contacted in 30+ days
-      return calculateConnectionScore(friend.lastContact) < 40 || daysSince > 30;
+      return daysSince > riskThreshold;
     });
 
     setAtRiskFriends(riskFriends);
@@ -115,6 +120,7 @@ const InsightsScreen = () => {
 
   const generatePersonalizedSuggestions = () => {
     const suggestions = [];
+    const now = new Date();
 
     // Find friends not contacted in 6+ months
     const longTimeFriends = friends.filter(friend => {
@@ -122,7 +128,7 @@ const InsightsScreen = () => {
 
       const lastContactDate = new Date(friend.lastContact);
       const daysSince = Math.floor(
-        (new Date().getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - lastContactDate.getTime()) / (1000 * 60 * 60 * 24)
       );
 
       return daysSince > 180; // 6 months
@@ -155,33 +161,62 @@ const InsightsScreen = () => {
     return (
       <PremiumGate
         featureName="Friendship Insights"
-        description="Get weekly reports on your connection trends, at-risk friendships, and personalized suggestions to strengthen your relationships."
+        description="Get weekly/monthly reports on your connection trends, at-risk friendships, and personalized suggestions to strengthen your relationships."
       />
     );
   }
 
   return (
     <ScrollView style={styles.container}>
-      {/* Summary Card */}
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryTitle}>Monthly Connections</Text>
-        <Text style={styles.summaryValue}>{monthlyStats.totalConnections}</Text>
-        <Text style={styles.summaryComparison}>
-          {monthlyStats.trend > 0 ? '+' : ''}{monthlyStats.trend} from last month
-        </Text>
+      <View style={styles.periodSelector}>
+        <TouchableOpacity
+          style={[styles.periodButton, timePeriod === 'week' && styles.activePeriod]}
+          onPress={() => setTimePeriod('week')}
+        >
+          <Text style={styles.periodButtonText}>Week</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.periodButton, timePeriod === 'month' && styles.activePeriod]}
+          onPress={() => setTimePeriod('month')}
+        >
+          <Text style={styles.periodButtonText}>Month</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Interaction Trend Chart */}
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>Connection Summary</Text>
+        <View style={styles.summaryStats}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{monthlyStats.totalConnections}</Text>
+            <Text style={styles.statLabel}>Friends Connected</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>
+              {monthlyStats.trend > 0 ? `+${monthlyStats.trend}` : monthlyStats.trend}
+            </Text>
+            <Text style={styles.statLabel}>vs. Previous {timePeriod}</Text>
+          </View>
+        </View>
+      </View>
+
       <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Interaction Trends</Text>
+        <Text style={styles.sectionTitle}>Connection Trends</Text>
         <LineChart
           data={{
-            labels: ['-5m', '-4m', '-3m', '-2m', '-1m', 'This month'],
+            labels: Array.from({ length: timePeriod === 'week' ? 7 : 30 }, (_, i) => {
+              const date = new Date();
+              date.setDate(date.getDate() - (timePeriod === 'week' ? 6 - i : 29 - i));
+              return timePeriod === 'week'
+                ? date.toLocaleDateString('en-US', { weekday: 'short' })
+                : date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }),
             datasets: [
               {
                 data: interactionData,
-              },
-            ],
+                color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
+                strokeWidth: 2
+              }
+            ]
           }}
           width={screenWidth - 32}
           height={220}
@@ -196,55 +231,50 @@ const InsightsScreen = () => {
             color: (opacity = 1) => `rgba(76, 175, 80, ${opacity})`,
             labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
             style: {
-              borderRadius: 16,
+              borderRadius: 16
             },
             propsForDots: {
               r: '4',
               strokeWidth: '2',
-              stroke: '#4CAF50',
-            },
+              stroke: '#4CAF50'
+            }
           }}
           bezier
           style={{
             marginVertical: 8,
-            borderRadius: 16,
+            borderRadius: 16
           }}
         />
       </View>
 
-      {/* At-Risk Friendships */}
-      <View style={styles.section}>
+      <View style={styles.atRiskSection}>
         <Text style={styles.sectionTitle}>At-Risk Friendships</Text>
         {atRiskFriends.length > 0 ? (
           atRiskFriends.map(friend => (
             <View key={friend.id} style={styles.friendItem}>
+              <MaterialIcons name="warning" size={20} color="#F44336" />
               <Text style={styles.friendName}>{friend.name}</Text>
-              <Text style={styles.friendAction}>
-                {friend.lastContact
-                  ? `Last contacted ${Math.floor(
-                      (new Date().getTime() - new Date(friend.lastContact).getTime()) /
-                      (1000 * 60 * 60 * 24)
-                    )} days ago`
-                  : 'Never contacted'}
+              <Text style={styles.friendStatus}>
+                Last contacted {friend.lastContact ? new Date(friend.lastContact).toLocaleDateString() : 'never'}
               </Text>
             </View>
           ))
         ) : (
-          <Text style={styles.noData}>No at-risk friendships detected</Text>
+          <Text style={styles.noRiskText}>No at-risk friendships detected!</Text>
         )}
       </View>
 
-      {/* Personalized Suggestions */}
-      <View style={styles.section}>
+      <View style={styles.suggestionsSection}>
         <Text style={styles.sectionTitle}>Personalized Suggestions</Text>
         {personalizedSuggestions.length > 0 ? (
           personalizedSuggestions.map((suggestion, index) => (
             <View key={index} style={styles.suggestionItem}>
+              <MaterialIcons name="lightbulb-outline" size={20} color="#FFC107" />
               <Text style={styles.suggestionText}>{suggestion}</Text>
             </View>
           ))
         ) : (
-          <Text style={styles.noData}>No personalized suggestions at this time</Text>
+          <Text style={styles.noSuggestionsText}>Your relationships are looking strong!</Text>
         )}
       </View>
     </ScrollView>
@@ -257,10 +287,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
+  periodSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  periodButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginHorizontal: 4,
+    borderRadius: 20,
+    backgroundColor: '#e0e0e0',
+  },
+  activePeriod: {
+    backgroundColor: '#4CAF50',
+  },
+  periodButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   summaryCard: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 20,
+    padding: 16,
     marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -269,17 +318,25 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   summaryTitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
   },
-  summaryValue: {
-    fontSize: 32,
+  summaryStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statValue: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#4CAF50',
   },
-  summaryComparison: {
-    fontSize: 14,
+  statLabel: {
+    fontSize: 12,
     color: '#666',
   },
   chartContainer: {
@@ -293,12 +350,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  chartTitle: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#333',
   },
-  section: {
+  atRiskSection: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
@@ -309,35 +367,54 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
   friendItem: {
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
   },
   friendName: {
     fontSize: 16,
-    fontWeight: '500',
+    marginLeft: 8,
+    flex: 1,
   },
-  friendAction: {
+  friendStatus: {
+    fontSize: 12,
+    color: '#666',
+  },
+  noRiskText: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  suggestionsSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   suggestionItem: {
-    paddingVertical: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#f0f0f0',
   },
   suggestionText: {
-    fontSize: 16,
+    fontSize: 14,
+    marginLeft: 8,
+    flex: 1,
+    color: '#333',
   },
-  noData: {
-    fontSize: 16,
+  noSuggestionsText: {
+    fontSize: 14,
     color: '#666',
     textAlign: 'center',
     paddingVertical: 16,
