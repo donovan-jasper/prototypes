@@ -175,7 +175,7 @@ const updateFirebaseSubmissionStatus = async (firebaseId, status) => {
     const submissionRef = doc(db, 'submissions', firebaseId);
     await updateDoc(submissionRef, {
       status: status,
-      updated_at: new Date().toISOString()
+      updatedAt: new Date().toISOString()
     });
   } catch (error) {
     console.error('Error updating Firebase submission status:', error);
@@ -203,34 +203,34 @@ const processSubmissionQueue = async () => {
         }
 
         // Step 2: Upload to IPFS if not already done
-        let ipfsCid = submission.ipfs_cid;
-        if (!ipfsCid) {
-          ipfsCid = await uploadToIPFS(submission.content);
-          if (!ipfsCid) {
+        let ipfsHash = submission.ipfs_cid;
+        if (!ipfsHash) {
+          ipfsHash = await uploadToIPFS(submission.content);
+          if (!ipfsHash) {
             throw new Error('IPFS upload failed');
           }
-          await updateLocalSubmissionStatus(submission.id, 'processing', ipfsCid);
+          await updateLocalSubmissionStatus(submission.id, 'processing', ipfsHash);
         }
 
         // Step 3: Submit to Firebase
-        const firebaseId = await submitToFirebase({
+        const firebaseResult = await submitToFirebase({
           title: submission.title,
           authors: submission.authors,
           abstract: submission.abstract,
           content: submission.content,
           proof: submission.proof,
-          ipfsHash: ipfsCid,
-          status: 'completed',
+          ipfsHash: ipfsHash,
+          status: 'published',
           createdAt: submission.created_at
         });
 
-        if (!firebaseId) {
+        if (!firebaseResult || !firebaseResult.id) {
           throw new Error('Firebase submission failed');
         }
 
-        // Update local status
-        await updateLocalSubmissionStatus(submission.id, 'completed', ipfsCid);
-        await updateFirebaseSubmissionStatus(firebaseId, 'completed');
+        // Update local and Firebase status
+        await updateLocalSubmissionStatus(submission.id, 'completed', ipfsHash);
+        await updateFirebaseSubmissionStatus(firebaseResult.id, 'completed');
       } catch (error) {
         console.error('Error processing submission:', error);
         await updateLocalSubmissionStatus(submission.id, 'failed', submission.ipfs_cid, error.message);
@@ -241,27 +241,22 @@ const processSubmissionQueue = async () => {
   }
 };
 
-const retryFailedStep = async (submissionId) => {
+const retryFailedStep = async () => {
   try {
-    const networkState = await NetInfo.fetch();
-    if (!networkState.isConnected) {
-      throw new Error('You must be online to retry submissions');
-    }
-
     const failedSubmissions = await getFailedSubmissions();
-    const submission = failedSubmissions.find(s => s.id === submissionId);
 
-    if (!submission) {
-      throw new Error('Submission not found');
+    for (const submission of failedSubmissions) {
+      try {
+        await updateLocalSubmissionStatus(submission.id, 'pending');
+      } catch (error) {
+        console.error('Error resetting failed submission:', error);
+      }
     }
-
-    // Reset status to pending to trigger reprocessing
-    await updateLocalSubmissionStatus(submissionId, 'pending', submission.ipfs_cid);
 
     // Trigger queue processing
     await processSubmissionQueue();
   } catch (error) {
-    console.error('Error retrying failed submission:', error);
+    console.error('Error retrying failed submissions:', error);
     throw error;
   }
 };

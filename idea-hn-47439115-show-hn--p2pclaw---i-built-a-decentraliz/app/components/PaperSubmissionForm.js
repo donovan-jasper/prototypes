@@ -1,36 +1,27 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 
-const PaperSubmissionForm = ({ onSubmit }) => {
-  const [formData, setFormData] = useState({
-    title: '',
-    authors: '',
-    abstract: '',
-    content: ''
-  });
+const PaperSubmissionForm = ({ onSubmit, isSubmitting }) => {
+  const [title, setTitle] = useState('');
+  const [authors, setAuthors] = useState('');
+  const [abstract, setAbstract] = useState('');
   const [errors, setErrors] = useState({});
 
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.title.trim()) {
+    if (!title.trim()) {
       newErrors.title = 'Title is required';
     }
 
-    if (!formData.authors.trim()) {
+    if (!authors.trim()) {
       newErrors.authors = 'Authors are required';
     }
 
-    if (!formData.abstract.trim()) {
+    if (!abstract.trim()) {
       newErrors.abstract = 'Abstract is required';
-    } else if (formData.abstract.length < 50) {
-      newErrors.abstract = 'Abstract should be at least 50 characters';
-    }
-
-    if (!formData.content.trim()) {
-      newErrors.content = 'Content is required';
-    } else if (formData.content.length < 200) {
-      newErrors.content = 'Content should be at least 200 characters';
+    } else if (abstract.length < 100) {
+      newErrors.abstract = 'Abstract must be at least 100 characters';
     }
 
     setErrors(newErrors);
@@ -39,63 +30,64 @@ const PaperSubmissionForm = ({ onSubmit }) => {
 
   const handleSubmit = () => {
     if (validateForm()) {
-      onSubmit(formData);
+      onSubmit({
+        title,
+        authors,
+        abstract
+      });
     } else {
       Alert.alert('Validation Error', 'Please fix the errors in the form');
     }
   };
 
-  const handleChange = (name, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Title</Text>
-      <TextInput
-        style={[styles.input, errors.title && styles.inputError]}
-        value={formData.title}
-        onChangeText={(text) => handleChange('title', text)}
-        placeholder="Enter paper title"
-      />
-      {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Title</Text>
+        <TextInput
+          style={[styles.input, errors.title && styles.inputError]}
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Enter paper title"
+          placeholderTextColor="#999"
+        />
+        {errors.title && <Text style={styles.errorText}>{errors.title}</Text>}
+      </View>
 
-      <Text style={styles.label}>Authors</Text>
-      <TextInput
-        style={[styles.input, errors.authors && styles.inputError]}
-        value={formData.authors}
-        onChangeText={(text) => handleChange('authors', text)}
-        placeholder="Enter authors (comma separated)"
-      />
-      {errors.authors && <Text style={styles.errorText}>{errors.authors}</Text>}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Authors</Text>
+        <TextInput
+          style={[styles.input, errors.authors && styles.inputError]}
+          value={authors}
+          onChangeText={setAuthors}
+          placeholder="Enter author names (comma separated)"
+          placeholderTextColor="#999"
+        />
+        {errors.authors && <Text style={styles.errorText}>{errors.authors}</Text>}
+      </View>
 
-      <Text style={styles.label}>Abstract</Text>
-      <TextInput
-        style={[styles.input, styles.textArea, errors.abstract && styles.inputError]}
-        value={formData.abstract}
-        onChangeText={(text) => handleChange('abstract', text)}
-        placeholder="Enter abstract (minimum 50 characters)"
-        multiline
-        numberOfLines={4}
-      />
-      {errors.abstract && <Text style={styles.errorText}>{errors.abstract}</Text>}
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Abstract</Text>
+        <TextInput
+          style={[styles.textArea, errors.abstract && styles.inputError]}
+          value={abstract}
+          onChangeText={setAbstract}
+          placeholder="Enter paper abstract (minimum 100 characters)"
+          placeholderTextColor="#999"
+          multiline
+          numberOfLines={6}
+        />
+        {errors.abstract && <Text style={styles.errorText}>{errors.abstract}</Text>}
+      </View>
 
-      <Text style={styles.label}>Content</Text>
-      <TextInput
-        style={[styles.input, styles.textArea, errors.content && styles.inputError]}
-        value={formData.content}
-        onChangeText={(text) => handleChange('content', text)}
-        placeholder="Enter paper content (minimum 200 characters)"
-        multiline
-        numberOfLines={8}
-      />
-      {errors.content && <Text style={styles.errorText}>{errors.content}</Text>}
-
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Submit Paper</Text>
+      <TouchableOpacity
+        style={[styles.submitButton, isSubmitting && styles.submitButtonDisabled]}
+        onPress={handleSubmit}
+        disabled={isSubmitting}
+      >
+        <Text style={styles.submitButtonText}>
+          {isSubmitting ? 'Submitting...' : 'Submit Paper'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -103,14 +95,17 @@ const PaperSubmissionForm = ({ onSubmit }) => {
 
 const styles = StyleSheet.create({
   container: {
+    backgroundColor: 'white',
     padding: 20,
-    backgroundColor: '#fff',
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3,
+  },
+  formGroup: {
+    marginBottom: 15,
   },
   label: {
     fontSize: 16,
@@ -121,34 +116,43 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
+    borderRadius: 8,
     padding: 12,
-    marginBottom: 10,
     fontSize: 16,
+    backgroundColor: '#f9f9f9',
   },
   textArea: {
-    height: 120,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+    minHeight: 120,
     textAlignVertical: 'top',
   },
   inputError: {
-    borderColor: '#ff4444',
+    borderColor: '#FF3B30',
   },
   errorText: {
-    color: '#ff4444',
+    color: '#FF3B30',
     fontSize: 14,
-    marginBottom: 10,
+    marginTop: 5,
   },
   submitButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   submitButtonText: {
-    color: '#fff',
+    color: 'white',
+    fontWeight: 'bold',
     fontSize: 16,
-    fontWeight: '600',
   },
 });
 
