@@ -9,11 +9,14 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  Switch,
+  ScrollView,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Friend, getAllFriends, addFriend, initDatabase } from '@/lib/database';
+import { Friend, Streak, getAllFriends, addFriend, initDatabase, getStreak } from '@/lib/database';
 import { calculateConnectionScore } from '@/lib/scoring';
 import FriendCard from '@/components/FriendCard';
+import { getContacts, Contact, filterContacts } from '@/lib/contacts';
 
 export default function FriendsScreen() {
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -21,23 +24,50 @@ export default function FriendsScreen() {
   const [modalVisible, setModalVisible] = useState(false);
   const [newFriendName, setNewFriendName] = useState('');
   const [newFriendPhone, setNewFriendPhone] = useState('');
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [selectedContacts, setSelectedContacts] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isPremium, setIsPremium] = useState(false);
 
   const loadFriends = async () => {
     try {
       await initDatabase();
       const allFriends = await getAllFriends();
-      
-      const updatedFriends = allFriends.map(friend => ({
-        ...friend,
-        connectionScore: calculateConnectionScore(friend.lastContact),
+
+      const updatedFriends = await Promise.all(allFriends.map(async friend => {
+        const streak = await getStreak(friend.id);
+        return {
+          ...friend,
+          connectionScore: calculateConnectionScore(friend.lastContact),
+          streak: streak || {
+            friendId: friend.id,
+            currentDays: 0,
+            longestDays: 0,
+            lastInteraction: null,
+            freezeUsed: false
+          }
+        };
       }));
-      
+
       setFriends(updatedFriends);
     } catch (error) {
       console.error('Error loading friends:', error);
       Alert.alert('Error', 'Failed to load friends');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadContacts = async () => {
+    try {
+      const contactsList = await getContacts();
+      setContacts(contactsList);
+      setFilteredContacts(contactsList);
+    } catch (error) {
+      console.error('Error loading contacts:', error);
+      Alert.alert('Error', 'Failed to load contacts');
     }
   };
 
@@ -69,12 +99,64 @@ export default function FriendsScreen() {
     }
   };
 
+  const handleImportContacts = async () => {
+    if (selectedContacts.size === 0) {
+      Alert.alert('No Selection', 'Please select at least one contact to import');
+      return;
+    }
+
+    try {
+      const selected = Array.from(selectedContacts).map(id =>
+        contacts.find(c => c.id === id)
+      ).filter(Boolean) as Contact[];
+
+      for (const contact of selected) {
+        const phone = contact.phoneNumbers[0]?.number || '';
+        const email = contact.emails?.[0]?.email || '';
+        await addFriend(contact.name, phone, email);
+      }
+
+      setSelectedContacts(new Set());
+      setImportModalVisible(false);
+      loadFriends();
+    } catch (error) {
+      console.error('Error importing contacts:', error);
+      Alert.alert('Error', 'Failed to import contacts');
+    }
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setFilteredContacts(filterContacts(contacts, query));
+  };
+
+  const toggleContactSelection = (contactId: string) => {
+    const newSelection = new Set(selectedContacts);
+    if (newSelection.has(contactId)) {
+      newSelection.delete(contactId);
+    } else {
+      newSelection.add(contactId);
+    }
+    setSelectedContacts(newSelection);
+  };
+
   const handleFriendPress = (friend: Friend) => {
     Alert.alert(
       friend.name,
       `Phone: ${friend.phone}\nConnection Score: ${friend.connectionScore}`,
       [{ text: 'OK' }]
     );
+  };
+
+  const handleFreezeStreak = async (friendId: number) => {
+    try {
+      // In a real app, you would update the streak in the database
+      // For now, we'll just reload the friends to reflect changes
+      await loadFriends();
+    } catch (error) {
+      console.error('Error freezing streak:', error);
+      Alert.alert('Error', 'Failed to freeze streak');
+    }
   };
 
   if (loading) {
@@ -93,8 +175,11 @@ export default function FriendsScreen() {
         renderItem={({ item }) => (
           <FriendCard
             friend={item}
+            streak={item.streak}
             onPress={() => handleFriendPress(item)}
             onInteractionLogged={loadFriends}
+            onFreezeStreak={handleFreezeStreak}
+            isPremium={isPremium}
           />
         )}
         ListEmptyComponent={
@@ -106,14 +191,28 @@ export default function FriendsScreen() {
         contentContainerStyle={friends.length === 0 ? styles.emptyList : styles.list}
       />
 
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => setModalVisible(true)}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      <View style={styles.fabContainer}>
+        <TouchableOpacity
+          style={[styles.fab, styles.importFab]}
+          onPress={() => {
+            setImportModalVisible(true);
+            loadContacts();
+          }}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.fabText}>📱</Text>
+        </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.fab, styles.addFab]}
+          onPress={() => setModalVisible(true)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.fabText}>+</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Add Friend Modal */}
       <Modal
         visible={modalVisible}
         animationType="slide"
@@ -123,7 +222,7 @@ export default function FriendsScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Add Friend</Text>
-            
+
             <TextInput
               style={styles.input}
               placeholder="Name"
@@ -131,7 +230,7 @@ export default function FriendsScreen() {
               onChangeText={setNewFriendName}
               autoFocus
             />
-            
+
             <TextInput
               style={styles.input}
               placeholder="Phone Number"
@@ -151,12 +250,81 @@ export default function FriendsScreen() {
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={[styles.button, styles.addButton]}
                 onPress={handleAddFriend}
               >
                 <Text style={styles.addButtonText}>Add</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Import Contacts Modal */}
+      <Modal
+        visible={importModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setImportModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.importModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Import Contacts</Text>
+              <Text style={styles.selectedCount}>
+                {selectedContacts.size} selected
+              </Text>
+            </View>
+
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search contacts..."
+              value={searchQuery}
+              onChangeText={handleSearch}
+            />
+
+            <ScrollView style={styles.contactsList}>
+              {filteredContacts.map(contact => (
+                <TouchableOpacity
+                  key={contact.id}
+                  style={styles.contactItem}
+                  onPress={() => toggleContactSelection(contact.id)}
+                >
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactName}>{contact.name}</Text>
+                    {contact.phoneNumbers.length > 0 && (
+                      <Text style={styles.contactPhone}>
+                        {contact.phoneNumbers[0].number}
+                      </Text>
+                    )}
+                  </View>
+                  <Switch
+                    value={selectedContacts.has(contact.id)}
+                    onValueChange={() => toggleContactSelection(contact.id)}
+                  />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={() => {
+                  setImportModalVisible(false);
+                  setSelectedContacts(new Set());
+                  setSearchQuery('');
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.addButton]}
+                onPress={handleImportContacts}
+              >
+                <Text style={styles.addButtonText}>Import Selected</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -182,44 +350,52 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 32,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    marginTop: 50,
   },
   emptyText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#666',
     marginBottom: 8,
   },
   emptySubtext: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    fontSize: 14,
+    color: '#999',
   },
-  fab: {
+  fabContainer: {
     position: 'absolute',
     right: 20,
     bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#007AFF',
+    flexDirection: 'row',
+    gap: 16,
+  },
+  fab: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 6,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  importFab: {
+    backgroundColor: '#34C759',
+  },
+  addFab: {
+    backgroundColor: '#007AFF',
   },
   fabText: {
-    fontSize: 32,
+    fontSize: 24,
     color: '#fff',
-    fontWeight: '300',
+    fontWeight: 'bold',
   },
   modalOverlay: {
     flex: 1,
@@ -228,55 +404,100 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
     width: '85%',
-    maxWidth: 400,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+  },
+  importModalContent: {
+    width: '90%',
+    height: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   modalTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 20,
-    textAlign: 'center',
+  },
+  selectedCount: {
+    fontSize: 16,
+    color: '#666',
   },
   input: {
+    height: 50,
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    paddingHorizontal: 12,
     marginBottom: 16,
-    backgroundColor: '#f9f9f9',
+    fontSize: 16,
+  },
+  searchInput: {
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    fontSize: 16,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    justifyContent: 'flex-end',
+    gap: 12,
+    marginTop: 16,
   },
   button: {
-    flex: 1,
-    padding: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#f0f0f0',
-    marginRight: 8,
   },
   cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#666',
+    fontSize: 16,
   },
   addButton: {
     backgroundColor: '#007AFF',
-    marginLeft: 8,
   },
   addButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#fff',
+  },
+  contactsList: {
+    flex: 1,
+    marginBottom: 16,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
   },
 });

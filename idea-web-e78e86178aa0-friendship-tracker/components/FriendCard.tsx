@@ -1,16 +1,27 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { Friend } from '@/lib/database';
+import { Friend, Streak } from '@/lib/database';
 import { getConnectionColor, getDaysSinceLastContact } from '@/lib/scoring';
 import InteractionLogger from './InteractionLogger';
+import StreakBadge from './StreakBadge';
 
 interface FriendCardProps {
   friend: Friend;
+  streak: Streak;
   onPress: () => void;
   onInteractionLogged?: () => void;
+  onFreezeStreak?: (friendId: number) => void;
+  isPremium?: boolean;
 }
 
-export default function FriendCard({ friend, onPress, onInteractionLogged }: FriendCardProps) {
+export default function FriendCard({
+  friend,
+  streak,
+  onPress,
+  onInteractionLogged,
+  onFreezeStreak,
+  isPremium
+}: FriendCardProps) {
   const [showLogger, setShowLogger] = useState(false);
   const daysSince = getDaysSinceLastContact(friend.lastContact);
   const scoreColor = getConnectionColor(friend.connectionScore);
@@ -21,17 +32,23 @@ export default function FriendCard({ friend, onPress, onInteractionLogged }: Fri
     notes?: string
   ) => {
     const { logInteraction, updateFriend, calculateConnectionScore } = await import('@/lib/database');
-    
+
     await logInteraction(friend.id, type, date, notes);
-    
+
     const newScore = calculateConnectionScore(date);
     await updateFriend(friend.id, {
       lastContact: date,
       connectionScore: newScore,
     });
-    
+
     if (onInteractionLogged) {
       onInteractionLogged();
+    }
+  };
+
+  const handleFreezeStreak = () => {
+    if (onFreezeStreak) {
+      onFreezeStreak(friend.id);
     }
   };
 
@@ -46,6 +63,11 @@ export default function FriendCard({ friend, onPress, onInteractionLogged }: Fri
                 ? `${daysSince} ${daysSince === 1 ? 'day' : 'days'} ago`
                 : 'Never contacted'}
             </Text>
+            <StreakBadge
+              streak={streak}
+              onFreeze={handleFreezeStreak}
+              isPremium={isPremium}
+            />
           </View>
           <View style={styles.rightSection}>
             <View style={[styles.scoreCircle, { backgroundColor: scoreColor }]}>
