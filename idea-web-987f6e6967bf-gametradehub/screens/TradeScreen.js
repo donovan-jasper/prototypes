@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView, Alert, Modal, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getGameDetails } from '../utils/api';
 import { createTradeRecord } from '../utils/firebase';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width } = Dimensions.get('window');
 
 const TradeScreen = ({ route }) => {
   const { barcode } = route.params;
@@ -12,6 +14,7 @@ const TradeScreen = ({ route }) => {
   const [error, setError] = useState(null);
   const [tradeInProgress, setTradeInProgress] = useState(false);
   const [priceHistory, setPriceHistory] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -146,60 +149,89 @@ const TradeScreen = ({ route }) => {
         <Text style={styles.gameTitle}>{gameData.name}</Text>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.gamePrice}>Market Price: ${gameData.price?.toFixed(2) || 'N/A'}</Text>
-          <Ionicons name="pricetag-outline" size={20} color="#2E7D32" />
+          <Text style={styles.gamePrice}>Market Price: ${gameData.price.toFixed(2)}</Text>
+          <Text style={styles.gameCondition}>Condition: {gameData.condition}</Text>
         </View>
 
         {renderPriceHistory()}
 
-        <View style={styles.infoRow}>
-          <Ionicons name="star-outline" size={18} color="#555" />
-          <Text style={styles.gameCondition}>Condition: {gameData.condition || 'N/A'}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="logo-game-controller-b" size={18} color="#555" />
-          <Text style={styles.gamePlatforms}>Platforms: {gameData.platforms || 'N/A'}</Text>
-        </View>
-
-        <View style={styles.infoRow}>
-          <Ionicons name="calendar-outline" size={18} color="#555" />
-          <Text style={styles.gameRelease}>Release Date: {gameData.releaseDate || 'N/A'}</Text>
-        </View>
-
-        {gameData.summary && (
-          <View style={styles.summaryContainer}>
-            <Text style={styles.summaryTitle}>Summary</Text>
-            <Text style={styles.summaryText}>{gameData.summary}</Text>
-          </View>
-        )}
-
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.button, styles.tradeButton]}
-            onPress={handleExecuteTrade}
-            disabled={tradeInProgress}
-          >
-            {tradeInProgress ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.buttonText}>Execute Trade</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.button, styles.cancelButton]}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.tradeButton}
+          onPress={() => setShowConfirmation(true)}
+          disabled={tradeInProgress}
+        >
+          {tradeInProgress ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.tradeButtonText}>Execute Trade</Text>
+          )}
+        </TouchableOpacity>
       </ScrollView>
+    );
+  };
+
+  const renderConfirmationModal = () => {
+    if (!gameData) return null;
+
+    const currentPrice = gameData.price;
+    const potentialProfit = currentPrice * 0.1; // Assuming 10% potential profit for demo
+
+    return (
+      <Modal
+        visible={showConfirmation}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowConfirmation(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Trade Execution</Text>
+
+            <View style={styles.modalGameInfo}>
+              <Image
+                source={{ uri: gameData.cover }}
+                style={styles.modalGameCover}
+                resizeMode="contain"
+              />
+              <View style={styles.modalGameDetails}>
+                <Text style={styles.modalGameName}>{gameData.name}</Text>
+                <Text style={styles.modalGamePrice}>Price: ${currentPrice.toFixed(2)}</Text>
+                <Text style={styles.modalGameCondition}>Condition: {gameData.condition}</Text>
+              </View>
+            </View>
+
+            <View style={styles.modalProfitContainer}>
+              <Text style={styles.modalProfitTitle}>Potential Profit:</Text>
+              <Text style={styles.modalProfitAmount}>${potentialProfit.toFixed(2)}</Text>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalCancelButton]}
+                onPress={() => setShowConfirmation(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalConfirmButton]}
+                onPress={() => {
+                  setShowConfirmation(false);
+                  handleExecuteTrade();
+                }}
+              >
+                <Text style={styles.modalButtonText}>Confirm Trade</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     );
   };
 
   return (
     <View style={styles.container}>
       {renderGameDetails()}
+      {renderConfirmationModal()}
     </View>
   );
 };
@@ -208,6 +240,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  gameContainer: {
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -234,22 +269,19 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     marginTop: 20,
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     backgroundColor: '#6200EE',
     borderRadius: 5,
   },
   retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  gameContainer: {
-    flex: 1,
-    padding: 15,
+    color: '#fff',
+    fontSize: 16,
   },
   gameCover: {
     width: '100%',
-    height: 250,
-    marginBottom: 15,
+    height: 200,
+    marginBottom: 20,
     borderRadius: 8,
   },
   gameTitle: {
@@ -259,20 +291,30 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   gamePrice: {
     fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginRight: 5,
+    fontWeight: '600',
+    color: '#6200EE',
+    marginBottom: 5,
+  },
+  gameCondition: {
+    fontSize: 16,
+    color: '#666',
   },
   priceHistoryContainer: {
-    marginVertical: 20,
+    marginBottom: 20,
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -281,7 +323,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
     color: '#333',
@@ -289,93 +331,128 @@ const styles = StyleSheet.create({
   priceChart: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    height: 150,
     alignItems: 'flex-end',
+    height: 150,
+    paddingVertical: 10,
   },
   priceBarContainer: {
     alignItems: 'center',
-    width: 30,
+    width: (width - 60) / 7,
   },
   priceBar: {
     width: 20,
     backgroundColor: '#6200EE',
     borderTopLeftRadius: 4,
     borderTopRightRadius: 4,
+    marginBottom: 5,
   },
   priceBarLabel: {
-    fontSize: 10,
-    marginTop: 5,
-    color: '#555',
-  },
-  priceBarDate: {
-    fontSize: 8,
-    marginTop: 2,
-    color: '#888',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  gameCondition: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: '#555',
-  },
-  gamePlatforms: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: '#555',
-  },
-  gameRelease: {
-    fontSize: 16,
-    marginLeft: 8,
-    color: '#555',
-  },
-  summaryContainer: {
-    marginVertical: 15,
-    padding: 15,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: 12,
     color: '#333',
   },
-  summaryText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#555',
+  priceBarDate: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
   },
-  actionButtons: {
+  tradeButton: {
+    backgroundColor: '#6200EE',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
     marginTop: 20,
+  },
+  tradeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxWidth: 400,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  modalGameInfo: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  modalGameCover: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 15,
+  },
+  modalGameDetails: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  modalGameName: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
+    color: '#333',
+  },
+  modalGamePrice: {
+    fontSize: 16,
+    color: '#6200EE',
+    marginBottom: 5,
+  },
+  modalGameCondition: {
+    fontSize: 14,
+    color: '#666',
+  },
+  modalProfitContainer: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+  },
+  modalProfitTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 5,
+    color: '#333',
+  },
+  modalProfitAmount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  button: {
+  modalButton: {
     flex: 1,
-    padding: 15,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 5,
   },
-  tradeButton: {
+  modalCancelButton: {
+    backgroundColor: '#f5f5f5',
+  },
+  modalConfirmButton: {
     backgroundColor: '#6200EE',
   },
-  cancelButton: {
-    backgroundColor: '#d32f2f',
-  },
-  buttonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  modalButtonText: {
     fontSize: 16,
+    fontWeight: '600',
   },
 });
 
