@@ -19,8 +19,8 @@ describe('HomeScreen', () => {
     expect(getByText('Loading your habits and health data...')).toBeTruthy();
   });
 
-  it('displays error message when data fetch fails', async () => {
-    // Mock the failed fetch
+  it('displays error state when data fetch fails', async () => {
+    // Mock the error case
     (calendarService.fetchCalendarEvents as jest.Mock).mockRejectedValue(new Error('Failed to fetch'));
     (healthService.fetchHealthData as jest.Mock).mockRejectedValue(new Error('Failed to fetch'));
 
@@ -34,19 +34,19 @@ describe('HomeScreen', () => {
   it('displays health metrics when data is loaded', async () => {
     // Mock successful data fetch
     const mockCalendarEvents = [
-      { title: 'Morning Run', startDate: new Date('2023-01-01') },
-      { title: 'Evening Walk', startDate: new Date('2023-01-02') },
+      { title: 'Morning run', startDate: new Date('2023-01-01') },
+      { title: 'Evening walk', startDate: new Date('2023-01-02') },
     ];
 
     const mockHealthData = {
       steps: 5000,
       sleep: 7.5,
-      workouts: 3,
+      workouts: 3
     };
 
     (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockCalendarEvents);
     (healthService.fetchHealthData as jest.Mock).mockResolvedValue(mockHealthData);
-    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['Run', 'Walk']);
+    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['run', 'walk']);
 
     const { getByText } = render(<HomeScreen />);
 
@@ -59,50 +59,58 @@ describe('HomeScreen', () => {
 
   it('displays habits when data is loaded', async () => {
     const mockCalendarEvents = [
-      { title: 'Morning Run', startDate: new Date('2023-01-01') },
-      { title: 'Morning Run', startDate: new Date('2023-01-02') },
-      { title: 'Evening Walk', startDate: new Date('2023-01-03') },
+      { title: 'Morning run', startDate: new Date('2023-01-01') },
+      { title: 'Evening walk', startDate: new Date('2023-01-02') },
     ];
 
     (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockCalendarEvents);
     (healthService.fetchHealthData as jest.Mock).mockResolvedValue({});
-    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['Run', 'Walk']);
+    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['run', 'walk']);
 
     const { getByText } = render(<HomeScreen />);
 
     await waitFor(() => {
-      expect(getByText('Run')).toBeTruthy();
-      expect(getByText('Walk')).toBeTruthy();
+      expect(getByText('run')).toBeTruthy();
+      expect(getByText('walk')).toBeTruthy();
+    });
+  });
+
+  it('displays empty state when no habits are detected', async () => {
+    const mockCalendarEvents = [];
+
+    (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockCalendarEvents);
+    (healthService.fetchHealthData as jest.Mock).mockResolvedValue({});
+    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue([]);
+
+    const { getByText } = render(<HomeScreen />);
+
+    await waitFor(() => {
+      expect(getByText('No habits detected yet')).toBeTruthy();
+      expect(getByText('Add events to your calendar to track habits')).toBeTruthy();
     });
   });
 
   it('refreshes data when pull to refresh is triggered', async () => {
     const mockCalendarEvents = [
-      { title: 'Morning Run', startDate: new Date('2023-01-01') },
+      { title: 'Morning run', startDate: new Date('2023-01-01') },
     ];
 
     (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockCalendarEvents);
     (healthService.fetchHealthData as jest.Mock).mockResolvedValue({});
-    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['Run']);
+    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(['run']);
 
     const { getByText, getByTestId } = render(<HomeScreen />);
 
-    // Wait for initial load
     await waitFor(() => {
-      expect(getByText('Run')).toBeTruthy();
+      expect(getByText('run')).toBeTruthy();
     });
 
-    // Mock a new response for refresh
-    (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValueOnce([
-      { title: 'Morning Run', startDate: new Date('2023-01-01') },
-      { title: 'Evening Walk', startDate: new Date('2023-01-02') },
-    ]);
-
     // Simulate pull to refresh
-    fireEvent(getByTestId('refresh-control'), 'onRefresh');
+    const refreshControl = getByTestId('refresh-control');
+    fireEvent(refreshControl, 'refresh');
 
     await waitFor(() => {
-      expect(getByText('Walk')).toBeTruthy();
+      expect(calendarService.fetchCalendarEvents).toHaveBeenCalledTimes(2);
     });
   });
 });

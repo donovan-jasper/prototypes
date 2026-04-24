@@ -11,26 +11,26 @@ interface HealthMetricsCardProps {
 const HealthMetricsCard: React.FC<HealthMetricsCardProps> = ({ steps, sleep, workouts }) => {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Today's Health</Text>
+      <View style={styles.metricContainer}>
+        <Ionicons name="walk-outline" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{steps.toLocaleString()}</Text>
+        <Text style={styles.metricLabel}>Steps</Text>
+      </View>
 
-      <View style={styles.metricsContainer}>
-        <View style={styles.metricItem}>
-          <Ionicons name="walk" size={24} color="#6200EE" />
-          <Text style={styles.metricValue}>{steps.toLocaleString()}</Text>
-          <Text style={styles.metricLabel}>Steps</Text>
-        </View>
+      <View style={styles.divider} />
 
-        <View style={styles.metricItem}>
-          <Ionicons name="moon" size={24} color="#6200EE" />
-          <Text style={styles.metricValue}>{sleep.toFixed(1)}</Text>
-          <Text style={styles.metricLabel}>Hours</Text>
-        </View>
+      <View style={styles.metricContainer}>
+        <Ionicons name="moon-outline" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{sleep.toFixed(1)}</Text>
+        <Text style={styles.metricLabel}>Hours</Text>
+      </View>
 
-        <View style={styles.metricItem}>
-          <Ionicons name="barbell" size={24} color="#6200EE" />
-          <Text style={styles.metricValue}>{workouts}</Text>
-          <Text style={styles.metricLabel}>Workouts</Text>
-        </View>
+      <View style={styles.divider} />
+
+      <View style={styles.metricContainer}>
+        <Ionicons name="barbell-outline" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{workouts}</Text>
+        <Text style={styles.metricLabel}>Workouts</Text>
       </View>
     </View>
   );
@@ -39,39 +39,37 @@ const HealthMetricsCard: React.FC<HealthMetricsCardProps> = ({ steps, sleep, wor
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    borderRadius: 10,
+    padding: 15,
+    margin: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricItem: {
+  metricContainer: {
     alignItems: 'center',
     flex: 1,
   },
   metricValue: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#6200EE',
-    marginTop: 8,
-    marginBottom: 4,
+    marginTop: 5,
+    color: '#333',
   },
   metricLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
+  },
+  divider: {
+    width: 1,
+    height: '60%',
+    backgroundColor: '#eee',
   },
 });
 

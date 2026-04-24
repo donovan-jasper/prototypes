@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
 import { calendarService } from '../../../lib/api/calendarService';
 import { healthService } from '../../../lib/api/healthService';
 import { calculateStreak } from '../../../lib/habitTracker';
@@ -171,43 +171,38 @@ const HomeScreen = () => {
       <StreakCounter
         habitName={topHabit.name}
         streak={topHabit.currentStreak}
+        onPress={() => console.log('View habit details')}
       />
 
-      {/* Habits Section */}
+      {/* Weekly Progress */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Weekly Progress</Text>
+        <ProgressChart data={topHabit.chartData} />
+      </View>
+
+      {/* Habits List */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your Habits</Text>
         {habits.length > 0 ? (
-          habits.map((habit) => (
+          habits.map(habit => (
             <HabitCard
               key={habit.id}
-              title={habit.name}
+              name={habit.name}
               streak={habit.currentStreak}
               progress={habit.progress}
+              onPress={() => console.log(`View details for ${habit.name}`)}
             />
           ))
         ) : (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No habits detected yet</Text>
-            <Text style={styles.emptySubtext}>Add some events to your calendar to track them</Text>
+            <Text style={styles.emptySubtext}>Add events to your calendar to track habits</Text>
+            <TouchableOpacity style={styles.addButton}>
+              <Text style={styles.addButtonText}>Add Habit</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
-
-      {/* Progress Charts */}
-      {habits.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Progress Over Time</Text>
-          {habits.map((habit) => (
-            <View key={`chart-${habit.id}`} style={styles.chartCard}>
-              <Text style={styles.chartTitle}>{habit.name}</Text>
-              <ProgressChart
-                data={habit.chartData}
-                habitName={habit.name}
-              />
-            </View>
-          ))}
-        </View>
-      )}
     </ScrollView>
   );
 };
@@ -216,94 +211,84 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-    padding: 16,
+  },
+  header: {
+    padding: 20,
+    backgroundColor: '#6200EE',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 5,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  section: {
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#333',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
   errorContainer: {
-    padding: 24,
+    padding: 20,
     alignItems: 'center',
   },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
+    marginBottom: 10,
     textAlign: 'center',
-    marginBottom: 8,
   },
   errorSubtext: {
     fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-  },
-  header: {
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
   },
   emptyState: {
+    padding: 20,
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 24,
+    borderRadius: 10,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 20,
   },
   emptyText: {
     fontSize: 16,
     fontWeight: '500',
+    marginBottom: 5,
     color: '#333',
-    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 15,
     textAlign: 'center',
   },
-  chartCard: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  addButton: {
+    backgroundColor: '#6200EE',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
   },
-  chartTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-    marginBottom: 8,
+  addButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 

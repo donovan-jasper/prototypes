@@ -1,51 +1,83 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import ProgressBar from './ProgressBar';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 interface HabitCardProps {
-  title: string;
+  name: string;
   streak: number;
   progress: number;
+  onPress: () => void;
 }
 
-const HabitCard: React.FC<HabitCardProps> = ({ title, streak, progress }) => {
+const HabitCard: React.FC<HabitCardProps> = ({ name, streak, progress, onPress }) => {
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.streak}>{streak} day streak</Text>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
+      <View style={styles.infoContainer}>
+        <Text style={styles.habitName}>{name}</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Ionicons name="flame-outline" size={16} color="#FF5722" />
+            <Text style={styles.statValue}>{streak}</Text>
+          </View>
+          <View style={styles.statItem}>
+            <Ionicons name="checkmark-circle-outline" size={16} color="#4CAF50" />
+            <Text style={styles.statValue}>{Math.round(progress)}%</Text>
+          </View>
+        </View>
       </View>
-      <ProgressBar progress={progress} />
-    </View>
+      <View style={styles.progressContainer}>
+        <View style={[styles.progressBar, { width: `${progress}%` }]} />
+      </View>
+    </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  header: {
+  infoContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  title: {
+  habitName: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
+    textTransform: 'capitalize',
   },
-  streak: {
+  statsContainer: {
+    flexDirection: 'row',
+  },
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 10,
+  },
+  statValue: {
     fontSize: 14,
-    color: '#6200EE',
-    fontWeight: '500',
+    color: '#666',
+    marginLeft: 3,
+  },
+  progressContainer: {
+    height: 6,
+    backgroundColor: '#eee',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#6200EE',
+    borderRadius: 3,
   },
 });
 

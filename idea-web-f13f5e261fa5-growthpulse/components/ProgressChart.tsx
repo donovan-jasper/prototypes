@@ -1,71 +1,61 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { LineChart } from 'react-native-chart-kit';
-import { Dimensions } from 'react-native';
 
 interface ProgressChartProps {
   data: number[];
-  habitName: string;
 }
 
-const ProgressChart: React.FC<ProgressChartProps> = ({ data, habitName }) => {
-  const screenWidth = Dimensions.get('window').width;
-
-  const chartConfig = {
-    backgroundGradientFrom: '#ffffff',
-    backgroundGradientTo: '#ffffff',
-    color: (opacity = 1) => `rgba(98, 0, 238, ${opacity})`,
-    strokeWidth: 2,
-    barPercentage: 0.5,
-    useShadowColorFromDataset: false,
-    propsForDots: {
-      r: '4',
-      strokeWidth: '2',
-      stroke: '#6200EE',
-    },
-  };
-
-  const chartData = {
-    labels: ['6d', '5d', '4d', '3d', '2d', '1d', 'Today'],
-    datasets: [
-      {
-        data: data,
-        color: (opacity = 1) => `rgba(98, 0, 238, ${opacity})`,
-        strokeWidth: 2,
-      },
-    ],
-    legend: [habitName],
-  };
+const ProgressChart: React.FC<ProgressChartProps> = ({ data }) => {
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <View style={styles.chartContainer}>
-      <LineChart
-        data={chartData}
-        width={screenWidth - 64}
-        height={220}
-        chartConfig={chartConfig}
-        bezier
-        style={styles.chart}
-        withDots={true}
-        withInnerLines={false}
-        withOuterLines={false}
-        fromZero={true}
-        yAxisSuffix=""
-        yAxisInterval={1}
-      />
+    <View style={styles.container}>
+      <View style={styles.chartContainer}>
+        {data.map((value, index) => (
+          <View key={index} style={styles.dayColumn}>
+            <View style={[
+              styles.bar,
+              { height: `${value * 100}%`, backgroundColor: value > 0 ? '#6200EE' : '#eee' }
+            ]} />
+            <Text style={styles.dayLabel}>{days[index]}</Text>
+          </View>
+        ))}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  chartContainer: {
-    marginTop: 8,
-    borderRadius: 8,
-    overflow: 'hidden',
+  container: {
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 8,
+  chartContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 150,
+    alignItems: 'flex-end',
+  },
+  dayColumn: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  bar: {
+    width: '60%',
+    borderRadius: 5,
+    marginBottom: 5,
+  },
+  dayLabel: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 5,
   },
 });
 
