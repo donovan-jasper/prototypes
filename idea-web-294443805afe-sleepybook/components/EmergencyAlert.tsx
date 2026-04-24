@@ -157,7 +157,7 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
       />
 
       <Button
-        title={emergencyContact ? 'Update Contact' : 'Save Contact'}
+        title="Save Contact"
         onPress={handleSaveContact}
         disabled={!isPremium}
       />
@@ -174,10 +174,10 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
       {isEnabled && (
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>
-            {isMonitoring ? 'Monitoring for stillness...' : 'Not monitoring'}
+            {isMonitoring ? 'Monitoring active' : 'Monitoring inactive'}
           </Text>
           {stillnessDuration > 0 && (
-            <Text style={styles.durationText}>
+            <Text style={styles.stillnessText}>
               Stillness detected: {stillnessDuration} minutes
             </Text>
           )}
@@ -229,16 +229,16 @@ const styles = StyleSheet.create({
   statusContainer: {
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#e6f7ff',
+    backgroundColor: '#e8f5e9',
     borderRadius: 4,
   },
   statusText: {
     fontSize: 14,
-    color: '#0050b3',
+    color: '#2e7d32',
   },
-  durationText: {
+  stillnessText: {
     fontSize: 14,
-    color: '#fa541c',
+    color: '#d32f2f',
     marginTop: 4,
   },
 });
