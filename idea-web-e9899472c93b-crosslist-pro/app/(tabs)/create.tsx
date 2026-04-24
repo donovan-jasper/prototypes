@@ -11,18 +11,21 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useProductStore } from '../../store/products';
 import Toast from 'react-native-toast-message';
+import { openDatabase } from '../../lib/db';
 
 const PLATFORMS = ['Amazon', 'eBay', 'Shopify', 'Etsy'];
 
 export default function CreateProduct() {
   const router = useRouter();
   const addProduct = useProductStore((state) => state.addProduct);
+  const db = openDatabase();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -32,6 +35,13 @@ export default function CreateProduct() {
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraft, setIsDraft] = useState(false);
+  const [errors, setErrors] = useState({
+    title: '',
+    description: '',
+    price: '',
+    quantity: '',
+    platforms: '',
+  });
 
   const pickImage = async () => {
     try {
@@ -64,30 +74,46 @@ export default function CreateProduct() {
         ? prev.filter((p) => p !== platform)
         : [...prev, platform]
     );
+    setErrors(prev => ({ ...prev, platforms: '' }));
   };
 
   const validateForm = (): boolean => {
+    const newErrors = {
+      title: '',
+      description: '',
+      price: '',
+      quantity: '',
+      platforms: '',
+    };
+    let isValid = true;
+
     if (!title.trim()) {
-      Alert.alert('Validation Error', 'Please enter a product title');
-      return false;
+      newErrors.title = 'Product title is required';
+      isValid = false;
     }
+
     if (!description.trim()) {
-      Alert.alert('Validation Error', 'Please enter a product description');
-      return false;
+      newErrors.description = 'Product description is required';
+      isValid = false;
     }
+
     if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid price');
-      return false;
+      newErrors.price = 'Please enter a valid price';
+      isValid = false;
     }
+
     if (!quantity || isNaN(parseInt(quantity)) || parseInt(quantity) <= 0) {
-      Alert.alert('Validation Error', 'Please enter a valid quantity');
-      return false;
+      newErrors.quantity = 'Please enter a valid quantity';
+      isValid = false;
     }
+
     if (!isDraft && selectedPlatforms.length === 0) {
-      Alert.alert('Validation Error', 'Please select at least one platform');
-      return false;
+      newErrors.platforms = 'Please select at least one platform';
+      isValid = false;
     }
-    return true;
+
+    setErrors(newErrors);
+    return isValid;
   };
 
   const handleSubmit = async (asDraft: boolean = false) => {
@@ -109,7 +135,25 @@ export default function CreateProduct() {
         isDraft: asDraft,
       };
 
+      // Save to Zustand store
       addProduct(productData);
+
+      // Save to SQLite database
+      await db.transactionAsync(async (tx) => {
+        await tx.executeSqlAsync(
+          'INSERT INTO products (title, description, price, quantity, imageUri, platforms, isDraft, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [
+            productData.title,
+            productData.description,
+            productData.price,
+            productData.quantity,
+            productData.imageUri || '',
+            JSON.stringify(productData.platforms),
+            productData.isDraft ? 1 : 0,
+            new Date().toISOString(),
+          ]
+        );
+      });
 
       Toast.show({
         type: 'success',
@@ -159,44 +203,88 @@ export default function CreateProduct() {
 
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Product Details</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Product Title"
-            value={title}
-            onChangeText={setTitle}
-            placeholderTextColor="#C7C7CC"
-          />
-          <TextInput
-            style={[styles.input, styles.textArea]}
-            placeholder="Description"
-            value={description}
-            onChangeText={setDescription}
-            placeholderTextColor="#C7C7CC"
-            multiline
-            numberOfLines={4}
-          />
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Title</Text>
+            <TextInput
+              style={[styles.input, errors.title && styles.inputError]}
+              placeholder="Enter product title"
+              value={title}
+              onChangeText={setTitle}
+              onBlur={() => {
+                if (!title.trim()) {
+                  setErrors(prev => ({ ...prev, title: 'Product title is required' }));
+                } else {
+                  setErrors(prev => ({ ...prev, title: '' }));
+                }
+              }}
+            />
+            {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={[styles.input, styles.textArea, errors.description && styles.inputError]}
+              placeholder="Enter product description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={4}
+              onBlur={() => {
+                if (!description.trim()) {
+                  setErrors(prev => ({ ...prev, description: 'Product description is required' }));
+                } else {
+                  setErrors(prev => ({ ...prev, description: '' }));
+                }
+              }}
+            />
+            {errors.description ? <Text style={styles.errorText}>{errors.description}</Text> : null}
+          </View>
+
           <View style={styles.row}>
-            <TextInput
-              style={[styles.input, styles.halfWidth]}
-              placeholder="Price"
-              value={price}
-              onChangeText={setPrice}
-              placeholderTextColor="#C7C7CC"
-              keyboardType="numeric"
-            />
-            <TextInput
-              style={[styles.input, styles.halfWidth]}
-              placeholder="Quantity"
-              value={quantity}
-              onChangeText={setQuantity}
-              placeholderTextColor="#C7C7CC"
-              keyboardType="numeric"
-            />
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={styles.label}>Price ($)</Text>
+              <TextInput
+                style={[styles.input, errors.price && styles.inputError]}
+                placeholder="0.00"
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="numeric"
+                onBlur={() => {
+                  if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
+                    setErrors(prev => ({ ...prev, price: 'Please enter a valid price' }));
+                  } else {
+                    setErrors(prev => ({ ...prev, price: '' }));
+                  }
+                }}
+              />
+              {errors.price ? <Text style={styles.errorText}>{errors.price}</Text> : null}
+            </View>
+
+            <View style={[styles.inputGroup, styles.halfWidth]}>
+              <Text style={styles.label}>Quantity</Text>
+              <TextInput
+                style={[styles.input, errors.quantity && styles.inputError]}
+                placeholder="0"
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="numeric"
+                onBlur={() => {
+                  if (!quantity || isNaN(parseInt(quantity)) || parseInt(quantity) <= 0) {
+                    setErrors(prev => ({ ...prev, quantity: 'Please enter a valid quantity' }));
+                  } else {
+                    setErrors(prev => ({ ...prev, quantity: '' }));
+                  }
+                }}
+              />
+              {errors.quantity ? <Text style={styles.errorText}>{errors.quantity}</Text> : null}
+            </View>
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Publish To</Text>
+          <Text style={styles.sectionTitle}>Platforms</Text>
           <View style={styles.platformContainer}>
             {PLATFORMS.map((platform) => (
               <TouchableOpacity
@@ -218,6 +306,19 @@ export default function CreateProduct() {
               </TouchableOpacity>
             ))}
           </View>
+          {errors.platforms ? <Text style={styles.errorText}>{errors.platforms}</Text> : null}
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>Save as Draft</Text>
+            <Switch
+              value={isDraft}
+              onValueChange={setIsDraft}
+              trackColor={{ false: '#767577', true: '#81b0ff' }}
+              thumbColor={isDraft ? '#f5dd4b' : '#f4f3f4'}
+            />
+          </View>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -226,14 +327,19 @@ export default function CreateProduct() {
             onPress={() => handleSubmit(true)}
             disabled={isSubmitting}
           >
-            <Text style={styles.buttonText}>Save Draft</Text>
+            {isSubmitting && isDraft ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Save Draft</Text>
+            )}
           </TouchableOpacity>
+
           <TouchableOpacity
             style={[styles.button, styles.publishButton]}
             onPress={() => handleSubmit(false)}
             disabled={isSubmitting}
           >
-            {isSubmitting ? (
+            {isSubmitting && !isDraft ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.buttonText}>Publish</Text>
@@ -248,11 +354,10 @@ export default function CreateProduct() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f8f9fa',
   },
   content: {
     padding: 20,
-    paddingBottom: 100,
   },
   section: {
     marginBottom: 24,
@@ -270,10 +375,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
   },
   imagePickerPlaceholder: {
-    justifyContent: 'center',
     alignItems: 'center',
   },
   imagePickerText: {
@@ -281,18 +391,25 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
   },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 8,
+    color: '#555',
   },
   input: {
     backgroundColor: '#fff',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
     fontSize: 16,
-    color: '#333',
+  },
+  inputError: {
+    borderColor: '#ff3b30',
   },
   textArea: {
     height: 100,
@@ -308,14 +425,15 @@ const styles = StyleSheet.create({
   platformContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginHorizontal: -4,
+    marginBottom: 8,
   },
   platformButton: {
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#e5e5ea',
-    margin: 4,
+    backgroundColor: '#e9ecef',
+    marginRight: 8,
+    marginBottom: 8,
   },
   platformButtonSelected: {
     backgroundColor: '#007AFF',
@@ -327,21 +445,31 @@ const styles = StyleSheet.create({
   platformButtonTextSelected: {
     color: '#fff',
   },
+  toggleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 16,
   },
   button: {
     flex: 1,
     padding: 16,
     borderRadius: 8,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     marginHorizontal: 4,
   },
   draftButton: {
-    backgroundColor: '#e5e5ea',
+    backgroundColor: '#6c757d',
   },
   publishButton: {
     backgroundColor: '#007AFF',
@@ -350,5 +478,10 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
