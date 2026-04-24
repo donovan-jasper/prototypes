@@ -1,13 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
 
-export class MOS6502Compiler {
+export class GameBoyCompiler {
   private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for MOS6502 compilation
-      const response = await fetch('lib/compiler/wasm/mos6502-toolchain.wasm');
+      // Load the WASM module for Game Boy compilation
+      const response = await fetch('lib/compiler/wasm/gameboy-toolchain.wasm');
       const buffer = await response.arrayBuffer();
       this.wasmModule = await WebAssembly.compile(buffer);
       this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
@@ -17,7 +17,7 @@ export class MOS6502Compiler {
         }
       });
     } catch (error) {
-      console.error('Failed to initialize MOS6502 compiler:', error);
+      console.error('Failed to initialize Game Boy compiler:', error);
       throw error;
     }
   }
@@ -34,7 +34,7 @@ export class MOS6502Compiler {
     let assembly: string | undefined;
 
     try {
-      logs.push('[INFO] Compiling MOS6502 code...');
+      logs.push('[INFO] Compiling Game Boy code...');
 
       // Get the WASM exports
       const exports = this.wasmInstance!.exports as any;
@@ -48,7 +48,7 @@ export class MOS6502Compiler {
       codeView[code.length] = 0; // Null-terminate
 
       // Call the compile function
-      const result = exports.compile_mos6502(codePtr);
+      const result = exports.compile_gameboy(codePtr);
 
       if (result === 0) {
         // Compilation successful
@@ -146,12 +146,12 @@ export class MOS6502Compiler {
     return hexDump;
   }
 
-  // 6502-specific syntax validation
+  // Game Boy-specific syntax validation
   validateSyntax(code: string): CompilationError[] {
     const errors: CompilationError[] = [];
     const lines = code.split('\n');
 
-    // Check for common 6502 syntax errors
+    // Check for common Game Boy syntax errors
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
       if (!line) continue;
@@ -161,27 +161,25 @@ export class MOS6502Compiler {
       if (opcodeMatch) {
         const opcode = opcodeMatch[1].toUpperCase();
         const validOpcodes = [
-          'ADC', 'AND', 'ASL', 'BCC', 'BCS', 'BEQ', 'BIT', 'BMI',
-          'BNE', 'BPL', 'BRK', 'BVC', 'BVS', 'CLC', 'CLD', 'CLI',
-          'CLV', 'CMP', 'CPX', 'CPY', 'DEC', 'DEX', 'DEY', 'EOR',
-          'INC', 'INX', 'INY', 'JMP', 'JSR', 'LDA', 'LDX', 'LDY',
-          'LSR', 'NOP', 'ORA', 'PHA', 'PHP', 'PLA', 'PLP', 'ROL',
-          'ROR', 'RTI', 'RTS', 'SBC', 'SEC', 'SED', 'SEI', 'STA',
-          'STX', 'STY', 'TAX', 'TAY', 'TSX', 'TXA', 'TXS', 'TYA'
+          'NOP', 'LD', 'INC', 'DEC', 'RLCA', 'ADD', 'ADC', 'SUB',
+          'SBC', 'AND', 'XOR', 'OR', 'CP', 'POP', 'JP', 'CALL',
+          'PUSH', 'RET', 'RETI', 'RST', 'JR', 'DAA', 'CPL', 'CCF',
+          'SCF', 'HALT', 'STOP', 'DI', 'EI', 'RLC', 'RRC', 'RL',
+          'RR', 'SLA', 'SRA', 'SWAP', 'SRL', 'BIT', 'RES', 'SET'
         ];
 
         if (!validOpcodes.includes(opcode)) {
           errors.push({
             line: i + 1,
             column: 0,
-            message: `Invalid 6502 opcode: ${opcode}`,
+            message: `Invalid Game Boy opcode: ${opcode}`,
             severity: 'error'
           });
         }
       }
 
       // Check for missing operands
-      if (line.match(/^\s*(ADC|AND|ASL|CMP|CPX|CPY|DEC|EOR|INC|LDA|LDX|LDY|LSR|ORA|ROL|ROR|SBC|STA|STX|STY)\s*$/i)) {
+      if (line.match(/^\s*(LD|INC|DEC|ADD|ADC|SUB|SBC|AND|XOR|OR|CP|POP|JP|CALL|PUSH|JR|RLC|RRC|RL|RR|SLA|SRA|SWAP|SRL|BIT|RES|SET)\s*$/i)) {
         errors.push({
           line: i + 1,
           column: 0,
@@ -190,31 +188,37 @@ export class MOS6502Compiler {
         });
       }
 
-      // Check for invalid addressing modes
-      if (line.match(/^\s*(ADC|AND|ASL|CMP|CPX|CPY|DEC|EOR|INC|LDA|LDX|LDY|LSR|ORA|ROL|ROR|SBC|STA|STX|STY)\s+([^,]+),([^,]+)/)) {
-        errors.push({
-          line: i + 1,
-          column: 0,
-          message: 'Invalid addressing mode for instruction',
-          severity: 'error'
-        });
-      }
-
       // Check for invalid register names
       const registerMatch = line.match(/([A-Za-z]+)/g);
       if (registerMatch) {
-        const validRegisters = ['A', 'X', 'Y', 'SP', 'PC'];
+        const validRegisters = [
+          'A', 'B', 'C', 'D', 'E', 'H', 'L', 'AF', 'BC', 'DE', 'HL',
+          'SP', 'PC', 'F', 'BC', 'DE', 'HL', 'AF', 'BC', 'DE', 'HL', 'SP'
+        ];
 
         registerMatch.forEach(reg => {
           if (reg.length > 1 && !validRegisters.includes(reg.toUpperCase())) {
             errors.push({
               line: i + 1,
               column: line.indexOf(reg),
-              message: `Invalid 6502 register: ${reg}`,
+              message: `Invalid Game Boy register: ${reg}`,
               severity: 'error'
             });
           }
         });
+      }
+
+      // Check for Game Boy-specific instructions
+      if (line.match(/\b(STOP|HALT|DI|EI|SWAP)\b/i)) {
+        // These are valid, but we'll check for proper usage
+        if (line.match(/\bSTOP\b/i) && !line.match(/\bSTOP\s*0\b/i)) {
+          errors.push({
+            line: i + 1,
+            column: line.indexOf('STOP'),
+            message: 'STOP instruction requires 0 operand',
+            severity: 'error'
+          });
+        }
       }
     }
 

@@ -1,8 +1,9 @@
-import { X86Compiler } from './targets/x86';
+import { X86Compiler } from './targets/x80';
 import { ARMCompiler } from './targets/arm';
 import { AVRCompiler } from './targets/avr';
 import { Z80Compiler } from './targets/z80';
 import { MOS6502Compiler } from './targets/mos6502';
+import { GameBoyCompiler } from './targets/gameboy';
 
 export interface CompilationResult {
   success: boolean;
@@ -26,6 +27,7 @@ export enum CompilationTarget {
   AVR = 'avr',
   Z80 = 'z80',
   MOS6502 = 'mos6502',
+  GAMEBOY = 'gameboy',
 }
 
 export class CompilerEngine {
@@ -38,6 +40,7 @@ export class CompilerEngine {
     this.compilers.set(CompilationTarget.AVR, new AVRCompiler());
     this.compilers.set(CompilationTarget.Z80, new Z80Compiler());
     this.compilers.set(CompilationTarget.MOS6502, new MOS6502Compiler());
+    this.compilers.set(CompilationTarget.GAMEBOY, new GameBoyCompiler());
   }
 
   async loadWasmModule(target: string): Promise<WebAssembly.Module> {
@@ -101,5 +104,15 @@ export class CompilerEngine {
         errors
       };
     }
+  }
+
+  // Validate syntax before compilation
+  validateSyntax(code: string, target: CompilationTarget): CompilationError[] {
+    const compiler = this.compilers.get(target);
+    if (!compiler || !compiler.validateSyntax) {
+      return [];
+    }
+
+    return compiler.validateSyntax(code);
   }
 }
