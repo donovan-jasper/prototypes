@@ -7,11 +7,10 @@ const { height } = Dimensions.get('window');
 interface AppDrawerProps {
   visible: boolean;
   onClose: () => void;
-  allowedApps?: string[];
 }
 
-const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, allowedApps }) => {
-  const { currentTheme } = useAppStore();
+const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
+  const { currentTheme, currentMode } = useAppStore();
 
   // Mock app data - in a real app this would come from the device's installed apps
   const apps = [
@@ -25,8 +24,9 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, allowedApps }) 
     { id: '8', name: 'Music', icon: 'music' },
   ];
 
-  const filteredApps = allowedApps
-    ? apps.filter(app => allowedApps.includes(app.id))
+  // Filter apps based on current focus mode's allowedApps
+  const filteredApps = currentMode?.allowedApps
+    ? apps.filter(app => currentMode.allowedApps.includes(app.id))
     : apps;
 
   if (!visible) return null;

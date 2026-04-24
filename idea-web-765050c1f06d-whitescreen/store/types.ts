@@ -1,14 +1,16 @@
-export interface Widget {
-  id: string;
-  type: 'timer' | 'scratchpad' | 'habitTracker';
-  position: number;
-}
-
 export interface FocusMode {
   id: string;
   name: string;
   color: string;
-  allowedApps?: string[];
+  allowedApps: string[];
+  widgets: string[];
+}
+
+export interface Widget {
+  id: string;
+  type: 'timer' | 'scratchpad' | 'habitTracker';
+  position: number;
+  data?: any;
 }
 
 export interface Theme {
@@ -16,17 +18,17 @@ export interface Theme {
   name: string;
   background: string;
   text: string;
-  widgetBackground: string;
   drawerBackground: string;
   dark: boolean;
 }
 
 export interface AppState {
   currentTheme: Theme;
-  currentMode: FocusMode | null;
+  currentMode: FocusMode;
   widgets: Widget[];
   setTheme: (themeId: string) => void;
   setFocusMode: (modeId: string) => void;
+  getAllowedApps: () => string[];
   addWidget: (widgetType: 'timer' | 'scratchpad' | 'habitTracker') => void;
   removeWidget: (widgetId: string) => void;
   loadInitialData: () => Promise<void>;

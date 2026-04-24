@@ -38,6 +38,11 @@ export const useAppStore = create<AppState>()(
         }
       },
 
+      // New method to get current focus mode's allowed apps
+      getAllowedApps: () => {
+        return get().currentMode?.allowedApps || [];
+      },
+
       addWidget: (widgetType: 'timer' | 'scratchpad' | 'habitTracker') => {
         const newWidget: Widget = {
           id: Date.now().toString(),
