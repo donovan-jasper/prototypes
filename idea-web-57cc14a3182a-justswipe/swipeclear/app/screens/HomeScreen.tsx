@@ -135,6 +135,8 @@ const HomeScreen = () => {
   const handleQuickAccessPress = (item) => {
     if (item.name === 'Refresh') {
       syncNotifications();
+    } else if (item.name === 'Notifications') {
+      setShowArchived(!showArchived);
     }
   };
 
@@ -180,23 +182,13 @@ const HomeScreen = () => {
         >
           <View style={styles.itemContent}>
             <View style={styles.itemHeader}>
-              <Text style={[styles.itemTitle, item.pinned && styles.pinnedItem]}>
-                {item.title}
-              </Text>
-              <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
+              <Text style={[styles.appName, item.pinned && styles.pinnedApp]}>{item.app}</Text>
+              {item.pinned && <Ionicons name="pin" size={16} color="#FF6B6B" />}
+              {item.muted && <Ionicons name="volume-mute" size={16} color="#6C757D" style={styles.mutedIcon} />}
             </View>
+            <Text style={styles.itemTitle}>{item.title}</Text>
             <Text style={styles.itemBody}>{item.body}</Text>
-            <View style={styles.itemFooter}>
-              <Text style={styles.itemApp}>{item.app}</Text>
-              {item.muted && (
-                <Ionicons
-                  name="volume-mute-outline"
-                  size={16}
-                  color="#666"
-                  style={styles.mutedIcon}
-                />
-              )}
-            </View>
+            <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
           </View>
         </SwipeAction>
       </Animated.View>
@@ -207,14 +199,9 @@ const HomeScreen = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>SwipeClear</Text>
-        <TouchableOpacity
-          style={styles.toggleButton}
-          onPress={() => setShowArchived(!showArchived)}
-        >
-          <Text style={styles.toggleText}>
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </Text>
-        </TouchableOpacity>
+        <Text style={styles.subtitle}>
+          {showArchived ? 'Archived Notifications' : 'Recent Notifications'}
+        </Text>
       </View>
 
       <FlatList
@@ -224,8 +211,9 @@ const HomeScreen = () => {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
+            <Ionicons name="notifications-off-outline" size={48} color="#6C757D" />
             <Text style={styles.emptyText}>
-              {showArchived ? 'No archived items' : 'No notifications'}
+              {showArchived ? 'No archived notifications' : 'No new notifications'}
             </Text>
           </View>
         }
@@ -242,93 +230,85 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F8F9FA',
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
+    padding: 20,
+    paddingTop: 40,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#E9ECEF',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#212529',
   },
-  toggleButton: {
-    padding: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-  },
-  toggleText: {
-    color: '#666',
-    fontSize: 14,
+  subtitle: {
+    fontSize: 16,
+    color: '#6C757D',
+    marginTop: 4,
   },
   listContent: {
     paddingBottom: 80,
   },
   itemContainer: {
-    marginBottom: 8,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    marginHorizontal: 16,
+    marginVertical: 8,
+    borderRadius: 12,
     overflow: 'hidden',
-    elevation: 2,
+    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   itemContent: {
     padding: 16,
   },
   itemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  appName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#495057',
+    marginRight: 8,
+  },
+  pinnedApp: {
+    color: '#FF6B6B',
+  },
+  mutedIcon: {
+    marginLeft: 'auto',
   },
   itemTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    flex: 1,
-  },
-  pinnedItem: {
-    color: '#007AFF',
-  },
-  itemTime: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 8,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 4,
   },
   itemBody: {
     fontSize: 14,
-    color: '#444',
+    color: '#495057',
     marginBottom: 8,
   },
-  itemFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  itemApp: {
+  itemTime: {
     fontSize: 12,
-    color: '#888',
-    fontWeight: '500',
-  },
-  mutedIcon: {
-    marginLeft: 8,
+    color: '#6C757D',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 40,
   },
   emptyText: {
     fontSize: 16,
-    color: '#888',
+    color: '#6C757D',
+    marginTop: 16,
     textAlign: 'center',
   },
 });
