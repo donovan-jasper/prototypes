@@ -182,20 +182,18 @@ const styles = StyleSheet.create({
   },
   controlButton: {
     backgroundColor: '#3498db',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 5,
-    minWidth: 80,
-    alignItems: 'center',
   },
   disabledButton: {
     backgroundColor: '#bdc3c7',
   },
   playButton: {
     backgroundColor: '#2ecc71',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
-    minWidth: 80,
-    alignItems: 'center',
   },
   controlText: {
     color: 'white',
@@ -204,6 +202,7 @@ const styles = StyleSheet.create({
   playText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   progressContainer: {
     marginBottom: 15,
@@ -215,7 +214,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   progressBar: {
-    height: 5,
+    height: '100%',
     backgroundColor: '#3498db',
     borderRadius: 2.5,
   },
@@ -237,7 +236,7 @@ const styles = StyleSheet.create({
   },
   activeStep: {
     borderLeftColor: '#3498db',
-    backgroundColor: '#f1f9ff',
+    backgroundColor: '#f0f7ff',
   },
   stepHeader: {
     flexDirection: 'row',
@@ -259,10 +258,9 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   detailsContainer: {
-    marginTop: 5,
-    paddingTop: 5,
-    borderTopWidth: 1,
-    borderTopColor: '#ecf0f1',
+    backgroundColor: '#f9f9f9',
+    padding: 10,
+    borderRadius: 3,
   },
   detailsTitle: {
     fontSize: 12,
@@ -272,7 +270,7 @@ const styles = StyleSheet.create({
   },
   detailsText: {
     fontSize: 12,
-    color: '#7f8c8d',
+    color: '#2c3e50',
   },
 });
 
