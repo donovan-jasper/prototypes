@@ -45,7 +45,7 @@ export async function generateSlides(
   if (!apiKey) {
     const template = findBestTemplate(prompt);
     const html = createSlideHTML(template.slides, themeName);
-    
+
     return {
       html,
       slideCount: template.slides.length,
@@ -70,8 +70,8 @@ export async function generateSlides(
       ],
     });
 
-    const responseText = message.content[0].type === 'text' 
-      ? message.content[0].text 
+    const responseText = message.content[0].type === 'text'
+      ? message.content[0].text
       : '';
 
     if (!responseText) {
@@ -81,7 +81,7 @@ export async function generateSlides(
     let slideContents: string[];
     try {
       slideContents = JSON.parse(responseText);
-      
+
       if (!Array.isArray(slideContents)) {
         throw new Error('Response is not an array');
       }
@@ -117,11 +117,11 @@ export async function generateSlides(
         throw new Error(`API error: ${error.message}`);
       }
     }
-    
+
     if (error instanceof Error) {
       throw error;
     }
-    
+
     throw new Error('Failed to generate slides. Please try again.');
   }
 }
