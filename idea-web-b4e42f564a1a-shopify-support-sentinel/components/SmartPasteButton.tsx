@@ -11,20 +11,22 @@ interface SmartPasteButtonProps {
 export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
   const handlePaste = async () => {
     try {
-      const text = await Clipboard.getStringAsync();
-      if (!text) {
+      const clipboardText = await Clipboard.getStringAsync();
+
+      if (!clipboardText) {
         Alert.alert('Clipboard empty', 'No text found in clipboard');
         return;
       }
 
-      const parsed = parseTicketFromText(text);
-      if (!parsed.company?.value && !parsed.ticketId?.value && !parsed.submittedAt?.value) {
-        Alert.alert('No ticket info found', 'Could not extract ticket information from the pasted text');
-        return;
-      }
-
+      const parsed = parseTicketFromText(clipboardText);
       onParsed(parsed);
-      Alert.alert('Success', 'Ticket information extracted successfully');
+
+      let message = 'Parsed information:\n';
+      if (parsed.company) message += `Company: ${parsed.company.value}\n`;
+      if (parsed.ticketId) message += `Ticket ID: ${parsed.ticketId.value}\n`;
+      if (parsed.submittedAt) message += `Date: ${parsed.submittedAt.value.toLocaleDateString()}\n`;
+
+      Alert.alert('Smart Paste', message);
     } catch (error) {
       Alert.alert('Error', 'Failed to parse clipboard content');
     }
