@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Button, TextInput, ActivityIndicator, Card, Text, Snackbar } from 'react-native-paper';
+import { Button, TextInput, ActivityIndicator, Card, Text, Snackbar, useTheme } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import VoiceInput from '../../components/VoiceInput';
 import { parseVoiceCommand } from '../../lib/ai';
@@ -8,6 +8,7 @@ import { createDatabase } from '../../lib/database';
 import { useStore } from '../../lib/store';
 
 export default function CreateScreen() {
+  const theme = useTheme();
   const [transcription, setTranscription] = useState('');
   const [tableName, setTableName] = useState('');
   const [fields, setFields] = useState<{name: string, type: string}[]>([]);
@@ -77,9 +78,9 @@ export default function CreateScreen() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={styles.content}>
-        <Text variant="headlineSmall" style={styles.title}>Create Database</Text>
+        <Text variant="headlineSmall" style={[styles.title, { color: theme.colors.onBackground }]}>Create Database</Text>
 
         <VoiceInput
           onResult={handleVoiceInput}
@@ -87,44 +88,51 @@ export default function CreateScreen() {
         />
 
         {transcription && (
-          <Card style={styles.transcriptionCard}>
+          <Card style={[styles.transcriptionCard, { backgroundColor: theme.colors.surface }]}>
             <Card.Content>
-              <Text variant="bodyMedium">You said:</Text>
-              <Text variant="bodyLarge" style={styles.transcriptionText}>{transcription}</Text>
+              <Text variant="bodyMedium" style={{ color: theme.colors.onSurface }}>You said:</Text>
+              <Text variant="bodyLarge" style={[styles.transcriptionText, { color: theme.colors.onSurface }]}>{transcription}</Text>
             </Card.Content>
           </Card>
         )}
 
         {showPreview && (
-          <Card style={styles.previewCard}>
-            <Card.Title title="Database Preview" />
+          <Card style={[styles.previewCard, { backgroundColor: theme.colors.surface }]}>
+            <Card.Title
+              title="Database Preview"
+              titleStyle={{ color: theme.colors.onSurface }}
+            />
             <Card.Content>
-              <Text variant="labelLarge">Table Name:</Text>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurface }}>Table Name:</Text>
               <TextInput
                 value={tableName}
                 onChangeText={setTableName}
-                style={styles.input}
+                style={[styles.input, { backgroundColor: theme.colors.surfaceVariant }]}
+                theme={{ colors: { text: theme.colors.onSurface, placeholder: theme.colors.onSurfaceVariant } }}
               />
 
-              <Text variant="labelLarge" style={styles.fieldsLabel}>Fields:</Text>
+              <Text variant="labelLarge" style={[styles.fieldsLabel, { color: theme.colors.onSurface }]}>Fields:</Text>
               {fields.map((field, index) => (
                 <View key={index} style={styles.fieldRow}>
                   <TextInput
                     label="Field Name"
                     value={field.name}
                     onChangeText={(text) => updateField(index, { ...field, name: text })}
-                    style={styles.fieldInput}
+                    style={[styles.fieldInput, { backgroundColor: theme.colors.surfaceVariant }]}
+                    theme={{ colors: { text: theme.colors.onSurface, placeholder: theme.colors.onSurfaceVariant } }}
                   />
                   <TextInput
                     label="Type"
                     value={field.type}
                     onChangeText={(text) => updateField(index, { ...field, type: text })}
-                    style={styles.fieldInput}
+                    style={[styles.fieldInput, { backgroundColor: theme.colors.surfaceVariant }]}
+                    theme={{ colors: { text: theme.colors.onSurface, placeholder: theme.colors.onSurfaceVariant } }}
                   />
                   <Button
                     icon="delete"
                     onPress={() => removeField(index)}
                     style={styles.deleteButton}
+                    textColor={theme.colors.error}
                   />
                 </View>
               ))}
@@ -134,6 +142,7 @@ export default function CreateScreen() {
                 mode="outlined"
                 onPress={addField}
                 style={styles.addButton}
+                textColor={theme.colors.primary}
               >
                 Add Field
               </Button>
@@ -146,13 +155,16 @@ export default function CreateScreen() {
           onPress={handleCreateDatabase}
           disabled={loading || !tableName || fields.length === 0}
           style={styles.createButton}
+          loading={loading}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : 'Create Database'}
+          Create Database
         </Button>
 
         <Snackbar
           visible={snackbarVisible}
           onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+          style={{ backgroundColor: theme.colors.errorContainer }}
           action={{
             label: 'Dismiss',
             onPress: () => setSnackbarVisible(false),
@@ -168,7 +180,6 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
   content: {
     padding: 16,
@@ -179,16 +190,19 @@ const styles = StyleSheet.create({
   },
   transcriptionCard: {
     marginVertical: 16,
+    padding: 8,
   },
   transcriptionText: {
     marginTop: 8,
-    fontStyle: 'italic',
+    fontWeight: 'bold',
   },
   previewCard: {
     marginVertical: 16,
+    padding: 8,
   },
   input: {
     marginVertical: 8,
+    paddingHorizontal: 8,
   },
   fieldsLabel: {
     marginTop: 16,
@@ -202,12 +216,14 @@ const styles = StyleSheet.create({
   fieldInput: {
     flex: 1,
     marginRight: 8,
+    paddingHorizontal: 8,
   },
   deleteButton: {
     marginLeft: 8,
   },
   addButton: {
-    marginTop: 16,
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
   createButton: {
     marginTop: 24,
