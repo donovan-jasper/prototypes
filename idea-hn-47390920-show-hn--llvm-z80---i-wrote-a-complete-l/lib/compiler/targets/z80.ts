@@ -161,15 +161,37 @@ export class Z80Compiler {
       if (line.startsWith(';')) continue;
 
       // Check for labels
-      if (line.endsWith(':')) continue;
+      if (line.endsWith(':')) {
+        const label = line.slice(0, -1).trim();
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(label)) {
+          errors.push({
+            line: i + 1,
+            column: 0,
+            message: 'Invalid label name',
+            severity: 'error'
+          });
+        }
+        continue;
+      }
 
-      // Check for basic instruction format
+      // Check for valid instructions
       const parts = line.split(/\s+/);
-      if (parts.length < 1) {
+      const instruction = parts[0].toUpperCase();
+
+      // List of common Z80 instructions
+      const validInstructions = [
+        'LD', 'ADD', 'ADC', 'SUB', 'SBC', 'AND', 'OR', 'XOR', 'CP',
+        'INC', 'DEC', 'NEG', 'DAA', 'CPL', 'CCF', 'SCF', 'NOP',
+        'PUSH', 'POP', 'EX', 'EXX', 'LDI', 'LDIR', 'LDD', 'LDDR',
+        'CPI', 'CPIR', 'CPD', 'CPDR', 'JP', 'JR', 'DJNZ', 'CALL', 'RET',
+        'RETI', 'RETN', 'RST', 'IN', 'OUT', 'IM', 'DI', 'EI', 'HALT'
+      ];
+
+      if (!validInstructions.includes(instruction)) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Invalid instruction format',
+          message: `Unknown instruction: ${instruction}`,
           severity: 'error'
         });
       }
