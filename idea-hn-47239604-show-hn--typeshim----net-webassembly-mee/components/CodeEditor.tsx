@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { compileTypeScriptToWasm, cleanupCompiler } from '../lib/compiler';
+import { compileTypeScriptToWasm, cleanupCompiler, getCompilationProgress } from '../lib/compiler';
 
 interface CodeEditorProps {
   initialCode: string;
@@ -12,8 +12,10 @@ interface CodeEditorProps {
 const CodeEditor: React.FC<CodeEditorProps> = ({ initialCode, onCompile, onProgress }) => {
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilationProgress, setCompilationProgress] = useState(0);
+  const [currentCode, setCurrentCode] = useState(initialCode);
   const webViewRef = useRef<WebView>(null);
   const [editorReady, setEditorReady] = useState(false);
+  const compilationRequestId = useRef<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -35,7 +37,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ initialCode, onCompile, onProgr
       }
 
       if (data.type === 'codeChange') {
-        // Handle code changes if needed
+        setCurrentCode(data.code);
       }
     } catch (error) {
       console.error('Error processing WebView message:', error);
@@ -47,6 +49,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ initialCode, onCompile, onProgr
 
     setIsCompiling(true);
     setCompilationProgress(0);
+    compilationRequestId.current = null;
 
     try {
       // Get current code from editor
@@ -79,8 +82,19 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ initialCode, onCompile, onProgr
       updateProgress(10); // Initial progress
 
       const result = await compileTypeScriptToWasm(codeResponse);
+      compilationRequestId.current = result.requestId;
 
-      updateProgress(90); // Almost done
+      // Start progress tracking
+      const progressInterval = setInterval(() => {
+        if (compilationRequestId.current) {
+          const progress = getCompilationProgress(compilationRequestId.current);
+          updateProgress(progress);
+
+          if (progress >= 100) {
+            clearInterval(progressInterval);
+          }
+        }
+      }, 200);
 
       onCompile(result);
       updateProgress(100);
@@ -164,14 +178,28 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ initialCode, onCompile, onProgr
         onMessage={handleMessage}
         javaScriptEnabled={true}
         originWhitelist={['*']}
-        style={styles.webview}
+        style={styles.webView}
       />
-      {isCompiling && (
-        <View style={styles.overlay}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.progressText}>{Math.round(compilationProgress)}%</Text>
-        </View>
-      )}
+
+      <View style={styles.toolbar}>
+        <TouchableOpacity
+          style={styles.compileButton}
+          onPress={handleCompile}
+          disabled={isCompiling}
+        >
+          {isCompiling ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.compileButtonText}>Compile</Text>
+          )}
+        </TouchableOpacity>
+
+        {isCompiling && (
+          <View style={styles.progressContainer}>
+            <Text style={styles.progressText}>Compiling: {compilationProgress}%</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -180,19 +208,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  webview: {
+  webView: {
     flex: 1,
   },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
+  toolbar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#252526',
+    borderTopWidth: 1,
+    borderTopColor: '#3e3e42',
+  },
+  compileButton: {
+    backgroundColor: '#007acc',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  compileButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  progressContainer: {
+    flex: 1,
   },
   progressText: {
-    color: 'white',
-    marginTop: 10,
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 12,
   },
 });
 

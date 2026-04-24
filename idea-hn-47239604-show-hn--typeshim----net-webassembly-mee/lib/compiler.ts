@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
 import { WebView } from 'react-native-webview';
-import { validateWasmOutput } from './validation';
 import { v4 as uuidv4 } from 'uuid';
 
 const db = SQLite.openDatabase('typebridge.db');
@@ -160,22 +159,14 @@ class WebViewCompiler {
         const requestIndex = this.queue.findIndex(req => req.requestId === data.requestId);
         if (requestIndex !== -1) {
           const request = this.queue[requestIndex];
+          this.queue.splice(requestIndex, 1);
 
           if (data.success) {
-            const wasmBytes = new Uint8Array(data.wasmBytes);
-            if (validateWasmOutput(wasmBytes)) {
-              request.resolve({
-                success: true,
-                wasmBytes,
-                requestId: data.requestId
-              });
-            } else {
-              request.resolve({
-                success: false,
-                error: 'Invalid WASM output format',
-                requestId: data.requestId
-              });
-            }
+            request.resolve({
+              success: true,
+              wasmBytes: new Uint8Array(data.wasmBytes),
+              requestId: data.requestId
+            });
           } else {
             request.resolve({
               success: false,
@@ -184,8 +175,6 @@ class WebViewCompiler {
             });
           }
 
-          this.queue.splice(requestIndex, 1);
-          delete this.compilationProgress[data.requestId];
           this.isProcessing = false;
           this.processQueue();
         }
@@ -203,24 +192,23 @@ class WebViewCompiler {
     this.isProcessing = true;
     const request = this.queue[0];
 
-    try {
-      this.webViewRef.current?.postMessage(JSON.stringify({
-        type: 'compile',
-        code: request.code,
-        requestId: request.requestId
-      }));
-    } catch (error) {
-      request.reject(error);
-      this.queue.shift();
-      this.isProcessing = false;
-      this.processQueue();
-    }
+    this.webViewRef.current?.postMessage(JSON.stringify({
+      type: 'compile',
+      code: request.code,
+      requestId: request.requestId
+    }));
   }
 
-  public compile(code: string): Promise<CompilationResult> {
+  public async compile(code: string): Promise<CompilationResult> {
     return new Promise((resolve, reject) => {
       const requestId = uuidv4();
-      this.queue.push({ code, requestId, resolve, reject });
+      this.queue.push({
+        code,
+        requestId,
+        resolve,
+        reject
+      });
+
       this.processQueue();
     });
   }
@@ -229,31 +217,34 @@ class WebViewCompiler {
     return this.compilationProgress[requestId] || 0;
   }
 
-  public cancelCompilation(requestId: string): boolean {
-    const index = this.queue.findIndex(req => req.requestId === requestId);
-    if (index !== -1) {
-      this.queue[index].reject(new Error('Compilation cancelled'));
-      this.queue.splice(index, 1);
-      delete this.compilationProgress[requestId];
-
-      if (index === 0) {
-        this.isProcessing = false;
-        this.processQueue();
-      }
-      return true;
-    }
-    return false;
+  public cleanup() {
+    this.queue = [];
+    this.isProcessing = false;
+    this.webViewReady = false;
+    this.compilationProgress = {};
   }
 }
 
-export const compileTypeScriptToWasm = (code: string): Promise<CompilationResult> => {
-  return WebViewCompiler.getInstance().compile(code);
+export const compileTypeScriptToWasm = async (code: string): Promise<CompilationResult> => {
+  const compiler = WebViewCompiler.getInstance();
+  return compiler.compile(code);
 };
 
 export const getCompilationProgress = (requestId: string): number => {
-  return WebViewCompiler.getInstance().getCompilationProgress(requestId);
+  const compiler = WebViewCompiler.getInstance();
+  return compiler.getCompilationProgress(requestId);
 };
 
-export const cancelCompilation = (requestId: string): boolean => {
-  return WebViewCompiler.getInstance().cancelCompilation(requestId);
+export const cleanupCompiler = () => {
+  const compiler = WebViewCompiler.getInstance();
+  compiler.cleanup();
+};
+
+export const validateWasmOutput = (wasmBytes: Uint8Array): boolean => {
+  // Check for WASM magic number (0x00 0x61 0x73 0x6d)
+  if (wasmBytes.length < 4) return false;
+  return wasmBytes[0] === 0x00 &&
+         wasmBytes[1] === 0x61 &&
+         wasmBytes[2] === 0x73 &&
+         wasmBytes[3] === 0x6d;
 };

@@ -1,128 +1,74 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, ScrollView } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { loadProject } from '../../lib/storage';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Text, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
+import { loadProject } from '../../lib/storage';
+import WasmPreview from '../../components/WasmPreview';
 
-const WasmPreview = () => {
-  const { projectId } = useLocalSearchParams();
-  const [wasmBytes, setWasmBytes] = useState<Uint8Array | null>(null);
-  const [consoleOutput, setConsoleOutput] = useState<string[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const webViewRef = useRef<WebView>(null);
+const PreviewScreen = () => {
+  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const [project, setProject] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadWasm = async () => {
-      if (projectId) {
-        const project = await loadProject(projectId);
-        if (project?.wasmBytes) {
-          setWasmBytes(project.wasmBytes);
+    const fetchProject = async () => {
+      try {
+        if (!projectId) {
+          setError('No project ID provided');
+          return;
         }
+
+        const loadedProject = await loadProject(projectId);
+        if (!loadedProject) {
+          setError('Project not found');
+          return;
+        }
+
+        setProject(loadedProject);
+      } catch (err) {
+        setError(err.message || 'Failed to load project');
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadWasm();
+
+    fetchProject();
   }, [projectId]);
 
-  const handleRun = () => {
-    if (!wasmBytes) return;
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007acc" />
+        <Text style={styles.loadingText}>Loading project...</Text>
+      </View>
+    );
+  }
 
-    setIsRunning(true);
-    setConsoleOutput([]);
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
-    // Convert WASM bytes to base64 for WebView
-    const wasmBase64 = btoa(String.fromCharCode.apply(null, wasmBytes));
-
-    // Inject WASM module and run it
-    const script = `
-      (async () => {
-        try {
-          // Load WASM module
-          const wasmBytes = Uint8Array.from(atob('${wasmBase64}'), c => c.charCodeAt(0));
-          const wasmModule = await WebAssembly.instantiate(wasmBytes, {
-            env: {
-              abort: () => { throw new Error('WASM abort called'); },
-              log: (ptr, len) => {
-                const memory = new Uint8Array(instance.exports.memory.buffer);
-                const message = new TextDecoder().decode(memory.subarray(ptr, ptr + len));
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'consoleOutput',
-                  message: message
-                }));
-              }
-            }
-          });
-
-          const instance = wasmModule.instance;
-
-          // Execute the WASM module
-          if (instance.exports._start) {
-            instance.exports._start();
-          }
-
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'runComplete'
-          }));
-        } catch (error) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'error',
-            message: error.message || 'Unknown error'
-          }));
-        }
-      })();
-    `;
-
-    webViewRef.current?.injectJavaScript(script);
-  };
-
-  const handleMessage = (event: any) => {
-    const data = JSON.parse(event.nativeEvent.data);
-
-    if (data.type === 'consoleOutput') {
-      setConsoleOutput(prev => [...prev, data.message]);
-    } else if (data.type === 'runComplete') {
-      setIsRunning(false);
-    } else if (data.type === 'error') {
-      setConsoleOutput(prev => [...prev, `ERROR: ${data.message}`]);
-      setIsRunning(false);
-    }
-  };
+  if (!project?.wasmBytes) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>No compiled WASM found. Please compile your project first.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ html: '<html><body></body></html>' }}
-        onMessage={handleMessage}
-        javaScriptEnabled={true}
-        originWhitelist={['*']}
-        style={styles.webView}
+      <Text style={styles.title}>{project.name}</Text>
+      <WasmPreview
+        wasmBytes={new Uint8Array(project.wasmBytes)}
+        onConsoleOutput={(output) => {
+          // You could add additional handling here
+        }}
       />
-
-      <View style={styles.consoleContainer}>
-        <View style={styles.consoleHeader}>
-          <Text style={styles.consoleTitle}>Console Output</Text>
-          <TouchableOpacity
-            style={styles.runButton}
-            onPress={handleRun}
-            disabled={!wasmBytes || isRunning}
-          >
-            <Text style={styles.runButtonText}>
-              {isRunning ? 'Running...' : 'Run WASM'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          style={styles.console}
-          contentContainerStyle={styles.consoleContent}
-        >
-          {consoleOutput.map((line, index) => (
-            <Text key={index} style={styles.consoleLine}>
-              {line}
-            </Text>
-          ))}
-        </ScrollView>
-      </View>
     </View>
   );
 };
@@ -130,51 +76,37 @@ const WasmPreview = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#fff',
   },
-  webView: {
+  loadingContainer: {
     flex: 1,
-    backgroundColor: 'white',
-  },
-  consoleContainer: {
-    height: 200,
-    backgroundColor: '#252526',
-    borderTopWidth: 1,
-    borderTopColor: '#373737',
-  },
-  consoleHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#373737',
+    backgroundColor: '#fff',
   },
-  consoleTitle: {
-    color: 'white',
-    fontWeight: 'bold',
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
   },
-  runButton: {
-    backgroundColor: '#007acc',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  runButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  console: {
+  errorContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
   },
-  consoleContent: {
-    padding: 10,
+  errorText: {
+    color: '#d32f2f',
+    textAlign: 'center',
   },
-  consoleLine: {
-    color: 'white',
-    marginBottom: 5,
-    fontFamily: 'monospace',
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
 });
 
-export default WasmPreview;
+export default PreviewScreen;

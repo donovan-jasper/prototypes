@@ -1,167 +1,153 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { compileTypeScriptToWasm, getCompilationProgress, cancelCompilation } from '../../lib/compiler';
-import { saveProject } from '../../lib/storage';
-import { useLocalSearchParams } from 'expo-router';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { loadProject, saveProject } from '../../lib/storage';
+import CodeEditor from '../../components/CodeEditor';
+import { compileTypeScriptToWasm } from '../../lib/compiler';
 
-const CodeEditor = () => {
-  const { projectId } = useLocalSearchParams();
-  const [code, setCode] = useState('');
+const EditorScreen = () => {
+  const { projectId } = useLocalSearchParams<{ projectId: string }>();
+  const router = useRouter();
+  const [project, setProject] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilationProgress, setCompilationProgress] = useState(0);
-  const [compilationRequestId, setCompilationRequestId] = useState<string | null>(null);
-  const webViewRef = useRef<WebView>(null);
 
   useEffect(() => {
-    // Load project code
-    const loadProject = async () => {
-      if (projectId) {
-        const project = await loadProject(projectId);
-        if (project) {
-          setCode(project.code);
+    const fetchProject = async () => {
+      try {
+        if (!projectId) {
+          setError('No project ID provided');
+          return;
         }
+
+        const loadedProject = await loadProject(projectId);
+        if (!loadedProject) {
+          setError('Project not found');
+          return;
+        }
+
+        setProject(loadedProject);
+      } catch (err) {
+        setError(err.message || 'Failed to load project');
+      } finally {
+        setIsLoading(false);
       }
     };
-    loadProject();
+
+    fetchProject();
   }, [projectId]);
 
-  const handleCodeChange = (newCode: string) => {
-    setCode(newCode);
-    // Auto-save with debounce
-    const debounceTimer = setTimeout(() => {
-      saveProject({ id: projectId, code: newCode });
-    }, 1000);
+  const handleSave = async () => {
+    if (!project) return;
 
-    return () => clearTimeout(debounceTimer);
+    setIsSaving(true);
+    try {
+      await saveProject(project);
+      Alert.alert('Success', 'Project saved successfully');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to save project');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleCompile = async () => {
-    if (!code.trim()) {
-      Alert.alert('Error', 'Please enter some code to compile');
-      return;
-    }
-
+  const handleCompile = async (code: string) => {
     setIsCompiling(true);
     setCompilationProgress(0);
 
     try {
       const result = await compileTypeScriptToWasm(code);
-      setCompilationRequestId(result.requestId);
 
-      // Start progress tracking
-      const progressInterval = setInterval(() => {
-        const progress = getCompilationProgress(result.requestId);
-        setCompilationProgress(progress);
+      if (result.success && result.wasmBytes) {
+        // Update project with new WASM bytes
+        const updatedProject = {
+          ...project,
+          wasmBytes: Array.from(result.wasmBytes),
+          updatedAt: Date.now()
+        };
 
-        if (progress >= 100) {
-          clearInterval(progressInterval);
-        }
-      }, 200);
+        setProject(updatedProject);
+        await saveProject(updatedProject);
 
-      if (result.success) {
-        // Save compiled WASM to project
-        await saveProject({
-          id: projectId,
-          wasmBytes: result.wasmBytes
-        });
         Alert.alert('Success', 'Compilation completed successfully');
       } else {
-        Alert.alert('Compilation Error', result.error || 'Unknown error');
+        Alert.alert('Compilation Error', result.error || 'Unknown compilation error');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Failed to compile code');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Compilation failed');
     } finally {
       setIsCompiling(false);
-      setCompilationRequestId(null);
     }
   };
 
-  const handleCancel = () => {
-    if (compilationRequestId) {
-      cancelCompilation(compilationRequestId);
-      setIsCompiling(false);
-      setCompilationProgress(0);
-    }
-  };
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007acc" />
+        <Text style={styles.loadingText}>Loading project...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!project) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Project not found</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{
-          html: `
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
-                <style>
-                  body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-                  #container { height: 100%; }
-                </style>
-              </head>
-              <body>
-                <div id="container"></div>
-                <script>
-                  require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs' }});
-                  require(['vs/editor/editor.main'], function() {
-                    const editor = monaco.editor.create(document.getElementById('container'), {
-                      value: ${JSON.stringify(code)},
-                      language: 'typescript',
-                      theme: 'vs-dark',
-                      automaticLayout: true
-                    });
+      <View style={styles.toolbar}>
+        <Text style={styles.title}>{project.name}</Text>
+        <View style={styles.toolbarButtons}>
+          <TouchableOpacity
+            style={styles.toolbarButton}
+            onPress={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.toolbarButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
 
-                    editor.onDidChangeModelContent(() => {
-                      const value = editor.getValue();
-                      window.ReactNativeWebView.postMessage(JSON.stringify({
-                        type: 'codeChange',
-                        code: value
-                      }));
-                    });
+          <TouchableOpacity
+            style={[styles.toolbarButton, styles.previewButton]}
+            onPress={() => router.push({
+              pathname: '/preview',
+              params: { projectId: project.id }
+            })}
+          >
+            <Text style={styles.toolbarButtonText}>Preview</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
-                    window.addEventListener('message', (event) => {
-                      if (event.data.type === 'setCode') {
-                        editor.setValue(event.data.code);
-                      }
-                    });
-                  });
-                </script>
-              </body>
-            </html>
-          `
-        }}
-        onMessage={(event) => {
-          const data = JSON.parse(event.nativeEvent.data);
-          if (data.type === 'codeChange') {
-            handleCodeChange(data.code);
-          }
-        }}
-        javaScriptEnabled={true}
-        originWhitelist={['*']}
-        style={styles.editor}
+      <CodeEditor
+        initialCode={project.code}
+        onCompile={handleCompile}
+        onProgress={(progress) => setCompilationProgress(progress)}
       />
 
-      <View style={styles.toolbar}>
-        {isCompiling ? (
-          <>
-            <Text style={styles.progressText}>Compiling: {compilationProgress}%</Text>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleCancel}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <TouchableOpacity
-            style={styles.compileButton}
-            onPress={handleCompile}
-          >
-            <Text style={styles.compileButtonText}>Compile</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {isCompiling && (
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressText}>Compiling: {compilationProgress}%</Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -169,44 +155,71 @@ const CodeEditor = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#fff',
   },
-  editor: {
+  loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#fff',
+  },
+  errorText: {
+    color: '#d32f2f',
+    textAlign: 'center',
   },
   toolbar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#252526',
-    borderTopWidth: 1,
-    borderTopColor: '#373737',
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
-  compileButton: {
+  title: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  toolbarButtons: {
+    flexDirection: 'row',
+  },
+  toolbarButton: {
     backgroundColor: '#007acc',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 4,
+    marginLeft: 10,
   },
-  compileButtonText: {
-    color: 'white',
+  previewButton: {
+    backgroundColor: '#4CAF50',
+  },
+  toolbarButtonText: {
+    color: '#fff',
     fontWeight: 'bold',
   },
-  cancelButton: {
-    backgroundColor: '#d13639',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 4,
-  },
-  cancelButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  progressContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 10,
+    backgroundColor: '#252526',
   },
   progressText: {
-    color: 'white',
-    marginRight: 10,
+    color: '#fff',
+    textAlign: 'center',
   },
 });
 
-export default CodeEditor;
+export default EditorScreen;
