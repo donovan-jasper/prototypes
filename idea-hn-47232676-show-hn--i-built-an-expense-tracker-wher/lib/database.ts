@@ -1,230 +1,207 @@
-import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
+import { openDatabaseAsync, SQLiteDatabase } from 'expo-sqlite';
+import type { Expense } from './types';
 
-export { SQLiteProvider, useSQLiteContext };
+let db: SQLiteDatabase | null = null;
 
-export const initializeDatabase = async (db: SQLiteDatabase) => {
-  try {
-    await db.execAsync(`
-      PRAGMA journal_mode = WAL;
-      PRAGMA foreign_keys = ON;
+export const openDatabase = async (name: string = 'pairpurse.db') => {
+  if (db) return db;
 
-      CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        description TEXT NOT NULL,
-        amount REAL NOT NULL,
-        category TEXT NOT NULL,
-        paidBy TEXT NOT NULL,
-        splitWith TEXT NOT NULL,
-        date TEXT NOT NULL,
-        createdAt INTEGER NOT NULL,
-        updatedAt INTEGER NOT NULL,
-        syncStatus TEXT NOT NULL DEFAULT 'pending'
-      );
-
-      CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        publicKey TEXT NOT NULL,
-        createdAt INTEGER NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS sync_log (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        deviceId TEXT NOT NULL,
-        timestamp INTEGER NOT NULL,
-        action TEXT NOT NULL,
-        recordId INTEGER,
-        recordType TEXT NOT NULL,
-        syncStatus TEXT NOT NULL DEFAULT 'pending'
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
-      CREATE INDEX IF NOT EXISTS idx_expenses_paidBy ON expenses(paidBy);
-      CREATE INDEX IF NOT EXISTS idx_expenses_syncStatus ON expenses(syncStatus);
-      CREATE INDEX IF NOT EXISTS idx_sync_log_timestamp ON sync_log(timestamp);
-    `);
-  } catch (error) {
-    console.error('Database initialization error:', error);
-    throw error;
-  }
+  db = await openDatabaseAsync(name);
+  await initializeDatabase(db);
+  return db;
 };
 
-export const addExpense = async (db: SQLiteDatabase, expense: {
-  description: string;
-  amount: number;
-  category: string;
-  paidBy: string;
-  splitWith: string[];
-  date: string;
-}) => {
-  try {
-    const now = Date.now();
-    const result = await db.runAsync(
-      `INSERT INTO expenses (description, amount, category, paidBy, splitWith, date, createdAt, updatedAt, syncStatus)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        expense.description,
-        expense.amount,
-        expense.category,
-        expense.paidBy,
-        JSON.stringify(expense.splitWith),
-        expense.date,
-        now,
-        now,
-        'pending'
-      ]
+const initializeDatabase = async (database: SQLiteDatabase) => {
+  await database.execAsync(`
+    PRAGMA journal_mode = WAL;
+
+    CREATE TABLE IF NOT EXISTS expenses (
+      id TEXT PRIMARY KEY,
+      amount REAL NOT NULL,
+      description TEXT,
+      category TEXT,
+      paidBy TEXT NOT NULL,
+      splitWith TEXT NOT NULL,
+      date TEXT NOT NULL,
+      createdAt INTEGER NOT NULL,
+      updatedAt INTEGER NOT NULL
     );
-    return result.lastInsertRowId;
-  } catch (error) {
-    console.error('Error adding expense:', error);
-    throw error;
-  }
-};
 
-export const getExpenses = async (db: SQLiteDatabase) => {
-  try {
-    const result = await db.getAllAsync<{
-      id: number;
-      description: string;
-      amount: number;
-      category: string;
-      paidBy: string;
-      splitWith: string;
-      date: string;
-      createdAt: number;
-      updatedAt: number;
-      syncStatus: string;
-    }>('SELECT * FROM expenses ORDER BY date DESC');
-    
-    return result.map(row => ({
-      ...row,
-      splitWith: JSON.parse(row.splitWith)
-    }));
-  } catch (error) {
-    console.error('Error getting expenses:', error);
-    throw error;
-  }
-};
-
-export const updateExpense = async (db: SQLiteDatabase, id: number, expense: {
-  description: string;
-  amount: number;
-  category: string;
-  paidBy: string;
-  splitWith: string[];
-  date: string;
-}) => {
-  try {
-    const now = Date.now();
-    await db.runAsync(
-      `UPDATE expenses 
-       SET description = ?, amount = ?, category = ?, paidBy = ?, splitWith = ?, date = ?, updatedAt = ?, syncStatus = ?
-       WHERE id = ?`,
-      [
-        expense.description,
-        expense.amount,
-        expense.category,
-        expense.paidBy,
-        JSON.stringify(expense.splitWith),
-        expense.date,
-        now,
-        'pending',
-        id
-      ]
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      isCurrentUser INTEGER NOT NULL DEFAULT 0
     );
-  } catch (error) {
-    console.error('Error updating expense:', error);
-    throw error;
-  }
-};
 
-export const deleteExpense = async (db: SQLiteDatabase, id: number) => {
-  try {
-    await db.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
-  } catch (error) {
-    console.error('Error deleting expense:', error);
-    throw error;
-  }
-};
-
-export const getBalance = async (db: SQLiteDatabase, user1: string, user2: string) => {
-  try {
-    const expenses = await getExpenses(db);
-    
-    let user1Paid = 0;
-    let user2Paid = 0;
-    let user1Owes = 0;
-    let user2Owes = 0;
-
-    expenses.forEach(expense => {
-      const splitCount = expense.splitWith.length;
-      const shareAmount = expense.amount / splitCount;
-
-      if (expense.paidBy === user1) {
-        user1Paid += expense.amount;
-        if (expense.splitWith.includes(user2)) {
-          user2Owes += shareAmount;
-        }
-      } else if (expense.paidBy === user2) {
-        user2Paid += expense.amount;
-        if (expense.splitWith.includes(user1)) {
-          user1Owes += shareAmount;
-        }
-      }
-    });
-
-    return user1Paid - user1Owes - (user2Paid - user2Owes);
-  } catch (error) {
-    console.error('Error calculating balance:', error);
-    throw error;
-  }
-};
-
-export const addUser = async (db: SQLiteDatabase, user: {
-  id: string;
-  name: string;
-  publicKey: string;
-}) => {
-  try {
-    const now = Date.now();
-    await db.runAsync(
-      'INSERT OR REPLACE INTO users (id, name, publicKey, createdAt) VALUES (?, ?, ?, ?)',
-      [user.id, user.name, user.publicKey, now]
+    CREATE TABLE IF NOT EXISTS sync_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      deviceId TEXT NOT NULL,
+      timestamp INTEGER NOT NULL,
+      changes TEXT NOT NULL
     );
-  } catch (error) {
-    console.error('Error adding user:', error);
-    throw error;
-  }
+
+    CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(date);
+    CREATE INDEX IF NOT EXISTS idx_expenses_paidBy ON expenses(paidBy);
+  `);
 };
 
-export const getUsers = async (db: SQLiteDatabase) => {
-  try {
-    return await db.getAllAsync<{
-      id: string;
-      name: string;
-      publicKey: string;
-      createdAt: number;
-    }>('SELECT * FROM users');
-  } catch (error) {
-    console.error('Error getting users:', error);
-    throw error;
-  }
+export const addExpense = async (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  const database = db || await openDatabase();
+  const id = Math.random().toString(36).substring(2, 15);
+  const now = Date.now();
+
+  await database.runAsync(
+    'INSERT INTO expenses (id, amount, description, category, paidBy, splitWith, date, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [
+      id,
+      expense.amount,
+      expense.description,
+      expense.category,
+      expense.paidBy,
+      JSON.stringify(expense.splitWith),
+      expense.date,
+      now,
+      now,
+    ]
+  );
+
+  return id;
 };
 
-export const addSyncLog = async (db: SQLiteDatabase, log: {
-  deviceId: string;
-  action: string;
-  recordId?: number;
-  recordType: string;
-}) => {
-  try {
-    const now = Date.now();
-    await db.runAsync(
-      'INSERT INTO sync_log (deviceId, timestamp, action, recordId, recordType, syncStatus) VALUES (?, ?, ?, ?, ?, ?)',
-      [log.deviceId, now, log.action, log.recordId || null, log.recordType, 'pending']
-    );
-  } catch (error) {
-    console.error('Error adding sync log:', error);
-    throw error;
+export const updateExpense = async (id: string, expense: Partial<Expense>) => {
+  const database = db || await openDatabase();
+  const now = Date.now();
+
+  const updates = [];
+  const params = [];
+
+  if (expense.amount !== undefined) {
+    updates.push('amount = ?');
+    params.push(expense.amount);
   }
+  if (expense.description !== undefined) {
+    updates.push('description = ?');
+    params.push(expense.description);
+  }
+  if (expense.category !== undefined) {
+    updates.push('category = ?');
+    params.push(expense.category);
+  }
+  if (expense.paidBy !== undefined) {
+    updates.push('paidBy = ?');
+    params.push(expense.paidBy);
+  }
+  if (expense.splitWith !== undefined) {
+    updates.push('splitWith = ?');
+    params.push(JSON.stringify(expense.splitWith));
+  }
+  if (expense.date !== undefined) {
+    updates.push('date = ?');
+    params.push(expense.date);
+  }
+
+  updates.push('updatedAt = ?');
+  params.push(now);
+
+  params.push(id);
+
+  await database.runAsync(
+    `UPDATE expenses SET ${updates.join(', ')} WHERE id = ?`,
+    params
+  );
+};
+
+export const deleteExpense = async (id: string) => {
+  const database = db || await openDatabase();
+  await database.runAsync('DELETE FROM expenses WHERE id = ?', [id]);
+};
+
+export const getExpenses = async (): Promise<Expense[]> => {
+  const database = db || await openDatabase();
+  const result = await database.getAllAsync<Expense>('SELECT * FROM expenses ORDER BY date DESC');
+
+  return result.map(expense => ({
+    ...expense,
+    splitWith: JSON.parse(expense.splitWith as unknown as string),
+  }));
+};
+
+export const getBalance = async (userId: string): Promise<number> => {
+  const database = db || await openDatabase();
+
+  // Calculate total amount paid by this user
+  const paidResult = await database.getFirstAsync<{ total: number }>(
+    'SELECT SUM(amount) as total FROM expenses WHERE paidBy = ?',
+    [userId]
+  );
+
+  // Calculate total amount this user should pay (based on split ratios)
+  const splitResult = await database.getAllAsync<{ amount: number; splitWith: string }>(
+    'SELECT amount, splitWith FROM expenses WHERE splitWith LIKE ?',
+    [`%${userId}%`]
+  );
+
+  let totalPaid = paidResult?.total || 0;
+  let totalOwed = 0;
+
+  for (const expense of splitResult) {
+    const splitWith = JSON.parse(expense.splitWith);
+    const splitCount = splitWith.length;
+    const amountPerPerson = expense.amount / splitCount;
+
+    // If this user is in the split, add their portion to totalOwed
+    if (splitWith.includes(userId)) {
+      totalOwed += amountPerPerson;
+    }
+  }
+
+  // Net balance is what this user paid minus what they should have paid
+  return totalPaid - totalOwed;
+};
+
+export const addUser = async (user: { id: string; name: string; isCurrentUser: boolean }) => {
+  const database = db || await openDatabase();
+  await database.runAsync(
+    'INSERT INTO users (id, name, isCurrentUser) VALUES (?, ?, ?)',
+    [user.id, user.name, user.isCurrentUser ? 1 : 0]
+  );
+};
+
+export const getUsers = async (): Promise<{ id: string; name: string; isCurrentUser: boolean }[]> => {
+  const database = db || await openDatabase();
+  const result = await database.getAllAsync<{ id: string; name: string; isCurrentUser: number }>(
+    'SELECT id, name, isCurrentUser FROM users'
+  );
+
+  return result.map(user => ({
+    ...user,
+    isCurrentUser: user.isCurrentUser === 1,
+  }));
+};
+
+export const logSync = async (deviceId: string, changes: any) => {
+  const database = db || await openDatabase();
+  await database.runAsync(
+    'INSERT INTO sync_log (deviceId, timestamp, changes) VALUES (?, ?, ?)',
+    [deviceId, Date.now(), JSON.stringify(changes)]
+  );
+};
+
+export const getSyncLog = async (): Promise<{ id: number; deviceId: string; timestamp: number; changes: any }[]> => {
+  const database = db || await openDatabase();
+  const result = await database.getAllAsync<{ id: number; deviceId: string; timestamp: number; changes: string }>(
+    'SELECT * FROM sync_log ORDER BY timestamp DESC'
+  );
+
+  return result.map(log => ({
+    ...log,
+    changes: JSON.parse(log.changes),
+  }));
+};
+
+export const useSQLiteContext = () => {
+  if (!db) {
+    throw new Error('Database not initialized. Call openDatabase() first.');
+  }
+  return db;
 };

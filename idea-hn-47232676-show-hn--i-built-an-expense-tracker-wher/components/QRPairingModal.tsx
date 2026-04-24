@@ -146,8 +146,7 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
     return (
       <Modal visible={visible} onRequestClose={onClose}>
         <View style={styles.container}>
-          <ActivityIndicator size="large" />
-          <Text>Requesting camera permission...</Text>
+          <Text>Requesting for camera permission</Text>
         </View>
       </Modal>
     );
@@ -157,95 +156,66 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
     return (
       <Modal visible={visible} onRequestClose={onClose}>
         <View style={styles.container}>
-          <Text style={styles.errorText}>No access to camera</Text>
-          <Button title="Close" onPress={onClose} />
+          <Text>No access to camera</Text>
+          <Button title="Grant Permission" onPress={() => BarCodeScanner.requestPermissionsAsync()} />
         </View>
       </Modal>
     );
   }
 
   return (
-    <Modal visible={visible} onRequestClose={onClose} animationType="slide">
+    <Modal visible={visible} onRequestClose={onClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>Pair New Device</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#666" />
+          <Text style={styles.title}>Pair Devices</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
         </View>
 
         {renderConnectionStatus()}
 
         <View style={styles.modeSelector}>
-          <Button
-            title="Show QR Code"
-            onPress={() => {
-              setMode('generate');
-              setScanned(false);
-              setConnectionStatus('idle');
-            }}
-            color={mode === 'generate' ? '#2e78b7' : '#999'}
-          />
-          <View style={styles.buttonSpacer} />
-          <Button
-            title="Scan QR Code"
-            onPress={() => {
-              setMode('scan');
-              setScanned(false);
-              setConnectionStatus('idle');
-            }}
-            color={mode === 'scan' ? '#2e78b7' : '#999'}
-          />
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'generate' && styles.activeMode]}
+            onPress={() => setMode('generate')}
+          >
+            <Text style={styles.modeButtonText}>Show QR Code</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'scan' && styles.activeMode]}
+            onPress={() => setMode('scan')}
+          >
+            <Text style={styles.modeButtonText}>Scan QR Code</Text>
+          </TouchableOpacity>
         </View>
 
         {mode === 'generate' ? (
           <View style={styles.qrContainer}>
-            <Text style={styles.instructionText}>
-              Scan this QR code on the other device:
-            </Text>
             {isProcessing ? (
-              <View style={styles.processingContainer}>
-                <ActivityIndicator size="large" color="#2e78b7" />
-                <Text>Generating connection...</Text>
-              </View>
+              <ActivityIndicator size="large" color="#2e78b7" />
             ) : (
-              <View style={styles.qrCodeContainer}>
-                {qrCode ? (
-                  <QRCode
-                    value={qrCode}
-                    size={250}
-                    color="#000"
-                    backgroundColor="#fff"
-                  />
-                ) : (
-                  <Text>Generating QR code...</Text>
-                )}
-              </View>
+              qrCode && <QRCode value={qrCode} size={250} />
             )}
-            <Text style={styles.noteText}>
-              Note: This contains WebRTC connection data
+            <Text style={styles.instructionText}>
+              Scan this QR code with the other device to pair
             </Text>
           </View>
         ) : (
           <View style={styles.scannerContainer}>
-            <Text style={styles.instructionText}>
-              Point your camera at the QR code from the other device
-            </Text>
-            <View style={styles.scannerBox}>
-              <BarCodeScanner
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                style={StyleSheet.absoluteFillObject}
-              />
+            <BarCodeScanner
+              onBarCodeScanned={handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={styles.scannerOverlay}>
+              <Text style={styles.scannerText}>Scan the QR code from the other device</Text>
             </View>
-            {scanned && (
-              <Button
-                title="Tap to scan again"
-                onPress={() => setScanned(false)}
-                color="#2e78b7"
-              />
-            )}
           </View>
         )}
+
+        <View style={styles.footer}>
+          <Button title="Cancel" onPress={onClose} color="#666" />
+        </View>
       </View>
     </Modal>
   );
@@ -266,14 +236,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
-  },
-  closeButton: {
-    padding: 8,
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 15,
     padding: 10,
     backgroundColor: '#f5f5f5',
@@ -284,72 +251,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   retryButton: {
-    marginLeft: 15,
+    marginLeft: 10,
     padding: 5,
     backgroundColor: '#2e78b7',
     borderRadius: 4,
   },
   retryText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 14,
   },
   modeSelector: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     marginBottom: 20,
   },
-  buttonSpacer: {
-    width: 10,
+  modeButton: {
+    flex: 1,
+    padding: 10,
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginHorizontal: 5,
+  },
+  activeMode: {
+    backgroundColor: '#2e78b7',
+  },
+  modeButtonText: {
+    color: '#333',
+    fontWeight: 'bold',
   },
   qrContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
   instructionText: {
+    marginTop: 20,
     fontSize: 16,
-    marginBottom: 20,
     textAlign: 'center',
     color: '#666',
   },
-  processingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 250,
-  },
-  qrCodeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  noteText: {
-    marginTop: 20,
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
   scannerContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-  },
-  scannerBox: {
-    width: 250,
-    height: 250,
-    overflow: 'hidden',
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#2e78b7',
+    alignItems: 'center',
     marginBottom: 20,
   },
-  errorText: {
-    color: 'red',
-    fontSize: 16,
-    marginBottom: 20,
+  scannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  scannerText: {
+    color: 'white',
+    fontSize: 18,
     textAlign: 'center',
+    padding: 20,
+  },
+  footer: {
+    marginTop: 20,
   },
 });

@@ -1,13 +1,11 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { Expense } from './types';
-
-type SyncStatus = 'offline' | 'connecting' | 'connected' | 'syncing';
+import type { Expense, User, SyncStatus } from './types';
 
 interface AppState {
   expenses: Expense[];
-  users: string[];
+  users: User[];
   syncStatus: SyncStatus;
   isPremium: boolean;
   pairedDevice: boolean;
@@ -18,6 +16,8 @@ interface AppState {
   setSyncStatus: (status: SyncStatus) => void;
   setPremium: (isPremium: boolean) => void;
   setPairedDevice: (paired: boolean) => void;
+  addUser: (user: User) => void;
+  setUsers: (users: User[]) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -42,6 +42,8 @@ export const useStore = create<AppState>()(
       setSyncStatus: (status) => set({ syncStatus: status }),
       setPremium: (isPremium) => set({ isPremium }),
       setPairedDevice: (paired) => set({ pairedDevice: paired }),
+      addUser: (user) => set((state) => ({ users: [...state.users, user] })),
+      setUsers: (users) => set({ users }),
     }),
     {
       name: 'pairpurse-storage',
@@ -49,6 +51,7 @@ export const useStore = create<AppState>()(
       partialize: (state) => ({
         isPremium: state.isPremium,
         pairedDevice: state.pairedDevice,
+        users: state.users,
       }),
     }
   )

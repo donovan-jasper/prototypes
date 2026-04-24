@@ -13,8 +13,7 @@ export interface Expense {
 export interface User {
   id: string;
   name: string;
-  publicKey: string;
-  isPaired: boolean;
+  isCurrentUser: boolean;
 }
 
 export type SyncStatus = 'offline' | 'connecting' | 'connected' | 'syncing';
