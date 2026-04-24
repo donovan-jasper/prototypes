@@ -19,36 +19,61 @@ export default function SlideViewer({ html, testID }: SlideViewerProps) {
     (function() {
       const slides = document.querySelectorAll('.slide');
       let currentIndex = 0;
-      
+
       window.totalSlides = slides.length;
-      window.ReactNativeWebView.postMessage(JSON.stringify({ 
-        type: 'init', 
-        totalSlides: slides.length 
+      window.ReactNativeWebView.postMessage(JSON.stringify({
+        type: 'init',
+        totalSlides: slides.length
       }));
-      
+
       function showSlide(index) {
         slides.forEach((slide, i) => {
           slide.style.display = i === index ? 'flex' : 'none';
         });
         currentIndex = index;
-        window.ReactNativeWebView.postMessage(JSON.stringify({ 
-          type: 'slideChange', 
-          currentSlide: index + 1 
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          type: 'slideChange',
+          currentSlide: index + 1
         }));
       }
-      
+
       window.nextSlide = function() {
         if (currentIndex < slides.length - 1) {
           showSlide(currentIndex + 1);
         }
       };
-      
+
       window.prevSlide = function() {
         if (currentIndex > 0) {
           showSlide(currentIndex - 1);
         }
       };
-      
+
+      // Handle touch events for swipe navigation
+      let touchStartX = 0;
+      let touchStartY = 0;
+
+      document.addEventListener('touchstart', function(e) {
+        touchStartX = e.changedTouches[0].screenX;
+        touchStartY = e.changedTouches[0].screenY;
+      }, false);
+
+      document.addEventListener('touchend', function(e) {
+        const touchEndX = e.changedTouches[0].screenX;
+        const touchEndY = e.changedTouches[0].screenY;
+
+        // Only handle horizontal swipes
+        if (Math.abs(touchEndY - touchStartY) > 50) return;
+
+        if (touchEndX < touchStartX - 50) {
+          // Swipe left - next slide
+          window.nextSlide();
+        } else if (touchEndX > touchStartX + 50) {
+          // Swipe right - previous slide
+          window.prevSlide();
+        }
+      }, false);
+
       showSlide(0);
     })();
     true;
@@ -88,7 +113,7 @@ export default function SlideViewer({ html, testID }: SlideViewerProps) {
         showsVerticalScrollIndicator={false}
         showsHorizontalScrollIndicator={false}
       />
-      
+
       <Surface style={styles.controls} elevation={4}>
         <IconButton
           icon="chevron-left"
