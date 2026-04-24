@@ -1,29 +1,39 @@
-import { extractWithLLM } from '../../api/llm';
-import { processImageWithOCR } from '../../api/ocr';
+import { extractWithLLM } from '../api/llm';
 
-export const extractData = async (input: {
+interface ExtractionInput {
   text?: string;
   audio?: string;
   image?: string;
-}): Promise<{ entities: Array<{ type: string; value: string }>; summary?: string }> => {
+}
+
+interface ExtractionResult {
+  entities: Array<{ type: string; value: string }>;
+  summary?: string;
+}
+
+export const extractData = async (input: ExtractionInput): Promise<ExtractionResult> => {
   try {
-    if (input.image) {
-      // Process image with OCR
-      const ocrText = await processImageWithOCR(input.image);
-      return await extractWithLLM(ocrText);
-    } else if (input.text) {
-      // Process text directly
-      return await extractWithLLM(input.text);
+    let textToProcess = '';
+
+    if (input.text) {
+      textToProcess = input.text;
     } else if (input.audio) {
-      // In a real app, you would transcribe audio first
-      // For now we'll simulate it with mock text
-      const mockText = "This is a transcription of the recorded audio. The customer mentioned they need to schedule an appointment for December 15th at 2:30 PM.";
-      return await extractWithLLM(mockText);
+      // In a real implementation, you would transcribe the audio here
+      // For this example, we'll use a mock transcription
+      textToProcess = "Sample transcribed text from audio: Meeting with John at 2:00 PM on 5/15/2023. Contact at john@example.com";
+    } else if (input.image) {
+      // In a real implementation, you would extract text from the image here
+      // For this example, we'll use mock text
+      textToProcess = "Sample text extracted from image: Invoice #12345 for $150.00 due 6/1/2023";
     }
 
-    throw new Error('No valid input provided for extraction');
+    if (!textToProcess) {
+      throw new Error('No valid input provided');
+    }
+
+    return await extractWithLLM(textToProcess);
   } catch (error) {
-    console.error('Extraction failed:', error);
+    console.error('Extraction error:', error);
     throw error;
   }
 };
