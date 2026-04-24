@@ -154,7 +154,7 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
           <VictoryLine
             data={analyticsData.map(item => ({
               x: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-              y: item.ratings
+              y: item.rating
             }))}
             style={{
               data: { stroke: '#FF9500', strokeWidth: 2 },
@@ -163,37 +163,6 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
           />
         </VictoryChart>
       </View>
-
-      <View style={styles.summaryContainer}>
-        <Text style={styles.summaryTitle}>Summary</Text>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Sales:</Text>
-          <Text style={styles.summaryValue}>
-            {analyticsData.reduce((sum, item) => sum + item.sales, 0)}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Downloads:</Text>
-          <Text style={styles.summaryValue}>
-            {analyticsData.reduce((sum, item) => sum + item.downloads, 0)}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Average Rating:</Text>
-          <Text style={styles.summaryValue}>
-            {(
-              analyticsData.reduce((sum, item) => sum + item.ratings, 0) /
-              analyticsData.length
-            ).toFixed(1)}
-          </Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabel}>Total Reviews:</Text>
-          <Text style={styles.summaryValue}>
-            {analyticsData.reduce((sum, item) => sum + item.reviews, 0)}
-          </Text>
-        </View>
-      </View>
     </ScrollView>
   );
 };
@@ -201,19 +170,25 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
     padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 10,
     color: '#666',
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -222,32 +197,25 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
+    color: '#d32f2f',
     fontSize: 16,
-    color: '#FF3B30',
     textAlign: 'center',
     marginBottom: 8,
   },
   errorSubtext: {
-    fontSize: 14,
     color: '#666',
+    fontSize: 14,
     textAlign: 'center',
   },
   errorBanner: {
-    backgroundColor: '#FFF9C4',
+    backgroundColor: '#fff3cd',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 16,
+    marginBottom: 20,
   },
   errorBannerText: {
     color: '#856404',
     fontSize: 14,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 24,
-    textAlign: 'center',
   },
   chartContainer: {
     backgroundColor: 'white',
@@ -261,43 +229,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
     marginBottom: 12,
-  },
-  summaryContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  summaryLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
   },
 });
 

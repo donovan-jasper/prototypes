@@ -1,57 +1,36 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import { setupApp } from './services/api';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import DashboardScreen from './screens/DashboardScreen';
+import AnalyticsScreen from './screens/AnalyticsScreen';
+
+const Tab = createBottomTabNavigator();
 
 export default function App() {
-  const [isReady, setIsReady] = useState(false);
-
-  useEffect(() => {
-    const initialize = async () => {
-      const success = await setupApp();
-      setIsReady(success);
-    };
-
-    initialize();
-  }, []);
-
-  if (!isReady) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" />
-        <Text style={styles.loadingText}>Initializing AppVista...</Text>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>AppVista</Text>
-      <Text style={styles.subtitle}>Your App Store Dashboard</Text>
-    </View>
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ focused, color, size }) => {
+            let iconName;
+
+            if (route.name === 'Dashboard') {
+              iconName = focused ? 'home' : 'home-outline';
+            } else if (route.name === 'Analytics') {
+              iconName = focused ? 'analytics' : 'analytics-outline';
+            }
+
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: '#007AFF',
+          tabBarInactiveTintColor: 'gray',
+          headerShown: false,
+        })}
+      >
+        <Tab.Screen name="Dashboard" component={DashboardScreen} />
+        <Tab.Screen name="Analytics" component={AnalyticsScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-});
