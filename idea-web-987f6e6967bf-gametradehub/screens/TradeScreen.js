@@ -147,10 +147,10 @@ const TradeScreen = ({ route }) => {
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.button, styles.addButton]}
-            onPress={() => navigation.navigate('Inventory', { addGame: gameData })}
+            style={[styles.button, styles.cancelButton]}
+            onPress={() => navigation.goBack()}
           >
-            <Text style={styles.buttonText}>Add to Inventory</Text>
+            <Text style={styles.buttonText}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -159,7 +159,6 @@ const TradeScreen = ({ route }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Game Details</Text>
       {renderGameDetails()}
     </View>
   );
@@ -168,20 +167,13 @@ const TradeScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#f5f5f5',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#6200EE',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    padding: 20,
   },
   loadingText: {
     marginTop: 10,
@@ -189,61 +181,53 @@ const styles = StyleSheet.create({
     color: '#6200EE',
   },
   errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    padding: 20,
   },
   errorText: {
-    fontSize: 18,
-    color: '#d32f2f',
-    marginBottom: 20,
-    textAlign: 'center',
     marginTop: 10,
+    fontSize: 16,
+    color: '#d32f2f',
+    textAlign: 'center',
   },
   retryButton: {
+    marginTop: 20,
+    padding: 10,
     backgroundColor: '#6200EE',
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 150,
+    borderRadius: 5,
   },
   retryButtonText: {
     color: 'white',
     fontSize: 16,
-    textAlign: 'center',
   },
   gameContainer: {
-    backgroundColor: 'white',
-    borderRadius: 10,
+    flex: 1,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   gameCover: {
     width: '100%',
-    height: 200,
-    marginBottom: 15,
+    height: 300,
+    marginBottom: 20,
     borderRadius: 8,
   },
   gameTitle: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
     color: '#333',
-    textAlign: 'center',
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 15,
   },
   gamePrice: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: 'bold',
     color: '#2E7D32',
     marginRight: 5,
-    fontWeight: 'bold',
   },
   infoRow: {
     flexDirection: 'row',
@@ -252,30 +236,35 @@ const styles = StyleSheet.create({
   },
   gameCondition: {
     fontSize: 16,
-    color: '#555',
     marginLeft: 5,
+    color: '#555',
   },
   gamePlatforms: {
     fontSize: 16,
-    color: '#555',
     marginLeft: 5,
+    color: '#555',
   },
   gameRelease: {
     fontSize: 16,
-    color: '#555',
     marginLeft: 5,
+    color: '#555',
   },
   summaryContainer: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   summaryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#6200EE',
+    color: '#333',
   },
   summaryText: {
     fontSize: 14,
@@ -283,22 +272,22 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButtons: {
-    marginTop: 25,
+    marginTop: 30,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   button: {
-    padding: 12,
-    borderRadius: 8,
     flex: 1,
-    marginHorizontal: 5,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 5,
   },
   tradeButton: {
-    backgroundColor: '#2E7D32',
-  },
-  addButton: {
     backgroundColor: '#6200EE',
+  },
+  cancelButton: {
+    backgroundColor: '#d32f2f',
   },
   buttonText: {
     color: 'white',
