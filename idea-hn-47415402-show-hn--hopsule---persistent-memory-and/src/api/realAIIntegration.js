@@ -1,7 +1,7 @@
 import { validateRule } from '../hooks/useAIRuleInjection';
 
-const API_BASE_URL = 'https://api.cursor.so/v1'; // Replace with actual API endpoint
-const API_KEY = process.env.CURSOR_API_KEY || 'your-api-key-here'; // Should be stored securely
+const API_BASE_URL = 'https://api.cursor.so/v1';
+const API_KEY = process.env.CURSOR_API_KEY || 'your-api-key-here';
 
 export const injectRulesIntoAISuggestion = (codeSuggestion, rules) => {
   if (!codeSuggestion || !rules || rules.length === 0) {
@@ -18,7 +18,7 @@ export const injectRulesIntoAISuggestion = (codeSuggestion, rules) => {
       if (matches) {
         modifiedSuggestion = modifiedSuggestion.replace(
           regex,
-          match => `/* RULE VIOLATION: ${rule.name} */ ${match}`
+          match => `/* RULE VIOLATION: ${rule.name} (${rule.severity}) */ ${match}`
         );
       }
     } catch (error) {
@@ -42,7 +42,7 @@ export const getAISuggestions = async (prompt) => {
         'Authorization': `Bearer ${API_KEY}`
       },
       body: JSON.stringify({ prompt }),
-      timeout: 10000 // 10 second timeout
+      timeout: 10000
     });
 
     if (!response.ok) {
@@ -71,7 +71,7 @@ export const analyzeCodeWithAI = async (code) => {
         'Authorization': `Bearer ${API_KEY}`
       },
       body: JSON.stringify({ code }),
-      timeout: 15000 // 15 second timeout for analysis
+      timeout: 15000
     });
 
     if (!response.ok) {

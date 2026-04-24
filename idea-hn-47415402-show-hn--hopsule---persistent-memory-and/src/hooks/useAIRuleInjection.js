@@ -102,17 +102,23 @@ const useAIRuleInjection = () => {
   };
 
   const injectRulesIntoAISuggestion = (codeSuggestion) => {
+    if (!codeSuggestion || !rules.length) return codeSuggestion;
+
     let modifiedSuggestion = codeSuggestion;
 
     rules.forEach(rule => {
-      const regex = new RegExp(rule.pattern, 'g');
-      const matches = modifiedSuggestion.match(regex);
+      try {
+        const regex = new RegExp(rule.pattern, 'g');
+        const matches = modifiedSuggestion.match(regex);
 
-      if (matches) {
-        modifiedSuggestion = modifiedSuggestion.replace(
-          regex,
-          match => `/* RULE VIOLATION: ${rule.name} */ ${match}`
-        );
+        if (matches) {
+          modifiedSuggestion = modifiedSuggestion.replace(
+            regex,
+            match => `/* RULE VIOLATION: ${rule.name} (${rule.severity}) */ ${match}`
+          );
+        }
+      } catch (error) {
+        console.error(`Error processing rule ${rule.name}:`, error);
       }
     });
 
