@@ -4,6 +4,7 @@ import { fetchHealthData, initializeHealthKit, initializeGoogleFit } from '../..
 import { fetchCalendarEvents, identifyHabitsFromEvents } from '../../../lib/calendarService';
 import { calculateStreak } from '../../../lib/habitTracker';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 interface HealthStats {
   steps: number;
@@ -26,6 +27,8 @@ const HomeScreen = () => {
     health: 'synced',
     calendar: 'synced'
   });
+  const [streak, setStreak] = useState(0);
+  const navigation = useNavigation();
 
   const syncData = useCallback(async () => {
     try {
@@ -37,7 +40,16 @@ const HomeScreen = () => {
       ]);
 
       setHealthData(health);
-      setHabits(identifyHabitsFromEvents(events));
+      const detectedHabits = identifyHabitsFromEvents(events);
+      setHabits(detectedHabits);
+
+      // Calculate streak based on detected habits
+      const habitDates = events
+        .filter(event => detectedHabits.some(habit => event.title.toLowerCase().includes(habit)))
+        .map(event => event.startDate.toISOString().split('T')[0]);
+
+      setStreak(calculateStreak(habitDates));
+
       setSyncStatus({ health: 'synced', calendar: 'synced' });
     } catch (err) {
       setError('Failed to sync data. Please check permissions.');
@@ -82,6 +94,10 @@ const HomeScreen = () => {
     }
   };
 
+  const navigateToJournal = () => {
+    navigation.navigate('journal');
+  };
+
   if (loading) {
     return (
       <View style={styles.centerContainer}>
@@ -116,6 +132,40 @@ const HomeScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>ProgressPulse</Text>
         <Text style={styles.subtitle}>Your daily health and habits summary</Text>
+      </View>
+
+      <View style={styles.dashboard}>
+        <View style={styles.streakContainer}>
+          <Text style={styles.streakLabel}>Today's Streak</Text>
+          <Text style={styles.streakValue}>{streak} days</Text>
+          <Text style={styles.streakDescription}>
+            {streak > 0 ? 'Keep it up!' : 'Start your habit streak today!'}
+          </Text>
+        </View>
+
+        <View style={styles.habitsSummary}>
+          <Text style={styles.sectionTitle}>Detected Habits</Text>
+          {habits.length > 0 ? (
+            <View style={styles.habitList}>
+              {habits.map((habit, index) => (
+                <View key={index} style={styles.habitItem}>
+                  <Ionicons name="checkmark-circle" size={16} color="#34C759" />
+                  <Text style={styles.habitText}>{habit}</Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={styles.noHabitsText}>No habits detected yet. Add some to your calendar!</Text>
+          )}
+        </View>
+
+        <TouchableOpacity
+          style={styles.quickCheckinButton}
+          onPress={navigateToJournal}
+        >
+          <Ionicons name="pencil" size={20} color="white" />
+          <Text style={styles.quickCheckinText}>Quick Check-in</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.syncStatusContainer}>
@@ -154,29 +204,6 @@ const HomeScreen = () => {
           </View>
         </View>
       </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Detected Habits</Text>
-        {habits.length > 0 ? (
-          <View style={styles.habitsContainer}>
-            {habits.map((habit, index) => (
-              <View key={index} style={styles.habitTag}>
-                <Text style={styles.habitText}>{habit}</Text>
-              </View>
-            ))}
-          </View>
-        ) : (
-          <Text style={styles.noHabitsText}>No habits detected yet. Add some to your calendar!</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Your Streak</Text>
-        <View style={styles.streakContainer}>
-          <Text style={styles.streakValue}>{calculateStreak(['2023-10-01', '2023-10-02', '2023-10-03'])}</Text>
-          <Text style={styles.streakLabel}>Days</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 };
@@ -184,18 +211,40 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8f9fa',
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
     padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
   header: {
     padding: 20,
     backgroundColor: '#007AFF',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   title: {
     fontSize: 24,
@@ -207,14 +256,98 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
   },
+  dashboard: {
+    padding: 20,
+  },
+  streakContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    alignItems: 'center',
+  },
+  streakLabel: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+  },
+  streakValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 5,
+  },
+  streakDescription: {
+    fontSize: 14,
+    color: '#666',
+  },
+  habitsSummary: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 15,
+    color: '#333',
+  },
+  habitList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  habitItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f8ff',
+    padding: 8,
+    borderRadius: 20,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  habitText: {
+    marginLeft: 5,
+    color: '#007AFF',
+  },
+  noHabitsText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  quickCheckinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#34C759',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+  quickCheckinText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10,
+  },
   syncStatusContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    padding: 20,
     backgroundColor: 'white',
-    margin: 15,
-    borderRadius: 10,
+    marginBottom: 20,
+    borderRadius: 12,
+    marginHorizontal: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -227,7 +360,6 @@ const styles = StyleSheet.create({
   },
   syncStatusLabel: {
     marginRight: 5,
-    fontSize: 14,
     color: '#666',
   },
   syncButton: {
@@ -240,96 +372,38 @@ const styles = StyleSheet.create({
   },
   syncButtonText: {
     color: 'white',
-    fontSize: 14,
     marginLeft: 5,
+    fontSize: 14,
   },
   section: {
-    marginHorizontal: 15,
-    marginBottom: 15,
-    padding: 15,
+    padding: 20,
+  },
+  metricsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  metricBox: {
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderRadius: 12,
+    padding: 15,
+    width: '30%',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricBox: {
-    alignItems: 'center',
-    flex: 1,
-  },
   metricValue: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#007AFF',
+    marginBottom: 5,
   },
   metricLabel: {
-    fontSize: 14,
+    fontSize: 12,
     color: '#666',
-    marginTop: 5,
-  },
-  habitsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  habitTag: {
-    backgroundColor: '#e0f2fe',
-    padding: 8,
-    borderRadius: 15,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  habitText: {
-    color: '#0369a1',
-    fontSize: 14,
-  },
-  noHabitsText: {
-    fontSize: 14,
-    color: '#666',
-  },
-  streakContainer: {
-    alignItems: 'center',
-  },
-  streakValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  streakLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#FF3B30',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontSize: 16,
   },
 });
 
