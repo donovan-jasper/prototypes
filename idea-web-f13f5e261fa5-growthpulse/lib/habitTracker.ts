@@ -1,11 +1,30 @@
 export const calculateStreak = (dates: string[]): number => {
   if (dates.length === 0) return 0;
 
+  // Sort dates in descending order
+  const sortedDates = [...dates].sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+
   let streak = 1;
-  for (let i = 1; i < dates.length; i++) {
-    const prevDate = new Date(dates[i - 1]);
-    const currentDate = new Date(dates[i]);
-    const diffTime = Math.abs(currentDate.getTime() - prevDate.getTime());
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Check if the most recent date is today
+  const mostRecentDate = new Date(sortedDates[0]);
+  mostRecentDate.setHours(0, 0, 0, 0);
+
+  if (mostRecentDate.getTime() !== today.getTime()) {
+    return 0;
+  }
+
+  // Check consecutive days
+  for (let i = 1; i < sortedDates.length; i++) {
+    const currentDate = new Date(sortedDates[i]);
+    const previousDate = new Date(sortedDates[i - 1]);
+
+    currentDate.setHours(0, 0, 0, 0);
+    previousDate.setHours(0, 0, 0, 0);
+
+    const diffTime = Math.abs(previousDate.getTime() - currentDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 1) {
