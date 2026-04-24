@@ -8,6 +8,8 @@ interface Card {
   recallStrength: number;
   nextReviewDate: Date;
   reviewCount: number;
+  easinessFactor: number;
+  interval: number;
 }
 
 interface Deck {
@@ -17,21 +19,53 @@ interface Deck {
   cardCount: number;
 }
 
-export const calculateNextReview = (lastReview: Date, recallStrength: number): Date => {
-  const now = new Date();
-  const daysSinceLastReview = Math.floor((now.getTime() - lastReview.getTime()) / (1000 * 60 * 60 * 24));
+interface ReviewHistory {
+  id: number;
+  cardId: number;
+  reviewDate: Date;
+  quality: number;
+  previousInterval: number;
+  nextInterval: number;
+}
 
-  // SM-2 algorithm simplified
-  let interval = 1;
-  if (recallStrength >= 0.7) {
-    interval = Math.max(1, Math.floor(interval * 1.5));
+export const calculateNextReview = (card: Card, quality: number): { nextReviewDate: Date, updatedCard: Card } => {
+  const now = new Date();
+  const { recallStrength, easinessFactor, interval, reviewCount } = card;
+
+  // SM-2 algorithm implementation
+  let newEasinessFactor = Math.max(1.3, easinessFactor + 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02));
+  let newInterval: number;
+
+  if (quality < 3) {
+    // Incorrect recall - reset to 1 day
+    newInterval = 1;
   } else {
-    interval = 1;
+    // Correct recall - calculate new interval
+    if (reviewCount === 0) {
+      newInterval = 1;
+    } else if (reviewCount === 1) {
+      newInterval = 6;
+    } else {
+      newInterval = Math.round(interval * newEasinessFactor);
+    }
   }
 
-  const nextReview = new Date(now);
-  nextReview.setDate(now.getDate() + interval);
-  return nextReview;
+  // Update recall strength based on quality (1-5 scale)
+  const newRecallStrength = Math.min(1, Math.max(0, recallStrength + (quality - 3) * 0.1));
+
+  const nextReviewDate = new Date(now);
+  nextReviewDate.setDate(now.getDate() + newInterval);
+
+  const updatedCard = {
+    ...card,
+    recallStrength: newRecallStrength,
+    easinessFactor: newEasinessFactor,
+    interval: newInterval,
+    nextReviewDate,
+    reviewCount: reviewCount + 1
+  };
+
+  return { nextReviewDate, updatedCard };
 };
 
 export const initializeDatabase = async (db: SQLiteDatabase) => {
@@ -53,11 +87,24 @@ export const initializeDatabase = async (db: SQLiteDatabase) => {
       recallStrength REAL DEFAULT 0.5,
       nextReviewDate TEXT NOT NULL,
       reviewCount INTEGER DEFAULT 0,
+      easinessFactor REAL DEFAULT 2.5,
+      interval INTEGER DEFAULT 1,
       FOREIGN KEY (deckId) REFERENCES decks(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS review_history (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cardId INTEGER NOT NULL,
+      reviewDate TEXT NOT NULL,
+      quality INTEGER NOT NULL,
+      previousInterval INTEGER NOT NULL,
+      nextInterval INTEGER NOT NULL,
+      FOREIGN KEY (cardId) REFERENCES cards(id)
     );
 
     CREATE INDEX IF NOT EXISTS idx_cards_deckId ON cards(deckId);
     CREATE INDEX IF NOT EXISTS idx_cards_nextReviewDate ON cards(nextReviewDate);
+    CREATE INDEX IF NOT EXISTS idx_review_history_cardId ON review_history(cardId);
   `);
 };
 
@@ -89,10 +136,10 @@ export const addCard = async (
   return result.lastInsertRowId;
 };
 
-export const updateCardRecallStrength = async (
+export const addReview = async (
   db: SQLiteDatabase,
   cardId: number,
-  isEasy: boolean
+  quality: number
 ): Promise<void> => {
   const card = await db.getFirstAsync<Card>(
     'SELECT * FROM cards WHERE id = ?',
@@ -101,13 +148,31 @@ export const updateCardRecallStrength = async (
 
   if (!card) return;
 
-  const lastReview = new Date(card.nextReviewDate);
-  const newRecallStrength = Math.min(1, Math.max(0, card.recallStrength + (isEasy ? 0.2 : -0.15)));
-  const nextReviewDate = calculateNextReview(lastReview, newRecallStrength).toISOString();
+  const { nextReviewDate, updatedCard } = calculateNextReview(card, quality);
 
+  // Update card with new values
   await db.runAsync(
-    'UPDATE cards SET recallStrength = ?, nextReviewDate = ?, reviewCount = reviewCount + 1 WHERE id = ?',
-    [newRecallStrength, nextReviewDate, cardId]
+    'UPDATE cards SET recallStrength = ?, nextReviewDate = ?, reviewCount = ?, easinessFactor = ?, interval = ? WHERE id = ?',
+    [
+      updatedCard.recallStrength,
+      updatedCard.nextReviewDate.toISOString(),
+      updatedCard.reviewCount,
+      updatedCard.easinessFactor,
+      updatedCard.interval,
+      cardId
+    ]
+  );
+
+  // Add review history entry
+  await db.runAsync(
+    'INSERT INTO review_history (cardId, reviewDate, quality, previousInterval, nextInterval) VALUES (?, ?, ?, ?, ?)',
+    [
+      cardId,
+      new Date().toISOString(),
+      quality,
+      card.interval,
+      updatedCard.interval
+    ]
   );
 };
 
@@ -151,4 +216,16 @@ export const getDeckStats = async (db: SQLiteDatabase, deckId: number): Promise<
     dueCards: dueCards?.count || 0,
     averageRecallStrength: avgRecall?.avg || 0.5
   };
+};
+
+export const getReviewHistory = async (db: SQLiteDatabase, cardId: number): Promise<ReviewHistory[]> => {
+  const history = await db.getAllAsync<ReviewHistory>(
+    'SELECT * FROM review_history WHERE cardId = ? ORDER BY reviewDate DESC',
+    [cardId]
+  );
+
+  return history.map(item => ({
+    ...item,
+    reviewDate: new Date(item.reviewDate)
+  }));
 };
