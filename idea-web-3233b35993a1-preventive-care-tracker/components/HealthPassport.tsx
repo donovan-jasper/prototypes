@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Vaccination, Prescription, Allergy, Insurance } from '../types';
-import { getVaccinations, getPrescriptions, getAllergies, getInsurance, addVaccination, addPrescription, addAllergy, addInsurance } from '../lib/database';
+import { getVaccinations, getPrescriptions, getAllergies, getInsurance, addInsurance } from '../lib/database';
+import { Camera } from 'expo-camera';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as SecureStore from 'expo-secure-store';
+import { format } from 'date-fns';
 
 interface HealthPassportProps {
   memberId: string;
@@ -17,359 +18,258 @@ export default function HealthPassport({ memberId }: HealthPassportProps) {
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [allergies, setAllergies] = useState<Allergy[]>([]);
   const [insurance, setInsurance] = useState<Insurance | null>(null);
-
-  // Form states
-  const [newVaccination, setNewVaccination] = useState<Omit<Vaccination, 'id' | 'memberId'>>({
-    name: '',
-    date: '',
-    provider: ''
-  });
-  const [newPrescription, setNewPrescription] = useState<Omit<Prescription, 'id' | 'memberId'>>({
-    name: '',
-    dosage: '',
-    date: ''
-  });
-  const [newAllergy, setNewAllergy] = useState<Omit<Allergy, 'id' | 'memberId'>>({
-    name: '',
-    severity: ''
-  });
-  const [newInsurance, setNewInsurance] = useState<Omit<Insurance, 'id' | 'memberId'>>({
-    name: '',
-    policyNumber: '',
-    expirationDate: ''
-  });
+  const [hasCameraPermission, setHasCameraPermission] = useState<boolean | null>(null);
+  const [cameraVisible, setCameraVisible] = useState(false);
 
   useEffect(() => {
-    loadHealthData();
+    loadData();
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasCameraPermission(status === 'granted');
+    })();
   }, [memberId]);
 
-  const loadHealthData = async () => {
-    try {
-      const [vaccinationsData, prescriptionsData, allergiesData, insuranceData] = await Promise.all([
-        getVaccinations(memberId),
-        getPrescriptions(memberId),
-        getAllergies(memberId),
-        getInsurance(memberId)
-      ]);
+  const loadData = async () => {
+    const [vaccinationsData, prescriptionsData, allergiesData, insuranceData] = await Promise.all([
+      getVaccinations(memberId),
+      getPrescriptions(memberId),
+      getAllergies(memberId),
+      getInsurance(memberId)
+    ]);
 
-      setVaccinations(vaccinationsData);
-      setPrescriptions(prescriptionsData);
-      setAllergies(allergiesData);
-      setInsurance(insuranceData.length > 0 ? insuranceData[0] : null);
-    } catch (error) {
-      console.error('Error loading health data:', error);
-      Alert.alert('Error', 'Failed to load health data');
-    }
+    setVaccinations(vaccinationsData);
+    setPrescriptions(prescriptionsData);
+    setAllergies(allergiesData);
+    setInsurance(insuranceData.length > 0 ? insuranceData[0] : null);
   };
 
-  const handleAddVaccination = async () => {
-    if (!newVaccination.name || !newVaccination.date) {
-      Alert.alert('Error', 'Please fill in all required fields');
+  const handleScanInsurance = async () => {
+    if (hasCameraPermission === null) {
+      Alert.alert('Permission required', 'Please allow camera access to scan insurance card');
       return;
     }
 
-    try {
-      const vaccination = await addVaccination({
-        ...newVaccination,
-        memberId
-      });
-      setVaccinations([...vaccinations, vaccination]);
-      setNewVaccination({ name: '', date: '', provider: '' });
-    } catch (error) {
-      console.error('Error adding vaccination:', error);
-      Alert.alert('Error', 'Failed to add vaccination');
-    }
-  };
-
-  const handleAddPrescription = async () => {
-    if (!newPrescription.name || !newPrescription.dosage || !newPrescription.date) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (hasCameraPermission === false) {
+      Alert.alert('Permission denied', 'Camera access is required to scan insurance card');
       return;
     }
 
-    try {
-      const prescription = await addPrescription({
-        ...newPrescription,
-        memberId
-      });
-      setPrescriptions([...prescriptions, prescription]);
-      setNewPrescription({ name: '', dosage: '', date: '' });
-    } catch (error) {
-      console.error('Error adding prescription:', error);
-      Alert.alert('Error', 'Failed to add prescription');
-    }
+    setCameraVisible(true);
   };
 
-  const handleAddAllergy = async () => {
-    if (!newAllergy.name || !newAllergy.severity) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
-
-    try {
-      const allergy = await addAllergy({
-        ...newAllergy,
-        memberId
-      });
-      setAllergies([...allergies, allergy]);
-      setNewAllergy({ name: '', severity: '' });
-    } catch (error) {
-      console.error('Error adding allergy:', error);
-      Alert.alert('Error', 'Failed to add allergy');
-    }
+  const handleCameraClose = () => {
+    setCameraVisible(false);
   };
 
-  const handleAddInsurance = async () => {
-    if (!newInsurance.name || !newInsurance.policyNumber || !newInsurance.expirationDate) {
-      Alert.alert('Error', 'Please fill in all required fields');
-      return;
-    }
+  const handleBarCodeScanned = async ({ data }: { data: string }) => {
+    setCameraVisible(false);
+
+    // In a real app, you would parse the scanned data and extract insurance information
+    // For this example, we'll just create a mock insurance record
+    const mockInsurance: Omit<Insurance, 'id'> = {
+      memberId,
+      name: 'Mock Insurance Provider',
+      policyNumber: data.substring(0, 12),
+      expirationDate: format(new Date(Date.now() + 365 * 24 * 60 * 60 * 1000), 'yyyy-MM-dd')
+    };
 
     try {
-      const insuranceData = await addInsurance({
-        ...newInsurance,
-        memberId
-      });
-      setInsurance(insuranceData);
-      setNewInsurance({ name: '', policyNumber: '', expirationDate: '' });
+      const newInsurance = await addInsurance(mockInsurance);
+      setInsurance(newInsurance);
+      Alert.alert('Success', 'Insurance information added successfully');
     } catch (error) {
-      console.error('Error adding insurance:', error);
-      Alert.alert('Error', 'Failed to add insurance');
+      Alert.alert('Error', 'Failed to save insurance information');
     }
   };
 
   const generatePDF = async () => {
+    const html = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 20px; }
+            h1 { color: #4CAF50; text-align: center; }
+            h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; margin-top: 20px; }
+            .section { margin-bottom: 20px; }
+            .item { margin-bottom: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; }
+            .severity-high { color: #d32f2f; }
+            .severity-medium { color: #ff9800; }
+            .severity-low { color: #4caf50; }
+          </style>
+        </head>
+        <body>
+          <h1>Health Passport Summary</h1>
+
+          <div class="section">
+            <h2>Vaccination History</h2>
+            ${vaccinations.map(v => `
+              <div class="item">
+                <strong>${v.name}</strong><br>
+                Date: ${format(new Date(v.date), 'MMMM d, yyyy')}<br>
+                Provider: ${v.provider || 'Not specified'}
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h2>Prescriptions</h2>
+            ${prescriptions.map(p => `
+              <div class="item">
+                <strong>${p.name}</strong><br>
+                Dosage: ${p.dosage}<br>
+                Date: ${format(new Date(p.date), 'MMMM d, yyyy')}
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h2>Allergies</h2>
+            ${allergies.map(a => `
+              <div class="item">
+                <strong>${a.name}</strong><br>
+                Severity: <span class="severity-${a.severity.toLowerCase()}">${a.severity}</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h2>Insurance Information</h2>
+            ${insurance ? `
+              <div class="item">
+                <strong>${insurance.name}</strong><br>
+                Policy Number: ${insurance.policyNumber}<br>
+                Expires: ${format(new Date(insurance.expirationDate), 'MMMM d, yyyy')}
+              </div>
+            ` : '<p>No insurance information available</p>'}
+          </div>
+        </body>
+      </html>
+    `;
+
     try {
-      const html = `
-        <html>
-          <head>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              h1 { color: #4CAF50; text-align: center; }
-              h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 5px; }
-              .section { margin-bottom: 20px; }
-              .item { margin-bottom: 10px; padding: 10px; background-color: #f9f9f9; border-radius: 5px; }
-              .label { font-weight: bold; color: #555; }
-            </style>
-          </head>
-          <body>
-            <h1>Health Passport</h1>
-
-            <div class="section">
-              <h2>Vaccinations</h2>
-              ${vaccinations.map(v => `
-                <div class="item">
-                  <div><span class="label">Name:</span> ${v.name}</div>
-                  <div><span class="label">Date:</span> ${v.date}</div>
-                  <div><span class="label">Provider:</span> ${v.provider || 'N/A'}</div>
-                </div>
-              `).join('')}
-            </div>
-
-            <div class="section">
-              <h2>Prescriptions</h2>
-              ${prescriptions.map(p => `
-                <div class="item">
-                  <div><span class="label">Name:</span> ${p.name}</div>
-                  <div><span class="label">Dosage:</span> ${p.dosage}</div>
-                  <div><span class="label">Date:</span> ${p.date}</div>
-                </div>
-              `).join('')}
-            </div>
-
-            <div class="section">
-              <h2>Allergies</h2>
-              ${allergies.map(a => `
-                <div class="item">
-                  <div><span class="label">Name:</span> ${a.name}</div>
-                  <div><span class="label">Severity:</span> ${a.severity}</div>
-                </div>
-              `).join('')}
-            </div>
-
-            <div class="section">
-              <h2>Insurance</h2>
-              ${insurance ? `
-                <div class="item">
-                  <div><span class="label">Provider:</span> ${insurance.name}</div>
-                  <div><span class="label">Policy Number:</span> ${insurance.policyNumber}</div>
-                  <div><span class="label">Expiration Date:</span> ${insurance.expirationDate}</div>
-                </div>
-              ` : '<p>No insurance information available</p>'}
-            </div>
-          </body>
-        </html>
-      `;
-
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Share Health Passport' });
     } catch (error) {
-      console.error('Error generating PDF:', error);
       Alert.alert('Error', 'Failed to generate PDF');
     }
   };
 
-  const renderSection = (title: string, items: any[], renderItem: (item: any) => React.ReactNode) => (
-    <View style={styles.section}>
+  const renderSectionHeader = (title: string, onAdd: () => void) => (
+    <View style={styles.sectionHeader}>
       <Text style={styles.sectionTitle}>{title}</Text>
-      {items.length > 0 ? (
-        items.map(item => (
-          <View key={item.id} style={styles.item}>
-            {renderItem(item)}
-          </View>
-        ))
-      ) : (
-        <Text style={styles.emptyText}>No {title.toLowerCase()} recorded</Text>
-      )}
+      <TouchableOpacity onPress={onAdd} style={styles.addButton}>
+        <Text style={styles.addButtonText}>+ Add</Text>
+      </TouchableOpacity>
     </View>
   );
 
   return (
     <ScrollView style={styles.container}>
-      {/* Vaccinations Section */}
-      {renderSection('Vaccinations', vaccinations, (v) => (
-        <>
-          <Text style={styles.itemTitle}>{v.name}</Text>
-          <Text style={styles.itemDetail}>Date: {v.date}</Text>
-          {v.provider && <Text style={styles.itemDetail}>Provider: {v.provider}</Text>}
-        </>
-      ))}
-
-      {/* Add Vaccination Form */}
-      <View style={styles.formSection}>
-        <Text style={styles.formTitle}>Add Vaccination</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Vaccine Name"
-          value={newVaccination.name}
-          onChangeText={(text) => setNewVaccination({...newVaccination, name: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Date (YYYY-MM-DD)"
-          value={newVaccination.date}
-          onChangeText={(text) => setNewVaccination({...newVaccination, date: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Provider (optional)"
-          value={newVaccination.provider}
-          onChangeText={(text) => setNewVaccination({...newVaccination, provider: text})}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddVaccination}>
-          <Text style={styles.addButtonText}>Add Vaccination</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Prescriptions Section */}
-      {renderSection('Prescriptions', prescriptions, (p) => (
-        <>
-          <Text style={styles.itemTitle}>{p.name}</Text>
-          <Text style={styles.itemDetail}>Dosage: {p.dosage}</Text>
-          <Text style={styles.itemDetail}>Date: {p.date}</Text>
-        </>
-      ))}
-
-      {/* Add Prescription Form */}
-      <View style={styles.formSection}>
-        <Text style={styles.formTitle}>Add Prescription</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Medication Name"
-          value={newPrescription.name}
-          onChangeText={(text) => setNewPrescription({...newPrescription, name: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Dosage"
-          value={newPrescription.dosage}
-          onChangeText={(text) => setNewPrescription({...newPrescription, dosage: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Date (YYYY-MM-DD)"
-          value={newPrescription.date}
-          onChangeText={(text) => setNewPrescription({...newPrescription, date: text})}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddPrescription}>
-          <Text style={styles.addButtonText}>Add Prescription</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Allergies Section */}
-      {renderSection('Allergies', allergies, (a) => (
-        <>
-          <Text style={styles.itemTitle}>{a.name}</Text>
-          <Text style={styles.itemDetail}>Severity: {a.severity}</Text>
-        </>
-      ))}
-
-      {/* Add Allergy Form */}
-      <View style={styles.formSection}>
-        <Text style={styles.formTitle}>Add Allergy</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Allergy Name"
-          value={newAllergy.name}
-          onChangeText={(text) => setNewAllergy({...newAllergy, name: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Severity (Mild/Moderate/Severe)"
-          value={newAllergy.severity}
-          onChangeText={(text) => setNewAllergy({...newAllergy, severity: text})}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddAllergy}>
-          <Text style={styles.addButtonText}>Add Allergy</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Insurance Section */}
+      {/* Vaccination History Section */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Insurance</Text>
-        {insurance ? (
-          <View style={styles.item}>
-            <Text style={styles.itemTitle}>{insurance.name}</Text>
-            <Text style={styles.itemDetail}>Policy Number: {insurance.policyNumber}</Text>
-            <Text style={styles.itemDetail}>Expiration Date: {insurance.expirationDate}</Text>
-          </View>
+        {renderSectionHeader('Vaccination History', () => navigation.navigate('vaccination/add', { memberId }))}
+        {vaccinations.length > 0 ? (
+          vaccinations.map(vaccination => (
+            <TouchableOpacity
+              key={vaccination.id}
+              style={styles.item}
+              onPress={() => navigation.navigate('vaccination/edit', { id: vaccination.id })}
+            >
+              <Text style={styles.itemTitle}>{vaccination.name}</Text>
+              <Text style={styles.itemDate}>{format(new Date(vaccination.date), 'MMMM d, yyyy')}</Text>
+              <Text style={styles.itemProvider}>{vaccination.provider}</Text>
+            </TouchableOpacity>
+          ))
         ) : (
-          <Text style={styles.emptyText}>No insurance information recorded</Text>
+          <Text style={styles.emptyText}>No vaccinations recorded</Text>
         )}
       </View>
 
-      {/* Add Insurance Form */}
-      <View style={styles.formSection}>
-        <Text style={styles.formTitle}>Add Insurance</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Insurance Provider"
-          value={newInsurance.name}
-          onChangeText={(text) => setNewInsurance({...newInsurance, name: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Policy Number"
-          value={newInsurance.policyNumber}
-          onChangeText={(text) => setNewInsurance({...newInsurance, policyNumber: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Expiration Date (YYYY-MM-DD)"
-          value={newInsurance.expirationDate}
-          onChangeText={(text) => setNewInsurance({...newInsurance, expirationDate: text})}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={handleAddInsurance}>
-          <Text style={styles.addButtonText}>Add Insurance</Text>
-        </TouchableOpacity>
+      {/* Prescription Tracker Section */}
+      <View style={styles.section}>
+        {renderSectionHeader('Prescription Tracker', () => navigation.navigate('prescription/add', { memberId }))}
+        {prescriptions.length > 0 ? (
+          prescriptions.map(prescription => (
+            <TouchableOpacity
+              key={prescription.id}
+              style={styles.item}
+              onPress={() => navigation.navigate('prescription/edit', { id: prescription.id })}
+            >
+              <Text style={styles.itemTitle}>{prescription.name}</Text>
+              <Text style={styles.itemDate}>{format(new Date(prescription.date), 'MMMM d, yyyy')}</Text>
+              <Text style={styles.itemDosage}>{prescription.dosage}</Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No prescriptions recorded</Text>
+        )}
+      </View>
+
+      {/* Allergy Management Section */}
+      <View style={styles.section}>
+        {renderSectionHeader('Allergy Management', () => navigation.navigate('allergy/add', { memberId }))}
+        {allergies.length > 0 ? (
+          allergies.map(allergy => (
+            <TouchableOpacity
+              key={allergy.id}
+              style={styles.item}
+              onPress={() => navigation.navigate('allergy/edit', { id: allergy.id })}
+            >
+              <Text style={styles.itemTitle}>{allergy.name}</Text>
+              <Text style={[
+                styles.itemSeverity,
+                allergy.severity === 'High' && styles.severityHigh,
+                allergy.severity === 'Medium' && styles.severityMedium,
+                allergy.severity === 'Low' && styles.severityLow
+              ]}>
+                Severity: {allergy.severity}
+              </Text>
+            </TouchableOpacity>
+          ))
+        ) : (
+          <Text style={styles.emptyText}>No allergies recorded</Text>
+        )}
+      </View>
+
+      {/* Insurance Card Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Insurance Information</Text>
+          <TouchableOpacity onPress={handleScanInsurance} style={styles.scanButton}>
+            <Text style={styles.scanButtonText}>Scan Card</Text>
+          </TouchableOpacity>
+        </View>
+        {insurance ? (
+          <View style={styles.item}>
+            <Text style={styles.itemTitle}>{insurance.name}</Text>
+            <Text style={styles.itemDate}>Policy: {insurance.policyNumber}</Text>
+            <Text style={styles.itemDate}>Expires: {format(new Date(insurance.expirationDate), 'MMMM d, yyyy')}</Text>
+          </View>
+        ) : (
+          <Text style={styles.emptyText}>No insurance information available</Text>
+        )}
       </View>
 
       {/* PDF Export Button */}
-      <View style={styles.pdfButtonContainer}>
-        <TouchableOpacity style={styles.pdfButton} onPress={generatePDF}>
-          <Text style={styles.pdfButtonText}>Export as PDF</Text>
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity style={styles.pdfButton} onPress={generatePDF}>
+        <Text style={styles.pdfButtonText}>Export as PDF</Text>
+      </TouchableOpacity>
+
+      {/* Camera Modal */}
+      {cameraVisible && (
+        <View style={styles.cameraContainer}>
+          <Camera
+            style={styles.camera}
+            onBarCodeScanned={handleBarCodeScanned}
+            barCodeScannerSettings={{
+              barCodeTypes: [Camera.Constants.BarCodeType.qr, Camera.Constants.BarCodeType.code128],
+            }}
+          />
+          <TouchableOpacity style={styles.closeButton} onPress={handleCameraClose}>
+            <Text style={styles.closeButtonText}>Close</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -381,30 +281,52 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   section: {
-    marginBottom: 24,
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
     elevation: 2,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    paddingBottom: 8,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  scanButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  scanButtonText: {
+    color: 'white',
+    fontWeight: '500',
   },
   item: {
-    marginBottom: 12,
     padding: 12,
-    backgroundColor: '#f9f9f9',
     borderRadius: 6,
+    backgroundColor: '#f9f9f9',
+    marginBottom: 8,
   },
   itemTitle: {
     fontSize: 16,
@@ -412,69 +334,72 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
-  itemDetail: {
+  itemDate: {
     fontSize: 14,
     color: '#666',
     marginBottom: 2,
+  },
+  itemProvider: {
+    fontSize: 14,
+    color: '#666',
+  },
+  itemDosage: {
+    fontSize: 14,
+    color: '#666',
+  },
+  itemSeverity: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  severityHigh: {
+    color: '#d32f2f',
+  },
+  severityMedium: {
+    color: '#ff9800',
+  },
+  severityLow: {
+    color: '#4caf50',
   },
   emptyText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-    marginTop: 8,
-  },
-  formSection: {
-    marginBottom: 24,
-    backgroundColor: 'white',
-    borderRadius: 8,
     padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 12,
-  },
-  input: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    marginBottom: 12,
-    backgroundColor: 'white',
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    padding: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  pdfButtonContainer: {
-    marginVertical: 20,
-    alignItems: 'center',
   },
   pdfButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    backgroundColor: '#673AB7',
+    padding: 16,
     borderRadius: 8,
-    width: '100%',
     alignItems: 'center',
+    marginBottom: 20,
   },
   pdfButtonText: {
     color: 'white',
     fontWeight: '600',
-    fontSize: 18,
+    fontSize: 16,
+  },
+  cameraContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'black',
+    zIndex: 100,
+  },
+  camera: {
+    flex: 1,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+    borderRadius: 5,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });

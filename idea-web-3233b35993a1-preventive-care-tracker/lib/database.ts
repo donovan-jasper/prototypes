@@ -125,7 +125,7 @@ export const getVaccinations = async (memberId: string): Promise<Vaccination[]> 
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT * FROM vaccinations WHERE memberId = ?;',
+          'SELECT * FROM vaccinations WHERE memberId = ? ORDER BY date DESC;',
           [memberId],
           (_, { rows }) => resolve(rows._array),
           (_, error) => reject(error)
@@ -202,7 +202,7 @@ export const getPrescriptions = async (memberId: string): Promise<Prescription[]
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT * FROM prescriptions WHERE memberId = ?;',
+          'SELECT * FROM prescriptions WHERE memberId = ? ORDER BY date DESC;',
           [memberId],
           (_, { rows }) => resolve(rows._array),
           (_, error) => reject(error)
@@ -279,7 +279,7 @@ export const getAllergies = async (memberId: string): Promise<Allergy[]> => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT * FROM allergies WHERE memberId = ?;',
+          'SELECT * FROM allergies WHERE memberId = ? ORDER BY severity DESC;',
           [memberId],
           (_, { rows }) => resolve(rows._array),
           (_, error) => reject(error)
@@ -366,36 +366,7 @@ export const getInsurance = async (memberId: string): Promise<Insurance[]> => {
   });
 };
 
-export const getInsuranceRecord = async (id: string): Promise<Insurance | null> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          'SELECT * FROM insurance WHERE id = ?;',
-          [id],
-          (_, { rows }) => resolve(rows._array.length > 0 ? rows._array[0] : null),
-          (_, error) => reject(error)
-        );
-      }
-    );
-  });
-};
-
 export const addInsurance = async (insurance: Omit<Insurance, 'id'>): Promise<Insurance> => {
-  // First delete any existing insurance for this member
-  await new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          'DELETE FROM insurance WHERE memberId = ?;',
-          [insurance.memberId],
-          () => resolve(true),
-          (_, error) => reject(error)
-        );
-      }
-    );
-  });
-
   const id = Date.now().toString();
   return new Promise((resolve, reject) => {
     db.transaction(
