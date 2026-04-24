@@ -14,6 +14,7 @@ export default function CreateScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [snackbarVisible, setSnackbarVisible] = useState(false);
   const { addDatabase } = useStore();
   const router = useRouter();
 
@@ -30,15 +31,18 @@ export default function CreateScreen() {
         setShowPreview(true);
       } else {
         setError('Could not parse voice command. Please try again.');
+        setSnackbarVisible(true);
       }
     } catch (err) {
       setError('Error processing voice command. Please try again.');
+      setSnackbarVisible(true);
     }
   };
 
   const handleCreateDatabase = async () => {
     if (!tableName || fields.length === 0) {
       setError('Please provide a table name and at least one field');
+      setSnackbarVisible(true);
       return;
     }
 
@@ -49,6 +53,7 @@ export default function CreateScreen() {
       router.push('/');
     } catch (error) {
       setError('Failed to create database. Please try again.');
+      setSnackbarVisible(true);
       console.error(error);
     } finally {
       setLoading(false);
@@ -146,9 +151,12 @@ export default function CreateScreen() {
         </Button>
 
         <Snackbar
-          visible={!!error}
-          onDismiss={() => setError(null)}
-          duration={3000}
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          action={{
+            label: 'Dismiss',
+            onPress: () => setSnackbarVisible(false),
+          }}
         >
           {error}
         </Snackbar>
@@ -160,12 +168,13 @@ export default function CreateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
   content: {
     padding: 16,
   },
   title: {
-    marginBottom: 16,
+    marginBottom: 24,
     textAlign: 'center',
   },
   transcriptionCard: {
@@ -179,7 +188,7 @@ const styles = StyleSheet.create({
     marginVertical: 16,
   },
   input: {
-    marginBottom: 16,
+    marginVertical: 8,
   },
   fieldsLabel: {
     marginTop: 16,
@@ -198,9 +207,10 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   addButton: {
-    marginTop: 8,
+    marginTop: 16,
   },
   createButton: {
     marginTop: 24,
+    paddingVertical: 8,
   },
 });
