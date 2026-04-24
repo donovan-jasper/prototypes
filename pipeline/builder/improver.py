@@ -9,7 +9,7 @@ from idea_scout.config import (
 from idea_scout.db import IdeaDB
 from idea_scout.notify import notify_improvement
 from builder.code_builder import llm_call, parse_code_blocks
-from builder.orchestrator import write_files, try_install_and_test, PROTOTYPES_DIR
+from builder.orchestrator import write_files, try_install_and_test, PROTOTYPES_DIR, _cleanup_node_modules
 
 ASSESS_PROMPT = """You are a senior React Native developer reviewing a mobile app prototype. Read the spec and code carefully.
 
@@ -212,6 +212,8 @@ async def improve_prototype(idea: dict) -> bool:
             cwd=PROTOTYPES_DIR,
         )
         subprocess.run(["git", "push"], cwd=PROTOTYPES_DIR)
+
+        _cleanup_node_modules(project_dir)
 
         db.record_improvement(idea["id"])
 

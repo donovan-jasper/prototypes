@@ -1,5 +1,6 @@
 import asyncio
 import os
+import shutil
 import subprocess
 import httpx
 from idea_scout.config import DB_PATH, OMNIROUTE_BASE, CODER_MODEL
@@ -12,6 +13,14 @@ from .code_builder import generate_code, fix_with_unstuck, parse_code_blocks
 PROTOTYPES_DIR = os.path.expanduser("~/prototypes")
 UV_BIN = os.path.expanduser("~/.local/bin/uv")
 MAX_UNSTUCK_RETRIES = 2
+
+
+def _cleanup_node_modules(project_dir: str):
+    """Remove node_modules after commit+push to reclaim disk space."""
+    nm = os.path.join(project_dir, 'node_modules')
+    if os.path.isdir(nm):
+        shutil.rmtree(nm, ignore_errors=True)
+        print(f'  [cleanup] Removed node_modules ({project_dir.split("/")[-1]})')
 
 README_PROMPT = """Write a short README.md (under 25 lines) for this mobile app.
 
@@ -314,6 +323,8 @@ async def build_next_prototype():
         cwd=PROTOTYPES_DIR,
     )
     subprocess.run(["git", "push"], cwd=PROTOTYPES_DIR)
+
+    _cleanup_node_modules(project_dir)
 
     # Notify
     await notify_build_complete(idea, status, len(files))
