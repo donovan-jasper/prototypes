@@ -1,59 +1,70 @@
 import create from 'zustand';
-import { addProduct, updateProduct, deleteProduct, getProducts } from '../db';
+import { getProducts, addProduct, updateProduct, deleteProduct } from '../db';
 
-const useProductStore = create((set) => ({
+interface Product {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  inventory: number;
+  imageUri: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface ProductStore {
+  products: Product[];
+  loading: boolean;
+  error: string | null;
+  fetchProducts: () => Promise<void>;
+  addProduct: (product: Product) => void;
+  updateProduct: (product: Product) => void;
+  deleteProduct: (id: number) => void;
+  decrementInventory: (id: number, amount: number) => void;
+}
+
+export const useProductStore = create<ProductStore>((set) => ({
   products: [],
   loading: false,
   error: null,
+
   fetchProducts: async () => {
-    set({ loading: true, error: null });
     try {
-      getProducts((products) => {
-        set({ products, loading: false });
-      });
+      set({ loading: true, error: null });
+      const products = await getProducts();
+      set({ products, loading: false });
     } catch (error) {
-      set({ error, loading: false });
+      set({ error: error.message, loading: false });
     }
   },
-  addProduct: async (product) => {
-    set({ loading: true, error: null });
-    try {
-      addProduct(product, (id) => {
-        set((state) => ({
-          products: [...state.products, { ...product, id }],
-          loading: false,
-        }));
-      });
-    } catch (error) {
-      set({ error, loading: false });
-    }
+
+  addProduct: (product) => {
+    set((state) => ({
+      products: [product, ...state.products],
+    }));
   },
-  updateProduct: async (product) => {
-    set({ loading: true, error: null });
-    try {
-      updateProduct(product, () => {
-        set((state) => ({
-          products: state.products.map((p) => (p.id === product.id ? product : p)),
-          loading: false,
-        }));
-      });
-    } catch (error) {
-      set({ error, loading: false });
-    }
+
+  updateProduct: (updatedProduct) => {
+    set((state) => ({
+      products: state.products.map((product) =>
+        product.id === updatedProduct.id ? updatedProduct : product
+      ),
+    }));
   },
-  deleteProduct: async (id) => {
-    set({ loading: true, error: null });
-    try {
-      deleteProduct(id, () => {
-        set((state) => ({
-          products: state.products.filter((p) => p.id !== id),
-          loading: false,
-        }));
-      });
-    } catch (error) {
-      set({ error, loading: false });
-    }
+
+  deleteProduct: (id) => {
+    set((state) => ({
+      products: state.products.filter((product) => product.id !== id),
+    }));
+  },
+
+  decrementInventory: (id, amount) => {
+    set((state) => ({
+      products: state.products.map((product) =>
+        product.id === id
+          ? { ...product, inventory: Math.max(0, product.inventory - amount) }
+          : product
+      ),
+    }));
   },
 }));
-
-export default useProductStore;

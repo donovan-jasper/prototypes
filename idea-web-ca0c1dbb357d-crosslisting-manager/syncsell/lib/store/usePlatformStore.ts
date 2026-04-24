@@ -1,46 +1,48 @@
 import create from 'zustand';
-import { connectPlatform, disconnectPlatform, getPlatforms } from '../db';
+import { getPlatforms, addPlatform, deletePlatform } from '../db';
 
-const usePlatformStore = create((set) => ({
+interface Platform {
+  id: number;
+  name: string;
+  apiKey: string;
+  businessAccountId?: string;
+  pageId?: string;
+  connectedAt: string;
+}
+
+interface PlatformStore {
+  platforms: Platform[];
+  loading: boolean;
+  error: string | null;
+  fetchPlatforms: () => Promise<void>;
+  addPlatform: (platform: Platform) => void;
+  deletePlatform: (id: number) => void;
+}
+
+export const usePlatformStore = create<PlatformStore>((set) => ({
   platforms: [],
   loading: false,
   error: null,
+
   fetchPlatforms: async () => {
-    set({ loading: true, error: null });
     try {
-      getPlatforms((platforms) => {
-        set({ platforms, loading: false });
-      });
+      set({ loading: true, error: null });
+      const platforms = await getPlatforms();
+      set({ platforms, loading: false });
     } catch (error) {
-      set({ error, loading: false });
+      set({ error: error.message, loading: false });
     }
   },
-  connectPlatform: async (platform) => {
-    set({ loading: true, error: null });
-    try {
-      connectPlatform(platform, (id) => {
-        set((state) => ({
-          platforms: [...state.platforms, { ...platform, id }],
-          loading: false,
-        }));
-      });
-    } catch (error) {
-      set({ error, loading: false });
-    }
+
+  addPlatform: (platform) => {
+    set((state) => ({
+      platforms: [platform, ...state.platforms],
+    }));
   },
-  disconnectPlatform: async (id) => {
-    set({ loading: true, error: null });
-    try {
-      disconnectPlatform(id, () => {
-        set((state) => ({
-          platforms: state.platforms.filter((p) => p.id !== id),
-          loading: false,
-        }));
-      });
-    } catch (error) {
-      set({ error, loading: false });
-    }
+
+  deletePlatform: (id) => {
+    set((state) => ({
+      platforms: state.platforms.filter((platform) => platform.id !== id),
+    }));
   },
 }));
-
-export default usePlatformStore;

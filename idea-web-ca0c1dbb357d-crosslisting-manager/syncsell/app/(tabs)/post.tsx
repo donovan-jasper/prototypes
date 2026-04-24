@@ -13,11 +13,13 @@ import { postProduct as postToInstagram, retryPostProduct as retryInstagram } fr
 import { postProduct as postToFacebook, retryPostProduct as retryFacebook } from '../../lib/api/facebook';
 import { addProduct } from '../../lib/db';
 import { useAuthStore } from '../../lib/store/useAuthStore';
+import { useNavigation } from '@react-navigation/native';
 
 export default function PostScreen() {
   const { addProduct: addToStore } = useProductStore();
   const { platforms } = usePlatformStore();
   const { isPremium } = useAuthStore();
+  const navigation = useNavigation();
   const [imageUri, setImageUri] = useState(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
@@ -60,10 +62,9 @@ export default function PostScreen() {
 
     try {
       // Save to local database first
-      addProduct(product, (productId) => {
-        product.id = productId;
-        addToStore(product);
-      });
+      const productId = await addProduct(product);
+      product.id = productId;
+      addToStore(product);
 
       // Post to selected platforms
       const platformResults = [];
@@ -115,6 +116,9 @@ export default function PostScreen() {
       // Reset form
       reset();
       setImageUri(null);
+
+      // Navigate to inventory after successful post
+      navigation.navigate('inventory');
     } catch (error) {
       console.error('Error posting product:', error);
       setSnackbarMessage('Failed to post product. Please try again.');
@@ -139,150 +143,193 @@ export default function PostScreen() {
     }
   };
 
+  const handleCameraCapture = (uri) => {
+    setImageUri(uri);
+    setShowCamera(false);
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {showCamera ? (
-        <CameraCapture onCapture={(uri) => {
-          setImageUri(uri);
-          setShowCamera(false);
-        }} />
-      ) : (
-        <>
-          <TouchableOpacity onPress={() => setShowCamera(true)} style={styles.cameraButton}>
-            {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.image} />
-            ) : (
-              <Text style={styles.cameraButtonText}>Take Photo</Text>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleImagePick} style={styles.galleryButton}>
-            <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
-          </TouchableOpacity>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Quick Post</Text>
+        <Text style={styles.subtitle}>Sell everywhere in seconds</Text>
+      </View>
 
-          <Controller
-            control={control}
-            rules={{ required: 'Title is required' }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="Title"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                error={!!errors.title}
-                style={styles.input}
-              />
-            )}
-            name="title"
-          />
-          {errors.title && <Text style={styles.errorText}>{errors.title.message}</Text>}
-
-          <Controller
-            control={control}
-            rules={{ required: 'Price is required' }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="Price"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                keyboardType="numeric"
-                error={!!errors.price}
-                style={styles.input}
-              />
-            )}
-            name="price"
-          />
-          {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
-
-          <Controller
-            control={control}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="Description"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                multiline
-                style={styles.input}
-              />
-            )}
-            name="description"
-          />
-
-          <Controller
-            control={control}
-            rules={{ required: 'Inventory is required' }}
-            render={({ field: { onChange, onBlur, value } }) => (
-              <TextInput
-                label="Inventory"
-                onBlur={onBlur}
-                onChangeText={onChange}
-                value={value}
-                keyboardType="numeric"
-                error={!!errors.inventory}
-                style={styles.input}
-              />
-            )}
-            name="inventory"
-          />
-          {errors.inventory && <Text style={styles.errorText}>{errors.inventory.message}</Text>}
-
-          <Controller
-            control={control}
-            render={({ field: { onChange, value } }) => (
-              <PlatformSelector
-                selectedPlatforms={value}
-                onSelectPlatforms={onChange}
-                isPremium={isPremium}
-              />
-            )}
-            name="platforms"
-          />
-
-          {isPosting && (
-            <View style={styles.progressContainer}>
-              <Text style={styles.progressText}>Posting to {postingPlatforms.join(', ')}...</Text>
-              <ActivityIndicator size="large" color="#6200ee" />
-              <Text style={styles.progressPercentage}>{postingProgress}%</Text>
-            </View>
-          )}
-
+      <View style={styles.imageContainer}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.productImage} />
+        ) : (
+          <View style={styles.imagePlaceholder}>
+            <Text style={styles.placeholderText}>No image selected</Text>
+          </View>
+        )}
+        <View style={styles.imageButtons}>
           <Button
-            mode="contained"
-            onPress={handleSubmit(onSubmit)}
-            style={styles.postButton}
-            disabled={isPosting}
-            loading={isPosting}
+            mode="outlined"
+            onPress={() => setShowCamera(true)}
+            style={styles.imageButton}
+            icon="camera"
           >
-            {isPosting ? 'Posting...' : 'Post Everywhere'}
+            Take Photo
           </Button>
+          <Button
+            mode="outlined"
+            onPress={handleImagePick}
+            style={styles.imageButton}
+            icon="image"
+          >
+            Choose Photo
+          </Button>
+        </View>
+      </View>
 
-          <Portal>
-            <Snackbar
-              visible={snackbarVisible}
-              onDismiss={() => setSnackbarVisible(false)}
-              duration={3000}
-            >
-              {snackbarMessage}
-            </Snackbar>
+      <View style={styles.form}>
+        <Controller
+          control={control}
+          rules={{ required: 'Title is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Product Title"
+              mode="outlined"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
+              error={!!errors.title}
+            />
+          )}
+          name="title"
+        />
+        {errors.title && <Text style={styles.errorText}>{errors.title.message}</Text>}
 
-            <Dialog visible={showUpgradeDialog} onDismiss={() => setShowUpgradeDialog(false)}>
-              <Dialog.Title>Upgrade Required</Dialog.Title>
-              <Dialog.Content>
-                <Paragraph>
-                  You can only post to 2 platforms on the free tier. Upgrade to premium to post to all selected platforms.
-                </Paragraph>
-              </Dialog.Content>
-              <Dialog.Actions>
-                <Button onPress={() => setShowUpgradeDialog(false)}>Cancel</Button>
-                <Button onPress={() => {
-                  setShowUpgradeDialog(false);
-                  // Navigate to upgrade screen
-                }}>Upgrade</Button>
-              </Dialog.Actions>
-            </Dialog>
-          </Portal>
-        </>
+        <Controller
+          control={control}
+          rules={{
+            required: 'Price is required',
+            pattern: {
+              value: /^\d+(\.\d{1,2})?$/,
+              message: 'Please enter a valid price'
+            }
+          }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Price ($)"
+              mode="outlined"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
+              keyboardType="numeric"
+              error={!!errors.price}
+            />
+          )}
+          name="price"
+        />
+        {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
+
+        <Controller
+          control={control}
+          rules={{ required: 'Inventory is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Inventory Count"
+              mode="outlined"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
+              keyboardType="numeric"
+              error={!!errors.inventory}
+            />
+          )}
+          name="inventory"
+        />
+        {errors.inventory && <Text style={styles.errorText}>{errors.inventory.message}</Text>}
+
+        <Controller
+          control={control}
+          render={({ field: { onChange, value } }) => (
+            <TextInput
+              label="Description (optional)"
+              mode="outlined"
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
+              multiline
+              numberOfLines={3}
+            />
+          )}
+          name="description"
+        />
+
+        <Controller
+          control={control}
+          render={({ field: { onChange, value } }) => (
+            <PlatformSelector
+              selectedPlatforms={value || []}
+              onChange={onChange}
+              isPremium={isPremium}
+            />
+          )}
+          name="platforms"
+        />
+      </View>
+
+      <Button
+        mode="contained"
+        onPress={handleSubmit(onSubmit)}
+        style={styles.postButton}
+        loading={isPosting}
+        disabled={isPosting}
+      >
+        {isPosting ? `Posting (${postingProgress}%)` : 'Post Everywhere'}
+      </Button>
+
+      {isPosting && (
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressText}>Posting to:</Text>
+          {postingPlatforms.map((platform, index) => (
+            <Text key={index} style={styles.platformText}>
+              • {platform}
+            </Text>
+          ))}
+        </View>
+      )}
+
+      <Portal>
+        <Dialog visible={showUpgradeDialog} onDismiss={() => setShowUpgradeDialog(false)}>
+          <Dialog.Title>Upgrade Required</Dialog.Title>
+          <Dialog.Content>
+            <Paragraph>
+              You've selected {postingPlatforms.length} platforms. Free users can only post to 2 platforms.
+            </Paragraph>
+            <Paragraph style={styles.dialogText}>
+              Upgrade to Premium to post to unlimited platforms and get more features.
+            </Paragraph>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setShowUpgradeDialog(false)}>Cancel</Button>
+            <Button onPress={() => {
+              setShowUpgradeDialog(false);
+              navigation.navigate('settings');
+            }}>Upgrade</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      <Snackbar
+        visible={snackbarVisible}
+        onDismiss={() => setSnackbarVisible(false)}
+        duration={3000}
+      >
+        {snackbarMessage}
+      </Snackbar>
+
+      {showCamera && (
+        <CameraCapture
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
       )}
     </ScrollView>
   );
@@ -290,59 +337,88 @@ export default function PostScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  contentContainer: {
     padding: 16,
   },
-  cameraButton: {
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+  header: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    marginTop: 4,
+  },
+  imageContainer: {
+    marginBottom: 24,
+    alignItems: 'center',
+  },
+  productImage: {
+    width: '100%',
     height: 200,
+    borderRadius: 8,
+    resizeMode: 'cover',
+  },
+  imagePlaceholder: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  cameraButtonText: {
-    fontSize: 18,
-    color: '#666',
+  placeholderText: {
+    color: '#999',
   },
-  galleryButton: {
-    backgroundColor: '#6200ee',
-    borderRadius: 8,
-    padding: 12,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  galleryButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  image: {
+  imageButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     width: '100%',
-    height: '100%',
-    borderRadius: 8,
+    marginTop: 16,
+  },
+  imageButton: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  form: {
+    marginBottom: 24,
   },
   input: {
     marginBottom: 16,
   },
   errorText: {
     color: 'red',
-    marginBottom: 16,
+    marginTop: -8,
+    marginBottom: 8,
+    fontSize: 12,
   },
   postButton: {
-    marginTop: 16,
-    padding: 8,
+    marginTop: 8,
+    paddingVertical: 8,
   },
   progressContainer: {
-    marginVertical: 20,
-    alignItems: 'center',
+    marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
   progressText: {
-    marginBottom: 10,
-    fontSize: 16,
-  },
-  progressPercentage: {
-    marginTop: 10,
-    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  platformText: {
+    marginLeft: 8,
+    marginTop: 4,
+  },
+  dialogText: {
+    marginTop: 16,
   },
 });
