@@ -126,7 +126,7 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
         if (!appDir.file(`Assets.xcassets/AppIcon.appiconset/${icon}`)) {
           issues.push({
             id: `issue-${Date.now()}`,
-            ruleId: `ios_missing_icon_${icon.replace(/[^a-zA-Z0-9]/g, '_')}`,
+            ruleId: `ios_missing_icon_${icon}`,
             title: `Missing Icon: ${icon}`,
             description: `The app bundle is missing the required icon file: ${icon}`,
             severity: 'warning',
@@ -137,37 +137,34 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
       });
 
       // Check for required device capabilities
-      const requiredCapabilities = [
-        'arm64',
-        'armv7',
-        'metal'
-      ];
-
       if (infoPlist.UIRequiredDeviceCapabilities) {
-        requiredCapabilities.forEach(cap => {
-          if (!infoPlist.UIRequiredDeviceCapabilities.includes(cap)) {
-            issues.push({
-              id: `issue-${Date.now()}`,
-              ruleId: `ios_missing_capability_${cap}`,
-              title: `Missing Device Capability: ${cap}`,
-              description: `The app bundle is missing the required device capability: ${cap}`,
-              severity: 'warning',
-              fix: `Add '${cap}' to the UIRequiredDeviceCapabilities array in Info.plist`,
-              documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
-            });
-          }
-        });
-      } else {
-        issues.push({
-          id: `issue-${Date.now()}`,
-          ruleId: 'ios_missing_device_capabilities',
-          title: 'Missing Device Capabilities',
-          description: 'The Info.plist is missing the UIRequiredDeviceCapabilities array',
-          severity: 'warning',
-          fix: 'Add the UIRequiredDeviceCapabilities array to your Info.plist file',
-          documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
-        });
+        const requiredCapabilities = infoPlist.UIRequiredDeviceCapabilities;
+        if (!Array.isArray(requiredCapabilities)) {
+          issues.push({
+            id: `issue-${Date.now()}`,
+            ruleId: 'ios_invalid_device_capabilities',
+            title: 'Invalid Device Capabilities',
+            description: 'The UIRequiredDeviceCapabilities should be an array',
+            severity: 'warning',
+            fix: 'Ensure UIRequiredDeviceCapabilities is an array in your Info.plist',
+            documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
+          });
+        }
       }
+    }
+
+    // Check for required entitlements
+    const entitlementsFile = appDir.file('embedded.mobileprovision');
+    if (!entitlementsFile) {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_missing_entitlements',
+        title: 'Missing Entitlements',
+        description: 'The app bundle is missing the required embedded.mobileprovision file',
+        severity: 'critical',
+        fix: 'Ensure your Xcode project is properly signed with a provisioning profile',
+        documentationUrl: 'https://developer.apple.com/documentation/xcode/configuring-your-app-for-distribution'
+      });
     }
 
     return issues;
@@ -176,10 +173,10 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
     return [{
       id: `issue-${Date.now()}`,
       ruleId: 'ios_scan_error',
-      title: 'IPA Scan Error',
-      description: 'An unexpected error occurred while scanning the IPA file',
+      title: 'Scan Error',
+      description: 'An error occurred while scanning the IPA file',
       severity: 'critical',
-      fix: 'Try scanning a different IPA file or contact support',
+      fix: 'Try scanning a different IPA file or check the console for error details',
       documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
     }];
   }
