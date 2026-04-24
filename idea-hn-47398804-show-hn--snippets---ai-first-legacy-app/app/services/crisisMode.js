@@ -98,11 +98,27 @@ const isCrisisModeEnabled = () => {
   });
 };
 
+const getShareableLink = async () => {
+  try {
+    const pin = await getCrisisPin();
+    if (!pin) {
+      throw new Error('No crisis PIN set');
+    }
+    // In a real app, this would generate a deep link with the PIN
+    // For this prototype, we'll return a mock URL
+    return `https://echovault.app/crisis?pin=${pin}`;
+  } catch (error) {
+    console.error('Failed to generate shareable link:', error);
+    throw error;
+  }
+};
+
 export {
   initializeCrisisMode,
   generateCrisisPin,
   setCrisisPin,
   getCrisisPin,
   verifyCrisisPin,
-  isCrisisModeEnabled
+  isCrisisModeEnabled,
+  getShareableLink
 };
