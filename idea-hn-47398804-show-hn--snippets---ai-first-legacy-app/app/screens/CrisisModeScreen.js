@@ -9,6 +9,7 @@ const CrisisModeScreen = () => {
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -17,8 +18,9 @@ const CrisisModeScreen = () => {
         const enabled = await isCrisisModeEnabled();
         setIsEnabled(enabled);
         if (enabled) {
-          const pin = await getShareableLink();
-          setGeneratedPin(pin.split('=')[1]); // Extract PIN from the URL
+          const link = await getShareableLink();
+          const pinFromLink = link.split('pin=')[1];
+          setGeneratedPin(pinFromLink);
         }
       } catch (error) {
         console.error('Failed to check crisis mode status:', error);
@@ -42,7 +44,33 @@ const CrisisModeScreen = () => {
     }
   };
 
+  const handleVerifyPin = async () => {
+    if (!generatedPin) {
+      Alert.alert('Error', 'No PIN generated yet');
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const isValid = await verifyCrisisPin(generatedPin);
+      if (isValid) {
+        Alert.alert('Success', 'PIN verified successfully!');
+      } else {
+        Alert.alert('Error', 'PIN verification failed');
+      }
+    } catch (error) {
+      console.error('PIN verification failed:', error);
+      Alert.alert('Error', 'Failed to verify PIN');
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
   const handleCopyPin = () => {
+    if (!generatedPin) {
+      Alert.alert('Error', 'No PIN generated yet');
+      return;
+    }
     Clipboard.setString(generatedPin);
     Alert.alert('Success', 'PIN copied to clipboard');
   };
@@ -120,12 +148,24 @@ const CrisisModeScreen = () => {
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.shareButton, styles.halfButton]}
-              onPress={handleShareLink}
+              style={[styles.verifyButton, styles.halfButton]}
+              onPress={handleVerifyPin}
+              disabled={isVerifying}
             >
-              <Text style={styles.shareButtonText}>Share Link</Text>
+              {isVerifying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.verifyButtonText}>Verify PIN</Text>
+              )}
             </TouchableOpacity>
           </View>
+
+          <TouchableOpacity
+            style={styles.shareButton}
+            onPress={handleShareLink}
+          >
+            <Text style={styles.shareButtonText}>Share Access Link</Text>
+          </TouchableOpacity>
 
           <Text style={styles.accessTitle}>Access Vault</Text>
           <Text style={styles.accessSubtitle}>
@@ -158,7 +198,7 @@ const CrisisModeScreen = () => {
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.backButtonText}>Back to Home</Text>
+        <Text style={styles.backButtonText}>Back</Text>
       </TouchableOpacity>
     </View>
   );
@@ -174,6 +214,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#333',
     textAlign: 'center',
   },
   setupContainer: {
@@ -186,16 +227,16 @@ const styles = StyleSheet.create({
   },
   instructionText: {
     fontSize: 16,
-    marginBottom: 20,
+    marginBottom: 30,
     textAlign: 'center',
-    color: '#333',
+    color: '#555',
   },
   generateButton: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    width: '80%',
+    width: '100%',
   },
   generateButtonText: {
     color: 'white',
@@ -205,50 +246,64 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   halfButton: {
     width: '48%',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   copyButton: {
     backgroundColor: '#2196F3',
-  },
-  shareButton: {
-    backgroundColor: '#FF9800',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   copyButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  verifyButton: {
+    backgroundColor: '#FF9800',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  verifyButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  shareButton: {
+    backgroundColor: '#9C27B0',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 30,
   },
   shareButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   accessTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
-    textAlign: 'center',
+    color: '#333',
   },
   accessSubtitle: {
     fontSize: 14,
-    color: '#666',
     marginBottom: 20,
-    textAlign: 'center',
+    color: '#666',
   },
   pinInput: {
+    backgroundColor: 'white',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+    fontSize: 18,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 15,
-    fontSize: 18,
-    marginBottom: 20,
-    backgroundColor: 'white',
   },
   submitButton: {
     backgroundColor: '#4CAF50',
@@ -264,12 +319,10 @@ const styles = StyleSheet.create({
   backButton: {
     marginTop: 20,
     padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#f0f0f0',
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#333',
+    color: '#2196F3',
     fontSize: 16,
   },
 });
