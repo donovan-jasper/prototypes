@@ -1,14 +1,31 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 export default function ProfileScreen() {
+  const navigation = useNavigation();
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Profile</Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.placeholder}>Settings coming soon</Text>
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => navigation.navigate('health-passport')}
+        >
+          <Text style={styles.menuItemText}>Health Passport</Text>
+        </TouchableOpacity>
+        <View style={styles.menuItem}>
+          <Text style={styles.menuItemText}>Settings</Text>
+        </View>
+        <View style={styles.menuItem}>
+          <Text style={styles.menuItemText}>Privacy</Text>
+        </View>
+        <View style={styles.menuItem}>
+          <Text style={styles.menuItemText}>Help & Support</Text>
+        </View>
       </View>
     </View>
   );
@@ -36,11 +53,21 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    padding: 20,
   },
-  placeholder: {
-    fontSize: 16,
-    color: '#666',
+  menuItem: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  menuItemText: {
+    fontSize: 18,
+    color: '#333',
   },
 });

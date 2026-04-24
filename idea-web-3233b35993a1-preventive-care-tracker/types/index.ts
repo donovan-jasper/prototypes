@@ -25,3 +25,14 @@ export interface Quest {
   completed: boolean;
   points: number;
 }
+
+export interface HealthPassportRecord {
+  id: string;
+  memberId: string;
+  type: 'vaccination' | 'prescription' | 'allergy' | 'insurance';
+  name: string;
+  details: string;
+  date: string;
+  expirationDate?: string;
+  notes?: string;
+}
