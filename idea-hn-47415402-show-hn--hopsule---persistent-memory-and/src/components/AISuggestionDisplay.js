@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import ConflictAlert from './ConflictAlert';
 import useAIRuleInjection from '../hooks/useAIRuleInjection';
@@ -9,8 +9,16 @@ const AISuggestionDisplay = ({ suggestion }) => {
   const [isAccepted, setIsAccepted] = useState(false);
   const [isRejected, setIsRejected] = useState(false);
   const [modifiedSuggestion, setModifiedSuggestion] = useState(suggestion);
+  const [violations, setViolations] = useState([]);
 
-  const violations = rules.filter(rule => !checkCode(suggestion));
+  useEffect(() => {
+    const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
+    setModifiedSuggestion(processedSuggestion);
+
+    // Check for violations in the modified suggestion
+    const foundViolations = rules.filter(rule => !checkCode(processedSuggestion, rule));
+    setViolations(foundViolations);
+  }, [suggestion, rules]);
 
   const handleAccept = () => {
     if (violations.length === 0) {
@@ -22,25 +30,55 @@ const AISuggestionDisplay = ({ suggestion }) => {
     setIsRejected(true);
   };
 
-  // Apply rule injection when component mounts or suggestion changes
-  React.useEffect(() => {
-    const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
-    setModifiedSuggestion(processedSuggestion);
-  }, [suggestion, rules]);
+  // Highlight violations in the code
+  const renderHighlightedCode = () => {
+    if (violations.length === 0) {
+      return <Text style={styles.suggestionText}>{modifiedSuggestion}</Text>;
+    }
+
+    // This is a simplified version - in a real app you'd need more sophisticated parsing
+    let highlightedText = modifiedSuggestion;
+    violations.forEach(violation => {
+      const regex = new RegExp(violation.pattern, 'g');
+      highlightedText = highlightedText.replace(
+        regex,
+        match => `<span style="color: red; background-color: yellow;">${match}</span>`
+      );
+    });
+
+    // Convert HTML-like spans to React Native Text components
+    const parts = highlightedText.split(/<span[^>]*>|<\/span>/g);
+    const styles = highlightedText.match(/<span[^>]*>/g) || [];
+
+    return parts.map((part, i) => {
+      if (i === 0) return <Text key={i} style={styles.suggestionText}>{part}</Text>;
+
+      const isViolation = styles[i-1]?.includes('color: red');
+      return (
+        <Text key={i} style={isViolation ? [styles.suggestionText, styles.violationText] : styles.suggestionText}>
+          {part}
+        </Text>
+      );
+    });
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>AI Suggestion</Text>
 
       <ScrollView style={styles.suggestionContainer}>
-        <Text style={styles.suggestionText}>{modifiedSuggestion}</Text>
+        {renderHighlightedCode()}
       </ScrollView>
 
       {violations.length > 0 && (
         <View style={styles.violationsContainer}>
           <Text style={styles.violationsTitle}>Rule Violations:</Text>
           {violations.map((violation, index) => (
-            <ConflictAlert key={index} message={`Violates: ${violation.name}`} />
+            <ConflictAlert
+              key={index}
+              message={`Violates: ${violation.name}`}
+              severity={violation.severity || 'warning'}
+            />
           ))}
         </View>
       )}
@@ -94,6 +132,11 @@ const styles = StyleSheet.create({
   },
   suggestionText: {
     fontFamily: 'monospace',
+  },
+  violationText: {
+    color: 'red',
+    backgroundColor: 'rgba(255, 200, 200, 0.5)',
+    fontWeight: 'bold',
   },
   violationsContainer: {
     marginBottom: 10,
