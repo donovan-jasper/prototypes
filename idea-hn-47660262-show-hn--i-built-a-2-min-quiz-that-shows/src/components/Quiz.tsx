@@ -5,9 +5,11 @@ import { calculateBetaDistribution } from '../utils/betaDistribution';
 
 interface QuizProps {
   onComplete: () => void;
+  currentQuestion: number;
+  totalQuestions: number;
 }
 
-const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
+const Quiz: React.FC<QuizProps> = ({ onComplete, currentQuestion, totalQuestions }) => {
   const [description, setDescription] = useState('');
   const [actualValue, setActualValue] = useState('');
   const [estimatedValue, setEstimatedValue] = useState('');
@@ -93,6 +95,13 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.progressContainer}>
+        <Text style={styles.progressText}>Question {currentQuestion} of {totalQuestions}</Text>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${(currentQuestion / totalQuestions) * 100}%` }]} />
+        </View>
+      </View>
+
       <Text style={styles.title}>Daily Calibration Quiz</Text>
 
       <TextInput
@@ -150,6 +159,26 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: '#f5f5f5',
   },
+  progressContainer: {
+    marginBottom: 20,
+  },
+  progressText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  progressBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 5,
+  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -187,9 +216,8 @@ const styles = StyleSheet.create({
   feedback: {
     marginTop: 20,
     textAlign: 'center',
-    fontSize: 16,
     color: '#333',
-    paddingHorizontal: 10,
+    fontSize: 16,
   },
 });
 
