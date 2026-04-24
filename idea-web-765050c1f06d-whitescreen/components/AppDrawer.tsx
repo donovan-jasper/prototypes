@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, Linking, Platform } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import * as Application from 'expo-application';
+import * as IntentLauncher from 'expo-intent-launcher';
 
 const { height } = Dimensions.get('window');
 
@@ -12,6 +14,7 @@ interface AppDrawerProps {
 
 const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
   const { currentTheme, currentMode } = useAppStore();
+  const [installedApps, setInstalledApps] = React.useState<{ id: string; name: string; packageName: string }[]>([]);
 
   // Animation value
   const drawerTranslateY = useSharedValue(height);
@@ -25,27 +28,65 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
   React.useEffect(() => {
     if (visible) {
       drawerTranslateY.value = withSpring(0, { damping: 20 });
+      loadInstalledApps();
     } else {
       drawerTranslateY.value = withSpring(height, { damping: 20 });
     }
   }, [visible]);
 
-  // Mock app data - in a real app this would come from the device's installed apps
-  const apps = [
-    { id: '1', name: 'Mail', icon: 'mail' },
-    { id: '2', name: 'Calendar', icon: 'calendar' },
-    { id: '3', name: 'Notes', icon: 'notes' },
-    { id: '4', name: 'Camera', icon: 'camera' },
-    { id: '5', name: 'Photos', icon: 'photos' },
-    { id: '6', name: 'Messages', icon: 'messages' },
-    { id: '7', name: 'Maps', icon: 'maps' },
-    { id: '8', name: 'Music', icon: 'music' },
-  ];
+  const loadInstalledApps = async () => {
+    try {
+      if (Platform.OS === 'android') {
+        const apps = await Application.getInstalledApplicationsAsync();
+        const filteredApps = apps
+          .filter(app => app.packageName && app.name)
+          .map(app => ({
+            id: app.packageName,
+            name: app.name,
+            packageName: app.packageName
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        setInstalledApps(filteredApps);
+      } else if (Platform.OS === 'ios') {
+        // iOS doesn't have a direct API for installed apps, so we'll use a fallback
+        const commonApps = [
+          { id: 'mail', name: 'Mail', packageName: 'message://' },
+          { id: 'calendar', name: 'Calendar', packageName: 'calshow://' },
+          { id: 'photos', name: 'Photos', packageName: 'photos-redirect://' },
+          { id: 'camera', name: 'Camera', packageName: 'camera://' },
+          { id: 'messages', name: 'Messages', packageName: 'sms://' },
+          { id: 'maps', name: 'Maps', packageName: 'maps://' },
+          { id: 'music', name: 'Music', packageName: 'music://' },
+          { id: 'notes', name: 'Notes', packageName: 'mobilenotes://' },
+        ];
+        setInstalledApps(commonApps);
+      }
+    } catch (error) {
+      console.error('Error loading installed apps:', error);
+    }
+  };
+
+  const handleAppLaunch = async (app: { id: string; name: string; packageName: string }) => {
+    try {
+      if (Platform.OS === 'android') {
+        await IntentLauncher.startActivityAsync('android.intent.action.MAIN', {
+          package: app.packageName,
+          flags: [IntentLauncher.FLAG_ACTIVITY_NEW_TASK],
+        });
+      } else if (Platform.OS === 'ios') {
+        await Linking.openURL(app.packageName);
+      }
+      onClose();
+    } catch (error) {
+      console.error('Error launching app:', error);
+    }
+  };
 
   // Filter apps based on current focus mode's allowedApps
   const filteredApps = currentMode?.allowedApps
-    ? apps.filter(app => currentMode.allowedApps.includes(app.id))
-    : apps;
+    ? installedApps.filter(app => currentMode.allowedApps.includes(app.id))
+    : installedApps;
 
   return (
     <Animated.View style={[styles.container, drawerStyle, { backgroundColor: currentTheme.drawerBackground }]}>
@@ -55,7 +96,10 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
         data={filteredApps}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <TouchableOpacity style={styles.appItem} onPress={onClose}>
+          <TouchableOpacity
+            style={styles.appItem}
+            onPress={() => handleAppLaunch(item)}
+          >
             <Text style={[styles.appName, { color: currentTheme.text }]}>{item.name}</Text>
           </TouchableOpacity>
         )}
