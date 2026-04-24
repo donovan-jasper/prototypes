@@ -150,22 +150,24 @@ const OutfitGeneratorScreen = () => {
         </View>
       )}
 
+      {outfits.length > 0 && (
+        <FlatList
+          data={outfits}
+          renderItem={renderOutfit}
+          keyExtractor={(item, index) => `outfit-${index}`}
+          contentContainerStyle={styles.outfitsList}
+        />
+      )}
+
       {outfits.length === 0 && wardrobe && !error && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
             {Object.values(wardrobe).every(arr => arr.length === 0)
               ? 'Please add some items to your wardrobe first'
-              : 'Select an occasion and tap "Generate Outfits"'}
+              : 'Select an occasion and tap "Generate Outfits" to create your outfits'}
           </Text>
         </View>
       )}
-
-      <FlatList
-        data={outfits}
-        renderItem={renderOutfit}
-        keyExtractor={(item, index) => index.toString()}
-        contentContainerStyle={styles.outfitsList}
-      />
     </View>
   );
 };
@@ -180,24 +182,21 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    textAlign: 'center',
     color: '#333',
+    textAlign: 'center',
   },
   occasionSelector: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     justifyContent: 'space-between',
     marginBottom: 20,
   },
   occasionButton: {
+    alignItems: 'center',
     padding: 10,
     borderRadius: 10,
     backgroundColor: '#e0e0e0',
-    marginBottom: 10,
-    width: '48%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 100,
+    flex: 1,
+    marginHorizontal: 5,
   },
   selectedOccasion: {
     backgroundColor: '#6200ee',
@@ -209,7 +208,7 @@ const styles = StyleSheet.create({
   },
   occasionText: {
     color: '#333',
-    fontWeight: '500',
+    fontSize: 12,
   },
   selectedOccasionText: {
     color: 'white',
@@ -223,11 +222,8 @@ const styles = StyleSheet.create({
   },
   generateButtonText: {
     color: 'white',
-    fontWeight: 'bold',
     fontSize: 16,
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#cccccc',
+    fontWeight: 'bold',
   },
   errorContainer: {
     backgroundColor: '#ffebee',
@@ -238,20 +234,6 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#c62828',
     textAlign: 'center',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyStateText: {
-    color: '#666',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  outfitsList: {
-    paddingBottom: 20,
   },
   outfitCard: {
     backgroundColor: 'white',
@@ -275,15 +257,18 @@ const styles = StyleSheet.create({
   },
   outfitItem: {
     flexDirection: 'row',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   itemLabel: {
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginRight: 5,
-    color: '#555',
+    color: '#333',
   },
   itemName: {
-    color: '#333',
+    color: '#555',
+  },
+  outfitsList: {
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -293,7 +278,19 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
+    color: '#6200ee',
+    fontSize: 16,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
     color: '#666',
+    textAlign: 'center',
+    fontSize: 16,
   },
 });
 
