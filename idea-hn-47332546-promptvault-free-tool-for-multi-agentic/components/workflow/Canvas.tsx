@@ -1,13 +1,14 @@
 import React, { useRef, useState } from 'react';
-import { View, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import Svg, { Line } from 'react-native-svg';
+import Svg, { Line, Circle } from 'react-native-svg';
 import Node from './Node';
+import { useTheme } from 'react-native-paper';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -18,6 +19,8 @@ interface NodeData {
   x: number;
   y: number;
   config?: Record<string, any>;
+  outputType?: 'text' | 'image' | 'audio' | 'number';
+  inputType?: 'text' | 'image' | 'audio' | 'number';
 }
 
 interface Connection {
@@ -31,8 +34,7 @@ interface CanvasProps {
   selectedNodeId?: string;
   onNodeMove: (nodeId: string, x: number, y: number) => void;
   onNodeSelect: (nodeId: string) => void;
-  onConnectionStart: (nodeId: string) => void;
-  onConnectionEnd: (nodeId: string) => void;
+  onConnectionCreate: (from: string, to: string) => void;
 }
 
 export default function Canvas({
@@ -41,9 +43,9 @@ export default function Canvas({
   selectedNodeId,
   onNodeMove,
   onNodeSelect,
-  onConnectionStart,
-  onConnectionEnd,
+  onConnectionCreate,
 }: CanvasProps) {
+  const theme = useTheme();
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -52,6 +54,10 @@ export default function Canvas({
   const savedTranslateY = useSharedValue(0);
 
   const [connectingFrom, setConnectingFrom] = useState<string | null>(null);
+  const [connectionValidation, setConnectionValidation] = useState<{
+    valid: boolean;
+    message: string;
+  } | null>(null);
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
@@ -87,13 +93,31 @@ export default function Canvas({
 
   const handleOutputPress = (nodeId: string) => {
     setConnectingFrom(nodeId);
-    onConnectionStart(nodeId);
+    setConnectionValidation(null);
   };
 
   const handleInputPress = (nodeId: string) => {
     if (connectingFrom && connectingFrom !== nodeId) {
-      onConnectionEnd(nodeId);
+      const fromNode = nodes.find(n => n.id === connectingFrom);
+      const toNode = nodes.find(n => n.id === nodeId);
+
+      if (fromNode && toNode) {
+        if (fromNode.outputType === toNode.inputType) {
+          onConnectionCreate(connectingFrom, nodeId);
+          setConnectionValidation({
+            valid: true,
+            message: 'Connection created successfully'
+          });
+        } else {
+          setConnectionValidation({
+            valid: false,
+            message: `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`
+          });
+        }
+      }
+
       setConnectingFrom(null);
+      setTimeout(() => setConnectionValidation(null), 3000);
     }
   };
 
@@ -121,11 +145,21 @@ export default function Canvas({
                   y1={fromPos.y + 50}
                   x2={toPos.x + 75}
                   y2={toPos.y + 50}
-                  stroke="#6200ee"
+                  stroke={theme.colors.primary}
                   strokeWidth="2"
                 />
               );
             })}
+
+            {connectingFrom && (
+              <Circle
+                cx={getNodePosition(connectingFrom).x + 75}
+                cy={getNodePosition(connectingFrom).y + 50}
+                r="10"
+                fill={theme.colors.primary}
+                opacity={0.7}
+              />
+            )}
           </Svg>
 
           {nodes.map((node) => (
@@ -141,10 +175,25 @@ export default function Canvas({
               onPress={() => onNodeSelect(node.id)}
               onOutputPress={handleOutputPress}
               onInputPress={handleInputPress}
+              outputType={node.outputType}
+              inputType={node.inputType}
             />
           ))}
         </Animated.View>
       </GestureDetector>
+
+      {connectionValidation && (
+        <View style={[
+          styles.validationFeedback,
+          {
+            backgroundColor: connectionValidation.valid
+              ? theme.colors.success
+              : theme.colors.error
+          }
+        ]}>
+          <Text style={styles.validationText}>{connectionValidation.message}</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -157,5 +206,18 @@ const styles = StyleSheet.create({
   canvas: {
     width: SCREEN_WIDTH * 3,
     height: SCREEN_HEIGHT * 3,
+  },
+  validationFeedback: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  validationText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
 });
