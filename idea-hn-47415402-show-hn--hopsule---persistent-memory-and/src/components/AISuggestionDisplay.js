@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import ConflictAlert from './ConflictAlert';
 import useAIRuleInjection from '../hooks/useAIRuleInjection';
-import { injectRulesIntoAISuggestion, getAISuggestions, analyzeCodeWithAI } from '../api/realAIIntegration';
+import { getAISuggestions, analyzeCodeWithAI } from '../api/realAIIntegration';
 
 const AISuggestionDisplay = ({ prompt }) => {
-  const { rules, isLoading: rulesLoading, error: rulesError, injectRulesIntoAISuggestion: localInjectRules } = useAIRuleInjection();
+  const { rules, isLoading: rulesLoading, error: rulesError, injectRulesIntoAISuggestion } = useAIRuleInjection();
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
@@ -49,15 +49,9 @@ const AISuggestionDisplay = ({ prompt }) => {
 
     try {
       // Process with both local rules and AI refinement
-      const processedSuggestion = await localInjectRules(suggestion);
-      setModifiedSuggestion(processedSuggestion);
-
-      // Check for violations
-      const foundViolations = rules.filter(rule => {
-        const regex = new RegExp(rule.pattern);
-        return regex.test(processedSuggestion);
-      });
-      setViolations(foundViolations);
+      const result = await injectRulesIntoAISuggestion(suggestion);
+      setModifiedSuggestion(result.code);
+      setViolations(result.violations);
 
       // Get AI analysis
       const analysis = await analyzeCodeWithAI(suggestion);
@@ -101,35 +95,26 @@ const AISuggestionDisplay = ({ prompt }) => {
     let lastIndex = 0;
 
     // Sort violations by their position in the code
-    const sortedViolations = [...violations].sort((a, b) => {
-      const aIndex = modifiedSuggestion.indexOf(a.pattern);
-      const bIndex = modifiedSuggestion.indexOf(b.pattern);
-      return aIndex - bIndex;
-    });
+    const sortedViolations = [...violations].sort((a, b) => a.position - b.position);
 
     sortedViolations.forEach(violation => {
-      const regex = new RegExp(violation.pattern, 'g');
-      let match;
-
-      while ((match = regex.exec(modifiedSuggestion)) !== null) {
-        // Add text before the match
-        if (match.index > lastIndex) {
-          parts.push({
-            text: modifiedSuggestion.substring(lastIndex, match.index),
-            isViolation: false
-          });
-        }
-
-        // Add the violation text
+      // Add text before the violation
+      if (violation.position > lastIndex) {
         parts.push({
-          text: match[0],
-          isViolation: true,
-          ruleName: violation.name,
-          severity: violation.severity
+          text: modifiedSuggestion.substring(lastIndex, violation.position),
+          isViolation: false
         });
-
-        lastIndex = regex.lastIndex;
       }
+
+      // Add the violation text
+      parts.push({
+        text: violation.match,
+        isViolation: true,
+        ruleName: violation.ruleName,
+        severity: violation.severity
+      });
+
+      lastIndex = violation.position + violation.match.length;
     });
 
     // Add remaining text
@@ -157,39 +142,40 @@ const AISuggestionDisplay = ({ prompt }) => {
     );
   };
 
-  if (rulesLoading) {
+  const renderViolationList = () => {
+    if (!violations.length) return null;
+
     return (
-      <View style={styles.container}>
+      <View style={styles.violationsContainer}>
+        <Text style={styles.violationsTitle}>Rule Violations:</Text>
+        {violations.map((violation, index) => (
+          <View key={index} style={styles.violationItem}>
+            <Text style={[
+              styles.violationText,
+              violation.severity === 'error' ? styles.errorViolation : null
+            ]}>
+              {violation.ruleName} ({violation.severity})
+            </Text>
+            <Text style={styles.violationMatch}>"{violation.match}"</Text>
+          </View>
+        ))}
+      </View>
+    );
+  };
+
+  if (isLoading || rulesLoading) {
+    return (
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading rules...</Text>
+        <Text style={styles.loadingText}>Loading AI suggestions...</Text>
       </View>
     );
   }
 
-  if (rulesError) {
+  if (apiError || rulesError) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{rulesError}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => window.location.reload()}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Fetching AI suggestions...</Text>
-      </View>
-    );
-  }
-
-  if (apiError) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>{apiError}</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{apiError || rulesError}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchSuggestions}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -199,83 +185,62 @@ const AISuggestionDisplay = ({ prompt }) => {
 
   if (!selectedSuggestion) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.noSuggestionsText}>No suggestions available</Text>
+      <View style={styles.noSuggestionContainer}>
+        <Text style={styles.noSuggestionText}>No suggestions available</Text>
       </View>
     );
   }
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>AI Suggestions</Text>
-        {violations.length > 0 && (
-          <ConflictAlert
-            violations={violations}
-            onPress={() => Alert.alert('Rule Violations', violations.map(v => `${v.name} (${v.severity})`).join('\n'))}
-          />
-        )}
-      </View>
-
       <View style={styles.suggestionContainer}>
-        <Text style={styles.suggestionTitle}>Original Suggestion:</Text>
-        <ScrollView horizontal style={styles.codeContainer}>
-          <Text style={styles.suggestionText}>{selectedSuggestion}</Text>
-        </ScrollView>
-
-        <Text style={styles.suggestionTitle}>Modified Suggestion:</Text>
+        <Text style={styles.suggestionTitle}>AI Suggestion</Text>
         <ScrollView horizontal style={styles.codeContainer}>
           {renderHighlightedCode()}
         </ScrollView>
-      </View>
 
-      {aiAnalysis && (
-        <View style={styles.analysisContainer}>
-          <Text style={styles.analysisTitle}>AI Analysis:</Text>
-          <Text style={styles.analysisText}>
-            Complexity: {aiAnalysis.complexity || 'N/A'} | Maintainability: {aiAnalysis.maintainability || 'N/A'}
-          </Text>
+        {renderViolationList()}
+
+        {aiAnalysis && (
+          <View style={styles.aiAnalysisContainer}>
+            <Text style={styles.aiAnalysisTitle}>AI Analysis</Text>
+            <Text style={styles.aiAnalysisText}>{aiAnalysis.summary}</Text>
+            <Text style={styles.aiAnalysisScore}>Score: {aiAnalysis.score}/10</Text>
+          </View>
+        )}
+
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={[styles.actionButton, styles.acceptButton]}
+            onPress={handleAccept}
+            disabled={isAccepted || isRejected}
+          >
+            <Text style={styles.actionButtonText}>Accept</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.actionButton, styles.rejectButton]}
+            onPress={handleReject}
+            disabled={isAccepted || isRejected}
+          >
+            <Text style={styles.actionButtonText}>Reject</Text>
+          </TouchableOpacity>
         </View>
-      )}
 
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.acceptButton]}
-          onPress={handleAccept}
-          disabled={isAccepted}
-        >
-          <Text style={styles.actionButtonText}>
-            {isAccepted ? 'Accepted' : 'Accept Suggestion'}
-          </Text>
-        </TouchableOpacity>
+        {isAccepted && (
+          <ConflictAlert
+            message="Suggestion accepted with rule violations"
+            severity="warning"
+          />
+        )}
 
-        <TouchableOpacity
-          style={[styles.actionButton, styles.rejectButton]}
-          onPress={handleReject}
-          disabled={isRejected}
-        >
-          <Text style={styles.actionButtonText}>
-            {isRejected ? 'Rejected' : 'Reject Suggestion'}
-          </Text>
-        </TouchableOpacity>
+        {isRejected && (
+          <ConflictAlert
+            message="Suggestion rejected"
+            severity="error"
+          />
+        )}
       </View>
-
-      {suggestions.length > 1 && (
-        <View style={styles.moreSuggestions}>
-          <Text style={styles.moreSuggestionsText}>More suggestions available:</Text>
-          {suggestions.slice(1).map((suggestion, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.suggestionItem}
-              onPress={() => processSuggestion(suggestion)}
-            >
-              <Text style={styles.suggestionItemText} numberOfLines={1}>
-                {suggestion.substring(0, 50)}...
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
     </ScrollView>
   );
 };
@@ -283,50 +248,56 @@ const AISuggestionDisplay = ({ prompt }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    padding: 20,
   },
   loadingText: {
-    marginTop: 16,
-    textAlign: 'center',
+    marginTop: 10,
+    fontSize: 16,
     color: '#666',
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
-    color: 'red',
+    fontSize: 16,
+    color: '#ff3b30',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   retryButton: {
     backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
   },
   retryButtonText: {
     color: 'white',
-    fontWeight: 'bold',
-  },
-  noSuggestionsText: {
-    textAlign: 'center',
-    color: '#666',
     fontSize: 16,
+  },
+  noSuggestionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noSuggestionText: {
+    fontSize: 16,
+    color: '#666',
   },
   suggestionContainer: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 10,
+    margin: 15,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -334,97 +305,101 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   suggestionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
     color: '#333',
   },
   codeContainer: {
     backgroundColor: '#f8f8f8',
-    borderRadius: 4,
-    padding: 8,
-    marginBottom: 16,
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
     maxHeight: 200,
   },
   suggestionText: {
     fontFamily: 'monospace',
     fontSize: 14,
-    color: '#333',
+    lineHeight: 20,
   },
   violationText: {
-    backgroundColor: 'rgba(255, 204, 0, 0.3)',
-    color: '#D4A017',
+    backgroundColor: '#fff3cd',
+    color: '#856404',
   },
   errorViolation: {
-    backgroundColor: 'rgba(255, 0, 0, 0.2)',
-    color: '#D32F2F',
+    backgroundColor: '#f8d7da',
+    color: '#721c24',
   },
-  analysisContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+  violationsContainer: {
+    marginBottom: 15,
+    padding: 10,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 5,
   },
-  analysisTitle: {
+  violationsTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 8,
-    color: '#333',
+    color: '#495057',
   },
-  analysisText: {
+  violationItem: {
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: 'white',
+    borderRadius: 4,
+    borderLeftWidth: 3,
+    borderLeftColor: '#ffc107',
+  },
+  violationMatch: {
+    fontFamily: 'monospace',
+    fontSize: 13,
+    marginTop: 4,
+    color: '#6c757d',
+  },
+  aiAnalysisContainer: {
+    marginBottom: 15,
+    padding: 10,
+    backgroundColor: '#e9f7fe',
+    borderRadius: 5,
+  },
+  aiAnalysisTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#17a2b8',
+  },
+  aiAnalysisText: {
     fontSize: 14,
-    color: '#666',
+    color: '#495057',
+    marginBottom: 8,
+  },
+  aiAnalysisScore: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#28a745',
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginTop: 15,
   },
   actionButton: {
     flex: 1,
-    padding: 12,
-    borderRadius: 8,
+    paddingVertical: 12,
+    borderRadius: 5,
+    marginHorizontal: 5,
     alignItems: 'center',
-    marginHorizontal: 4,
   },
   acceptButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#28a745',
   },
   rejectButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#dc3545',
   },
   actionButtonText: {
     color: 'white',
-    fontWeight: 'bold',
-  },
-  moreSuggestions: {
-    marginTop: 16,
-  },
-  moreSuggestionsText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-    color: '#333',
-  },
-  suggestionItem: {
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  suggestionItemText: {
-    fontSize: 14,
-    color: '#333',
+    fontWeight: 'bold',
   },
 });
 

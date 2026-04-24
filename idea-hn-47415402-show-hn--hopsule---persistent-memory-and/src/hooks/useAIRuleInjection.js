@@ -105,6 +105,7 @@ const useAIRuleInjection = () => {
     if (!codeSuggestion || !rules.length) return codeSuggestion;
 
     let modifiedSuggestion = codeSuggestion;
+    const violations = [];
 
     // First apply local rules
     rules.forEach(rule => {
@@ -115,7 +116,15 @@ const useAIRuleInjection = () => {
         if (matches) {
           modifiedSuggestion = modifiedSuggestion.replace(
             regex,
-            match => `/* RULE VIOLATION: ${rule.name} (${rule.severity}) */ ${match}`
+            match => {
+              violations.push({
+                ruleName: rule.name,
+                severity: rule.severity,
+                match: match,
+                position: modifiedSuggestion.indexOf(match)
+              });
+              return `/* RULE VIOLATION: ${rule.name} (${rule.severity}) */ ${match}`
+            }
           );
         }
       } catch (error) {
@@ -148,7 +157,10 @@ const useAIRuleInjection = () => {
       console.error('Error calling AI refinement API:', error);
     }
 
-    return modifiedSuggestion;
+    return {
+      code: modifiedSuggestion,
+      violations: violations.sort((a, b) => a.position - b.position)
+    };
   };
 
   return {
