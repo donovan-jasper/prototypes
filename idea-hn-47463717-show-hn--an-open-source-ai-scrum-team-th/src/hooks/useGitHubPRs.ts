@@ -1,47 +1,71 @@
 import { useState } from 'react';
+import { Octokit } from '@octokit/rest';
 
 interface PRReviewResponse {
   success: boolean;
   message: string;
 }
 
-const useGitHubPRs = () => {
+const useGitHubPRs = (token: string) => {
   const [loading, setLoading] = useState(false);
+  const octokit = new Octokit({ auth: token });
 
-  const approvePR = async (prId: number): Promise<PRReviewResponse> => {
+  const approvePR = async (owner: string, repo: string, prNumber: number): Promise<PRReviewResponse> => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews', {
+        owner,
+        repo,
+        pull_number: prNumber,
+        event: 'APPROVE',
+        headers: {
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
 
-      return {
-        success: true,
-        message: 'PR Approved!'
-      };
+      if (response.status === 200) {
+        return {
+          success: true,
+          message: 'PR Approved!'
+        };
+      } else {
+        throw new Error('Failed to approve PR');
+      }
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to approve PR'
+        message: error instanceof Error ? error.message : 'Failed to approve PR'
       };
     } finally {
       setLoading(false);
     }
   };
 
-  const rejectPR = async (prId: number): Promise<PRReviewResponse> => {
+  const rejectPR = async (owner: string, repo: string, prNumber: number): Promise<PRReviewResponse> => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await octokit.request('POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews', {
+        owner,
+        repo,
+        pull_number: prNumber,
+        event: 'REQUEST_CHANGES',
+        headers: {
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
 
-      return {
-        success: true,
-        message: 'PR Rejected!'
-      };
+      if (response.status === 200) {
+        return {
+          success: true,
+          message: 'PR Rejected!'
+        };
+      } else {
+        throw new Error('Failed to reject PR');
+      }
     } catch (error) {
       return {
         success: false,
-        message: 'Failed to reject PR'
+        message: error instanceof Error ? error.message : 'Failed to reject PR'
       };
     } finally {
       setLoading(false);
