@@ -1,75 +1,76 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
-import { Audio } from 'expo-av';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { getAudiobook } from '@/lib/db/audiobooks';
 import { getChapters, updateChapter, deleteChapter, createChapter } from '@/lib/db/chapters';
-import { getAudiobook, updateAudiobook } from '@/lib/db/audiobooks';
-import { mergeAudioFiles, embedChapters } from '@/lib/audio/processor';
-import { useRouter } from 'expo-router';
+import { Audio } from 'expo-av';
 
 interface Chapter {
-  id: number;
+  id?: number;
   title: string;
   startTime: number;
   endTime: number;
-  order: number;
 }
 
-interface ChapterEditorProps {
-  audiobookId: number;
+interface Audiobook {
+  id: number;
+  title: string;
+  author: string;
+  duration: number;
+  filePath: string;
 }
 
-export default function ChapterEditor({ audiobookId }: ChapterEditorProps) {
+export default function ChapterEditor() {
+  const { id } = useLocalSearchParams();
+  const router = useRouter();
+  const [audiobook, setAudiobook] = useState<Audiobook | null>(null);
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [audiobook, setAudiobook] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [currentPosition, setCurrentPosition] = useState(0);
-  const router = useRouter();
-  const playbackInterval = useRef<NodeJS.Timeout | null>(null);
+  const [position, setPosition] = useState(0);
 
   useEffect(() => {
+    const loadData = async () => {
+      try {
+        if (typeof id === 'string') {
+          const bookId = parseInt(id);
+          const book = await getAudiobook(bookId);
+          const chapterList = await getChapters(bookId);
+
+          setAudiobook(book);
+          setChapters(chapterList);
+        }
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     loadData();
 
     return () => {
       if (sound) {
         sound.unloadAsync();
       }
-      if (playbackInterval.current) {
-        clearInterval(playbackInterval.current);
-      }
     };
-  }, []);
+  }, [id]);
 
-  const loadData = async () => {
+  const loadAudio = async () => {
+    if (!audiobook) return;
+
     try {
-      const book = await getAudiobook(audiobookId);
-      const chapterList = await getChapters(audiobookId);
-
-      setAudiobook(book);
-      setChapters(chapterList.sort((a, b) => a.order - b.order));
-      setIsLoading(false);
-
-      // Load audio for preview
-      await loadAudio(book.filePath);
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setIsLoading(false);
-    }
-  };
-
-  const loadAudio = async (uri: string) => {
-    try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri },
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: audiobook.filePath },
         { shouldPlay: false }
       );
-      setSound(sound);
+      setSound(newSound);
 
-      sound.setOnPlaybackStatusUpdate(status => {
+      newSound.setOnPlaybackStatusUpdate(status => {
         if (status.isLoaded) {
-          setCurrentPosition(status.positionMillis || 0);
+          setPosition(status.positionMillis);
+          setIsPlaying(status.isPlaying);
         }
       });
     } catch (error) {
@@ -77,121 +78,152 @@ export default function ChapterEditor({ audiobookId }: ChapterEditorProps) {
     }
   };
 
-  const togglePlayback = async () => {
-    if (!sound) return;
-
-    if (isPlaying) {
-      await sound.pauseAsync();
-      setIsPlaying(false);
-      if (playbackInterval.current) {
-        clearInterval(playbackInterval.current);
-      }
-    } else {
-      await sound.playAsync();
-      setIsPlaying(true);
-
-      // Update position every 100ms
-      playbackInterval.current = setInterval(async () => {
-        if (sound) {
-          const status = await sound.getStatusAsync();
-          if (status.isLoaded) {
-            setCurrentPosition(status.positionMillis || 0);
-          }
-        }
-      }, 100);
-    }
-  };
-
-  const seekTo = async (position: number) => {
+  const playAudio = async () => {
     if (sound) {
-      await sound.setPositionAsync(position);
-      setCurrentPosition(position);
+      await sound.playAsync();
+    } else {
+      await loadAudio();
+      if (sound) {
+        await sound.playAsync();
+      }
     }
   };
 
-  const handleChapterChange = (id: number, field: 'title' | 'startTime' | 'endTime', value: string | number) => {
-    setChapters(prev => prev.map(chapter =>
-      chapter.id === id ? { ...chapter, [field]: value } : chapter
-    ));
-  };
-
-  const saveChapter = async (chapter: Chapter) => {
-    try {
-      await updateChapter(chapter);
-    } catch (error) {
-      console.error('Error saving chapter:', error);
+  const pauseAudio = async () => {
+    if (sound) {
+      await sound.pauseAsync();
     }
   };
 
-  const addChapter = async () => {
-    try {
-      const newChapter = {
-        audiobookId,
-        title: `Chapter ${chapters.length + 1}`,
-        startTime: currentPosition,
-        endTime: currentPosition + 30000, // Default 30 seconds
-        order: chapters.length,
-      };
-
-      const createdChapter = await createChapter(newChapter);
-      setChapters([...chapters, createdChapter]);
-    } catch (error) {
-      console.error('Error adding chapter:', error);
+  const seekTo = async (time: number) => {
+    if (sound) {
+      await sound.setPositionAsync(time);
     }
   };
 
-  const removeChapter = async (id: number) => {
-    try {
-      await deleteChapter(id);
-      setChapters(prev => prev.filter(chapter => chapter.id !== id));
-    } catch (error) {
-      console.error('Error removing chapter:', error);
-    }
+  const formatTime = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
   };
 
-  const saveAudiobook = async () => {
+  const handleChapterChange = (index: number, field: 'title' | 'startTime' | 'endTime', value: string | number) => {
+    const updatedChapters = [...chapters];
+    if (field === 'title') {
+      updatedChapters[index].title = value as string;
+    } else if (field === 'startTime') {
+      updatedChapters[index].startTime = Number(value);
+    } else if (field === 'endTime') {
+      updatedChapters[index].endTime = Number(value);
+    }
+    setChapters(updatedChapters);
+  };
+
+  const saveChapters = async () => {
     if (!audiobook) return;
 
-    setIsSaving(true);
-
     try {
-      // Sort chapters by start time
-      const sortedChapters = [...chapters].sort((a, b) => a.startTime - b.startTime);
-
-      // Update chapter orders based on sorted position
-      const updatedChapters = sortedChapters.map((chapter, index) => ({
-        ...chapter,
-        order: index,
-      }));
-
-      // Save all chapters
-      for (const chapter of updatedChapters) {
-        await updateChapter(chapter);
+      // Update existing chapters and create new ones
+      for (const chapter of chapters) {
+        if (chapter.id) {
+          await updateChapter(chapter.id, chapter);
+        } else {
+          await createChapter(audiobook.id, chapter);
+        }
       }
 
-      // Update audiobook duration if needed
-      if (updatedChapters.length > 0) {
-        const lastChapter = updatedChapters[updatedChapters.length - 1];
-        await updateAudiobook(audiobook.id, {
-          duration: lastChapter.endTime,
-        });
-      }
-
-      // Merge and embed chapters (if needed)
-      // This would be more complex in a real implementation
-      // For now we'll just navigate back to the player
-
+      // Navigate back to player
       router.push({
         pathname: '/audiobook/[id]',
         params: { id: audiobook.id },
       });
     } catch (error) {
-      console.error('Error saving audiobook:', error);
-      alert('Failed to save audiobook. Please try again.');
-    } finally {
-      setIsSaving(false);
+      console.error('Error saving chapters:', error);
+      alert('Failed to save chapters. Please try again.');
     }
   };
+
+  const addChapter = () => {
+    const newChapter: Chapter = {
+      title: `Chapter ${chapters.length + 1}`,
+      startTime: chapters.length > 0 ? chapters[chapters.length - 1].endTime : 0,
+      endTime: chapters.length > 0 ? chapters[chapters.length - 1].endTime + 30000 : 30000,
+    };
+    setChapters([...chapters, newChapter]);
+  };
+
+  const removeChapter = async (index: number) => {
+    const chapterToRemove = chapters[index];
+    if (chapterToRemove.id) {
+      try {
+        await deleteChapter(chapterToRemove.id);
+      } catch (error) {
+        console.error('Error deleting chapter:', error);
+        alert('Failed to delete chapter. Please try again.');
+      }
+    }
+
+    const updatedChapters = [...chapters];
+    updatedChapters.splice(index, 1);
+    setChapters(updatedChapters);
+  };
+
+  const renderChapterItem = ({ item, index }: { item: Chapter; index: number }) => (
+    <View style={styles.chapterItem}>
+      <View style={styles.chapterHeader}>
+        <Text style={styles.chapterTitle}>Chapter {index + 1}</Text>
+        <TouchableOpacity onPress={() => removeChapter(index)}>
+          <Text style={styles.removeButton}>Remove</Text>
+        </TouchableOpacity>
+      </View>
+
+      <TextInput
+        style={styles.input}
+        value={item.title}
+        onChangeText={(text) => handleChapterChange(index, 'title', text)}
+        placeholder="Chapter title"
+      />
+
+      <View style={styles.timeInputs}>
+        <View style={styles.timeInput}>
+          <Text style={styles.label}>Start Time (ms):</Text>
+          <TextInput
+            style={styles.input}
+            value={item.startTime.toString()}
+            onChangeText={(text) => handleChapterChange(index, 'startTime', text)}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.timeInput}>
+          <Text style={styles.label}>End Time (ms):</Text>
+          <TextInput
+            style={styles.input}
+            value={item.endTime.toString()}
+            onChangeText={(text) => handleChapterChange(index, 'endTime', text)}
+            keyboardType="numeric"
+          />
+        </View>
+      </View>
+
+      <View style={styles.timeControls}>
+        <TouchableOpacity
+          style={styles.timeButton}
+          onPress={() => seekTo(item.startTime)}
+        >
+          <Text style={styles.timeButtonText}>Go to Start</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.timeButton}
+          onPress={() => seekTo(item.endTime)}
+        >
+          <Text style={styles.timeButtonText}>Go to End</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   if (isLoading) {
     return (
@@ -202,119 +234,46 @@ export default function ChapterEditor({ audiobookId }: ChapterEditorProps) {
     );
   }
 
+  if (!audiobook) {
+    return (
+      <View style={styles.container}>
+        <Text>Audiobook not found</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Edit Chapters</Text>
+      <Text style={styles.title}>{audiobook.title}</Text>
+      <Text style={styles.author}>{audiobook.author}</Text>
 
-      {/* Audio Player Controls */}
       <View style={styles.playerControls}>
-        <TouchableOpacity onPress={togglePlayback} style={styles.playButton}>
+        <TouchableOpacity
+          style={styles.playButton}
+          onPress={isPlaying ? pauseAudio : playAudio}
+        >
           <Text style={styles.playButtonText}>{isPlaying ? 'Pause' : 'Play'}</Text>
         </TouchableOpacity>
-        <Text style={styles.positionText}>
-          {formatTime(currentPosition)} / {formatTime(audiobook?.duration || 0)}
-        </Text>
+        <Text style={styles.positionText}>{formatTime(position)}</Text>
       </View>
 
-      {/* Chapter List */}
-      <ScrollView style={styles.chapterList}>
-        {chapters.map((chapter, index) => (
-          <View key={chapter.id} style={styles.chapterItem}>
-            <TextInput
-              style={styles.chapterTitle}
-              value={chapter.title}
-              onChangeText={(text) => handleChapterChange(chapter.id, 'title', text)}
-              onBlur={() => saveChapter(chapter)}
-            />
+      <FlatList
+        data={chapters}
+        renderItem={renderChapterItem}
+        keyExtractor={(item, index) => index.toString()}
+        style={styles.chapterList}
+      />
 
-            <View style={styles.timeControls}>
-              <TextInput
-                style={styles.timeInput}
-                value={formatTime(chapter.startTime)}
-                onChangeText={(text) => {
-                  const time = parseTime(text);
-                  handleChapterChange(chapter.id, 'startTime', time);
-                }}
-                onBlur={() => saveChapter(chapter)}
-              />
-              <Text> - </Text>
-              <TextInput
-                style={styles.timeInput}
-                value={formatTime(chapter.endTime)}
-                onChangeText={(text) => {
-                  const time = parseTime(text);
-                  handleChapterChange(chapter.id, 'endTime', time);
-                }}
-                onBlur={() => saveChapter(chapter)}
-              />
-            </View>
+      <TouchableOpacity style={styles.addButton} onPress={addChapter}>
+        <Text style={styles.addButtonText}>Add Chapter</Text>
+      </TouchableOpacity>
 
-            <View style={styles.chapterActions}>
-              <TouchableOpacity
-                style={styles.seekButton}
-                onPress={() => seekTo(chapter.startTime)}
-              >
-                <Text style={styles.seekButtonText}>Go to Start</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.seekButton, styles.deleteButton]}
-                onPress={() => removeChapter(chapter.id)}
-              >
-                <Text style={styles.seekButtonText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ))}
-
-        <TouchableOpacity style={styles.addButton} onPress={addChapter}>
-          <Text style={styles.addButtonText}>+ Add Chapter</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Save Button */}
-      <TouchableOpacity
-        style={[styles.saveButton, isSaving && styles.disabledButton]}
-        onPress={saveAudiobook}
-        disabled={isSaving}
-      >
-        {isSaving ? (
-          <ActivityIndicator color="white" />
-        ) : (
-          <Text style={styles.saveButtonText}>Save Audiobook</Text>
-        )}
+      <TouchableOpacity style={styles.saveButton} onPress={saveChapters}>
+        <Text style={styles.saveButtonText}>Save Chapters</Text>
       </TouchableOpacity>
     </View>
   );
 }
-
-const formatTime = (milliseconds: number) => {
-  const totalSeconds = Math.floor(milliseconds / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  } else {
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-  }
-};
-
-const parseTime = (timeString: string) => {
-  const parts = timeString.split(':').map(Number);
-
-  if (parts.length === 3) {
-    // HH:MM:SS
-    return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
-  } else if (parts.length === 2) {
-    // MM:SS
-    return (parts[0] * 60 + parts[1]) * 1000;
-  } else {
-    // SS
-    return parts[0] * 1000;
-  }
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -330,26 +289,27 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  author: {
+    fontSize: 18,
+    color: '#666',
     marginBottom: 20,
-    textAlign: 'center',
   },
   playerControls: {
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
   },
   playButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#6200ee',
     padding: 10,
     borderRadius: 5,
     marginRight: 15,
   },
   playButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#fff',
+    fontSize: 16,
   },
   positionText: {
     fontSize: 16,
@@ -363,65 +323,79 @@ const styles = StyleSheet.create({
     borderBottomColor: '#eee',
     marginBottom: 10,
   },
+  chapterHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
   chapterTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    padding: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 4,
+    fontWeight: 'bold',
   },
-  timeControls: {
+  removeButton: {
+    color: '#ff3b30',
+    fontSize: 14,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  timeInputs: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
   timeInput: {
-    padding: 8,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-    minWidth: 80,
-    textAlign: 'center',
+    flex: 1,
+    marginHorizontal: 5,
   },
-  chapterActions: {
+  label: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  timeControls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  seekButton: {
-    backgroundColor: '#007AFF',
+  timeButton: {
+    backgroundColor: '#6200ee',
     padding: 8,
-    borderRadius: 4,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
   },
-  seekButtonText: {
-    color: 'white',
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
+  timeButtonText: {
+    color: '#fff',
+    fontSize: 14,
   },
   addButton: {
-    backgroundColor: '#4CD964',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  addButtonText: {
-    color: 'white',
-    fontWeight: '600',
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#4caf50',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 20,
+    marginBottom: 10,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#6200ee',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   saveButtonText: {
-    color: 'white',
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  disabledButton: {
-    opacity: 0.7,
+    fontWeight: 'bold',
   },
 });

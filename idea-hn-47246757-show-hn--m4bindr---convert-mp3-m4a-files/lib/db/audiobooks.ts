@@ -1,199 +1,133 @@
-import { getDatabase } from './schema';
-import { Audiobook, Chapter } from './schema';
+import { openDatabase } from './schema';
 
-const db = getDatabase();
+interface Audiobook {
+  id?: number;
+  title: string;
+  author: string;
+  duration: number;
+  filePath: string;
+  coverArt: string | null;
+  currentPosition?: number;
+  createdAt?: string;
+}
 
-export const createAudiobook = async (audiobook: Audiobook): Promise<Audiobook> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `INSERT INTO audiobooks (title, author, duration, filePath, coverArt)
-           VALUES (?, ?, ?, ?, ?);`,
-          [audiobook.title, audiobook.author, audiobook.duration, audiobook.filePath, audiobook.coverArt || null],
-          (_, result) => {
-            const newAudiobookId = result.insertId;
+export const createAudiobook = async (audiobook: Omit<Audiobook, 'id' | 'createdAt'>): Promise<Audiobook> => {
+  const db = await openDatabase();
 
-            // Insert chapters if they exist
-            if (audiobook.chapters && audiobook.chapters.length > 0) {
-              const chapterValues = audiobook.chapters.map((chapter, index) => [
-                newAudiobookId,
-                chapter.title,
-                chapter.startTime,
-                chapter.endTime,
-                index + 1
-              ]);
-
-              chapterValues.forEach((chapter) => {
-                tx.executeSql(
-                  `INSERT INTO chapters (audiobookId, title, startTime, endTime, "order")
-                   VALUES (?, ?, ?, ?, ?);`,
-                  chapter
-                );
-              });
-            }
-
-            resolve({ ...audiobook, id: newAudiobookId });
-          },
-          (_, error) => {
-            reject(error);
-            return false;
-          }
-        );
-      },
-      (error) => {
-        console.error('Transaction error:', error);
-        reject(error);
-      }
+  try {
+    const result = await db.runAsync(
+      'INSERT INTO audiobooks (title, author, duration, filePath, coverArt, currentPosition) VALUES (?, ?, ?, ?, ?, ?)',
+      [audiobook.title, audiobook.author, audiobook.duration, audiobook.filePath, audiobook.coverArt, audiobook.currentPosition || 0]
     );
-  });
+
+    return {
+      ...audiobook,
+      id: result.lastInsertRowId,
+      createdAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error('Error creating audiobook:', error);
+    throw error;
+  }
+};
+
+export const getAudiobook = async (id: number): Promise<Audiobook> => {
+  const db = await openDatabase();
+
+  try {
+    const result = await db.getFirstAsync<Audiobook>(
+      'SELECT * FROM audiobooks WHERE id = ?',
+      [id]
+    );
+
+    if (!result) {
+      throw new Error('Audiobook not found');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('Error getting audiobook:', error);
+    throw error;
+  }
 };
 
 export const getAudiobooks = async (): Promise<Audiobook[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT * FROM audiobooks ORDER BY createdAt DESC;`,
-          [],
-          (_, { rows }) => {
-            const audiobooks: Audiobook[] = rows._array;
+  const db = await openDatabase();
 
-            // Get chapters for each audiobook
-            const audiobookPromises = audiobooks.map(audiobook => {
-              return new Promise<Audiobook>((resolveAudiobook) => {
-                tx.executeSql(
-                  `SELECT * FROM chapters WHERE audiobookId = ? ORDER BY "order";`,
-                  [audiobook.id],
-                  (_, { rows: chapterRows }) => {
-                    const chapters: Chapter[] = chapterRows._array;
-                    resolveAudiobook({ ...audiobook, chapters });
-                  },
-                  (_, error) => {
-                    console.error('Error fetching chapters:', error);
-                    resolveAudiobook(audiobook);
-                  }
-                );
-              });
-            });
-
-            Promise.all(audiobookPromises).then(resolvedAudiobooks => {
-              resolve(resolvedAudiobooks);
-            });
-          },
-          (_, error) => {
-            reject(error);
-            return false;
-          }
-        );
-      },
-      (error) => {
-        console.error('Transaction error:', error);
-        reject(error);
-      }
+  try {
+    const result = await db.getAllAsync<Audiobook>(
+      'SELECT * FROM audiobooks ORDER BY createdAt DESC'
     );
-  });
+    return result;
+  } catch (error) {
+    console.error('Error getting audiobooks:', error);
+    throw error;
+  }
 };
 
-export const getAudiobookById = async (id: number): Promise<Audiobook | null> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `SELECT * FROM audiobooks WHERE id = ?;`,
-          [id],
-          (_, { rows }) => {
-            if (rows.length === 0) {
-              resolve(null);
-              return;
-            }
+export const updateAudiobook = async (id: number, updates: Partial<Audiobook>) => {
+  const db = await openDatabase();
 
-            const audiobook: Audiobook = rows.item(0);
+  try {
+    const updateFields = [];
+    const params = [];
 
-            // Get chapters
-            tx.executeSql(
-              `SELECT * FROM chapters WHERE audiobookId = ? ORDER BY "order";`,
-              [id],
-              (_, { rows: chapterRows }) => {
-                const chapters: Chapter[] = chapterRows._array;
-                resolve({ ...audiobook, chapters });
-              },
-              (_, error) => {
-                reject(error);
-                return false;
-              }
-            );
-          },
-          (_, error) => {
-            reject(error);
-            return false;
-          }
-        );
-      },
-      (error) => {
-        console.error('Transaction error:', error);
-        reject(error);
-      }
+    if (updates.title !== undefined) {
+      updateFields.push('title = ?');
+      params.push(updates.title);
+    }
+    if (updates.author !== undefined) {
+      updateFields.push('author = ?');
+      params.push(updates.author);
+    }
+    if (updates.duration !== undefined) {
+      updateFields.push('duration = ?');
+      params.push(updates.duration);
+    }
+    if (updates.filePath !== undefined) {
+      updateFields.push('filePath = ?');
+      params.push(updates.filePath);
+    }
+    if (updates.coverArt !== undefined) {
+      updateFields.push('coverArt = ?');
+      params.push(updates.coverArt);
+    }
+    if (updates.currentPosition !== undefined) {
+      updateFields.push('currentPosition = ?');
+      params.push(updates.currentPosition);
+    }
+
+    if (updateFields.length === 0) return;
+
+    params.push(id);
+
+    await db.runAsync(
+      `UPDATE audiobooks SET ${updateFields.join(', ')} WHERE id = ?`,
+      params
     );
-  });
+  } catch (error) {
+    console.error('Error updating audiobook:', error);
+    throw error;
+  }
 };
 
-export const updateProgress = async (id: number, position: number): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          `UPDATE audiobooks SET currentPosition = ? WHERE id = ?;`,
-          [position, id],
-          () => {
-            resolve();
-          },
-          (_, error) => {
-            reject(error);
-            return false;
-          }
-        );
-      },
-      (error) => {
-        console.error('Transaction error:', error);
-        reject(error);
-      }
-    );
-  });
+export const updateProgress = async (id: number, position: number) => {
+  await updateAudiobook(id, { currentPosition: position });
 };
 
-export const deleteAudiobook = async (id: number): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        // First delete chapters
-        tx.executeSql(
-          `DELETE FROM chapters WHERE audiobookId = ?;`,
-          [id],
-          () => {
-            // Then delete the audiobook
-            tx.executeSql(
-              `DELETE FROM audiobooks WHERE id = ?;`,
-              [id],
-              () => {
-                resolve();
-              },
-              (_, error) => {
-                reject(error);
-                return false;
-              }
-            );
-          },
-          (_, error) => {
-            reject(error);
-            return false;
-          }
-        );
-      },
-      (error) => {
-        console.error('Transaction error:', error);
-        reject(error);
-      }
-    );
-  });
+export const deleteAudiobook = async (id: number) => {
+  const db = await openDatabase();
+
+  try {
+    await db.transactionAsync(async (tx) => {
+      // First delete chapters
+      await tx.executeSqlAsync('DELETE FROM chapters WHERE audiobookId = ?', [id]);
+
+      // Then delete the audiobook
+      await tx.executeSqlAsync('DELETE FROM audiobooks WHERE id = ?', [id]);
+    });
+  } catch (error) {
+    console.error('Error deleting audiobook:', error);
+    throw error;
+  }
 };
