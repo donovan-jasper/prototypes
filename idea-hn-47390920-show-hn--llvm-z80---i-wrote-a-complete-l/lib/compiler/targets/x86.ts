@@ -7,13 +7,17 @@ export class X86Compiler {
   async initialize(): Promise<void> {
     try {
       // Load the WASM module for x86 compilation
-      const response = await fetch('lib/compiler/wasm/x86-toolchain.wasm');
+      const response = await fetch('lib/compiler/wasm/x86.wasm');
       const buffer = await response.arrayBuffer();
       this.wasmModule = await WebAssembly.compile(buffer);
       this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
         env: {
           memory: new WebAssembly.Memory({ initial: 256 }),
           table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
+          // Add any required imports here
+          abort: () => {
+            throw new Error('WASM module aborted');
+          }
         }
       });
     } catch (error) {
@@ -37,7 +41,7 @@ export class X86Compiler {
       logs.push('[INFO] Compiling x86 code...');
 
       // Get the WASM exports
-      const exports = this.wasmInstance!.exports as any;
+      const exports = this.wasmInstance.exports as any;
 
       // Allocate memory for the input code
       const codePtr = exports.allocate(code.length + 1);

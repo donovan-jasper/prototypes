@@ -26,19 +26,35 @@ export enum CompilationTarget {
   AVR = 'avr',
   Z80 = 'z80',
   MOS6502 = 'mos6502',
-  // Add more targets as needed
 }
 
 export class CompilerEngine {
   private compilers: Map<CompilationTarget, any> = new Map();
+  private wasmModules: Map<string, WebAssembly.Module> = new Map();
 
   constructor() {
-    // Initialize compilers
     this.compilers.set(CompilationTarget.X86, new X86Compiler());
     this.compilers.set(CompilationTarget.ARM, new ARMCompiler());
     this.compilers.set(CompilationTarget.AVR, new AVRCompiler());
     this.compilers.set(CompilationTarget.Z80, new Z80Compiler());
     this.compilers.set(CompilationTarget.MOS6502, new MOS6502Compiler());
+  }
+
+  async loadWasmModule(target: string): Promise<WebAssembly.Module> {
+    if (this.wasmModules.has(target)) {
+      return this.wasmModules.get(target)!;
+    }
+
+    try {
+      const response = await fetch(`lib/compiler/wasm/${target}.wasm`);
+      const buffer = await response.arrayBuffer();
+      const module = await WebAssembly.compile(buffer);
+      this.wasmModules.set(target, module);
+      return module;
+    } catch (error) {
+      console.error(`Failed to load WASM module for ${target}:`, error);
+      throw error;
+    }
   }
 
   async compile(code: string, target: CompilationTarget): Promise<CompilationResult> {
