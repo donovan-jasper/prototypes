@@ -65,7 +65,7 @@ app.get('/health', (req, res) => {
 
 // Routes
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     service: 'CodeCapsule Backend',
     version: '2.0.0',
     endpoints: {
@@ -86,7 +86,7 @@ app.post('/api/session', (req, res) => {
     output: [],
     status: 'active'
   });
-  
+
   res.json({ sessionId });
 });
 
@@ -95,25 +95,25 @@ function validateCode(code) {
   if (!code || typeof code !== 'string') {
     throw new Error('Invalid code input');
   }
-  
+
   if (code.length > MAX_CODE_LENGTH) {
     throw new Error(`Code exceeds maximum length of ${MAX_CODE_LENGTH} characters`);
   }
-  
+
   // Check for forbidden patterns
   for (const pattern of FORBIDDEN_PATTERNS) {
     if (pattern.test(code)) {
       throw new Error('Code contains forbidden shell metacharacters or patterns');
     }
   }
-  
+
   // Check for dangerous imports
   for (const pattern of DANGEROUS_IMPORTS) {
     if (pattern.test(code)) {
       throw new Error('Code contains forbidden system-level imports');
     }
   }
-  
+
   return true;
 }
 
@@ -123,9 +123,9 @@ async function writeCodeToTempFile(code, language) {
   const extension = getFileExtension(language);
   const filename = `code${extension}`;
   const filepath = path.join(tempDir, filename);
-  
+
   await fs.writeFile(filepath, code, 'utf8');
-  
+
   return { tempDir, filepath, filename };
 }
 
@@ -148,29 +148,67 @@ function getFileExtension(language) {
   }
 }
 
+function getDockerImage(language) {
+  switch (language.toLowerCase()) {
+    case 'python':
+      return 'python:3.9-slim';
+    case 'javascript':
+    case 'nodejs':
+      return 'node:16-slim';
+    case 'go':
+      return 'golang:1.17';
+    case 'java':
+      return 'openjdk:17-jdk-slim';
+    case 'c++':
+    case 'cpp':
+      return 'gcc:11';
+    default:
+      return 'node:16-slim';
+  }
+}
+
+function getCodeExecutionCommand(filename, language) {
+  switch (language.toLowerCase()) {
+    case 'python':
+      return ['python3', `/workspace/${filename}`];
+    case 'javascript':
+    case 'nodejs':
+      return ['node', `/workspace/${filename}`];
+    case 'go':
+      return ['go', 'run', `/workspace/${filename}`];
+    case 'java':
+      return ['javac', `/workspace/${filename}`, '&&', 'java', '-cp', '/workspace', 'Main'];
+    case 'c++':
+    case 'cpp':
+      return ['g++', `/workspace/${filename}`, '-o', '/workspace/output', '&&', '/workspace/output'];
+    default:
+      return ['node', `/workspace/${filename}`];
+  }
+}
+
 app.post('/api/run/:sessionId', async (req, res) => {
   const { sessionId } = req.params;
   const session = sessions.get(sessionId);
-  
+
   if (!session) {
     return res.status(404).json({ error: 'Session not found' });
   }
-  
+
   const { code, language } = req.body;
   session.code = code;
-  
+
   let tempDir = null;
   let container = null;
   let timeoutId = null;
-  
+
   try {
     // Validate code
     validateCode(code);
-    
+
     // Write code to temporary file
     const { tempDir: dir, filepath, filename } = await writeCodeToTempFile(code, language);
     tempDir = dir;
-    
+
     // Create container with strict security settings
     container = await docker.createContainer({
       Image: getDockerImage(language),
@@ -186,183 +224,103 @@ app.post('/api/run/:sessionId', async (req, res) => {
         ReadonlyRootfs: true,
         SecurityOpt: ['no-new-privileges'],
         CapDrop: ['ALL'],
-        Binds: [`${tempDir}:/workspace:ro`], // Mount as read-only
+        Binds: [`${tempDir}:/workspace`],
       },
       WorkingDir: '/workspace',
-      AttachStdin: false,
-      AttachStdout: true,
-      AttachStderr: true,
-      Tty: false
     });
-    
-    const startTime = Date.now();
+
+    // Start container
     await container.start();
-    
-    // Set up timeout with force-kill
-    const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(async () => {
-        try {
-          await container.kill();
-        } catch (e) {
-          // Container might already be stopped
-        }
-        reject(new Error('Execution timeout - container force-killed'));
-      }, EXECUTION_TIMEOUT);
-    });
-    
-    // Get logs
-    const logsPromise = container.logs({
+
+    // Set timeout for execution
+    timeoutId = setTimeout(async () => {
+      try {
+        await container.stop();
+        io.to(sessionId).emit('output', {
+          output: 'Execution timed out (30 seconds)',
+          language,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error('Error stopping container:', err);
+      }
+    }, EXECUTION_TIMEOUT);
+
+    // Wait for container to finish
+    const result = await container.wait();
+
+    // Clear timeout if container finished
+    clearTimeout(timeoutId);
+
+    // Get container logs
+    const logs = await container.logs({
       stdout: true,
       stderr: true,
       timestamps: false,
-      follow: true
-    }).then(stream => {
-      return new Promise((resolve, reject) => {
-        let output = '';
-        stream.on('data', chunk => {
-          output += chunk.toString();
-        });
-        stream.on('end', () => resolve(output));
-        stream.on('error', reject);
-      });
     });
-    
-    // Wait for container to finish or timeout
-    const output = await Promise.race([logsPromise, timeoutPromise]);
-    
-    // Clear timeout if execution completed
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    
-    // Wait for container to finish
-    await container.wait();
-    
-    const executionTime = Date.now() - startTime;
-    
-    session.output.push({
-      timestamp: new Date(),
-      output: output,
-      language: language,
-      executionTime: executionTime
-    });
-    
-    // Emit to client via WebSocket
+
+    // Convert logs to string
+    let output = logs.toString('utf8');
+
+    // Clean up
+    await container.remove();
+    await fs.rm(tempDir, { recursive: true, force: true });
+
+    // Emit output via WebSocket
     io.to(sessionId).emit('output', {
-      output: output,
-      language: language,
-      timestamp: new Date(),
-      executionTime: executionTime
+      output,
+      language,
+      timestamp: new Date().toISOString(),
     });
-    
-    res.json({ success: true, output, executionTime });
+
+    res.json({ success: true });
   } catch (error) {
     console.error('Execution error:', error);
-    const errorMessage = error.message || 'Execution failed';
-    
-    // Force-kill container if it exists
+
+    // Clean up resources if they exist
+    if (timeoutId) clearTimeout(timeoutId);
     if (container) {
       try {
-        await container.kill();
-      } catch (e) {
-        // Container might already be stopped
+        await container.stop();
+        await container.remove();
+      } catch (err) {
+        console.error('Error cleaning up container:', err);
       }
     }
-    
-    session.output.push({
-      timestamp: new Date(),
-      output: errorMessage,
-      language: language
-    });
-    
-    io.to(sessionId).emit('output', {
-      output: errorMessage,
-      language: language,
-      timestamp: new Date()
-    });
-    
-    res.status(500).json({ error: errorMessage });
-  } finally {
-    // Clean up timeout
-    if (timeoutId) {
-      clearTimeout(timeoutId);
-    }
-    
-    // Clean up temporary directory
     if (tempDir) {
       try {
         await fs.rm(tempDir, { recursive: true, force: true });
-      } catch (e) {
-        console.error('Error cleaning up temp directory:', e);
+      } catch (err) {
+        console.error('Error cleaning up temp directory:', err);
       }
     }
+
+    // Emit error via WebSocket
+    io.to(sessionId).emit('error', {
+      error: error.message || 'Execution failed',
+      timestamp: new Date().toISOString(),
+    });
+
+    res.status(500).json({ error: error.message || 'Execution failed' });
   }
 });
 
-// Socket.IO connection handling
+// WebSocket connection handling
 io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
+  console.log('Client connected');
+
   socket.on('join-session', (sessionId) => {
     socket.join(sessionId);
-    console.log(`Socket ${socket.id} joined session ${sessionId}`);
+    console.log(`Client joined session ${sessionId}`);
   });
-  
+
   socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
+    console.log('Client disconnected');
   });
 });
 
-// Helper functions
-function getDockerImage(language) {
-  switch (language.toLowerCase()) {
-    case 'python':
-      return 'python:3.11-alpine';
-    case 'javascript':
-    case 'nodejs':
-      return 'node:18-alpine';
-    case 'go':
-      return 'golang:1.21-alpine';
-    case 'java':
-      return 'openjdk:17-jdk-alpine';
-    case 'c++':
-    case 'cpp':
-      return 'gcc:latest';
-    default:
-      return 'node:18-alpine';
-  }
-}
-
-function getCodeExecutionCommand(filename, language) {
-  switch (language.toLowerCase()) {
-    case 'python':
-      return ['python', filename];
-    case 'javascript':
-    case 'nodejs':
-      return ['node', filename];
-    case 'go':
-      return ['go', 'run', filename];
-    case 'java':
-      const className = filename.replace('.java', '');
-      return ['sh', '-c', `javac ${filename} && java ${className}`];
-    case 'c++':
-    case 'cpp':
-      return ['sh', '-c', `g++ ${filename} -o main && ./main`];
-    default:
-      return ['node', filename];
-  }
-}
-
+// Start server
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`CodeCapsule server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
-  server.close(() => {
-    console.log('HTTP server closed');
-  });
+server.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

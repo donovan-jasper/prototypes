@@ -23,7 +23,7 @@ interface SessionContextType {
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
 // Replace with your deployed backend URL (e.g., Railway, Render, AWS)
-const API_URL = 'https://your-backend-url.com';
+const API_URL = 'http://localhost:3000';
 
 export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -94,7 +94,6 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!sessionId || !code.trim()) return;
 
     setIsRunning(true);
-    setOutputs([]); // Clear previous outputs
 
     try {
       const response = await fetch(`${API_URL}/api/run/${sessionId}`, {
