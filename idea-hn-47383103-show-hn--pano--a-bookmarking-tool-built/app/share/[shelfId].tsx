@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
-import { Text, useTheme, Button, Appbar, IconButton } from 'react-native-paper';
+import { View, StyleSheet, FlatList, ActivityIndicator, Alert, Linking, ScrollView } from 'react-native';
+import { Text, useTheme, Button, Appbar, IconButton, Card, Avatar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useItems } from '../../hooks/useItems';
 import { useShelves } from '../../hooks/useShelves';
 import { ItemCard } from '../../components/ItemCard';
 import { parseShareLink } from '../../lib/utils/share';
 import { useUserStore } from '../../lib/store/user';
+import { trackShelfView } from '../../lib/api/analytics';
 
 export default function PublicShelfScreen() {
   const theme = useTheme();
@@ -16,10 +17,11 @@ export default function PublicShelfScreen() {
 
   const { shelves, loading: shelvesLoading } = useShelves();
   const { items, loading: itemsLoading, refresh } = useItems(shelfId);
-  const { user } = useUserStore();
+  const { user, isPremium } = useUserStore();
 
   const [isCloning, setIsCloning] = useState(false);
   const [isValidLink, setIsValidLink] = useState(true);
+  const [viewCount, setViewCount] = useState<number | null>(null);
 
   const shelf = shelves.find(s => s.id === shelfId);
 
@@ -28,8 +30,18 @@ export default function PublicShelfScreen() {
     const linkValid = parseShareLink(`https://shelflife.app/share/${shelfId}?token=${token}`);
     if (!linkValid) {
       setIsValidLink(false);
+      return;
     }
-  }, [shelfId, token]);
+
+    // Track view if premium user
+    if (isPremium && shelfId) {
+      trackShelfView(shelfId).then(count => {
+        setViewCount(count);
+      }).catch(() => {
+        // Silently fail if tracking fails
+      });
+    }
+  }, [shelfId, token, isPremium]);
 
   const handleCloneShelf = async () => {
     if (!shelf || !user) {
@@ -95,6 +107,20 @@ export default function PublicShelfScreen() {
       <Text variant="bodySmall" style={{ color: theme.colors.primary, marginTop: 8 }}>
         {items.length} {items.length === 1 ? 'item' : 'items'}
       </Text>
+
+      {isPremium && viewCount !== null && (
+        <View style={styles.viewCountContainer}>
+          <Avatar.Icon
+            size={24}
+            icon="eye"
+            style={{ backgroundColor: theme.colors.surfaceVariant }}
+            color={theme.colors.onSurfaceVariant}
+          />
+          <Text variant="bodySmall" style={{ marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
+            {viewCount} {viewCount === 1 ? 'view' : 'views'}
+          </Text>
+        </View>
+      )}
     </View>
   );
 
@@ -160,14 +186,14 @@ export default function PublicShelfScreen() {
         ListEmptyComponent={renderEmpty}
       />
 
-      <View style={styles.cloneButtonContainer}>
+      <View style={styles.fabContainer}>
         <Button
           mode="contained"
           onPress={handleCloneShelf}
           loading={isCloning}
           disabled={isCloning}
-          style={styles.cloneButton}
           icon="content-copy"
+          style={styles.cloneButton}
         >
           Clone to My Library
         </Button>
@@ -190,10 +216,10 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   shelfName: {
-    fontWeight: 'bold',
+    marginBottom: 8,
   },
   shelfDescription: {
-    marginTop: 4,
+    marginBottom: 8,
   },
   list: {
     padding: 8,
@@ -208,12 +234,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 32,
   },
-  cloneButtonContainer: {
+  fabContainer: {
     padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    backgroundColor: 'transparent',
   },
   cloneButton: {
-    paddingVertical: 8,
+    width: '100%',
+  },
+  viewCountContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
   },
 });

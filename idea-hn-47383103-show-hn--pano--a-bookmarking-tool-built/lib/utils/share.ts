@@ -1,37 +1,23 @@
-import { generateRandomString } from './random';
-
-const BASE_URL = 'https://shelflife.app/share/';
+import { Linking } from 'react-native';
 
 export function generateShareLink(shelfId: number): string {
-  // In a real app, this would generate a unique token and store it in the database
-  // For this prototype, we'll just use a simple format
-  const token = generateRandomString(16);
-  return `${BASE_URL}${shelfId}?token=${token}`;
+  // In a real app, this would generate a signed URL with expiration
+  return `https://shelflife.app/share/${shelfId}?token=abc123`;
 }
 
-export function parseShareLink(url: string): { shelfId: number; token: string } | null {
+export function parseShareLink(url: string): boolean {
+  // Basic validation - in a real app, this would verify the token
+  const regex = /^https:\/\/shelflife\.app\/share\/(\d+)\?token=([a-zA-Z0-9]+)$/;
+  return regex.test(url);
+}
+
+export async function shareShelf(shelfId: number, shelfName: string): Promise<void> {
+  const shareLink = generateShareLink(shelfId);
+
   try {
-    const parsedUrl = new URL(url);
-    const pathParts = parsedUrl.pathname.split('/');
-    const shelfId = parseInt(pathParts[pathParts.length - 1], 10);
-
-    if (isNaN(shelfId)) return null;
-
-    const token = parsedUrl.searchParams.get('token');
-    if (!token) return null;
-
-    return { shelfId, token };
-  } catch {
-    return null;
+    await Linking.openURL(`mailto:?subject=Check out my ShelfLife shelf: ${shelfName}&body=I've shared a shelf with you: ${shareLink}`);
+  } catch (error) {
+    console.error('Error sharing shelf:', error);
+    throw error;
   }
-}
-
-export function isValidShareLink(url: string): boolean {
-  const parsed = parseShareLink(url);
-  return parsed !== null;
-}
-
-export function getShelfIdFromLink(url: string): number | null {
-  const parsed = parseShareLink(url);
-  return parsed ? parsed.shelfId : null;
 }
