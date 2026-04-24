@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions } from 'react-native';
 import { Camera } from 'expo-camera';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { compressImage } from '../lib/utils/imageProcessor';
 
 interface CameraCaptureProps {
   onCapture: (uri: string) => void;
@@ -13,6 +14,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [type, setType] = useState(Camera.Constants.Type.back);
   const [isFlashOn, setIsFlashOn] = useState(false);
+  const [isReady, setIsReady] = useState(false);
   const cameraRef = useRef<Camera>(null);
 
   useEffect(() => {
@@ -31,22 +33,26 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           skipProcessing: true,
         });
 
-        // Compress and resize the image
-        const manipResult = await ImageManipulator.manipulateAsync(
-          photo.uri,
-          [{ resize: { width: 1024 } }],
-          { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-        );
+        // Compress the image
+        const compressedUri = await compressImage(photo.uri);
 
-        onCapture(manipResult.uri);
+        onCapture(compressedUri);
       } catch (error) {
         console.error('Error taking picture:', error);
+        Alert.alert('Error', 'Failed to capture image. Please try again.');
       }
     }
   };
 
   if (hasPermission === null) {
-    return <View />;
+    return (
+      <Modal visible={true} transparent={true} animationType="slide">
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200ee" />
+          <Text style={styles.loadingText}>Requesting camera permission...</Text>
+        </View>
+      </Modal>
+    );
   }
 
   if (hasPermission === false) {
@@ -54,6 +60,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
       <Modal visible={true} transparent={true} animationType="slide">
         <View style={styles.permissionContainer}>
           <Text style={styles.permissionText}>No access to camera</Text>
+          <Text style={styles.permissionSubtext}>
+            Please enable camera access in your device settings to take photos.
+          </Text>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
             <Text style={styles.closeButtonText}>Close</Text>
           </TouchableOpacity>
@@ -73,6 +82,7 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
             ? Camera.Constants.FlashMode.on
             : Camera.Constants.FlashMode.off
         }
+        onCameraReady={() => setIsReady(true)}
       >
         <View style={styles.cameraControls}>
           <TouchableOpacity
@@ -89,8 +99,9 @@ export default function CameraCapture({ onCapture, onClose }: CameraCaptureProps
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.captureButton}
+            style={[styles.captureButton, !isReady && styles.disabledButton]}
             onPress={takePicture}
+            disabled={!isReady}
           />
 
           <TouchableOpacity
@@ -146,6 +157,9 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: 'rgba(255,255,255,0.5)',
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   closeButton: {
     position: 'absolute',
     top: 40,
@@ -163,10 +177,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 20,
   },
   permissionText: {
     color: 'white',
     fontSize: 18,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  permissionSubtext: {
+    color: 'white',
+    fontSize: 14,
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.8)',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 10,
   },
 });

@@ -56,6 +56,17 @@ export const initDatabase = () => {
         FOREIGN KEY (platform_id) REFERENCES platforms (id)
       );`
     );
+
+    // Queue table for offline posts
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS queue (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        product_id INTEGER NOT NULL,
+        platforms TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        FOREIGN KEY (product_id) REFERENCES products (id)
+      );`
+    );
   });
 };
 
@@ -258,5 +269,53 @@ export const markMessageAsRead = (id: number): Promise<void> => {
   });
 };
 
-// Initialize database when this module is imported
-initDatabase();
+// Queue operations
+export const addToQueue = (item: any): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `INSERT INTO queue (product_id, platforms, timestamp)
+         VALUES (?, ?, ?);`,
+        [
+          item.productId,
+          JSON.stringify(item.platforms),
+          new Date().toISOString()
+        ],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getQueue = (): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM queue ORDER BY timestamp ASC;`,
+        [],
+        (_, { rows: { _array } }) => {
+          const parsedQueue = _array.map(item => ({
+            ...item,
+            platforms: JSON.parse(item.platforms)
+          }));
+          resolve(parsedQueue);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const removeFromQueue = (id: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `DELETE FROM queue WHERE id = ?;`,
+        [id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
