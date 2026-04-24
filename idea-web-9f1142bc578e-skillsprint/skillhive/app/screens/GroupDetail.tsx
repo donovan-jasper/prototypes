@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Modal, Alert, ScrollView } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 interface Group {
@@ -21,6 +21,7 @@ interface Challenge {
   xpReward: number;
   groupId: string;
   createdAt: Date;
+  completedBy?: string[];
 }
 
 interface User {
@@ -44,6 +45,8 @@ const GroupDetail: React.FC = () => {
     description: '',
     xpReward: 0
   });
+  const [showMemberModal, setShowMemberModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<User | null>(null);
   const db = getFirestore();
   const auth = getAuth();
 
@@ -85,6 +88,7 @@ const GroupDetail: React.FC = () => {
         }
       } catch (error) {
         console.error('Error fetching group data:', error);
+        Alert.alert('Error', 'Failed to load group data');
       } finally {
         setLoading(false);
       }
@@ -103,7 +107,8 @@ const GroupDetail: React.FC = () => {
       await addDoc(collection(db, 'challenges'), {
         ...newChallenge,
         groupId,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        completedBy: []
       });
 
       // Refresh challenges
@@ -124,6 +129,97 @@ const GroupDetail: React.FC = () => {
     } catch (error) {
       console.error('Error creating challenge:', error);
       Alert.alert('Error', 'Failed to create challenge');
+    }
+  };
+
+  const handleToggleChallengeCompletion = async (challengeId: string) => {
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) return;
+
+      const challengeRef = doc(db, 'challenges', challengeId);
+      const challengeDoc = await getDoc(challengeRef);
+
+      if (challengeDoc.exists()) {
+        const challengeData = challengeDoc.data() as Challenge;
+        const isCompleted = challengeData.completedBy?.includes(currentUser.uid);
+
+        if (isCompleted) {
+          // Remove completion
+          await updateDoc(challengeRef, {
+            completedBy: arrayRemove(currentUser.uid)
+          });
+        } else {
+          // Add completion
+          await updateDoc(challengeRef, {
+            completedBy: arrayUnion(currentUser.uid)
+          });
+        }
+
+        // Refresh challenges
+        const challengesQuery = query(
+          collection(db, 'challenges'),
+          where('groupId', '==', groupId)
+        );
+        const challengesSnapshot = await getDocs(challengesQuery);
+        const challengesData = challengesSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Challenge[];
+        setChallenges(challengesData);
+      }
+    } catch (error) {
+      console.error('Error toggling challenge completion:', error);
+      Alert.alert('Error', 'Failed to update challenge status');
+    }
+  };
+
+  const handlePromoteMember = async (memberId: string) => {
+    try {
+      if (!group) return;
+
+      await updateDoc(doc(db, 'groups', group.id), {
+        adminId: memberId
+      });
+
+      // Refresh group data
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (groupDoc.exists()) {
+        const groupData = { id: groupDoc.id, ...groupDoc.data() } as Group;
+        setGroup(groupData);
+        setIsAdmin(groupData.adminId === auth.currentUser?.uid);
+      }
+
+      setShowMemberModal(false);
+      Alert.alert('Success', 'Member promoted to admin');
+    } catch (error) {
+      console.error('Error promoting member:', error);
+      Alert.alert('Error', 'Failed to promote member');
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string) => {
+    try {
+      if (!group) return;
+
+      await updateDoc(doc(db, 'groups', group.id), {
+        members: arrayRemove(memberId)
+      });
+
+      // Refresh members
+      const memberPromises = group.members.filter(id => id !== memberId).map(async (memberId) => {
+        const userDoc = await getDoc(doc(db, 'users', memberId));
+        return userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } as User : null;
+      });
+
+      const membersData = (await Promise.all(memberPromises)).filter(Boolean) as User[];
+      setMembers(membersData);
+
+      setShowMemberModal(false);
+      Alert.alert('Success', 'Member removed from group');
+    } catch (error) {
+      console.error('Error removing member:', error);
+      Alert.alert('Error', 'Failed to remove member');
     }
   };
 
@@ -151,7 +247,7 @@ const GroupDetail: React.FC = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.groupName}>{group.name}</Text>
         <Text style={styles.groupPrivacy}>
@@ -161,55 +257,76 @@ const GroupDetail: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-        <FlatList
-          data={members}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.memberItem}>
-              <Text style={styles.memberName}>{item.displayName || item.email}</Text>
-            </View>
-          )}
-          ListEmptyComponent={
-            <Text style={styles.emptyListText}>No members yet</Text>
-          }
-        />
+        <Text style={styles.sectionTitle}>Challenges</Text>
+        {isAdmin && (
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setShowChallengeModal(true)}
+          >
+            <Text style={styles.addButtonText}>+ Add Challenge</Text>
+          </TouchableOpacity>
+        )}
+
+        {challenges.length > 0 ? (
+          <FlatList
+            data={challenges}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.challengeItem}
+                onPress={() => handleToggleChallengeCompletion(item.id)}
+              >
+                <View style={styles.challengeHeader}>
+                  <Text style={styles.challengeTitle}>{item.title}</Text>
+                  <Text style={styles.challengeXP}>{item.xpReward} XP</Text>
+                </View>
+                <Text style={styles.challengeDescription}>{item.description}</Text>
+                <View style={styles.challengeStatus}>
+                  <Text style={styles.challengeStatusText}>
+                    {item.completedBy?.includes(auth.currentUser?.uid || '') ? 'Completed' : 'Not completed'}
+                  </Text>
+                  <Text style={styles.challengeCompletionCount}>
+                    {item.completedBy?.length || 0} members completed
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.emptySectionText}>No challenges yet</Text>
+        )}
       </View>
 
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Group Challenges</Text>
-          {isAdmin && (
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setShowChallengeModal(true)}
-            >
-              <Text style={styles.addButtonText}>+ Add Challenge</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-        <FlatList
-          data={challenges}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.challengeItem}>
-              <Text style={styles.challengeTitle}>{item.title}</Text>
-              <Text style={styles.challengeDescription}>{item.description}</Text>
-              <Text style={styles.challengeXP}>XP: {item.xpReward}</Text>
-            </View>
-          )}
-          ListEmptyComponent={
-            <Text style={styles.emptyListText}>No challenges yet</Text>
-          }
-        />
+        <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+        {members.length > 0 ? (
+          <FlatList
+            data={members}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.memberItem}
+                onPress={() => {
+                  if (isAdmin && item.id !== auth.currentUser?.uid) {
+                    setSelectedMember(item);
+                    setShowMemberModal(true);
+                  }
+                }}
+              >
+                <Text style={styles.memberName}>{item.displayName}</Text>
+                <Text style={styles.memberEmail}>{item.email}</Text>
+                {group.adminId === item.id && (
+                  <Text style={styles.adminBadge}>Admin</Text>
+                )}
+              </TouchableOpacity>
+            )}
+            scrollEnabled={false}
+          />
+        ) : (
+          <Text style={styles.emptySectionText}>No members yet</Text>
+        )}
       </View>
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>Back to Groups</Text>
-      </TouchableOpacity>
 
       {/* Challenge Creation Modal */}
       <Modal
@@ -255,7 +372,7 @@ const GroupDetail: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.createButton]}
+                style={[styles.modalButton, styles.confirmButton]}
                 onPress={handleCreateChallenge}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -264,14 +381,53 @@ const GroupDetail: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+
+      {/* Member Management Modal */}
+      {selectedMember && (
+        <Modal
+          visible={showMemberModal}
+          animationType="slide"
+          transparent={true}
+          onRequestClose={() => setShowMemberModal(false)}
+        >
+          <View style={styles.modalContainer}>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Manage Member</Text>
+              <Text style={styles.memberModalName}>{selectedMember.displayName}</Text>
+
+              <View style={styles.memberModalActions}>
+                <TouchableOpacity
+                  style={[styles.memberActionButton, styles.promoteButton]}
+                  onPress={() => handlePromoteMember(selectedMember.id)}
+                >
+                  <Text style={styles.memberActionText}>Promote to Admin</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.memberActionButton, styles.removeButton]}
+                  onPress={() => handleRemoveMember(selectedMember.id)}
+                >
+                  <Text style={styles.memberActionText}>Remove from Group</Text>
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowMemberModal(false)}
+              >
+                <Text style={styles.closeButtonText}>Close</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
@@ -293,23 +449,27 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     marginBottom: 20,
-    color: '#666',
+    textAlign: 'center',
+  },
+  backButton: {
+    backgroundColor: '#6200EE',
+    padding: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
   header: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    padding: 20,
+    backgroundColor: 'white',
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 5,
   },
   groupPrivacy: {
@@ -319,90 +479,96 @@ const styles = StyleSheet.create({
   },
   groupDescription: {
     fontSize: 16,
-    color: '#444',
+    color: '#333',
   },
   section: {
-    marginBottom: 20,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: 'white',
     marginBottom: 10,
+    padding: 15,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    marginBottom: 10,
   },
   addButton: {
     backgroundColor: '#6200EE',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
+    padding: 10,
+    borderRadius: 5,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
   },
   addButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 14,
   },
-  memberItem: {
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  memberName: {
-    fontSize: 16,
-    color: '#333',
-  },
   challengeItem: {
-    padding: 12,
-    marginBottom: 8,
     backgroundColor: '#f9f9f9',
-    borderRadius: 6,
-    borderLeftWidth: 4,
-    borderLeftColor: '#6200EE',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  challengeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
   },
   challengeTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  challengeDescription: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
   },
   challengeXP: {
     fontSize: 14,
     color: '#6200EE',
     fontWeight: 'bold',
   },
-  emptyListText: {
+  challengeDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  challengeStatus: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  challengeStatusText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  challengeCompletionCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  memberItem: {
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  memberEmail: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  adminBadge: {
+    backgroundColor: '#6200EE',
+    color: 'white',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    fontSize: 12,
+    alignSelf: 'flex-start',
+    marginTop: 5,
+  },
+  emptySectionText: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
-    marginTop: 10,
-  },
-  backButton: {
-    backgroundColor: '#6200EE',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    padding: 20,
   },
   modalContainer: {
     flex: 1,
@@ -411,17 +577,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
+    backgroundColor: 'white',
     width: '80%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
     padding: 20,
+    borderRadius: 10,
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
     textAlign: 'center',
-    color: '#333',
   },
   input: {
     borderWidth: 1,
@@ -438,7 +603,6 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
   },
   modalButton: {
     padding: 10,
@@ -450,13 +614,46 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: '#f0f0f0',
   },
-  createButton: {
+  confirmButton: {
     backgroundColor: '#6200EE',
   },
   modalButtonText: {
-    color: '#fff',
+    color: 'white',
     fontSize: 16,
+  },
+  memberModalName: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  memberModalActions: {
+    marginBottom: 20,
+  },
+  memberActionButton: {
+    padding: 12,
+    borderRadius: 5,
+    marginBottom: 10,
+    alignItems: 'center',
+  },
+  promoteButton: {
+    backgroundColor: '#4CAF50',
+  },
+  removeButton: {
+    backgroundColor: '#F44336',
+  },
+  memberActionText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  closeButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: 16,
   },
 });
 
