@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Clipboard, ActivityIndicator, Share } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Clipboard, ActivityIndicator, Share, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { generateCrisisPin, setCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink } from '../services/crisisMode';
+import { generateCrisisPin, setCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink, disableCrisisMode } from '../services/crisisMode';
 
 const CrisisModeScreen = () => {
   const [pin, setPin] = useState('');
@@ -10,6 +10,7 @@ const CrisisModeScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [shareableLink, setShareableLink] = useState('');
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -19,6 +20,7 @@ const CrisisModeScreen = () => {
         setIsEnabled(enabled);
         if (enabled) {
           const link = await getShareableLink();
+          setShareableLink(link);
           const pinFromLink = link.split('pin=')[1];
           setGeneratedPin(pinFromLink);
         }
@@ -35,6 +37,8 @@ const CrisisModeScreen = () => {
       const newPin = generateCrisisPin();
       setGeneratedPin(newPin);
       await setCrisisPin(newPin);
+      const link = await getShareableLink();
+      setShareableLink(link);
       setIsEnabled(true);
     } catch (error) {
       console.error('Failed to generate PIN:', error);
@@ -75,11 +79,23 @@ const CrisisModeScreen = () => {
     Alert.alert('Success', 'PIN copied to clipboard');
   };
 
+  const handleCopyLink = () => {
+    if (!shareableLink) {
+      Alert.alert('Error', 'No shareable link generated yet');
+      return;
+    }
+    Clipboard.setString(shareableLink);
+    Alert.alert('Success', 'Shareable link copied to clipboard');
+  };
+
   const handleShareLink = async () => {
     try {
-      const link = await getShareableLink();
+      if (!shareableLink) {
+        Alert.alert('Error', 'No shareable link generated yet');
+        return;
+      }
       await Share.share({
-        message: `Emergency access to my vault: ${link}`,
+        message: `Emergency access to my vault: ${shareableLink}`,
         title: 'Crisis Access Link'
       });
     } catch (error) {
@@ -110,95 +126,127 @@ const CrisisModeScreen = () => {
     }
   };
 
+  const toggleCrisisMode = async () => {
+    try {
+      if (isEnabled) {
+        await disableCrisisMode();
+        setIsEnabled(false);
+        setGeneratedPin('');
+        setShareableLink('');
+      } else {
+        await handleGeneratePin();
+      }
+    } catch (error) {
+      console.error('Failed to toggle crisis mode:', error);
+      Alert.alert('Error', 'Failed to update crisis mode status');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Crisis Mode Setup</Text>
 
-      {!isEnabled ? (
-        <View style={styles.setupContainer}>
-          <Text style={styles.instructionText}>
-            Generate a 6-digit PIN for family members to access your vault in emergencies.
-          </Text>
+      <View style={styles.toggleContainer}>
+        <Text style={styles.toggleLabel}>Enable Crisis Mode</Text>
+        <Switch
+          value={isEnabled}
+          onValueChange={toggleCrisisMode}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={isEnabled ? '#f5dd4b' : '#f4f3f4'}
+        />
+      </View>
 
-          <TouchableOpacity
-            style={styles.generateButton}
-            onPress={handleGeneratePin}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.generateButtonText}>Generate Crisis PIN</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={styles.accessContainer}>
-          <Text style={styles.instructionText}>
-            Your crisis PIN is: {generatedPin || '••••••'}
-          </Text>
+      {isEnabled ? (
+        <View style={styles.enabledContainer}>
+          <Text style={styles.sectionTitle}>Your Crisis Access</Text>
+
+          <View style={styles.infoBox}>
+            <Text style={styles.infoLabel}>Your Crisis PIN:</Text>
+            <Text style={styles.infoValue}>{generatedPin || '••••••'}</Text>
+          </View>
+
+          <View style={styles.infoBox}>
+            <Text style={styles.infoLabel}>Shareable Link:</Text>
+            <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
+              {shareableLink || 'Generating link...'}
+            </Text>
+          </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.copyButton, styles.halfButton]}
+              style={[styles.actionButton, styles.copyButton]}
               onPress={handleCopyPin}
               disabled={!generatedPin}
             >
-              <Text style={styles.copyButtonText}>Copy PIN</Text>
+              <Text style={styles.buttonText}>Copy PIN</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.verifyButton, styles.halfButton]}
-              onPress={handleVerifyPin}
-              disabled={isVerifying}
+              style={[styles.actionButton, styles.copyButton]}
+              onPress={handleCopyLink}
+              disabled={!shareableLink}
             >
-              {isVerifying ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.verifyButtonText}>Verify PIN</Text>
-              )}
+              <Text style={styles.buttonText}>Copy Link</Text>
             </TouchableOpacity>
           </View>
 
           <TouchableOpacity
-            style={styles.shareButton}
+            style={[styles.actionButton, styles.shareButton]}
             onPress={handleShareLink}
+            disabled={!shareableLink}
           >
-            <Text style={styles.shareButtonText}>Share Access Link</Text>
+            <Text style={styles.buttonText}>Share Link</Text>
           </TouchableOpacity>
-
-          <Text style={styles.accessTitle}>Access Vault</Text>
-          <Text style={styles.accessSubtitle}>
-            Enter the crisis PIN to access the encrypted vault
-          </Text>
-
-          <TextInput
-            style={styles.pinInput}
-            placeholder="Enter 6-digit PIN"
-            keyboardType="number-pad"
-            maxLength={6}
-            secureTextEntry
-            value={pin}
-            onChangeText={setPin}
-          />
 
           <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handlePinSubmit}
-            disabled={isLoading}
+            style={[styles.actionButton, styles.verifyButton]}
+            onPress={handleVerifyPin}
+            disabled={isVerifying || !generatedPin}
           >
-            <Text style={styles.submitButtonText}>
-              {isLoading ? 'Verifying...' : 'Access Vault'}
-            </Text>
+            {isVerifying ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Verify PIN</Text>
+            )}
           </TouchableOpacity>
         </View>
+      ) : (
+        <View style={styles.disabledContainer}>
+          <Text style={styles.instructionText}>
+            Crisis Mode is currently disabled. Enable it to generate a secure PIN and shareable link for family members to access your vault in emergencies.
+          </Text>
+        </View>
       )}
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Enter Crisis PIN to Access Vault</Text>
+        <TextInput
+          style={styles.pinInput}
+          placeholder="Enter 6-digit PIN"
+          keyboardType="numeric"
+          maxLength={6}
+          secureTextEntry={true}
+          value={pin}
+          onChangeText={setPin}
+        />
+        <TouchableOpacity
+          style={[styles.actionButton, styles.accessButton]}
+          onPress={handlePinSubmit}
+          disabled={isLoading || pin.length !== 6}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Access Vault</Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.backButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.backButtonText}>Back</Text>
+        <Text style={styles.backButtonText}>Back to Home</Text>
       </TouchableOpacity>
     </View>
   );
@@ -214,115 +262,136 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    textAlign: 'center',
     color: '#333',
-    textAlign: 'center',
   },
-  setupContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  accessContainer: {
-    flex: 1,
-  },
-  instructionText: {
-    fontSize: 16,
-    marginBottom: 30,
-    textAlign: 'center',
-    color: '#555',
-  },
-  generateButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    width: '100%',
-  },
-  generateButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  buttonRow: {
+  toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  toggleLabel: {
+    fontSize: 16,
+    color: '#333',
+  },
+  enabledContainer: {
     marginBottom: 20,
   },
-  halfButton: {
-    width: '48%',
-  },
-  copyButton: {
-    backgroundColor: '#2196F3',
+  disabledContainer: {
     padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 20,
   },
-  copyButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  verifyButton: {
-    backgroundColor: '#FF9800',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  verifyButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  shareButton: {
-    backgroundColor: '#9C27B0',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  shareButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  accessTitle: {
-    fontSize: 20,
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
     color: '#333',
   },
-  accessSubtitle: {
+  infoBox: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  infoLabel: {
     fontSize: 14,
-    marginBottom: 20,
     color: '#666',
+    marginBottom: 5,
   },
-  pinInput: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    fontSize: 18,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  submitButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  submitButtonText: {
-    color: 'white',
+  infoValue: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 15,
+  },
+  actionButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  copyButton: {
+    backgroundColor: '#4CAF50',
+  },
+  shareButton: {
+    backgroundColor: '#2196F3',
+    marginBottom: 15,
+  },
+  verifyButton: {
+    backgroundColor: '#FF9800',
+  },
+  accessButton: {
+    backgroundColor: '#9C27B0',
+    marginTop: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  inputContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  inputLabel: {
+    fontSize: 16,
+    marginBottom: 10,
+    color: '#333',
+  },
+  pinInput: {
+    height: 50,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    fontSize: 18,
+    backgroundColor: '#f9f9f9',
+  },
+  instructionText: {
+    fontSize: 16,
+    color: '#666',
+    lineHeight: 24,
+    textAlign: 'center',
   },
   backButton: {
     marginTop: 20,
     padding: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
     alignItems: 'center',
   },
   backButtonText: {
-    color: '#2196F3',
+    color: '#666',
     fontSize: 16,
   },
 });
