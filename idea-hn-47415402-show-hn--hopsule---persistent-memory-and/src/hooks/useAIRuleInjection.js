@@ -11,6 +11,7 @@ export const validateRule = (code, rule) => {
 const useAIRuleInjection = () => {
   const [rules, setRules] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     initializeDatabase();
@@ -25,7 +26,8 @@ const useAIRuleInjection = () => {
           loadRules();
         },
         (_, error) => {
-          console.log('Database error:', error);
+          console.error('Database error:', error);
+          setError('Failed to initialize database');
           setIsLoading(false);
         }
       );
@@ -40,9 +42,11 @@ const useAIRuleInjection = () => {
         (_, { rows: { _array } }) => {
           setRules(_array);
           setIsLoading(false);
+          setError(null);
         },
         (_, error) => {
-          console.log('Error loading rules:', error);
+          console.error('Error loading rules:', error);
+          setError('Failed to load rules');
           setIsLoading(false);
         }
       );
@@ -50,14 +54,28 @@ const useAIRuleInjection = () => {
   };
 
   const addRule = (rule) => {
+    if (!rule.name || !rule.pattern) {
+      setError('Rule name and pattern are required');
+      return;
+    }
+
     db.transaction(tx => {
       tx.executeSql(
         'INSERT INTO rules (id, name, pattern, severity) VALUES (?, ?, ?, ?);',
-        [Date.now().toString(), rule.name, rule.pattern, rule.severity || 'warning'],
+        [
+          Date.now().toString(),
+          rule.name,
+          rule.pattern,
+          rule.severity || 'warning'
+        ],
         () => {
           loadRules();
+          setError(null);
         },
-        (_, error) => console.log('Error adding rule:', error)
+        (_, error) => {
+          console.error('Error adding rule:', error);
+          setError('Failed to add rule');
+        }
       );
     });
   };
@@ -69,8 +87,12 @@ const useAIRuleInjection = () => {
         [id],
         () => {
           loadRules();
+          setError(null);
         },
-        (_, error) => console.log('Error removing rule:', error)
+        (_, error) => {
+          console.error('Error removing rule:', error);
+          setError('Failed to remove rule');
+        }
       );
     });
   };
@@ -79,7 +101,33 @@ const useAIRuleInjection = () => {
     return validateRule(code, rule);
   };
 
-  return { rules, isLoading, addRule, removeRule, checkCode };
+  const injectRulesIntoAISuggestion = (codeSuggestion) => {
+    let modifiedSuggestion = codeSuggestion;
+
+    rules.forEach(rule => {
+      const regex = new RegExp(rule.pattern, 'g');
+      const matches = modifiedSuggestion.match(regex);
+
+      if (matches) {
+        modifiedSuggestion = modifiedSuggestion.replace(
+          regex,
+          match => `/* RULE VIOLATION: ${rule.name} */ ${match}`
+        );
+      }
+    });
+
+    return modifiedSuggestion;
+  };
+
+  return {
+    rules,
+    isLoading,
+    error,
+    addRule,
+    removeRule,
+    checkCode,
+    injectRulesIntoAISuggestion
+  };
 };
 
 export default useAIRuleInjection;

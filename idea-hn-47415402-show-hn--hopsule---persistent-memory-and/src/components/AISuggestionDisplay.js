@@ -5,7 +5,7 @@ import useAIRuleInjection from '../hooks/useAIRuleInjection';
 import { injectRulesIntoAISuggestion, getAISuggestions, analyzeCodeWithAI } from '../api/realAIIntegration';
 
 const AISuggestionDisplay = ({ prompt }) => {
-  const { rules, checkCode } = useAIRuleInjection();
+  const { rules, isLoading: rulesLoading, error: rulesError, injectRulesIntoAISuggestion } = useAIRuleInjection();
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
@@ -14,24 +14,29 @@ const AISuggestionDisplay = ({ prompt }) => {
   const [modifiedSuggestion, setModifiedSuggestion] = useState('');
   const [violations, setViolations] = useState([]);
   const [aiAnalysis, setAiAnalysis] = useState(null);
+  const [apiError, setApiError] = useState(null);
 
   useEffect(() => {
-    if (prompt) {
+    if (prompt && !rulesLoading) {
       fetchSuggestions();
     }
-  }, [prompt]);
+  }, [prompt, rulesLoading]);
 
   const fetchSuggestions = async () => {
     setIsLoading(true);
+    setApiError(null);
+
     try {
       const suggestions = await getAISuggestions(prompt);
       setSuggestions(suggestions);
+
       if (suggestions.length > 0) {
         await processSuggestion(suggestions[0]);
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error);
-      Alert.alert('Error', 'Failed to fetch AI suggestions. Please try again.');
+      setApiError(error.message || 'Failed to fetch AI suggestions');
+      Alert.alert('Error', error.message || 'Failed to fetch AI suggestions. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -39,30 +44,48 @@ const AISuggestionDisplay = ({ prompt }) => {
 
   const processSuggestion = async (suggestion) => {
     setSelectedSuggestion(suggestion);
-    const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
-    setModifiedSuggestion(processedSuggestion);
+    setIsAccepted(false);
+    setIsRejected(false);
 
-    const foundViolations = rules.filter(rule => !checkCode(processedSuggestion, rule));
-    setViolations(foundViolations);
-
-    // Get AI analysis of the suggestion
     try {
+      // Process with rules
+      const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
+      setModifiedSuggestion(processedSuggestion);
+
+      // Check for violations
+      const foundViolations = rules.filter(rule => {
+        const regex = new RegExp(rule.pattern);
+        return regex.test(processedSuggestion);
+      });
+      setViolations(foundViolations);
+
+      // Get AI analysis
       const analysis = await analyzeCodeWithAI(suggestion);
       setAiAnalysis(analysis);
     } catch (error) {
-      console.error('Error analyzing code with AI:', error);
+      console.error('Error processing suggestion:', error);
+      setApiError(error.message || 'Failed to process suggestion');
+      Alert.alert('Error', error.message || 'Failed to process suggestion');
     }
-
-    setIsAccepted(false);
-    setIsRejected(false);
   };
 
   const handleAccept = () => {
-    if (violations.length === 0) {
+    if (violations.length > 0) {
+      Alert.alert(
+        'Warning',
+        'This suggestion contains rule violations. Are you sure you want to accept it?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Accept Anyway',
+            onPress: () => setIsAccepted(true),
+            style: 'destructive'
+          }
+        ]
+      );
+    } else {
       setIsAccepted(true);
       Alert.alert('Success', 'Suggestion accepted and ready to use!');
-    } else {
-      Alert.alert('Warning', 'Cannot accept suggestion with rule violations');
     }
   };
 
@@ -74,39 +97,98 @@ const AISuggestionDisplay = ({ prompt }) => {
   const renderHighlightedCode = () => {
     if (!modifiedSuggestion) return null;
 
-    if (violations.length === 0) {
-      return <Text style={styles.suggestionText}>{modifiedSuggestion}</Text>;
+    const parts = [];
+    let lastIndex = 0;
+
+    // Sort violations by their position in the code
+    const sortedViolations = [...violations].sort((a, b) => {
+      const aIndex = modifiedSuggestion.indexOf(a.pattern);
+      const bIndex = modifiedSuggestion.indexOf(b.pattern);
+      return aIndex - bIndex;
+    });
+
+    sortedViolations.forEach(violation => {
+      const regex = new RegExp(violation.pattern, 'g');
+      let match;
+
+      while ((match = regex.exec(modifiedSuggestion)) !== null) {
+        // Add text before the match
+        if (match.index > lastIndex) {
+          parts.push({
+            text: modifiedSuggestion.substring(lastIndex, match.index),
+            isViolation: false
+          });
+        }
+
+        // Add the violation text
+        parts.push({
+          text: match[0],
+          isViolation: true,
+          ruleName: violation.name
+        });
+
+        lastIndex = regex.lastIndex;
+      }
+    });
+
+    // Add remaining text
+    if (lastIndex < modifiedSuggestion.length) {
+      parts.push({
+        text: modifiedSuggestion.substring(lastIndex),
+        isViolation: false
+      });
     }
 
-    let highlightedText = modifiedSuggestion;
-    violations.forEach(violation => {
-      const regex = new RegExp(violation.pattern, 'g');
-      highlightedText = highlightedText.replace(
-        regex,
-        match => `<span style="color: red; background-color: yellow;">${match}</span>`
-      );
-    });
-
-    const parts = highlightedText.split(/<span[^>]*>|<\/span>/g);
-    const styles = highlightedText.match(/<span[^>]*>/g) || [];
-
-    return parts.map((part, i) => {
-      if (i === 0) return <Text key={i} style={styles.suggestionText}>{part}</Text>;
-
-      const isViolation = styles[i-1]?.includes('color: red');
-      return (
-        <Text key={i} style={isViolation ? [styles.suggestionText, styles.violationText] : styles.suggestionText}>
-          {part}
-        </Text>
-      );
-    });
+    return (
+      <Text style={styles.suggestionText}>
+        {parts.map((part, index) => (
+          <Text
+            key={index}
+            style={part.isViolation ? styles.violationText : null}
+          >
+            {part.text}
+          </Text>
+        ))}
+      </Text>
+    );
   };
+
+  if (rulesLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Loading team rules...</Text>
+      </View>
+    );
+  }
+
+  if (rulesError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error loading rules: {rulesError}</Text>
+        <TouchableOpacity onPress={() => window.location.reload()}>
+          <Text style={styles.retryButton}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
         <Text>Fetching AI suggestions and analyzing code...</Text>
+      </View>
+    );
+  }
+
+  if (apiError) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Error: {apiError}</Text>
+        <TouchableOpacity onPress={fetchSuggestions}>
+          <Text style={styles.retryButton}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -156,42 +238,35 @@ const AISuggestionDisplay = ({ prompt }) => {
       )}
 
       {aiAnalysis && (
-        <View style={styles.aiAnalysisContainer}>
-          <Text style={styles.aiAnalysisTitle}>AI Analysis:</Text>
-          <Text style={styles.aiAnalysisText}>
-            Complexity: {aiAnalysis.complexity || 'N/A'} | Maintainability: {aiAnalysis.maintainability || 'N/A'}
+        <View style={styles.analysisContainer}>
+          <Text style={styles.analysisTitle}>AI Analysis:</Text>
+          <Text style={styles.analysisText}>
+            {aiAnalysis.summary || 'No analysis available'}
           </Text>
         </View>
       )}
 
-      <View style={styles.buttonContainer}>
+      <View style={styles.actionButtons}>
         <TouchableOpacity
-          style={[styles.button, styles.acceptButton, violations.length > 0 && styles.disabledButton]}
+          style={[styles.actionButton, styles.acceptButton]}
           onPress={handleAccept}
-          disabled={violations.length > 0}
+          disabled={isAccepted}
         >
-          <Text style={styles.buttonText}>Accept</Text>
+          <Text style={styles.actionButtonText}>
+            {isAccepted ? 'Accepted' : 'Accept'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
+          style={[styles.actionButton, styles.rejectButton]}
           onPress={handleReject}
+          disabled={isRejected}
         >
-          <Text style={styles.buttonText}>Reject</Text>
+          <Text style={styles.actionButtonText}>
+            {isRejected ? 'Rejected' : 'Reject'}
+          </Text>
         </TouchableOpacity>
       </View>
-
-      {isAccepted && (
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>Suggestion accepted!</Text>
-        </View>
-      )}
-
-      {isRejected && (
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>Suggestion rejected</Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -206,36 +281,56 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  retryButton: {
+    color: 'blue',
+    textDecorationLine: 'underline',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   title: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#333',
   },
   suggestionSelector: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginBottom: 16,
   },
   suggestionButton: {
     padding: 8,
     marginRight: 8,
+    marginBottom: 8,
     backgroundColor: '#e0e0e0',
     borderRadius: 4,
   },
   selectedSuggestion: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#bbdefb',
   },
   suggestionButtonText: {
     color: '#333',
   },
   suggestionContainer: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     padding: 12,
     borderRadius: 4,
     marginBottom: 16,
@@ -245,8 +340,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   violationText: {
-    color: '#d32f2f',
-    backgroundColor: '#ffebee',
+    color: 'red',
+    backgroundColor: 'rgba(255, 0, 0, 0.1)',
   },
   violationsContainer: {
     marginBottom: 16,
@@ -255,55 +350,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
+    color: '#d32f2f',
   },
-  aiAnalysisContainer: {
+  analysisContainer: {
     marginBottom: 16,
-    padding: 12,
-    backgroundColor: '#e3f2fd',
-    borderRadius: 4,
   },
-  aiAnalysisTitle: {
+  analysisTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 8,
+    color: '#1976d2',
   },
-  aiAnalysisText: {
+  analysisText: {
     fontSize: 14,
+    color: '#333',
   },
-  buttonContainer: {
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
-  button: {
+  actionButton: {
+    flex: 1,
     padding: 12,
     borderRadius: 4,
-    flex: 1,
     marginHorizontal: 4,
     alignItems: 'center',
   },
   acceptButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#4caf50',
   },
   rejectButton: {
     backgroundColor: '#f44336',
   },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonText: {
+  actionButtonText: {
     color: 'white',
     fontWeight: 'bold',
-  },
-  statusContainer: {
-    padding: 12,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 4,
-    marginTop: 16,
-  },
-  statusText: {
-    color: '#2e7d32',
-    textAlign: 'center',
   },
 });
 
