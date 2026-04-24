@@ -1,215 +1,290 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { useFriend } from '../../hooks/useFriend';
-import StreakBadge from '../../components/StreakBadge';
-import ConnectionTimeline from '../../components/ConnectionTimeline';
-import { getAvailableChallenges } from '../../constants/challenges';
-import { startChallenge } from '../../lib/challenges';
+import { getFriendById, getInteractions, getChallenges } from '../../lib/database';
+import { calculateFriendshipScore } from '../../lib/analytics';
+import { calculateStreaks } from '../../lib/streaks';
+import { ConnectionTimeline } from '../../components/ConnectionTimeline';
+import { ChallengeCard } from '../../components/ChallengeCard';
+import { StreakBadge } from '../../components/StreakBadge';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function FriendDetailScreen() {
   const { id } = useLocalSearchParams();
-  const { friend, streak, interactions, logInteraction } = useFriend(id);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [availableChallenges, setAvailableChallenges] = useState([]);
+  const [friend, setFriend] = useState(null);
+  const [interactions, setInteractions] = useState([]);
+  const [challenges, setChallenges] = useState([]);
+  const [score, setScore] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  if (!friend) {
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const friendData = await getFriendById(id);
+        const interactionsData = await getInteractions(id);
+        const challengesData = await getChallenges(id);
+        const scoreData = await calculateFriendshipScore(id, friendData?.notificationPreference);
+
+        setFriend(friendData);
+        setInteractions(interactionsData);
+        setChallenges(challengesData);
+        setScore(scoreData);
+      } catch (error) {
+        console.error('Error loading friend data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [id]);
+
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Friend not found</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
       </View>
     );
   }
 
-  const handleStartChallenge = async () => {
-    const challenges = getAvailableChallenges('free', streak?.current || 0);
-    setAvailableChallenges(challenges);
-    setModalVisible(true);
-  };
+  if (!friend) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Friend not found</Text>
+      </View>
+    );
+  }
 
-  const handleSelectChallenge = async (challenge) => {
-    await startChallenge(parseInt(id), challenge.title);
-    setModalVisible(false);
-  };
+  const activeChallenges = challenges.filter(c => c.status === 'active');
+  const completedChallenges = challenges.filter(c => c.status === 'completed');
 
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.name}>{friend.name}</Text>
-        <StreakBadge streak={streak} />
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{friend.name.charAt(0)}</Text>
+        </View>
+
+        <View style={styles.headerInfo}>
+          <Text style={styles.name}>{friend.name}</Text>
+          <StreakBadge friendId={friend.id} />
+        </View>
       </View>
 
+      {score && (
+        <View style={styles.scoreSection}>
+          <Text style={styles.scoreLabel}>Friendship Score</Text>
+          <View style={styles.scoreContainer}>
+            <View style={[styles.scoreBar, { width: `${score.score}%`, backgroundColor: getStatusColor(score.score) }]} />
+            <Text style={styles.scoreText}>{score.score}/100</Text>
+          </View>
+
+          <View style={styles.scoreBreakdown}>
+            <View style={styles.breakdownItem}>
+              <Text style={styles.breakdownLabel}>Frequency</Text>
+              <View style={styles.breakdownBar}>
+                <View style={[styles.breakdownFill, { width: `${score.breakdown.frequency * 100}%`, backgroundColor: '#FF6B6B' }]} />
+              </View>
+            </View>
+
+            <View style={styles.breakdownItem}>
+              <Text style={styles.breakdownLabel}>Variety</Text>
+              <View style={styles.breakdownBar}>
+                <View style={[styles.breakdownFill, { width: `${score.breakdown.variety * 100}%`, backgroundColor: '#FF6B6B' }]} />
+              </View>
+            </View>
+
+            <View style={styles.breakdownItem}>
+              <Text style={styles.breakdownLabel}>Challenges</Text>
+              <View style={styles.breakdownBar}>
+                <View style={[styles.breakdownFill, { width: `${score.breakdown.challengeCompletion * 100}%`, backgroundColor: '#FF6B6B' }]} />
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
       <View style={styles.actions}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => logInteraction('text')}
-        >
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name="chatbubble-outline" size={24} color="#FF6B6B" />
           <Text style={styles.actionText}>Log Text</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => logInteraction('call')}
-        >
+
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name="call-outline" size={24} color="#FF6B6B" />
           <Text style={styles.actionText}>Log Call</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => logInteraction('hangout')}
-        >
+
+        <TouchableOpacity style={styles.actionButton}>
+          <Ionicons name="people-outline" size={24} color="#FF6B6B" />
           <Text style={styles.actionText}>Log Hangout</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.challengeSection}>
-        <TouchableOpacity
-          style={styles.startChallengeButton}
-          onPress={handleStartChallenge}
-        >
-          <Text style={styles.startChallengeText}>Start Challenge</Text>
-        </TouchableOpacity>
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Connection Timeline</Text>
+        <ConnectionTimeline interactions={interactions} />
       </View>
 
-      <ConnectionTimeline interactions={interactions} />
-
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Available Challenges</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeButton}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={availableChallenges}
-              keyExtractor={(item) => item.id.toString()}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.challengeItem}
-                  onPress={() => handleSelectChallenge(item)}
-                >
-                  <View style={styles.challengeContent}>
-                    <Text style={styles.challengeTitle}>{item.title}</Text>
-                    <Text style={styles.challengeDescription}>{item.description}</Text>
-                  </View>
-                  {item.premium && <Text style={styles.premiumBadge}>Pro</Text>}
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>No challenges available</Text>
-              }
-            />
-          </View>
+      {activeChallenges.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Active Challenges</Text>
+          {activeChallenges.map(challenge => (
+            <ChallengeCard key={challenge.id} challenge={challenge} />
+          ))}
         </View>
-      </Modal>
+      )}
+
+      {completedChallenges.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Completed Challenges</Text>
+          {completedChallenges.map(challenge => (
+            <ChallengeCard key={challenge.id} challenge={challenge} />
+          ))}
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.startChallengeButton}>
+        <Text style={styles.startChallengeText}>Start New Challenge</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
 
+const getStatusColor = (score: number) => {
+  if (score >= 80) return '#4CAF50'; // Green
+  if (score >= 60) return '#FFC107'; // Yellow
+  if (score >= 40) return '#FF9800'; // Orange
+  return '#F44336'; // Red
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   header: {
-    padding: 20,
+    flexDirection: 'row',
     alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFE6E6',
+  },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#FF6B6B',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  headerInfo: {
+    flex: 1,
   },
   name: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 8,
+  },
+  scoreSection: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  scoreLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  scoreContainer: {
+    height: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 6,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  scoreBar: {
+    height: '100%',
+    borderRadius: 6,
+  },
+  scoreText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+    textAlign: 'right',
+  },
+  scoreBreakdown: {
+    marginTop: 16,
+  },
+  breakdownItem: {
+    marginBottom: 8,
+  },
+  breakdownLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  breakdownBar: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  breakdownFill: {
+    height: '100%',
+    borderRadius: 4,
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    padding: 20,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
   actionButton: {
-    backgroundColor: '#FF6B6B',
-    padding: 10,
-    borderRadius: 5,
-  },
-  actionText: {
-    color: '#FFF',
-    fontSize: 16,
-  },
-  challengeSection: {
-    padding: 20,
     alignItems: 'center',
   },
+  actionText: {
+    marginTop: 4,
+    fontSize: 12,
+    color: '#666',
+  },
+  section: {
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
   startChallengeButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
+    backgroundColor: '#FF6B6B',
+    padding: 16,
+    margin: 20,
     borderRadius: 8,
-    width: '100%',
     alignItems: 'center',
   },
   startChallengeText: {
-    color: '#FFF',
+    color: '#fff',
+    fontWeight: 'bold',
     fontSize: 16,
-    fontWeight: 'bold',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    backgroundColor: '#FFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    fontSize: 24,
-    color: '#888',
-  },
-  challengeItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  challengeContent: {
-    flex: 1,
-  },
-  challengeTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  challengeDescription: {
-    fontSize: 14,
-    color: '#888',
-    marginTop: 5,
-  },
-  premiumBadge: {
-    color: '#FF6B6B',
-    fontWeight: 'bold',
-    marginLeft: 10,
-  },
-  emptyText: {
+  errorText: {
     textAlign: 'center',
-    padding: 20,
-    color: '#888',
+    marginTop: 20,
+    fontSize: 16,
+    color: '#666',
   },
 });

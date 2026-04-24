@@ -1,44 +1,137 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useAnalytics } from '../../hooks/useAnalytics';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { useFriends } from '../../hooks/useFriends';
+import { getAnalyticsSummary, getFriendsNeedingAttention, getLongestStreaks } from '../../lib/analytics';
+import { calculateStreaks } from '../../lib/streaks';
+import { LineChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
+import { FriendCard } from '../../components/FriendCard';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function InsightsScreen() {
-  const { summary, friendsNeedingAttention, longestStreaks } = useAnalytics();
+  const { friends } = useFriends();
+  const [summary, setSummary] = useState(null);
+  const [friendsNeedingAttention, setFriendsNeedingAttention] = useState([]);
+  const [longestStreaks, setLongestStreaks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [summaryData, attentionData, streaksData] = await Promise.all([
+          getAnalyticsSummary(friends),
+          getFriendsNeedingAttention(friends),
+          getLongestStreaks(friends)
+        ]);
+
+        setSummary(summaryData);
+        setFriendsNeedingAttention(attentionData);
+        setLongestStreaks(streaksData);
+      } catch (error) {
+        console.error('Error loading insights:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, [friends]);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    );
+  }
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.summary}>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{summary.totalFriends}</Text>
-          <Text style={styles.summaryLabel}>Friends</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{summary.averageStreak}</Text>
-          <Text style={styles.summaryLabel}>Avg Streak</Text>
-        </View>
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryValue}>{summary.interactionsThisMonth}</Text>
-          <Text style={styles.summaryLabel}>Interactions</Text>
+      <View style={styles.summarySection}>
+        <Text style={styles.sectionTitle}>Your Friendship Stats</Text>
+
+        <View style={styles.summaryCards}>
+          <View style={styles.card}>
+            <Text style={styles.cardValue}>{summary?.totalFriends || 0}</Text>
+            <Text style={styles.cardLabel}>Friends</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardValue}>{summary?.averageStreak || 0}</Text>
+            <Text style={styles.cardLabel}>Avg Streak</Text>
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardValue}>{summary?.interactionsThisMonth || 0}</Text>
+            <Text style={styles.cardLabel}>This Month</Text>
+          </View>
         </View>
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Friends Needing Attention</Text>
-        {friendsNeedingAttention.map(friend => (
-          <View key={friend.id} style={styles.friendItem}>
-            <Text style={styles.friendName}>{friend.name}</Text>
-            <Text style={styles.friendScore}>{friend.score}</Text>
-          </View>
-        ))}
+      <View style={styles.chartSection}>
+        <Text style={styles.sectionTitle}>Interaction Trends</Text>
+        <LineChart
+          data={{
+            labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'],
+            datasets: [
+              {
+                data: [20, 45, 28, 80, 99, 43],
+                color: (opacity = 1) => `rgba(255, 107, 107, ${opacity})`,
+                strokeWidth: 2
+              }
+            ]
+          }}
+          width={screenWidth - 32}
+          height={220}
+          yAxisLabel=""
+          yAxisSuffix=""
+          yAxisInterval={1}
+          chartConfig={{
+            backgroundColor: '#ffffff',
+            backgroundGradientFrom: '#ffffff',
+            backgroundGradientTo: '#ffffff',
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(255, 107, 107, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+            style: {
+              borderRadius: 16
+            },
+            propsForDots: {
+              r: '6',
+              strokeWidth: '2',
+              stroke: '#FF6B6B'
+            }
+          }}
+          bezier
+          style={{
+            marginVertical: 8,
+            borderRadius: 16
+          }}
+        />
       </View>
+
+      {friendsNeedingAttention.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Friends Needing Attention</Text>
+          {friendsNeedingAttention.map(friend => (
+            <FriendCard
+              key={friend.id}
+              friend={friend}
+              showScore
+            />
+          ))}
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Longest Streaks</Text>
         {longestStreaks.map(friend => (
-          <View key={friend.id} style={styles.friendItem}>
-            <Text style={styles.friendName}>{friend.name}</Text>
-            <Text style={styles.friendScore}>{friend.streak} days</Text>
-          </View>
+          <FriendCard
+            key={friend.id}
+            friend={friend}
+            showStreak
+          />
         ))}
       </View>
     </ScrollView>
@@ -48,47 +141,48 @@ export default function InsightsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: '#fff',
+    padding: 16,
   },
-  summary: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    padding: 20,
-  },
-  summaryCard: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  summaryValue: {
+  summarySection: {
+    marginBottom: 24,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  chartSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+  },
+  summaryCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  card: {
+    backgroundColor: '#FFE6E6',
+    borderRadius: 12,
+    padding: 16,
+    width: '30%',
+    alignItems: 'center',
+  },
+  cardValue: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#FF6B6B',
   },
-  summaryLabel: {
+  cardLabel: {
     fontSize: 14,
-    color: '#888',
-  },
-  section: {
-    padding: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#EEE',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  friendItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
-  },
-  friendName: {
-    fontSize: 16,
-  },
-  friendScore: {
-    fontSize: 16,
-    color: '#FF6B6B',
+    color: '#666',
+    marginTop: 4,
   },
 });
