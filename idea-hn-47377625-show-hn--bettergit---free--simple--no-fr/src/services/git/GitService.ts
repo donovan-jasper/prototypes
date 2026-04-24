@@ -9,17 +9,21 @@ export interface CloneProgress {
   total: number;
 }
 
+export interface CloneOptions {
+  url: string;
+  dir: string;
+  authToken?: string;
+  onProgress?: (progress: CloneProgress) => void;
+}
+
 export class GitService {
   private static getRepoDir(repoId: string): string {
     return `${FileSystem.documentDirectory}repos/${repoId}`;
   }
 
-  static async clone(
-    url: string,
-    repoId: string,
-    onProgress?: (progress: CloneProgress) => void
-  ): Promise<void> {
-    const dir = this.getRepoDir(repoId);
+  static async clone(options: CloneOptions): Promise<void> {
+    const { url, dir, authToken, onProgress } = options;
+    const fullDir = this.getRepoDir(dir);
 
     // Ensure repos directory exists
     const reposDir = `${FileSystem.documentDirectory}repos`;
@@ -28,10 +32,16 @@ export class GitService {
       await FileSystem.makeDirectoryAsync(reposDir, { intermediates: true });
     }
 
+    // Configure auth if token is provided
+    const authConfig = authToken ? {
+      username: 'token',
+      password: authToken
+    } : undefined;
+
     await git.clone({
       fs: FileSystemAdapter,
       http,
-      dir,
+      dir: fullDir,
       url,
       singleBranch: true,
       depth: 1,
@@ -44,6 +54,7 @@ export class GitService {
           });
         }
       },
+      ...(authConfig && { auth: authConfig })
     });
   }
 

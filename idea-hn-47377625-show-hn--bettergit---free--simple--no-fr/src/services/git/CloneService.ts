@@ -3,12 +3,13 @@ import { GitService, CloneProgress } from './GitService';
 export interface CloneOptions {
   url: string;
   repoId: string;
+  authToken?: string;
   onProgress?: (progress: CloneProgress) => void;
 }
 
 export class CloneService {
   static async cloneRepository(options: CloneOptions): Promise<void> {
-    const { url, repoId, onProgress } = options;
+    const { url, repoId, authToken, onProgress } = options;
 
     // Check if repo already exists
     const exists = await GitService.repoExists(repoId);
@@ -16,8 +17,13 @@ export class CloneService {
       throw new Error('Repository already cloned');
     }
 
-    // Clone the repository
-    await GitService.clone(url, repoId, onProgress);
+    // Clone the repository with auth if provided
+    await GitService.clone({
+      url,
+      dir: repoId,
+      authToken,
+      onProgress
+    });
   }
 
   static async deleteRepository(repoId: string): Promise<void> {
