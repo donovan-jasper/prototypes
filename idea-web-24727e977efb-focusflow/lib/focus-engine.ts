@@ -1,5 +1,7 @@
 import { saveFocusSession } from './db';
 import { blockApps, unblockApps } from './app-blocker';
+import * as TaskManager from 'expo-task-manager';
+import * as BackgroundFetch from 'expo-background-fetch';
 
 interface FocusSession {
   id: string;
@@ -11,7 +13,20 @@ interface FocusSession {
   completed?: boolean;
 }
 
+const BACKGROUND_TASK_NAME = 'focus-session-task';
 const sessions: Map<string, FocusSession> = new Map();
+
+TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
+  const activeSession = getActiveSession();
+  if (activeSession) {
+    const remaining = Math.max(0, Math.floor((activeSession.endTime - Date.now()) / 1000));
+    if (remaining <= 0) {
+      await endFocusSession(activeSession.id, true);
+      return BackgroundFetch.BackgroundFetchResult.NewData;
+    }
+  }
+  return BackgroundFetch.BackgroundFetchResult.NoData;
+});
 
 export function startFocusSession(
   duration: number,
@@ -33,6 +48,13 @@ export function startFocusSession(
     blockApps(blockedApps);
   }
 
+  // Register background task
+  BackgroundFetch.registerTaskAsync(BACKGROUND_TASK_NAME, {
+    minimumInterval: 60, // Run every minute
+    stopOnTerminate: false,
+    startOnBoot: true,
+  });
+
   return session;
 }
 
@@ -52,6 +74,9 @@ export async function endFocusSession(sessionId: string, completed: boolean): Pr
 
     unblockApps();
     sessions.delete(sessionId);
+
+    // Unregister background task
+    BackgroundFetch.unregisterTaskAsync(BACKGROUND_TASK_NAME);
   }
 }
 

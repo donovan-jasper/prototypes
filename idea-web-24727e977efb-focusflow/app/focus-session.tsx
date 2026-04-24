@@ -8,6 +8,7 @@ import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, se
 import { ProgressChart } from 'react-native-chart-kit';
 import { Dimensions } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as BackgroundFetch from 'expo-background-fetch';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -161,81 +162,58 @@ export default function FocusSessionScreen() {
     data: [getProgress() / 100],
   };
 
-  if (!activeSession) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.errorText}>No active session</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.replace('/(tabs)')}
-        >
-          <Text style={styles.backButtonText}>Back to Home</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  const chartConfig = {
+    backgroundGradientFrom: '#1E2923',
+    backgroundGradientFromOpacity: 0,
+    backgroundGradientTo: '#08130D',
+    backgroundGradientToOpacity: 0.5,
+    color: (opacity = 1) => `rgba(26, 255, 146, ${opacity})`,
+    strokeWidth: 2,
+    barPercentage: 0.5,
+    useShadowColorFromDataset: false,
+  };
 
   return (
     <View style={styles.container}>
-      {showBlockingOverlay && (
-        <View style={styles.blockingOverlay}>
-          <Text style={styles.blockingText}>Focus Mode Active</Text>
-        </View>
-      )}
-
       <View style={styles.timerContainer}>
         <ProgressChart
           data={chartData}
-          width={screenWidth - 40}
+          width={screenWidth * 0.8}
           height={220}
           strokeWidth={16}
           radius={32}
-          chartConfig={{
-            backgroundColor: '#1cc910',
-            backgroundGradientFrom: '#eff3ff',
-            backgroundGradientTo: '#efefef',
-            decimalPlaces: 0,
-            color: (opacity = 1) => `rgba(28, 201, 16, ${opacity})`,
-            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-          }}
+          chartConfig={chartConfig}
           hideLegend={true}
         />
         <Text style={styles.timeText}>{formatTime(timeRemaining)}</Text>
       </View>
 
-      <View style={styles.infoContainer}>
-        <Text style={styles.durationText}>
-          {activeSession.duration} minute focus session
-        </Text>
-
-        {isBlocking && (
-          <View style={styles.blockedAppsContainer}>
-            <Text style={styles.blockedAppsTitle}>Blocked Apps:</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {getBlockedAppNames().map((appName, index) => (
-                <View key={index} style={styles.blockedAppTag}>
-                  <Text style={styles.blockedAppText}>{appName}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        )}
-      </View>
+      {isBlocking && (
+        <View style={styles.blockedAppsContainer}>
+          <Text style={styles.blockedAppsTitle}>Blocked Apps:</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {getBlockedAppNames().map((appName, index) => (
+              <View key={index} style={styles.blockedAppTag}>
+                <Text style={styles.blockedAppText}>{appName}</Text>
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, styles.endButton]}
           onPress={handleEndEarly}
         >
-          <Text style={styles.buttonText}>End Early</Text>
+          <Text style={styles.buttonText}>End Session</Text>
         </TouchableOpacity>
       </View>
 
-      {Platform.OS === 'android' && (
-        <View style={styles.warningContainer}>
-          <Text style={styles.warningText}>
-            Note: On Android, you'll need to manually close blocked apps.
-          </Text>
+      {showBlockingOverlay && (
+        <View style={styles.blockingOverlay}>
+          <Text style={styles.blockingText}>Focus Session Active</Text>
+          <Text style={styles.blockingSubtext}>Stay focused!</Text>
         </View>
       )}
     </View>
@@ -245,8 +223,62 @@ export default function FocusSessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     padding: 20,
+    alignItems: 'center',
+  },
+  timerContainer: {
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  timeText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: '#333',
+    position: 'absolute',
+    top: '50%',
+    marginTop: -24,
+  },
+  blockedAppsContainer: {
+    marginTop: 40,
+    width: '100%',
+  },
+  blockedAppsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 10,
+  },
+  blockedAppTag: {
+    backgroundColor: '#ff6b6b',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  blockedAppText: {
+    color: 'white',
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    marginTop: 40,
+    width: '100%',
+    alignItems: 'center',
+  },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 30,
+    width: '80%',
+    alignItems: 'center',
+  },
+  endButton: {
+    backgroundColor: '#ff6b6b',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 18,
+    fontWeight: '600',
   },
   blockingOverlay: {
     position: 'absolute',
@@ -254,98 +286,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 100,
   },
   blockingText: {
+    color: 'white',
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1cc910',
-  },
-  timerContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  timeText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    position: 'absolute',
-    top: '50%',
-    marginTop: -24,
-  },
-  infoContainer: {
-    marginVertical: 20,
-    alignItems: 'center',
-  },
-  durationText: {
-    fontSize: 18,
-    color: '#666',
     marginBottom: 10,
   },
-  blockedAppsContainer: {
-    marginTop: 10,
-    alignItems: 'center',
-  },
-  blockedAppsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  blockedAppTag: {
-    backgroundColor: '#f0f0f0',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginRight: 8,
-  },
-  blockedAppText: {
-    fontSize: 14,
-  },
-  buttonContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-  },
-  button: {
-    paddingVertical: 12,
-    paddingHorizontal: 30,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  endButton: {
-    backgroundColor: '#ff4444',
-  },
-  buttonText: {
+  blockingSubtext: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  warningContainer: {
-    marginTop: 20,
-    padding: 10,
-    backgroundColor: '#fff8e1',
-    borderRadius: 8,
-  },
-  warningText: {
-    color: '#ff9800',
-    textAlign: 'center',
-  },
-  errorText: {
     fontSize: 18,
-    color: 'red',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    backgroundColor: '#1cc910',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });

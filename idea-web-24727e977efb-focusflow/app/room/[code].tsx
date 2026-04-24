@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getRoomStatus, leaveRoom, pollRoomUpdates } from '../../lib/room-manager';
+import { getRoomStatus, leaveRoom, connectToRoomSocket, pollRoomUpdates } from '../../lib/room-manager';
 import { useStore } from '../../store/useStore';
 import * as Notifications from 'expo-notifications';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -17,13 +17,14 @@ export default function RoomScreen() {
   const intervalRef = useRef(null);
   const timerRef = useRef(null);
   const lastParticipantsRef = useRef([]);
+  const socketRef = useRef(null);
 
   useEffect(() => {
     const fetchRoomStatus = async () => {
       try {
         const status = await getRoomStatus(code);
         setRoomStatus(status);
-        setTimeLeft(status.duration * 60); // Convert to seconds
+        setTimeLeft(status.timeRemaining * 60); // Convert to seconds
         updateRoomStatus(status);
         lastParticipantsRef.current = status.participants;
         setLoading(false);
@@ -37,31 +38,62 @@ export default function RoomScreen() {
 
     fetchRoomStatus();
 
-    // Set up polling every 5 seconds
-    const stopPolling = pollRoomUpdates(code, (status) => {
-      setRoomStatus(status);
-      updateRoomStatus(status);
+    // Try to connect to WebSocket first
+    try {
+      socketRef.current = connectToRoomSocket(code, (status) => {
+        setRoomStatus(status);
+        updateRoomStatus(status);
+        setTimeLeft(status.timeRemaining * 60);
 
-      // Check for participant changes
-      if (lastParticipantsRef.current.length !== status.participants.length) {
-        const leftParticipants = lastParticipantsRef.current.filter(
-          p => !status.participants.includes(p)
-        );
+        // Check for participant changes
+        if (lastParticipantsRef.current.length !== status.participants.length) {
+          const leftParticipants = lastParticipantsRef.current.filter(
+            p => !status.participants.includes(p)
+          );
 
-        if (leftParticipants.length > 0) {
-          Notifications.scheduleNotificationAsync({
-            content: {
-              title: "Someone left the room",
-              body: `${leftParticipants.join(', ')} has left the focus session`,
-              sound: true,
-            },
-            trigger: null,
-          });
+          if (leftParticipants.length > 0) {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: "Someone left the room",
+                body: `${leftParticipants.join(', ')} has left the focus session`,
+                sound: true,
+              },
+              trigger: null,
+            });
+          }
         }
-      }
 
-      lastParticipantsRef.current = status.participants;
-    });
+        lastParticipantsRef.current = status.participants;
+      });
+    } catch (error) {
+      console.log('WebSocket connection failed, falling back to polling');
+      // Fall back to polling if WebSocket fails
+      intervalRef.current = pollRoomUpdates(code, (status) => {
+        setRoomStatus(status);
+        updateRoomStatus(status);
+        setTimeLeft(status.timeRemaining * 60);
+
+        // Check for participant changes
+        if (lastParticipantsRef.current.length !== status.participants.length) {
+          const leftParticipants = lastParticipantsRef.current.filter(
+            p => !status.participants.includes(p)
+          );
+
+          if (leftParticipants.length > 0) {
+            Notifications.scheduleNotificationAsync({
+              content: {
+                title: "Someone left the room",
+                body: `${leftParticipants.join(', ')} has left the focus session`,
+                sound: true,
+              },
+              trigger: null,
+            });
+          }
+        }
+
+        lastParticipantsRef.current = status.participants;
+      });
+    }
 
     // Set up timer countdown
     timerRef.current = setInterval(() => {
@@ -75,7 +107,12 @@ export default function RoomScreen() {
     }, 1000);
 
     return () => {
-      stopPolling();
+      if (socketRef.current) {
+        socketRef.current();
+      }
+      if (intervalRef.current) {
+        intervalRef.current();
+      }
       clearInterval(timerRef.current);
     };
   }, [code]);
@@ -83,6 +120,9 @@ export default function RoomScreen() {
   const handleLeaveRoom = async () => {
     try {
       await leaveRoom(code, 'currentUser'); // In a real app, use actual username
+      if (socketRef.current) {
+        socketRef.current();
+      }
       router.back();
     } catch (error) {
       console.error('Error leaving room:', error);
@@ -166,12 +206,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#333',
     textAlign: 'center',
+    color: '#6200ee',
   },
   timerContainer: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginVertical: 30,
   },
   timer: {
     fontSize: 48,
@@ -183,13 +223,13 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   participantsContainer: {
-    marginBottom: 30,
+    marginVertical: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
-    color: '#6200ee',
+    color: '#333',
   },
   participant: {
     alignItems: 'center',
@@ -205,9 +245,9 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   avatarText: {
-    color: '#fff',
-    fontSize: 20,
+    color: 'white',
     fontWeight: 'bold',
+    fontSize: 20,
   },
   participantName: {
     fontSize: 12,
@@ -218,23 +258,23 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 'auto',
+    marginTop: 30,
   },
   leaveButtonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
   },
   loadingText: {
     marginTop: 10,
-    textAlign: 'center',
+    fontSize: 16,
     color: '#666',
   },
   errorText: {
     color: '#f44336',
     fontSize: 16,
-    textAlign: 'center',
     marginBottom: 20,
+    textAlign: 'center',
   },
   button: {
     backgroundColor: '#6200ee',
@@ -243,7 +283,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
   },

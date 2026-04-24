@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { useSQLiteContext } from 'expo-sqlite';
+import { io } from 'socket.io-client';
 
 interface Room {
   id: number;
@@ -15,6 +16,7 @@ interface RoomStatus {
   duration: number;
   participants: string[];
   createdAt: number;
+  timeRemaining: number;
 }
 
 // Initialize the database tables
@@ -127,12 +129,17 @@ export const joinRoom = async (code: string, username: string): Promise<RoomStat
 
     const participants = participantsResult.map(row => row.username);
 
+    // Calculate time remaining
+    const elapsedTime = Math.floor((Date.now() - roomResult.created_at) / 1000 / 60);
+    const timeRemaining = Math.max(0, roomResult.duration - elapsedTime);
+
     return {
       code: roomResult.code,
       creator: roomResult.creator,
       duration: roomResult.duration,
       participants,
-      createdAt: roomResult.created_at
+      createdAt: roomResult.created_at,
+      timeRemaining
     };
   } catch (error) {
     console.error('Error joining room:', error);
@@ -203,12 +210,17 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
 
     const participants = participantsResult.map(row => row.username);
 
+    // Calculate time remaining
+    const elapsedTime = Math.floor((Date.now() - roomResult.created_at) / 1000 / 60);
+    const timeRemaining = Math.max(0, roomResult.duration - elapsedTime);
+
     return {
       code: roomResult.code,
       creator: roomResult.creator,
       duration: roomResult.duration,
       participants,
-      createdAt: roomResult.created_at
+      createdAt: roomResult.created_at,
+      timeRemaining
     };
   } catch (error) {
     console.error('Error getting room status:', error);
@@ -216,17 +228,49 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
   }
 };
 
-// Poll for room updates
-export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => void) => {
-  const interval = setInterval(async () => {
+// WebSocket connection for real-time updates
+let socket = null;
+
+export const connectToRoomSocket = (code: string, onUpdate: (status: RoomStatus) => void) => {
+  if (socket) {
+    socket.disconnect();
+  }
+
+  socket = io('https://your-websocket-server.com', {
+    query: { roomCode: code }
+  });
+
+  socket.on('connect', () => {
+    console.log('Connected to WebSocket server');
+  });
+
+  socket.on('roomUpdate', (status: RoomStatus) => {
+    onUpdate(status);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Disconnected from WebSocket server');
+  });
+
+  return () => {
+    if (socket) {
+      socket.disconnect();
+    }
+  };
+};
+
+// Polling fallback for when WebSocket isn't available
+export const pollRoomUpdates = (code: string, onUpdate: (status: RoomStatus) => void, interval = 5000) => {
+  let pollingInterval = setInterval(async () => {
     try {
       const status = await getRoomStatus(code);
-      callback(status);
+      onUpdate(status);
     } catch (error) {
       console.error('Error polling room updates:', error);
     }
-  }, 5000); // Poll every 5 seconds
+  }, interval);
 
-  // Return a function to stop polling
-  return () => clearInterval(interval);
+  return () => {
+    clearInterval(pollingInterval);
+  };
 };

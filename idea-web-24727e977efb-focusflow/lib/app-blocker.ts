@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import * as Linking from 'expo-linking';
 import * as Device from 'expo-device';
 import * as AppUsage from 'react-native-app-usage';
+import { NativeModules, Platform } from 'react-native';
 
 interface BlockedApp {
   id: string;
@@ -22,6 +23,7 @@ export const COMMON_APPS: BlockedApp[] = [
 
 let blockedApps: Set<string> = new Set();
 let notificationScheduled = false;
+let monitoringInterval: NodeJS.Timeout | null = null;
 
 export async function requestNotificationPermissions(): Promise<boolean> {
   const { status: existingStatus } = await Notifications.getPermissionsAsync();
@@ -38,10 +40,10 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 export function blockApps(appList: string[]): void {
   blockedApps = new Set(appList);
 
-  if (Device.osName === 'Android') {
+  if (Platform.OS === 'android') {
     // Android implementation using react-native-app-usage
     AppUsage.startTracking();
-    setInterval(() => {
+    monitoringInterval = setInterval(() => {
       AppUsage.getAppList().then((apps) => {
         const blockedAppsList = Array.from(blockedApps);
         const openBlockedApp = apps.find(app =>
@@ -55,17 +57,11 @@ export function blockApps(appList: string[]): void {
         }
       });
     }, 5000);
-  } else if (Device.osName === 'iOS') {
-    // iOS implementation using deep linking
-    const url = Linking.createURL('blocked-app');
-    Linking.addEventListener('url', ({ url }) => {
-      if (url.includes('blocked-app')) {
-        const appName = url.split('blocked-app/')[1];
-        if (blockedApps.has(appName)) {
-          showBlockedAppAlert(appName);
-        }
-      }
-    });
+  } else if (Platform.OS === 'ios') {
+    // iOS implementation using native module
+    if (NativeModules.AppBlockerModule) {
+      NativeModules.AppBlockerModule.blockApps(Array.from(blockedApps));
+    }
   }
 }
 
@@ -73,8 +69,16 @@ export function unblockApps(): void {
   blockedApps.clear();
   notificationScheduled = false;
 
-  if (Device.osName === 'Android') {
+  if (Platform.OS === 'android') {
     AppUsage.stopTracking();
+    if (monitoringInterval) {
+      clearInterval(monitoringInterval);
+      monitoringInterval = null;
+    }
+  } else if (Platform.OS === 'ios') {
+    if (NativeModules.AppBlockerModule) {
+      NativeModules.AppBlockerModule.unblockApps();
+    }
   }
 }
 
@@ -116,7 +120,7 @@ export async function setupNotificationHandler(): Promise<void> {
 }
 
 export async function checkBlockedApps(): Promise<void> {
-  if (Device.osName === 'iOS') {
+  if (Platform.OS === 'ios') {
     // For iOS, we need to check if any blocked apps are open
     // This would require a native module to check running apps
     // For now, we'll just show a notification if the app is opened via deep link

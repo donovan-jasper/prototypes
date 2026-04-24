@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, Share, ActivityIndicator } from 'react-native';
 import { useStore } from '../../store/useStore';
-import { createRoom, joinRoom, getRoomStatus, pollRoomUpdates } from '../../lib/room-manager';
+import { createRoom, joinRoom, getRoomStatus, connectToRoomSocket } from '../../lib/room-manager';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -9,6 +9,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 export default function TogetherScreen() {
   const [roomCode, setRoomCode] = useState('');
   const [username, setUsername] = useState('');
+  const [duration, setDuration] = useState('50');
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -23,13 +24,14 @@ export default function TogetherScreen() {
 
     setLoading(true);
     try {
-      const room = await createRoom(username, 50); // Default 50 min duration
+      const room = await createRoom(username, parseInt(duration));
       setActiveRoom({
         code: room.code,
         creator: room.creator,
         duration: room.duration,
         participants: [username],
-        createdAt: room.createdAt
+        createdAt: room.createdAt,
+        timeRemaining: room.duration
       });
       router.push(`/room/${room.code}`);
     } catch (error) {
@@ -54,7 +56,8 @@ export default function TogetherScreen() {
         creator: status.creator || '',
         duration: status.duration,
         participants: status.participants,
-        createdAt: status.createdAt
+        createdAt: status.createdAt,
+        timeRemaining: status.timeRemaining
       });
       router.push(`/room/${roomCode}`);
     } catch (error) {
@@ -110,6 +113,13 @@ export default function TogetherScreen() {
           value={username}
           onChangeText={setUsername}
         />
+        <TextInput
+          style={styles.input}
+          placeholder="Duration (minutes)"
+          value={duration}
+          onChangeText={setDuration}
+          keyboardType="numeric"
+        />
         <TouchableOpacity
           style={[styles.button, loading && styles.disabledButton]}
           onPress={createNewRoom}
@@ -159,28 +169,21 @@ export default function TogetherScreen() {
             keyExtractor={(item) => item.code}
             renderItem={({ item }) => (
               <View style={styles.roomCard}>
-                <View style={styles.roomHeader}>
-                  <Text style={styles.roomCode}>Room: {item.code}</Text>
-                  <TouchableOpacity onPress={() => shareRoomLink(item.code)}>
-                    <MaterialIcons name="share" size={24} color="#6200ee" />
-                  </TouchableOpacity>
+                <View style={styles.roomInfo}>
+                  <Text style={styles.roomCode}>{item.code}</Text>
+                  <Text style={styles.roomDuration}>{item.duration} min</Text>
                 </View>
-                <Text style={styles.roomInfo}>Created by: {item.creator}</Text>
-                <Text style={styles.roomInfo}>Duration: {item.duration} minutes</Text>
                 <TouchableOpacity
-                  style={styles.joinButton}
-                  onPress={() => {
-                    setRoomCode(item.code);
-                    joinExistingRoom();
-                  }}
+                  style={styles.shareButton}
+                  onPress={() => shareRoomLink(item.code)}
                 >
-                  <Text style={styles.joinButtonText}>Join</Text>
+                  <MaterialIcons name="share" size={20} color="#6200ee" />
                 </TouchableOpacity>
               </View>
             )}
           />
         ) : (
-          <Text style={styles.emptyText}>No active rooms yet</Text>
+          <Text style={styles.noRoomsText}>No active rooms yet</Text>
         )}
       </View>
     </View>
@@ -197,16 +200,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    color: '#333',
+    textAlign: 'center',
+    color: '#6200ee',
   },
   section: {
     marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
-    color: '#6200ee',
+    color: '#333',
   },
   input: {
     height: 50,
@@ -215,7 +222,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 15,
     marginBottom: 10,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: '#fff',
   },
   button: {
     backgroundColor: '#6200ee',
@@ -227,45 +234,39 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: '#fff',
+    color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
   },
   roomCard: {
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    padding: 15,
-    marginBottom: 10,
-  },
-  roomHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 5,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  roomInfo: {
+    flex: 1,
   },
   roomCode: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#6200ee',
   },
-  roomInfo: {
+  roomDuration: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginTop: 5,
   },
-  joinButton: {
-    backgroundColor: '#6200ee',
+  shareButton: {
     padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-    marginTop: 10,
   },
-  joinButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  emptyText: {
-    color: '#999',
+  noRoomsText: {
+    color: '#666',
     textAlign: 'center',
     marginTop: 10,
   },

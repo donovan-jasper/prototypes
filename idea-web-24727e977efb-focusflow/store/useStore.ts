@@ -15,6 +15,7 @@ interface Room {
   duration: number;
   participants: string[];
   createdAt: number;
+  timeRemaining: number;
 }
 
 interface RoomStatus {
@@ -23,6 +24,7 @@ interface RoomStatus {
   duration: number;
   participants: string[];
   createdAt: number;
+  timeRemaining: number;
 }
 
 interface StoreState {
@@ -34,6 +36,7 @@ interface StoreState {
   clearActiveRoom: () => void;
   updateRoomParticipants: (participants: string[]) => void;
   updateRoomStatus: (status: RoomStatus) => void;
+  updateRoomTimer: (timeRemaining: number) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -56,7 +59,14 @@ export const useStore = create<StoreState>((set) => ({
             ...state.activeRoom,
             participants: status.participants,
             duration: status.duration,
+            timeRemaining: status.timeRemaining,
           }
+        : null,
+    })),
+  updateRoomTimer: (timeRemaining) =>
+    set((state) => ({
+      activeRoom: state.activeRoom
+        ? { ...state.activeRoom, timeRemaining }
         : null,
     })),
 }));
