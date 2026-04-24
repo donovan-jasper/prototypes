@@ -3,9 +3,16 @@ import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator } from 'rea
 import { Picker } from '@react-native-picker/picker';
 import CodeEditor from '../components/CodeEditor';
 import { useSession } from '../context/SessionContext';
+import { useCodeExecution } from '../hooks/useCodeExecution';
 
 export default function EditorScreen() {
-  const { code, language, isRunning, sessionId, setCode, setLanguage, runCode } = useSession();
+  const { code, language, sessionId, setCode, setLanguage } = useSession();
+  const { executeCode, isExecuting, executionError } = useCodeExecution();
+
+  const handleRunCode = async () => {
+    if (!code.trim()) return;
+    await executeCode(code);
+  };
 
   return (
     <View style={styles.container}>
@@ -26,11 +33,11 @@ export default function EditorScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.runButton, (isRunning || !sessionId) && styles.runButtonDisabled]}
-          onPress={runCode}
-          disabled={isRunning || !sessionId}
+          style={[styles.runButton, (isExecuting || !sessionId) && styles.runButtonDisabled]}
+          onPress={handleRunCode}
+          disabled={isExecuting || !sessionId}
         >
-          {isRunning ? (
+          {isExecuting ? (
             <>
               <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
               <Text style={styles.runButtonText}>Running...</Text>
@@ -44,6 +51,12 @@ export default function EditorScreen() {
       {sessionId && (
         <View style={styles.sessionInfo}>
           <Text style={styles.sessionText}>Session: {sessionId.substring(0, 8)}...</Text>
+        </View>
+      )}
+
+      {executionError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{executionError}</Text>
         </View>
       )}
 
@@ -106,6 +119,14 @@ const styles = StyleSheet.create({
   sessionText: {
     color: '#94a3b8',
     fontSize: 12,
+  },
+  errorContainer: {
+    padding: 12,
+    backgroundColor: '#ef4444',
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 14,
   },
   editorContainer: {
     flex: 1,

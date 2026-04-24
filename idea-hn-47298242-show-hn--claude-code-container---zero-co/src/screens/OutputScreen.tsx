@@ -1,9 +1,11 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { useSession } from '../context/SessionContext';
+import { useCodeExecution } from '../hooks/useCodeExecution';
 
 export default function OutputScreen() {
   const { outputs, clearOutputs, sessionId } = useSession();
+  const { executionError } = useCodeExecution();
 
   const renderOutput = ({ item }: { item: any }) => (
     <View style={styles.outputItem}>
@@ -27,7 +29,13 @@ export default function OutputScreen() {
         )}
       </View>
 
-      {outputs.length === 0 ? (
+      {executionError && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{executionError}</Text>
+        </View>
+      )}
+
+      {outputs.length === 0 && !executionError ? (
         <View style={styles.placeholderContainer}>
           <Text style={styles.placeholder}>
             {sessionId ? 'Run code to see output here...' : 'Connecting to server...'}
@@ -73,6 +81,14 @@ const styles = StyleSheet.create({
   clearButtonText: {
     color: '#e2e8f0',
     fontSize: 12,
+  },
+  errorContainer: {
+    padding: 12,
+    backgroundColor: '#ef4444',
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 14,
   },
   placeholderContainer: {
     flex: 1,
