@@ -15,15 +15,17 @@ const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    height: 20,
     width: '100%',
+    height: 10,
     backgroundColor: '#e0e0e0',
-    borderRadius: 10,
+    borderRadius: 5,
     overflow: 'hidden',
+    marginTop: 20,
   },
   progressBar: {
     height: '100%',
     backgroundColor: '#4CAF50',
+    borderRadius: 5,
   },
 });
 
