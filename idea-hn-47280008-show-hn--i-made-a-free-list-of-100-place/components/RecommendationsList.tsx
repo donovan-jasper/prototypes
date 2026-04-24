@@ -18,8 +18,8 @@ export default function RecommendationsList({ category }: RecommendationsListPro
     async function loadRecommendations() {
       try {
         setLoading(true);
-        const topDirectories = await getPriorityRecommendations(category, 10);
-        setRecommendations(topDirectories);
+        const recs = await getPriorityRecommendations(category, 5);
+        setRecommendations(recs);
       } catch (error) {
         console.error('Failed to load recommendations:', error);
       } finally {
@@ -34,7 +34,7 @@ export default function RecommendationsList({ category }: RecommendationsListPro
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading recommendations...</Text>
+        <Text style={styles.loadingText}>Finding best matches...</Text>
       </View>
     );
   }
@@ -84,21 +84,22 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 12,
   },
-  loadingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  loadingText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: '#666',
-  },
   listContent: {
     paddingVertical: 8,
   },
   cardContainer: {
     marginRight: 12,
     width: 220,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
   },
 });

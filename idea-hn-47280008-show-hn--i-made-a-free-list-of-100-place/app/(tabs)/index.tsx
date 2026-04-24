@@ -204,6 +204,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     padding: 20,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   emptyText: {
     fontSize: 16,
