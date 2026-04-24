@@ -74,6 +74,31 @@ const PDFEditor = ({ pdfData, onSave }) => {
     });
   };
 
+  const handleOCR = async () => {
+    if (ocrLimitReached) {
+      Alert.alert('OCR Limit Reached', 'You have reached your daily OCR limit. Please upgrade to continue.');
+      return;
+    }
+
+    try {
+      const worker = await createWorker({
+        logger: m => console.log(m),
+      });
+
+      await worker.loadLanguage('eng');
+      await worker.initialize('eng');
+
+      const { data: { text } } = await worker.recognize(pdfData);
+      setOcrText(text);
+      updateOcrUsage();
+
+      await worker.terminate();
+    } catch (error) {
+      console.error('OCR Error:', error);
+      Alert.alert('OCR Error', 'Failed to extract text from the document.');
+    }
+  };
+
   const handleEdit = async () => {
     const pdfDoc = await PDFDocument.load(pdfData);
     const pages = pdfDoc.getPages();
@@ -153,9 +178,10 @@ const PDFEditor = ({ pdfData, onSave }) => {
           radius: 0,
         });
       } else {
-        const dx = event.nativeEvent.x - currentAnnotation.x;
-        const dy = event.nativeEvent.y - currentAnnotation.y;
-        const newRadius = Math.sqrt(dx * dx + dy * dy);
+        const newRadius = Math.sqrt(
+          Math.pow(event.nativeEvent.x - currentAnnotation.x, 2) +
+          Math.pow(event.nativeEvent.y - currentAnnotation.y, 2)
+        );
         setCurrentAnnotation({
           ...currentAnnotation,
           radius: newRadius,
@@ -164,214 +190,192 @@ const PDFEditor = ({ pdfData, onSave }) => {
     }
   };
 
-  const handleGestureEnd = () => {
-    if (currentAnnotation) {
-      setAnnotations([...annotations, currentAnnotation]);
-      setCurrentAnnotation(null);
+  const handleGestureStateChange = (event) => {
+    if (event.nativeEvent.oldState === State.ACTIVE) {
+      if (currentAnnotation) {
+        setAnnotations([...annotations, currentAnnotation]);
+        setCurrentAnnotation(null);
+      }
     }
   };
 
   const handlePinchGesture = (event) => {
     if (event.nativeEvent.state === State.ACTIVE) {
-      const newScale = scale * event.nativeEvent.scale;
-      setScale(newScale);
+      setScale(scale * event.nativeEvent.scale);
     }
   };
 
   const handlePanGesture = (event) => {
     if (event.nativeEvent.state === State.ACTIVE) {
-      const newTranslateX = lastTranslateX + event.nativeEvent.translationX;
-      const newTranslateY = lastTranslateY + event.nativeEvent.translationY;
-      setTranslateX(newTranslateX);
-      setTranslateY(newTranslateY);
+      setTranslateX(lastTranslateX + event.nativeEvent.translationX);
+      setTranslateY(lastTranslateY + event.nativeEvent.translationY);
     } else if (event.nativeEvent.state === State.END) {
       setLastTranslateX(translateX);
       setLastTranslateY(translateY);
     }
   };
 
-  const handleOCR = async () => {
-    if (ocrLimitReached) {
-      Alert.alert('OCR Limit Reached', 'You have reached your daily OCR limit. Please upgrade to use more.');
-      return;
-    }
-
-    try {
-      const worker = await createWorker('eng');
-      const { data: { text } } = await worker.recognize(pdfData);
-      await worker.terminate();
-      setOcrText(text);
-      updateOcrUsage();
-    } catch (error) {
-      Alert.alert('OCR Error', 'Failed to perform OCR. Please try again.');
-    }
-  };
-
-  const renderAnnotations = () => {
-    return annotations.map((annotation, index) => {
-      if (annotation.type === 'text') {
-        return (
-          <SvgText
-            key={`text-${index}`}
-            x={annotation.x}
-            y={annotation.y}
-            fontSize={12}
-            fill="black"
-          >
-            {annotation.text}
-          </SvgText>
-        );
-      } else if (annotation.type === 'rectangle') {
-        return (
-          <Rect
-            key={`rect-${index}`}
-            x={annotation.x}
-            y={annotation.y}
-            width={annotation.width}
-            height={annotation.height}
-            stroke="black"
-            strokeWidth="1"
-            fill="none"
-          />
-        );
-      } else if (annotation.type === 'circle') {
-        return (
-          <Circle
-            key={`circle-${index}`}
-            cx={annotation.x + annotation.radius}
-            cy={annotation.y + annotation.radius}
-            r={annotation.radius}
-            stroke="black"
-            strokeWidth="1"
-            fill="none"
-          />
-        );
-      }
-      return null;
-    });
-  };
-
-  const renderCurrentAnnotation = () => {
-    if (!currentAnnotation) return null;
-
-    if (currentAnnotation.type === 'text') {
-      return (
-        <SvgText
-          x={currentAnnotation.x}
-          y={currentAnnotation.y}
-          fontSize={12}
-          fill="black"
-        >
-          {currentAnnotation.text}
-        </SvgText>
-      );
-    } else if (currentAnnotation.type === 'rectangle') {
-      return (
-        <Rect
-          x={currentAnnotation.x}
-          y={currentAnnotation.y}
-          width={currentAnnotation.width}
-          height={currentAnnotation.height}
-          stroke="black"
-          strokeWidth="1"
-          fill="none"
-        />
-      );
-    } else if (currentAnnotation.type === 'circle') {
-      return (
-        <Circle
-          cx={currentAnnotation.x + currentAnnotation.radius}
-          cy={currentAnnotation.y + currentAnnotation.radius}
-          r={currentAnnotation.radius}
-          stroke="black"
-          strokeWidth="1"
-          fill="none"
-        />
-      );
-    }
-    return null;
-  };
-
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.toolbar}>
-        <TouchableOpacity onPress={() => setTool('text')} style={[styles.toolButton, tool === 'text' && styles.activeTool]}>
-          <Text>Text</Text>
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'text' && styles.activeTool]}
+          onPress={() => setTool('text')}
+        >
+          <Text style={styles.toolButtonText}>Text</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTool('rectangle')} style={[styles.toolButton, tool === 'rectangle' && styles.activeTool]}>
-          <Text>Rectangle</Text>
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'rectangle' && styles.activeTool]}
+          onPress={() => setTool('rectangle')}
+        >
+          <Text style={styles.toolButtonText}>Rectangle</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setTool('circle')} style={[styles.toolButton, tool === 'circle' && styles.activeTool]}>
-          <Text>Circle</Text>
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'circle' && styles.activeTool]}
+          onPress={() => setTool('circle')}
+        >
+          <Text style={styles.toolButtonText}>Circle</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={handleOCR} style={styles.toolButton}>
-          <Text>OCR</Text>
+        <TouchableOpacity
+          style={styles.ocrButton}
+          onPress={handleOCR}
+          disabled={ocrLimitReached}
+        >
+          <Text style={styles.ocrButtonText}>OCR</Text>
         </TouchableOpacity>
       </View>
 
       {tool === 'text' && (
         <TextInput
           style={styles.textInput}
-          placeholder="Enter text annotation"
+          placeholder="Enter text"
           value={textInput}
           onChangeText={setTextInput}
         />
       )}
 
-      <PinchGestureHandler onGestureEvent={handlePinchGesture}>
-        <PanGestureHandler onGestureEvent={handlePanGesture}>
-          <View style={styles.pdfContainer}>
-            <Pdf
-              ref={pdfRef}
-              source={{ uri: `data:application/pdf;base64,${pdfData.toString('base64')}` }}
-              style={styles.pdf}
-              onLoadComplete={(numberOfPages, filePath) => {
-                console.log(`Number of pages: ${numberOfPages}`);
-              }}
-              onPageChanged={(page, numberOfPages) => {
-                console.log(`Current page: ${page}`);
-              }}
-              onError={(error) => {
-                console.log(error);
-              }}
-              scale={scale}
-              horizontal={true}
-              enablePaging={true}
-            />
-            <Svg
-              ref={svgRef}
-              style={StyleSheet.absoluteFill}
-              width={width}
-              height={height}
-            >
-              {renderAnnotations()}
-              {renderCurrentAnnotation()}
-            </Svg>
-            <PanGestureHandler
-              onGestureEvent={handleGestureEvent}
-              onHandlerStateChange={({ nativeEvent }) => {
-                if (nativeEvent.state === State.END) {
-                  handleGestureEnd();
-                }
-              }}
-            >
-              <View style={StyleSheet.absoluteFill} />
-            </PanGestureHandler>
-          </View>
-        </PanGestureHandler>
-      </PinchGestureHandler>
+      <GestureHandlerRootView style={styles.pdfContainer}>
+        <PinchGestureHandler
+          onGestureEvent={handlePinchGesture}
+          onHandlerStateChange={handlePinchGesture}
+        >
+          <PanGestureHandler
+            onGestureEvent={handlePanGesture}
+            onHandlerStateChange={handlePanGesture}
+          >
+            <View style={styles.pdfWrapper}>
+              <Pdf
+                ref={pdfRef}
+                source={{ uri: `data:application/pdf;base64,${pdfData.toString('base64')}` }}
+                style={styles.pdf}
+                scale={scale}
+                horizontal={true}
+                enablePaging={true}
+                spacing={10}
+              />
+              <Svg
+                ref={svgRef}
+                style={StyleSheet.absoluteFill}
+                width={width}
+                height={height}
+                transform={`translate(${translateX}, ${translateY})`}
+              >
+                {annotations.map((annotation, index) => (
+                  <React.Fragment key={index}>
+                    {annotation.type === 'text' && (
+                      <SvgText
+                        x={annotation.x}
+                        y={annotation.y}
+                        fontSize={12}
+                        fill="black"
+                      >
+                        {annotation.text}
+                      </SvgText>
+                    )}
+                    {annotation.type === 'rectangle' && (
+                      <Rect
+                        x={annotation.x}
+                        y={annotation.y}
+                        width={annotation.width}
+                        height={annotation.height}
+                        stroke="black"
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                    )}
+                    {annotation.type === 'circle' && (
+                      <Circle
+                        cx={annotation.x + annotation.radius}
+                        cy={annotation.y + annotation.radius}
+                        r={annotation.radius}
+                        stroke="black"
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                    )}
+                  </React.Fragment>
+                ))}
+                {currentAnnotation && (
+                  <React.Fragment>
+                    {currentAnnotation.type === 'text' && (
+                      <SvgText
+                        x={currentAnnotation.x}
+                        y={currentAnnotation.y}
+                        fontSize={12}
+                        fill="black"
+                      >
+                        {textInput}
+                      </SvgText>
+                    )}
+                    {currentAnnotation.type === 'rectangle' && (
+                      <Rect
+                        x={currentAnnotation.x}
+                        y={currentAnnotation.y}
+                        width={currentAnnotation.width}
+                        height={currentAnnotation.height}
+                        stroke="black"
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                    )}
+                    {currentAnnotation.type === 'circle' && (
+                      <Circle
+                        cx={currentAnnotation.x + currentAnnotation.radius}
+                        cy={currentAnnotation.y + currentAnnotation.radius}
+                        r={currentAnnotation.radius}
+                        stroke="black"
+                        strokeWidth={1}
+                        fill="none"
+                      />
+                    )}
+                  </React.Fragment>
+                )}
+              </Svg>
+              <PanGestureHandler
+                onGestureEvent={handleGestureEvent}
+                onHandlerStateChange={handleGestureStateChange}
+              >
+                <View style={StyleSheet.absoluteFill} />
+              </PanGestureHandler>
+            </View>
+          </PanGestureHandler>
+        </PinchGestureHandler>
+      </GestureHandlerRootView>
 
       {ocrText && (
-        <ScrollView style={styles.ocrResult}>
-          <Text>{ocrText}</Text>
-        </ScrollView>
+        <View style={styles.ocrResultContainer}>
+          <Text style={styles.ocrResultTitle}>Extracted Text:</Text>
+          <ScrollView style={styles.ocrResultScroll}>
+            <Text style={styles.ocrResultText}>{ocrText}</Text>
+          </ScrollView>
+        </View>
       )}
 
       <View style={styles.buttonContainer}>
-        <Button title="Edit PDF" onPress={handleEdit} />
+        <Button title="Edit" onPress={handleEdit} />
         <Button title="Save" onPress={handleSave} />
       </View>
-    </GestureHandlerRootView>
+    </View>
   );
 };
 
@@ -389,21 +393,36 @@ const styles = StyleSheet.create({
   },
   toolButton: {
     padding: 10,
-    marginRight: 10,
+    marginRight: 5,
     backgroundColor: '#ddd',
     borderRadius: 5,
   },
   activeTool: {
-    backgroundColor: '#bbb',
+    backgroundColor: '#4CAF50',
+  },
+  toolButtonText: {
+    color: '#000',
+  },
+  ocrButton: {
+    padding: 10,
+    marginLeft: 'auto',
+    backgroundColor: '#2196F3',
+    borderRadius: 5,
+  },
+  ocrButtonText: {
+    color: '#fff',
   },
   textInput: {
     height: 40,
     borderColor: 'gray',
     borderWidth: 1,
+    padding: 10,
     margin: 10,
-    padding: 5,
   },
   pdfContainer: {
+    flex: 1,
+  },
+  pdfWrapper: {
     flex: 1,
     position: 'relative',
   },
@@ -412,16 +431,29 @@ const styles = StyleSheet.create({
     width: width,
     height: height,
   },
-  ocrResult: {
-    height: 150,
+  ocrResultContainer: {
+    height: 200,
+    padding: 10,
+    backgroundColor: '#f9f9f9',
     borderTopWidth: 1,
     borderTopColor: '#ccc',
-    padding: 10,
+  },
+  ocrResultTitle: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  ocrResultScroll: {
+    flex: 1,
+  },
+  ocrResultText: {
+    fontSize: 14,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#ccc',
   },
 });
 
