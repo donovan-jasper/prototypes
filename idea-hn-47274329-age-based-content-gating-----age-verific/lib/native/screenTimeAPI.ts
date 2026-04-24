@@ -181,8 +181,9 @@ class ScreenTimeAPI {
 
       const success = await NativeModules.ScreenTimeModule.updateContentFilter(config);
 
-      if (success && config.profileType) {
-        this.currentProfile = config.profileType;
+      if (success) {
+        console.log('[ScreenTimeAPI] Content filter updated successfully');
+        console.log('[ScreenTimeAPI] Updated configuration:', config);
       }
 
       return success;
@@ -191,52 +192,6 @@ class ScreenTimeAPI {
       return false;
     }
   }
-
-  /**
-   * Block specific domains
-   */
-  async blockDomains(domains: string[]): Promise<boolean> {
-    if (Platform.OS !== 'ios') {
-      console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
-      return false;
-    }
-
-    if (!this.isAvailable) {
-      console.error('[ScreenTimeAPI] Screen Time API not available');
-      return false;
-    }
-
-    try {
-      console.log('[ScreenTimeAPI] Blocking domains:', domains);
-      return await NativeModules.ScreenTimeModule.blockDomains(domains);
-    } catch (error) {
-      console.error('[ScreenTimeAPI] Error blocking domains:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Unblock specific domains
-   */
-  async unblockDomains(domains: string[]): Promise<boolean> {
-    if (Platform.OS !== 'ios') {
-      console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
-      return false;
-    }
-
-    if (!this.isAvailable) {
-      console.error('[ScreenTimeAPI] Screen Time API not available');
-      return false;
-    }
-
-    try {
-      console.log('[ScreenTimeAPI] Unblocking domains:', domains);
-      return await NativeModules.ScreenTimeModule.unblockDomains(domains);
-    } catch (error) {
-      console.error('[ScreenTimeAPI] Error unblocking domains:', error);
-      return false;
-    }
-  }
 }
 
-export default new ScreenTimeAPI();
+export const screenTimeAPI = new ScreenTimeAPI();

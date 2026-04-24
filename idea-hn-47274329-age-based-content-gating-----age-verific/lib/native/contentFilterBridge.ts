@@ -1,18 +1,11 @@
 import { Platform } from 'react-native';
-import { DigitalWellbeingAPI } from './digitalWellbeingAPI';
-import { ScreenTimeAPI } from './screenTimeAPI';
+import { digitalWellbeingAPI } from './digitalWellbeingAPI';
+import { screenTimeAPI } from './screenTimeAPI';
 import { getAgeProfile } from '../../constants/ageProfiles';
 import { filterURL } from '../../lib/filtering/contentFilter';
 
 export class ContentFilterBridge {
-  private digitalWellbeingAPI: DigitalWellbeingAPI;
-  private screenTimeAPI: ScreenTimeAPI;
   private currentProfile: string | null = null;
-
-  constructor() {
-    this.digitalWellbeingAPI = new DigitalWellbeingAPI();
-    this.screenTimeAPI = new ScreenTimeAPI();
-  }
 
   /**
    * Enable content filtering for the specified profile
@@ -38,9 +31,9 @@ export class ContentFilterBridge {
     };
 
     if (Platform.OS === 'android') {
-      return this.digitalWellbeingAPI.enableContentFilter(config);
+      return digitalWellbeingAPI.enableContentFilter(config);
     } else if (Platform.OS === 'ios') {
-      return this.screenTimeAPI.enableContentFilter(config);
+      return screenTimeAPI.enableContentFilter(config);
     }
 
     return false;
@@ -53,9 +46,9 @@ export class ContentFilterBridge {
     this.currentProfile = null;
 
     if (Platform.OS === 'android') {
-      return this.digitalWellbeingAPI.disableContentFilter();
+      return digitalWellbeingAPI.disableContentFilter();
     } else if (Platform.OS === 'ios') {
-      return this.screenTimeAPI.disableContentFilter();
+      return screenTimeAPI.disableContentFilter();
     }
 
     return false;
@@ -83,9 +76,9 @@ export class ContentFilterBridge {
    */
   async getStatus() {
     if (Platform.OS === 'android') {
-      return this.digitalWellbeingAPI.getStatus();
+      return digitalWellbeingAPI.getStatus();
     } else if (Platform.OS === 'ios') {
-      return this.screenTimeAPI.getStatus();
+      return screenTimeAPI.getStatus();
     }
 
     return {
@@ -93,6 +86,19 @@ export class ContentFilterBridge {
       enabled: false,
       error: 'Unsupported platform'
     };
+  }
+
+  /**
+   * Update content filtering rules
+   */
+  async updateContentFilter(config: Partial<ContentFilterConfig>): Promise<boolean> {
+    if (Platform.OS === 'android') {
+      return digitalWellbeingAPI.updateContentFilter(config);
+    } else if (Platform.OS === 'ios') {
+      return screenTimeAPI.updateContentFilter(config);
+    }
+
+    return false;
   }
 }
 

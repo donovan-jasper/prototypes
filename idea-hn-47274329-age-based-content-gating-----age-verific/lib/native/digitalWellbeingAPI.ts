@@ -181,8 +181,9 @@ class DigitalWellbeingAPI {
 
       const success = await NativeModules.DigitalWellbeingModule.updateContentFilter(config);
 
-      if (success && config.profileType) {
-        this.currentProfile = config.profileType;
+      if (success) {
+        console.log('[DigitalWellbeingAPI] Content filter updated successfully');
+        console.log('[DigitalWellbeingAPI] Updated configuration:', config);
       }
 
       return success;
@@ -191,52 +192,6 @@ class DigitalWellbeingAPI {
       return false;
     }
   }
-
-  /**
-   * Block specific domains
-   */
-  async blockDomains(domains: string[]): Promise<boolean> {
-    if (Platform.OS !== 'android') {
-      console.warn('[DigitalWellbeingAPI] Digital Wellbeing API only available on Android');
-      return false;
-    }
-
-    if (!this.isAvailable) {
-      console.error('[DigitalWellbeingAPI] Digital Wellbeing API not available');
-      return false;
-    }
-
-    try {
-      console.log('[DigitalWellbeingAPI] Blocking domains:', domains);
-      return await NativeModules.DigitalWellbeingModule.blockDomains(domains);
-    } catch (error) {
-      console.error('[DigitalWellbeingAPI] Error blocking domains:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Unblock specific domains
-   */
-  async unblockDomains(domains: string[]): Promise<boolean> {
-    if (Platform.OS !== 'android') {
-      console.warn('[DigitalWellbeingAPI] Digital Wellbeing API only available on Android');
-      return false;
-    }
-
-    if (!this.isAvailable) {
-      console.error('[DigitalWellbeingAPI] Digital Wellbeing API not available');
-      return false;
-    }
-
-    try {
-      console.log('[DigitalWellbeingAPI] Unblocking domains:', domains);
-      return await NativeModules.DigitalWellbeingModule.unblockDomains(domains);
-    } catch (error) {
-      console.error('[DigitalWellbeingAPI] Error unblocking domains:', error);
-      return false;
-    }
-  }
 }
 
-export default new DigitalWellbeingAPI();
+export const digitalWellbeingAPI = new DigitalWellbeingAPI();
