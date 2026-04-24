@@ -8,11 +8,14 @@ import {
   ScrollView,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useProductStore } from '../../store/products';
+import Toast from 'react-native-toast-message';
 
 const PLATFORMS = ['Amazon', 'eBay', 'Shopify', 'Etsy'];
 
@@ -29,7 +32,7 @@ export default function CreateProduct() {
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    
+
     if (!permissionResult.granted) {
       Alert.alert('Permission Required', 'Please allow access to your photo library');
       return;
@@ -93,129 +96,128 @@ export default function CreateProduct() {
       platforms: selectedPlatforms,
     });
 
-    Alert.alert('Success', 'Product created successfully', [
-      {
-        text: 'OK',
-        onPress: () => {
-          setTitle('');
-          setDescription('');
-          setPrice('');
-          setQuantity('');
-          setImageUri(undefined);
-          setSelectedPlatforms([]);
-          router.push('/(tabs)');
-        },
-      },
-    ]);
+    Toast.show({
+      type: 'success',
+      text1: 'Product Created',
+      text2: 'Your product has been successfully added',
+      visibilityTime: 3000,
+    });
+
+    setTitle('');
+    setDescription('');
+    setPrice('');
+    setQuantity('');
+    setImageUri(undefined);
+    setSelectedPlatforms([]);
+    router.push('/(tabs)');
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Product Photo</Text>
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-          {imageUri ? (
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} />
-          ) : (
-            <View style={styles.imagePickerPlaceholder}>
-              <Ionicons name="camera-outline" size={40} color="#007AFF" />
-              <Text style={styles.imagePickerText}>Add Photo</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Photo</Text>
+          <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+            {imageUri ? (
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+            ) : (
+              <View style={styles.imagePickerPlaceholder}>
+                <Ionicons name="camera-outline" size={40} color="#007AFF" />
+                <Text style={styles.imagePickerText}>Add Photo</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Product Details</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Product Title"
-          value={title}
-          onChangeText={setTitle}
-          placeholderTextColor="#C7C7CC"
-        />
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Description"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-          placeholderTextColor="#C7C7CC"
-        />
-        <View style={styles.row}>
-          <View style={styles.halfInput}>
-            <Text style={styles.inputLabel}>Price</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0.00"
-              value={price}
-              onChangeText={setPrice}
-              keyboardType="decimal-pad"
-              placeholderTextColor="#C7C7CC"
-            />
-          </View>
-          <View style={styles.halfInput}>
-            <Text style={styles.inputLabel}>Quantity</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="0"
-              value={quantity}
-              onChangeText={setQuantity}
-              keyboardType="number-pad"
-              placeholderTextColor="#C7C7CC"
-            />
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Product Details</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Product Title"
+            value={title}
+            onChangeText={setTitle}
+            placeholderTextColor="#C7C7CC"
+          />
+          <TextInput
+            style={[styles.input, styles.textArea]}
+            placeholder="Description"
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+            placeholderTextColor="#C7C7CC"
+          />
+          <View style={styles.row}>
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>Price</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0.00"
+                value={price}
+                onChangeText={setPrice}
+                keyboardType="decimal-pad"
+                placeholderTextColor="#C7C7CC"
+              />
+            </View>
+            <View style={styles.halfInput}>
+              <Text style={styles.inputLabel}>Quantity</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="0"
+                value={quantity}
+                onChangeText={setQuantity}
+                keyboardType="number-pad"
+                placeholderTextColor="#C7C7CC"
+              />
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Select Platforms</Text>
-        <View style={styles.platformGrid}>
-          {PLATFORMS.map((platform) => {
-            const isSelected = selectedPlatforms.includes(platform);
-            return (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Publish To</Text>
+          <View style={styles.platformContainer}>
+            {PLATFORMS.map((platform) => (
               <TouchableOpacity
                 key={platform}
                 style={[
                   styles.platformButton,
-                  isSelected && styles.platformButtonSelected,
+                  selectedPlatforms.includes(platform) && styles.platformButtonSelected,
                 ]}
                 onPress={() => togglePlatform(platform)}
               >
                 <Text
                   style={[
                     styles.platformButtonText,
-                    isSelected && styles.platformButtonTextSelected,
+                    selectedPlatforms.includes(platform) && styles.platformButtonTextSelected,
                   ]}
                 >
                   {platform}
                 </Text>
-                {isSelected && (
-                  <Ionicons name="checkmark-circle" size={20} color="#007AFF" />
-                )}
               </TouchableOpacity>
-            );
-          })}
+            ))}
+          </View>
         </View>
-      </View>
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Create Product</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>Create Product</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F5',
   },
   content: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: 20,
+    paddingBottom: 40,
   },
   section: {
     marginBottom: 24,
@@ -223,99 +225,91 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
+    color: '#333',
     marginBottom: 12,
   },
   imagePicker: {
     width: '100%',
-    height: 200,
-    borderRadius: 12,
-    overflow: 'hidden',
+    aspectRatio: 1,
     backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-    borderStyle: 'dashed',
-  },
-  imagePickerPlaceholder: {
-    flex: 1,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  imagePickerText: {
-    marginTop: 8,
-    fontSize: 16,
-    color: '#007AFF',
-    fontWeight: '500',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   imagePreview: {
     width: '100%',
     height: '100%',
+    borderRadius: 8,
+  },
+  imagePickerPlaceholder: {
+    alignItems: 'center',
+  },
+  imagePickerText: {
+    color: '#007AFF',
+    marginTop: 8,
+    fontSize: 16,
   },
   input: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 8,
     padding: 12,
-    fontSize: 16,
-    color: '#000000',
+    borderRadius: 8,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E5E5EA',
+    borderColor: '#E0E0E0',
+    fontSize: 16,
   },
   textArea: {
-    height: 100,
-    paddingTop: 12,
+    height: 120,
   },
   row: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   halfInput: {
-    flex: 1,
+    width: '48%',
   },
   inputLabel: {
     fontSize: 14,
-    fontWeight: '500',
-    color: '#8E8E93',
-    marginBottom: 6,
+    color: '#666',
+    marginBottom: 4,
   },
-  platformGrid: {
+  platformContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    marginHorizontal: -4,
   },
   platformButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    paddingVertical: 8,
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-    gap: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    margin: 4,
   },
   platformButtonSelected: {
+    backgroundColor: '#007AFF',
     borderColor: '#007AFF',
-    backgroundColor: '#E5F3FF',
   },
   platformButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
+    color: '#333',
+    fontSize: 14,
   },
   platformButtonTextSelected: {
-    color: '#007AFF',
+    color: '#FFFFFF',
   },
   submitButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 12,
     padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 24,
   },
   submitButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
