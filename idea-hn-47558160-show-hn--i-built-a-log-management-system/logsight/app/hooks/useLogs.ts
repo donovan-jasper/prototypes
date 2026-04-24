@@ -1,96 +1,137 @@
 import { useState, useEffect } from 'react';
 import * as SQLite from 'expo-sqlite';
+import { initializeApp } from 'firebase/app';
+import { getFirestore, collection, query, where, onSnapshot, orderBy, limit } from 'firebase/firestore';
 
-const db = SQLite.openDatabase('logsight.db');
+// Initialize Firebase
+const firebaseConfig = {
+  apiKey: "YOUR_API_KEY",
+  authDomain: "YOUR_AUTH_DOMAIN",
+  projectId: "YOUR_PROJECT_ID",
+  storageBucket: "YOUR_STORAGE_BUCKET",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId: "YOUR_APP_ID"
+};
 
-const useLogs = () => {
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const localDb = SQLite.openDatabase('logsight.db');
+
+const useLogs = (queryParams = {}) => {
   const [logs, setLogs] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
 
+  // Initialize local database
   useEffect(() => {
-    db.transaction(tx => {
+    localDb.transaction(tx => {
       tx.executeSql(
-        'CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, severity TEXT, message TEXT);'
+        'CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT, severity TEXT, message TEXT, statusCode INTEGER, service TEXT);'
       );
     });
   }, []);
 
-  const fetchLogs = async () => {
+  // Set up Firestore real-time listener
+  useEffect(() => {
     setIsLoading(true);
-    try {
-      // First try to fetch from Firebase (mock implementation)
-      const mockLogs = await fetchMockLogs();
-      if (mockLogs.length > 0) {
-        // Clear existing logs and insert new ones
-        db.transaction(tx => {
-          tx.executeSql('DELETE FROM logs');
-          mockLogs.forEach(log => {
-            tx.executeSql(
-              'INSERT INTO logs (timestamp, severity, message) VALUES (?, ?, ?);',
-              [log.timestamp, log.severity, log.message]
-            );
-          });
-        });
-      }
+    setError(null);
 
-      // Then fetch from local DB
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT * FROM logs ORDER BY timestamp DESC;',
-          [],
-          (_, { rows: { _array } }) => {
-            setLogs(_array);
-            setIsLoading(false);
-          },
-          (_, error) => {
-            console.log(error);
-            setIsLoading(false);
-          }
-        );
-      });
-    } catch (error) {
-      console.error('Error fetching logs:', error);
-      setIsLoading(false);
+    // Build Firestore query based on params
+    let firestoreQuery = query(
+      collection(db, 'logs'),
+      orderBy('timestamp', 'desc'),
+      limit(100)
+    );
+
+    if (queryParams.severity) {
+      firestoreQuery = query(firestoreQuery, where('severity', '==', queryParams.severity));
     }
-  };
 
-  const addLog = (log) => {
-    db.transaction(tx => {
+    if (queryParams.statusCode) {
+      firestoreQuery = query(firestoreQuery, where('statusCode', '==', queryParams.statusCode));
+    }
+
+    if (queryParams.service) {
+      firestoreQuery = query(firestoreQuery, where('service', '==', queryParams.service));
+    }
+
+    if (queryParams.keyword) {
+      // For keyword search, we'll filter locally after fetching
+    }
+
+    const unsubscribe = onSnapshot(firestoreQuery, (querySnapshot) => {
+      const newLogs = [];
+      querySnapshot.forEach((doc) => {
+        newLogs.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+
+      // Filter by keyword if provided
+      const filteredLogs = queryParams.keyword
+        ? newLogs.filter(log =>
+            log.message.toLowerCase().includes(queryParams.keyword.toLowerCase()) ||
+            (log.service && log.service.toLowerCase().includes(queryParams.keyword.toLowerCase()))
+          )
+        : newLogs;
+
+      // Store in local database
+      localDb.transaction(tx => {
+        tx.executeSql('DELETE FROM logs');
+        filteredLogs.forEach(log => {
+          tx.executeSql(
+            'INSERT INTO logs (timestamp, severity, message, statusCode, service) VALUES (?, ?, ?, ?, ?);',
+            [log.timestamp, log.severity, log.message, log.statusCode || null, log.service || null]
+          );
+        });
+      });
+
+      setLogs(filteredLogs);
+      setIsLoading(false);
+    }, (err) => {
+      console.error('Firestore error:', err);
+      setError(err.message);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [queryParams]);
+
+  const fetchLocalLogs = () => {
+    setIsLoading(true);
+    localDb.transaction(tx => {
       tx.executeSql(
-        'INSERT INTO logs (timestamp, severity, message) VALUES (?, ?, ?);',
-        [log.timestamp, log.severity, log.message],
-        () => fetchLogs(),
-        (_, error) => console.log(error)
+        'SELECT * FROM logs ORDER BY timestamp DESC;',
+        [],
+        (_, { rows: { _array } }) => {
+          setLogs(_array);
+          setIsLoading(false);
+        },
+        (_, error) => {
+          console.log(error);
+          setError(error.message);
+          setIsLoading(false);
+        }
       );
     });
   };
 
-  return { logs, fetchLogs, addLog, isLoading };
-};
+  const addLog = (log) => {
+    localDb.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO logs (timestamp, severity, message, statusCode, service) VALUES (?, ?, ?, ?, ?);',
+        [log.timestamp, log.severity, log.message, log.statusCode || null, log.service || null],
+        () => fetchLocalLogs(),
+        (_, error) => {
+          console.log(error);
+          setError(error.message);
+        }
+      );
+    });
+  };
 
-// Mock function to simulate fetching from Firebase
-const fetchMockLogs = async () => {
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-
-  // Return mock log data
-  return [
-    {
-      timestamp: new Date().toISOString(),
-      severity: 'ERROR',
-      message: 'Failed to connect to database'
-    },
-    {
-      timestamp: new Date(Date.now() - 300000).toISOString(),
-      severity: 'WARN',
-      message: 'High memory usage detected'
-    },
-    {
-      timestamp: new Date(Date.now() - 600000).toISOString(),
-      severity: 'INFO',
-      message: 'Application started successfully'
-    }
-  ];
+  return { logs, isLoading, error, addLog, fetchLocalLogs };
 };
 
 export default useLogs;
