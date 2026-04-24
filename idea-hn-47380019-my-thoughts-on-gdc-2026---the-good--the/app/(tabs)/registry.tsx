@@ -153,200 +153,175 @@ export default function RegistryScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Creator Credit Registry</Text>
-
       <View style={styles.searchContainer}>
         <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search artists or styles..."
+          placeholder="Search artists by name or style"
           value={searchQuery}
           onChangeText={setSearchQuery}
           placeholderTextColor="#999"
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.registerButton}
-        onPress={() => setShowRegisterModal(true)}
-      >
-        <Text style={styles.registerButtonText}>Register as Artist</Text>
-      </TouchableOpacity>
-
-      {filteredArtists.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="people" size={48} color="#999" />
-          <Text style={styles.emptyText}>No artists found</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={filteredArtists}
-          keyExtractor={(item) => item.id.toString()}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.artistCard}
-              onPress={() => handleArtistSelect(item)}
-            >
-              <Image
-                source={{ uri: item.profileImage }}
-                style={styles.artistImage}
-                onError={() => console.log('Image load error')}
-              />
-              <View style={styles.artistInfo}>
-                <Text style={styles.artistName}>{item.name}</Text>
-                <Text style={styles.artistStyle}>{item.style}</Text>
-                <View style={styles.followersContainer}>
-                  <Ionicons name="people" size={16} color="#666" />
-                  <Text style={styles.artistFollowers}>{item.followers} followers</Text>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
-
-      {/* Artist Profile Modal */}
-      <Modal
-        visible={!!selectedArtist}
-        animationType="slide"
-        onRequestClose={() => setSelectedArtist(null)}
-      >
-        <ScrollView style={styles.modalContainer}>
-          {selectedArtist && (
-            <>
+      {!selectedArtist ? (
+        <>
+          <FlatList
+            data={filteredArtists}
+            keyExtractor={(item) => item.id.toString()}
+            renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setSelectedArtist(null)}
+                style={styles.artistCard}
+                onPress={() => handleArtistSelect(item)}
               >
-                <Ionicons name="close" size={24} color="#333" />
-              </TouchableOpacity>
-
-              <Image
-                source={{ uri: selectedArtist.profileImage }}
-                style={styles.profileImage}
-                onError={() => console.log('Profile image load error')}
-              />
-              <Text style={styles.profileName}>{selectedArtist.name}</Text>
-              <Text style={styles.profileStyle}>{selectedArtist.style}</Text>
-
-              <View style={styles.earningsContainer}>
-                <Text style={styles.earningsLabel}>Earnings:</Text>
-                <Text style={styles.earningsAmount}>${artistEarnings.toFixed(2)}</Text>
-              </View>
-
-              <Text style={styles.profileBio}>{selectedArtist.bio}</Text>
-
-              <TouchableOpacity
-                style={styles.tipButton}
-                onPress={() => setShowTipModal(true)}
-              >
-                <Text style={styles.tipButtonText}>Tip Artist</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.sectionTitle}>Portfolio</Text>
-
-              {artistWorks.length > 0 ? (
-                <FlatList
-                  data={artistWorks}
-                  keyExtractor={(item) => item.id.toString()}
-                  renderItem={({ item }) => (
-                    <View style={styles.workItem}>
-                      <Image
-                        source={{ uri: item.imageUrl }}
-                        style={styles.workImage}
-                        onError={() => console.log('Work image load error')}
-                      />
-                      {item.description && (
-                        <Text style={styles.workDescription}>{item.description}</Text>
-                      )}
-                    </View>
-                  )}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.worksList}
+                <Image
+                  source={{ uri: item.profileImage }}
+                  style={styles.artistImage}
                 />
-              ) : (
-                <View style={styles.emptyWorks}>
-                  <Ionicons name="image" size={24} color="#999" />
-                  <Text style={styles.emptyWorksText}>No works in portfolio</Text>
+                <View style={styles.artistInfo}>
+                  <Text style={styles.artistName}>{item.name}</Text>
+                  <Text style={styles.artistStyle}>{item.style}</Text>
+                  <View style={styles.followersContainer}>
+                    <Ionicons name="people" size={16} color="#666" />
+                    <Text style={styles.followersText}>{item.followers} followers</Text>
+                  </View>
                 </View>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No artists found</Text>
+              </View>
+            }
+          />
+
+          <TouchableOpacity
+            style={styles.registerButton}
+            onPress={() => setShowRegisterModal(true)}
+          >
+            <Ionicons name="add" size={24} color="white" />
+            <Text style={styles.registerButtonText}>Register as Artist</Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        <ScrollView style={styles.artistDetailContainer}>
+          <View style={styles.artistHeader}>
+            <Image
+              source={{ uri: selectedArtist.profileImage }}
+              style={styles.artistDetailImage}
+            />
+            <View style={styles.artistDetailInfo}>
+              <Text style={styles.artistDetailName}>{selectedArtist.name}</Text>
+              <Text style={styles.artistDetailStyle}>{selectedArtist.style}</Text>
+              <View style={styles.followersContainer}>
+                <Ionicons name="people" size={16} color="#666" />
+                <Text style={styles.followersText}>{selectedArtist.followers} followers</Text>
+              </View>
+            </View>
+          </View>
+
+          <Text style={styles.sectionTitle}>About</Text>
+          <Text style={styles.bioText}>{selectedArtist.bio}</Text>
+
+          <View style={styles.earningsContainer}>
+            <Text style={styles.earningsLabel}>Total Earnings:</Text>
+            <Text style={styles.earningsAmount}>${artistEarnings.toFixed(2)}</Text>
+          </View>
+
+          <Text style={styles.sectionTitle}>Registered Works</Text>
+          {artistWorks.length > 0 ? (
+            <FlatList
+              data={artistWorks}
+              keyExtractor={(item) => item.id.toString()}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <Image
+                  source={{ uri: item.imageUrl }}
+                  style={styles.workImage}
+                />
               )}
-            </>
+            />
+          ) : (
+            <Text style={styles.emptyWorksText}>No registered works yet</Text>
           )}
+
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.tipButton}
+              onPress={() => setShowTipModal(true)}
+            >
+              <Ionicons name="cash" size={20} color="white" />
+              <Text style={styles.tipButtonText}>Send Tip</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setSelectedArtist(null)}
+            >
+              <Text style={styles.backButtonText}>Back to Artists</Text>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
-      </Modal>
+      )}
 
       {/* Register Artist Modal */}
       <Modal
         visible={showRegisterModal}
         animationType="slide"
+        transparent={true}
         onRequestClose={() => setShowRegisterModal(false)}
       >
-        <ScrollView style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowRegisterModal(false)}
-          >
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Register as Artist</Text>
 
-          <Text style={styles.modalTitle}>Register as Artist</Text>
-
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Name</Text>
             <TextInput
               style={styles.input}
+              placeholder="Name"
               value={newArtist.name}
               onChangeText={(text) => setNewArtist({...newArtist, name: text})}
-              placeholder="Your name or artist name"
             />
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Style</Text>
             <TextInput
               style={styles.input}
+              placeholder="Style"
               value={newArtist.style}
               onChangeText={(text) => setNewArtist({...newArtist, style: text})}
-              placeholder="Describe your artistic style"
             />
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Bio</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.bioInput]}
+              placeholder="Bio"
               value={newArtist.bio}
               onChangeText={(text) => setNewArtist({...newArtist, bio: text})}
-              placeholder="Tell us about yourself and your work"
               multiline
-              numberOfLines={4}
             />
-          </View>
 
-          <View style={styles.formGroup}>
-            <Text style={styles.label}>Profile Image URL</Text>
             <TextInput
               style={styles.input}
+              placeholder="Profile Image URL"
               value={newArtist.profileImage}
               onChangeText={(text) => setNewArtist({...newArtist, profileImage: text})}
-              placeholder="https://example.com/your-image.jpg"
             />
-          </View>
 
-          <TouchableOpacity
-            style={styles.submitButton}
-            onPress={handleRegisterSubmit}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Text style={styles.submitButtonText}>Submit Registration</Text>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowRegisterModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.submitButton]}
+                onPress={handleRegisterSubmit}
+              >
+                <Text style={styles.modalButtonText}>Register</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       </Modal>
 
       {/* Tip Modal */}
@@ -356,47 +331,37 @@ export default function RegistryScreen() {
         transparent={true}
         onRequestClose={() => setShowTipModal(false)}
       >
-        <View style={styles.tipModalContainer}>
-          <View style={styles.tipModalContent}>
-            <Text style={styles.tipModalTitle}>Send Tip</Text>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Send Tip to {selectedArtist?.name}</Text>
 
-            <Text style={styles.tipModalArtistName}>
-              {selectedArtist?.name}
+            <TextInput
+              style={styles.input}
+              placeholder="Amount ($)"
+              value={tipAmount}
+              onChangeText={setTipAmount}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.feeText}>
+              {user.premiumStatus
+                ? '10% service fee (premium)'
+                : '15% service fee (free)'}
             </Text>
 
-            <View style={styles.tipAmountContainer}>
-              <Text style={styles.tipAmountLabel}>Amount ($):</Text>
-              <TextInput
-                style={styles.tipAmountInput}
-                value={tipAmount}
-                onChangeText={setTipAmount}
-                keyboardType="numeric"
-                placeholder="0.00"
-              />
-            </View>
-
-            <Text style={styles.tipFeeText}>
-              Fee: {user.premiumStatus ? '10%' : '15%'}
-            </Text>
-
-            <View style={styles.tipModalButtons}>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.tipModalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowTipModal(false)}
               >
-                <Text style={styles.tipModalButtonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.tipModalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.submitButton]}
                 onPress={handleTipSubmit}
-                disabled={isLoading}
               >
-                {isLoading ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Text style={styles.tipModalButtonText}>Send Tip</Text>
-                )}
+                <Text style={styles.modalButtonText}>Send Tip</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -409,64 +374,50 @@ export default function RegistryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
     padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 10,
     color: '#666',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
     fontSize: 16,
-  },
-  registerButton: {
-    backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  registerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  listContent: {
-    paddingBottom: 16,
   },
   artistCard: {
     flexDirection: 'row',
-    backgroundColor: '#f9f9f9',
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 12,
     marginBottom: 12,
-    alignItems: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   artistImage: {
     width: 60,
@@ -476,6 +427,7 @@ const styles = StyleSheet.create({
   },
   artistInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   artistName: {
     fontSize: 16,
@@ -491,218 +443,201 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  artistFollowers: {
+  followersText: {
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 40,
+    padding: 20,
   },
   emptyText: {
     fontSize: 16,
-    color: '#999',
-    marginTop: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#fff',
-    padding: 16,
-  },
-  closeButton: {
-    alignSelf: 'flex-end',
-    padding: 8,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignSelf: 'center',
-    marginBottom: 16,
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  profileStyle: {
-    fontSize: 16,
     color: '#666',
-    textAlign: 'center',
-    marginBottom: 16,
   },
-  earningsContainer: {
+  registerButton: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    justifyContent: 'center',
+    backgroundColor: '#6200ee',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 16,
   },
-  earningsLabel: {
+  registerButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  artistDetailContainer: {
+    flex: 1,
+  },
+  artistHeader: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  artistDetailImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginRight: 16,
+  },
+  artistDetailInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  artistDetailName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  artistDetailStyle: {
     fontSize: 16,
     color: '#666',
-    marginRight: 8,
-  },
-  earningsAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6200ee',
-  },
-  profileBio: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  tipButton: {
-    backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  tipButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
+    marginTop: 20,
   },
-  worksList: {
-    paddingVertical: 8,
+  bioText: {
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
+    marginBottom: 20,
   },
-  workItem: {
-    width: 150,
-    marginRight: 12,
+  earningsContainer: {
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  earningsLabel: {
+    fontSize: 16,
+    color: '#4caf50',
+    marginBottom: 4,
+  },
+  earningsAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2e7d32',
   },
   workImage: {
-    width: '100%',
-    height: 150,
+    width: 120,
+    height: 120,
     borderRadius: 8,
-    marginBottom: 8,
-  },
-  workDescription: {
-    fontSize: 12,
-    color: '#666',
-  },
-  emptyWorks: {
-    alignItems: 'center',
-    padding: 20,
+    marginRight: 12,
   },
   emptyWorksText: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    color: '#666',
+    marginBottom: 20,
   },
-  modalTitle: {
-    fontSize: 20,
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  tipButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#4caf50',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flex: 1,
+    marginRight: 8,
+    justifyContent: 'center',
+  },
+  tipButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
+    marginLeft: 8,
   },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  input: {
+  backButton: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    flex: 1,
+    marginLeft: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 12,
+  },
+  backButtonText: {
+    color: '#666',
     fontSize: 16,
   },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  submitButton: {
-    backgroundColor: '#6200ee',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  submitButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  tipModalContainer: {
+  modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  tipModalContent: {
-    backgroundColor: '#fff',
+  modalContent: {
+    backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
-    width: '80%',
+    width: '90%',
+    maxWidth: 400,
   },
-  tipModalTitle: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  tipModalArtistName: {
-    fontSize: 16,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  tipAmountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  tipAmountLabel: {
-    fontSize: 16,
-    marginRight: 8,
-  },
-  tipAmountInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 8,
-    fontSize: 16,
-    textAlign: 'right',
-  },
-  tipFeeText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
     marginBottom: 20,
+    textAlign: 'center',
   },
-  tipModalButtons: {
+  input: {
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+  },
+  bioInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
-  tipModalButton: {
-    padding: 12,
-    borderRadius: 4,
+  modalButton: {
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     flex: 1,
     marginHorizontal: 4,
     alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
-  confirmButton: {
+  submitButton: {
     backgroundColor: '#6200ee',
   },
-  tipModalButtonText: {
+  modalButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  feeText: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
   },
 });
