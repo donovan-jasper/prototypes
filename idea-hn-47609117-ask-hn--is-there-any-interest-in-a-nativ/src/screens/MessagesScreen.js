@@ -3,7 +3,7 @@ import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'reac
 import { getOfflineMessages, syncMessages } from '../services/discordApi';
 import { getStoredToken } from '../services/auth';
 
-const MessagesScreen = ({ route }) => {
+const MessagesScreen = ({ route, navigation }) => {
   const { channelId } = route.params;
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -76,7 +76,9 @@ const MessagesScreen = ({ route }) => {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         inverted
-        contentContainerStyle={styles.messagesList}
+        ListHeaderComponent={
+          <Text style={styles.header}>Messages</Text>
+        }
       />
     </View>
   );
@@ -93,28 +95,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#36393F',
   },
-  messagesList: {
-    padding: 10,
+  header: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    padding: 15,
+    backgroundColor: '#2F3136',
   },
   messageItem: {
-    backgroundColor: '#40444B',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2F3136',
   },
   messageAuthor: {
     color: '#5865F2',
     fontWeight: 'bold',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   messageContent: {
-    color: '#fff',
-    marginBottom: 4,
+    color: '#dcddde',
+    fontSize: 16,
+    marginBottom: 5,
   },
   messageTimestamp: {
-    color: '#72767D',
+    color: '#72767d',
     fontSize: 12,
-    textAlign: 'right',
   },
 });
 
