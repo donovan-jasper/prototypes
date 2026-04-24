@@ -164,84 +164,87 @@ export function parseTicketFromText(text: string): ParsedTicket {
               date = now;
             }
           }
+
+          if (date) {
+            result.submittedAt = {
+              value: date,
+              confidence: 0.8
+            };
+            break;
+          }
         }
 
         // Handle absolute dates
-        if (!date) {
-          // Month name format
-          if (match[1] && match[2] && match[3] && isNaN(parseInt(match[1]))) {
-            const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
-                               'july', 'august', 'september', 'october', 'november', 'december'];
-            const month = monthNames.indexOf(match[1].toLowerCase());
-            const day = parseInt(match[2]);
-            const year = parseInt(match[3]);
+        if (match[1] && match[2] && match[3]) {
+          const day = parseInt(match[1]);
+          const month = parseInt(match[2]) || getMonthFromName(match[1]);
+          const year = parseInt(match[3]) > 1000 ? parseInt(match[3]) : 2000 + parseInt(match[3]);
 
-            if (month >= 0 && day > 0 && year > 0) {
-              date = new Date(year, month, day);
-            }
-          }
-          // Numeric format (MM/DD/YYYY or DD/MM/YYYY)
-          else if (match[1] && match[2] && match[3]) {
-            const day1 = parseInt(match[1]);
-            const day2 = parseInt(match[2]);
-            const year = parseInt(match[3]);
+          if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+            date = new Date(year, month - 1, day);
 
-            // Check which format makes more sense
-            if (day1 > 12 && day2 <= 12) {
-              // DD/MM/YYYY
-              date = new Date(year, day2 - 1, day1);
-            } else if (day2 > 12 && day1 <= 12) {
-              // MM/DD/YYYY
-              date = new Date(year, day1 - 1, day2);
-            } else if (year > 31) {
-              // YYYY/MM/DD
-              date = new Date(year, day1 - 1, day2);
+            // Handle time if present
+            if (match[5] && match[6]) {
+              let hours = parseInt(match[5]);
+              const minutes = parseInt(match[6]);
+              const period = match[7]?.toLowerCase();
+
+              if (period === 'pm' && hours < 12) {
+                hours += 12;
+              } else if (period === 'am' && hours === 12) {
+                hours = 0;
+              }
+
+              date.setHours(hours, minutes);
             }
+
+            result.submittedAt = {
+              value: date,
+              confidence: 0.9
+            };
+            break;
           }
         }
 
-        // Handle time if present
-        if (date && match[5] && match[6]) {
-          let hours = parseInt(match[5]);
-          const minutes = parseInt(match[6]);
-          const period = match[7] ? match[7].toLowerCase() : '';
-
-          if (period === 'pm' && hours < 12) {
-            hours += 12;
-          } else if (period === 'am' && hours === 12) {
-            hours = 0;
-          }
-
-          date.setHours(hours, minutes);
-        }
-
-        // Handle today/yesterday
-        if (!date && match[1]) {
+        // Handle today/yesterday/tomorrow
+        if (match[0]) {
           const now = new Date();
-          const lowerMatch = match[1].toLowerCase();
+          const lowerMatch = match[0].toLowerCase();
 
           if (lowerMatch === 'today') {
-            date = now;
+            result.submittedAt = {
+              value: now,
+              confidence: 0.7
+            };
+            break;
           } else if (lowerMatch === 'yesterday') {
             now.setDate(now.getDate() - 1);
-            date = now;
+            result.submittedAt = {
+              value: now,
+              confidence: 0.7
+            };
+            break;
           } else if (lowerMatch === 'tomorrow') {
             now.setDate(now.getDate() + 1);
-            date = now;
+            result.submittedAt = {
+              value: now,
+              confidence: 0.7
+            };
+            break;
           }
         }
-
-        if (date) {
-          result.submittedAt = {
-            value: date,
-            confidence: 0.8
-          };
-        }
-      } catch (e) {
-        console.log('Date parsing error:', e);
+      } catch (error) {
+        console.log('Date parsing error:', error);
       }
     }
   }
 
   return result;
+}
+
+function getMonthFromName(monthName: string): number {
+  const months = ['january', 'february', 'march', 'april', 'may', 'june',
+                 'july', 'august', 'september', 'october', 'november', 'december'];
+  const lowerName = monthName.toLowerCase();
+  return months.indexOf(lowerName) + 1;
 }

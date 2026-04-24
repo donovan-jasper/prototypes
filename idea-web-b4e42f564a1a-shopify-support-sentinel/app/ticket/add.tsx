@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, Alert, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, Alert, TouchableOpacity, Platform, Clipboard } from 'react-native';
 import { useNavigation } from 'expo-router';
 import { createTicket } from '../../lib/database';
-import { ParsedTicket } from '../../lib/types';
-import SmartPasteButton from '../../components/SmartPasteButton';
+import { parseTicketFromText } from '../../lib/ticketParser';
 import { format } from 'date-fns';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Picker } from '@react-native-picker/picker';
@@ -17,10 +16,24 @@ export default function AddTicketScreen() {
   const [expectedResponseHours, setExpectedResponseHours] = useState(48);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  const handleSmartPaste = (parsed: ParsedTicket) => {
-    if (parsed.company) setCompany(parsed.company.value);
-    if (parsed.ticketId) setTicketId(parsed.ticketId.value);
-    if (parsed.submittedAt) setSubmittedAt(parsed.submittedAt.value);
+  const handleSmartPaste = async () => {
+    try {
+      const clipboardText = await Clipboard.getString();
+      if (!clipboardText) {
+        Alert.alert('Clipboard is empty', 'Please copy text from an email or support page first');
+        return;
+      }
+
+      const parsed = parseTicketFromText(clipboardText);
+
+      if (parsed.company?.value) setCompany(parsed.company.value);
+      if (parsed.ticketId?.value) setTicketId(parsed.ticketId.value);
+      if (parsed.submittedAt?.value) setSubmittedAt(parsed.submittedAt.value);
+
+      Alert.alert('Smart Paste', 'Ticket information extracted successfully');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to parse clipboard content');
+    }
   };
 
   const handleSave = async () => {
@@ -114,7 +127,9 @@ export default function AddTicketScreen() {
           </Picker>
         </View>
 
-        <SmartPasteButton onParsed={handleSmartPaste} />
+        <TouchableOpacity style={styles.smartPasteButton} onPress={handleSmartPaste}>
+          <Text style={styles.smartPasteButtonText}>Smart Paste</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>Save Ticket</Text>
@@ -169,6 +184,18 @@ const styles = StyleSheet.create({
   picker: {
     height: 50,
     width: '100%',
+  },
+  smartPasteButton: {
+    backgroundColor: '#4CAF50',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  smartPasteButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
   saveButton: {
     backgroundColor: '#2196F3',

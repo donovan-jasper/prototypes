@@ -1,44 +1,30 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import { TouchableOpacity, Text, StyleSheet, Alert, Clipboard } from 'react-native';
 import { parseTicketFromText } from '../lib/ticketParser';
-import { ParsedTicket } from '../lib/types';
 
 interface SmartPasteButtonProps {
   onParsed: (parsed: ParsedTicket) => void;
 }
 
 export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
-  const handlePaste = async () => {
+  const handlePress = async () => {
     try {
-      const text = await Clipboard.getStringAsync();
-
-      if (!text) {
-        Alert.alert('Clipboard empty', 'No text found in clipboard');
+      const clipboardText = await Clipboard.getString();
+      if (!clipboardText) {
+        Alert.alert('Clipboard is empty', 'Please copy text from an email or support page first');
         return;
       }
 
-      const parsed = parseTicketFromText(text);
+      const parsed = parseTicketFromText(clipboardText);
       onParsed(parsed);
-
-      // Show confirmation
-      let message = 'Pasted content analyzed:\n';
-      if (parsed.company) message += `Company: ${parsed.company.value}\n`;
-      if (parsed.ticketId) message += `Ticket ID: ${parsed.ticketId.value}\n`;
-      if (parsed.submittedAt) message += `Date: ${parsed.submittedAt.value.toLocaleDateString()}\n`;
-
-      if (message === 'Pasted content analyzed:\n') {
-        message = 'No ticket information found in pasted text';
-      }
-
-      Alert.alert('Smart Paste', message);
+      Alert.alert('Smart Paste', 'Ticket information extracted successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to read clipboard');
+      Alert.alert('Error', 'Failed to parse clipboard content');
     }
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePaste}>
+    <TouchableOpacity style={styles.button} onPress={handlePress}>
       <Text style={styles.buttonText}>Smart Paste</Text>
     </TouchableOpacity>
   );
