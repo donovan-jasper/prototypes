@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Dimensions } from 'react-native';
+import { LineChart } from 'react-native-chart-kit';
 import { calendarService } from '../../../lib/api/calendarService';
 import { healthService } from '../../../lib/api/healthService';
 import { identifyHabitsFromEvents } from '../../../lib/ml/habitDetection';
 import { calculateStreak } from '../../../lib/habitTracker';
 import HealthMetricsCard from '../../../components/HealthMetricsCard';
 import StreakCounter from '../../../components/StreakCounter';
+import ProgressChart from '../../../components/ProgressChart';
 
 interface Habit {
   id: string;
@@ -14,6 +16,7 @@ interface Habit {
   currentStreak: number;
   progress: number;
   dates: string[];
+  chartData: number[];
 }
 
 interface HealthMetrics {
@@ -53,8 +56,9 @@ const HomeScreen = () => {
         name: habit.name,
         frequency: habit.frequency,
         currentStreak: calculateStreak(habit.dates),
-        progress: Math.min(100, (habit.frequency / 7) * 100), // Assuming weekly goal
-        dates: habit.dates
+        progress: Math.min(100, (habit.frequency / 7) * 100),
+        dates: habit.dates,
+        chartData: generateChartData(habit.dates)
       }));
 
       // Process health metrics
@@ -73,6 +77,23 @@ const HomeScreen = () => {
       setIsLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const generateChartData = (dates: string[]): number[] => {
+    const last7Days = Array(7).fill(0);
+    const today = new Date();
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+      const dateString = date.toISOString().split('T')[0];
+
+      if (dates.includes(dateString)) {
+        last7Days[6 - i] = 1;
+      }
+    }
+
+    return last7Days;
   };
 
   useEffect(() => {
@@ -148,8 +169,14 @@ const HomeScreen = () => {
         habits.map(habit => (
           <View key={habit.id} style={styles.habitCard}>
             <Text style={styles.habitTitle}>{habit.name}</Text>
-            <Text style={styles.habitStreak}>Streak: {habit.currentStreak} days</Text>
-            <Text style={styles.habitProgress}>Progress: {habit.progress}%</Text>
+            <Text style={styles.habitStreak}>Current Streak: {habit.currentStreak} days</Text>
+            <Text style={styles.habitProgress}>Weekly Progress: {habit.progress}%</Text>
+
+            {/* Progress Chart */}
+            <ProgressChart
+              data={habit.chartData}
+              habitName={habit.name}
+            />
           </View>
         ))
       ) : (
@@ -168,35 +195,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-    padding: 20,
-  },
-  errorText: {
-    color: '#d32f2f',
-    fontSize: 16,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  errorSubtext: {
-    color: '#666',
-    fontSize: 14,
-    textAlign: 'center',
-  },
   header: {
     marginBottom: 24,
   },
@@ -212,21 +210,51 @@ const styles = StyleSheet.create({
   },
   sectionHeader: {
     marginTop: 24,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '600',
     color: '#333',
   },
+  habitCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  habitTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 8,
+  },
+  habitStreak: {
+    fontSize: 16,
+    color: '#6200EE',
+    marginBottom: 4,
+  },
+  habitProgress: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
+  },
   emptyState: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 24,
     alignItems: 'center',
-    marginTop: 40,
-    padding: 20,
+    justifyContent: 'center',
+    marginTop: 16,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '500',
+    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
     marginBottom: 8,
   },
@@ -235,31 +263,31 @@ const styles = StyleSheet.create({
     color: '#666',
     textAlign: 'center',
   },
-  habitCard: {
-    backgroundColor: 'white',
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
+    marginBottom: 16,
   },
-  habitTitle: {
+  errorText: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 4,
+    color: '#d32f2f',
+    marginBottom: 8,
   },
-  habitStreak: {
+  errorSubtext: {
     fontSize: 14,
-    color: '#6200EE',
-    marginBottom: 4,
-  },
-  habitProgress: {
-    fontSize: 14,
-    color: '#666',
+    color: '#d32f2f',
   },
 });
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 interface StreakCounterProps {
   habitName: string;
@@ -11,7 +11,7 @@ const StreakCounter: React.FC<StreakCounterProps> = ({ habitName, streak }) => {
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <MaterialCommunityIcons name="fire" size={24} color="#FF6B6B" />
+        <Ionicons name="flame" size={24} color="#FF6B6B" />
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>Current Streak</Text>
@@ -29,7 +29,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
