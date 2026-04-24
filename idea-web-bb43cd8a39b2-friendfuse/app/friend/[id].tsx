@@ -5,7 +5,8 @@ import { Avatar, Button, IconButton, Card, Divider } from 'react-native-paper';
 import { format, differenceInDays, isToday } from 'date-fns';
 import { useFriends, useInteractions, useChallenges } from '../../hooks';
 import { InteractionType, Challenge } from '../../types';
-import { calculateStreak, calculateFriendshipScore } from '../../lib/analytics';
+import { calculateStreak, calculateFriendshipScore } from '../../lib/streaks';
+import * as Localization from 'expo-localization';
 
 const FriendDetailScreen = () => {
   const { id } = useLocalSearchParams();
@@ -31,7 +32,7 @@ const FriendDetailScreen = () => {
     if (interactions && friend) {
       const filtered = interactions.filter(i => i.friend_id === friend.id);
       setFriendInteractions(filtered);
-      const calculatedStreak = calculateStreak(filtered);
+      const calculatedStreak = calculateStreak(filtered, Localization.timezone);
       setStreak(calculatedStreak.current);
       const score = calculateFriendshipScore(filtered, friendChallenges);
       setFriendshipScore(score);
@@ -135,7 +136,19 @@ const FriendDetailScreen = () => {
 
       {/* Connection Timeline */}
       <Card style={styles.section}>
-        <Card.Title title="Connection Timeline" />
+        <Card.Title
+          title="Connection Timeline"
+          right={(props) => (
+            <IconButton
+              {...props}
+              icon="plus"
+              onPress={() => router.push({
+                pathname: '/interaction/new',
+                params: { friendId: friend.id }
+              })}
+            />
+          )}
+        />
         <Card.Content>
           {friendInteractions.length === 0 ? (
             <Text style={styles.emptyState}>No interactions yet. Start logging your connections!</Text>
@@ -144,19 +157,22 @@ const FriendDetailScreen = () => {
               data={friendInteractions.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
-                <View style={styles.timelineItem}>
-                  <View style={styles.timelineDot} />
-                  <View style={styles.timelineContent}>
-                    <Text style={styles.timelineDate}>
-                      {isToday(new Date(item.timestamp))
-                        ? 'Today'
-                        : format(new Date(item.timestamp), 'MMM d, yyyy')}
+                <View style={styles.interactionItem}>
+                  <View style={styles.interactionIcon}>
+                    {item.type === 'text' && <IconButton icon="message-text" size={20} />}
+                    {item.type === 'call' && <IconButton icon="phone" size={20} />}
+                    {item.type === 'hangout' && <IconButton icon="account-group" size={20} />}
+                  </View>
+                  <View style={styles.interactionDetails}>
+                    <Text style={styles.interactionType}>{item.type}</Text>
+                    <Text style={styles.interactionDate}>
+                      {format(new Date(item.timestamp), 'MMM d, yyyy h:mm a')}
                     </Text>
-                    <Text style={styles.timelineType}>{item.type}</Text>
+                    {item.notes && <Text style={styles.interactionNotes}>{item.notes}</Text>}
                   </View>
                 </View>
               )}
-              scrollEnabled={false}
+              ItemSeparatorComponent={() => <Divider />}
             />
           )}
         </Card.Content>
@@ -166,15 +182,17 @@ const FriendDetailScreen = () => {
       <Card style={styles.section}>
         <Card.Title
           title="Active Challenges"
-          right={() => (
-            <Button mode="text" onPress={handleStartChallenge}>
-              Start Challenge
-            </Button>
+          right={(props) => (
+            <IconButton
+              {...props}
+              icon="plus"
+              onPress={handleStartChallenge}
+            />
           )}
         />
         <Card.Content>
-          {friendChallenges.length === 0 ? (
-            <Text style={styles.emptyState}>No active challenges. Start one to keep your friendship growing!</Text>
+          {friendChallenges.filter(c => c.status === 'active').length === 0 ? (
+            <Text style={styles.emptyState}>No active challenges. Start one to grow your friendship!</Text>
           ) : (
             <FlatList
               data={friendChallenges.filter(c => c.status === 'active')}
@@ -183,9 +201,20 @@ const FriendDetailScreen = () => {
                 <View style={styles.challengeItem}>
                   <Text style={styles.challengeTitle}>{item.title}</Text>
                   <Text style={styles.challengeDescription}>{item.description}</Text>
+                  <Button
+                    mode="outlined"
+                    onPress={() => {
+                      // Mark challenge as completed
+                      // In a real app, you would update the challenge status in the database
+                      Alert.alert('Challenge Completed', `You completed the "${item.title}" challenge!`);
+                    }}
+                    style={styles.completeButton}
+                  >
+                    Mark Complete
+                  </Button>
                 </View>
               )}
-              scrollEnabled={false}
+              ItemSeparatorComponent={() => <Divider />}
             />
           )}
         </Card.Content>
@@ -203,29 +232,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
-    marginBottom: 10,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   headerText: {
     marginLeft: 15,
     flex: 1,
   },
   name: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    marginTop: 10,
   },
   statItem: {
-    alignItems: 'center',
+    marginRight: 20,
   },
   statValue: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#4CAF50',
   },
   statLabel: {
     fontSize: 12,
@@ -235,7 +263,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     padding: 15,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     marginBottom: 10,
   },
   actionButton: {
@@ -243,46 +271,52 @@ const styles = StyleSheet.create({
     marginHorizontal: 5,
   },
   section: {
-    marginBottom: 10,
-    backgroundColor: '#fff',
+    margin: 10,
+    elevation: 2,
   },
   emptyState: {
+    padding: 20,
     textAlign: 'center',
     color: '#666',
-    padding: 20,
   },
-  timelineItem: {
+  interactionItem: {
     flexDirection: 'row',
     paddingVertical: 10,
   },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#4CAF50',
+  interactionIcon: {
     marginRight: 10,
-    marginTop: 5,
   },
-  timelineContent: {
+  interactionDetails: {
     flex: 1,
   },
-  timelineDate: {
+  interactionType: {
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  timelineType: {
+  interactionDate: {
+    fontSize: 12,
     color: '#666',
+    marginVertical: 2,
+  },
+  interactionNotes: {
+    fontSize: 14,
+    color: '#444',
   },
   challengeItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingVertical: 10,
   },
   challengeTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
   },
   challengeDescription: {
+    fontSize: 14,
     color: '#666',
+    marginVertical: 5,
+  },
+  completeButton: {
+    marginTop: 5,
+    alignSelf: 'flex-start',
   },
 });
 

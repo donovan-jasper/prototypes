@@ -1,6 +1,7 @@
 import { Interaction } from '../types';
 import { differenceInCalendarDays, isSameDay, startOfDay } from 'date-fns';
 import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import * as Localization from 'expo-localization';
 
 export interface Streak {
   current: number;
@@ -9,7 +10,7 @@ export interface Streak {
   status: 'active' | 'at-risk' | 'broken';
 }
 
-export const calculateStreak = (interactions: Interaction[], timezone: string = 'UTC'): Streak => {
+export const calculateStreak = (interactions: Interaction[], timezone: string = Localization.timezone): Streak => {
   if (interactions.length === 0) {
     return {
       current: 0,
@@ -24,7 +25,7 @@ export const calculateStreak = (interactions: Interaction[], timezone: string = 
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
-  const lastInteractionLocal = new Date(sortedInteractions[0].timestamp);
+  const lastInteractionLocal = utcToZonedTime(new Date(sortedInteractions[0].timestamp), timezone);
   const nowLocal = new Date();
 
   // Convert all dates to local timezone for comparison
