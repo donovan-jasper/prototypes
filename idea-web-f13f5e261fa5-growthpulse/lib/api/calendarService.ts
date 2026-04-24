@@ -1,63 +1,75 @@
-import { CalendarEvent } from '../../types';
+import * as Calendar from 'expo-calendar';
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  startDate: Date;
+  endDate: Date;
+  location?: string;
+}
+
+export const requestCalendarPermissions = async (): Promise<boolean> => {
+  const { status } = await Calendar.requestCalendarPermissionsAsync();
+  return status === 'granted';
+};
+
+export const fetchCalendarEvents = async (days: number = 7): Promise<CalendarEvent[]> => {
+  const hasPermission = await requestCalendarPermissions();
+  if (!hasPermission) return [];
+
+  try {
+    const calendars = await Calendar.getCalendarsAsync(Calendar.EntityTypes.EVENT);
+    if (calendars.length === 0) return [];
+
+    const today = new Date();
+    const startDate = new Date(today);
+    startDate.setDate(today.getDate() - days);
+
+    const events: CalendarEvent[] = [];
+
+    for (const calendar of calendars) {
+      const calendarEvents = await Calendar.getEventsAsync(
+        [calendar.id],
+        startDate,
+        today
+      );
+
+      events.push(
+        ...calendarEvents.map(event => ({
+          id: event.id,
+          title: event.title,
+          startDate: new Date(event.startDate),
+          endDate: new Date(event.endDate),
+          location: event.location,
+        }))
+      );
+    }
+
+    return events;
+  } catch (error) {
+    console.error('Error fetching calendar events:', error);
+    return [];
+  }
+};
+
+export const identifyHabitsFromEvents = (events: CalendarEvent[]): string[] => {
+  const habitKeywords = ['meditation', 'reading', 'yoga', 'workout', 'study', 'journal', 'exercise', 'walk', 'run'];
+  const detectedHabits = new Set<string>();
+
+  events.forEach(event => {
+    const titleLower = event.title.toLowerCase();
+    habitKeywords.forEach(keyword => {
+      if (titleLower.includes(keyword)) {
+        detectedHabits.add(keyword);
+      }
+    });
+  });
+
+  return Array.from(detectedHabits);
+};
 
 export const calendarService = {
-  async getEvents(): Promise<CalendarEvent[]> {
-    // In a real app, this would connect to Google Calendar or Apple Calendar
-    // For demo purposes, we return mock data
-    return new Promise(resolve => {
-      setTimeout(() => {
-        resolve([
-          {
-            id: '1',
-            title: 'Morning Workout',
-            startDate: new Date('2023-05-01T07:00:00'),
-            endDate: new Date('2023-05-01T08:00:00'),
-            type: 'workout'
-          },
-          {
-            id: '2',
-            title: 'Team Meeting',
-            startDate: new Date('2023-05-01T10:00:00'),
-            endDate: new Date('2023-05-01T11:00:00'),
-            type: 'meeting'
-          },
-          {
-            id: '3',
-            title: 'Evening Meditation',
-            startDate: new Date('2023-05-01T20:00:00'),
-            endDate: new Date('2023-05-01T20:30:00'),
-            type: 'meditation'
-          },
-          {
-            id: '4',
-            title: 'Morning Workout',
-            startDate: new Date('2023-05-02T07:00:00'),
-            endDate: new Date('2023-05-02T08:00:00'),
-            type: 'workout'
-          },
-          {
-            id: '5',
-            title: 'Evening Meditation',
-            startDate: new Date('2023-05-02T20:00:00'),
-            endDate: new Date('2023-05-02T20:30:00'),
-            type: 'meditation'
-          },
-          {
-            id: '6',
-            title: 'Morning Workout',
-            startDate: new Date('2023-05-03T07:00:00'),
-            endDate: new Date('2023-05-03T08:00:00'),
-            type: 'workout'
-          },
-          {
-            id: '7',
-            title: 'Evening Meditation',
-            startDate: new Date('2023-05-03T20:00:00'),
-            endDate: new Date('2023-05-03T20:30:00'),
-            type: 'meditation'
-          }
-        ]);
-      }, 1000);
-    });
-  }
+  requestCalendarPermissions,
+  fetchCalendarEvents,
+  identifyHabitsFromEvents,
 };

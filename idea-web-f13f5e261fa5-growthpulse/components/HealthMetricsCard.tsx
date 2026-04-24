@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface HealthMetricsCardProps {
   steps: number;
@@ -11,32 +11,26 @@ interface HealthMetricsCardProps {
 const HealthMetricsCard: React.FC<HealthMetricsCardProps> = ({ steps, sleep, workouts }) => {
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>Today's Health</Text>
+      <View style={styles.metricContainer}>
+        <MaterialCommunityIcons name="walk" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{steps.toLocaleString()}</Text>
+        <Text style={styles.metricLabel}>Steps</Text>
+      </View>
 
-      <View style={styles.metricsContainer}>
-        <View style={styles.metricItem}>
-          <Ionicons name="walk" size={24} color="#6200EE" style={styles.icon} />
-          <View>
-            <Text style={styles.metricValue}>{steps.toLocaleString()}</Text>
-            <Text style={styles.metricLabel}>Steps</Text>
-          </View>
-        </View>
+      <View style={styles.divider} />
 
-        <View style={styles.metricItem}>
-          <Ionicons name="moon" size={24} color="#6200EE" style={styles.icon} />
-          <View>
-            <Text style={styles.metricValue}>{sleep.toFixed(1)}</Text>
-            <Text style={styles.metricLabel}>Hours Sleep</Text>
-          </View>
-        </View>
+      <View style={styles.metricContainer}>
+        <MaterialCommunityIcons name="sleep" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{sleep.toFixed(1)}</Text>
+        <Text style={styles.metricLabel}>Hours</Text>
+      </View>
 
-        <View style={styles.metricItem}>
-          <Ionicons name="barbell" size={24} color="#6200EE" style={styles.icon} />
-          <View>
-            <Text style={styles.metricValue}>{workouts}</Text>
-            <Text style={styles.metricLabel}>Workouts</Text>
-          </View>
-        </View>
+      <View style={styles.divider} />
+
+      <View style={styles.metricContainer}>
+        <MaterialCommunityIcons name="dumbbell" size={24} color="#6200EE" />
+        <Text style={styles.metricValue}>{workouts}</Text>
+        <Text style={styles.metricLabel}>Workouts</Text>
       </View>
     </View>
   );
@@ -45,40 +39,38 @@ const HealthMetricsCard: React.FC<HealthMetricsCardProps> = ({ steps, sleep, wor
 const styles = StyleSheet.create({
   card: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
+    margin: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricItem: {
-    flexDirection: 'row',
+  metricContainer: {
     alignItems: 'center',
-  },
-  icon: {
-    marginRight: 8,
+    flex: 1,
   },
   metricValue: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#6200EE',
+    color: '#333',
+    marginTop: 4,
   },
   metricLabel: {
     fontSize: 12,
     color: '#666',
+    marginTop: 2,
+  },
+  divider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: '#e0e0e0',
+    marginHorizontal: 8,
   },
 });
 

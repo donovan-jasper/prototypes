@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { View, StyleSheet, Dimensions } from 'react-native';
 import { LineChart } from 'react-native-chart-kit';
 
 interface ProgressChartProps {
@@ -11,8 +11,8 @@ const ProgressChart: React.FC<ProgressChartProps> = ({ data, habitName }) => {
   const screenWidth = Dimensions.get('window').width;
 
   const chartConfig = {
-    backgroundGradientFrom: '#fff',
-    backgroundGradientTo: '#fff',
+    backgroundGradientFrom: '#ffffff',
+    backgroundGradientTo: '#ffffff',
     color: (opacity = 1) => `rgba(98, 0, 238, ${opacity})`,
     strokeWidth: 2,
     barPercentage: 0.5,
@@ -33,12 +33,11 @@ const ProgressChart: React.FC<ProgressChartProps> = ({ data, habitName }) => {
         strokeWidth: 2,
       },
     ],
-    legend: [`${habitName} Completion`],
+    legend: [habitName],
   };
 
   return (
     <View style={styles.chartContainer}>
-      <Text style={styles.chartTitle}>Last 7 Days</Text>
       <LineChart
         data={chartData}
         width={screenWidth - 64}
@@ -56,8 +55,10 @@ const ProgressChart: React.FC<ProgressChartProps> = ({ data, habitName }) => {
         yAxisInterval={1}
         yLabelsOffset={10}
         xLabelsOffset={-5}
+        withVerticalLabels={true}
+        withHorizontalLabels={false}
         segments={1}
-        formatYLabel={(value) => value === 1 ? 'Done' : ''}
+        formatYLabel={(yValue) => yValue === '1' ? 'Done' : ''}
       />
     </View>
   );
@@ -65,16 +66,9 @@ const ProgressChart: React.FC<ProgressChartProps> = ({ data, habitName }) => {
 
 const styles = StyleSheet.create({
   chartContainer: {
-    marginTop: 16,
-    padding: 8,
-    backgroundColor: '#f9f9f9',
+    marginVertical: 8,
     borderRadius: 8,
-  },
-  chartTitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 8,
-    textAlign: 'center',
+    overflow: 'hidden',
   },
   chart: {
     borderRadius: 8,
