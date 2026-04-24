@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal, Alert, ActivityIndicator, SafeAreaView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Group {
   id: string;
@@ -11,6 +12,7 @@ interface Group {
   privacy: 'public' | 'private';
   members: string[];
   createdAt: Date;
+  adminId: string;
 }
 
 const Hive: React.FC = () => {
@@ -46,6 +48,16 @@ const Hive: React.FC = () => {
       return;
     }
 
+    if (newGroup.name.length > 30) {
+      Alert.alert('Error', 'Group name must be 30 characters or less');
+      return;
+    }
+
+    if (newGroup.description.length > 140) {
+      Alert.alert('Error', 'Description must be 140 characters or less');
+      return;
+    }
+
     try {
       const user = auth.currentUser;
       if (!user) {
@@ -56,12 +68,14 @@ const Hive: React.FC = () => {
       const groupData = {
         ...newGroup,
         members: [user.uid],
+        adminId: user.uid,
         createdAt: new Date()
       };
 
       await addDoc(collection(db, 'groups'), groupData);
       setShowCreateModal(false);
       setNewGroup({ name: '', description: '', privacy: 'public' });
+      Alert.alert('Success', 'Group created successfully!');
     } catch (error) {
       console.error('Error creating group:', error);
       Alert.alert('Error', 'Failed to create group');
@@ -85,6 +99,10 @@ const Hive: React.FC = () => {
         Alert.alert('Success', `You left ${group.name}`);
       } else {
         // Join group
+        if (group.privacy === 'private') {
+          Alert.alert('Private Group', 'This group requires an invitation to join');
+          return;
+        }
         await updateDoc(groupRef, {
           members: arrayUnion(user.uid)
         });
@@ -112,7 +130,7 @@ const Hive: React.FC = () => {
 
   if (groups.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
+      <SafeAreaView style={styles.emptyContainer}>
         <Text style={styles.emptyText}>No groups found. Create one to get started!</Text>
         <TouchableOpacity
           style={styles.createButton}
@@ -120,20 +138,22 @@ const Hive: React.FC = () => {
         >
           <Text style={styles.createButtonText}>Create New Group</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.title}>SkillHive Groups</Text>
 
       <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search groups..."
           value={searchQuery}
           onChangeText={setSearchQuery}
+          placeholderTextColor="#999"
         />
       </View>
 
@@ -154,7 +174,10 @@ const Hive: React.FC = () => {
           >
             <View style={styles.groupHeader}>
               <Text style={styles.groupName}>{item.name}</Text>
-              <Text style={styles.groupPrivacy}>
+              <Text style={[
+                styles.groupPrivacy,
+                { color: item.privacy === 'public' ? '#4CAF50' : '#F44336' }
+              ]}>
                 {item.privacy === 'public' ? 'Public' : 'Private'}
               </Text>
             </View>
@@ -175,6 +198,7 @@ const Hive: React.FC = () => {
             </View>
           </TouchableOpacity>
         )}
+        contentContainerStyle={styles.listContent}
       />
 
       <Modal
@@ -191,16 +215,17 @@ const Hive: React.FC = () => {
               style={styles.input}
               placeholder="Group Name"
               value={newGroup.name}
-              onChangeText={(text) => setNewGroup({ ...newGroup, name: text })}
+              onChangeText={(text) => setNewGroup({...newGroup, name: text})}
+              maxLength={30}
             />
 
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder="Description"
-              multiline
-              numberOfLines={4}
               value={newGroup.description}
-              onChangeText={(text) => setNewGroup({ ...newGroup, description: text })}
+              onChangeText={(text) => setNewGroup({...newGroup, description: text})}
+              multiline
+              maxLength={140}
             />
 
             <View style={styles.privacyContainer}>
@@ -210,18 +235,18 @@ const Hive: React.FC = () => {
                   styles.privacyOption,
                   newGroup.privacy === 'public' && styles.selectedPrivacy
                 ]}
-                onPress={() => setNewGroup({ ...newGroup, privacy: 'public' })}
+                onPress={() => setNewGroup({...newGroup, privacy: 'public'})}
               >
-                <Text style={styles.privacyOptionText}>Public</Text>
+                <Text style={styles.privacyText}>Public</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.privacyOption,
                   newGroup.privacy === 'private' && styles.selectedPrivacy
                 ]}
-                onPress={() => setNewGroup({ ...newGroup, privacy: 'private' })}
+                onPress={() => setNewGroup({...newGroup, privacy: 'private'})}
               >
-                <Text style={styles.privacyOptionText}>Private</Text>
+                <Text style={styles.privacyText}>Private</Text>
               </TouchableOpacity>
             </View>
 
@@ -233,7 +258,7 @@ const Hive: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.createModalButton]}
+                style={[styles.modalButton, styles.confirmButton]}
                 onPress={handleCreateGroup}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -242,15 +267,15 @@ const Hive: React.FC = () => {
           </View>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -261,39 +286,48 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6200EE',
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
     backgroundColor: '#f5f5f5',
   },
   emptyText: {
     fontSize: 18,
-    color: '#333',
+    color: '#666',
     marginBottom: 20,
+    textAlign: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#6200EE',
+    color: '#333',
     marginBottom: 20,
-    textAlign: 'center',
   },
   searchContainer: {
-    marginBottom: 16,
-  },
-  searchInput: {
-    backgroundColor: 'white',
-    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    fontSize: 16,
+    paddingHorizontal: 12,
+    marginBottom: 16,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 1,
+  },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+    color: '#333',
   },
   createButton: {
     backgroundColor: '#6200EE',
@@ -301,22 +335,30 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   createButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
   },
+  listContent: {
+    paddingBottom: 20,
+  },
   groupItem: {
     backgroundColor: 'white',
-    padding: 16,
     borderRadius: 8,
+    padding: 16,
     marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   groupHeader: {
     flexDirection: 'row',
@@ -326,15 +368,15 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#6200EE',
+    color: '#333',
   },
   groupPrivacy: {
     fontSize: 14,
-    color: '#666',
+    fontWeight: '600',
   },
   groupDescription: {
     fontSize: 14,
-    color: '#333',
+    color: '#666',
     marginBottom: 12,
   },
   groupFooter: {
@@ -348,7 +390,7 @@ const styles = StyleSheet.create({
   },
   joinButton: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: 16,
     borderRadius: 4,
   },
@@ -358,7 +400,7 @@ const styles = StyleSheet.create({
   joinButtonText: {
     color: 'white',
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -367,24 +409,26 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
+    width: '90%',
+    maxWidth: 400,
     backgroundColor: 'white',
-    width: '80%',
-    padding: 20,
     borderRadius: 8,
+    padding: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#6200EE',
     marginBottom: 20,
+    color: '#333',
     textAlign: 'center',
   },
   input: {
     backgroundColor: '#f5f5f5',
-    padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    padding: 12,
+    marginBottom: 16,
     fontSize: 16,
+    color: '#333',
   },
   textArea: {
     height: 100,
@@ -398,41 +442,42 @@ const styles = StyleSheet.create({
   privacyLabel: {
     fontSize: 16,
     color: '#333',
-    marginRight: 10,
+    marginRight: 16,
   },
   privacyOption: {
-    padding: 8,
-    borderRadius: 4,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
     marginRight: 8,
     backgroundColor: '#f5f5f5',
   },
   selectedPrivacy: {
     backgroundColor: '#6200EE',
   },
-  privacyOptionText: {
+  privacyText: {
     color: '#333',
+    fontSize: 14,
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   modalButton: {
-    padding: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    flex: 1,
-    marginHorizontal: 4,
-    alignItems: 'center',
+    marginLeft: 10,
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
   },
-  createModalButton: {
+  confirmButton: {
     backgroundColor: '#6200EE',
   },
   modalButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
 
