@@ -17,14 +17,15 @@ export const extractWithLLM = async (text: string): Promise<LLMResponse> => {
         messages: [
           {
             role: 'system',
-            content: 'You are a data extraction assistant. Extract entities like emails, dates, phone numbers, and monetary values from the text.'
+            content: 'You are a data extraction assistant. Extract entities like emails, dates, phone numbers, monetary values, and names from the text. Also provide a concise summary of the text. Format your response as JSON with "entities" and "summary" fields.'
           },
           {
             role: 'user',
-            content: `Extract entities from this text: ${text}`
+            content: `Extract entities and provide a summary from this text: ${text}`
           }
         ],
-        max_tokens: 150
+        max_tokens: 200,
+        response_format: { type: "json_object" }
       },
       {
         headers: {
@@ -35,31 +36,9 @@ export const extractWithLLM = async (text: string): Promise<LLMResponse> => {
     );
 
     const content = response.data.choices[0].message.content;
-    // Parse the LLM response into structured data
-    // This would need a proper parser based on your LLM's output format
-    return parseLLMResponse(content);
+    return JSON.parse(content);
   } catch (error) {
     console.error('LLM API error:', error);
     throw error;
   }
 };
-
-function parseLLMResponse(content: string): LLMResponse {
-  // Simple parser - in production you'd want a more robust solution
-  const entities: Array<{ type: string; value: string }> = [];
-  const lines = content.split('\n');
-
-  for (const line of lines) {
-    if (line.includes('Email:')) {
-      entities.push({ type: 'email', value: line.split('Email:')[1].trim() });
-    } else if (line.includes('Date:')) {
-      entities.push({ type: 'date', value: line.split('Date:')[1].trim() });
-    } else if (line.includes('Phone:')) {
-      entities.push({ type: 'phone', value: line.split('Phone:')[1].trim() });
-    } else if (line.includes('Amount:')) {
-      entities.push({ type: 'amount', value: line.split('Amount:')[1].trim() });
-    }
-  }
-
-  return { entities };
-}

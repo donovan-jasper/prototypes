@@ -23,10 +23,8 @@ export const useExtraction = () => {
       if (input.text) {
         textToProcess = input.text;
       } else if (input.audio) {
-        // Transcribe audio using the actual audio service
         textToProcess = await transcribeAudio(input.audio);
       } else if (input.image) {
-        // Extract text from image using OCR service
         textToProcess = await extractTextFromImage(input.image);
       }
 
@@ -35,7 +33,11 @@ export const useExtraction = () => {
       }
 
       const llmResult = await extractWithLLM(textToProcess);
-      setResult(llmResult);
+      setResult({
+        entities: llmResult.entities || [],
+        summary: llmResult.summary,
+        error: undefined
+      });
     } catch (error) {
       console.error('Extraction error:', error);
       setResult({
