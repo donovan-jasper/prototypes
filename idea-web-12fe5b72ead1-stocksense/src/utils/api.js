@@ -29,19 +29,22 @@ export const fetchUserDebtInfo = async () => {
   return {
     debts: [
       {
-        amount: 5000,
+        id: 1,
+        balance: 5000,
         interestRate: 18.5,
-        monthlyPayment: 150
+        minimumPayment: 150
       },
       {
-        amount: 12000,
+        id: 2,
+        balance: 12000,
         interestRate: 6.2,
-        monthlyPayment: 200
+        minimumPayment: 200
       },
       {
-        amount: 3000,
+        id: 3,
+        balance: 3000,
         interestRate: 12.0,
-        monthlyPayment: 100
+        minimumPayment: 100
       }
     ],
     monthlyIncome: 4500,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import InvestmentSimulator from '../components/InvestmentSimulator';
 import DebtRoadmap from '../components/DebtRoadmap';
 import { calculateDebtPayoffPlan } from '../utils/debt';
@@ -55,9 +55,11 @@ const InsightsScreen = () => {
     <ScrollView style={styles.container}>
       <InvestmentSimulator />
       <DebtRoadmap
-        debts={debtPlan}
+        debts={debtPlan.payments}
         totalDebt={debtData.totalDebt}
         monthlyIncome={debtData.monthlyIncome}
+        totalPayoffMonths={debtPlan.totalPayoffMonths}
+        totalInterestSaved={debtPlan.totalInterestSaved}
       />
     </ScrollView>
   );
