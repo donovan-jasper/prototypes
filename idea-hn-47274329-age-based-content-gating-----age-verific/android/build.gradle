@@ -1,0 +1,4 @@
+dependencies {
+    implementation 'com.facebook.react:react-native:+'
+    implementation 'com.google.android.digitalwellbeing:digitalwellbeing:1.0.0'
+}
