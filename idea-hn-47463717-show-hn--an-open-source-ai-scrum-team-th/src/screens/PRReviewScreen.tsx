@@ -1,9 +1,12 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { useRoute } from '@react-navigation/native';
 import PRReview from '../components/PRReview';
 
 const PRReviewScreen: React.FC = () => {
   const [loading, setLoading] = React.useState<boolean>(false);
+  const route = useRoute();
+  const { pr } = route.params as { pr: any };
 
   const handleApprove = () => {
     setLoading(true);
@@ -32,15 +35,27 @@ const PRReviewScreen: React.FC = () => {
   }
 
   return (
-    <PRReview
-      prTitle="Fix login bug"
-      onApprove={handleApprove}
-      onReject={handleReject}
-    />
+    <View style={styles.container}>
+      <Text style={styles.title}>{pr.title}</Text>
+      <PRReview
+        prTitle={pr.title}
+        onApprove={handleApprove}
+        onReject={handleReject}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
