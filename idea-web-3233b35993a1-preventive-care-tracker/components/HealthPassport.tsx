@@ -1,248 +1,239 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Button } from 'react-native';
-import { HealthPassportRecord } from '../types';
-import { getHealthPassportRecords, addHealthPassportRecord, updateHealthPassportRecord, deleteHealthPassportRecord } from '../lib/database';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import { getVaccinations, getPrescriptions, getAllergies, getInsurance, addVaccination, addPrescription, addAllergy, addInsurance, deleteVaccination, deletePrescription, deleteAllergy, deleteInsurance } from '../lib/database';
 
-interface HealthPassportProps {
-  memberId: string;
+type RecordType = 'vaccinations' | 'prescriptions' | 'allergies' | 'insurance';
+
+interface Record {
+  id: string;
+  name: string;
+  date?: string;
+  dosage?: string;
+  severity?: string;
+  provider?: string;
+  policyNumber?: string;
+  expirationDate?: string;
 }
 
-const HealthPassport: React.FC<HealthPassportProps> = ({ memberId }) => {
-  const [records, setRecords] = useState<HealthPassportRecord[]>([]);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingRecord, setEditingRecord] = useState<HealthPassportRecord | null>(null);
-  const [formData, setFormData] = useState({
-    type: 'vaccination',
-    name: '',
-    details: '',
-    date: '',
-    expirationDate: '',
-    notes: ''
-  });
+export default function HealthPassport({ memberId }: { memberId: string }) {
+  const navigation = useNavigation();
+  const [activeTab, setActiveTab] = useState<RecordType>('vaccinations');
+  const [records, setRecords] = useState<Record[]>([]);
 
   useEffect(() => {
     loadRecords();
-  }, []);
+  }, [activeTab, memberId]);
 
   const loadRecords = async () => {
-    const data = await getHealthPassportRecords(memberId);
-    setRecords(data);
+    try {
+      let data: Record[] = [];
+      switch (activeTab) {
+        case 'vaccinations':
+          data = await getVaccinations(memberId);
+          break;
+        case 'prescriptions':
+          data = await getPrescriptions(memberId);
+          break;
+        case 'allergies':
+          data = await getAllergies(memberId);
+          break;
+        case 'insurance':
+          data = await getInsurance(memberId);
+          break;
+      }
+      setRecords(data);
+    } catch (error) {
+      console.error('Error loading records:', error);
+      Alert.alert('Error', 'Failed to load records. Please try again.');
+    }
   };
 
   const handleAddRecord = () => {
-    setEditingRecord(null);
-    setFormData({
-      type: 'vaccination',
-      name: '',
-      details: '',
-      date: '',
-      expirationDate: '',
-      notes: ''
+    navigation.navigate('add-record', {
+      memberId,
+      recordType: activeTab,
+      onSave: loadRecords
     });
-    setModalVisible(true);
   };
 
-  const handleEditRecord = (record: HealthPassportRecord) => {
-    setEditingRecord(record);
-    setFormData({
-      type: record.type,
-      name: record.name,
-      details: record.details,
-      date: record.date,
-      expirationDate: record.expirationDate || '',
-      notes: record.notes || ''
-    });
-    setModalVisible(true);
-  };
-
-  const handleDeleteRecord = async (id: string) => {
-    await deleteHealthPassportRecord(id);
-    loadRecords();
-  };
-
-  const handleSaveRecord = async () => {
-    if (editingRecord) {
-      await updateHealthPassportRecord({
-        ...editingRecord,
-        ...formData
-      });
-    } else {
-      await addHealthPassportRecord({
-        memberId,
-        ...formData
-      });
+  const handleDeleteRecord = async (recordId: string) => {
+    try {
+      Alert.alert(
+        'Delete Record',
+        'Are you sure you want to delete this record?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Delete',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                switch (activeTab) {
+                  case 'vaccinations':
+                    await deleteVaccination(recordId);
+                    break;
+                  case 'prescriptions':
+                    await deletePrescription(recordId);
+                    break;
+                  case 'allergies':
+                    await deleteAllergy(recordId);
+                    break;
+                  case 'insurance':
+                    await deleteInsurance(recordId);
+                    break;
+                }
+                loadRecords();
+              } catch (error) {
+                console.error('Error deleting record:', error);
+                Alert.alert('Error', 'Failed to delete record. Please try again.');
+              }
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Error showing delete confirmation:', error);
     }
-    setModalVisible(false);
-    loadRecords();
   };
 
-  const renderRecord = ({ item }: { item: HealthPassportRecord }) => (
-    <View style={styles.recordCard}>
-      <View style={styles.recordHeader}>
-        <Text style={styles.recordType}>{item.type}</Text>
-        <Text style={styles.recordDate}>{item.date}</Text>
-      </View>
-      <Text style={styles.recordName}>{item.name}</Text>
-      <Text style={styles.recordDetails}>{item.details}</Text>
-      {item.expirationDate && (
-        <Text style={styles.recordExpiration}>Expires: {item.expirationDate}</Text>
-      )}
-      {item.notes && (
-        <Text style={styles.recordNotes}>Notes: {item.notes}</Text>
-      )}
-      <View style={styles.recordActions}>
-        <TouchableOpacity onPress={() => handleEditRecord(item)}>
-          <Text style={styles.editButton}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => handleDeleteRecord(item.id)}>
-          <Text style={styles.deleteButton}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+  const renderRecordItem = (record: Record) => {
+    switch (activeTab) {
+      case 'vaccinations':
+        return (
+          <View style={styles.recordItem}>
+            <View style={styles.recordHeader}>
+              <Text style={styles.recordTitle}>{record.name}</Text>
+              <TouchableOpacity onPress={() => handleDeleteRecord(record.id)}>
+                <MaterialIcons name="delete" size={20} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.recordDetail}>Date: {record.date || 'N/A'}</Text>
+            <Text style={styles.recordDetail}>Provider: {record.provider || 'N/A'}</Text>
+          </View>
+        );
+      case 'prescriptions':
+        return (
+          <View style={styles.recordItem}>
+            <View style={styles.recordHeader}>
+              <Text style={styles.recordTitle}>{record.name}</Text>
+              <TouchableOpacity onPress={() => handleDeleteRecord(record.id)}>
+                <MaterialIcons name="delete" size={20} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.recordDetail}>Dosage: {record.dosage || 'N/A'}</Text>
+            <Text style={styles.recordDetail}>Date: {record.date || 'N/A'}</Text>
+          </View>
+        );
+      case 'allergies':
+        return (
+          <View style={styles.recordItem}>
+            <View style={styles.recordHeader}>
+              <Text style={styles.recordTitle}>{record.name}</Text>
+              <TouchableOpacity onPress={() => handleDeleteRecord(record.id)}>
+                <MaterialIcons name="delete" size={20} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.recordDetail}>Severity: {record.severity || 'N/A'}</Text>
+          </View>
+        );
+      case 'insurance':
+        return (
+          <View style={styles.recordItem}>
+            <View style={styles.recordHeader}>
+              <Text style={styles.recordTitle}>{record.name}</Text>
+              <TouchableOpacity onPress={() => handleDeleteRecord(record.id)}>
+                <MaterialIcons name="delete" size={20} color="#ff4444" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.recordDetail}>Policy Number: {record.policyNumber || 'N/A'}</Text>
+            <Text style={styles.recordDetail}>Expiration: {record.expirationDate || 'N/A'}</Text>
+          </View>
+        );
+    }
+  };
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Health Passport</Text>
-        <TouchableOpacity onPress={handleAddRecord} style={styles.addButton}>
-          <Text style={styles.addButtonText}>+ Add Record</Text>
-        </TouchableOpacity>
+      <View style={styles.tabContainer}>
+        {(['vaccinations', 'prescriptions', 'allergies', 'insurance'] as RecordType[]).map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tab, activeTab === tab && styles.activeTab]}
+            onPress={() => setActiveTab(tab)}
+          >
+            <Text style={[styles.tabText, activeTab === tab && styles.activeTabText]}>
+              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
-      <FlatList
-        data={records}
-        renderItem={renderRecord}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-      />
-
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingRecord ? 'Edit Record' : 'Add New Record'}
-            </Text>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Type</Text>
-              <View style={styles.radioGroup}>
-                {['vaccination', 'prescription', 'allergy', 'insurance'].map(type => (
-                  <TouchableOpacity
-                    key={type}
-                    style={styles.radioOption}
-                    onPress={() => setFormData({ ...formData, type })}
-                  >
-                    <View style={[
-                      styles.radioCircle,
-                      formData.type === type && styles.radioCircleSelected
-                    ]} />
-                    <Text style={styles.radioLabel}>{type}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Name</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.name}
-                onChangeText={text => setFormData({ ...formData, name: text })}
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Details</Text>
-              <TextInput
-                style={[styles.input, styles.multilineInput]}
-                value={formData.details}
-                onChangeText={text => setFormData({ ...formData, details: text })}
-                multiline
-              />
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Date</Text>
-              <TextInput
-                style={styles.input}
-                value={formData.date}
-                onChangeText={text => setFormData({ ...formData, date: text })}
-                placeholder="YYYY-MM-DD"
-              />
-            </View>
-
-            {formData.type !== 'allergy' && (
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Expiration Date</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.expirationDate}
-                  onChangeText={text => setFormData({ ...formData, expirationDate: text })}
-                  placeholder="YYYY-MM-DD (optional)"
-                />
-              </View>
-            )}
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Notes</Text>
-              <TextInput
-                style={[styles.input, styles.multilineInput]}
-                value={formData.notes}
-                onChangeText={text => setFormData({ ...formData, notes: text })}
-                multiline
-              />
-            </View>
-
-            <View style={styles.modalButtons}>
-              <Button title="Cancel" onPress={() => setModalVisible(false)} color="#666" />
-              <Button title="Save" onPress={handleSaveRecord} />
-            </View>
+      <ScrollView style={styles.recordsContainer}>
+        {records.length > 0 ? (
+          records.map((record) => (
+            <TouchableOpacity
+              key={record.id}
+              onPress={() => navigation.navigate('edit-record', {
+                memberId,
+                recordType: activeTab,
+                recordId: record.id,
+                onSave: loadRecords
+              })}
+            >
+              {renderRecordItem(record)}
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No {activeTab} records found</Text>
           </View>
-        </View>
-      </Modal>
+        )}
+      </ScrollView>
+
+      <TouchableOpacity style={styles.addButton} onPress={handleAddRecord}>
+        <MaterialIcons name="add" size={24} color="white" />
+      </TouchableOpacity>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
   },
-  header: {
+  tabContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
+    paddingHorizontal: 8,
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 4,
   },
-  addButtonText: {
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 20,
+    marginHorizontal: 4,
+  },
+  activeTab: {
+    backgroundColor: '#4CAF50',
+  },
+  tabText: {
+    color: '#666',
+    fontWeight: '500',
+  },
+  activeTabText: {
     color: 'white',
-    fontWeight: 'bold',
   },
-  listContent: {
+  recordsContainer: {
+    flex: 1,
     padding: 16,
   },
-  recordCard: {
+  recordItem: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
@@ -256,121 +247,44 @@ const styles = StyleSheet.create({
   recordHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  recordType: {
-    fontSize: 14,
-    color: '#666',
-    textTransform: 'capitalize',
-  },
-  recordDate: {
-    fontSize: 14,
-    color: '#666',
-  },
-  recordName: {
+  recordTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  recordDetails: {
-    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
   },
-  recordExpiration: {
-    fontSize: 12,
-    color: '#888',
+  recordDetail: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
-  recordNotes: {
-    fontSize: 12,
-    color: '#555',
-    marginBottom: 8,
-  },
-  recordActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-  },
-  editButton: {
-    color: '#2196F3',
-    marginLeft: 16,
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    color: '#F44336',
-    marginLeft: 16,
-    fontWeight: 'bold',
-  },
-  modalContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
     padding: 20,
-    width: '90%',
-    maxHeight: '80%',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  emptyText: {
+    fontSize: 16,
+    color: '#999',
     textAlign: 'center',
   },
-  formGroup: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 16,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
-    fontSize: 16,
-  },
-  multilineInput: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  radioGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: 8,
-  },
-  radioOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-    marginBottom: 8,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: '#ccc',
-    marginRight: 8,
-  },
-  radioCircleSelected: {
-    borderColor: '#4CAF50',
+  addButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: '#4CAF50',
-  },
-  radioLabel: {
-    fontSize: 16,
-    textTransform: 'capitalize',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
 });
-
-export default HealthPassport;
