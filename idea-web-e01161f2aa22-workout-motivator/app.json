@@ -16,14 +16,16 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourcompany.motivemate"
+      "bundleIdentifier": "com.yourcompany.motivemate",
+      "backgroundMode": ["audio", "fetch"]
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "package": "com.yourcompany.motivemate"
+      "package": "com.yourcompany.motivemate",
+      "permissions": ["android.permission.FOREGROUND_SERVICE"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -32,7 +34,15 @@
       "expo-av",
       "expo-speech",
       "expo-sqlite",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-background-fetch",
+        {
+          "minimumInterval": 15 * 60,
+          "stopOnTerminate": false,
+          "startOnBoot": true
+        }
+      ]
     ]
   }
 }
