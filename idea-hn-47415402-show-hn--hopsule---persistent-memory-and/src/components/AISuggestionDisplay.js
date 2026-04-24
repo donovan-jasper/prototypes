@@ -1,24 +1,50 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import ConflictAlert from './ConflictAlert';
 import useAIRuleInjection from '../hooks/useAIRuleInjection';
-import { injectRulesIntoAISuggestion } from '../api/mockAIIntegration';
+import { injectRulesIntoAISuggestion, getAISuggestions } from '../api/mockAIIntegration';
 
-const AISuggestionDisplay = ({ suggestion }) => {
+const AISuggestionDisplay = ({ prompt }) => {
   const { rules, checkCode } = useAIRuleInjection();
+  const [isLoading, setIsLoading] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedSuggestion, setSelectedSuggestion] = useState(null);
   const [isAccepted, setIsAccepted] = useState(false);
   const [isRejected, setIsRejected] = useState(false);
-  const [modifiedSuggestion, setModifiedSuggestion] = useState(suggestion);
+  const [modifiedSuggestion, setModifiedSuggestion] = useState('');
   const [violations, setViolations] = useState([]);
 
   useEffect(() => {
+    if (prompt) {
+      fetchSuggestions();
+    }
+  }, [prompt]);
+
+  const fetchSuggestions = async () => {
+    setIsLoading(true);
+    try {
+      const suggestions = await getAISuggestions(prompt);
+      setSuggestions(suggestions);
+      if (suggestions.length > 0) {
+        processSuggestion(suggestions[0]);
+      }
+    } catch (error) {
+      console.error('Error fetching suggestions:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const processSuggestion = (suggestion) => {
+    setSelectedSuggestion(suggestion);
     const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
     setModifiedSuggestion(processedSuggestion);
 
-    // Check for violations in the modified suggestion
     const foundViolations = rules.filter(rule => !checkCode(processedSuggestion, rule));
     setViolations(foundViolations);
-  }, [suggestion, rules]);
+    setIsAccepted(false);
+    setIsRejected(false);
+  };
 
   const handleAccept = () => {
     if (violations.length === 0) {
@@ -30,13 +56,13 @@ const AISuggestionDisplay = ({ suggestion }) => {
     setIsRejected(true);
   };
 
-  // Highlight violations in the code
   const renderHighlightedCode = () => {
+    if (!modifiedSuggestion) return null;
+
     if (violations.length === 0) {
       return <Text style={styles.suggestionText}>{modifiedSuggestion}</Text>;
     }
 
-    // This is a simplified version - in a real app you'd need more sophisticated parsing
     let highlightedText = modifiedSuggestion;
     violations.forEach(violation => {
       const regex = new RegExp(violation.pattern, 'g');
@@ -46,7 +72,6 @@ const AISuggestionDisplay = ({ suggestion }) => {
       );
     });
 
-    // Convert HTML-like spans to React Native Text components
     const parts = highlightedText.split(/<span[^>]*>|<\/span>/g);
     const styles = highlightedText.match(/<span[^>]*>/g) || [];
 
@@ -62,9 +87,41 @@ const AISuggestionDisplay = ({ suggestion }) => {
     });
   };
 
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0000ff" />
+        <Text>Fetching AI suggestions...</Text>
+      </View>
+    );
+  }
+
+  if (suggestions.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text>No suggestions available. Try a different prompt.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>AI Suggestion</Text>
+      <Text style={styles.title}>AI Suggestions</Text>
+
+      <View style={styles.suggestionSelector}>
+        {suggestions.map((suggestion, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.suggestionButton,
+              selectedSuggestion === suggestion && styles.selectedSuggestion
+            ]}
+            onPress={() => processSuggestion(suggestion)}
+          >
+            <Text style={styles.suggestionButtonText}>Suggestion {index + 1}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
       <ScrollView style={styles.suggestionContainer}>
         {renderHighlightedCode()}
@@ -123,6 +180,22 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
+  suggestionSelector: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  suggestionButton: {
+    padding: 8,
+    backgroundColor: '#ddd',
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  selectedSuggestion: {
+    backgroundColor: '#4CAF50',
+  },
+  suggestionButtonText: {
+    color: 'black',
+  },
   suggestionContainer: {
     maxHeight: 200,
     marginBottom: 10,
@@ -173,6 +246,16 @@ const styles = StyleSheet.create({
     marginTop: 10,
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyContainer: {
+    padding: 20,
+    alignItems: 'center',
   },
 });
 
