@@ -16,16 +16,17 @@ export const calculateStreak = (dates: string[]): number => {
     return 0;
   }
 
-  // Check consecutive days
+  // Calculate streak
   for (let i = 1; i < sortedDates.length; i++) {
     const currentDate = new Date(sortedDates[i]);
     const previousDate = new Date(sortedDates[i - 1]);
 
+    // Set to midnight for comparison
     currentDate.setHours(0, 0, 0, 0);
     previousDate.setHours(0, 0, 0, 0);
 
-    const diffTime = Math.abs(previousDate.getTime() - currentDate.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffTime = previousDate.getTime() - currentDate.getTime();
+    const diffDays = diffTime / (1000 * 60 * 60 * 24);
 
     if (diffDays === 1) {
       streak++;
