@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, ActivityIndicator, Surface, SegmentedButtons, Banner, Divider } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { TextInput, Button, Text, ActivityIndicator, Surface, SegmentedButtons, Banner, Divider, Portal, Modal, IconButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { generateSlides } from '../../lib/ai/generateSlides';
 import { saveDeck, getSettings } from '../../lib/db/queries';
@@ -19,6 +19,7 @@ export default function CreateScreen() {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
   const [showDemoBanner, setShowDemoBanner] = useState(true);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   useEffect(() => {
     checkApiKey();
@@ -50,8 +51,10 @@ export default function CreateScreen() {
       setSlideCount(result.slideCount);
       setDeckTitle(result.title);
       setIsDemo(result.isDemo || false);
+      setShowPreviewModal(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate slides');
+      Alert.alert('Error', err instanceof Error ? err.message : 'Failed to generate slides');
     } finally {
       setLoading(false);
     }
@@ -83,11 +86,18 @@ export default function CreateScreen() {
       setSlideCount(0);
       setDeckTitle('');
       setIsDemo(false);
+      setShowPreviewModal(false);
 
       router.push('/(tabs)/');
     } catch (err) {
       setError('Failed to save deck');
+      Alert.alert('Error', 'Failed to save deck');
     }
+  };
+
+  const handleRegenerate = () => {
+    setShowPreviewModal(false);
+    handleGenerate();
   };
 
   return (
@@ -168,15 +178,17 @@ export default function CreateScreen() {
             disabled={loading}
           />
 
-          <Text variant="labelLarge" style={styles.sectionLabel}>
-            Theme
-          </Text>
-          <SegmentedButtons
-            value={selectedTheme}
-            onValueChange={setSelectedTheme}
-            buttons={themeOptions}
-            style={styles.themeSelector}
-          />
+          <View style={styles.themeSelector}>
+            <Text variant="labelLarge" style={styles.themeLabel}>
+              Slide Theme
+            </Text>
+            <SegmentedButtons
+              value={selectedTheme}
+              onValueChange={setSelectedTheme}
+              buttons={themeOptions}
+              style={styles.segmentedButtons}
+            />
+          </View>
 
           <Button
             mode="contained"
@@ -197,44 +209,76 @@ export default function CreateScreen() {
         </View>
 
         {generatedHtml && (
-          <>
-            <Divider style={styles.divider} />
-
-            <View style={styles.previewSection}>
-              <Text variant="headlineSmall" style={styles.previewTitle}>
-                Preview
-              </Text>
-              <Text variant="bodyMedium" style={styles.previewSubtitle}>
-                {slideCount} slides • {deckTitle}
-              </Text>
-
-              <View style={styles.slideViewerContainer}>
-                <SlideViewer html={generatedHtml} />
-              </View>
-
-              <View style={styles.actionButtons}>
-                <Button
-                  mode="outlined"
-                  onPress={() => setGeneratedHtml(null)}
-                  icon="close"
-                  style={styles.cancelButton}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  mode="contained"
-                  onPress={handleSave}
-                  icon="content-save"
-                  style={styles.saveButton}
-                >
-                  Save Deck
-                </Button>
-              </View>
+          <View style={styles.previewSection}>
+            <Text variant="titleMedium" style={styles.previewTitle}>
+              Preview ({slideCount} slides)
+            </Text>
+            <Text variant="bodyMedium" style={styles.previewSubtitle}>
+              {deckTitle}
+            </Text>
+            <View style={styles.previewContainer}>
+              <SlideViewer html={generatedHtml} />
             </View>
-          </>
+            <View style={styles.actionButtons}>
+              <Button
+                mode="outlined"
+                onPress={handleRegenerate}
+                icon="refresh"
+                style={styles.actionButton}
+              >
+                Regenerate
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                icon="content-save"
+                style={styles.actionButton}
+              >
+                Save Deck
+              </Button>
+            </View>
+          </View>
         )}
       </ScrollView>
+
+      <Portal>
+        <Modal
+          visible={showPreviewModal && !!generatedHtml}
+          onDismiss={() => setShowPreviewModal(false)}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Surface style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text variant="headlineSmall">Slide Preview</Text>
+              <IconButton
+                icon="close"
+                onPress={() => setShowPreviewModal(false)}
+              />
+            </View>
+            <View style={styles.modalPreview}>
+              <SlideViewer html={generatedHtml} />
+            </View>
+            <View style={styles.modalActions}>
+              <Button
+                mode="outlined"
+                onPress={handleRegenerate}
+                icon="refresh"
+                style={styles.modalActionButton}
+              >
+                Regenerate
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                icon="content-save"
+                style={styles.modalActionButton}
+              >
+                Save Deck
+              </Button>
+            </View>
+          </Surface>
+        </Modal>
+      </Portal>
     </KeyboardAvoidingView>
   );
 }
@@ -246,12 +290,12 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
+    paddingBottom: 32,
   },
   header: {
     padding: 16,
     marginBottom: 16,
     borderRadius: 8,
-    backgroundColor: '#fff',
   },
   headerTitle: {
     marginBottom: 4,
@@ -274,27 +318,27 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 16,
-    backgroundColor: '#fff',
-  },
-  sectionLabel: {
-    marginBottom: 8,
-    color: '#666',
+    backgroundColor: 'white',
   },
   themeSelector: {
     marginBottom: 16,
+  },
+  themeLabel: {
+    marginBottom: 8,
+  },
+  segmentedButtons: {
+    backgroundColor: 'white',
   },
   generateButton: {
     marginTop: 8,
   },
   errorText: {
-    color: '#d32f2f',
+    color: 'red',
     marginTop: 8,
-  },
-  divider: {
-    marginVertical: 24,
+    textAlign: 'center',
   },
   previewSection: {
-    marginBottom: 24,
+    marginTop: 24,
   },
   previewTitle: {
     marginBottom: 4,
@@ -303,23 +347,49 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 16,
   },
-  slideViewerContainer: {
+  previewContainer: {
     height: 300,
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
   },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  cancelButton: {
+  actionButton: {
     flex: 1,
-    marginRight: 8,
+    marginHorizontal: 4,
   },
-  saveButton: {
+  modalContainer: {
+    padding: 20,
     flex: 1,
-    marginLeft: 8,
+    justifyContent: 'center',
+  },
+  modalContent: {
+    padding: 16,
+    borderRadius: 8,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalPreview: {
+    height: 400,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: 'white',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  modalActionButton: {
+    flex: 1,
+    marginHorizontal: 4,
   },
 });
