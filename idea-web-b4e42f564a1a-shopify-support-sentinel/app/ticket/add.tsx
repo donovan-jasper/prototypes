@@ -1,141 +1,95 @@
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
-import { useRouter } from 'expo-router';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
+import React, { useState } from 'react';
+import { View, Text, TextInput, StyleSheet, ScrollView, Alert } from 'react-native';
+import { useNavigation } from 'expo-router';
 import { createTicket } from '../../lib/database';
+import { ParsedTicket } from '../../lib/types';
+import SmartPasteButton from '../../components/SmartPasteButton';
+import { format } from 'date-fns';
 
 export default function AddTicketScreen() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const [company, setCompany] = useState('');
   const [ticketId, setTicketId] = useState('');
   const [description, setDescription] = useState('');
   const [submittedAt, setSubmittedAt] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [expectedResponseHours, setExpectedResponseHours] = useState(48);
-  const [saving, setSaving] = useState(false);
+
+  const handleSmartPaste = (parsed: ParsedTicket) => {
+    if (parsed.company) setCompany(parsed.company.value);
+    if (parsed.ticketId) setTicketId(parsed.ticketId.value);
+    if (parsed.submittedAt) setSubmittedAt(parsed.submittedAt.value);
+  };
 
   const handleSave = async () => {
-    if (!company.trim() || !ticketId.trim() || !description.trim()) {
-      alert('Please fill in all required fields');
+    if (!company || !ticketId) {
+      Alert.alert('Missing fields', 'Please provide company and ticket ID');
       return;
     }
 
-    setSaving(true);
     try {
       await createTicket({
-        company: company.trim(),
-        ticketId: ticketId.trim(),
-        description: description.trim(),
+        company,
+        ticketId,
+        description,
         submittedAt,
         expectedResponseHours,
+        status: 'active'
       });
-      router.back();
-    } catch (error) {
-      console.error('Failed to create ticket:', error);
-      alert('Failed to create ticket. Please try again.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
-    setShowDatePicker(Platform.OS === 'ios');
-    if (selectedDate) {
-      setSubmittedAt(selectedDate);
+      Alert.alert('Success', 'Ticket added successfully');
+      navigation.goBack();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save ticket');
     }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.label}>Company Name *</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.form}>
+        <Text style={styles.label}>Company Name</Text>
         <TextInput
           style={styles.input}
           value={company}
           onChangeText={setCompany}
-          placeholder="e.g., Amazon, Shopify"
-          placeholderTextColor="#C7C7CC"
+          placeholder="e.g. Amazon, Shopify"
         />
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Ticket ID *</Text>
+        <Text style={styles.label}>Ticket ID</Text>
         <TextInput
           style={styles.input}
           value={ticketId}
           onChangeText={setTicketId}
-          placeholder="e.g., AMZ-12345"
-          placeholderTextColor="#C7C7CC"
+          placeholder="e.g. #12345 or CASE-6789"
         />
-      </View>
 
-      <View style={styles.section}>
-        <Text style={styles.label}>Description *</Text>
+        <Text style={styles.label}>Description</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[styles.input, styles.multiline]}
           value={description}
           onChangeText={setDescription}
-          placeholder="Brief description of the issue"
-          placeholderTextColor="#C7C7CC"
+          placeholder="Brief description of your issue"
           multiline
-          numberOfLines={4}
-          textAlignVertical="top"
+          numberOfLines={3}
         />
-      </View>
 
-      <View style={styles.section}>
         <Text style={styles.label}>Submission Date</Text>
-        <TouchableOpacity
-          style={styles.dateButton}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.dateText}>
-            {submittedAt.toLocaleDateString()} {submittedAt.toLocaleTimeString()}
-          </Text>
-        </TouchableOpacity>
-        {showDatePicker && (
-          <DateTimePicker
-            value={submittedAt}
-            mode="datetime"
-            display="default"
-            onChange={onDateChange}
-          />
-        )}
-      </View>
+        <Text style={styles.dateText}>{format(submittedAt, 'MMMM d, yyyy')}</Text>
 
-      <View style={styles.section}>
         <Text style={styles.label}>Expected Response Time</Text>
-        <View style={styles.pickerContainer}>
-          <Picker
-            selectedValue={expectedResponseHours}
-            onValueChange={(value) => setExpectedResponseHours(value)}
-            style={styles.picker}
-          >
-            <Picker.Item label="24 hours" value={24} />
-            <Picker.Item label="48 hours" value={48} />
-            <Picker.Item label="1 week" value={168} />
-          </Picker>
-        </View>
-      </View>
+        <TextInput
+          style={styles.input}
+          value={expectedResponseHours.toString()}
+          onChangeText={(text) => setExpectedResponseHours(parseInt(text) || 0)}
+          keyboardType="numeric"
+          placeholder="Hours"
+        />
 
-      <TouchableOpacity
-        style={[styles.saveButton, saving && styles.saveButtonDisabled]}
-        onPress={handleSave}
-        disabled={saving}
-      >
-        <Text style={styles.saveButtonText}>
-          {saving ? 'Saving...' : 'Save Ticket'}
-        </Text>
-      </TouchableOpacity>
+        <SmartPasteButton onParsed={handleSmartPaste} />
+
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>Save Ticket</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -143,68 +97,48 @@ export default function AddTicketScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F9F9F9',
+    backgroundColor: '#f5f5f5',
   },
-  content: {
-    padding: 16,
-  },
-  section: {
-    marginBottom: 24,
+  form: {
+    padding: 20,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#000000',
     marginBottom: 8,
+    marginTop: 16,
+    color: '#333',
   },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 8,
+    backgroundColor: 'white',
     padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
     fontSize: 16,
-    color: '#000000',
   },
-  textArea: {
+  multiline: {
     height: 100,
-    paddingTop: 12,
-  },
-  dateButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 8,
-    padding: 12,
+    textAlignVertical: 'top',
   },
   dateText: {
     fontSize: 16,
-    color: '#000000',
-  },
-  pickerContainer: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    padding: 12,
+    backgroundColor: 'white',
     borderRadius: 8,
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 50,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   saveButton: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
+    backgroundColor: '#2196F3',
     padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  saveButtonDisabled: {
-    opacity: 0.5,
+    marginTop: 32,
   },
   saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+    color: 'white',
+    fontSize: 18,
     fontWeight: '600',
   },
 });

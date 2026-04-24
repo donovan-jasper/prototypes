@@ -11,26 +11,23 @@ export interface Ticket {
 }
 
 export interface ParsedTicket {
-  company?: string;
-  ticketId?: string;
-  submittedAt?: Date;
+  company?: {
+    value: string;
+    confidence: number;
+  };
+  ticketId?: {
+    value: string;
+    confidence: number;
+  };
+  submittedAt?: {
+    value: Date;
+    confidence: number;
+  };
 }
 
-export interface CreateTicketInput {
+export interface FollowUpOptions {
   company: string;
   ticketId: string;
-  description: string;
+  daysOverdue: number;
   submittedAt: Date;
-  expectedResponseHours: number;
-  notes?: string;
-}
-
-export interface UpdateTicketInput {
-  company?: string;
-  ticketId?: string;
-  description?: string;
-  status?: 'active' | 'resolved' | 'snoozed';
-  expectedResponseHours?: number;
-  resolvedAt?: Date;
-  notes?: string;
 }
