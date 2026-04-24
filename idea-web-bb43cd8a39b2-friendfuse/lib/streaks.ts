@@ -19,23 +19,23 @@ export const calculateStreak = (interactions: Interaction[], timezone: string = 
     };
   }
 
-  // Convert all dates to UTC for consistent comparison
-  const utcInteractions = interactions.map(interaction => ({
-    ...interaction,
-    timestamp: zonedTimeToUtc(new Date(interaction.timestamp), timezone)
-  }));
-
   // Sort interactions by date (newest first)
-  const sortedInteractions = [...utcInteractions].sort(
+  const sortedInteractions = [...interactions].sort(
     (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
   );
 
-  const lastInteractionUtc = new Date(sortedInteractions[0].timestamp);
-  const nowUtc = new Date();
+  const lastInteractionLocal = new Date(sortedInteractions[0].timestamp);
+  const nowLocal = new Date();
 
-  // Group interactions by calendar day in UTC
+  // Convert all dates to local timezone for comparison
+  const localInteractions = interactions.map(interaction => ({
+    ...interaction,
+    timestamp: utcToZonedTime(new Date(interaction.timestamp), timezone)
+  }));
+
+  // Group interactions by calendar day in local timezone
   const interactionsByDay: Record<string, Interaction[]> = {};
-  sortedInteractions.forEach(interaction => {
+  localInteractions.forEach(interaction => {
     const dateKey = startOfDay(new Date(interaction.timestamp)).toISOString();
     if (!interactionsByDay[dateKey]) {
       interactionsByDay[dateKey] = [];
@@ -44,13 +44,11 @@ export const calculateStreak = (interactions: Interaction[], timezone: string = 
   });
 
   const interactionDays = Object.keys(interactionsByDay).sort().reverse();
-  const todayKey = startOfDay(nowUtc).toISOString();
+  const todayKey = startOfDay(nowLocal).toISOString();
 
-  // If no interactions today, check if last interaction was today in local time
-  const lastInteractionLocal = utcToZonedTime(lastInteractionUtc, timezone);
-  const todayLocal = new Date();
-
-  if (isSameDay(lastInteractionLocal, todayLocal)) {
+  // Check if there was an interaction today in local time
+  const todayInteractions = interactionsByDay[todayKey];
+  if (todayInteractions && todayInteractions.length > 0) {
     return {
       current: 1,
       longest: 1,
@@ -59,8 +57,8 @@ export const calculateStreak = (interactions: Interaction[], timezone: string = 
     };
   }
 
-  // Calculate days since last interaction in calendar days
-  const daysSinceLast = differenceInCalendarDays(nowUtc, lastInteractionUtc);
+  // Calculate days since last interaction in calendar days (local time)
+  const daysSinceLast = differenceInCalendarDays(nowLocal, lastInteractionLocal);
 
   // If more than 7 days since last interaction, streak is broken
   if (daysSinceLast > 7) {
