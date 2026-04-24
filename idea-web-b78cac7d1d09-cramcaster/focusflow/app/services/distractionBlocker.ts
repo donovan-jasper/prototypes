@@ -20,7 +20,10 @@ export const registerDistractionBlocker = async () => {
     if (Platform.OS === 'android') {
       await DistractionBlockerModule.startAccessibilityService();
     } else if (Platform.OS === 'ios') {
-      await DistractionBlockerModule.requestScreenTimePermission();
+      const hasPermission = await DistractionBlockerModule.requestScreenTimePermission();
+      if (hasPermission) {
+        await DistractionBlockerModule.enableScreenTimeBlocking();
+      }
     }
     console.log('Distraction blocker registered for apps:', DISTRACTING_APPS);
   } catch (error) {
@@ -45,4 +48,8 @@ export const unregisterDistractionBlocker = async () => {
 
 export const isDistractingApp = (packageName: string) => {
   return DISTRACTING_APPS.includes(packageName);
+};
+
+export const getDistractingApps = () => {
+  return [...DISTRACTING_APPS];
 };

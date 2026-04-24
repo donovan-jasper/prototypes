@@ -34,15 +34,19 @@ export const registerBackgroundTask = async () => {
       stopOnTerminate: false,
       startOnBoot: true,
     });
+    console.log('Background task registered successfully');
   } catch (error) {
     console.error('Failed to register background task:', error);
+    throw error;
   }
 };
 
 export const unregisterBackgroundTask = async () => {
   try {
     await BackgroundFetch.unregisterTaskAsync(BACKGROUND_TASK_NAME);
+    console.log('Background task unregistered successfully');
   } catch (error) {
     console.error('Failed to unregister background task:', error);
+    throw error;
   }
 };
