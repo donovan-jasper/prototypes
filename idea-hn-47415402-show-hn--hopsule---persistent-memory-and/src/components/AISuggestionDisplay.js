@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import ConflictAlert from './ConflictAlert';
 import useAIRuleInjection from '../hooks/useAIRuleInjection';
+import { injectRulesIntoAISuggestion } from '../api/mockAIIntegration';
 
 const AISuggestionDisplay = ({ suggestion }) => {
   const { rules, checkCode } = useAIRuleInjection();
   const [isAccepted, setIsAccepted] = useState(false);
   const [isRejected, setIsRejected] = useState(false);
+  const [modifiedSuggestion, setModifiedSuggestion] = useState(suggestion);
 
   const violations = rules.filter(rule => !checkCode(suggestion));
 
@@ -20,12 +22,18 @@ const AISuggestionDisplay = ({ suggestion }) => {
     setIsRejected(true);
   };
 
+  // Apply rule injection when component mounts or suggestion changes
+  React.useEffect(() => {
+    const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
+    setModifiedSuggestion(processedSuggestion);
+  }, [suggestion, rules]);
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>AI Suggestion</Text>
 
       <ScrollView style={styles.suggestionContainer}>
-        <Text style={styles.suggestionText}>{suggestion}</Text>
+        <Text style={styles.suggestionText}>{modifiedSuggestion}</Text>
       </ScrollView>
 
       {violations.length > 0 && (
