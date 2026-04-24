@@ -7,6 +7,7 @@ import { SYSTEM_PROMPT } from './promptTemplates';
 interface GenerateSlidesResult {
   html: string;
   slideCount: number;
+  title: string;
   isDemo?: boolean;
 }
 
@@ -28,6 +29,7 @@ export async function generateSlides(
     return {
       html,
       slideCount: template.slides.length,
+      title: prompt.slice(0, 50) + (prompt.length > 50 ? '...' : ''),
       isDemo: true,
     };
   }
@@ -58,12 +60,25 @@ export async function generateSlides(
     }
 
     let slideContents: string[];
-    try {
-      slideContents = JSON.parse(responseText);
+    let generatedTitle: string = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
 
-      if (!Array.isArray(slideContents)) {
-        throw new Error('Response is not an array');
+    try {
+      // Parse the response which should be in the format:
+      // {
+      //   title: "Generated Title",
+      //   slides: ["Slide 1 content", "Slide 2 content", ...]
+      // }
+      const parsedResponse = JSON.parse(responseText);
+
+      if (parsedResponse.title) {
+        generatedTitle = parsedResponse.title;
       }
+
+      if (!Array.isArray(parsedResponse.slides)) {
+        throw new Error('Response does not contain slides array');
+      }
+
+      slideContents = parsedResponse.slides;
 
       if (slideContents.length === 0) {
         throw new Error('No slides generated');
@@ -82,6 +97,7 @@ export async function generateSlides(
     return {
       html,
       slideCount: slideContents.length,
+      title: generatedTitle,
       isDemo: false,
     };
   } catch (error) {

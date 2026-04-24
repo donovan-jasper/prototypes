@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
-import { TextInput, Button, Text, ActivityIndicator, Surface, SegmentedButtons, Banner } from 'react-native-paper';
+import { TextInput, Button, Text, ActivityIndicator, Surface, SegmentedButtons, Banner, Divider } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { generateSlides } from '../../lib/ai/generateSlides';
 import { saveDeck, getSettings } from '../../lib/db/queries';
@@ -14,6 +14,7 @@ export default function CreateScreen() {
   const [loading, setLoading] = useState(false);
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [slideCount, setSlideCount] = useState(0);
+  const [deckTitle, setDeckTitle] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [isDemo, setIsDemo] = useState(false);
@@ -47,6 +48,7 @@ export default function CreateScreen() {
       const result = await generateSlides(prompt, selectedTheme);
       setGeneratedHtml(result.html);
       setSlideCount(result.slideCount);
+      setDeckTitle(result.title);
       setIsDemo(result.isDemo || false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate slides');
@@ -66,11 +68,10 @@ export default function CreateScreen() {
     if (!generatedHtml) return;
 
     try {
-      const title = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
       const now = Date.now();
 
       await saveDeck({
-        title,
+        title: deckTitle,
         html: generatedHtml,
         slideCount,
         createdAt: now,
@@ -80,6 +81,7 @@ export default function CreateScreen() {
       setPrompt('');
       setGeneratedHtml(null);
       setSlideCount(0);
+      setDeckTitle('');
       setIsDemo(false);
 
       router.push('/(tabs)/');
@@ -166,10 +168,9 @@ export default function CreateScreen() {
             disabled={loading}
           />
 
-          <Text variant="labelLarge" style={styles.sectionTitle}>
-            Slide Theme
+          <Text variant="labelLarge" style={styles.sectionLabel}>
+            Theme
           </Text>
-
           <SegmentedButtons
             value={selectedTheme}
             onValueChange={setSelectedTheme}
@@ -183,48 +184,55 @@ export default function CreateScreen() {
             loading={loading}
             disabled={loading || !prompt.trim()}
             style={styles.generateButton}
-            icon="auto-fix"
+            icon="magic"
           >
             Generate Slides
           </Button>
 
           {error && (
-            <Text style={styles.errorText} variant="bodyMedium">
+            <Text variant="bodyMedium" style={styles.errorText}>
               {error}
             </Text>
           )}
         </View>
 
         {generatedHtml && (
-          <View style={styles.previewSection}>
-            <Text variant="headlineSmall" style={styles.previewTitle}>
-              Preview ({slideCount} slides)
-            </Text>
+          <>
+            <Divider style={styles.divider} />
 
-            <View style={styles.slideViewerContainer}>
-              <SlideViewer html={generatedHtml} />
+            <View style={styles.previewSection}>
+              <Text variant="headlineSmall" style={styles.previewTitle}>
+                Preview
+              </Text>
+              <Text variant="bodyMedium" style={styles.previewSubtitle}>
+                {slideCount} slides • {deckTitle}
+              </Text>
+
+              <View style={styles.slideViewerContainer}>
+                <SlideViewer html={generatedHtml} />
+              </View>
+
+              <View style={styles.actionButtons}>
+                <Button
+                  mode="outlined"
+                  onPress={() => setGeneratedHtml(null)}
+                  icon="close"
+                  style={styles.cancelButton}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  mode="contained"
+                  onPress={handleSave}
+                  icon="content-save"
+                  style={styles.saveButton}
+                >
+                  Save Deck
+                </Button>
+              </View>
             </View>
-
-            <View style={styles.actionButtons}>
-              <Button
-                mode="outlined"
-                onPress={() => setGeneratedHtml(null)}
-                style={styles.actionButton}
-                icon="close"
-              >
-                Discard
-              </Button>
-
-              <Button
-                mode="contained"
-                onPress={handleSave}
-                style={styles.actionButton}
-                icon="content-save"
-              >
-                Save Deck
-              </Button>
-            </View>
-          </View>
+          </>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
@@ -238,7 +246,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
   },
   header: {
     padding: 16,
@@ -269,7 +276,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#fff',
   },
-  sectionTitle: {
+  sectionLabel: {
     marginBottom: 8,
     color: '#666',
   },
@@ -282,16 +289,22 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#d32f2f',
     marginTop: 8,
-    textAlign: 'center',
+  },
+  divider: {
+    marginVertical: 24,
   },
   previewSection: {
-    marginTop: 24,
+    marginBottom: 24,
   },
   previewTitle: {
+    marginBottom: 4,
+  },
+  previewSubtitle: {
+    color: '#666',
     marginBottom: 16,
   },
   slideViewerContainer: {
-    height: 400,
+    height: 300,
     marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
@@ -301,8 +314,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  actionButton: {
+  cancelButton: {
     flex: 1,
-    marginHorizontal: 4,
+    marginRight: 8,
+  },
+  saveButton: {
+    flex: 1,
+    marginLeft: 8,
   },
 });
