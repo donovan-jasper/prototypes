@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, Button, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useDesignStore } from '../store/useDesignStore';
 import DesignSystemCard from '../components/DesignSystemCard';
 import BlendSlider from '../components/BlendSlider';
@@ -13,12 +13,17 @@ const BlendScreen = () => {
   const [weights, setWeights] = useState([]);
   const [blendedSystem, setBlendedSystem] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isBlending, setIsBlending] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     if (selectedSystems.length > 0) {
-      const blended = blendSystems(selectedSystems, weights);
-      setBlendedSystem(blended);
+      setIsBlending(true);
+      const timer = setTimeout(() => {
+        const blended = blendSystems(selectedSystems, weights);
+        setBlendedSystem(blended);
+        setIsBlending(false);
+      }, 300); // Small delay to show loading state
     } else {
       setBlendedSystem(null);
     }
@@ -98,20 +103,27 @@ const BlendScreen = () => {
             />
           ))}
 
-          {blendedSystem && (
-            <>
-              <Text className="text-lg font-semibold mt-6 mb-4 text-gray-700">Preview</Text>
-              <ComponentPreview system={blendedSystem} />
+          {isBlending ? (
+            <View className="mt-6 items-center">
+              <ActivityIndicator size="large" color="#4F46E5" />
+              <Text className="mt-2 text-gray-600">Blending systems...</Text>
+            </View>
+          ) : (
+            blendedSystem && (
+              <>
+                <Text className="text-lg font-semibold mt-6 mb-4 text-gray-700">Preview</Text>
+                <ComponentPreview system={blendedSystem} />
 
-              <View className="mt-6">
-                <Button
-                  title={isSaving ? "Saving..." : "Save Blended System"}
-                  onPress={handleSaveBlend}
-                  disabled={isSaving || selectedSystems.length < 2}
-                  color="#4F46E5"
-                />
-              </View>
-            </>
+                <View className="mt-6">
+                  <Button
+                    title={isSaving ? "Saving..." : "Save Blended System"}
+                    onPress={handleSaveBlend}
+                    disabled={isSaving || selectedSystems.length < 2}
+                    color="#4F46E5"
+                  />
+                </View>
+              </>
+            )
           )}
         </View>
       )}
