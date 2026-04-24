@@ -132,63 +132,29 @@ export class CloneService {
     }
   }
 
-  static async getCloneProgress(repoId: string): Promise<CloneProgress | null> {
+  static async getCloneProgress(repoId: string): Promise<CloneProgress> {
     try {
-      return await GitService.getCloneProgress(repoId);
+      // Get the repository path
+      const repoPath = await FileSystemService.getRepositoryPath(repoId);
+
+      // Check if repository exists
+      const exists = await FileSystemService.directoryExists(repoPath);
+      if (!exists) {
+        throw new Error('Repository does not exist');
+      }
+
+      // Get the current progress from GitService
+      const progress = await GitService.getCloneProgress(repoPath);
+
+      // If progress is completed, update the database
+      if (progress.stage === 'completed') {
+        await DatabaseService.updateRepositoryLastUpdated(repoId, new Date().toISOString());
+      }
+
+      return progress;
     } catch (error) {
       console.error('Error getting clone progress:', error);
-      return null;
+      throw new Error('Failed to get clone progress');
     }
-  }
-
-  static async cancelClone(repoId: string): Promise<void> {
-    try {
-      await GitService.cancelClone(repoId);
-      // Clean up partial clone
-      const repoPath = await FileSystemService.getRepositoryPath(repoId);
-      await FileSystemService.deleteDirectory(repoPath);
-    } catch (error) {
-      console.error('Error canceling clone:', error);
-      if (error instanceof Error) {
-        if (error.message.includes('not found')) {
-          throw new Error('Clone operation not found or already completed.');
-        }
-      }
-      throw new Error('Failed to cancel clone operation. Please try again.');
-    }
-  }
-
-  static async retryClone(options: CloneOptions, retryCount: number = 3): Promise<void> {
-    let lastError: Error | null = null;
-
-    for (let i = 0; i < retryCount; i++) {
-      try {
-        await this.cloneRepository(options);
-        return; // Success
-      } catch (error) {
-        lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-        console.error(`Clone attempt ${i + 1} failed:`, error);
-
-        // Don't wait on the last attempt
-        if (i < retryCount - 1) {
-          // Exponential backoff: 1s, 2s, 4s
-          const delay = Math.pow(2, i) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    // If we get here, all retries failed
-    if (lastError) {
-      if (lastError.message.includes('timeout')) {
-        throw new Error('Network timeout after multiple attempts. Please check your connection and try again later.');
-      } else if (lastError.message.includes('authentication')) {
-        throw new Error('Authentication failed after multiple attempts. Please verify your credentials.');
-      } else if (lastError.message.includes('access')) {
-        throw new Error('Access denied after multiple attempts. Please check your permissions.');
-      }
-    }
-
-    throw new Error('Failed to clone repository after multiple attempts. Please try again later.');
   }
 }
