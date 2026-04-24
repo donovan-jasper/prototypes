@@ -68,7 +68,7 @@ export default function CreateScreen() {
     try {
       const title = prompt.slice(0, 50) + (prompt.length > 50 ? '...' : '');
       const now = Date.now();
-      
+
       await saveDeck({
         title,
         html: generatedHtml,
@@ -81,7 +81,7 @@ export default function CreateScreen() {
       setGeneratedHtml(null);
       setSlideCount(0);
       setIsDemo(false);
-      
+
       router.push('/(tabs)/');
     } catch (err) {
       setError('Failed to save deck');
@@ -89,11 +89,11 @@ export default function CreateScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView 
+      <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
@@ -166,22 +166,16 @@ export default function CreateScreen() {
             disabled={loading}
           />
 
-          <Text variant="labelLarge" style={styles.themeLabel}>
-            Theme
+          <Text variant="labelLarge" style={styles.sectionTitle}>
+            Slide Theme
           </Text>
+
           <SegmentedButtons
             value={selectedTheme}
             onValueChange={setSelectedTheme}
             buttons={themeOptions}
             style={styles.themeSelector}
-            disabled={loading}
           />
-
-          {error && (
-            <Text variant="bodySmall" style={styles.errorText}>
-              {error}
-            </Text>
-          )}
 
           <Button
             mode="contained"
@@ -189,47 +183,43 @@ export default function CreateScreen() {
             loading={loading}
             disabled={loading || !prompt.trim()}
             style={styles.generateButton}
+            icon="auto-fix"
           >
-            {loading ? 'Generating...' : 'Generate Slides'}
+            Generate Slides
           </Button>
+
+          {error && (
+            <Text style={styles.errorText} variant="bodyMedium">
+              {error}
+            </Text>
+          )}
         </View>
 
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" />
-            <Text variant="bodyMedium" style={styles.loadingText}>
-              Creating your slides...
-            </Text>
-          </View>
-        )}
-
-        {generatedHtml && !loading && (
+        {generatedHtml && (
           <View style={styles.previewSection}>
-            <View style={styles.previewHeader}>
-              <Text variant="titleLarge" style={styles.previewTitle}>
-                Preview
-              </Text>
-              <Text variant="bodyMedium" style={styles.slideCountText}>
-                {slideCount} {slideCount === 1 ? 'slide' : 'slides'}
-              </Text>
-            </View>
+            <Text variant="headlineSmall" style={styles.previewTitle}>
+              Preview ({slideCount} slides)
+            </Text>
 
-            <View style={styles.viewerContainer}>
+            <View style={styles.slideViewerContainer}>
               <SlideViewer html={generatedHtml} />
             </View>
 
             <View style={styles.actionButtons}>
               <Button
                 mode="outlined"
-                onPress={handleGenerate}
+                onPress={() => setGeneratedHtml(null)}
                 style={styles.actionButton}
+                icon="close"
               >
-                Regenerate
+                Discard
               </Button>
+
               <Button
                 mode="contained"
                 onPress={handleSave}
                 style={styles.actionButton}
+                icon="content-save"
               >
                 Save Deck
               </Button>
@@ -247,29 +237,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   scrollContent: {
-    flexGrow: 1,
+    padding: 16,
+    paddingBottom: 32,
   },
   header: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 16,
+    padding: 16,
+    marginBottom: 16,
+    borderRadius: 8,
     backgroundColor: '#fff',
   },
   headerTitle: {
-    fontWeight: 'bold',
     marginBottom: 4,
   },
   headerSubtitle: {
     color: '#666',
   },
   banner: {
-    backgroundColor: '#e3f2fd',
+    marginBottom: 16,
   },
   demoBanner: {
-    backgroundColor: '#fff3e0',
+    marginBottom: 16,
+    backgroundColor: '#e3f2fd',
   },
   inputSection: {
-    padding: 16,
+    marginBottom: 24,
   },
   demoButton: {
     marginBottom: 16,
@@ -278,56 +269,40 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     backgroundColor: '#fff',
   },
-  themeLabel: {
+  sectionTitle: {
     marginBottom: 8,
     color: '#666',
   },
   themeSelector: {
     marginBottom: 16,
   },
-  errorText: {
-    color: '#d32f2f',
-    marginBottom: 8,
-  },
   generateButton: {
     marginTop: 8,
   },
-  loadingContainer: {
-    padding: 32,
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#666',
+  errorText: {
+    color: '#d32f2f',
+    marginTop: 8,
+    textAlign: 'center',
   },
   previewSection: {
-    flex: 1,
-    padding: 16,
-  },
-  previewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 24,
   },
   previewTitle: {
-    fontWeight: 'bold',
+    marginBottom: 16,
   },
-  slideCountText: {
-    color: '#666',
-  },
-  viewerContainer: {
+  slideViewerContainer: {
     height: 400,
-    backgroundColor: '#000',
+    marginBottom: 16,
     borderRadius: 8,
     overflow: 'hidden',
-    marginBottom: 16,
+    backgroundColor: '#fff',
   },
   actionButtons: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'space-between',
   },
   actionButton: {
     flex: 1,
+    marginHorizontal: 4,
   },
 });
