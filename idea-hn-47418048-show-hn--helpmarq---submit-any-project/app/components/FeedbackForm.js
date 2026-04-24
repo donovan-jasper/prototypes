@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../../firebase';
 
-const FeedbackForm = ({ onSubmit }) => {
+const FeedbackForm = ({ onSubmit, submissionId }) => {
   const [question1, setQuestion1] = useState('');
   const [question2, setQuestion2] = useState('');
   const [question3, setQuestion3] = useState('');
@@ -43,14 +45,41 @@ const FeedbackForm = ({ onSubmit }) => {
     return null;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const calculatedScore = calculateScore();
-    onSubmit({
-      question1,
-      question2,
-      question3,
-      score: calculatedScore
-    });
+
+    if (!calculatedScore) {
+      Alert.alert('Error', 'Please answer all questions before submitting');
+      return;
+    }
+
+    try {
+      const feedbackData = {
+        submissionId,
+        question1: question1.toLowerCase() === 'yes' ? 7 : 3,
+        question2: question2.toLowerCase() === 'yes' ? 8 : 2,
+        question3: parseInt(question3) || 0,
+        score: calculatedScore,
+        timestamp: new Date()
+      };
+
+      await addDoc(collection(db, 'feedback'), feedbackData);
+
+      if (onSubmit) {
+        onSubmit(feedbackData);
+      }
+
+      // Reset form
+      setQuestion1('');
+      setQuestion2('');
+      setQuestion3('');
+      setScore(null);
+
+      Alert.alert('Success', 'Feedback submitted successfully!');
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    }
   };
 
   return (

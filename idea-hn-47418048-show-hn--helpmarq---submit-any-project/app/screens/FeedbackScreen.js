@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import FeedbackForm from '../components/FeedbackForm';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -10,7 +10,10 @@ const FeedbackScreen = ({ route }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!submissionId) return;
+    if (!submissionId) {
+      setLoading(false);
+      return;
+    }
 
     const q = query(
       collection(db, 'feedback'),
@@ -50,6 +53,7 @@ const FeedbackScreen = ({ route }) => {
       setLoading(false);
     }, (error) => {
       console.error("Error fetching feedback:", error);
+      Alert.alert('Error', 'Failed to load feedback. Please try again.');
       setLoading(false);
     });
 
@@ -57,8 +61,8 @@ const FeedbackScreen = ({ route }) => {
   }, [submissionId]);
 
   const handleSubmit = (feedback) => {
-    // This would be handled by the FeedbackForm component
-    // when submitting to Firestore
+    // Feedback is automatically saved to Firestore via FeedbackForm
+    // This callback is just for any additional UI updates if needed
   };
 
   if (loading) {
@@ -159,21 +163,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
-    paddingVertical: 5,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
   resultLabel: {
     fontSize: 16,
-    color: '#555',
+    color: '#333',
   },
   resultValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#007AFF',
   },
   scoreContainer: {
-    marginTop: 20,
+    marginTop: 15,
     padding: 15,
     backgroundColor: '#e6f2ff',
     borderRadius: 5,
@@ -185,10 +189,10 @@ const styles = StyleSheet.create({
     color: '#007AFF',
   },
   noFeedbackContainer: {
+    marginBottom: 30,
     padding: 20,
     backgroundColor: '#f8f8f8',
     borderRadius: 10,
-    marginBottom: 30,
     alignItems: 'center',
   },
   noFeedbackText: {
@@ -199,19 +203,19 @@ const styles = StyleSheet.create({
   },
   noFeedbackSubtext: {
     fontSize: 14,
-    color: '#888',
+    color: '#999',
     textAlign: 'center',
   },
   formContainer: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f8f8f8',
     borderRadius: 10,
   },
   formTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
     marginBottom: 15,
+    fontWeight: 'bold',
     color: '#333',
   },
 });
