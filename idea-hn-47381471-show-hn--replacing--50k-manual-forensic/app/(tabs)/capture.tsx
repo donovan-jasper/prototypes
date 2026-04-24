@@ -1,448 +1,369 @@
-import React, { useState, useRef, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Image,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Switch, Picker } from 'react-native';
 import { Camera, useCameraDevice, useCameraFormat } from 'react-native-vision-camera';
-import { useOCR, TextBlock } from 'vision-camera-ocr';
+import { useScanBarcodes, BarcodeFormat } from 'vision-camera-code-scanner';
+import { useIsFocused } from '@react-navigation/native';
+import { scanDocument } from '../../lib/ocr';
+import { extractTransaction } from '../../lib/parser';
+import { addTransaction, addDocument } from '../../lib/database';
 import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import { extractTransaction } from '@/lib/parser';
-import { hashDocument } from '@/lib/crypto';
-import { addDocument, addTransaction } from '@/lib/database';
-import { isFreeTier, showPaywall } from '@/lib/subscription';
-import { useOnDeviceOCR } from '@/lib/ocr';
+import { hashDocument } from '../../lib/crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function CaptureScreen() {
-  const cameraRef = useRef<Camera>(null);
-  const [imageUri, setImageUri] = useState<string | null>(null);
-  const [ocrText, setOcrText] = useState<string>('');
-  const [date, setDate] = useState<string>('');
-  const [amount, setAmount] = useState<string>('');
-  const [payee, setPayee] = useState<string>('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [frequency, setFrequency] = useState<'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'>('monthly');
+  const [accountType, setAccountType] = useState<'checking' | 'savings' | 'credit card'>('checking');
+  const [interestRate, setInterestRate] = useState('');
+  const [includeInterest, setIncludeInterest] = useState(false);
+
+  const [date, setDate] = useState('');
+  const [amount, setAmount] = useState('');
+  const [payee, setPayee] = useState('');
+  const [type, setType] = useState<'deposit' | 'withdrawal'>('withdrawal');
+  const [documentUri, setDocumentUri] = useState<string | null>(null);
+  const [ocrText, setOcrText] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isCameraActive, setIsCameraActive] = useState(false);
 
-  const {
-    device,
-    format,
-    frameProcessor,
-    processImage: processImageWithOCR,
-    isProcessing: isOcrProcessing,
-    error: ocrError,
-  } = useOnDeviceOCR();
+  const device = useCameraDevice('back');
+  const format = useCameraFormat(device, [
+    { videoResolution: { width: 1280, height: 720 } },
+  ]);
+  const camera = useRef<Camera>(null);
+  const isFocused = useIsFocused();
 
-  const resetForm = () => {
-    setImageUri(null);
-    setOcrText('');
-    setDate('');
-    setAmount('');
-    setPayee('');
-    setError(null);
-    setIsCameraActive(false);
-  };
+  const [frameProcessor, barcodes] = useScanBarcodes([BarcodeFormat.QR_CODE], {
+    checkInverted: true,
+  });
 
-  const handleTakePhoto = async () => {
-    try {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Camera permission is required to take photos.');
-        return;
-      }
-
-      setIsCameraActive(true);
-    } catch (err) {
-      setError('Failed to access camera. Please try again.');
-      console.error('Camera error:', err);
-    }
-  };
-
-  const takePicture = async () => {
-    if (!cameraRef.current) return;
+  const takePhoto = async () => {
+    if (!camera.current) return;
 
     setIsProcessing(true);
-    setError(null);
-
     try {
-      const photo = await cameraRef.current.takePhoto({
+      const photo = await camera.current.takePhoto({
         qualityPrioritization: 'quality',
         enableShutterSound: false,
       });
 
-      const uri = `file://${photo.path}`;
-      await processImage(uri);
-      setIsCameraActive(false);
-    } catch (err) {
-      setError('Failed to take photo. Please try again.');
-      console.error('Camera capture error:', err);
+      // Save photo to file system
+      const fileUri = `${FileSystem.documentDirectory}documents/${uuidv4()}.jpg`;
+      await FileSystem.moveAsync({
+        from: photo.path,
+        to: fileUri,
+      });
+
+      setDocumentUri(fileUri);
+
+      // Process the document
+      await processDocument(fileUri);
+    } catch (error) {
+      console.error('Photo capture error:', error);
+      Alert.alert('Error', 'Failed to capture photo. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleUploadDocument = async () => {
+  const pickDocument = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'image/*',
-        copyToCacheDirectory: true,
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 1,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        await processImage(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const fileUri = `${FileSystem.documentDirectory}documents/${uuidv4()}.jpg`;
+
+        // Copy the selected image to our documents directory
+        await FileSystem.copyAsync({
+          from: result.assets[0].uri,
+          to: fileUri,
+        });
+
+        setDocumentUri(fileUri);
+
+        // Process the document
+        await processDocument(fileUri);
       }
-    } catch (err) {
-      setError('Failed to upload document. Please try again.');
-      console.error('Document picker error:', err);
+    } catch (error) {
+      console.error('Document picker error:', error);
+      Alert.alert('Error', 'Failed to select document. Please try again.');
     }
   };
 
-  const processImage = async (uri: string) => {
+  const processDocument = async (uri: string) => {
     setIsProcessing(true);
-    setError(null);
-    setImageUri(uri);
-
     try {
-      // Process with on-device OCR
-      const text = await processImageWithOCR(uri);
+      // Extract text using OCR
+      const text = await scanDocument(uri);
       setOcrText(text);
 
       // Parse transaction details
-      const transaction = extractTransaction(text);
-
-      if (transaction) {
-        setDate(transaction.date.toISOString().split('T')[0]);
-        setAmount(Math.abs(transaction.amount).toString());
-        setPayee(transaction.payee);
-      } else {
-        setError('Could not automatically extract transaction details. Please enter manually.');
+      const parsed = extractTransaction(text);
+      if (parsed) {
+        setDate(parsed.date.toISOString().split('T')[0]);
+        setAmount(parsed.amount.toFixed(2));
+        setPayee(parsed.payee);
       }
-    } catch (err) {
-      setError('Failed to process image with on-device OCR. Please enter details manually.');
-      console.error('OCR error:', err);
+    } catch (error) {
+      console.error('Document processing error:', error);
+      Alert.alert('Error', 'Failed to process document. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleSave = async () => {
-    // Validate inputs
-    if (!imageUri) {
-      Alert.alert('Error', 'Please capture or upload a document first.');
+  const saveTransaction = async () => {
+    if (!documentUri) {
+      Alert.alert('Error', 'No document captured or selected');
       return;
     }
 
     if (!date || !amount || !payee) {
-      Alert.alert('Error', 'Please fill in all fields (date, amount, and payee).');
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
-    }
-
-    // Validate date format
-    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(date)) {
-      Alert.alert('Error', 'Please enter date in YYYY-MM-DD format.');
-      return;
-    }
-
-    // Validate amount
-    const parsedAmount = parseFloat(amount);
-    if (isNaN(parsedAmount)) {
-      Alert.alert('Error', 'Please enter a valid amount.');
-      return;
-    }
-
-    // Check free tier limit
-    try {
-      const isLimitReached = await isFreeTier();
-      if (isLimitReached) {
-        showPaywall();
-        return;
-      }
-    } catch (err) {
-      console.error('Error checking tier:', err);
     }
 
     setIsProcessing(true);
-    setError(null);
-
     try {
-      // Hash the document
-      const hash = await hashDocument(imageUri);
+      // Generate document hash
+      const documentHash = await hashDocument(documentUri);
 
-      // Add document to database
-      const documentId = await addDocument({
-        id: '',
-        uri: imageUri,
-        hash,
+      // Create document record
+      const documentId = uuidv4();
+      await addDocument({
+        id: documentId,
+        uri: documentUri,
+        hash: documentHash,
         uploadDate: new Date(),
-        ocrText: ocrText,
+        ocrText,
       });
 
-      // Add transaction to database
+      // Create transaction record
+      const transactionId = uuidv4();
       await addTransaction({
-        id: '',
+        id: transactionId,
         date: new Date(date),
-        amount: parsedAmount,
-        payee: payee,
-        type: parsedAmount > 0 ? 'deposit' : 'withdrawal',
-        documentId: documentId,
-        documentHash: hash,
+        amount: parseFloat(amount),
+        payee,
+        type,
+        documentId,
+        documentHash,
+        recurring: isRecurring ? {
+          frequency,
+          endDate: undefined // Could add end date field if needed
+        } : undefined,
+        accountType,
+        interestRate: includeInterest ? parseFloat(interestRate) || 0 : 0
       });
 
-      Alert.alert('Success', 'Transaction saved successfully!');
-      resetForm();
-    } catch (err) {
-      setError('Failed to save transaction. Please try again.');
-      console.error('Save error:', err);
+      Alert.alert('Success', 'Transaction saved successfully');
+      // Reset form
+      setDate('');
+      setAmount('');
+      setPayee('');
+      setDocumentUri(null);
+      setOcrText('');
+      setIsRecurring(false);
+      setIncludeInterest(false);
+      setInterestRate('');
+    } catch (error) {
+      console.error('Save transaction error:', error);
+      Alert.alert('Error', 'Failed to save transaction. Please try again.');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  if (isCameraActive && device) {
+  if (!device) {
     return (
       <View style={styles.container}>
+        <Text>No camera device available</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {isFocused && (
         <Camera
-          ref={cameraRef}
+          ref={camera}
           style={StyleSheet.absoluteFill}
           device={device}
           isActive={true}
           photo={true}
           format={format}
           frameProcessor={frameProcessor}
+          frameProcessorFps={5}
         />
-        <View style={styles.cameraControls}>
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={takePicture}
+      )}
+
+      <View style={styles.overlay}>
+        <View style={styles.controls}>
+          <Button
+            title="Take Photo"
+            onPress={takePhoto}
             disabled={isProcessing}
+          />
+          <Button
+            title="Upload Document"
+            onPress={pickDocument}
+            disabled={isProcessing}
+          />
+        </View>
+
+        <View style={styles.form}>
+          <Text style={styles.label}>Date</Text>
+          <TextInput
+            style={styles.input}
+            value={date}
+            onChangeText={setDate}
+            placeholder="YYYY-MM-DD"
+          />
+
+          <Text style={styles.label}>Amount</Text>
+          <TextInput
+            style={styles.input}
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+            placeholder="0.00"
+          />
+
+          <Text style={styles.label}>Payee</Text>
+          <TextInput
+            style={styles.input}
+            value={payee}
+            onChangeText={setPayee}
+            placeholder="Payee name"
+          />
+
+          <Text style={styles.label}>Transaction Type</Text>
+          <Picker
+            selectedValue={type}
+            style={styles.picker}
+            onValueChange={(itemValue) => setType(itemValue)}
           >
-            {isProcessing ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <View style={styles.captureButtonInner} />
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setIsCameraActive(false)}
+            <Picker.Item label="Withdrawal" value="withdrawal" />
+            <Picker.Item label="Deposit" value="deposit" />
+          </Picker>
+
+          <Text style={styles.label}>Account Type</Text>
+          <Picker
+            selectedValue={accountType}
+            style={styles.picker}
+            onValueChange={(itemValue) => setAccountType(itemValue)}
           >
-            <Text style={styles.closeButtonText}>Cancel</Text>
-          </TouchableOpacity>
+            <Picker.Item label="Checking" value="checking" />
+            <Picker.Item label="Savings" value="savings" />
+            <Picker.Item label="Credit Card" value="credit card" />
+          </Picker>
+
+          <View style={styles.switchContainer}>
+            <Text style={styles.label}>Recurring Transaction</Text>
+            <Switch
+              value={isRecurring}
+              onValueChange={setIsRecurring}
+            />
+          </View>
+
+          {isRecurring && (
+            <>
+              <Text style={styles.label}>Frequency</Text>
+              <Picker
+                selectedValue={frequency}
+                style={styles.picker}
+                onValueChange={(itemValue) => setFrequency(itemValue)}
+              >
+                <Picker.Item label="Daily" value="daily" />
+                <Picker.Item label="Weekly" value="weekly" />
+                <Picker.Item label="Biweekly" value="biweekly" />
+                <Picker.Item label="Monthly" value="monthly" />
+                <Picker.Item label="Quarterly" value="quarterly" />
+                <Picker.Item label="Yearly" value="yearly" />
+              </Picker>
+            </>
+          )}
+
+          {accountType === 'savings' && (
+            <View style={styles.switchContainer}>
+              <Text style={styles.label}>Include Interest</Text>
+              <Switch
+                value={includeInterest}
+                onValueChange={setIncludeInterest}
+              />
+            </View>
+          )}
+
+          {includeInterest && (
+            <>
+              <Text style={styles.label}>Interest Rate (%)</Text>
+              <TextInput
+                style={styles.input}
+                value={interestRate}
+                onChangeText={setInterestRate}
+                keyboardType="numeric"
+                placeholder="0.00"
+              />
+            </>
+          )}
+
+          <Button
+            title={isProcessing ? "Processing..." : "Save Transaction"}
+            onPress={saveTransaction}
+            disabled={isProcessing || !documentUri}
+          />
         </View>
       </View>
-    );
-  }
-
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleTakePhoto}
-          disabled={isProcessing}
-        >
-          <Text style={styles.buttonText}>Take Photo</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={handleUploadDocument}
-          disabled={isProcessing}
-        >
-          <Text style={styles.buttonText}>Upload Document</Text>
-        </TouchableOpacity>
-      </View>
-
-      {imageUri && (
-        <View style={styles.imagePreviewContainer}>
-          <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="contain" />
-        </View>
-      )}
-
-      {isProcessing && (
-        <View style={styles.processingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.processingText}>Processing document...</Text>
-        </View>
-      )}
-
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
-      )}
-
-      <View style={styles.formContainer}>
-        <Text style={styles.label}>Date</Text>
-        <TextInput
-          style={styles.input}
-          value={date}
-          onChangeText={setDate}
-          placeholder="YYYY-MM-DD"
-          keyboardType="default"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        <Text style={styles.label}>Amount</Text>
-        <TextInput
-          style={styles.input}
-          value={amount}
-          onChangeText={setAmount}
-          placeholder="0.00"
-          keyboardType="numeric"
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-
-        <Text style={styles.label}>Payee</Text>
-        <TextInput
-          style={styles.input}
-          value={payee}
-          onChangeText={setPayee}
-          placeholder="Payee name"
-          autoCapitalize="words"
-          autoCorrect={false}
-        />
-
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={handleSave}
-          disabled={isProcessing}
-        >
-          <Text style={styles.saveButtonText}>Save Transaction</Text>
-        </TouchableOpacity>
-      </View>
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
   },
-  contentContainer: {
-    padding: 20,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  actionButton: {
+  overlay: {
     flex: 1,
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 8,
-    marginHorizontal: 5,
-    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'space-between',
   },
-  buttonText: {
-    color: 'white',
-    fontWeight: '600',
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
   },
-  imagePreviewContainer: {
-    marginVertical: 20,
-    alignItems: 'center',
-  },
-  imagePreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    backgroundColor: '#e0e0e0',
-  },
-  processingContainer: {
-    marginVertical: 20,
-    alignItems: 'center',
-  },
-  processingText: {
-    marginTop: 10,
-    color: '#666',
-  },
-  errorContainer: {
-    marginVertical: 10,
-    padding: 10,
-    backgroundColor: '#ffebee',
-    borderRadius: 4,
-  },
-  errorText: {
-    color: '#d32f2f',
-  },
-  formContainer: {
-    marginTop: 20,
+  form: {
+    padding: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 5,
-    color: '#333',
+    marginBottom: 8,
+    fontWeight: 'bold',
   },
   input: {
-    backgroundColor: 'white',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
+    height: 40,
+    borderColor: 'gray',
     borderWidth: 1,
-    borderColor: '#ddd',
-    fontSize: 16,
+    marginBottom: 16,
+    paddingHorizontal: 8,
+    borderRadius: 4,
   },
-  saveButton: {
-    backgroundColor: '#28a745',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
+  picker: {
+    height: 50,
+    marginBottom: 16,
   },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  cameraControls: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
+  switchContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-  },
-  captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 4,
-    borderColor: 'white',
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'white',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    padding: 10,
-  },
-  closeButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
 });

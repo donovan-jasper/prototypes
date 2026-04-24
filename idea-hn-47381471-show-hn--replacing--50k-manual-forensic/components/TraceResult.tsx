@@ -10,6 +10,8 @@ interface TraceResultProps {
     timeline: any[];
     missingTransactions: boolean;
     totalFees: number;
+    totalInterest: number;
+    recurringTransactions: any[];
   };
 }
 
@@ -23,6 +25,7 @@ const TraceResult: React.FC<TraceResultProps> = ({ result }) => {
         </Text>
         <Text>Gap: ${result.gap.toFixed(2)}</Text>
         <Text>Total Fees Applied: ${result.totalFees.toFixed(2)}</Text>
+        <Text>Total Interest Earned: ${result.totalInterest.toFixed(2)}</Text>
         {result.missingTransactions && (
           <Text style={styles.warning}>Missing transactions detected</Text>
         )}
@@ -36,17 +39,42 @@ const TraceResult: React.FC<TraceResultProps> = ({ result }) => {
             <Text style={styles.payee}>{tx.payee}</Text>
             <Text style={[
               styles.amount,
-              tx.type === 'deposit' ? styles.deposit : styles.withdrawal
+              tx.type === 'deposit' ? styles.deposit :
+              tx.type === 'withdrawal' ? styles.withdrawal :
+              tx.type === 'interest' ? styles.interest : styles.fee
             ]}>
-              {tx.type === 'deposit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+              {tx.type === 'deposit' ? '+' :
+               tx.type === 'withdrawal' ? '-' :
+               tx.type === 'interest' ? '+' : '-'}
+              ${Math.abs(tx.amount).toFixed(2)}
+              {tx.type === 'withdrawal' && tx.fee > 0 && ` (Fee: $${tx.fee.toFixed(2)})`}
             </Text>
-            {tx.fee > 0 && (
-              <Text style={styles.fee}>Fee: -${tx.fee.toFixed(2)}</Text>
-            )}
             <Text style={styles.balance}>Balance: ${tx.runningBalance.toFixed(2)}</Text>
+            {tx.recurring && (
+              <Text style={styles.recurring}>Recurring: {tx.recurring.frequency}</Text>
+            )}
           </View>
         ))}
       </View>
+
+      {result.recurringTransactions.length > 0 && (
+        <View style={styles.recurringSection}>
+          <Text style={styles.sectionTitle}>Recurring Transactions</Text>
+          {result.recurringTransactions.map((tx, index) => (
+            <View key={`recurring-${index}`} style={styles.transactionRow}>
+              <Text style={styles.date}>{format(new Date(tx.date), 'MM/dd/yyyy')}</Text>
+              <Text style={styles.payee}>{tx.payee}</Text>
+              <Text style={[
+                styles.amount,
+                tx.type === 'deposit' ? styles.deposit : styles.withdrawal
+              ]}>
+                {tx.type === 'deposit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+              </Text>
+              <Text style={styles.recurring}>Frequency: {tx.recurring.frequency}</Text>
+            </View>
+          ))}
+        </View>
+      )}
 
       {result.explained && (
         <ExportButton
@@ -121,14 +149,25 @@ const styles = StyleSheet.create({
   withdrawal: {
     color: 'red',
   },
+  interest: {
+    color: 'blue',
+  },
   fee: {
-    fontSize: 14,
-    color: '#999',
+    color: 'purple',
   },
   balance: {
     fontSize: 14,
     color: '#666',
     marginTop: 4,
+  },
+  recurring: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 4,
+  },
+  recurringSection: {
+    marginTop: 20,
+    marginBottom: 20,
   },
 });
 
