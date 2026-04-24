@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, RefreshControl } from 'react-native';
 import { fetchHealthData, initializeHealthKit, initializeGoogleFit } from '../../../lib/healthService';
 import { fetchCalendarEvents, identifyHabitsFromEvents } from '../../../lib/calendarService';
 import { calculateStreak } from '../../../lib/habitTracker';
+import { Ionicons } from '@expo/vector-icons';
 
 interface HealthStats {
   steps: number;
@@ -10,27 +11,49 @@ interface HealthStats {
   workouts: number;
 }
 
+interface SyncStatus {
+  health: 'synced' | 'syncing' | 'failed';
+  calendar: 'synced' | 'syncing' | 'failed';
+}
+
 const HomeScreen = () => {
   const [healthData, setHealthData] = useState<HealthStats | null>(null);
   const [habits, setHabits] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    health: 'synced',
+    calendar: 'synced'
+  });
+
+  const syncData = useCallback(async () => {
+    try {
+      setSyncStatus(prev => ({ ...prev, health: 'syncing', calendar: 'syncing' }));
+
+      const [health, events] = await Promise.all([
+        fetchHealthData(),
+        fetchCalendarEvents()
+      ]);
+
+      setHealthData(health);
+      setHabits(identifyHabitsFromEvents(events));
+      setSyncStatus({ health: 'synced', calendar: 'synced' });
+    } catch (err) {
+      setError('Failed to sync data. Please check permissions.');
+      setSyncStatus({ health: 'failed', calendar: 'failed' });
+      console.error(err);
+    }
+  }, []);
 
   useEffect(() => {
     const initializeServices = async () => {
       try {
         await initializeHealthKit();
         await initializeGoogleFit();
-
-        const [health, events] = await Promise.all([
-          fetchHealthData(),
-          fetchCalendarEvents()
-        ]);
-
-        setHealthData(health);
-        setHabits(identifyHabitsFromEvents(events));
+        await syncData();
       } catch (err) {
-        setError('Failed to load data. Please check permissions.');
+        setError('Failed to initialize services. Please check permissions.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -38,7 +61,26 @@ const HomeScreen = () => {
     };
 
     initializeServices();
-  }, []);
+  }, [syncData]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await syncData();
+    setRefreshing(false);
+  }, [syncData]);
+
+  const getSyncIcon = (status: 'synced' | 'syncing' | 'failed') => {
+    switch (status) {
+      case 'synced':
+        return <Ionicons name="checkmark-circle" size={20} color="#34C759" />;
+      case 'syncing':
+        return <ActivityIndicator size="small" color="#FF9500" />;
+      case 'failed':
+        return <Ionicons name="alert-circle" size={20} color="#FF3B30" />;
+      default:
+        return null;
+    }
+  };
 
   if (loading) {
     return (
@@ -53,15 +95,46 @@ const HomeScreen = () => {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={syncData}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#007AFF"
+        />
+      }
+    >
       <View style={styles.header}>
         <Text style={styles.title}>ProgressPulse</Text>
         <Text style={styles.subtitle}>Your daily health and habits summary</Text>
+      </View>
+
+      <View style={styles.syncStatusContainer}>
+        <View style={styles.syncStatusItem}>
+          <Text style={styles.syncStatusLabel}>Health Data</Text>
+          {getSyncIcon(syncStatus.health)}
+        </View>
+        <View style={styles.syncStatusItem}>
+          <Text style={styles.syncStatusLabel}>Calendar</Text>
+          {getSyncIcon(syncStatus.calendar)}
+        </View>
+        <TouchableOpacity
+          style={styles.syncButton}
+          onPress={syncData}
+          disabled={syncStatus.health === 'syncing' || syncStatus.calendar === 'syncing'}
+        >
+          <Ionicons name="refresh" size={16} color="white" />
+          <Text style={styles.syncButtonText}>Sync Now</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.section}>
@@ -118,6 +191,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   header: {
     padding: 20,
@@ -133,8 +207,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'rgba(255,255,255,0.8)',
   },
-  section: {
+  syncStatusContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: 'white',
     margin: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  syncStatusItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncStatusLabel: {
+    marginRight: 5,
+    fontSize: 14,
+    color: '#666',
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+  },
+  syncButtonText: {
+    color: 'white',
+    fontSize: 14,
+    marginLeft: 5,
+  },
+  section: {
+    marginHorizontal: 15,
+    marginBottom: 15,
     padding: 15,
     backgroundColor: 'white',
     borderRadius: 10,
@@ -186,7 +297,6 @@ const styles = StyleSheet.create({
   noHabitsText: {
     fontSize: 14,
     color: '#666',
-    fontStyle: 'italic',
   },
   streakContainer: {
     alignItems: 'center',
@@ -206,10 +316,20 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   errorText: {
-    color: 'red',
     fontSize: 16,
+    color: '#FF3B30',
     textAlign: 'center',
-    padding: 20,
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+  },
+  retryButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 
