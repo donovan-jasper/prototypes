@@ -5,11 +5,23 @@ import { useExtraction } from '../hooks/useExtraction';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 
+interface Entity {
+  type: string;
+  value: string;
+}
+
+interface ExtractionResult {
+  entities?: Entity[];
+  summary?: string;
+  error?: string;
+}
+
 const ExtractionScreen = () => {
   const route = useRoute();
   const { text, audio, image } = route.params as { text?: string; audio?: string; image?: string };
   const { extractData, isLoading, result } = useExtraction();
   const [audioUri, setAudioUri] = useState<string | null>(null);
+  const [extractionResult, setExtractionResult] = useState<ExtractionResult | null>(null);
 
   useEffect(() => {
     const processData = async () => {
@@ -25,14 +37,16 @@ const ExtractionScreen = () => {
         }
       }
 
-      await extractData({ text, audio, image });
+      const extractionResponse = await extractData({ text, audio, image });
+      setExtractionResult(extractionResponse);
     };
 
     processData();
   }, [text, audio, image]);
 
   const handleRetry = async () => {
-    await extractData({ text, audio, image });
+    const extractionResponse = await extractData({ text, audio, image });
+    setExtractionResult(extractionResponse);
   };
 
   if (isLoading) {
@@ -44,10 +58,10 @@ const ExtractionScreen = () => {
     );
   }
 
-  if (result?.error) {
+  if (extractionResult?.error) {
     return (
       <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>{result.error}</Text>
+        <Text style={styles.errorText}>{extractionResult.error}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -55,7 +69,7 @@ const ExtractionScreen = () => {
     );
   }
 
-  if (!result) {
+  if (!extractionResult) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2196F3" />
@@ -75,10 +89,10 @@ const ExtractionScreen = () => {
         </View>
       )}
 
-      {result.entities && result.entities.length > 0 ? (
+      {extractionResult.entities && extractionResult.entities.length > 0 ? (
         <View style={styles.entitiesContainer}>
           <Text style={styles.sectionTitle}>Entities Found:</Text>
-          {result.entities.map((entity, index) => (
+          {extractionResult.entities.map((entity, index) => (
             <View key={index} style={styles.entityItem}>
               <Text style={styles.entityType}>{entity.type}</Text>
               <Text style={styles.entityValue}>{entity.value}</Text>
@@ -89,10 +103,10 @@ const ExtractionScreen = () => {
         <Text style={styles.noDataText}>No entities found in the data.</Text>
       )}
 
-      {result.summary && (
+      {extractionResult.summary && (
         <View style={styles.summaryContainer}>
           <Text style={styles.sectionTitle}>Summary:</Text>
-          <Text style={styles.summaryText}>{result.summary}</Text>
+          <Text style={styles.summaryText}>{extractionResult.summary}</Text>
         </View>
       )}
     </ScrollView>
@@ -185,8 +199,8 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   title: {
     fontSize: 24,
@@ -197,7 +211,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginTop: 15,
     marginBottom: 10,
     color: '#444',
   },
@@ -213,7 +226,6 @@ const styles = StyleSheet.create({
   audioButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
   },
   entitiesContainer: {
     marginBottom: 20,
@@ -225,15 +237,16 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   entityType: {
-    fontWeight: 'bold',
-    color: '#2196F3',
+    fontSize: 14,
+    color: '#666',
     marginBottom: 4,
   },
   entityValue: {
+    fontSize: 16,
     color: '#333',
   },
   noDataText: {
-    color: '#666',
+    color: '#999',
     fontSize: 16,
     textAlign: 'center',
     marginVertical: 20,

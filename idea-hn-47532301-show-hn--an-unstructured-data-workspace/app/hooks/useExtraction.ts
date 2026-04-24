@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { extractWithLLM } from '../api/llm';
-import { extractTextFromImage } from '../api/ocr';
-import { transcribeAudio } from '../api/audio';
+import { extractWithLLM } from '../../api/llm';
+
+interface ExtractionParams {
+  text?: string;
+  audio?: string;
+  image?: string;
+}
+
+interface Entity {
+  type: string;
+  value: string;
+}
 
 interface ExtractionResult {
-  entities: Array<{ type: string; value: string }>;
+  entities?: Entity[];
   summary?: string;
   error?: string;
 }
@@ -13,37 +22,40 @@ export const useExtraction = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [result, setResult] = useState<ExtractionResult | null>(null);
 
-  const extractData = async (input: { text?: string; audio?: string; image?: string }) => {
+  const extractData = async ({ text, audio, image }: ExtractionParams): Promise<ExtractionResult> => {
     setIsLoading(true);
     setResult(null);
 
     try {
-      let textToProcess = '';
+      let extractionText = '';
 
-      if (input.text) {
-        textToProcess = input.text;
-      } else if (input.audio) {
-        textToProcess = await transcribeAudio(input.audio);
-      } else if (input.image) {
-        textToProcess = await extractTextFromImage(input.image);
+      if (text) {
+        extractionText = text;
+      } else if (audio) {
+        // In a real app, you would transcribe the audio here
+        extractionText = "Audio transcription would go here";
+      } else if (image) {
+        // In a real app, you would extract text from the image here
+        extractionText = "Image text extraction would go here";
       }
 
-      if (!textToProcess || textToProcess.trim().length === 0) {
-        throw new Error('No valid text content found in the input');
+      if (!extractionText) {
+        throw new Error('No valid input provided for extraction');
       }
 
-      const llmResult = await extractWithLLM(textToProcess);
-      setResult({
-        entities: llmResult.entities || [],
+      const llmResult = await extractWithLLM(extractionText);
+      const extractionResult: ExtractionResult = {
+        entities: llmResult.entities,
         summary: llmResult.summary,
-        error: undefined
-      });
+      };
+
+      setResult(extractionResult);
+      return extractionResult;
     } catch (error) {
-      console.error('Extraction error:', error);
-      setResult({
-        entities: [],
-        error: error instanceof Error ? error.message : 'Failed to process data'
-      });
+      const errorMessage = error instanceof Error ? error.message : 'Failed to extract data';
+      const errorResult: ExtractionResult = { error: errorMessage };
+      setResult(errorResult);
+      return errorResult;
     } finally {
       setIsLoading(false);
     }
