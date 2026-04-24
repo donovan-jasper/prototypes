@@ -34,3 +34,11 @@ export const updateBuild = async (id: number, name: string) => {
     [name, id]
   );
 };
+
+export const saveComponentPosition = async (buildId: number, componentId: number, x: number, y: number) => {
+  const db = await SQLite.openDatabaseAsync('audiochain.db');
+  await db.runAsync(
+    'INSERT OR REPLACE INTO build_components (build_id, component_id, position, x, y) VALUES (?, ?, ?, ?, ?)',
+    [buildId, componentId, 0, x, y]
+  );
+};
