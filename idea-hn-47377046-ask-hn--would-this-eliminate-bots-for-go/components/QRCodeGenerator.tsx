@@ -172,22 +172,11 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F2F2F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+    padding: 8,
   },
   closeText: {
-    fontSize: 18,
+    fontSize: 20,
     color: '#8E8E93',
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#FF3B30',
-    textAlign: 'center',
-    marginBottom: 20,
   },
   qrContainer: {
     alignItems: 'center',
@@ -237,32 +226,32 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 8,
     backgroundColor: '#007AFF',
-    alignItems: 'center',
     marginHorizontal: 4,
+    alignItems: 'center',
   },
   shareButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#007AFF',
   },
   actionText: {
     color: '#fff',
-    fontSize: 16,
     fontWeight: '600',
   },
   shareText: {
-    color: '#fff',
+    color: '#007AFF',
   },
   instructions: {
     fontSize: 14,
     color: '#8E8E93',
     textAlign: 'center',
-    marginTop: 12,
   },
   expiredContainer: {
     alignItems: 'center',
-    paddingVertical: 32,
+    padding: 24,
   },
   expiredText: {
     fontSize: 18,
@@ -271,7 +260,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   expiredSubtext: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#8E8E93',
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#FF3B30',
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });
