@@ -4,6 +4,7 @@ import { GLView } from 'expo-gl';
 import { Renderer, TextureLoader, Scene, PerspectiveCamera, BoxGeometry, MeshBasicMaterial, Mesh, OBJLoader } from 'expo-three';
 import * as THREE from 'three';
 import { Asset } from 'expo-asset';
+import { Camera } from 'expo-camera';
 import { AR } from 'expo';
 
 const ARTryOnScreen = ({ route }) => {
@@ -11,15 +12,23 @@ const ARTryOnScreen = ({ route }) => {
   const [renderer, setRenderer] = useState(null);
   const [scene, setScene] = useState(null);
   const [camera, setCamera] = useState(null);
-  const [models, setModels] = useState([]);
+  const [hasPermission, setHasPermission] = useState(null);
   const [isARReady, setIsARReady] = useState(false);
   const glViewRef = useRef(null);
+  const arSession = useRef(null);
 
   useEffect(() => {
-    if (renderer && scene && camera && outfit) {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (renderer && scene && camera && outfit && hasPermission) {
       setupARScene();
     }
-  }, [renderer, scene, camera, outfit]);
+  }, [renderer, scene, camera, outfit, hasPermission]);
 
   const loadModel = async (modelPath) => {
     try {
@@ -42,6 +51,12 @@ const ARTryOnScreen = ({ route }) => {
           scene.remove(child);
         }
       });
+
+      // Initialize AR session
+      if (Platform.OS === 'ios') {
+        arSession.current = await AR.startAsync();
+        await AR.setPlaneDetection(AR.PlaneDetectionTypes.Horizontal);
+      }
 
       // Create avatar (simplified as a box)
       const avatarGeometry = new BoxGeometry(0.5, 1.5, 0.3);
@@ -78,11 +93,6 @@ const ARTryOnScreen = ({ route }) => {
         }
       }
 
-      // Set up AR session
-      if (Platform.OS === 'ios') {
-        await AR.setPlaneDetection(AR.PlaneDetectionTypes.Horizontal);
-      }
-
       setIsARReady(true);
     } catch (error) {
       Alert.alert('AR Error', error.message);
@@ -115,6 +125,14 @@ const ARTryOnScreen = ({ route }) => {
       onRender();
     }
   }, [isARReady]);
+
+  if (hasPermission === null) {
+    return <View />;
+  }
+
+  if (hasPermission === false) {
+    return <View style={styles.container}><Text>No access to camera</Text></View>;
+  }
 
   return (
     <View style={styles.container}>
