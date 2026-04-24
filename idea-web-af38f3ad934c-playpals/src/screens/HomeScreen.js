@@ -149,19 +149,20 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.eventTitle}>{item.title}</Text>
             <Text style={styles.eventLocation}>{item.location}</Text>
           </View>
-          <Text style={styles.eventDistance}>{item.distance} mi</Text>
-        </View>
-        <View style={styles.eventDetails}>
-          <Text style={styles.eventTime}>🕐 {item.time}</Text>
-          <Text style={styles.eventParticipants}>
-            👥 {item.currentParticipants}/{item.maxCapacity}
-          </Text>
-        </View>
-        {item.createdBy === 'user' && (
-          <View style={styles.userBadge}>
-            <Text style={styles.userBadgeText}>Your Activity</Text>
+          <View style={styles.eventDetails}>
+            <Text style={styles.eventDistance}>{item.distance} mi</Text>
+            <Text style={styles.eventTime}>
+              {item.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
           </View>
-        )}
+        </View>
+        <View style={styles.eventFooter}>
+          <Text style={styles.eventParticipants}>
+            {item.participants} {item.participants === 1 ? 'person' : 'people'} going
+          </Text>
+          {item.isPopular && <Text style={styles.popularBadge}>Popular</Text>}
+          {item.isNew && <Text style={styles.newBadge}>New</Text>}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -172,6 +173,15 @@ const HomeScreen = ({ navigation }) => {
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.activityFilterContainer}
     >
+      <TouchableOpacity
+        style={[
+          styles.activityFilterItem,
+          !selectedActivity && styles.activityFilterItemSelected
+        ]}
+        onPress={() => setSelectedActivity(null)}
+      >
+        <Text style={styles.activityFilterText}>All</Text>
+      </TouchableOpacity>
       {ACTIVITY_TYPES.map((activity) => (
         <TouchableOpacity
           key={activity.name}
@@ -179,7 +189,7 @@ const HomeScreen = ({ navigation }) => {
             styles.activityFilterItem,
             selectedActivity === activity.name && styles.activityFilterItemSelected
           ]}
-          onPress={() => setSelectedActivity(selectedActivity === activity.name ? null : activity.name)}
+          onPress={() => setSelectedActivity(activity.name)}
         >
           <Text style={styles.activityFilterText}>{activity.emoji} {activity.name}</Text>
         </TouchableOpacity>
@@ -190,8 +200,8 @@ const HomeScreen = ({ navigation }) => {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#4CAF50" />
-        <Text style={styles.loadingText}>Finding nearby activities...</Text>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Finding events near you...</Text>
       </View>
     );
   }
@@ -201,7 +211,7 @@ const HomeScreen = ({ navigation }) => {
       <View style={styles.searchContainer}>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search activities or locations..."
+          placeholder="Search events or locations"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -210,27 +220,38 @@ const HomeScreen = ({ navigation }) => {
       {renderActivityFilter()}
 
       <View style={styles.distanceFilterContainer}>
-        <Text style={styles.distanceFilterLabel}>Show activities within:</Text>
-        <Text style={styles.distanceFilterValue}>{distanceFilter} miles</Text>
+        <Text style={styles.distanceFilterLabel}>Distance: {distanceFilter} miles</Text>
+        <View style={styles.distanceSlider}>
+          <TouchableOpacity
+            style={styles.distanceButton}
+            onPress={() => setDistanceFilter(Math.max(1, distanceFilter - 1))}
+          >
+            <Text style={styles.distanceButtonText}>-</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.distanceButton}
+            onPress={() => setDistanceFilter(Math.min(20, distanceFilter + 1))}
+          >
+            <Text style={styles.distanceButtonText}>+</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
         ref={flatListRef}
         data={filteredEvents}
         renderItem={renderItem}
-        keyExtractor={(item, index) => `${item.id}-${index}`}
+        keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            colors={['#4CAF50']}
-            tintColor="#4CAF50"
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyList}>
-            <Text style={styles.emptyListText}>No activities found matching your criteria</Text>
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No events found matching your filters</Text>
           </View>
         }
       />
@@ -247,73 +268,84 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#666',
   },
   searchContainer: {
-    padding: 10,
-    backgroundColor: '#fff',
+    padding: 15,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   searchInput: {
     height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
     paddingHorizontal: 15,
-    backgroundColor: '#fff',
+    fontSize: 16,
   },
   activityFilterContainer: {
     paddingVertical: 10,
-    paddingHorizontal: 5,
-    backgroundColor: '#fff',
+    paddingHorizontal: 15,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   activityFilterItem: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 12,
     paddingVertical: 8,
+    backgroundColor: '#f0f0f0',
     borderRadius: 20,
-    backgroundColor: '#e0e0e0',
-    marginHorizontal: 5,
+    marginRight: 8,
   },
   activityFilterItemSelected: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
   },
   activityFilterText: {
     color: '#333',
+    fontSize: 14,
   },
   distanceFilterContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#fff',
+    padding: 15,
+    backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   distanceFilterLabel: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#333',
   },
-  distanceFilterValue: {
-    fontSize: 14,
-    color: '#4CAF50',
+  distanceSlider: {
+    flexDirection: 'row',
+  },
+  distanceButton: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  distanceButtonText: {
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   listContainer: {
-    padding: 10,
+    padding: 15,
   },
   eventItem: {
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 10,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -323,7 +355,6 @@ const styles = StyleSheet.create({
   eventHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
   eventEmoji: {
     fontSize: 24,
@@ -342,45 +373,54 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
+  eventDetails: {
+    alignItems: 'flex-end',
+  },
   eventDistance: {
     fontSize: 14,
-    color: '#4CAF50',
-    fontWeight: 'bold',
-  },
-  eventDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 8,
+    color: '#666',
   },
   eventTime: {
     fontSize: 14,
     color: '#666',
+    marginTop: 2,
+  },
+  eventFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
   },
   eventParticipants: {
     fontSize: 14,
     color: '#666',
   },
-  userBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  userBadgeText: {
-    color: '#fff',
+  popularBadge: {
+    backgroundColor: '#FFD700',
+    color: '#333',
     fontSize: 12,
     fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 10,
   },
-  emptyList: {
+  newBadge: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    fontSize: 12,
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+    marginLeft: 10,
+  },
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  emptyListText: {
+  emptyText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
