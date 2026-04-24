@@ -1,9 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { useSession } from '../context/SessionContext';
 
 export default function OutputScreen() {
-  const { outputs } = useSession();
+  const { outputs, clearOutputs } = useSession();
 
   const renderOutput = ({ item }: { item: any }) => (
     <View style={styles.outputItem}>
@@ -20,8 +20,13 @@ export default function OutputScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerText}>Output</Text>
+        {outputs.length > 0 && (
+          <TouchableOpacity onPress={clearOutputs} style={styles.clearButton}>
+            <Text style={styles.clearButtonText}>Clear</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      
+
       {outputs.length === 0 ? (
         <View style={styles.placeholderContainer}>
           <Text style={styles.placeholder}>Run code to see output here...</Text>
@@ -44,6 +49,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#0f172a',
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
     backgroundColor: '#1e293b',
     borderBottomWidth: 1,
@@ -53,6 +61,16 @@ const styles = StyleSheet.create({
     color: '#e2e8f0',
     fontSize: 16,
     fontWeight: '600',
+  },
+  clearButton: {
+    backgroundColor: '#334155',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  clearButtonText: {
+    color: '#e2e8f0',
+    fontSize: 12,
   },
   placeholderContainer: {
     flex: 1,

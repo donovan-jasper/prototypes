@@ -24,7 +24,7 @@ export default function EditorScreen() {
             <Picker.Item label="C++" value="cpp" />
           </Picker>
         </View>
-        
+
         <TouchableOpacity
           style={[styles.runButton, (isRunning || !sessionId) && styles.runButtonDisabled]}
           onPress={runCode}
@@ -40,13 +40,13 @@ export default function EditorScreen() {
           )}
         </TouchableOpacity>
       </View>
-      
+
       {sessionId && (
         <View style={styles.sessionInfo}>
           <Text style={styles.sessionText}>Session: {sessionId.substring(0, 8)}...</Text>
         </View>
       )}
-      
+
       <View style={styles.editorContainer}>
         <CodeEditor value={code} onChange={setCode} language={language} />
       </View>

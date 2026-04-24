@@ -17,6 +17,7 @@ interface SessionContextType {
   setCode: (code: string) => void;
   setLanguage: (language: string) => void;
   runCode: () => Promise<void>;
+  clearOutputs: () => void;
 }
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
@@ -42,15 +43,15 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           },
           body: JSON.stringify({ language }),
         });
-        
+
         const data = await response.json();
         setSessionId(data.sessionId);
-        
+
         const socketConnection = io(API_URL);
         setSocket(socketConnection);
-        
+
         socketConnection.emit('join-session', data.sessionId);
-        
+
         socketConnection.on('output', (outputData: any) => {
           setOutputs(prev => [...prev, {
             ...outputData,
@@ -59,13 +60,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           }]);
           setIsRunning(false);
         });
+
+        socketConnection.on('error', (errorData: any) => {
+          setOutputs(prev => [...prev, {
+            output: errorData.error,
+            language,
+            timestamp: new Date(),
+            id: Date.now(),
+          }]);
+          setIsRunning(false);
+        });
       } catch (error) {
         console.error('Error creating session:', error);
+        setOutputs(prev => [...prev, {
+          output: 'Failed to connect to server',
+          language,
+          timestamp: new Date(),
+          id: Date.now(),
+        }]);
       }
     };
-    
+
     initSession();
-    
+
     return () => {
       if (socket) {
         socket.close();
@@ -75,9 +92,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
   const runCode = async () => {
     if (!sessionId || !code.trim()) return;
-    
+
     setIsRunning(true);
-    
+    setOutputs([]); // Clear previous outputs
+
     try {
       const response = await fetch(`${API_URL}/api/run/${sessionId}`, {
         method: 'POST',
@@ -86,11 +104,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         },
         body: JSON.stringify({ code, language }),
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         setOutputs(prev => [...prev, {
-          output: errorData.error,
+          output: errorData.error || 'Execution failed',
           language,
           timestamp: new Date(),
           id: Date.now(),
@@ -109,6 +127,10 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const clearOutputs = () => {
+    setOutputs([]);
+  };
+
   return (
     <SessionContext.Provider
       value={{
@@ -120,6 +142,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
         setCode,
         setLanguage,
         runCode,
+        clearOutputs,
       }}
     >
       {children}
