@@ -109,6 +109,12 @@ export default function Canvas({
             valid: true,
             message: 'Connection created successfully'
           });
+          Toast.show({
+            type: 'success',
+            text1: 'Connection Created',
+            text2: 'Nodes connected successfully',
+            visibilityTime: 2000,
+          });
         } else {
           const message = `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`;
           setConnectionValidation({
@@ -120,7 +126,6 @@ export default function Canvas({
             text1: 'Connection Error',
             text2: message,
             visibilityTime: 3000,
-            autoHide: true,
           });
         }
       }
@@ -160,18 +165,20 @@ export default function Canvas({
                   y2={toPos.y + 50}
                   stroke={isValid ? theme.colors.primary : theme.colors.error}
                   strokeWidth="2"
-                  strokeDasharray={isValid ? undefined : "5,5"}
+                  strokeDasharray={isValid ? undefined : '5,5'}
                 />
               );
             })}
 
             {connectingFrom && (
-              <Circle
-                cx={getNodePosition(connectingFrom).x + 75}
-                cy={getNodePosition(connectingFrom).y + 50}
-                r="10"
-                fill={theme.colors.primary}
-                opacity={0.7}
+              <Line
+                x1={getNodePosition(connectingFrom).x + 75}
+                y1={getNodePosition(connectingFrom).y + 50}
+                x2={getNodePosition(connectingFrom).x + 75 + 50}
+                y2={getNodePosition(connectingFrom).y + 50 + 50}
+                stroke={theme.colors.primary}
+                strokeWidth="2"
+                strokeDasharray="5,5"
               />
             )}
           </Svg>
@@ -179,18 +186,13 @@ export default function Canvas({
           {nodes.map((node) => (
             <Node
               key={node.id}
-              id={node.id}
-              type={node.type}
-              label={node.label}
-              x={node.x}
-              y={node.y}
-              selected={selectedNodeId === node.id}
-              onDragEnd={handleNodeDragEnd}
-              onPress={() => onNodeSelect(node.id)}
-              onOutputPress={handleOutputPress}
-              onInputPress={handleInputPress}
-              outputType={node.outputType}
-              inputType={node.inputType}
+              node={node}
+              isSelected={node.id === selectedNodeId}
+              onSelect={() => onNodeSelect(node.id)}
+              onDragEnd={(x, y) => handleNodeDragEnd(node.id, x, y)}
+              onOutputPress={() => handleOutputPress(node.id)}
+              onInputPress={() => handleInputPress(node.id)}
+              isConnectingFrom={connectingFrom === node.id}
             />
           ))}
         </Animated.View>
@@ -198,10 +200,23 @@ export default function Canvas({
 
       {connectionValidation && (
         <View style={[
-          styles.validationToast,
-          connectionValidation.valid ? styles.validToast : styles.invalidToast
+          styles.validationFeedback,
+          {
+            backgroundColor: connectionValidation.valid
+              ? theme.colors.primaryContainer
+              : theme.colors.errorContainer
+          }
         ]}>
-          <Text style={styles.toastText}>{connectionValidation.message}</Text>
+          <Text style={[
+            styles.validationText,
+            {
+              color: connectionValidation.valid
+                ? theme.colors.onPrimaryContainer
+                : theme.colors.onErrorContainer
+            }
+          ]}>
+            {connectionValidation.message}
+          </Text>
         </View>
       )}
     </View>
@@ -217,30 +232,25 @@ const styles = StyleSheet.create({
     flex: 1,
     width: SCREEN_WIDTH * 3,
     height: SCREEN_HEIGHT * 3,
+    backgroundColor: '#f5f5f5',
   },
-  validationToast: {
+  validationFeedback: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    padding: 15,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 5,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
-  validToast: {
-    backgroundColor: '#4caf50',
-  },
-  invalidToast: {
-    backgroundColor: '#f44336',
-  },
-  toastText: {
-    color: 'white',
-    fontWeight: 'bold',
+  validationText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

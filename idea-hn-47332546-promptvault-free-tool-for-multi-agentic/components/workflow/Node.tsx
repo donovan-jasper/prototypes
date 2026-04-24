@@ -1,82 +1,56 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { useTheme } from 'react-native-paper';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface NodeProps {
-  id: string;
-  type: 'trigger' | 'ai' | 'action';
-  label: string;
-  x: number;
-  y: number;
-  selected: boolean;
-  onDragEnd: (id: string, x: number, y: number) => void;
-  onPress: () => void;
-  onOutputPress: (id: string) => void;
-  onInputPress: (id: string) => void;
-  outputType?: 'text' | 'image' | 'audio' | 'number';
-  inputType?: 'text' | 'image' | 'audio' | 'number';
+  node: {
+    id: string;
+    type: 'trigger' | 'ai' | 'action';
+    label: string;
+    x: number;
+    y: number;
+    outputType?: 'text' | 'image' | 'audio' | 'number';
+    inputType?: 'text' | 'image' | 'audio' | 'number';
+  };
+  isSelected: boolean;
+  onSelect: () => void;
+  onDragEnd: (x: number, y: number) => void;
+  onOutputPress: () => void;
+  onInputPress: () => void;
+  isConnectingFrom: boolean;
 }
 
-const NODE_ICONS = {
-  trigger: 'lightning-bolt',
-  ai: 'brain',
-  action: 'cog',
-};
-
-const NODE_COLORS = {
-  trigger: '#4caf50',
-  ai: '#2196f3',
-  action: '#ff9800',
-};
-
-const TYPE_COLORS = {
-  text: '#4caf50',
-  image: '#ff9800',
-  audio: '#2196f3',
-  number: '#9c27b0',
-};
+const NODE_WIDTH = 150;
+const NODE_HEIGHT = 100;
 
 export default function Node({
-  id,
-  type,
-  label,
-  x,
-  y,
-  selected,
+  node,
+  isSelected,
+  onSelect,
   onDragEnd,
-  onPress,
   onOutputPress,
   onInputPress,
-  outputType,
-  inputType,
+  isConnectingFrom,
 }: NodeProps) {
-  const translateX = useSharedValue(x);
-  const translateY = useSharedValue(y);
-  const savedX = useSharedValue(x);
-  const savedY = useSharedValue(y);
-
-  React.useEffect(() => {
-    translateX.value = withSpring(x);
-    translateY.value = withSpring(y);
-    savedX.value = x;
-    savedY.value = y;
-  }, [x, y]);
+  const theme = useTheme();
+  const translateX = useSharedValue(node.x);
+  const translateY = useSharedValue(node.y);
 
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
-      translateX.value = savedX.value + e.translationX;
-      translateY.value = savedY.value + e.translationY;
+      translateX.value = node.x + e.translationX;
+      translateY.value = node.y + e.translationY;
     })
-    .onEnd(() => {
-      savedX.value = translateX.value;
-      savedY.value = translateY.value;
-      onDragEnd(id, translateX.value, translateY.value);
+    .onEnd((e) => {
+      const newX = node.x + e.translationX;
+      const newY = node.y + e.translationY;
+      onDragEnd(newX, newY);
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -86,106 +60,179 @@ export default function Node({
     ],
   }));
 
+  const getNodeColor = () => {
+    switch (node.type) {
+      case 'trigger':
+        return theme.colors.primaryContainer;
+      case 'ai':
+        return theme.colors.secondaryContainer;
+      case 'action':
+        return theme.colors.tertiaryContainer;
+      default:
+        return theme.colors.surfaceVariant;
+    }
+  };
+
+  const getNodeIcon = () => {
+    switch (node.type) {
+      case 'trigger':
+        return '⚡';
+      case 'ai':
+        return '🤖';
+      case 'action':
+        return '🔄';
+      default:
+        return '❓';
+    }
+  };
+
   return (
-    <Animated.View style={[styles.container, animatedStyle]}>
-      <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={panGesture}>
+      <Animated.View style={[styles.nodeContainer, animatedStyle]}>
         <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={onSelect}
           style={[
             styles.node,
-            { borderColor: NODE_COLORS[type] },
-            selected && styles.selectedNode,
+            {
+              backgroundColor: getNodeColor(),
+              borderColor: isSelected ? theme.colors.primary : 'transparent',
+              borderWidth: isSelected ? 2 : 0,
+            },
           ]}
-          onPress={onPress}
-          activeOpacity={0.8}
         >
-          <View style={styles.header}>
-            <MaterialCommunityIcons
-              name={NODE_ICONS[type] as any}
-              size={20}
-              color={NODE_COLORS[type]}
-            />
-            <Text style={styles.label}>{label}</Text>
+          <View style={styles.nodeHeader}>
+            <Text style={[
+              styles.nodeIcon,
+              { color: theme.colors.onSurface }
+            ]}>
+              {getNodeIcon()}
+            </Text>
+            <Text
+              style={[
+                styles.nodeLabel,
+                { color: theme.colors.onSurface }
+              ]}
+              numberOfLines={1}
+            >
+              {node.label}
+            </Text>
           </View>
 
-          <TouchableOpacity
-            style={[styles.port, styles.inputPort]}
-            onPress={() => onInputPress(id)}
-          >
-            <View style={[
-              styles.portDot,
-              { backgroundColor: inputType ? TYPE_COLORS[inputType] : '#6200ee' }
-            ]} />
-          </TouchableOpacity>
+          <View style={styles.nodePorts}>
+            {node.inputType && (
+              <TouchableOpacity
+                style={[
+                  styles.port,
+                  styles.inputPort,
+                  isConnectingFrom && styles.disabledPort
+                ]}
+                onPress={onInputPress}
+                disabled={isConnectingFrom}
+              >
+                <View style={[
+                  styles.portIndicator,
+                  { backgroundColor: theme.colors.primary }
+                ]} />
+                <Text style={[
+                  styles.portLabel,
+                  { color: theme.colors.onSurface }
+                ]}>
+                  {node.inputType}
+                </Text>
+              </TouchableOpacity>
+            )}
 
-          <TouchableOpacity
-            style={[styles.port, styles.outputPort]}
-            onPress={() => onOutputPress(id)}
-          >
-            <View style={[
-              styles.portDot,
-              { backgroundColor: outputType ? TYPE_COLORS[outputType] : '#6200ee' }
-            ]} />
-          </TouchableOpacity>
+            {node.outputType && (
+              <TouchableOpacity
+                style={[
+                  styles.port,
+                  styles.outputPort,
+                  isConnectingFrom && styles.activePort
+                ]}
+                onPress={onOutputPress}
+              >
+                <View style={[
+                  styles.portIndicator,
+                  { backgroundColor: theme.colors.primary }
+                ]} />
+                <Text style={[
+                  styles.portLabel,
+                  { color: theme.colors.onSurface }
+                ]}>
+                  {node.outputType}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </TouchableOpacity>
-      </GestureDetector>
-    </Animated.View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  nodeContainer: {
     position: 'absolute',
+    width: NODE_WIDTH,
+    height: NODE_HEIGHT,
   },
   node: {
-    width: 150,
-    height: 100,
-    backgroundColor: '#fff',
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
-    borderWidth: 2,
     padding: 12,
+    justifyContent: 'space-between',
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
   },
-  selectedNode: {
-    borderWidth: 3,
-    borderColor: '#6200ee',
-  },
-  header: {
+  nodeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  label: {
+  nodeIcon: {
+    fontSize: 18,
+  },
+  nodeLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: '500',
     flex: 1,
   },
-  port: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
+  nodePorts: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
+  port: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    padding: 4,
+    borderRadius: 4,
+  },
   inputPort: {
-    top: '50%',
-    left: -10,
-    marginTop: -10,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
   outputPort: {
-    top: '50%',
-    right: -10,
-    marginTop: -10,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
   },
-  portDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#fff',
+  activePort: {
+    backgroundColor: 'rgba(0, 122, 255, 0.1)',
+  },
+  disabledPort: {
+    opacity: 0.5,
+  },
+  portIndicator: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  portLabel: {
+    fontSize: 10,
+    fontWeight: '400',
   },
 });
