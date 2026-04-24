@@ -2,7 +2,16 @@ import * as SQLite from 'expo-sqlite';
 
 const db = SQLite.openDatabase('typebridge.db');
 
-export async function initDatabase() {
+export interface Project {
+  id: string;
+  name: string;
+  code: string;
+  wasmBytes?: Uint8Array;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export async function initDatabase(): Promise<void> {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       // Create projects table
@@ -26,69 +35,70 @@ export async function initDatabase() {
         );`
       );
 
-      // Create templates table
-      tx.executeSql(
-        `CREATE TABLE IF NOT EXISTS templates (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT NOT NULL,
-          code TEXT NOT NULL,
-          category TEXT NOT NULL,
-          isPremium INTEGER NOT NULL
-        );`
-      );
+      // Add any additional tables or migrations here
     }, reject, resolve);
   });
 }
 
-export async function getProjects() {
+export async function getProjectById(id: string): Promise<Project | null> {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'SELECT * FROM projects ORDER BY updatedAt DESC',
-        [],
-        (_, { rows }) => resolve(rows._array),
-        (_, error) => reject(error)
-      );
-    });
-  });
-}
-
-export async function createProject(project: any) {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'INSERT INTO projects (id, name, code, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)',
-        [project.id, project.name, project.code, Date.now(), Date.now()],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
-    });
-  });
-}
-
-export async function updateProject(project: any) {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'UPDATE projects SET name = ?, code = ?, wasmBytes = ?, updatedAt = ? WHERE id = ?',
-        [project.name, project.code, project.wasmBytes, Date.now(), project.id],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
-    });
-  });
-}
-
-export async function deleteProject(id: string) {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'DELETE FROM projects WHERE id = ?',
+        'SELECT * FROM projects WHERE id = ?',
         [id],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
+        (_, { rows }) => {
+          if (rows.length > 0) {
+            const project = rows.item(0);
+            // Convert wasmBytes from base64 string to Uint8Array if it exists
+            if (project.wasmBytes) {
+              project.wasmBytes = new Uint8Array(
+                atob(project.wasmBytes)
+                  .split('')
+                  .map(c => c.charCodeAt(0))
+              );
+            }
+            resolve(project);
+          } else {
+            resolve(null);
+          }
+        },
+        (_, error) => {
+          reject(error);
+          return false;
+        }
       );
     });
   });
 }
+
+export async function saveProject(project: Project): Promise<void> {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      // Convert wasmBytes to base64 string for storage
+      const wasmBytes = project.wasmBytes
+        ? btoa(String.fromCharCode.apply(null, project.wasmBytes))
+        : null;
+
+      tx.executeSql(
+        `INSERT OR REPLACE INTO projects
+        (id, name, code, wasmBytes, createdAt, updatedAt)
+        VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          project.id,
+          project.name,
+          project.code,
+          wasmBytes,
+          project.createdAt,
+          project.updatedAt || Date.now()
+        ],
+        () => resolve(),
+        (_, error) => {
+          reject(error);
+          return false;
+        }
+      );
+    });
+  });
+}
+
+// Other existing database functions...
