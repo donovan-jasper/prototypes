@@ -1,4 +1,4 @@
-export type Question = {
+export interface Question {
   id: string;
   title: string;
   content: string;
@@ -6,4 +6,4 @@ export type Question = {
   upvotes: number;
   isAnswered: boolean;
   createdAt: Date;
-};
+}
