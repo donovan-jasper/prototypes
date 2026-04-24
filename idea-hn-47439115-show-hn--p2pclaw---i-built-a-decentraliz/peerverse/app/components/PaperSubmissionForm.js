@@ -1,75 +1,132 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 
 const PaperSubmissionForm = ({ onSubmit }) => {
   const [title, setTitle] = useState('');
   const [authors, setAuthors] = useState('');
   const [abstract, setAbstract] = useState('');
   const [content, setContent] = useState('');
+  const [titleError, setTitleError] = useState('');
+  const [authorsError, setAuthorsError] = useState('');
+  const [abstractError, setAbstractError] = useState('');
+  const [contentError, setContentError] = useState('');
+
+  const validateForm = () => {
+    let isValid = true;
+
+    if (!title.trim()) {
+      setTitleError('Please enter a title');
+      isValid = false;
+    } else {
+      setTitleError('');
+    }
+
+    if (!authors.trim()) {
+      setAuthorsError('Please enter at least one author');
+      isValid = false;
+    } else {
+      setAuthorsError('');
+    }
+
+    if (!abstract.trim()) {
+      setAbstractError('Please enter an abstract');
+      isValid = false;
+    } else if (abstract.trim().length < 200) {
+      setAbstractError('Abstract should be at least 200 characters');
+      isValid = false;
+    } else {
+      setAbstractError('');
+    }
+
+    if (!content.trim()) {
+      setContentError('Please enter paper content');
+      isValid = false;
+    } else if (content.trim().length < 500) {
+      setContentError('Content should be at least 500 characters');
+      isValid = false;
+    } else {
+      setContentError('');
+    }
+
+    if (!isValid) {
+      Alert.alert('Validation Error', 'Please fix the errors in the form');
+    }
+
+    return isValid;
+  };
 
   const handleSubmit = () => {
-    if (!title || !authors || !abstract || !content) {
-      alert('Please fill in all fields');
-      return;
-    }
+    if (!validateForm()) return;
 
     onSubmit({
       title,
-      authors: authors.split(',').map(author => author.trim()),
+      authors,
       abstract,
-      content,
+      content
     });
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.formGroup}>
+    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
+      <View style={styles.formContainer}>
         <Text style={styles.label}>Title</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, titleError && styles.inputError]}
           value={title}
           onChangeText={setTitle}
           placeholder="Enter paper title"
+          autoCapitalize="words"
+          returnKeyType="next"
         />
-      </View>
+        {titleError ? <Text style={styles.errorText}>{titleError}</Text> : null}
 
-      <View style={styles.formGroup}>
-        <Text style={styles.label}>Authors (comma separated)</Text>
+        <Text style={styles.label}>Authors</Text>
         <TextInput
-          style={styles.input}
+          style={[styles.input, authorsError && styles.inputError]}
           value={authors}
           onChangeText={setAuthors}
-          placeholder="John Doe, Jane Smith"
+          placeholder="Enter authors (comma separated)"
+          autoCapitalize="words"
+          returnKeyType="next"
         />
-      </View>
+        {authorsError ? <Text style={styles.errorText}>{authorsError}</Text> : null}
 
-      <View style={styles.formGroup}>
         <Text style={styles.label}>Abstract</Text>
         <TextInput
-          style={[styles.input, styles.multilineInput]}
+          style={[styles.input, styles.multilineInput, abstractError && styles.inputError]}
           value={abstract}
           onChangeText={setAbstract}
-          placeholder="Enter abstract"
+          placeholder="Enter abstract (200-300 words)"
           multiline
           numberOfLines={4}
+          textAlignVertical="top"
+          returnKeyType="next"
         />
-      </View>
+        {abstractError ? <Text style={styles.errorText}>{abstractError}</Text> : null}
 
-      <View style={styles.formGroup}>
         <Text style={styles.label}>Content</Text>
         <TextInput
-          style={[styles.input, styles.multilineInput]}
+          style={[styles.input, styles.multilineInput, styles.contentInput, contentError && styles.inputError]}
           value={content}
           onChangeText={setContent}
           placeholder="Enter full paper content"
           multiline
-          numberOfLines={10}
+          numberOfLines={15}
+          textAlignVertical="top"
         />
-      </View>
+        {contentError ? <Text style={styles.errorText}>{contentError}</Text> : null}
 
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Submit Paper</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            (!title || !authors || !abstract || !content) && styles.submitButtonDisabled
+          ]}
+          onPress={handleSubmit}
+          disabled={!title || !authors || !abstract || !content}
+        >
+          <Text style={styles.submitButtonText}>Submit Paper</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 };
@@ -77,38 +134,54 @@ const PaperSubmissionForm = ({ onSubmit }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  formGroup: {
-    marginBottom: 15,
+  formContainer: {
+    padding: 20,
   },
   label: {
     fontSize: 16,
-    marginBottom: 5,
+    fontWeight: '600',
+    marginBottom: 8,
     color: '#333',
   },
   input: {
+    backgroundColor: 'white',
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 8,
     fontSize: 16,
-    backgroundColor: '#fff',
+  },
+  inputError: {
+    borderColor: '#ff3b30',
   },
   multilineInput: {
-    height: 100,
-    textAlignVertical: 'top',
+    height: 120,
+  },
+  contentInput: {
+    height: 250,
+  },
+  errorText: {
+    color: '#ff3b30',
+    fontSize: 14,
+    marginBottom: 16,
   },
   submitButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 5,
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 4,
     alignItems: 'center',
     marginTop: 20,
   },
+  submitButtonDisabled: {
+    opacity: 0.5,
+  },
   submitButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
