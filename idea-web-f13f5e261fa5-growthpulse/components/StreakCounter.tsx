@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 
 interface StreakCounterProps {
   habitName: string;
@@ -11,12 +11,12 @@ const StreakCounter: React.FC<StreakCounterProps> = ({ habitName, streak }) => {
   return (
     <View style={styles.container}>
       <View style={styles.iconContainer}>
-        <MaterialCommunityIcons name="fire" size={24} color="#FF5722" />
+        <Ionicons name="flame" size={24} color="#FF6B6B" />
       </View>
       <View style={styles.textContainer}>
         <Text style={styles.title}>Current Streak</Text>
         <Text style={styles.habitName}>{habitName}</Text>
-        <Text style={styles.streakCount}>{streak} days</Text>
+        <Text style={styles.streakValue}>{streak} days</Text>
       </View>
     </View>
   );
@@ -27,9 +27,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
-    margin: 12,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -45,7 +45,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   habitName: {
     fontSize: 16,
@@ -53,10 +53,10 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 4,
   },
-  streakCount: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FF5722',
+  streakValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#6200EE',
   },
 });
 

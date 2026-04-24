@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { ProgressBar } from './ProgressBar';
+import ProgressBar from './ProgressBar';
 
 interface HabitCardProps {
   title: string;
@@ -8,22 +8,14 @@ interface HabitCardProps {
   progress: number;
 }
 
-export const HabitCard = ({ title, streak, progress }: HabitCardProps) => {
+const HabitCard: React.FC<HabitCardProps> = ({ title, streak, progress }) => {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.title}>{title}</Text>
-        <View style={styles.streakContainer}>
-          <Text style={styles.streakLabel}>Current Streak:</Text>
-          <Text style={styles.streakValue}>{streak} days</Text>
-        </View>
+        <Text style={styles.streak}>{streak} day streak</Text>
       </View>
-
-      <View style={styles.progressContainer}>
-        <Text style={styles.progressLabel}>Weekly Progress</Text>
-        <ProgressBar progress={progress} />
-        <Text style={styles.progressValue}>{Math.round(progress)}%</Text>
-      </View>
+      <ProgressBar progress={progress} />
     </View>
   );
 };
@@ -43,40 +35,18 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-  },
-  streakContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  streakLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 4,
-  },
-  streakValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#6200EE',
-  },
-  progressContainer: {
-    marginTop: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: '#666',
     marginBottom: 8,
   },
-  progressValue: {
-    fontSize: 12,
-    color: '#666',
-    marginTop: 4,
-    textAlign: 'right',
+  title: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+  },
+  streak: {
+    fontSize: 14,
+    color: '#6200EE',
+    fontWeight: '500',
   },
 });
+
+export default HabitCard;

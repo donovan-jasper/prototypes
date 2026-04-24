@@ -169,38 +169,45 @@ const HomeScreen = () => {
 
       {/* Streak Counter */}
       <StreakCounter
-        habitName={topHabit?.name || 'No habits'}
-        currentStreak={topHabit?.currentStreak || 0}
+        habitName={topHabit.name}
+        streak={topHabit.currentStreak}
       />
 
-      {/* Progress Chart */}
-      {topHabit && (
-        <ProgressChart
-          title={topHabit.name}
-          data={topHabit.chartData}
-        />
-      )}
-
-      {/* Habits List */}
-      <View style={styles.habitsSection}>
+      {/* Habits Section */}
+      <View style={styles.section}>
         <Text style={styles.sectionTitle}>Your Habits</Text>
         {habits.length > 0 ? (
-          habits.map(habit => (
+          habits.map((habit) => (
             <HabitCard
               key={habit.id}
-              name={habit.name}
+              title={habit.name}
               streak={habit.currentStreak}
               progress={habit.progress}
-              chartData={habit.chartData}
             />
           ))
         ) : (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No habits detected yet.</Text>
-            <Text style={styles.emptySubtext}>Add events to your calendar to track them automatically.</Text>
+            <Text style={styles.emptyText}>No habits detected yet</Text>
+            <Text style={styles.emptySubtext}>Add some events to your calendar to track them</Text>
           </View>
         )}
       </View>
+
+      {/* Progress Charts */}
+      {habits.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Progress Over Time</Text>
+          {habits.map((habit) => (
+            <View key={`chart-${habit.id}`} style={styles.chartCard}>
+              <Text style={styles.chartTitle}>{habit.name}</Text>
+              <ProgressChart
+                data={habit.chartData}
+                habitName={habit.name}
+              />
+            </View>
+          ))}
+        </View>
+      )}
     </ScrollView>
   );
 };
@@ -209,27 +216,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
   errorContainer: {
-    padding: 20,
+    padding: 24,
     alignItems: 'center',
   },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
-    marginBottom: 10,
     textAlign: 'center',
+    marginBottom: 8,
   },
   errorSubtext: {
     fontSize: 14,
@@ -237,45 +245,65 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   header: {
-    padding: 20,
-    backgroundColor: '#6200EE',
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 5,
+    color: '#333',
+    marginBottom: 4,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: '#666',
   },
-  habitsSection: {
-    padding: 20,
+  section: {
+    marginBottom: 24,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 16,
   },
   emptyState: {
-    padding: 20,
-    alignItems: 'center',
     backgroundColor: 'white',
-    borderRadius: 10,
-    marginTop: 10,
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   emptyText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: '#666',
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
+    color: '#666',
     textAlign: 'center',
+  },
+  chartCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    marginBottom: 8,
   },
 });
 

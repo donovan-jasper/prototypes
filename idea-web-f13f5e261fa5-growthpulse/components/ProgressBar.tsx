@@ -5,10 +5,10 @@ interface ProgressBarProps {
   progress: number;
 }
 
-export const ProgressBar = ({ progress }: ProgressBarProps) => {
+const ProgressBar: React.FC<ProgressBarProps> = ({ progress }) => {
   return (
     <View style={styles.container}>
-      <View style={[styles.progress, { width: `${progress}%` }]} />
+      <View style={[styles.progressBar, { width: `${progress}%` }]} />
     </View>
   );
 };
@@ -20,9 +20,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  progress: {
+  progressBar: {
     height: '100%',
     backgroundColor: '#6200EE',
     borderRadius: 4,
   },
 });
+
+export default ProgressBar;
