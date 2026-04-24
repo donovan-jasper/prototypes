@@ -25,6 +25,13 @@ const DebtRoadmap = ({ debtPlan }) => {
     return Math.min(1, debt.monthlyPayment / debt.amount);
   };
 
+  // Calculate estimated payoff date
+  const getEstimatedPayoffDate = (months) => {
+    const date = new Date();
+    date.setMonth(date.getMonth() + months);
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Debt Payoff Roadmap</Text>
@@ -44,6 +51,10 @@ const DebtRoadmap = ({ debtPlan }) => {
             {payoffYears > 0 ? `${payoffYears} year${payoffYears > 1 ? 's' : ''} ` : ''}
             {payoffMonths} month{payoffMonths !== 1 ? 's' : ''}
           </Text>
+        </View>
+        <View style={styles.summaryItem}>
+          <Text style={styles.summaryLabel}>Estimated Payoff Date</Text>
+          <Text style={styles.summaryValue}>{getEstimatedPayoffDate(debtPlan.totalPayoffMonths)}</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Total Interest Saved</Text>
@@ -68,9 +79,14 @@ const DebtRoadmap = ({ debtPlan }) => {
               color="#007AFF"
               style={styles.progressBar}
             />
-            <Text style={styles.debtPayoffTime}>
-              Payoff Time: {Math.ceil(debt.amount / debt.monthlyPayment)} months
-            </Text>
+            <View style={styles.payoffInfo}>
+              <Text style={styles.debtPayoffTime}>
+                Payoff Time: {Math.ceil(debt.amount / debt.monthlyPayment)} months
+              </Text>
+              <Text style={styles.debtPayoffDate}>
+                Estimated Payoff: {getEstimatedPayoffDate(Math.ceil(debt.amount / debt.monthlyPayment))}
+              </Text>
+            </View>
           </View>
         ))}
       </View>
@@ -171,10 +187,18 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginVertical: 10,
   },
+  payoffInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 5,
+  },
   debtPayoffTime: {
     fontSize: 14,
     color: '#666',
-    marginTop: 5,
+  },
+  debtPayoffDate: {
+    fontSize: 14,
+    color: '#666',
   },
   tipContainer: {
     marginTop: 20,
@@ -185,8 +209,8 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
     color: '#007AFF',
+    marginBottom: 5,
   },
   tipText: {
     fontSize: 14,

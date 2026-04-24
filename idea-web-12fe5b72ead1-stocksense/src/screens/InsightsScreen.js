@@ -51,18 +51,10 @@ const InsightsScreen = () => {
     );
   }
 
-  const debtPlan = calculateDebtPayoffPlan(debtData.debts, debtData.monthlyIncome);
-
   return (
     <ScrollView style={styles.container}>
       <InvestmentSimulator />
-      <DebtRoadmap
-        debts={debtPlan.payments}
-        totalDebt={debtData.totalDebt}
-        monthlyIncome={debtData.monthlyIncome}
-        totalPayoffMonths={debtPlan.totalPayoffMonths}
-        totalInterestSaved={debtPlan.totalInterestSaved}
-      />
+      <DebtRoadmap debtPlan={debtData} />
     </ScrollView>
   );
 };
