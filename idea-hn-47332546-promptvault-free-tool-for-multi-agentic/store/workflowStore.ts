@@ -176,11 +176,10 @@ export const useWorkflowStore = create<WorkflowState>()(
         set((state) => {
           if (!state.currentWorkflow) return state;
 
-          // Remove the node and any connections involving it
-          const updatedNodes = state.currentWorkflow.nodes.filter(
-            node => node.id !== nodeId
-          );
+          // Remove the node
+          const updatedNodes = state.currentWorkflow.nodes.filter(node => node.id !== nodeId);
 
+          // Remove any connections involving this node
           const updatedConnections = state.currentWorkflow.connections.filter(
             conn => conn.from !== nodeId && conn.to !== nodeId
           );
@@ -226,20 +225,15 @@ export const useWorkflowStore = create<WorkflowState>()(
           if (!state.currentWorkflow) return state;
 
           // Check if connection already exists
-          const exists = state.currentWorkflow.connections.some(
+          const connectionExists = state.currentWorkflow.connections.some(
             conn => conn.from === from && conn.to === to
           );
 
-          if (exists) return state;
-
-          const updatedConnections = [
-            ...state.currentWorkflow.connections,
-            { from, to },
-          ];
+          if (connectionExists) return state;
 
           const updatedWorkflow = {
             ...state.currentWorkflow,
-            connections: updatedConnections,
+            connections: [...state.currentWorkflow.connections, { from, to }],
           };
 
           get().updateWorkflow(updatedWorkflow);
