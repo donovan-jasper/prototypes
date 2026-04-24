@@ -173,34 +173,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#fff',
   },
   loadingText: {
     marginTop: 10,
-    color: '#666',
     fontSize: 16,
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#fff',
   },
   errorText: {
-    color: '#d32f2f',
     fontSize: 16,
+    color: '#d32f2f',
     marginBottom: 20,
     textAlign: 'center',
   },
   retryButton: {
     backgroundColor: '#2196F3',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 5,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
   },
   title: {
     fontSize: 24,
@@ -211,6 +211,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginTop: 20,
     marginBottom: 10,
     color: '#444',
   },
@@ -220,45 +221,42 @@ const styles = StyleSheet.create({
   audioButton: {
     backgroundColor: '#4CAF50',
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 5,
     alignItems: 'center',
   },
   audioButtonText: {
     color: '#fff',
-    fontWeight: 'bold',
+    fontSize: 16,
   },
   entitiesContainer: {
     marginBottom: 20,
   },
   entityItem: {
     backgroundColor: '#f5f5f5',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 10,
   },
   entityType: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   entityValue: {
     fontSize: 16,
     color: '#333',
   },
   noDataText: {
-    color: '#999',
     fontSize: 16,
-    textAlign: 'center',
-    marginVertical: 20,
+    color: '#666',
+    marginBottom: 20,
   },
   summaryContainer: {
     marginBottom: 20,
   },
   summaryText: {
     fontSize: 16,
-    lineHeight: 24,
     color: '#333',
+    lineHeight: 24,
   },
 });
-
-export default ExtractionScreen;

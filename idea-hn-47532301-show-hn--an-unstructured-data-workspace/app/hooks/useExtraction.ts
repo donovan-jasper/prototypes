@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { extractWithLLM } from '../../api/llm';
+import { transcribeAudio } from '../../api/ocr';
+import { extractTextFromImage } from '../../api/ocr';
 
 interface ExtractionParams {
   text?: string;
@@ -32,11 +34,13 @@ export const useExtraction = () => {
       if (text) {
         extractionText = text;
       } else if (audio) {
-        // In a real app, you would transcribe the audio here
-        extractionText = "Audio transcription would go here";
+        // Transcribe audio using OCR API
+        const transcription = await transcribeAudio(audio);
+        extractionText = transcription.text;
       } else if (image) {
-        // In a real app, you would extract text from the image here
-        extractionText = "Image text extraction would go here";
+        // Extract text from image using OCR API
+        const imageText = await extractTextFromImage(image);
+        extractionText = imageText.text;
       }
 
       if (!extractionText) {
