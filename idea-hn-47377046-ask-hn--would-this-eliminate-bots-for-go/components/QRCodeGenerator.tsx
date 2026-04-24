@@ -226,6 +226,7 @@ const styles = StyleSheet.create({
   tokenText: {
     fontSize: 14,
     fontFamily: 'monospace',
+    color: '#1C1C1E',
     backgroundColor: '#F2F2F7',
     padding: 12,
     borderRadius: 8,
@@ -237,7 +238,7 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     alignItems: 'center',
     backgroundColor: '#F2F2F7',
     marginHorizontal: 4,
@@ -256,7 +257,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });

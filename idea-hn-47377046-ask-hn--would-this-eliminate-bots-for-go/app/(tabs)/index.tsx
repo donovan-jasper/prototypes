@@ -169,7 +169,7 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 18,
     color: '#8E8E93',
-    marginBottom: 20,
+    marginBottom: 40,
   },
   statusContainer: {
     flexDirection: 'row',
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   reputationValue: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#007AFF',
   },
   count: {
     marginTop: 20,
@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
   },
 });
