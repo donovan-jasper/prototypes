@@ -1,26 +1,29 @@
-export const extractData = async (text: string): Promise<{ entities: Array<{ type: string; value: string }> }> => {
-  // Mock implementation - in a real app this would call an LLM API
-  const mockEntities = [
-    { type: 'email', value: 'john@example.com' },
-    { type: 'date', value: '2023-12-15' },
-    { type: 'phone', value: '(555) 123-4567' },
-  ];
+import { extractWithLLM } from '../../api/llm';
+import { processImageWithOCR } from '../../api/ocr';
 
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+export const extractData = async (input: {
+  text?: string;
+  audio?: string;
+  image?: string;
+}): Promise<{ entities: Array<{ type: string; value: string }>; summary?: string }> => {
+  try {
+    if (input.image) {
+      // Process image with OCR
+      const ocrText = await processImageWithOCR(input.image);
+      return await extractWithLLM(ocrText);
+    } else if (input.text) {
+      // Process text directly
+      return await extractWithLLM(input.text);
+    } else if (input.audio) {
+      // In a real app, you would transcribe audio first
+      // For now we'll simulate it with mock text
+      const mockText = "This is a transcription of the recorded audio. The customer mentioned they need to schedule an appointment for December 15th at 2:30 PM.";
+      return await extractWithLLM(mockText);
+    }
 
-  // Simple pattern matching for demo purposes
-  const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g;
-  const dateRegex = /\b\d{4}-\d{2}-\d{2}\b/g;
-  const phoneRegex = /\b\(\d{3}\) \d{3}-\d{4}\b/g;
-
-  const foundEntities = [
-    ...text.matchAll(emailRegex).map(match => ({ type: 'email', value: match[0] })),
-    ...text.matchAll(dateRegex).map(match => ({ type: 'date', value: match[0] })),
-    ...text.matchAll(phoneRegex).map(match => ({ type: 'phone', value: match[0] })),
-  ];
-
-  return {
-    entities: foundEntities.length > 0 ? foundEntities : mockEntities
-  };
+    throw new Error('No valid input provided for extraction');
+  } catch (error) {
+    console.error('Extraction failed:', error);
+    throw error;
+  }
 };
