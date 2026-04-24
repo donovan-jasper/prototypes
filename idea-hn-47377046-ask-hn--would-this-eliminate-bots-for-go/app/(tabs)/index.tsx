@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Alert } from 'react-native';
+import { View, Text, StyleSheet, Alert, Modal } from 'react-native';
 import VerificationButton from '@/components/VerificationButton';
 import TrustScoreGauge from '@/components/TrustScoreGauge';
+import QRCodeGenerator from '@/components/QRCodeGenerator';
 import { authenticateUser, isBiometricAvailable } from '@/lib/biometrics';
 import { collectBehavioralData, calculateMovementEntropy } from '@/lib/sensors';
 import { generateVerificationToken } from '@/lib/crypto';
@@ -11,6 +12,8 @@ import { initDatabase, saveVerification, getVerificationCount } from '@/lib/data
 export default function HomeScreen() {
   const [trustScore, setTrustScore] = useState(0);
   const [verificationCount, setVerificationCount] = useState(0);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [tokenData, setTokenData] = useState<{ token: string; expiryTime: number } | null>(null);
 
   useEffect(() => {
     initDatabase();
@@ -60,10 +63,10 @@ export default function HomeScreen() {
 
       await loadVerificationCount();
 
-      return { token, expiryTime };
+      setTokenData({ token, expiryTime });
+      setShowQRCode(true);
     } catch (error) {
       Alert.alert('Error', String(error));
-      throw error;
     }
   };
 
@@ -79,6 +82,23 @@ export default function HomeScreen() {
       <Text style={styles.count}>
         {verificationCount} verification{verificationCount !== 1 ? 's' : ''} completed
       </Text>
+
+      <Modal
+        visible={showQRCode}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQRCode(false)}
+      >
+        <View style={styles.modalContainer}>
+          {tokenData && (
+            <QRCodeGenerator
+              token={tokenData.token}
+              expiryTime={tokenData.expiryTime}
+              onClose={() => setShowQRCode(false)}
+            />
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -105,5 +125,11 @@ const styles = StyleSheet.create({
     marginTop: 20,
     fontSize: 14,
     color: '#8E8E93',
+  },
+  modalContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
 });

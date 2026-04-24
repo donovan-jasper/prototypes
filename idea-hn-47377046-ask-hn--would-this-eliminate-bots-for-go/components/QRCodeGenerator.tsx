@@ -137,6 +137,10 @@ export default function QRCodeGenerator({ token, expiryTime, onClose }: Props) {
               <Text style={[styles.actionText, styles.shareText]}>Share</Text>
             </TouchableOpacity>
           </View>
+
+          <Text style={styles.instructions}>
+            Scan this QR code with another app to verify your identity.
+          </Text>
         </>
       )}
     </View>
@@ -177,22 +181,13 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 18,
-    fontWeight: '600',
     color: '#8E8E93',
   },
-  expiredContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  expiredText: {
-    fontSize: 20,
-    fontWeight: '600',
+  errorText: {
+    fontSize: 18,
     color: '#FF3B30',
-    marginBottom: 8,
-  },
-  expiredSubtext: {
-    fontSize: 16,
-    color: '#8E8E93',
+    textAlign: 'center',
+    marginBottom: 20,
   },
   qrContainer: {
     alignItems: 'center',
@@ -213,7 +208,7 @@ const styles = StyleSheet.create({
   expiryTime: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#007AFF',
     marginBottom: 4,
   },
   expiryDate: {
@@ -230,7 +225,6 @@ const styles = StyleSheet.create({
   },
   tokenText: {
     fontSize: 14,
-    color: '#1C1C1E',
     fontFamily: 'monospace',
     backgroundColor: '#F2F2F7',
     padding: 12,
@@ -239,11 +233,12 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 24,
   },
   actionButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: '#007AFF',
     alignItems: 'center',
     marginHorizontal: 4,
@@ -259,10 +254,24 @@ const styles = StyleSheet.create({
   shareText: {
     color: '#fff',
   },
-  errorText: {
-    fontSize: 18,
-    color: '#FF3B30',
+  instructions: {
+    fontSize: 14,
+    color: '#8E8E93',
     textAlign: 'center',
-    marginBottom: 20,
+    marginTop: 12,
+  },
+  expiredContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  expiredText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 8,
+  },
+  expiredSubtext: {
+    fontSize: 16,
+    color: '#8E8E93',
   },
 });
