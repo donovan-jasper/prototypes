@@ -196,36 +196,32 @@ export const getDeckStats = async (db: SQLiteDatabase, deckId: number): Promise<
 }> => {
   const today = new Date().toISOString();
 
-  const totalCards = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM cards WHERE deckId = ?',
-    [deckId]
-  );
+  const stats = await db.getFirstAsync<{
+    totalCards: number;
+    dueCards: number;
+    sumRecallStrength: number;
+  }>(`
+    SELECT
+      COUNT(*) as totalCards,
+      SUM(CASE WHEN nextReviewDate <= ? THEN 1 ELSE 0 END) as dueCards,
+      SUM(recallStrength) as sumRecallStrength
+    FROM cards
+    WHERE deckId = ?
+  `, [today, deckId]);
 
-  const dueCards = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM cards WHERE deckId = ? AND nextReviewDate <= ?',
-    [deckId, today]
-  );
-
-  const avgRecall = await db.getFirstAsync<{ avg: number }>(
-    'SELECT AVG(recallStrength) as avg FROM cards WHERE deckId = ?',
-    [deckId]
-  );
+  if (!stats) {
+    return {
+      totalCards: 0,
+      dueCards: 0,
+      averageRecallStrength: 0
+    };
+  }
 
   return {
-    totalCards: totalCards?.count || 0,
-    dueCards: dueCards?.count || 0,
-    averageRecallStrength: avgRecall?.avg || 0.5
+    totalCards: stats.totalCards,
+    dueCards: stats.dueCards,
+    averageRecallStrength: stats.totalCards > 0
+      ? stats.sumRecallStrength / stats.totalCards
+      : 0
   };
-};
-
-export const getReviewHistory = async (db: SQLiteDatabase, cardId: number): Promise<ReviewHistory[]> => {
-  const history = await db.getAllAsync<ReviewHistory>(
-    'SELECT * FROM review_history WHERE cardId = ? ORDER BY reviewDate DESC',
-    [cardId]
-  );
-
-  return history.map(item => ({
-    ...item,
-    reviewDate: new Date(item.reviewDate)
-  }));
 };
