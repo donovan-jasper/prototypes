@@ -182,7 +182,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     marginBottom: 5,
-    textAlign: 'center',
   },
   progressBar: {
     height: 10,
@@ -198,8 +197,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    textAlign: 'center',
     color: '#333',
+    textAlign: 'center',
   },
   input: {
     height: 50,
@@ -229,16 +228,13 @@ const styles = StyleSheet.create({
   feedbackContainer: {
     marginTop: 20,
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#e8f5e9',
     borderRadius: 8,
-    borderColor: '#ddd',
-    borderWidth: 1,
   },
   feedback: {
     fontSize: 16,
-    color: '#333',
+    color: '#2e7d32',
     marginBottom: 10,
-    textAlign: 'center',
   },
   scoreContainer: {
     marginTop: 10,
