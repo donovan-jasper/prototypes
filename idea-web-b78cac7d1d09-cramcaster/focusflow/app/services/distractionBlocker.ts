@@ -1,55 +1,89 @@
+import * as Notifications from 'expo-notifications';
 import * as Application from 'expo-application';
-import { NativeModules, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const { DistractionBlockerModule } = NativeModules;
+const BLOCKED_APPS_KEY = 'blocked_apps';
+const DISTRACTION_BLOCKER_KEY = 'distraction_blocker_active';
 
-const DISTRACTING_APPS = [
-  'com.facebook.katana',
-  'com.instagram.android',
-  'com.snapchat.android',
-  'com.twitter.android',
-  'com.whatsapp',
-  'com.tiktok.android',
-  'com.spotify.music',
-  'com.netflix.mediaclient',
-  'com.disney.disneyplus',
-];
+export const getBlockedApps = async (): Promise<string[]> => {
+  try {
+    const apps = await AsyncStorage.getItem(BLOCKED_APPS_KEY);
+    return apps ? JSON.parse(apps) : [];
+  } catch (error) {
+    console.error('Failed to get blocked apps:', error);
+    return [];
+  }
+};
+
+export const addBlockedApp = async (packageName: string) => {
+  try {
+    const currentApps = await getBlockedApps();
+    if (!currentApps.includes(packageName)) {
+      const updatedApps = [...currentApps, packageName];
+      await AsyncStorage.setItem(BLOCKED_APPS_KEY, JSON.stringify(updatedApps));
+    }
+  } catch (error) {
+    console.error('Failed to add blocked app:', error);
+  }
+};
+
+export const removeBlockedApp = async (packageName: string) => {
+  try {
+    const currentApps = await getBlockedApps();
+    const updatedApps = currentApps.filter(app => app !== packageName);
+    await AsyncStorage.setItem(BLOCKED_APPS_KEY, JSON.stringify(updatedApps));
+  } catch (error) {
+    console.error('Failed to remove blocked app:', error);
+  }
+};
 
 export const registerDistractionBlocker = async () => {
   try {
-    if (Platform.OS === 'android') {
-      await DistractionBlockerModule.startAccessibilityService();
-    } else if (Platform.OS === 'ios') {
-      const hasPermission = await DistractionBlockerModule.requestScreenTimePermission();
-      if (hasPermission) {
-        await DistractionBlockerModule.enableScreenTimeBlocking();
-      }
-    }
-    console.log('Distraction blocker registered for apps:', DISTRACTING_APPS);
+    // Block notifications
+    await Notifications.setNotificationChannelAsync('focus-mode', {
+      name: 'Focus Mode',
+      importance: Notifications.AndroidImportance.MIN,
+      sound: null,
+      vibrationPattern: [],
+    });
+
+    // Store the active state
+    await AsyncStorage.setItem(DISTRACTION_BLOCKER_KEY, 'true');
+
+    // In a real app, you would also implement app blocking logic here
+    // This would require platform-specific code and might need to be implemented
+    // as a native module or using device-specific APIs
+    console.log('Distraction blocker registered');
   } catch (error) {
     console.error('Failed to register distraction blocker:', error);
-    throw error;
   }
 };
 
 export const unregisterDistractionBlocker = async () => {
   try {
-    if (Platform.OS === 'android') {
-      await DistractionBlockerModule.stopAccessibilityService();
-    } else if (Platform.OS === 'ios') {
-      await DistractionBlockerModule.disableScreenTimeBlocking();
-    }
+    // Reset notification settings
+    await Notifications.setNotificationChannelAsync('focus-mode', {
+      name: 'Focus Mode',
+      importance: Notifications.AndroidImportance.DEFAULT,
+      sound: 'default',
+      vibrationPattern: [0, 250, 250, 250],
+    });
+
+    // Remove the active state
+    await AsyncStorage.removeItem(DISTRACTION_BLOCKER_KEY);
+
     console.log('Distraction blocker unregistered');
   } catch (error) {
     console.error('Failed to unregister distraction blocker:', error);
-    throw error;
   }
 };
 
-export const isDistractingApp = (packageName: string) => {
-  return DISTRACTING_APPS.includes(packageName);
-};
-
-export const getDistractingApps = () => {
-  return [...DISTRACTING_APPS];
+export const isDistractionBlockerActive = async (): Promise<boolean> => {
+  try {
+    const isActive = await AsyncStorage.getItem(DISTRACTION_BLOCKER_KEY);
+    return isActive === 'true';
+  } catch (error) {
+    console.error('Failed to check distraction blocker status:', error);
+    return false;
+  }
 };

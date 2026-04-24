@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import { View, StyleSheet, Text, Switch } from 'react-native';
 import FocusTimer from '../components/FocusTimer';
 import ProgressBar from '../components/ProgressBar';
 import FocusIndicator from '../components/FocusIndicator';
 import { getCalendarEvents, isEventInProgress } from '../services/calendarService';
 import { registerBackgroundTask } from '../services/backgroundService';
+import { registerDistractionBlocker, unregisterDistractionBlocker } from '../services/distractionBlocker';
+import { blockNotifications, unblockNotifications } from '../services/notificationService';
 
 const FocusTimerScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [isFocusActive, setIsFocusActive] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Calendar.Event | null>(null);
+  const [isDistractionBlockingEnabled, setIsDistractionBlockingEnabled] = useState(true);
   const duration = 60 * 25; // 25 minutes in seconds
 
   useEffect(() => {
@@ -25,8 +28,18 @@ const FocusTimerScreen: React.FC = () => {
           return currentTime >= startDate && currentTime <= endDate;
         });
 
+        const wasFocusActive = isFocusActive;
         setIsFocusActive(!!activeEvent);
         setCurrentEvent(activeEvent || null);
+
+        // Handle distraction blocking when focus state changes
+        if (!!activeEvent && !wasFocusActive && isDistractionBlockingEnabled) {
+          await blockNotifications();
+          await registerDistractionBlocker();
+        } else if (!activeEvent && wasFocusActive) {
+          await unblockNotifications();
+          await unregisterDistractionBlocker();
+        }
       } catch (error) {
         console.error('Failed to check focus status:', error);
       }
@@ -36,10 +49,14 @@ const FocusTimerScreen: React.FC = () => {
     const interval = setInterval(checkFocusStatus, 60000); // Check every minute
 
     return () => clearInterval(interval);
-  }, []);
+  }, [isDistractionBlockingEnabled]);
 
   const handleComplete = () => {
     console.log('Focus session completed!');
+    if (isFocusActive && isDistractionBlockingEnabled) {
+      unblockNotifications();
+      unregisterDistractionBlocker();
+    }
   };
 
   const handleTimeUpdate = (timeLeft: number) => {
@@ -47,9 +64,20 @@ const FocusTimerScreen: React.FC = () => {
     setProgress(newProgress);
   };
 
+  const toggleDistractionBlocking = () => {
+    setIsDistractionBlockingEnabled(!isDistractionBlockingEnabled);
+    if (!isDistractionBlockingEnabled && isFocusActive) {
+      blockNotifications();
+      registerDistractionBlocker();
+    } else if (isDistractionBlockingEnabled && isFocusActive) {
+      unblockNotifications();
+      unregisterDistractionBlocker();
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <FocusIndicator isFocusActive={isFocusActive} />
+      <FocusIndicator isFocusActive={isFocusActive} isDistractionBlockingActive={isFocusActive && isDistractionBlockingEnabled} />
       {currentEvent && (
         <View style={styles.eventInfo}>
           <Text style={styles.eventTitle}>{currentEvent.title}</Text>
@@ -60,6 +88,16 @@ const FocusTimerScreen: React.FC = () => {
       )}
       <FocusTimer duration={duration} onComplete={handleComplete} onTimeUpdate={handleTimeUpdate} />
       <ProgressBar progress={progress} />
+
+      <View style={styles.settingsRow}>
+        <Text style={styles.settingsLabel}>Distraction Blocking</Text>
+        <Switch
+          value={isDistractionBlockingEnabled}
+          onValueChange={toggleDistractionBlocking}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={isDistractionBlockingEnabled ? '#f5dd4b' : '#f4f3f4'}
+        />
+      </View>
     </View>
   );
 };
@@ -83,6 +121,17 @@ const styles = StyleSheet.create({
   eventTime: {
     fontSize: 14,
     color: '#666',
+  },
+  settingsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  settingsLabel: {
+    fontSize: 16,
   },
 });
 
