@@ -9,72 +9,78 @@ interface MotionData {
 }
 
 export const useMotionDetector = () => {
-  const [motionData, setMotionData] = useState<MotionData[]>([]);
   const [isStill, setIsStill] = useState(false);
+  const [motionData, setMotionData] = useState<MotionData[]>([]);
+  const [stillnessDuration, setStillnessDuration] = useState(0);
 
   useEffect(() => {
     let subscription: any;
 
-    const startMotionDetection = async () => {
-      subscription = Accelerometer.addListener((data) => {
-        const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
-        const newData = {
-          x: data.x,
-          y: data.y,
-          z: data.z,
-          timestamp: Date.now(),
-        };
+    // Start accelerometer
+    Accelerometer.setUpdateInterval(1000); // 1 second interval
+    subscription = Accelerometer.addListener((data) => {
+      const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
+      const newData = { ...data, magnitude, timestamp: Date.now() };
 
-        setMotionData(prev => [...prev, newData].slice(-120)); // Keep last 2 minutes of data (1 sample per second)
-
-        // Check if stillness is detected
-        if (prev.length >= 120) { // 120 samples = 2 minutes
-          const avgMagnitude = prev.reduce((sum, item) => {
-            const itemMagnitude = Math.sqrt(item.x * item.x + item.y * item.y + item.z * item.z);
-            return sum + itemMagnitude;
-          }, 0) / prev.length;
-
-          setIsStill(avgMagnitude < 0.05); // Threshold for stillness
-        }
+      setMotionData(prev => {
+        const updatedData = [...prev, newData].slice(-120); // Keep last 2 minutes (120 samples)
+        return updatedData;
       });
+    });
 
-      Accelerometer.setUpdateInterval(1000); // Update every second
-    };
+    // Check for stillness every 2 minutes
+    const interval = setInterval(() => {
+      if (motionData.length >= 120) { // At least 2 minutes of data
+        const recentData = motionData.slice(-120); // Last 2 minutes
+        const avgMagnitude = recentData.reduce((sum, data) => sum + data.magnitude, 0) / recentData.length;
 
-    startMotionDetection();
+        if (avgMagnitude < 0.05) { // Threshold for stillness
+          setStillnessDuration(prev => prev + 2); // Increment by 2 minutes
+          if (stillnessDuration >= 10) {
+            setIsStill(true);
+          }
+        } else {
+          setStillnessDuration(0);
+          setIsStill(false);
+        }
+      }
+    }, 120000); // Check every 2 minutes
 
     return () => {
       if (subscription) {
         subscription.remove();
       }
+      clearInterval(interval);
     };
-  }, []);
+  }, [motionData, stillnessDuration]);
 
-  return { motionData, isStill };
+  return { isStill, stillnessDuration };
 };
 
 export const detectStillness = async (durationSeconds: number): Promise<boolean> => {
   return new Promise((resolve) => {
-    const startTime = Date.now();
-    let stillnessCount = 0;
-    let subscription: any;
+    let stillCount = 0;
+    const requiredSamples = Math.floor(durationSeconds / 2); // 1 sample per 2 seconds
 
-    subscription = Accelerometer.addListener((data) => {
+    const subscription = Accelerometer.addListener((data) => {
       const magnitude = Math.sqrt(data.x * data.x + data.y * data.y + data.z * data.z);
 
-      if (magnitude < 0.05) {
-        stillnessCount++;
+      if (magnitude < 0.05) { // Stillness threshold
+        stillCount++;
       } else {
-        stillnessCount = 0;
+        stillCount = 0;
       }
 
-      const elapsedSeconds = (Date.now() - startTime) / 1000;
-      if (elapsedSeconds >= durationSeconds) {
+      if (stillCount >= requiredSamples) {
         subscription.remove();
-        resolve(stillnessCount >= durationSeconds); // Need continuous stillness for full duration
+        resolve(true);
       }
     });
 
-    Accelerometer.setUpdateInterval(1000);
+    // Set timeout to prevent hanging
+    setTimeout(() => {
+      subscription.remove();
+      resolve(false);
+    }, durationSeconds * 1000);
   });
 };

@@ -1,19 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, Button, StyleSheet, Switch, Alert } from 'react-native';
 import { EmergencyAlert } from '@/components/EmergencyAlert';
 import { useAppStore } from '@/store/useAppStore';
 
 export default function SettingsScreen() {
-  const { isPremium, setPremiumStatus } = useAppStore();
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(false);
+  const { isPremium, setPremiumStatus, emergencyContact, setEmergencyContact } = useAppStore();
+  const [phoneNumber, setPhoneNumber] = useState(emergencyContact || '');
+  const [isEmergencyEnabled, setIsEmergencyEnabled] = useState(!!emergencyContact);
+
+  useEffect(() => {
+    if (emergencyContact) {
+      setPhoneNumber(emergencyContact);
+      setIsEmergencyEnabled(true);
+    }
+  }, [emergencyContact]);
 
   const handleSaveContact = () => {
     if (!phoneNumber) {
       Alert.alert('Error', 'Please enter a valid phone number');
       return;
     }
-    // In a real app, you would save this to your backend or local storage
+
+    // Basic phone number validation
+    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    if (!phoneRegex.test(phoneNumber)) {
+      Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
+    setEmergencyContact(phoneNumber);
     Alert.alert('Success', 'Emergency contact saved');
   };
 
@@ -22,6 +37,12 @@ export default function SettingsScreen() {
       Alert.alert('Premium Feature', 'Emergency alerts require a premium subscription');
       return;
     }
+
+    if (!isEmergencyEnabled && !phoneNumber) {
+      Alert.alert('Error', 'Please save an emergency contact first');
+      return;
+    }
+
     setIsEmergencyEnabled(!isEmergencyEnabled);
   };
 
@@ -38,11 +59,13 @@ export default function SettingsScreen() {
           value={phoneNumber}
           onChangeText={setPhoneNumber}
           keyboardType="phone-pad"
+          editable={isPremium}
         />
 
         <Button
           title="Save Contact"
           onPress={handleSaveContact}
+          disabled={!isPremium}
         />
 
         <View style={styles.toggleContainer}>
@@ -68,6 +91,10 @@ export default function SettingsScreen() {
           onPress={() => Alert.alert('Premium', 'Subscription management would go here')}
         />
       </View>
+
+      {isPremium && (
+        <EmergencyAlert isPremium={isPremium} />
+      )}
     </View>
   );
 }

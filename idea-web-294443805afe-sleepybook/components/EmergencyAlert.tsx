@@ -18,6 +18,7 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
   const [isEnabled, setIsEnabled] = useState(false);
   const [stillnessDuration, setStillnessDuration] = useState(0);
   const [lastAlertTime, setLastAlertTime] = useState<Date | null>(null);
+  const [isMonitoring, setIsMonitoring] = useState(false);
 
   const { emergencyContact, setEmergencyContact } = useAppStore();
 
@@ -30,6 +31,10 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
     // Register background task
     TaskManager.defineTask(EMERGENCY_TASK_NAME, async () => {
       try {
+        if (!isEnabled || !emergencyContact) {
+          return BackgroundFetch.BackgroundFetchResult.NoData;
+        }
+
         const stillnessDetected = await detectStillness(120); // Check last 2 minutes
         if (stillnessDetected) {
           setStillnessDuration(prev => prev + 2); // Increment by 2 minutes
@@ -54,24 +59,50 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
 
         return BackgroundFetch.BackgroundFetchResult.NewData;
       } catch (error) {
+        console.error('Error in emergency alert task:', error);
         return BackgroundFetch.BackgroundFetchResult.Failed;
       }
     });
 
-    // Register background fetch
-    BackgroundFetch.registerTaskAsync(EMERGENCY_TASK_NAME, {
-      minimumInterval: 120, // 2 minutes
-      stopOnTerminate: false,
-      startOnBoot: true,
-    });
+    return () => {
+      // Clean up background task
+      TaskManager.unregisterTaskAsync(EMERGENCY_TASK_NAME);
+    };
+  }, [emergencyContact, stillnessDuration, lastAlertTime, isEnabled]);
+
+  useEffect(() => {
+    // Register/unregister background fetch based on isEnabled
+    if (isEnabled && isPremium) {
+      BackgroundFetch.registerTaskAsync(EMERGENCY_TASK_NAME, {
+        minimumInterval: 120, // 2 minutes
+        stopOnTerminate: false,
+        startOnBoot: true,
+      }).then(() => {
+        setIsMonitoring(true);
+      }).catch(error => {
+        console.error('Failed to register background fetch:', error);
+        Alert.alert('Error', 'Failed to start emergency monitoring');
+      });
+    } else {
+      BackgroundFetch.unregisterTaskAsync(EMERGENCY_TASK_NAME).then(() => {
+        setIsMonitoring(false);
+      });
+    }
 
     return () => {
       BackgroundFetch.unregisterTaskAsync(EMERGENCY_TASK_NAME);
     };
-  }, [emergencyContact, stillnessDuration, lastAlertTime]);
+  }, [isEnabled, isPremium]);
 
   const handleSaveContact = () => {
     if (!phoneNumber) {
+      Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
+    // Basic phone number validation
+    const phoneRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s\.]?[0-9]{3}[-\s\.]?[0-9]{4,6}$/;
+    if (!phoneRegex.test(phoneNumber)) {
       Alert.alert('Error', 'Please enter a valid phone number');
       return;
     }
@@ -83,6 +114,11 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
   const toggleEmergencyAlert = () => {
     if (!isPremium) {
       Alert.alert('Premium Feature', 'Emergency alerts require a premium subscription');
+      return;
+    }
+
+    if (!isEnabled && !phoneNumber) {
+      Alert.alert('Error', 'Please save an emergency contact first');
       return;
     }
 
@@ -139,6 +175,9 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
               Alert in: {10 - stillnessDuration} minutes
             </Text>
           )}
+          <Text style={styles.monitoringStatus}>
+            {isMonitoring ? 'Monitoring active' : 'Monitoring inactive'}
+          </Text>
         </View>
       )}
     </View>
@@ -192,10 +231,16 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 16,
-    marginBottom: 4,
+    marginBottom: 8,
   },
   countdownText: {
+    fontSize: 16,
+    color: '#e67e22',
+    fontWeight: 'bold',
+  },
+  monitoringStatus: {
     fontSize: 14,
-    color: '#666',
+    color: '#7f8c8d',
+    marginTop: 8,
   },
 });

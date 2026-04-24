@@ -7,6 +7,8 @@ interface AppState {
   setEmergencyContact: (contact: string) => void;
   isPremium: boolean;
   setPremiumStatus: (isPremium: boolean) => void;
+  lastAlertTime: Date | null;
+  setLastAlertTime: (time: Date | null) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -16,10 +18,17 @@ export const useAppStore = create<AppState>()(
       setEmergencyContact: (contact) => set({ emergencyContact: contact }),
       isPremium: false,
       setPremiumStatus: (isPremium) => set({ isPremium }),
+      lastAlertTime: null,
+      setLastAlertTime: (time) => set({ lastAlertTime: time }),
     }),
     {
       name: 'app-storage',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        emergencyContact: state.emergencyContact,
+        isPremium: state.isPremium,
+        lastAlertTime: state.lastAlertTime,
+      }),
     }
   )
 );
