@@ -48,8 +48,8 @@ const ReplayView = ({ log }) => {
         setIsPlaying(false);
       }}
     >
-      <Text style={styles.stepText}>{item.timestamp}</Text>
-      <Text style={styles.stepText}>{item.message}</Text>
+      <Text style={styles.timestamp}>{item.timestamp}</Text>
+      <Text style={styles.message}>{item.message}</Text>
     </TouchableOpacity>
   );
 
@@ -58,6 +58,7 @@ const ReplayView = ({ log }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Log Replay: {log.id}</Text>
+      <Text style={styles.description}>{log.message}</Text>
 
       <View style={styles.controls}>
         <Button
@@ -77,7 +78,7 @@ const ReplayView = ({ log }) => {
       </View>
 
       <View style={styles.progressContainer}>
-        <Text>Step {currentStep + 1} of {logSteps.length}</Text>
+        <Text style={styles.progressText}>Step {currentStep + 1} of {logSteps.length}</Text>
       </View>
 
       <FlatList
@@ -96,11 +97,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     margin: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 5,
+    color: '#333',
+  },
+  description: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 15,
   },
   controls: {
     flexDirection: 'row',
@@ -111,19 +120,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 10,
   },
+  progressText: {
+    fontSize: 14,
+    color: '#555',
+  },
   stepsList: {
     maxHeight: 300,
   },
   stepItem: {
-    padding: 10,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
+    backgroundColor: 'white',
   },
   activeStep: {
     backgroundColor: '#e3f2fd',
   },
-  stepText: {
+  timestamp: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+  },
+  message: {
     fontSize: 14,
+    color: '#333',
   },
 });
 
