@@ -1,6 +1,6 @@
 import React, { useContext, useEffect, useState } from 'react';
-import { View, StyleSheet, Image, TouchableOpacity, Share, Platform } from 'react-native';
-import { ActivityIndicator, Text, IconButton, Snackbar } from 'react-native-paper';
+import { View, StyleSheet, Image, TouchableOpacity, Share, Platform, ActivityIndicator } from 'react-native';
+import { Text, IconButton, Snackbar } from 'react-native-paper';
 import VideoPlayer from '../components/VideoPlayer';
 import { AppContext } from '../context/AppContext';
 import * as Cast from 'expo-cast';
@@ -30,12 +30,15 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
   const [snackbarVisible, setSnackbarVisible] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
   const [isCasting, setIsCasting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const foundChannel = channels.find(ch => ch.id === channelId);
     if (foundChannel) {
       setChannel(foundChannel);
       setIsFavorite(favorites.some(fav => fav.id === channelId));
+    } else {
+      setError('Channel not found');
     }
     setIsLoading(false);
 
@@ -93,8 +96,22 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#6200ee" />
         <Text style={styles.loadingText}>Loading channel...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <IconButton
+          icon="arrow-left"
+          size={24}
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        />
       </View>
     );
   }
@@ -107,6 +124,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
           icon="arrow-left"
           size={24}
           onPress={() => navigation.goBack()}
+          style={styles.backButton}
         />
       </View>
     );
@@ -120,6 +138,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
           streamUrl={channel.streamUrl}
           channelName={channel.name}
           currentProgram={channel.currentProgram}
+          onError={(errorMessage) => setError(errorMessage)}
         />
       </View>
 
@@ -174,57 +193,68 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
   },
   loadingText: {
-    color: '#fff',
     marginTop: 16,
     fontSize: 16,
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000',
+    backgroundColor: '#fff',
+    padding: 20,
   },
   errorText: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
+    color: '#d32f2f',
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  backButton: {
+    marginTop: 10,
+  },
+  playerContainer: {
+    height: 250,
+    backgroundColor: '#000',
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 16,
-    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   channelLogo: {
-    width: 40,
-    height: 40,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     marginRight: 12,
   },
   channelInfo: {
     flex: 1,
   },
   channelName: {
-    color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   programTitle: {
-    color: '#fff',
     fontSize: 14,
+    color: '#666',
     marginTop: 4,
   },
   nextProgram: {
-    color: '#aaa',
     fontSize: 12,
+    color: '#999',
     marginTop: 2,
   },
   headerButtons: {
@@ -234,23 +264,18 @@ const styles = StyleSheet.create({
   favoriteButton: {
     marginRight: 8,
   },
-  playerContainer: {
-    flex: 1,
-  },
   programInfo: {
     padding: 16,
-    backgroundColor: '#1a1a1a',
   },
   sectionTitle: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-    marginTop: 8,
+    color: '#333',
+    marginBottom: 8,
   },
   programDescription: {
-    color: '#fff',
     fontSize: 14,
-    marginTop: 4,
+    color: '#666',
     marginBottom: 16,
   },
   snackbar: {
