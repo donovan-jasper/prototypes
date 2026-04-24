@@ -173,6 +173,8 @@ export default function LessonEditorScreen() {
               value={content}
               onChangeText={handleContentChange}
               multiline
+              autoCapitalize="sentences"
+              autoCorrect
               textAlignVertical="top"
             />
           </View>
@@ -182,27 +184,133 @@ export default function LessonEditorScreen() {
   );
 }
 
+const markdownStyles = {
+  heading1: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+    color: '#000000',
+  },
+  heading2: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 12,
+    marginBottom: 6,
+    color: '#000000',
+  },
+  heading3: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 4,
+    color: '#000000',
+  },
+  heading4: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginTop: 8,
+    marginBottom: 2,
+    color: '#000000',
+  },
+  heading5: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    marginTop: 6,
+    marginBottom: 2,
+    color: '#000000',
+  },
+  heading6: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginTop: 4,
+    marginBottom: 2,
+    color: '#000000',
+  },
+  text: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#000000',
+    marginBottom: 8,
+  },
+  list_item: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: '#000000',
+    marginBottom: 4,
+  },
+  bullet_list: {
+    marginLeft: 20,
+    marginBottom: 8,
+  },
+  ordered_list: {
+    marginLeft: 20,
+    marginBottom: 8,
+  },
+  code_inline: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 4,
+    padding: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  code_block: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 4,
+    padding: 12,
+    marginVertical: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  fence: {
+    backgroundColor: '#F2F2F7',
+    borderRadius: 4,
+    padding: 12,
+    marginVertical: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier New' : 'monospace',
+  },
+  blockquote: {
+    backgroundColor: '#F2F2F7',
+    borderLeftWidth: 4,
+    borderLeftColor: '#C7C7CC',
+    paddingLeft: 12,
+    marginVertical: 8,
+    paddingVertical: 8,
+  },
+  hr: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#C7C7CC',
+    marginVertical: 16,
+  },
+  link: {
+    color: '#007AFF',
+    textDecorationLine: 'underline',
+  },
+  image: {
+    marginVertical: 8,
+    alignSelf: 'center',
+  },
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },
-  headerButton: {
-    padding: 8,
-  },
   headerActions: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    marginLeft: 8,
   },
   scrollView: {
     flex: 1,
@@ -211,153 +319,77 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   titleContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
   titleInput: {
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#000000',
-    padding: 16,
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
   editorContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    minHeight: 400,
+    flex: 1,
   },
   contentInput: {
     fontSize: 16,
-    color: '#000000',
-    padding: 16,
-    minHeight: 400,
     lineHeight: 24,
-  },
-  previewContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    color: '#000000',
+    minHeight: 300,
+    padding: 8,
     borderWidth: 1,
     borderColor: '#E5E5EA',
+    borderRadius: 8,
+    textAlignVertical: 'top',
+  },
+  previewContainer: {
+    flex: 1,
     padding: 16,
-    minHeight: 400,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
   },
   previewHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    marginBottom: 12,
   },
   previewHeaderText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: '#8E8E93',
+    marginLeft: 8,
   },
   emptyPreview: {
     fontSize: 16,
-    color: '#C7C7CC',
+    color: '#8E8E93',
     textAlign: 'center',
     marginTop: 32,
   },
   errorState: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 32,
   },
   errorTitle: {
-    fontSize: 20,
+    fontSize: 19,
     fontWeight: '600',
     color: '#000000',
     marginTop: 16,
     marginBottom: 24,
   },
   backButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingVertical: 12,
-    borderRadius: 12,
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
   },
   backButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
     color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '500',
   },
 });
-
-const markdownStyles = {
-  body: {
-    fontSize: 16,
-    color: '#000000',
-    lineHeight: 24,
-  },
-  heading1: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#000000',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  heading2: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  heading3: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  paragraph: {
-    marginTop: 0,
-    marginBottom: 12,
-  },
-  strong: {
-    fontWeight: '700',
-  },
-  em: {
-    fontStyle: 'italic',
-  },
-  bullet_list: {
-    marginBottom: 12,
-  },
-  ordered_list: {
-    marginBottom: 12,
-  },
-  list_item: {
-    marginBottom: 4,
-  },
-  code_inline: {
-    backgroundColor: '#F2F2F7',
-    color: '#FF3B30',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: 4,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  code_block: {
-    backgroundColor: '#F2F2F7',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  blockquote: {
-    backgroundColor: '#F2F2F7',
-    borderLeftWidth: 4,
-    borderLeftColor: '#007AFF',
-    paddingLeft: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
-  },
-};

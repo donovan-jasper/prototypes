@@ -153,6 +153,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                   course.id === id ? { ...course, ...updates } : course
                 )
               }));
+
               resolve();
             }
           );
@@ -180,6 +181,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                   set(state => ({
                     courses: state.courses.filter(course => course.id !== id)
                   }));
+
                   resolve();
                 }
               );
@@ -260,6 +262,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                     : course
                 )
               }));
+
               resolve();
             }
           );
@@ -290,6 +293,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                     : course
                 )
               }));
+
               resolve();
             }
           );
@@ -306,7 +310,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     return new Promise((resolve, reject) => {
       db.transaction(
         tx => {
-          // Update each lesson's order in the database
+          // Update order for each lesson in the database
           lessons.forEach((lesson, index) => {
             tx.executeSql(
               'UPDATE lessons SET "order" = ? WHERE id = ?',
