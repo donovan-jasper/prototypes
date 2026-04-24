@@ -1,8 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   Image,
   TextInput,
@@ -10,16 +9,21 @@ import {
   ActivityIndicator,
   ScrollView,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
+import { Camera, useCameraDevice, useCameraFormat } from 'react-native-vision-camera';
+import { useOCR, TextBlock } from 'vision-camera-ocr';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import { scanDocument, hasValidOCR } from '@/lib/ocr';
+import * as FileSystem from 'expo-file-system';
 import { extractTransaction } from '@/lib/parser';
 import { hashDocument } from '@/lib/crypto';
 import { addDocument, addTransaction } from '@/lib/database';
 import { isFreeTier, showPaywall } from '@/lib/subscription';
+import { useOnDeviceOCR } from '@/lib/ocr';
 
 export default function CaptureScreen() {
+  const cameraRef = useRef<Camera>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [ocrText, setOcrText] = useState<string>('');
   const [date, setDate] = useState<string>('');
@@ -27,6 +31,16 @@ export default function CaptureScreen() {
   const [payee, setPayee] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+
+  const {
+    device,
+    format,
+    frameProcessor,
+    processImage: processImageWithOCR,
+    isProcessing: isOcrProcessing,
+    error: ocrError,
+  } = useOnDeviceOCR();
 
   const resetForm = () => {
     setImageUri(null);
@@ -35,6 +49,7 @@ export default function CaptureScreen() {
     setAmount('');
     setPayee('');
     setError(null);
+    setIsCameraActive(false);
   };
 
   const handleTakePhoto = async () => {
@@ -45,18 +60,33 @@ export default function CaptureScreen() {
         return;
       }
 
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-        allowsEditing: true,
+      setIsCameraActive(true);
+    } catch (err) {
+      setError('Failed to access camera. Please try again.');
+      console.error('Camera error:', err);
+    }
+  };
+
+  const takePicture = async () => {
+    if (!cameraRef.current) return;
+
+    setIsProcessing(true);
+    setError(null);
+
+    try {
+      const photo = await cameraRef.current.takePhoto({
+        qualityPrioritization: 'quality',
+        enableShutterSound: false,
       });
 
-      if (!result.canceled && result.assets[0]) {
-        await processImage(result.assets[0].uri);
-      }
+      const uri = `file://${photo.path}`;
+      await processImage(uri);
+      setIsCameraActive(false);
     } catch (err) {
       setError('Failed to take photo. Please try again.');
-      console.error('Camera error:', err);
+      console.error('Camera capture error:', err);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -82,36 +112,22 @@ export default function CaptureScreen() {
     setImageUri(uri);
 
     try {
-      // Extract text using OCR
-      const text = await scanDocument(uri);
+      // Process with on-device OCR
+      const text = await processImageWithOCR(uri);
       setOcrText(text);
 
-      // Check if OCR was successful
-      if (hasValidOCR(text)) {
-        // Parse transaction details
-        const transaction = extractTransaction(text);
-        
-        if (transaction) {
-          setDate(transaction.date.toISOString().split('T')[0]);
-          setAmount(Math.abs(transaction.amount).toString());
-          setPayee(transaction.payee);
-        } else {
-          // If parsing fails, allow manual entry
-          setError('Could not automatically extract transaction details. Please enter manually.');
-        }
+      // Parse transaction details
+      const transaction = extractTransaction(text);
+
+      if (transaction) {
+        setDate(transaction.date.toISOString().split('T')[0]);
+        setAmount(Math.abs(transaction.amount).toString());
+        setPayee(transaction.payee);
       } else {
-        // OCR returned empty or failed
-        setError('Could not extract text from image. Please enter details manually.');
+        setError('Could not automatically extract transaction details. Please enter manually.');
       }
-    } catch (err: any) {
-      // Handle specific error types
-      if (err.message?.includes('Network error')) {
-        setError('Network error: Please check your internet connection and try again.');
-      } else if (err.message?.includes('OCR service configuration')) {
-        setError('OCR service is not configured. Please enter details manually.');
-      } else {
-        setError('Failed to process image. Please enter details manually.');
-      }
+    } catch (err) {
+      setError('Failed to process image with on-device OCR. Please enter details manually.');
       console.error('OCR error:', err);
     } finally {
       setIsProcessing(false);
@@ -168,7 +184,7 @@ export default function CaptureScreen() {
         uri: imageUri,
         hash,
         uploadDate: new Date(),
-        ocrText,
+        ocrText: ocrText,
       });
 
       // Add transaction to database
@@ -176,15 +192,14 @@ export default function CaptureScreen() {
         id: '',
         date: new Date(date),
         amount: parsedAmount,
-        payee,
-        type: parsedAmount >= 0 ? 'deposit' : 'withdrawal',
-        documentId: documentId as string,
+        payee: payee,
+        type: parsedAmount > 0 ? 'deposit' : 'withdrawal',
+        documentId: documentId,
         documentHash: hash,
       });
 
-      Alert.alert('Success', 'Transaction saved successfully!', [
-        { text: 'OK', onPress: resetForm },
-      ]);
+      Alert.alert('Success', 'Transaction saved successfully!');
+      resetForm();
     } catch (err) {
       setError('Failed to save transaction. Please try again.');
       console.error('Save error:', err);
@@ -193,18 +208,53 @@ export default function CaptureScreen() {
     }
   };
 
+  if (isCameraActive && device) {
+    return (
+      <View style={styles.container}>
+        <Camera
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          device={device}
+          isActive={true}
+          photo={true}
+          format={format}
+          frameProcessor={frameProcessor}
+        />
+        <View style={styles.cameraControls}>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={takePicture}
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <View style={styles.captureButtonInner} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => setIsCameraActive(false)}
+          >
+            <Text style={styles.closeButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.button}
+          style={styles.actionButton}
           onPress={handleTakePhoto}
           disabled={isProcessing}
         >
           <Text style={styles.buttonText}>Take Photo</Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.button}
+          style={styles.actionButton}
           onPress={handleUploadDocument}
           disabled={isProcessing}
         >
@@ -212,10 +262,16 @@ export default function CaptureScreen() {
         </TouchableOpacity>
       </View>
 
+      {imageUri && (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="contain" />
+        </View>
+      )}
+
       {isProcessing && (
-        <View style={styles.loadingContainer}>
+        <View style={styles.processingContainer}>
           <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Processing document...</Text>
+          <Text style={styles.processingText}>Processing document...</Text>
         </View>
       )}
 
@@ -225,55 +281,47 @@ export default function CaptureScreen() {
         </View>
       )}
 
-      {imageUri && !isProcessing && (
-        <View style={styles.previewContainer}>
-          <Text style={styles.sectionTitle}>Document Preview</Text>
-          <Image source={{ uri: imageUri }} style={styles.preview} />
+      <View style={styles.formContainer}>
+        <Text style={styles.label}>Date</Text>
+        <TextInput
+          style={styles.input}
+          value={date}
+          onChangeText={setDate}
+          placeholder="YYYY-MM-DD"
+          keyboardType="default"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-          <Text style={styles.sectionTitle}>Transaction Details</Text>
-          
-          <Text style={styles.label}>Date</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="YYYY-MM-DD"
-            value={date}
-            onChangeText={setDate}
-          />
+        <Text style={styles.label}>Amount</Text>
+        <TextInput
+          style={styles.input}
+          value={amount}
+          onChangeText={setAmount}
+          placeholder="0.00"
+          keyboardType="numeric"
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
 
-          <Text style={styles.label}>Amount</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="0.00"
-            keyboardType="numeric"
-            value={amount}
-            onChangeText={setAmount}
-          />
+        <Text style={styles.label}>Payee</Text>
+        <TextInput
+          style={styles.input}
+          value={payee}
+          onChangeText={setPayee}
+          placeholder="Payee name"
+          autoCapitalize="words"
+          autoCorrect={false}
+        />
 
-          <Text style={styles.label}>Payee</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Store or person name"
-            value={payee}
-            onChangeText={setPayee}
-          />
-
-          <TouchableOpacity
-            style={[styles.saveButton, isProcessing && styles.disabledButton]}
-            onPress={handleSave}
-            disabled={isProcessing}
-          >
-            <Text style={styles.saveButtonText}>Save Transaction</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cancelButton}
-            onPress={resetForm}
-            disabled={isProcessing}
-          >
-            <Text style={styles.cancelButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSave}
+          disabled={isProcessing}
+        >
+          <Text style={styles.saveButtonText}>Save Transaction</Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -281,103 +329,119 @@ export default function CaptureScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
+  },
+  contentContainer: {
+    padding: 20,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  button: {
+  actionButton: {
     flex: 1,
     backgroundColor: '#007AFF',
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
-    marginHorizontal: 4,
+    marginHorizontal: 5,
     alignItems: 'center',
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: 'white',
     fontWeight: '600',
   },
-  loadingContainer: {
+  imagePreviewContainer: {
+    marginVertical: 20,
     alignItems: 'center',
-    marginVertical: 32,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#e0e0e0',
+  },
+  processingContainer: {
+    marginVertical: 20,
+    alignItems: 'center',
+  },
+  processingText: {
+    marginTop: 10,
     color: '#666',
   },
   errorContainer: {
+    marginVertical: 10,
+    padding: 10,
     backgroundColor: '#ffebee',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
+    borderRadius: 4,
   },
   errorText: {
-    color: '#c62828',
-    fontSize: 14,
+    color: '#d32f2f',
   },
-  previewContainer: {
-    marginTop: 16,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    marginTop: 16,
-  },
-  preview: {
-    width: '100%',
-    height: 300,
-    borderRadius: 8,
-    marginBottom: 16,
-    resizeMode: 'contain',
+  formContainer: {
+    marginTop: 20,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
-    marginBottom: 8,
+    marginBottom: 5,
     color: '#333',
   },
   input: {
-    height: 48,
-    borderColor: '#ddd',
-    borderWidth: 1,
+    backgroundColor: 'white',
+    padding: 12,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    marginBottom: 16,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#ddd',
     fontSize: 16,
   },
   saveButton: {
-    backgroundColor: '#34C759',
-    padding: 16,
+    backgroundColor: '#28a745',
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 20,
   },
   saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
+    color: 'white',
     fontWeight: '600',
+    fontSize: 16,
   },
-  disabledButton: {
-    opacity: 0.5,
-  },
-  cancelButton: {
-    backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 8,
+  cameraControls: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
-  cancelButtonText: {
-    color: '#333',
+  captureButton: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'white',
+  },
+  captureButtonInner: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: 'white',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    padding: 10,
+  },
+  closeButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
