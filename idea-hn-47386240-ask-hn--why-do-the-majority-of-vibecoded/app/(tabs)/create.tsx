@@ -171,16 +171,14 @@ const styles = StyleSheet.create({
   },
   stepTitle: {
     marginBottom: 8,
-    fontWeight: 'bold',
   },
   stepDescription: {
     marginBottom: 16,
     color: '#666',
-    lineHeight: 20,
   },
   nextButton: {
     marginTop: 16,
-    paddingVertical: 8,
+    alignSelf: 'flex-end',
   },
   navigationButtons: {
     flexDirection: 'row',
@@ -190,6 +188,5 @@ const styles = StyleSheet.create({
   backButton: {
     flex: 1,
     marginRight: 8,
-    paddingVertical: 8,
   },
 });

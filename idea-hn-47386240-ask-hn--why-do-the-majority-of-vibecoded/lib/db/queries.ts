@@ -5,7 +5,7 @@ export async function createProject(data: Omit<Project, 'id' | 'createdAt' | 'up
   const db = await getDatabase();
   const id = `proj_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   const now = Date.now();
-  
+
   const project: Project = {
     id,
     ...data,
@@ -41,10 +41,10 @@ export async function getAllProjects(): Promise<Project[]> {
 export async function updateProject(id: string, data: Partial<Omit<Project, 'id' | 'createdAt'>>): Promise<void> {
   const db = await getDatabase();
   const now = Date.now();
-  
+
   const updates: string[] = [];
   const values: any[] = [];
-  
+
   if (data.name !== undefined) {
     updates.push('name = ?');
     values.push(data.name);
@@ -57,7 +57,7 @@ export async function updateProject(id: string, data: Partial<Omit<Project, 'id'
     updates.push('appType = ?');
     values.push(data.appType);
   }
-  
+
   updates.push('updatedAt = ?');
   values.push(now);
   values.push(id);
@@ -76,7 +76,7 @@ export async function deleteProject(id: string): Promise<void> {
 export async function createScreen(data: Omit<Screen, 'id'>): Promise<Screen> {
   const db = await getDatabase();
   const id = `screen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const screen: Screen = {
     id,
     ...data,
@@ -106,7 +106,7 @@ export async function getScreensByProject(projectId: string): Promise<Screen[]> 
 export async function createComponent(data: Omit<Component, 'id'>): Promise<Component> {
   const db = await getDatabase();
   const id = `comp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
+
   const component: Component = {
     id,
     ...data,

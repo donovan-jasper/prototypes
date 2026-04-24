@@ -169,37 +169,14 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
             </Button>
           </View>
         )}
-      </View>
 
-      <View style={styles.navigationButtons}>
         {currentQuestionIndex > 0 && (
           <Button
             mode="outlined"
             onPress={goBack}
             style={styles.backButton}
           >
-            Previous
-          </Button>
-        )}
-        {currentQuestionIndex < questions.length - 1 && (
-          <Button
-            mode="contained"
-            onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
-            style={styles.nextButton}
-            disabled={!answers[currentQuestion.id]}
-          >
-            Next
-          </Button>
-        )}
-        {currentQuestionIndex === questions.length - 1 && (
-          <Button
-            mode="contained"
-            onPress={submitAnswers}
-            style={styles.submitButton}
-            disabled={!answers[currentQuestion.id] || submitting}
-            loading={submitting}
-          >
-            {submitting ? 'Submitting...' : 'Complete'}
+            Back
           </Button>
         )}
       </View>
@@ -215,7 +192,6 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    marginBottom: 8,
     textAlign: 'center',
   },
   subtitle: {
@@ -228,50 +204,38 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   questionContainer: {
-    marginBottom: 24,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   questionText: {
     marginBottom: 16,
-    fontWeight: 'bold',
   },
   textInput: {
-    backgroundColor: '#fff',
+    marginBottom: 16,
   },
   optionsContainer: {
-    marginTop: 8,
+    marginBottom: 16,
   },
   optionButton: {
     marginBottom: 8,
-    justifyContent: 'flex-start',
-    paddingHorizontal: 16,
   },
   booleanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
+    justifyContent: 'space-around',
+    marginBottom: 16,
   },
   booleanButton: {
     flex: 1,
     marginHorizontal: 4,
   },
-  navigationButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
-  },
   backButton: {
-    flex: 1,
-    marginRight: 8,
-    paddingVertical: 8,
-  },
-  nextButton: {
-    flex: 1,
-    marginLeft: 8,
-    paddingVertical: 8,
-  },
-  submitButton: {
-    flex: 1,
-    paddingVertical: 8,
+    marginTop: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -281,7 +245,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
-    color: '#666',
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1,

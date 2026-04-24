@@ -1,120 +1,106 @@
+import { Component } from '@/types/component';
 import { IntentResult } from './intentParser';
-
-interface SuggestedComponent {
-  type: string;
-  props: Record<string, any>;
-  position: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-}
 
 interface SuggestedScreen {
   name: string;
-  components: SuggestedComponent[];
+  components: Component[];
 }
 
 export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
   const screens: SuggestedScreen[] = [];
 
-  // Common screens for all apps
-  screens.push({
-    name: 'Onboarding',
-    components: [
-      {
-        type: 'header',
-        props: {
-          title: 'Welcome',
-          subtitle: 'Get started with our app',
-          textAlign: 'center'
-        },
-        position: { x: 0, y: 0, width: '100%', height: 'auto' }
+  // Common components for all apps
+  const commonComponents: Component[] = [
+    {
+      id: 'header',
+      type: 'header',
+      props: {
+        title: 'App Name',
+        showBackButton: false,
       },
-      {
-        type: 'image',
-        props: {
-          source: 'https://example.com/onboarding-image.jpg',
-          resizeMode: 'contain',
-          height: 200
-        },
-        position: { x: 0, y: 80, width: '100%', height: 200 }
+      position: { x: 0, y: 0 },
+      order: 0,
+    },
+    {
+      id: 'footer',
+      type: 'footer',
+      props: {
+        items: [
+          { label: 'Home', icon: 'home' },
+          { label: 'Search', icon: 'search' },
+          { label: 'Profile', icon: 'account' },
+        ],
       },
-      {
-        type: 'button',
-        props: {
-          label: 'Get Started',
-          variant: 'primary',
-          size: 'large'
-        },
-        position: { x: 20, y: 300, width: '90%', height: 50 }
-      }
-    ]
-  });
+      position: { x: 0, y: 'auto' },
+      order: 100,
+    },
+  ];
 
-  // App type specific screens
+  // App type specific screens and components
   switch (intent.appType) {
     case 'social':
       screens.push({
         name: 'Feed',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
-            props: {
-              title: 'Feed',
-              showBackButton: false
-            },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
-          },
-          {
+            id: 'post-list',
             type: 'feed',
             props: {
-              itemType: 'post',
-              showAvatars: true,
-              showActions: true
+              items: [
+                {
+                  user: 'User1',
+                  content: 'Check out this post!',
+                  likes: 42,
+                  comments: 12,
+                },
+                {
+                  user: 'User2',
+                  content: 'Another interesting post',
+                  likes: 28,
+                  comments: 5,
+                },
+              ],
             },
-            position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 120px)' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
-          {
-            type: 'fab',
-            props: {
-              icon: 'plus',
-              position: 'bottom-right',
-              color: 'primary'
-            },
-            position: { x: 'auto', y: 'auto', width: 56, height: 56 }
-          }
-        ]
+        ],
       });
 
       screens.push({
         name: 'Profile',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
-            props: {
-              title: 'Profile',
-              showBackButton: true
-            },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
-          },
-          {
+            id: 'profile-header',
             type: 'profile-header',
             props: {
-              showEditButton: true
+              name: 'User Name',
+              bio: 'App user',
+              avatar: 'https://example.com/avatar.jpg',
+              followers: 120,
+              following: 80,
             },
-            position: { x: 0, y: 60, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'tab-bar',
+            id: 'user-posts',
+            type: 'feed',
             props: {
-              tabs: ['Posts', 'About', 'Photos'],
-              initialTab: 'Posts'
+              items: [
+                {
+                  content: 'My first post!',
+                  likes: 15,
+                  comments: 3,
+                },
+              ],
             },
-            position: { x: 0, y: 200, width: '100%', height: 'auto' }
-          }
-        ]
+            position: { x: 0, y: 200 },
+            order: 2,
+          },
+        ],
       });
       break;
 
@@ -122,107 +108,102 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
       screens.push({
         name: 'Product List',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
-            props: {
-              title: 'Shop',
-              showSearch: true
-            },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
-          },
-          {
+            id: 'product-grid',
             type: 'product-grid',
             props: {
-              columns: 2,
-              showPrice: true,
-              showAddToCart: true
+              items: [
+                {
+                  name: 'Product 1',
+                  price: '$19.99',
+                  image: 'https://example.com/product1.jpg',
+                },
+                {
+                  name: 'Product 2',
+                  price: '$29.99',
+                  image: 'https://example.com/product2.jpg',
+                },
+              ],
             },
-            position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 120px)' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
-          {
-            type: 'filter-button',
-            props: {
-              position: 'top-right'
-            },
-            position: { x: 'auto', y: 10, width: 40, height: 40 }
-          }
-        ]
+        ],
       });
 
       screens.push({
         name: 'Product Detail',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
+            id: 'product-image',
+            type: 'image',
             props: {
-              title: 'Product',
-              showBackButton: true
+              source: 'https://example.com/product1.jpg',
+              resizeMode: 'cover',
             },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'product-image',
-            props: {
-              height: 300
-            },
-            position: { x: 0, y: 60, width: '100%', height: 300 }
-          },
-          {
+            id: 'product-info',
             type: 'product-info',
             props: {
-              showPrice: true,
-              showDescription: true
+              name: 'Product 1',
+              price: '$19.99',
+              description: 'This is a great product that solves your needs.',
+              rating: 4.5,
             },
-            position: { x: 0, y: 360, width: '100%', height: 'auto' }
+            position: { x: 0, y: 300 },
+            order: 2,
           },
           {
+            id: 'add-to-cart',
             type: 'button',
             props: {
               label: 'Add to Cart',
               variant: 'primary',
-              size: 'large'
             },
-            position: { x: 20, y: 450, width: '90%', height: 50 }
-          }
-        ]
+            position: { x: 0, y: 500 },
+            order: 3,
+          },
+        ],
       });
 
       screens.push({
         name: 'Cart',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
+            id: 'cart-items',
+            type: 'cart-list',
             props: {
-              title: 'Cart',
-              showBackButton: true
+              items: [
+                {
+                  name: 'Product 1',
+                  price: '$19.99',
+                  quantity: 1,
+                },
+              ],
+              subtotal: '$19.99',
+              shipping: '$5.00',
+              total: '$24.99',
             },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'cart-items',
-            props: {
-              showRemoveButton: true
-            },
-            position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 200px)' }
-          },
-          {
-            type: 'cart-summary',
-            props: {
-              showTotal: true,
-              showTax: true
-            },
-            position: { x: 0, y: 'auto', width: '100%', height: 100 }
-          },
-          {
+            id: 'checkout',
             type: 'button',
             props: {
-              label: 'Checkout',
+              label: 'Proceed to Checkout',
               variant: 'primary',
-              size: 'large'
             },
-            position: { x: 20, y: 'auto', width: '90%', height: 50 }
-          }
-        ]
+            position: { x: 0, y: 400 },
+            order: 2,
+          },
+        ],
       });
       break;
 
@@ -230,224 +211,186 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
       screens.push({
         name: 'Dashboard',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
-            props: {
-              title: 'Dashboard',
-              showBackButton: false
-            },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
-          },
-          {
+            id: 'stats',
             type: 'stats-grid',
             props: {
               items: [
-                { label: 'Workouts', value: '0' },
-                { label: 'Calories', value: '0' },
-                { label: 'Minutes', value: '0' }
-              ]
+                { label: 'Workouts', value: '12' },
+                { label: 'Calories', value: '1,200' },
+                { label: 'Weight', value: '180 lbs' },
+              ],
             },
-            position: { x: 0, y: 60, width: '100%', height: 120 }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'progress-chart',
+            id: 'recent-workouts',
+            type: 'list',
             props: {
-              type: 'weekly',
-              height: 200
+              items: [
+                { title: 'Morning Run', subtitle: '30 min' },
+                { title: 'Weight Training', subtitle: '45 min' },
+              ],
             },
-            position: { x: 0, y: 180, width: '100%', height: 200 }
+            position: { x: 0, y: 200 },
+            order: 2,
           },
-          {
-            type: 'button',
-            props: {
-              label: 'Start Workout',
-              variant: 'primary',
-              size: 'large'
-            },
-            position: { x: 20, y: 400, width: '90%', height: 50 }
-          }
-        ]
+        ],
       });
 
       screens.push({
-        name: 'Workout',
+        name: 'Workout Log',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
+            id: 'workout-form',
+            type: 'form',
             props: {
-              title: 'Workout',
-              showBackButton: true
+              fields: [
+                { label: 'Workout Type', type: 'select', options: ['Run', 'Walk', 'Swim', 'Cycle'] },
+                { label: 'Duration', type: 'number', unit: 'minutes' },
+                { label: 'Calories', type: 'number' },
+                { label: 'Notes', type: 'text' },
+              ],
             },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'workout-timer',
-            props: {
-              initialTime: 30
-            },
-            position: { x: 0, y: 60, width: '100%', height: 100 }
-          },
-          {
-            type: 'exercise-list',
-            props: {
-              showReps: true,
-              showTimer: true
-            },
-            position: { x: 0, y: 160, width: '100%', height: 'calc(100% - 220px)' }
-          },
-          {
+            id: 'save-workout',
             type: 'button',
             props: {
-              label: 'Finish Workout',
+              label: 'Save Workout',
               variant: 'primary',
-              size: 'large'
             },
-            position: { x: 20, y: 'auto', width: '90%', height: 50 }
-          }
-        ]
+            position: { x: 0, y: 400 },
+            order: 2,
+          },
+        ],
       });
       break;
 
-    default:
-      // Default screens for utility apps
+    default: // utility or other app types
       screens.push({
         name: 'Home',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
+            id: 'welcome',
+            type: 'text',
             props: {
-              title: 'Home',
-              showBackButton: false
+              content: 'Welcome to your app!',
+              variant: 'headline',
             },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
           {
-            type: 'main-content',
-            props: {
-              content: 'Welcome to your app!'
-            },
-            position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 120px)' }
-          },
-          {
+            id: 'main-action',
             type: 'button',
             props: {
               label: 'Get Started',
               variant: 'primary',
-              size: 'large'
             },
-            position: { x: 20, y: 'auto', width: '90%', height: 50 }
-          }
-        ]
+            position: { x: 0, y: 150 },
+            order: 2,
+          },
+        ],
       });
 
       screens.push({
-        name: 'Main Feature',
+        name: 'Settings',
         components: [
+          ...commonComponents,
           {
-            type: 'header',
+            id: 'settings-list',
+            type: 'list',
             props: {
-              title: 'Main Feature',
-              showBackButton: true
+              items: [
+                { title: 'Account', icon: 'account' },
+                { title: 'Notifications', icon: 'bell' },
+                { title: 'Privacy', icon: 'lock' },
+                { title: 'About', icon: 'information' },
+              ],
             },
-            position: { x: 0, y: 0, width: '100%', height: 'auto' }
+            position: { x: 0, y: 50 },
+            order: 1,
           },
-          {
-            type: 'feature-content',
-            props: {
-              content: 'This is where the main functionality of your app will be.'
-            },
-            position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 120px)' }
-          },
-          {
-            type: 'button',
-            props: {
-              label: 'Action',
-              variant: 'primary',
-              size: 'large'
-            },
-            position: { x: 20, y: 'auto', width: '90%', height: 50 }
-          }
-        ]
+        ],
       });
   }
 
-  // Add common screens for all apps
-  screens.push({
-    name: 'Login',
-    components: [
-      {
-        type: 'header',
-        props: {
-          title: 'Login',
-          showBackButton: true
+  // Add authentication screens if needed
+  if (intent.keyFeatures.includes('login') || intent.keyFeatures.includes('signup')) {
+    screens.push({
+      name: 'Login',
+      components: [
+        {
+          id: 'login-form',
+          type: 'form',
+          props: {
+            fields: [
+              { label: 'Email', type: 'email' },
+              { label: 'Password', type: 'password' },
+            ],
+          },
+          position: { x: 0, y: 50 },
+          order: 1,
         },
-        position: { x: 0, y: 0, width: '100%', height: 'auto' }
-      },
-      {
-        type: 'input',
-        props: {
-          label: 'Email',
-          placeholder: 'Enter your email',
-          keyboardType: 'email-address',
-          autoCapitalize: 'none'
+        {
+          id: 'login-button',
+          type: 'button',
+          props: {
+            label: 'Login',
+            variant: 'primary',
+          },
+          position: { x: 0, y: 250 },
+          order: 2,
         },
-        position: { x: 20, y: 80, width: '90%', height: 60 }
-      },
-      {
-        type: 'input',
-        props: {
-          label: 'Password',
-          placeholder: 'Enter your password',
-          secureTextEntry: true
+        {
+          id: 'forgot-password',
+          type: 'button',
+          props: {
+            label: 'Forgot Password?',
+            variant: 'text',
+          },
+          position: { x: 0, y: 300 },
+          order: 3,
         },
-        position: { x: 20, y: 150, width: '90%', height: 60 }
-      },
-      {
-        type: 'button',
-        props: {
-          label: 'Login',
-          variant: 'primary',
-          size: 'large'
-        },
-        position: { x: 20, y: 240, width: '90%', height: 50 }
-      },
-      {
-        type: 'text',
-        props: {
-          content: 'Forgot password?',
-          textAlign: 'center',
-          color: 'primary'
-        },
-        position: { x: 0, y: 310, width: '100%', height: 'auto' }
-      }
-    ]
-  });
+      ],
+    });
 
-  screens.push({
-    name: 'Settings',
-    components: [
-      {
-        type: 'header',
-        props: {
-          title: 'Settings',
-          showBackButton: true
+    screens.push({
+      name: 'Signup',
+      components: [
+        {
+          id: 'signup-form',
+          type: 'form',
+          props: {
+            fields: [
+              { label: 'Name', type: 'text' },
+              { label: 'Email', type: 'email' },
+              { label: 'Password', type: 'password' },
+            ],
+          },
+          position: { x: 0, y: 50 },
+          order: 1,
         },
-        position: { x: 0, y: 0, width: '100%', height: 'auto' }
-      },
-      {
-        type: 'settings-list',
-        props: {
-          items: [
-            { label: 'Account', icon: 'account' },
-            { label: 'Notifications', icon: 'bell' },
-            { label: 'Privacy', icon: 'lock' },
-            { label: 'Help', icon: 'help' }
-          ]
+        {
+          id: 'signup-button',
+          type: 'button',
+          props: {
+            label: 'Create Account',
+            variant: 'primary',
+          },
+          position: { x: 0, y: 300 },
+          order: 2,
         },
-        position: { x: 0, y: 60, width: '100%', height: 'calc(100% - 60px)' }
-      }
-    ]
-  });
+      ],
+    });
+  }
 
   return screens;
 }

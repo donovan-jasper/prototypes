@@ -60,7 +60,7 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
       setIsRecording(false);
       setIsTranscribing(true);
 
-      // In a real app, you would send the audio file to a transcription service
+      // In a real app, you would send the audio file to Whisper API
       // For this prototype, we'll simulate transcription
       setTimeout(async () => {
         // Use the actual transcription if available, otherwise use a default
@@ -141,55 +141,57 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
         Describe Your App Idea
       </Text>
 
-      <View style={styles.controls}>
-        <Button
-          mode="contained"
-          onPress={isRecording ? stopRecording : startRecording}
-          icon={isRecording ? 'stop' : 'microphone'}
-          style={styles.recordButton}
-          disabled={isTranscribing}
-          loading={isRecording}
-        >
-          {isRecording ? 'Stop Recording' : 'Start Recording'}
-        </Button>
-
-        <Text variant="bodyMedium" style={styles.hintText}>
-          {isRecording ? 'Speak clearly into your microphone...' : 'Tap the microphone to start recording'}
-        </Text>
-      </View>
-
-      <View style={styles.transcriptionContainer}>
-        <Text variant="titleMedium" style={styles.sectionTitle}>
-          Transcription
-        </Text>
+      <View style={styles.controlContainer}>
         <TextInput
           mode="outlined"
           multiline
           numberOfLines={4}
           value={transcription}
           onChangeText={setTranscription}
-          style={styles.transcriptionInput}
-          placeholder="Your spoken idea will appear here..."
-          disabled={isTranscribing}
+          style={styles.textInput}
+          placeholder="Type your app idea here or use voice input..."
+          disabled={isRecording || isTranscribing}
         />
-        {isTranscribing && (
-          <View style={styles.transcribingIndicator}>
-            <ActivityIndicator animating={true} size="small" />
-            <Text style={styles.transcribingText}>Transcribing...</Text>
-          </View>
-        )}
+
+        <View style={styles.buttonContainer}>
+          {!isRecording ? (
+            <IconButton
+              icon="microphone"
+              size={30}
+              onPress={startRecording}
+              disabled={isTranscribing}
+              style={styles.recordButton}
+            />
+          ) : (
+            <IconButton
+              icon="stop"
+              size={30}
+              onPress={stopRecording}
+              style={styles.stopButton}
+            />
+          )}
+
+          <Button
+            mode="contained"
+            onPress={handleTextSubmit}
+            disabled={isRecording || isTranscribing || !transcription.trim()}
+            style={styles.submitButton}
+          >
+            {isTranscribing ? (
+              <>
+                <ActivityIndicator animating={true} color="#fff" />
+                <Text style={styles.buttonText}>Processing...</Text>
+              </>
+            ) : 'Create Prototype'}
+          </Button>
+        </View>
       </View>
 
-      <View style={styles.actions}>
-        <Button
-          mode="contained"
-          onPress={handleTextSubmit}
-          disabled={!transcription.trim() || isTranscribing}
-          style={styles.submitButton}
-        >
-          Continue with This Description
-        </Button>
-      </View>
+      {isRecording && (
+        <View style={styles.recordingIndicator}>
+          <Text style={styles.recordingText}>Recording...</Text>
+        </View>
+      )}
     </View>
   );
 }
@@ -202,43 +204,38 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
-  controls: {
-    alignItems: 'center',
-    marginBottom: 24,
+  controlContainer: {
+    marginBottom: 16,
   },
-  recordButton: {
-    marginBottom: 8,
-    paddingHorizontal: 24,
-    paddingVertical: 8,
+  textInput: {
+    marginBottom: 16,
   },
-  hintText: {
-    color: '#666',
-    textAlign: 'center',
-  },
-  transcriptionContainer: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    marginBottom: 8,
-    fontWeight: 'bold',
-  },
-  transcriptionInput: {
-    backgroundColor: '#fff',
-  },
-  transcribingIndicator: {
+  buttonContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
   },
-  transcribingText: {
-    marginLeft: 8,
-    color: '#666',
+  recordButton: {
+    backgroundColor: '#ff4444',
+    marginRight: 8,
   },
-  actions: {
-    marginTop: 16,
+  stopButton: {
+    backgroundColor: '#ff4444',
+    marginRight: 8,
   },
   submitButton: {
-    paddingVertical: 8,
+    flex: 1,
+  },
+  buttonText: {
+    color: '#fff',
+    marginLeft: 8,
+  },
+  recordingIndicator: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  recordingText: {
+    color: '#ff4444',
+    fontWeight: 'bold',
   },
 });

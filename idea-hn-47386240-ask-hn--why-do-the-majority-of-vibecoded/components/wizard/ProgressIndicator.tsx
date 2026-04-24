@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, ProgressBar } from 'react-native-paper';
+import { Text } from 'react-native-paper';
 
 interface ProgressIndicatorProps {
   currentStep: number;
@@ -9,60 +9,55 @@ interface ProgressIndicatorProps {
 }
 
 export default function ProgressIndicator({ currentStep, totalSteps, stepNames }: ProgressIndicatorProps) {
-  const progress = (currentStep + 1) / totalSteps;
-
   return (
     <View style={styles.container}>
-      <ProgressBar progress={progress} style={styles.progressBar} />
-
-      <View style={styles.stepsContainer}>
-        {stepNames.map((name, index) => (
-          <View key={index} style={styles.stepItem}>
-            <View style={[
-              styles.stepCircle,
-              index <= currentStep ? styles.activeStep : styles.inactiveStep
-            ]}>
-              <Text style={[
-                styles.stepNumber,
-                index <= currentStep ? styles.activeStepText : styles.inactiveStepText
-              ]}>
-                {index + 1}
-              </Text>
-            </View>
+      {stepNames.map((name, index) => (
+        <View key={index} style={styles.stepContainer}>
+          <View style={[
+            styles.stepCircle,
+            index <= currentStep ? styles.activeStep : styles.inactiveStep
+          ]}>
             <Text style={[
-              styles.stepName,
+              styles.stepNumber,
               index <= currentStep ? styles.activeStepText : styles.inactiveStepText
             ]}>
-              {name}
+              {index + 1}
             </Text>
           </View>
-        ))}
-      </View>
+          <Text style={[
+            styles.stepName,
+            index <= currentStep ? styles.activeStepText : styles.inactiveStepText
+          ]}>
+            {name}
+          </Text>
+          {index < totalSteps - 1 && (
+            <View style={[
+              styles.connector,
+              index < currentStep ? styles.activeConnector : styles.inactiveConnector
+            ]} />
+          )}
+        </View>
+      ))}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 24,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 16,
-  },
-  stepsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+    paddingHorizontal: 16,
   },
-  stepItem: {
+  stepContainer: {
     alignItems: 'center',
     flex: 1,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
@@ -85,5 +80,18 @@ const styles = StyleSheet.create({
   stepName: {
     fontSize: 12,
     textAlign: 'center',
+  },
+  connector: {
+    position: 'absolute',
+    top: 15,
+    left: '50%',
+    right: '-50%',
+    height: 2,
+  },
+  activeConnector: {
+    backgroundColor: '#6200ee',
+  },
+  inactiveConnector: {
+    backgroundColor: '#e0e0e0',
   },
 });
