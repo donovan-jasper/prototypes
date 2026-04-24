@@ -173,7 +173,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
   loadingText: {
     marginTop: 10,
@@ -185,18 +184,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#fff',
   },
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
-    marginBottom: 20,
     textAlign: 'center',
+    marginBottom: 20,
   },
   retryButton: {
     backgroundColor: '#2196F3',
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: '#fff',
@@ -211,7 +209,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginTop: 20,
     marginBottom: 10,
     color: '#444',
   },
@@ -221,7 +218,7 @@ const styles = StyleSheet.create({
   audioButton: {
     backgroundColor: '#4CAF50',
     padding: 12,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
   },
   audioButtonText: {
@@ -233,14 +230,14 @@ const styles = StyleSheet.create({
   },
   entityItem: {
     backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   entityType: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   entityValue: {
     fontSize: 16,
@@ -260,3 +257,5 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
 });
+
+export default ExtractionScreen;
