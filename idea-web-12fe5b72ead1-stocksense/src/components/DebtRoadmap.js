@@ -2,8 +2,8 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { ProgressBar } from 'react-native-paper';
 
-const DebtRoadmap = ({ debts, monthlyIncome, totalDebt, totalPayoffMonths, totalInterestSaved }) => {
-  if (!debts || debts.length === 0) {
+const DebtRoadmap = ({ debtPlan }) => {
+  if (!debtPlan || !debtPlan.debts || debtPlan.debts.length === 0) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Debt Payoff Roadmap</Text>
@@ -13,11 +13,17 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt, totalPayoffMonths, total
   }
 
   // Calculate total monthly payment
-  const totalMonthlyPayment = debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
+  const totalMonthlyPayment = debtPlan.debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
 
   // Calculate payoff time in years and months
-  const payoffYears = Math.floor(totalPayoffMonths / 12);
-  const payoffMonths = totalPayoffMonths % 12;
+  const payoffYears = Math.floor(debtPlan.totalPayoffMonths / 12);
+  const payoffMonths = debtPlan.totalPayoffMonths % 12;
+
+  // Calculate monthly progress for each debt
+  const calculateMonthlyProgress = (debt) => {
+    const monthsToPayoff = Math.ceil(debt.amount / debt.monthlyPayment);
+    return Math.min(1, debt.monthlyPayment / debt.amount);
+  };
 
   return (
     <View style={styles.container}>
@@ -26,7 +32,7 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt, totalPayoffMonths, total
       <View style={styles.summaryContainer}>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Total Debt</Text>
-          <Text style={styles.summaryValue}>${totalDebt.toLocaleString()}</Text>
+          <Text style={styles.summaryValue}>${debtPlan.totalDebt.toLocaleString()}</Text>
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Monthly Payment</Text>
@@ -41,24 +47,24 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt, totalPayoffMonths, total
         </View>
         <View style={styles.summaryItem}>
           <Text style={styles.summaryLabel}>Total Interest Saved</Text>
-          <Text style={styles.summaryValue}>${totalInterestSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+          <Text style={styles.summaryValue}>${debtPlan.totalInterestSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
         </View>
       </View>
 
-      <View style={styles.debtsContainer}>
-        <Text style={styles.sectionTitle}>Your Debts</Text>
-        {debts.map((debt, index) => (
-          <View key={index} style={styles.debtItem}>
-            <View style={styles.debtHeader}>
+      <View style={styles.timelineContainer}>
+        <Text style={styles.sectionTitle}>Monthly Progress</Text>
+        {debtPlan.debts.map((debt, index) => (
+          <View key={index} style={styles.timelineItem}>
+            <View style={styles.timelineHeader}>
               <Text style={styles.debtName}>{debt.name}</Text>
               <Text style={styles.debtAmount}>${debt.amount.toLocaleString()}</Text>
             </View>
-            <View style={styles.debtDetails}>
+            <View style={styles.timelineDetails}>
               <Text style={styles.debtInterest}>{debt.interestRate}% APR</Text>
               <Text style={styles.debtPayment}>Monthly Payment: ${debt.monthlyPayment.toFixed(2)}</Text>
             </View>
             <ProgressBar
-              progress={debt.monthlyPayment / debt.amount}
+              progress={calculateMonthlyProgress(debt)}
               color="#007AFF"
               style={styles.progressBar}
             />
@@ -117,7 +123,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  debtsContainer: {
+  timelineContainer: {
     marginTop: 20,
   },
   sectionTitle: {
@@ -126,13 +132,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     color: '#333',
   },
-  debtItem: {
+  timelineItem: {
     marginBottom: 15,
     padding: 15,
     backgroundColor: '#f8f8f8',
     borderRadius: 8,
   },
-  debtHeader: {
+  timelineHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 5,
@@ -147,7 +153,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#007AFF',
   },
-  debtDetails: {
+  timelineDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
@@ -179,8 +185,8 @@ const styles = StyleSheet.create({
   tipTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
     marginBottom: 5,
+    color: '#007AFF',
   },
   tipText: {
     fontSize: 14,
