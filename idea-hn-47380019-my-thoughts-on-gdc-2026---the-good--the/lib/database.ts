@@ -153,14 +153,28 @@ export const addArtistWork = async (work: Omit<ArtistWork, 'id'>): Promise<numbe
   });
 };
 
-// New function to increment artist followers
-export const incrementArtistFollowers = async (artistId: number): Promise<void> => {
+// New function to update artist followers count
+export const updateArtistFollowers = async (artistId: number, increment: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'UPDATE artists SET followers = followers + 1 WHERE id = ?;',
-        [artistId],
+        'UPDATE artists SET followers = followers + ? WHERE id = ?;',
+        [increment, artistId],
         () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// New function to search artists by style
+export const searchArtistsByStyle = async (styleQuery: string): Promise<Artist[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM artists WHERE style LIKE ? ORDER BY followers DESC;',
+        [`%${styleQuery}%`],
+        (_, { rows }) => resolve(rows._array as Artist[]),
         (_, error) => reject(error)
       );
     });

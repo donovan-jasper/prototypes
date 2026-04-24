@@ -72,7 +72,8 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
       prompt: prompt,
       timestamp: new Date().toISOString(),
       attributionId: `attribution-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      styleInfluences: creditedArtists.map(artist => artist.style)
+      styleInfluences: creditedArtists.map(artist => artist.style),
+      trainingDataSources: ['OpenAI training data']
     };
 
     return {
@@ -162,4 +163,10 @@ const detectStyleMatches = (prompt: string, artists: Artist[]): Artist[] => {
   }
 
   return matches;
+};
+
+// New function to check if a prompt matches any registered artist styles
+export const checkStyleMatches = async (prompt: string): Promise<Artist[]> => {
+  const artists = await getArtists();
+  return detectStyleMatches(prompt, artists);
 };

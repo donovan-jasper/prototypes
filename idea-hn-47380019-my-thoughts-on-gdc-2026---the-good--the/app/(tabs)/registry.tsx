@@ -145,82 +145,82 @@ export default function RegistryScreen() {
 
   const renderArtistItem = ({ item }: { item: Artist }) => (
     <TouchableOpacity onPress={() => handleArtistSelect(item)} style={styles.artistItem}>
-      <Avatar.Image size={60} source={{ uri: item.profileImage }} />
+      <Avatar.Image
+        size={60}
+        source={{ uri: item.profileImage }}
+        style={styles.artistAvatar}
+      />
       <View style={styles.artistInfo}>
         <Text style={styles.artistName}>{item.name}</Text>
         <Text style={styles.artistStyle}>{item.style}</Text>
         <Text style={styles.artistFollowers}>{item.followers} followers</Text>
       </View>
-      <Ionicons name="chevron-forward" size={24} color="#6200ee" />
+      <Ionicons name="chevron-forward" size={24} color="#666" />
     </TouchableOpacity>
   );
 
-  const renderWorkItem = ({ item }: { item: ArtistWork }) => (
+  const renderArtistWork = ({ item }: { item: ArtistWork }) => (
     <Card style={styles.workCard}>
       <Card.Cover source={{ uri: item.imageUrl }} />
       <Card.Content>
-        <Paragraph>{item.description || 'No description available'}</Paragraph>
+        <Paragraph>{item.description}</Paragraph>
       </Card.Content>
     </Card>
   );
 
-  if (isLoading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200ee" />
-        <Text style={styles.loadingText}>Loading...</Text>
+  return (
+    <SafeAreaView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Creator Credit Registry</Text>
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search artists or styles..."
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+        />
       </View>
-    );
-  }
 
-  if (selectedArtist) {
-    return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => setSelectedArtist(null)}>
-            <Ionicons name="arrow-back" size={24} color="#6200ee" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Artist Profile</Text>
-          <View style={{ width: 24 }} />
-        </View>
-
-        <ScrollView style={styles.profileContainer}>
-          <View style={styles.profileHeader}>
-            <Avatar.Image size={100} source={{ uri: selectedArtist.profileImage }} />
-            <View style={styles.profileInfo}>
+      {isLoading ? (
+        <ActivityIndicator size="large" style={styles.loading} />
+      ) : selectedArtist ? (
+        <ScrollView style={styles.artistDetailContainer}>
+          <View style={styles.artistHeader}>
+            <Avatar.Image
+              size={100}
+              source={{ uri: selectedArtist.profileImage }}
+              style={styles.artistDetailAvatar}
+            />
+            <View style={styles.artistDetailInfo}>
               <Title>{selectedArtist.name}</Title>
-              <Paragraph>{selectedArtist.style}</Paragraph>
-              <Text style={styles.followersText}>{selectedArtist.followers} followers</Text>
+              <Paragraph style={styles.artistDetailStyle}>{selectedArtist.style}</Paragraph>
+              <Paragraph>{selectedArtist.followers} followers</Paragraph>
+              <Paragraph style={styles.artistEarnings}>Earnings: ${artistEarnings.toFixed(2)}</Paragraph>
             </View>
           </View>
 
           <Divider style={styles.divider} />
 
-          <View style={styles.bioSection}>
+          <View style={styles.bioContainer}>
             <Title>About</Title>
             <Paragraph>{selectedArtist.bio}</Paragraph>
           </View>
 
           <Divider style={styles.divider} />
 
-          <View style={styles.earningsSection}>
-            <Title>Earnings</Title>
-            <Text style={styles.earningsAmount}>${artistEarnings.toFixed(2)}</Text>
-          </View>
-
-          <Divider style={styles.divider} />
-
-          <View style={styles.worksSection}>
-            <Title>Credited Works</Title>
+          <View style={styles.portfolioContainer}>
+            <Title>Portfolio</Title>
             {artistWorks.length > 0 ? (
               <FlatList
                 data={artistWorks}
-                renderItem={renderWorkItem}
+                renderItem={renderArtistWork}
                 keyExtractor={(item) => item.id.toString()}
-                contentContainerStyle={styles.worksList}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.workList}
               />
             ) : (
-              <Text style={styles.noWorksText}>No credited works yet</Text>
+              <Paragraph>No works in portfolio yet.</Paragraph>
             )}
           </View>
 
@@ -232,118 +232,139 @@ export default function RegistryScreen() {
           >
             Send Tip
           </Button>
-        </ScrollView>
 
-        <Modal
-          visible={showTipModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowTipModal(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Title>Send Tip to {selectedArtist?.name}</Title>
-              <TextInput
-                style={styles.tipInput}
-                placeholder="Amount ($)"
-                keyboardType="numeric"
-                value={tipAmount}
-                onChangeText={setTipAmount}
-              />
-              <View style={styles.tipInfo}>
-                <Text>Your balance: ${user.balance?.toFixed(2) || '0.00'}</Text>
-                <Text>Fee: {user.premiumStatus ? '10%' : '15%'}</Text>
-              </View>
-              <View style={styles.modalButtons}>
-                <Button onPress={() => setShowTipModal(false)}>Cancel</Button>
-                <Button mode="contained" onPress={handleTipSubmit}>Send Tip</Button>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      </SafeAreaView>
-    );
-  }
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Creator Registry</Text>
-        <TouchableOpacity onPress={() => setShowRegisterModal(true)}>
-          <Ionicons name="add-circle-outline" size={24} color="#6200ee" />
-        </TouchableOpacity>
-      </View>
-
-      <TextInput
-        style={styles.searchInput}
-        placeholder="Search artists or styles..."
-        value={searchQuery}
-        onChangeText={setSearchQuery}
-      />
-
-      {filteredArtists.length > 0 ? (
-        <FlatList
-          data={filteredArtists}
-          renderItem={renderArtistItem}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.artistList}
-        />
-      ) : (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>No artists found</Text>
           <Button
             mode="outlined"
+            onPress={() => setSelectedArtist(null)}
+            style={styles.backButton}
+          >
+            Back to Registry
+          </Button>
+        </ScrollView>
+      ) : (
+        <View style={styles.artistListContainer}>
+          <FlatList
+            data={filteredArtists}
+            renderItem={renderArtistItem}
+            keyExtractor={(item) => item.id.toString()}
+            ListEmptyComponent={
+              <View style={styles.emptyList}>
+                <Text>No artists found. Be the first to register!</Text>
+              </View>
+            }
+          />
+          <Button
+            mode="contained"
             onPress={() => setShowRegisterModal(true)}
             style={styles.registerButton}
+            icon="add"
           >
             Register as Artist
           </Button>
         </View>
       )}
 
+      {/* Register Artist Modal */}
       <Modal
         visible={showRegisterModal}
-        transparent={true}
         animationType="slide"
         onRequestClose={() => setShowRegisterModal(false)}
       >
-        <View style={styles.modalContainer}>
+        <SafeAreaView style={styles.modalContainer}>
+          <ScrollView contentContainerStyle={styles.modalContent}>
+            <Title style={styles.modalTitle}>Register as Artist</Title>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Name"
+              value={newArtist.name}
+              onChangeText={(text) => setNewArtist({...newArtist, name: text})}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Style (e.g., 'Surrealism, Digital Art')"
+              value={newArtist.style}
+              onChangeText={(text) => setNewArtist({...newArtist, style: text})}
+            />
+
+            <TextInput
+              style={[styles.input, styles.bioInput]}
+              placeholder="Bio (describe your style and work)"
+              value={newArtist.bio}
+              onChangeText={(text) => setNewArtist({...newArtist, bio: text})}
+              multiline
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Profile Image URL"
+              value={newArtist.profileImage}
+              onChangeText={(text) => setNewArtist({...newArtist, profileImage: text})}
+            />
+
+            <View style={styles.buttonGroup}>
+              <Button
+                mode="contained"
+                onPress={handleRegisterSubmit}
+                disabled={isLoading}
+                loading={isLoading}
+              >
+                Register
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => setShowRegisterModal(false)}
+              >
+                Cancel
+              </Button>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Tip Modal */}
+      <Modal
+        visible={showTipModal}
+        animationType="slide"
+        onRequestClose={() => setShowTipModal(false)}
+      >
+        <SafeAreaView style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Title>Register as Artist</Title>
-            <ScrollView>
-              <TextInput
-                style={styles.input}
-                placeholder="Name"
-                value={newArtist.name}
-                onChangeText={(text) => setNewArtist({...newArtist, name: text})}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Style"
-                value={newArtist.style}
-                onChangeText={(text) => setNewArtist({...newArtist, style: text})}
-              />
-              <TextInput
-                style={[styles.input, styles.bioInput]}
-                placeholder="Bio"
-                multiline
-                numberOfLines={4}
-                value={newArtist.bio}
-                onChangeText={(text) => setNewArtist({...newArtist, bio: text})}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Profile Image URL"
-                value={newArtist.profileImage}
-                onChangeText={(text) => setNewArtist({...newArtist, profileImage: text})}
-              />
-              <View style={styles.modalButtons}>
-                <Button onPress={() => setShowRegisterModal(false)}>Cancel</Button>
-                <Button mode="contained" onPress={handleRegisterSubmit}>Register</Button>
-              </View>
-            </ScrollView>
+            <Title style={styles.modalTitle}>Send Tip to {selectedArtist?.name}</Title>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Amount ($)"
+              value={tipAmount}
+              onChangeText={setTipAmount}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.feeInfo}>
+              {user.premiumStatus
+                ? '10% fee (premium user)'
+                : '15% fee (free user)'}
+            </Text>
+
+            <View style={styles.buttonGroup}>
+              <Button
+                mode="contained"
+                onPress={handleTipSubmit}
+                disabled={isLoading}
+                loading={isLoading}
+              >
+                Send Tip
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => setShowTipModal(false)}
+              >
+                Cancel
+              </Button>
+            </View>
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -355,161 +376,134 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   header: {
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  searchInput: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  artistListContainer: {
+    flex: 1,
+  },
+  artistItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  searchInput: {
-    padding: 12,
-    margin: 16,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-  },
-  artistList: {
-    padding: 16,
-  },
-  artistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    marginBottom: 8,
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+  artistAvatar: {
+    marginRight: 16,
   },
   artistInfo: {
     flex: 1,
-    marginLeft: 12,
   },
   artistName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   artistStyle: {
-    fontSize: 14,
     color: '#666',
+    marginVertical: 4,
   },
   artistFollowers: {
+    color: '#888',
     fontSize: 12,
-    color: '#999',
   },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+  emptyList: {
     padding: 16,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 16,
+    alignItems: 'center',
   },
   registerButton: {
+    margin: 16,
+  },
+  artistDetailContainer: {
+    flex: 1,
+    padding: 16,
+  },
+  artistHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  artistDetailAvatar: {
+    marginRight: 16,
+  },
+  artistDetailInfo: {
+    flex: 1,
+  },
+  artistDetailStyle: {
+    color: '#666',
+    marginVertical: 4,
+  },
+  artistEarnings: {
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  divider: {
+    marginVertical: 16,
+  },
+  bioContainer: {
+    marginBottom: 16,
+  },
+  portfolioContainer: {
+    marginBottom: 16,
+  },
+  workList: {
+    paddingVertical: 8,
+  },
+  workCard: {
+    width: 200,
+    marginRight: 12,
+  },
+  tipButton: {
     marginTop: 16,
+  },
+  backButton: {
+    marginTop: 8,
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#fff',
   },
   modalContent: {
-    width: '90%',
-    maxHeight: '80%',
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
+    padding: 16,
+  },
+  modalTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     padding: 12,
+    borderRadius: 8,
     marginBottom: 12,
   },
   bioInput: {
     height: 100,
     textAlignVertical: 'top',
   },
-  modalButtons: {
+  buttonGroup: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     marginTop: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  profileContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  profileHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  profileInfo: {
-    marginLeft: 16,
-    flex: 1,
-  },
-  followersText: {
-    color: '#666',
-    marginTop: 4,
-  },
-  divider: {
-    marginVertical: 16,
-  },
-  bioSection: {
-    marginBottom: 16,
-  },
-  earningsSection: {
-    marginBottom: 16,
-  },
-  earningsAmount: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#6200ee',
-    marginTop: 8,
-  },
-  worksSection: {
-    marginBottom: 16,
-  },
-  worksList: {
-    paddingBottom: 16,
-  },
-  workCard: {
-    marginBottom: 12,
-  },
-  noWorksText: {
+  feeInfo: {
     color: '#666',
     textAlign: 'center',
-    marginTop: 16,
-  },
-  tipButton: {
-    marginTop: 16,
-  },
-  tipInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 16,
-  },
-  tipInfo: {
     marginBottom: 16,
   },
 });

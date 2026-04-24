@@ -16,7 +16,7 @@ export const generateAttribution = async (params: {
     timestamp: params.timestamp ? params.timestamp.toISOString() : new Date().toISOString(),
     attributionId: `attribution-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     styleInfluences: creditedArtists.map(artist => artist.style),
-    trainingDataSources: ['OpenAI training data'] // Placeholder - would be more detailed in real implementation
+    trainingDataSources: ['OpenAI training data']
   };
 };
 
@@ -68,4 +68,24 @@ const detectStyleMatches = (prompt: string, artists: Artist[]): Artist[] => {
   }
 
   return matches;
+};
+
+// New function to get credited artists from a prompt
+export const getCreditedArtists = async (prompt: string): Promise<Artist[]> => {
+  const artists = await getArtists();
+  return detectStyleMatches(prompt, artists);
+};
+
+// New function to format attribution for sharing
+export const formatShareAttribution = (attribution: Attribution): string => {
+  let text = `Created with CrediGen using ${attribution.model}\n\n`;
+
+  if (attribution.styleInfluences && attribution.styleInfluences.length > 0) {
+    text += `Style influences: ${attribution.styleInfluences.join(', ')}\n\n`;
+  }
+
+  text += `Prompt: ${attribution.prompt}\n\n`;
+  text += `Generated on ${new Date(attribution.timestamp).toLocaleDateString()}`;
+
+  return text;
 };
