@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { GLView } from 'expo-gl';
-import { Renderer, TextureLoader, Scene, PerspectiveCamera, BoxGeometry, MeshBasicMaterial, Mesh } from 'expo-three';
+import { Renderer, TextureLoader, Scene, PerspectiveCamera, BoxGeometry, MeshBasicMaterial, Mesh, OBJLoader } from 'expo-three';
 import * as THREE from 'three';
 import { Asset } from 'expo-asset';
 import { AR } from 'expo';
@@ -21,6 +21,19 @@ const ARTryOnScreen = ({ route }) => {
     }
   }, [renderer, scene, camera, outfit]);
 
+  const loadModel = async (modelPath) => {
+    try {
+      const asset = Asset.fromModule(modelPath);
+      await asset.downloadAsync();
+      const loader = new OBJLoader();
+      const model = await loader.loadAsync(asset.localUri);
+      return model;
+    } catch (error) {
+      console.error('Error loading model:', error);
+      return null;
+    }
+  };
+
   const setupARScene = async () => {
     try {
       // Clear previous models
@@ -37,29 +50,32 @@ const ARTryOnScreen = ({ route }) => {
       avatar.position.set(0, -0.75, -1.5);
       scene.add(avatar);
 
-      // Add clothing items based on outfit
+      // Load and position clothing items
       if (outfit.top) {
-        const topGeometry = new BoxGeometry(0.4, 0.6, 0.1);
-        const topMaterial = new MeshBasicMaterial({ color: 0xFF0000 }); // Red shirt
-        const top = new Mesh(topGeometry, topMaterial);
-        top.position.set(0, 0.2, -1.5);
-        scene.add(top);
+        const shirtModel = await loadModel(require('../../assets/models/shirt.obj'));
+        if (shirtModel) {
+          shirtModel.position.set(0, 0.2, -1.5);
+          shirtModel.scale.set(0.3, 0.3, 0.3);
+          scene.add(shirtModel);
+        }
       }
 
       if (outfit.bottom) {
-        const bottomGeometry = new BoxGeometry(0.4, 0.8, 0.1);
-        const bottomMaterial = new MeshBasicMaterial({ color: 0x0000FF }); // Blue pants
-        const bottom = new Mesh(bottomGeometry, bottomMaterial);
-        bottom.position.set(0, -0.5, -1.5);
-        scene.add(bottom);
+        const pantsModel = await loadModel(require('../../assets/models/pants.obj'));
+        if (pantsModel) {
+          pantsModel.position.set(0, -0.5, -1.5);
+          pantsModel.scale.set(0.3, 0.3, 0.3);
+          scene.add(pantsModel);
+        }
       }
 
       if (outfit.accessory) {
-        const accessoryGeometry = new BoxGeometry(0.2, 0.2, 0.1);
-        const accessoryMaterial = new MeshBasicMaterial({ color: 0x00FF00 }); // Green accessory
-        const accessory = new Mesh(accessoryGeometry, accessoryMaterial);
-        accessory.position.set(0.2, 0.5, -1.5);
-        scene.add(accessory);
+        const accessoryModel = await loadModel(require('../../assets/models/accessory.obj'));
+        if (accessoryModel) {
+          accessoryModel.position.set(0.2, 0.5, -1.5);
+          accessoryModel.scale.set(0.2, 0.2, 0.2);
+          scene.add(accessoryModel);
+        }
       }
 
       // Set up AR session
