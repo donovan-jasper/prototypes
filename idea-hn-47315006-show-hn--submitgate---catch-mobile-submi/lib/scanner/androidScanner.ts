@@ -135,85 +135,62 @@ export const scanAPK = async (fileUri: string): Promise<ComplianceIssue[]> => {
     });
 
     // Check for required permissions
-    if (manifest.usesPermission) {
-      const requiredPermissions = [
-        'android.permission.INTERNET',
-        'android.permission.ACCESS_NETWORK_STATE'
-      ];
+    const requiredPermissions = [
+      'android.permission.INTERNET',
+      'android.permission.ACCESS_NETWORK_STATE'
+    ];
 
-      requiredPermissions.forEach(permission => {
-        const hasPermission = manifest.usesPermission.some((p: any) =>
-          p.$.name === permission
-        );
-
-        if (!hasPermission) {
+    if (manifest['uses-permission']) {
+      const declaredPermissions = manifest['uses-permission'].map((p: any) => p.$['android:name']);
+      requiredPermissions.forEach(perm => {
+        if (!declaredPermissions.includes(perm)) {
           issues.push({
             id: `issue-${Date.now()}`,
-            ruleId: `android_missing_permission_${permission.split('.').pop()}`,
-            title: `Missing Permission: ${permission}`,
-            description: `The APK is missing the required permission: ${permission}`,
+            ruleId: `android_missing_permission_${perm.split('.').pop()}`,
+            title: `Missing Permission: ${perm}`,
+            description: `The APK is missing the required permission: ${perm}`,
             severity: 'warning',
-            fix: 'Add the missing permission to your AndroidManifest.xml',
-            documentationUrl: 'https://developer.android.com/guide/topics/permissions/overview'
+            fix: `Add the permission to your AndroidManifest.xml: <uses-permission android:name="${perm}" />`,
+            documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-permission-element'
           });
         }
       });
-    }
-
-    // Check for required features
-    if (manifest.usesFeature) {
-      const requiredFeatures = [
-        'android.hardware.screen.portrait',
-        'android.hardware.screen.landscape'
-      ];
-
-      requiredFeatures.forEach(feature => {
-        const hasFeature = manifest.usesFeature.some((f: any) =>
-          f.$.name === feature && f.$['android:required'] === 'true'
-        );
-
-        if (!hasFeature) {
-          issues.push({
-            id: `issue-${Date.now()}`,
-            ruleId: `android_missing_feature_${feature.split('.').pop()}`,
-            title: `Missing Feature: ${feature}`,
-            description: `The APK is missing the required feature: ${feature}`,
-            severity: 'warning',
-            fix: 'Add the missing feature to your AndroidManifest.xml',
-            documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-feature-element'
-          });
-        }
+    } else {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'android_missing_permissions',
+        title: 'Missing Permissions',
+        description: 'The AndroidManifest.xml is missing required permissions',
+        severity: 'warning',
+        fix: 'Add the required permissions to your AndroidManifest.xml',
+        documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-permission-element'
       });
     }
 
-    // Check for required SDK version
-    if (manifest.usesSdk) {
-      const minSdk = manifest.usesSdk[0].$['android:minSdkVersion'];
-      const targetSdk = manifest.usesSdk[0].$['android:targetSdkVersion'];
-
-      if (!minSdk) {
+    // Check target SDK version
+    if (manifest.$['android:targetSdkVersion']) {
+      const targetSdk = parseInt(manifest.$['android:targetSdkVersion']);
+      if (targetSdk < 31) {
         issues.push({
           id: `issue-${Date.now()}`,
-          ruleId: 'android_missing_min_sdk',
-          title: 'Missing Minimum SDK Version',
-          description: 'The AndroidManifest.xml is missing the required android:minSdkVersion attribute',
-          severity: 'critical',
-          fix: 'Add the android:minSdkVersion attribute to your AndroidManifest.xml',
-          documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-sdk-element'
-        });
-      }
-
-      if (!targetSdk) {
-        issues.push({
-          id: `issue-${Date.now()}`,
-          ruleId: 'android_missing_target_sdk',
-          title: 'Missing Target SDK Version',
-          description: 'The AndroidManifest.xml is missing the required android:targetSdkVersion attribute',
+          ruleId: 'android_outdated_sdk',
+          title: 'Outdated Target SDK Version',
+          description: `The target SDK version (${targetSdk}) is below the recommended minimum of 31`,
           severity: 'warning',
-          fix: 'Add the android:targetSdkVersion attribute to your AndroidManifest.xml',
-          documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-sdk-element'
+          fix: 'Update the targetSdkVersion to at least 31 in your build.gradle file',
+          documentationUrl: 'https://developer.android.com/about/versions/12'
         });
       }
+    } else {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'android_missing_sdk_version',
+        title: 'Missing Target SDK Version',
+        description: 'The AndroidManifest.xml is missing the required android:targetSdkVersion attribute',
+        severity: 'critical',
+        fix: 'Add the android:targetSdkVersion attribute to your AndroidManifest.xml',
+        documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-sdk-element'
+      });
     }
 
     return issues;
@@ -222,8 +199,8 @@ export const scanAPK = async (fileUri: string): Promise<ComplianceIssue[]> => {
     return [{
       id: `issue-${Date.now()}`,
       ruleId: 'android_scan_error',
-      title: 'Scan Error',
-      description: 'An error occurred while scanning the APK file',
+      title: 'APK Scan Error',
+      description: 'An unexpected error occurred while scanning the APK file',
       severity: 'critical',
       fix: 'Try scanning a different APK file or contact support',
       documentationUrl: 'https://developer.android.com/studio/publish/preparing'

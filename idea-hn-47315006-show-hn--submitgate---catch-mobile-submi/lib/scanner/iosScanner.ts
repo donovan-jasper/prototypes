@@ -126,7 +126,7 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
         if (!appDir.file(`Assets.xcassets/AppIcon.appiconset/${icon}`)) {
           issues.push({
             id: `issue-${Date.now()}`,
-            ruleId: `ios_missing_icon_${icon}`,
+            ruleId: `ios_missing_icon_${icon.replace(/[^a-zA-Z0-9]/g, '_')}`,
             title: `Missing Icon: ${icon}`,
             description: `The app bundle is missing the required icon file: ${icon}`,
             severity: 'warning',
@@ -137,47 +137,37 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
       });
 
       // Check for required device capabilities
-      if (infoPlist.UIRequiredDeviceCapabilities) {
-        const requiredCapabilities = infoPlist.UIRequiredDeviceCapabilities;
-        if (!Array.isArray(requiredCapabilities) || requiredCapabilities.length === 0) {
-          issues.push({
-            id: `issue-${Date.now()}`,
-            ruleId: 'ios_empty_device_capabilities',
-            title: 'Empty Device Capabilities',
-            description: 'The UIRequiredDeviceCapabilities array is empty',
-            severity: 'warning',
-            fix: 'Specify required device capabilities or remove the key',
-            documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
-          });
-        }
-      }
+      const requiredCapabilities = [
+        'arm64',
+        'armv7',
+        'metal'
+      ];
 
-      // Check for age rating
-      if (!infoPlist.ITSAppUsesNonExemptEncryption) {
+      if (infoPlist.UIRequiredDeviceCapabilities) {
+        requiredCapabilities.forEach(cap => {
+          if (!infoPlist.UIRequiredDeviceCapabilities.includes(cap)) {
+            issues.push({
+              id: `issue-${Date.now()}`,
+              ruleId: `ios_missing_capability_${cap}`,
+              title: `Missing Device Capability: ${cap}`,
+              description: `The app bundle is missing the required device capability: ${cap}`,
+              severity: 'warning',
+              fix: `Add '${cap}' to the UIRequiredDeviceCapabilities array in Info.plist`,
+              documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
+            });
+          }
+        });
+      } else {
         issues.push({
           id: `issue-${Date.now()}`,
-          ruleId: 'ios_missing_encryption_flag',
-          title: 'Missing Encryption Flag',
-          description: 'The ITSAppUsesNonExemptEncryption flag is missing',
-          severity: 'info',
-          fix: 'Add the ITSAppUsesNonExemptEncryption key to your Info.plist',
-          documentationUrl: 'https://developer.apple.com/documentation/security/preparing_your_app_for_the_app_store'
+          ruleId: 'ios_missing_device_capabilities',
+          title: 'Missing Device Capabilities',
+          description: 'The Info.plist is missing the UIRequiredDeviceCapabilities array',
+          severity: 'warning',
+          fix: 'Add the UIRequiredDeviceCapabilities array to your Info.plist file',
+          documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
         });
       }
-    }
-
-    // Check for required screenshots
-    const screenshotDir = appDir.folder('AppPreview.appiconset');
-    if (!screenshotDir) {
-      issues.push({
-        id: `issue-${Date.now()}`,
-        ruleId: 'ios_missing_screenshots',
-        title: 'Missing App Preview Screenshots',
-        description: 'The app bundle is missing the AppPreview.appiconset directory',
-        severity: 'warning',
-        fix: 'Add app preview screenshots to your project',
-        documentationUrl: 'https://developer.apple.com/app-store/app-previews/'
-      });
     }
 
     return issues;
@@ -186,8 +176,8 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
     return [{
       id: `issue-${Date.now()}`,
       ruleId: 'ios_scan_error',
-      title: 'Scan Error',
-      description: 'An error occurred while scanning the IPA file',
+      title: 'IPA Scan Error',
+      description: 'An unexpected error occurred while scanning the IPA file',
       severity: 'critical',
       fix: 'Try scanning a different IPA file or contact support',
       documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
