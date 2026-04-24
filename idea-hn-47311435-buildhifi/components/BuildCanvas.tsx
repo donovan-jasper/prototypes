@@ -17,7 +17,7 @@ interface BuildCanvasProps {
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
-  const { currentBuild, setCurrentBuild } = useBuildStore();
+  const { currentBuild, setCurrentBuild, updateComponentPosition } = useBuildStore();
   const [componentPositions, setComponentPositions] = useState<{ [key: number]: { x: number; y: number } }>({});
   const [validation, setValidation] = useState<{ isValid: boolean; suggestions: string[]; issues: any[] }>({
     isValid: true,
@@ -98,15 +98,73 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       saveComponentPosition(currentBuild.id, componentId, snapPosition.x, snapPosition.y);
 
       // Update Zustand store
-      setCurrentBuild({
-        ...currentBuild,
-        components: currentBuild.components.map(c =>
-          c.id === componentId
-            ? { ...c, position: { x: snapPosition.x, y: snapPosition.y } }
-            : c
-        )
-      });
+      updateComponentPosition(componentId, snapPosition.x, snapPosition.y);
     }
+  };
+
+  const renderComponent = (component: Component) => {
+    const position = componentPositions[component.id] || { x: 0, y: 0 };
+    const x = useSharedValue(position.x);
+    const y = useSharedValue(position.y);
+
+    const gesture = Gesture.Pan()
+      .onUpdate((e) => {
+        x.value = e.translationX + position.x;
+        y.value = e.translationY + position.y;
+      })
+      .onEnd(() => {
+        handleDragEnd(component.id, x.value, y.value);
+      });
+
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        transform: [
+          { translateX: x.value },
+          { translateY: y.value },
+        ],
+      };
+    });
+
+    return (
+      <GestureDetector key={component.id} gesture={gesture}>
+        <Animated.View style={[styles.componentContainer, animatedStyle]}>
+          <ComponentCard component={component} />
+        </Animated.View>
+      </GestureDetector>
+    );
+  };
+
+  const renderConnectionLines = () => {
+    if (!currentBuild?.components || currentBuild.components.length < 2) return null;
+
+    return currentBuild.components.map((component, index) => {
+      if (index === currentBuild.components.length - 1) return null;
+
+      const nextComponent = currentBuild.components[index + 1];
+      const fromPosition = componentPositions[component.id];
+      const toPosition = componentPositions[nextComponent.id];
+
+      if (!fromPosition || !toPosition) return null;
+
+      // Determine connection status
+      let status: 'compatible' | 'warning' | 'incompatible' = 'compatible';
+      const issue = validation.issues.find(issue =>
+        issue.componentIndices.includes(index) && issue.componentIndices.includes(index + 1)
+      );
+
+      if (issue) {
+        status = issue.severity === 'error' ? 'incompatible' : 'warning';
+      }
+
+      return (
+        <ConnectionLine
+          key={`connection-${component.id}-${nextComponent.id}`}
+          from={{ ...component, position: fromPosition }}
+          to={{ ...nextComponent, position: toPosition }}
+          status={status}
+        />
+      );
+    });
   };
 
   if (!currentBuild) {
@@ -125,7 +183,14 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.canvas}>
+          {renderConnectionLines()}
+          {currentBuild.components.map(renderComponent)}
+        </View>
+      </ScrollView>
+
       {validation.issues.length > 0 && (
         <Banner
           visible={true}
@@ -139,131 +204,61 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
           ]}
         >
           <Text style={styles.bannerTitle}>
-            {validation.isValid ? 'Warnings Found' : 'Compatibility Issues Found'}
+            {validation.isValid ? 'Potential Issues' : 'Incompatible Setup'}
           </Text>
-          {validation.issues.map((issue, index) => (
-            <Text key={index} style={styles.issueText}>
-              • {issue.message}
-            </Text>
-          ))}
+          <Text style={styles.bannerContent}>
+            {validation.issues.length} issue{validation.issues.length !== 1 ? 's' : ''} found
+          </Text>
         </Banner>
       )}
-
-      <View style={styles.canvas}>
-        {currentBuild.components.map((component, index) => {
-          const nextComponent = currentBuild.components[index + 1];
-          let connectionStatus: 'compatible' | 'warning' | 'incompatible' = 'compatible';
-
-          if (nextComponent) {
-            const pairValidation = validateSignalChain([component, nextComponent]);
-            if (!pairValidation.isValid) {
-              connectionStatus = 'incompatible';
-            } else if (pairValidation.issues.some(issue => issue.severity === 'warning')) {
-              connectionStatus = 'warning';
-            }
-          }
-
-          const dragGesture = Gesture.Pan()
-            .onUpdate((e) => {
-              setComponentPositions(prev => ({
-                ...prev,
-                [component.id]: {
-                  x: prev[component.id]?.x || 0 + e.translationX,
-                  y: prev[component.id]?.y || 0 + e.translationY
-                }
-              }));
-            })
-            .onEnd((e) => {
-              handleDragEnd(component.id, e.translationX, e.translationY);
-            });
-
-          const animatedStyle = useAnimatedStyle(() => {
-            return {
-              transform: [
-                { translateX: componentPositions[component.id]?.x || 0 },
-                { translateY: componentPositions[component.id]?.y || 0 },
-              ],
-            };
-          });
-
-          return (
-            <GestureDetector key={component.id} gesture={dragGesture}>
-              <Animated.View style={[styles.componentContainer, animatedStyle]}>
-                <ComponentCard
-                  component={component}
-                  validationStatus={connectionStatus}
-                />
-                {nextComponent && (
-                  <ConnectionLine
-                    from={{
-                      ...component,
-                      position: componentPositions[component.id] || { x: 0, y: 0 }
-                    }}
-                    to={{
-                      ...nextComponent,
-                      position: componentPositions[nextComponent.id] || { x: 0, y: 0 }
-                    }}
-                    status={connectionStatus}
-                  />
-                )}
-              </Animated.View>
-            </GestureDetector>
-          );
-        })}
-      </View>
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+  },
+  scrollContainer: {
+    flex: 1,
   },
   scrollContent: {
-    padding: 16,
+    flexGrow: 1,
   },
   canvas: {
-    flex: 1,
-    minHeight: 600,
-    backgroundColor: 'white',
-    borderRadius: 8,
+    width: SCREEN_WIDTH * 2,
+    height: 600,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   componentContainer: {
     position: 'absolute',
-    width: 120,
-    height: 120,
+    width: 150,
+    height: 200,
   },
   emptyText: {
     textAlign: 'center',
-    marginTop: 50,
+    margin: 20,
     color: '#666',
-    fontSize: 16,
   },
   banner: {
-    marginBottom: 16,
-    borderLeftWidth: 4,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    margin: 10,
   },
   warningBanner: {
-    borderLeftColor: '#ff9800',
     backgroundColor: '#fff8e1',
   },
   errorBanner: {
-    borderLeftColor: '#f44336',
     backgroundColor: '#ffebee',
   },
   bannerTitle: {
     fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  issueText: {
     marginBottom: 4,
+  },
+  bannerContent: {
+    fontSize: 12,
   },
 });
 

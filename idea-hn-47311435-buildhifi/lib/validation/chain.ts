@@ -149,7 +149,7 @@ export const validateSignalChain = (components: Component[]): {
     // Check cable length if specified
     if (current.specs.maxCableLength && next.specs.cableLength) {
       if (next.specs.cableLength > current.specs.maxCableLength) {
-        const message = `Cable too long: ${next.specs.cableLength}m exceeds ${current.specs.maxCableLength}m max for ${current.name}`;
+        const message = `Cable length exceeds maximum for ${current.name}: ${next.specs.cableLength}ft > ${current.specs.maxCableLength}ft`;
         suggestions.push(message);
         issues.push({
           type: 'cable_length',

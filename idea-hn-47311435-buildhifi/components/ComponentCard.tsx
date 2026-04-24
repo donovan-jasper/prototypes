@@ -5,80 +5,40 @@ import { Component } from '@/lib/types';
 
 interface ComponentCardProps {
   component: Component;
-  validationStatus: 'compatible' | 'warning' | 'incompatible';
 }
 
-const ComponentCard: React.FC<ComponentCardProps> = ({ component, validationStatus }) => {
-  const getStatusColor = () => {
-    switch (validationStatus) {
-      case 'compatible':
-        return '#4caf50';
-      case 'warning':
-        return '#ff9800';
-      case 'incompatible':
-        return '#f44336';
-      default:
-        return '#9e9e9e';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (validationStatus) {
-      case 'compatible':
-        return 'check-circle';
-      case 'warning':
-        return 'alert-circle';
-      case 'incompatible':
-        return 'close-circle';
-      default:
-        return 'help-circle';
-    }
+const ComponentCard: React.FC<ComponentCardProps> = ({ component }) => {
+  const getCompatibilityColor = () => {
+    // This would be connected to the validation system
+    return '#4caf50'; // Default to green
   };
 
   return (
     <Card style={styles.card}>
+      <Card.Cover
+        source={{ uri: component.imageUrl || 'https://via.placeholder.com/150' }}
+        style={styles.image}
+      />
       <Card.Content style={styles.content}>
-        <View style={styles.imageContainer}>
-          {component.imageUrl ? (
-            <Image
-              source={{ uri: component.imageUrl }}
-              style={styles.image}
-              resizeMode="contain"
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Text style={styles.placeholderText}>{component.type.charAt(0).toUpperCase()}</Text>
-            </View>
-          )}
-        </View>
-
         <Text style={styles.name} numberOfLines={1}>{component.name}</Text>
         <Text style={styles.brand} numberOfLines={1}>{component.brand}</Text>
-
         <View style={styles.specsContainer}>
           {component.specs.impedance && (
-            <Badge style={[styles.specBadge, { backgroundColor: '#2196f3' }]}>
+            <Badge style={[styles.specBadge, { backgroundColor: getCompatibilityColor() }]}>
               {component.specs.impedance}Ω
             </Badge>
           )}
           {component.specs.powerWatts && (
-            <Badge style={[styles.specBadge, { backgroundColor: '#9c27b0' }]}>
+            <Badge style={[styles.specBadge, { backgroundColor: getCompatibilityColor() }]}>
               {component.specs.powerWatts}W
             </Badge>
           )}
           {component.specs.outputs && (
-            <Badge style={[styles.specBadge, { backgroundColor: '#ff5722' }]}>
+            <Badge style={[styles.specBadge, { backgroundColor: getCompatibilityColor() }]}>
               {component.specs.outputs.join(', ')}
             </Badge>
           )}
         </View>
-
-        <Badge
-          style={[styles.statusBadge, { backgroundColor: getStatusColor() }]}
-          icon={getStatusIcon()}
-        >
-          {validationStatus.charAt(0).toUpperCase() + validationStatus.slice(1)}
-        </Badge>
       </Card.Content>
     </Card>
   );
@@ -86,65 +46,37 @@ const ComponentCard: React.FC<ComponentCardProps> = ({ component, validationStat
 
 const styles = StyleSheet.create({
   card: {
-    width: 120,
-    height: 180,
+    width: '100%',
+    height: '100%',
     borderRadius: 8,
     elevation: 2,
   },
+  image: {
+    height: 100,
+    borderTopLeftRadius: 8,
+    borderTopRightRadius: 8,
+  },
   content: {
     padding: 8,
-    alignItems: 'center',
-  },
-  imageContainer: {
-    width: 80,
-    height: 80,
-    marginBottom: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-  },
-  placeholderImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#eeeeee',
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    fontSize: 32,
-    color: '#9e9e9e',
   },
   name: {
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: 'bold',
-    textAlign: 'center',
     marginBottom: 2,
   },
   brand: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#666',
-    textAlign: 'center',
     marginBottom: 8,
   },
   specsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'center',
-    marginBottom: 8,
+    gap: 4,
   },
   specBadge: {
-    margin: 2,
-    fontSize: 10,
-  },
-  statusBadge: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    fontSize: 10,
+    marginRight: 4,
+    marginBottom: 4,
   },
 });
 
