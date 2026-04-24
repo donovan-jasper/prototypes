@@ -182,50 +182,13 @@ const GroupDetail: React.FC = () => {
 
     try {
       await deleteDoc(doc(db, 'challenges', challengeToDelete));
-
-      // Refresh challenges
-      const challengesQuery = query(
-        collection(db, 'challenges'),
-        where('groupId', '==', groupId)
-      );
-      const challengesSnapshot = await getDocs(challengesQuery);
-      const challengesData = challengesSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Challenge[];
-      setChallenges(challengesData);
-
+      setChallenges(challenges.filter(challenge => challenge.id !== challengeToDelete));
       setShowDeleteConfirm(false);
       setChallengeToDelete(null);
       Alert.alert('Success', 'Challenge deleted successfully!');
     } catch (error) {
       console.error('Error deleting challenge:', error);
       Alert.alert('Error', 'Failed to delete challenge');
-    }
-  };
-
-  const handleRemoveMember = async (memberId: string) => {
-    if (!group) return;
-
-    try {
-      const groupRef = doc(db, 'groups', group.id);
-      await updateDoc(groupRef, {
-        members: arrayRemove(memberId)
-      });
-
-      // Refresh members
-      const memberPromises = group.members.filter(id => id !== memberId).map(async (memberId) => {
-        const userDoc = await getDoc(doc(db, 'users', memberId));
-        return userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } as User : null;
-      });
-
-      const membersData = (await Promise.all(memberPromises)).filter(Boolean) as User[];
-      setMembers(membersData);
-
-      Alert.alert('Success', 'Member removed successfully!');
-    } catch (error) {
-      console.error('Error removing member:', error);
-      Alert.alert('Error', 'Failed to remove member');
     }
   };
 
@@ -244,16 +207,13 @@ const GroupDetail: React.FC = () => {
                 setShowDeleteConfirm(true);
               }}
             >
-              <Ionicons name="trash-outline" size={20} color="#ff5252" />
+              <Ionicons name="trash-outline" size={20} color="#FF6B6B" />
             </TouchableOpacity>
           )}
         </View>
         <Text style={styles.challengeDescription}>{item.description}</Text>
         <View style={styles.challengeFooter}>
-          <View style={styles.xpContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.xpText}>{item.xpReward} XP</Text>
-          </View>
+          <Text style={styles.xpReward}>{item.xpReward} XP</Text>
           <TouchableOpacity
             style={[styles.completeButton, isCompleted && styles.completedButton]}
             onPress={() => handleToggleChallengeCompletion(item.id)}
@@ -267,27 +227,37 @@ const GroupDetail: React.FC = () => {
     );
   };
 
-  const renderMemberItem = ({ item }: { item: User }) => (
-    <View style={styles.memberItem}>
-      <Text style={styles.memberName}>{item.displayName || 'Anonymous'}</Text>
-      {isAdmin && item.id !== auth.currentUser?.uid && (
-        <TouchableOpacity
-          onPress={() => {
-            setSelectedMember(item);
-            setShowMemberModal(true);
-          }}
-        >
-          <Ionicons name="ellipsis-vertical" size={20} color="#666" />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const renderMemberItem = ({ item }: { item: User }) => {
+    const isCurrentUser = auth.currentUser?.uid === item.id;
+    return (
+      <View style={styles.memberItem}>
+        <View style={styles.memberAvatar}>
+          <Text style={styles.memberInitial}>
+            {item.displayName ? item.displayName.charAt(0).toUpperCase() : '?'}
+          </Text>
+        </View>
+        <View style={styles.memberInfo}>
+          <Text style={styles.memberName}>{item.displayName || 'Anonymous'}</Text>
+          {isCurrentUser && <Text style={styles.memberTag}>You</Text>}
+        </View>
+        {isAdmin && !isCurrentUser && (
+          <TouchableOpacity
+            onPress={() => {
+              setSelectedMember(item);
+              setShowMemberModal(true);
+            }}
+          >
+            <Ionicons name="ellipsis-vertical" size={20} color="#999" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6200EE" />
-        <Text style={styles.loadingText}>Loading group details...</Text>
+        <ActivityIndicator size="large" color="#6C63FF" />
       </View>
     );
   }
@@ -296,12 +266,6 @@ const GroupDetail: React.FC = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>Group not found</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -310,52 +274,65 @@ const GroupDetail: React.FC = () => {
     <SafeAreaView style={styles.container}>
       <ScrollView>
         <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#6C63FF" />
+          </TouchableOpacity>
           <Text style={styles.groupName}>{group.name}</Text>
           <View style={[styles.privacyBadge, group.privacy === 'public' ? styles.publicBadge : styles.privateBadge]}>
             <Text style={styles.privacyText}>{group.privacy}</Text>
           </View>
         </View>
 
-        <Text style={styles.description}>{group.description}</Text>
+        <Text style={styles.groupDescription}>{group.description}</Text>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Challenges</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+        </View>
+
+        <FlatList
+          data={members}
+          renderItem={renderMemberItem}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          contentContainerStyle={styles.membersList}
+        />
+
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Challenges</Text>
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowChallengeModal(true)}
+            >
+              <Ionicons name="add-circle-outline" size={24} color="#6C63FF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {challenges.length > 0 ? (
+          <FlatList
+            data={challenges}
+            renderItem={renderChallengeItem}
+            keyExtractor={(item) => item.id}
+            scrollEnabled={false}
+            contentContainerStyle={styles.challengesList}
+          />
+        ) : (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No challenges yet</Text>
             {isAdmin && (
               <TouchableOpacity
-                style={styles.addButton}
+                style={styles.addChallengeButton}
                 onPress={() => setShowChallengeModal(true)}
               >
-                <Ionicons name="add" size={20} color="white" />
+                <Text style={styles.addChallengeButtonText}>Create First Challenge</Text>
               </TouchableOpacity>
             )}
           </View>
-
-          {challenges.length > 0 ? (
-            <FlatList
-              data={challenges}
-              renderItem={renderChallengeItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text style={styles.emptyText}>No challenges yet. {isAdmin ? 'Create one!' : 'Ask the admin to add some.'}</Text>
-          )}
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-          {members.length > 0 ? (
-            <FlatList
-              data={members}
-              renderItem={renderMemberItem}
-              keyExtractor={(item) => item.id}
-              scrollEnabled={false}
-            />
-          ) : (
-            <Text style={styles.emptyText}>No members yet</Text>
-          )}
-        </View>
+        )}
       </ScrollView>
 
       {/* Create Challenge Modal */}
@@ -377,7 +354,7 @@ const GroupDetail: React.FC = () => {
             />
 
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[styles.input, styles.descriptionInput]}
               placeholder="Description"
               value={newChallenge.description}
               onChangeText={(text) => setNewChallenge({...newChallenge, description: text})}
@@ -410,35 +387,40 @@ const GroupDetail: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Member Options Modal */}
+      {/* Member Actions Modal */}
       <Modal
         visible={showMemberModal}
         animationType="fade"
         transparent={true}
         onRequestClose={() => setShowMemberModal(false)}
       >
-        <View style={styles.memberModalContainer}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          onPress={() => setShowMemberModal(false)}
+        >
           <View style={styles.memberModalContent}>
-            <Text style={styles.memberModalTitle}>Member Options</Text>
             <TouchableOpacity
-              style={styles.memberOption}
-              onPress={() => {
+              style={styles.memberAction}
+              onPress={async () => {
                 if (selectedMember) {
-                  handleRemoveMember(selectedMember.id);
-                  setShowMemberModal(false);
+                  try {
+                    await updateDoc(doc(db, 'groups', groupId), {
+                      members: arrayRemove(selectedMember.id)
+                    });
+                    setMembers(members.filter(m => m.id !== selectedMember.id));
+                    setShowMemberModal(false);
+                    Alert.alert('Success', 'Member removed from group');
+                  } catch (error) {
+                    console.error('Error removing member:', error);
+                    Alert.alert('Error', 'Failed to remove member');
+                  }
                 }
               }}
             >
-              <Text style={styles.memberOptionText}>Remove Member</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.memberOption}
-              onPress={() => setShowMemberModal(false)}
-            >
-              <Text style={styles.memberOptionText}>Cancel</Text>
+              <Text style={styles.memberActionText}>Remove Member</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Delete Confirmation Modal */}
@@ -448,22 +430,22 @@ const GroupDetail: React.FC = () => {
         transparent={true}
         onRequestClose={() => setShowDeleteConfirm(false)}
       >
-        <View style={styles.deleteModalContainer}>
-          <View style={styles.deleteModalContent}>
-            <Text style={styles.deleteModalTitle}>Delete Challenge</Text>
-            <Text style={styles.deleteModalText}>Are you sure you want to delete this challenge?</Text>
-            <View style={styles.deleteModalButtons}>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Delete Challenge</Text>
+            <Text style={styles.confirmText}>Are you sure you want to delete this challenge?</Text>
+            <View style={styles.modalButtons}>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.cancelButton]}
+                style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setShowDeleteConfirm(false)}
               >
-                <Text style={styles.deleteModalButtonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.deleteModalButton, styles.deleteButton]}
+                style={[styles.modalButton, styles.deleteButton]}
                 onPress={handleDeleteChallenge}
               >
-                <Text style={styles.deleteModalButtonText}>Delete</Text>
+                <Text style={styles.modalButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -476,84 +458,49 @@ const GroupDetail: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 24,
-  },
-  backButton: {
-    backgroundColor: '#6200EE',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
-    backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingTop: 24,
+  },
+  backButton: {
+    marginRight: 8,
   },
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
+    flex: 1,
   },
   privacyBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   publicBadge: {
-    backgroundColor: '#e3f2fd',
+    backgroundColor: '#E3F2FD',
   },
   privateBadge: {
-    backgroundColor: '#f3e5f5',
+    backgroundColor: '#F3E5F5',
   },
   privacyText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
   },
-  description: {
+  groupDescription: {
     fontSize: 16,
     color: '#666',
-    padding: 16,
-    backgroundColor: 'white',
-    marginBottom: 16,
-  },
-  section: {
-    backgroundColor: 'white',
-    marginBottom: 16,
-    padding: 16,
+    paddingHorizontal: 16,
+    marginBottom: 24,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
     marginBottom: 12,
   },
   sectionTitle: {
@@ -562,18 +509,59 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   addButton: {
-    backgroundColor: '#6200EE',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    padding: 4,
+  },
+  membersList: {
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+  memberItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  memberAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6C63FF',
     justifyContent: 'center',
     alignItems: 'center',
+    marginRight: 12,
+  },
+  memberInitial: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  memberInfo: {
+    flex: 1,
+  },
+  memberName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  memberTag: {
+    fontSize: 12,
+    color: '#6C63FF',
+    marginTop: 2,
+  },
+  challengesList: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   challengeCard: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    backgroundColor: '#FFF',
+    borderRadius: 12,
     padding: 16,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   challengeHeader: {
     flexDirection: 'row',
@@ -582,7 +570,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   challengeTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -596,46 +584,58 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  xpContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  xpText: {
+  xpReward: {
     fontSize: 14,
-    color: '#FFD700',
-    marginLeft: 4,
-    fontWeight: 'bold',
+    color: '#6C63FF',
+    fontWeight: '600',
   },
   completeButton: {
+    backgroundColor: '#6C63FF',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#6200EE',
   },
   completedButton: {
     backgroundColor: '#4CAF50',
   },
   completeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: '#FFF',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  memberItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  memberName: {
-    fontSize: 16,
-    color: '#333',
+    padding: 32,
   },
   emptyText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
-    textAlign: 'center',
-    padding: 16,
+    marginBottom: 16,
+  },
+  addChallengeButton: {
+    backgroundColor: '#6C63FF',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  addChallengeButtonText: {
+    color: '#FFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#FF6B6B',
   },
   modalContainer: {
     flex: 1,
@@ -644,9 +644,9 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    padding: 24,
     width: '90%',
     maxWidth: 400,
   },
@@ -655,106 +655,71 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
+    textAlign: 'center',
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
     fontSize: 16,
+    color: '#333',
   },
-  textArea: {
+  descriptionInput: {
     height: 100,
     textAlignVertical: 'top',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
   },
   modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    padding: 12,
     borderRadius: 8,
-    marginLeft: 8,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
   },
   createButton: {
-    backgroundColor: '#6200EE',
+    backgroundColor: '#6C63FF',
+  },
+  deleteButton: {
+    backgroundColor: '#FF6B6B',
   },
   modalButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  memberModalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  memberModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    width: '80%',
-    maxWidth: 300,
-  },
-  memberModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  memberOption: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  memberOptionText: {
-    fontSize: 16,
+    fontWeight: '600',
     color: '#333',
   },
-  deleteModalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  deleteModalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
-    width: '80%',
-    maxWidth: 300,
-  },
-  deleteModalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#333',
-  },
-  deleteModalText: {
+  confirmText: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 20,
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  deleteModalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  deleteModalButton: {
+  memberModalContent: {
+    backgroundColor: '#FFF',
+    borderRadius: 12,
+    width: '80%',
+    padding: 16,
+  },
+  memberAction: {
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginLeft: 8,
   },
-  deleteButton: {
-    backgroundColor: '#ff5252',
-  },
-  deleteModalButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  memberActionText: {
+    fontSize: 16,
+    color: '#FF6B6B',
+    textAlign: 'center',
   },
 });
 
