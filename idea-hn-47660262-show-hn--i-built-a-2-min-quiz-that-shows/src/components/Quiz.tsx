@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
   progressFill: {
     height: '100%',
     backgroundColor: '#4CAF50',
-    borderRadius: 5,
   },
   title: {
     fontSize: 24,
@@ -188,36 +187,37 @@ const styles = StyleSheet.create({
   },
   input: {
     height: 50,
-    borderColor: '#ccc',
+    borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingHorizontal: 15,
     marginBottom: 15,
     backgroundColor: 'white',
-    color: '#333',
+    fontSize: 16,
   },
   button: {
     backgroundColor: '#4CAF50',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'center',
   },
   disabledButton: {
     backgroundColor: '#cccccc',
   },
   buttonText: {
     color: 'white',
+    fontSize: 18,
     fontWeight: 'bold',
-    fontSize: 16,
   },
   feedback: {
     marginTop: 20,
     textAlign: 'center',
-    color: '#333',
     fontSize: 16,
+    color: '#333',
+    padding: 10,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
   },
 });
 
