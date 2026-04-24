@@ -10,9 +10,27 @@ export interface CloneOptions {
   onProgress?: (progress: CloneProgress) => void;
 }
 
+export interface CloneStatus {
+  progress: number;
+  currentFile?: string;
+  totalFiles?: number;
+  totalSize?: number;
+  receivedSize?: number;
+  error?: string;
+  isComplete: boolean;
+}
+
 export class CloneService {
+  private static activeClones: Map<string, CloneStatus> = new Map();
+
   static async cloneRepository(options: CloneOptions): Promise<void> {
     const { url, repoId, authToken, onProgress } = options;
+    const status: CloneStatus = {
+      progress: 0,
+      isComplete: false
+    };
+
+    this.activeClones.set(repoId, status);
 
     try {
       // Validate the repository URL
@@ -37,6 +55,12 @@ export class CloneService {
         dir: repoPath,
         authToken,
         onProgress: (progress) => {
+          status.progress = progress.percent;
+          status.currentFile = progress.currentFile;
+          status.totalFiles = progress.totalFiles;
+          status.totalSize = progress.totalSize;
+          status.receivedSize = progress.receivedSize;
+
           if (onProgress) {
             onProgress(progress);
           }
@@ -56,19 +80,12 @@ export class CloneService {
         path: repoPath
       });
 
+      status.isComplete = true;
+      status.progress = 100;
+
     } catch (error) {
-      // Handle specific error cases
-      if (error instanceof Error) {
-        if (error.message.includes('timeout')) {
-          throw new Error('Network timeout while cloning repository. Please check your connection and try again.');
-        } else if (error.message.includes('authentication') || error.message.includes('401')) {
-          throw new Error('Authentication failed. Please check your credentials and try again.');
-        } else if (error.message.includes('access') || error.message.includes('403')) {
-          throw new Error('You do not have permission to access this repository.');
-        } else if (error.message.includes('not found') || error.message.includes('404')) {
-          throw new Error('Repository not found. Please verify the URL and try again.');
-        }
-      }
+      status.error = error instanceof Error ? error.message : 'Unknown error occurred';
+      status.isComplete = true;
 
       // Clean up if clone failed
       try {
@@ -78,7 +95,9 @@ export class CloneService {
       }
 
       // Re-throw the original error with user-friendly message
-      throw new Error('Failed to clone repository. Please try again later.');
+      throw new Error(status.error || 'Failed to clone repository. Please try again later.');
+    } finally {
+      this.activeClones.delete(repoId);
     }
   }
 
@@ -90,6 +109,9 @@ export class CloneService {
 
       // Delete from database
       await DatabaseService.deleteRepository(repoId);
+
+      // Remove from active clones if present
+      this.activeClones.delete(repoId);
     } catch (error) {
       console.error('Error deleting repository:', error);
       if (error instanceof Error) {
@@ -132,29 +154,33 @@ export class CloneService {
     }
   }
 
-  static async getCloneProgress(repoId: string): Promise<CloneProgress> {
+  static getCloneProgress(repoId: string): CloneStatus {
+    const status = this.activeClones.get(repoId);
+    if (!status) {
+      return {
+        progress: 0,
+        isComplete: false,
+        error: 'No active clone operation found'
+      };
+    }
+    return status;
+  }
+
+  static async cancelClone(repoId: string): Promise<void> {
     try {
-      // Get the repository path
-      const repoPath = await FileSystemService.getRepositoryPath(repoId);
+      const status = this.activeClones.get(repoId);
+      if (status) {
+        status.isComplete = true;
+        status.error = 'Clone operation was cancelled';
+        this.activeClones.delete(repoId);
 
-      // Check if repository exists
-      const exists = await FileSystemService.directoryExists(repoPath);
-      if (!exists) {
-        throw new Error('Repository does not exist');
+        // Clean up filesystem
+        const repoPath = await FileSystemService.getRepositoryPath(repoId);
+        await FileSystemService.deleteDirectory(repoPath);
       }
-
-      // Get the current progress from GitService
-      const progress = await GitService.getCloneProgress(repoPath);
-
-      // If progress is completed, update the database
-      if (progress.stage === 'completed') {
-        await DatabaseService.updateRepositoryLastUpdated(repoId, new Date().toISOString());
-      }
-
-      return progress;
     } catch (error) {
-      console.error('Error getting clone progress:', error);
-      throw new Error('Failed to get clone progress');
+      console.error('Error cancelling clone:', error);
+      throw new Error('Failed to cancel clone operation');
     }
   }
 }

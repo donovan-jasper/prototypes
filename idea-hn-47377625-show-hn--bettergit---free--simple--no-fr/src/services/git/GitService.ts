@@ -1,12 +1,13 @@
-import * as FileSystem from 'expo-file-system';
-import git from 'isomorphic-git';
+import * as git from 'isomorphic-git';
 import http from 'isomorphic-git/http/web';
-import { FileSystemAdapter } from './FileSystemAdapter';
+import { FileSystemService } from '../storage/FileSystemService';
 
 export interface CloneProgress {
-  phase: string;
-  loaded: number;
-  total: number;
+  percent: number;
+  currentFile?: string;
+  totalFiles?: number;
+  totalSize?: number;
+  receivedSize?: number;
 }
 
 export interface CloneOptions {
@@ -17,94 +18,79 @@ export interface CloneOptions {
 }
 
 export class GitService {
-  private static getRepoDir(repoId: string): string {
-    return `${FileSystem.documentDirectory}repos/${repoId}`;
-  }
-
   static async clone(options: CloneOptions): Promise<void> {
     const { url, dir, authToken, onProgress } = options;
-    const fullDir = this.getRepoDir(dir);
 
-    // Ensure repos directory exists
-    const reposDir = `${FileSystem.documentDirectory}repos`;
-    const dirInfo = await FileSystem.getInfoAsync(reposDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(reposDir, { intermediates: true });
-    }
+    const fs = FileSystemService.getFileSystem();
 
-    // Configure auth if token is provided
-    const authConfig = authToken ? {
-      username: 'token',
-      password: authToken
-    } : undefined;
+    let totalObjects = 0;
+    let receivedObjects = 0;
+    let currentFile: string | undefined;
+    let totalSize = 0;
+    let receivedSize = 0;
 
-    await git.clone({
-      fs: FileSystemAdapter,
-      http,
-      dir: fullDir,
-      url,
-      singleBranch: true,
-      depth: 1,
-      onProgress: (progress) => {
-        if (onProgress) {
-          onProgress({
-            phase: progress.phase,
-            loaded: progress.loaded,
-            total: progress.total,
-          });
+    try {
+      await git.clone({
+        fs,
+        http,
+        dir,
+        url,
+        onProgress: (progress) => {
+          if (progress.total) {
+            totalObjects = progress.total;
+            receivedObjects = progress.loaded;
+          }
+
+          if (progress.objects) {
+            totalSize = progress.objects.size;
+            receivedSize = progress.objects.transferred;
+          }
+
+          if (progress.phase === 'receiving objects') {
+            currentFile = progress.currentFile;
+          }
+
+          const percent = totalObjects > 0
+            ? Math.round((receivedObjects / totalObjects) * 100)
+            : 0;
+
+          if (onProgress) {
+            onProgress({
+              percent,
+              currentFile,
+              totalFiles: totalObjects,
+              totalSize,
+              receivedSize
+            });
+          }
+        },
+        onAuth: () => {
+          if (authToken) {
+            return {
+              username: 'oauth2',
+              password: authToken
+            };
+          }
+          return undefined;
+        },
+        onMessage: (message) => {
+          console.log('Git message:', message);
+        },
+        onError: (error) => {
+          console.error('Git error:', error);
+          throw error;
         }
-      },
-      ...(authConfig && { auth: authConfig })
-    });
-  }
-
-  static async listFiles(repoId: string, path: string = ''): Promise<string[]> {
-    const dir = this.getRepoDir(repoId);
-    const fullPath = path ? `${dir}/${path}` : dir;
-
-    try {
-      const files = await FileSystem.readDirectoryAsync(fullPath);
-      return files.filter((file) => file !== '.git');
+      });
     } catch (error) {
-      console.error('Error listing files:', error);
-      return [];
-    }
-  }
-
-  static async readFile(repoId: string, filePath: string): Promise<string> {
-    const dir = this.getRepoDir(repoId);
-    const fullPath = `${dir}/${filePath}`;
-
-    try {
-      return await FileSystem.readAsStringAsync(fullPath);
-    } catch (error) {
-      console.error('Error reading file:', error);
+      console.error('Clone failed:', error);
       throw error;
     }
   }
 
-  static async getFileInfo(
-    repoId: string,
-    filePath: string
-  ): Promise<FileSystem.FileInfo> {
-    const dir = this.getRepoDir(repoId);
-    const fullPath = `${dir}/${filePath}`;
-
-    return await FileSystem.getInfoAsync(fullPath);
-  }
-
-  static async deleteRepo(repoId: string): Promise<void> {
-    const dir = this.getRepoDir(repoId);
-    const dirInfo = await FileSystem.getInfoAsync(dir);
-
-    if (dirInfo.exists) {
-      await FileSystem.deleteAsync(dir, { idempotent: true });
-    }
-  }
-
   static async repoExists(repoId: string): Promise<boolean> {
-    const dir = this.getRepoDir(repoId);
-    const dirInfo = await FileSystem.getInfoAsync(dir);
-    return dirInfo.exists;
+    const repoPath = await FileSystemService.getRepositoryPath(repoId);
+    return await FileSystemService.directoryExists(repoPath);
   }
+
+  // Other existing methods...
 }
