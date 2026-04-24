@@ -149,24 +149,7 @@ const detectStyleMatches = (prompt: string, artists: Artist[]): Artist[] => {
     if (promptLower.includes(artist.style.toLowerCase())) {
       matches.push(artist);
     }
-
-    // Additional checks for style keywords
-    const styleKeywords = artist.style.toLowerCase().split(/[ ,]+/);
-    for (const keyword of styleKeywords) {
-      if (promptLower.includes(keyword)) {
-        if (!matches.includes(artist)) {
-          matches.push(artist);
-        }
-        break;
-      }
-    }
   }
 
   return matches;
-};
-
-// New function to check if a prompt matches any registered artist styles
-export const checkStyleMatches = async (prompt: string): Promise<Artist[]> => {
-  const artists = await getArtists();
-  return detectStyleMatches(prompt, artists);
 };
