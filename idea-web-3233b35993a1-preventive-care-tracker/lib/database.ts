@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import * as SecureStore from 'expo-secure-store';
 
 const db = SQLite.openDatabase('carequest.db');
 
@@ -365,7 +366,7 @@ export const getInsurance = async (memberId: string): Promise<Insurance[]> => {
   });
 };
 
-export const getInsuranceById = async (id: string): Promise<Insurance | null> => {
+export const getInsuranceRecord = async (id: string): Promise<Insurance | null> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
@@ -381,6 +382,20 @@ export const getInsuranceById = async (id: string): Promise<Insurance | null> =>
 };
 
 export const addInsurance = async (insurance: Omit<Insurance, 'id'>): Promise<Insurance> => {
+  // First delete any existing insurance for this member
+  await new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'DELETE FROM insurance WHERE memberId = ?;',
+          [insurance.memberId],
+          () => resolve(true),
+          (_, error) => reject(error)
+        );
+      }
+    );
+  });
+
   const id = Date.now().toString();
   return new Promise((resolve, reject) => {
     db.transaction(
