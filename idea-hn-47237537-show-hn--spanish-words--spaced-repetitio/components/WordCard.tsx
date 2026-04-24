@@ -184,26 +184,28 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
               </>
             ) : (
               <TouchableOpacity
-                style={styles.showTranslationButton}
-                onPress={() => {
-                  setShowTranslation(true);
-                  playPronunciation();
-                }}
+                style={styles.revealButton}
+                onPress={() => setShowTranslation(true)}
               >
-                <Text style={styles.showTranslationText}>Show Translation</Text>
+                <Text style={styles.revealButtonText}>Show Translation</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.swipeIndicators}>
-            <View style={[styles.indicator, styles.correct]}>
-              <Ionicons name="checkmark" size={24} color="white" />
+            <View style={styles.swipeIndicatorContainer}>
+              <Ionicons name="arrow-back" size={24} color="#FF9800" />
+              <Text style={styles.swipeIndicatorText}>Learning</Text>
             </View>
-            <View style={[styles.indicator, styles.learning]}>
-              <Ionicons name="help" size={24} color="white" />
+
+            <View style={styles.swipeIndicatorContainer}>
+              <Ionicons name="arrow-down" size={24} color="#F44336" />
+              <Text style={styles.swipeIndicatorText}>Forgot</Text>
             </View>
-            <View style={[styles.indicator, styles.forgot]}>
-              <Ionicons name="close" size={24} color="white" />
+
+            <View style={styles.swipeIndicatorContainer}>
+              <Ionicons name="arrow-forward" size={24} color="#4CAF50" />
+              <Text style={styles.swipeIndicatorText}>Know it</Text>
             </View>
           </View>
         </Animated.View>
@@ -217,12 +219,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   card: {
-    width: '100%',
+    width: '90%',
     maxWidth: 400,
-    height: 500,
+    height: '70%',
     backgroundColor: 'white',
     borderRadius: 15,
     shadowColor: '#000',
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     padding: 20,
-    position: 'relative',
+    justifyContent: 'space-between',
   },
   cardContent: {
     flex: 1,
@@ -246,61 +247,54 @@ const styles = StyleSheet.create({
   wordText: {
     fontSize: 32,
     fontWeight: 'bold',
+    color: '#1E40AF',
     marginBottom: 10,
-    color: '#333',
+    textAlign: 'center',
   },
   translationText: {
     fontSize: 24,
-    color: '#666',
+    color: '#4B5563',
     marginBottom: 15,
+    textAlign: 'center',
   },
   exampleText: {
-    fontSize: 18,
-    color: '#444',
+    fontSize: 16,
+    color: '#6B7280',
+    marginBottom: 20,
     textAlign: 'center',
-    paddingHorizontal: 20,
+    fontStyle: 'italic',
+  },
+  audioButton: {
+    padding: 10,
+    borderRadius: 50,
+    backgroundColor: '#E0F2FE',
     marginBottom: 20,
   },
-  showTranslationButton: {
-    backgroundColor: '#2196F3',
+  revealButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 25,
+    backgroundColor: '#1E40AF',
+    borderRadius: 8,
     marginTop: 20,
   },
-  showTranslationText: {
+  revealButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
-  audioButton: {
-    marginTop: 20,
-    padding: 10,
-  },
   swipeIndicators: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingHorizontal: 20,
-  },
-  indicator: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    opacity: 0.7,
+    paddingHorizontal: 10,
+    marginTop: 20,
   },
-  correct: {
-    backgroundColor: '#4CAF50',
+  swipeIndicatorContainer: {
+    alignItems: 'center',
   },
-  learning: {
-    backgroundColor: '#FFC107',
-  },
-  forgot: {
-    backgroundColor: '#F44336',
+  swipeIndicatorText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 5,
   },
 });

@@ -1,24 +1,19 @@
-import { WordProgress } from './database';
-
 interface CardState {
   difficulty: number;
   stability: number;
   retrievability: number;
 }
 
-interface NextReview {
+interface ReviewResult {
   date: Date;
   intervalDays: number;
 }
 
-export const calculateNextReview = (card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): NextReview => {
-  // FSRS-4.5 algorithm implementation
-  // This is a simplified version for demonstration
-  // In production, you would use the full algorithm with more parameters
+export function calculateNextReview(card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): ReviewResult {
+  const now = new Date();
+  let intervalDays = 1;
 
-  let intervalDays = 1; // Default to 1 day
-
-  // Adjust interval based on rating
+  // Adjust interval based on rating and current stability
   switch (rating) {
     case 'forgot':
       intervalDays = 1;
@@ -34,108 +29,56 @@ export const calculateNextReview = (card: CardState, rating: 'forgot' | 'hard' |
       break;
   }
 
-  // Add some randomness to prevent perfect spacing
+  // Add some randomness to prevent overfitting
   intervalDays = Math.floor(intervalDays * (0.9 + Math.random() * 0.2));
 
-  const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + intervalDays);
+  const nextReviewDate = new Date(now);
+  nextReviewDate.setDate(now.getDate() + intervalDays);
 
   return {
     date: nextReviewDate,
     intervalDays,
   };
-};
+}
 
-export const updateCardState = (card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): CardState => {
-  // Update card state based on rating
-  let newDifficulty = card.difficulty;
-  let newStability = card.stability;
-  let newRetrievability = card.retrievability;
+export function updateCardState(card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): CardState {
+  const newCard = { ...card };
 
+  // Update difficulty based on rating
   switch (rating) {
     case 'forgot':
-      newDifficulty = Math.max(0, card.difficulty - 0.2);
-      newStability = Math.max(1, card.stability * 0.5);
-      newRetrievability = 0;
+      newCard.difficulty = Math.max(1, newCard.difficulty - 0.2);
+      newCard.stability = Math.max(1, newCard.stability * 0.5);
       break;
     case 'hard':
-      newDifficulty = Math.min(10, card.difficulty + 0.1);
-      newStability = Math.max(1, card.stability * 0.7);
-      newRetrievability = 0.5;
+      newCard.difficulty = Math.max(1, newCard.difficulty - 0.15);
+      newCard.stability = Math.max(1, newCard.stability * 0.8);
       break;
     case 'good':
-      newDifficulty = Math.min(10, card.difficulty + 0.05);
-      newStability = Math.max(1, card.stability * 0.9);
-      newRetrievability = 0.8;
+      newCard.difficulty = Math.min(10, newCard.difficulty + 0.1);
+      newCard.stability = Math.max(1, newCard.stability * 1.1);
       break;
     case 'easy':
-      newDifficulty = Math.min(10, card.difficulty - 0.05);
-      newStability = Math.max(1, card.stability * 1.1);
-      newRetrievability = 1;
+      newCard.difficulty = Math.min(10, newCard.difficulty + 0.2);
+      newCard.stability = Math.max(1, newCard.stability * 1.2);
       break;
   }
 
-  return {
-    difficulty: newDifficulty,
-    stability: newStability,
-    retrievability: newRetrievability,
-  };
-};
+  // Update retrievability based on rating
+  switch (rating) {
+    case 'forgot':
+      newCard.retrievability = 0;
+      break;
+    case 'hard':
+      newCard.retrievability = 0.5;
+      break;
+    case 'good':
+      newCard.retrievability = 0.8;
+      break;
+    case 'easy':
+      newCard.retrievability = 1;
+      break;
+  }
 
-export const getDueWords = async (limit: number, isNew: boolean): Promise<WordProgress[]> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        const now = Date.now();
-
-        if (isNew) {
-          // Get words that have never been reviewed
-          tx.executeSql(
-            `SELECT w.*, up.*
-             FROM words w
-             LEFT JOIN user_progress up ON w.id = up.wordId
-             WHERE up.wordId IS NULL
-             ORDER BY w.frequency DESC
-             LIMIT ?`,
-            [limit],
-            (_, { rows }) => {
-              const words = rows._array.map(word => ({
-                ...word,
-                difficulty: word.difficulty || 2.5,
-                stability: word.stability || 1,
-                retrievability: word.retrievability || 0,
-                correctCount: word.correctCount || 0,
-                incorrectCount: word.incorrectCount || 0,
-              }));
-              resolve(words);
-            },
-            (_, error) => reject(error)
-          );
-        } else {
-          // Get words that are due for review
-          tx.executeSql(
-            `SELECT w.*, up.*
-             FROM words w
-             JOIN user_progress up ON w.id = up.wordId
-             WHERE up.nextReview <= ? AND up.nextReview IS NOT NULL
-             ORDER BY up.nextReview ASC, w.frequency DESC
-             LIMIT ?`,
-            [now, limit],
-            (_, { rows }) => {
-              const words = rows._array.map(word => ({
-                ...word,
-                difficulty: word.difficulty || 2.5,
-                stability: word.stability || 1,
-                retrievability: word.retrievability || 0,
-                correctCount: word.correctCount || 0,
-                incorrectCount: word.incorrectCount || 0,
-              }));
-              resolve(words);
-            },
-            (_, error) => reject(error)
-          );
-        }
-      }
-    );
-  });
-};
+  return newCard;
+}

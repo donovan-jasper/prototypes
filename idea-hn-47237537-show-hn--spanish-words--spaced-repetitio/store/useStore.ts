@@ -145,7 +145,7 @@ export const useStore = create<StoreState>()(
           }
 
           const diffTime = today.getTime() - lastPracticedDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
           if (diffDays === 1) {
             // Consecutive day
@@ -162,8 +162,8 @@ export const useStore = create<StoreState>()(
 
       updateSettings: async (newSettings) => {
         try {
-          await updateSettings(newSettings);
-          const updatedSettings = await getSettings();
+          const updatedSettings = { ...get().settings, ...newSettings };
+          await updateSettings(updatedSettings);
           set({ settings: updatedSettings });
         } catch (error) {
           console.error('Error updating settings:', error);
