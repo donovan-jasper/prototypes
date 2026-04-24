@@ -9,6 +9,7 @@ import Animated, {
 import Svg, { Line, Circle } from 'react-native-svg';
 import Node from './Node';
 import { useTheme } from 'react-native-paper';
+import Toast from 'react-native-toast-message';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -109,9 +110,17 @@ export default function Canvas({
             message: 'Connection created successfully'
           });
         } else {
+          const message = `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`;
           setConnectionValidation({
             valid: false,
-            message: `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`
+            message
+          });
+          Toast.show({
+            type: 'error',
+            text1: 'Connection Error',
+            text2: message,
+            visibilityTime: 3000,
+            autoHide: true,
           });
         }
       }
@@ -138,6 +147,10 @@ export default function Canvas({
             {connections.map((conn, index) => {
               const fromPos = getNodePosition(conn.from);
               const toPos = getNodePosition(conn.to);
+              const fromNode = nodes.find(n => n.id === conn.from);
+              const toNode = nodes.find(n => n.id === conn.to);
+              const isValid = fromNode?.outputType === toNode?.inputType;
+
               return (
                 <Line
                   key={`${conn.from}-${conn.to}-${index}`}
@@ -145,8 +158,9 @@ export default function Canvas({
                   y1={fromPos.y + 50}
                   x2={toPos.x + 75}
                   y2={toPos.y + 50}
-                  stroke={theme.colors.primary}
+                  stroke={isValid ? theme.colors.primary : theme.colors.error}
                   strokeWidth="2"
+                  strokeDasharray={isValid ? undefined : "5,5"}
                 />
               );
             })}
@@ -184,14 +198,10 @@ export default function Canvas({
 
       {connectionValidation && (
         <View style={[
-          styles.validationFeedback,
-          {
-            backgroundColor: connectionValidation.valid
-              ? theme.colors.success
-              : theme.colors.error
-          }
+          styles.validationToast,
+          connectionValidation.valid ? styles.validToast : styles.invalidToast
         ]}>
-          <Text style={styles.validationText}>{connectionValidation.message}</Text>
+          <Text style={styles.toastText}>{connectionValidation.message}</Text>
         </View>
       )}
     </View>
@@ -204,19 +214,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   canvas: {
+    flex: 1,
     width: SCREEN_WIDTH * 3,
     height: SCREEN_HEIGHT * 3,
   },
-  validationFeedback: {
+  validationToast: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    padding: 12,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
-  validationText: {
+  validToast: {
+    backgroundColor: '#4caf50',
+  },
+  invalidToast: {
+    backgroundColor: '#f44336',
+  },
+  toastText: {
     color: 'white',
     fontWeight: 'bold',
   },

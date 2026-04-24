@@ -19,6 +19,8 @@ interface NodeProps {
   onPress: () => void;
   onOutputPress: (id: string) => void;
   onInputPress: (id: string) => void;
+  outputType?: 'text' | 'image' | 'audio' | 'number';
+  inputType?: 'text' | 'image' | 'audio' | 'number';
 }
 
 const NODE_ICONS = {
@@ -33,6 +35,13 @@ const NODE_COLORS = {
   action: '#ff9800',
 };
 
+const TYPE_COLORS = {
+  text: '#4caf50',
+  image: '#ff9800',
+  audio: '#2196f3',
+  number: '#9c27b0',
+};
+
 export default function Node({
   id,
   type,
@@ -44,6 +53,8 @@ export default function Node({
   onPress,
   onOutputPress,
   onInputPress,
+  outputType,
+  inputType,
 }: NodeProps) {
   const translateX = useSharedValue(x);
   const translateY = useSharedValue(y);
@@ -100,14 +111,20 @@ export default function Node({
             style={[styles.port, styles.inputPort]}
             onPress={() => onInputPress(id)}
           >
-            <View style={styles.portDot} />
+            <View style={[
+              styles.portDot,
+              { backgroundColor: inputType ? TYPE_COLORS[inputType] : '#6200ee' }
+            ]} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.port, styles.outputPort]}
             onPress={() => onOutputPress(id)}
           >
-            <View style={styles.portDot} />
+            <View style={[
+              styles.portDot,
+              { backgroundColor: outputType ? TYPE_COLORS[outputType] : '#6200ee' }
+            ]} />
           </TouchableOpacity>
         </TouchableOpacity>
       </GestureDetector>
@@ -168,7 +185,6 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#6200ee',
     borderWidth: 2,
     borderColor: '#fff',
   },
