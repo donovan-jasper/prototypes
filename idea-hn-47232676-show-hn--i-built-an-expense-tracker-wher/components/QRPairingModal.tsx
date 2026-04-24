@@ -168,31 +168,27 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Pair Devices</Text>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.modeSelector}>
-          <TouchableOpacity
-            style={[styles.modeButton, mode === 'generate' && styles.activeModeButton]}
-            onPress={() => setMode('generate')}
-          >
-            <Text style={[styles.modeButtonText, mode === 'generate' && styles.activeModeButtonText]}>
-              Generate QR Code
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.modeButton, mode === 'scan' && styles.activeModeButton]}
-            onPress={() => setMode('scan')}
-          >
-            <Text style={[styles.modeButtonText, mode === 'scan' && styles.activeModeButtonText]}>
-              Scan QR Code
-            </Text>
+          <TouchableOpacity onPress={onClose}>
+            <Ionicons name="close" size={24} color="#000" />
           </TouchableOpacity>
         </View>
 
         {renderConnectionStatus()}
+
+        <View style={styles.modeSelector}>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'generate' && styles.activeMode]}
+            onPress={() => setMode('generate')}
+          >
+            <Text style={styles.modeText}>Show QR Code</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'scan' && styles.activeMode]}
+            onPress={() => setMode('scan')}
+          >
+            <Text style={styles.modeText}>Scan QR Code</Text>
+          </TouchableOpacity>
+        </View>
 
         {mode === 'generate' ? (
           <View style={styles.qrContainer}>
@@ -203,15 +199,15 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
                 <QRCode
                   value={qrCode}
                   size={250}
-                  color="#2e78b7"
-                  backgroundColor="white"
+                  color="#000"
+                  backgroundColor="#fff"
                 />
               ) : (
                 <Text>Generating QR code...</Text>
               )
             )}
             <Text style={styles.instructionText}>
-              Scan this QR code on another device to pair
+              Scan this QR code with another device to pair
             </Text>
           </View>
         ) : (
@@ -221,19 +217,17 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
               style={StyleSheet.absoluteFillObject}
             />
             {scanned && (
-              <TouchableOpacity
-                style={styles.scanAgainButton}
+              <Button
+                title={'Tap to Scan Again'}
                 onPress={() => setScanned(false)}
-              >
-                <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
-              </TouchableOpacity>
+              />
             )}
           </View>
         )}
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Keep devices close for best results
+            Pairing establishes a secure connection between devices
           </Text>
         </View>
       </View>
@@ -245,7 +239,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -256,10 +250,29 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2e78b7',
   },
-  closeButton: {
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    marginBottom: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+  },
+  statusText: {
+    marginLeft: 8,
+    fontSize: 16,
+  },
+  retryButton: {
+    marginLeft: 10,
     padding: 5,
+    backgroundColor: '#2e78b7',
+    borderRadius: 5,
+  },
+  retryText: {
+    color: '#fff',
+    fontSize: 14,
   },
   modeSelector: {
     flexDirection: 'row',
@@ -269,75 +282,42 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     alignItems: 'center',
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
-  activeModeButton: {
-    borderBottomColor: '#2e78b7',
-  },
-  modeButtonText: {
-    color: '#666',
-  },
-  activeModeButtonText: {
-    color: '#2e78b7',
-    fontWeight: 'bold',
-  },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 5,
-  },
-  statusText: {
-    marginLeft: 10,
-    color: '#333',
-  },
-  retryButton: {
-    marginLeft: 10,
-    padding: 5,
+  activeMode: {
     backgroundColor: '#2e78b7',
-    borderRadius: 5,
+    borderColor: '#2e78b7',
   },
-  retryText: {
-    color: 'white',
-    fontSize: 12,
+  modeText: {
+    color: '#000',
+    fontWeight: 'bold',
   },
   qrContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    padding: 20,
   },
   instructionText: {
     marginTop: 20,
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
+    color: '#666',
   },
   scannerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  scanAgainButton: {
-    position: 'absolute',
-    bottom: 20,
-    padding: 15,
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    borderRadius: 5,
-  },
-  scanAgainText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   footer: {
     padding: 10,
     alignItems: 'center',
   },
   footerText: {
-    color: '#666',
     fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
   },
 });

@@ -177,47 +177,41 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
 
 export const handleSignalingData = async (data: string): Promise<string | null> => {
   try {
-    const signalingData: SignalingData = JSON.parse(data);
+    const parsedData: { signalingData: string; deviceId: string; publicKey: string } = JSON.parse(data);
 
     if (!peerConnection) {
       await initializePeerConnection(false);
     }
 
-    if (signalingData.type === 'offer') {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
+    const signalingData: SignalingData = JSON.parse(parsedData.signalingData);
 
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription({
+    if (signalingData.type === 'offer') {
+      if (!peerConnection?.localDescription) {
+        await peerConnection?.setRemoteDescription(new RTCSessionDescription({
           type: 'offer',
           sdp: signalingData.sdp,
-        })
-      );
+        }));
 
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
+        const answer = await peerConnection?.createAnswer();
+        await peerConnection?.setLocalDescription(answer);
 
-      const answerData: SignalingData = {
-        type: 'answer',
-        sdp: answer.sdp,
-        deviceId: await getDeviceId(),
-      };
+        const responseData: SignalingData = {
+          type: 'answer',
+          sdp: answer?.sdp,
+          deviceId: await getDeviceId(),
+        };
 
-      return JSON.stringify(answerData);
+        return JSON.stringify(responseData);
+      }
     } else if (signalingData.type === 'answer') {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
-
-      await peerConnection.setRemoteDescription(
-        new RTCSessionDescription({
+      if (peerConnection?.localDescription?.type === 'offer') {
+        await peerConnection?.setRemoteDescription(new RTCSessionDescription({
           type: 'answer',
           sdp: signalingData.sdp,
-        })
-      );
+        }));
+      }
     } else if (signalingData.type === 'candidate' && signalingData.candidate) {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
-
-      await peerConnection.addIceCandidate(
-        new RTCIceCandidate(signalingData.candidate)
-      );
+      await peerConnection?.addIceCandidate(new RTCIceCandidate(signalingData.candidate));
     }
 
     return null;
@@ -227,77 +221,79 @@ export const handleSignalingData = async (data: string): Promise<string | null> 
   }
 };
 
-export const createSyncPayload = async (): Promise<SyncPayload> => {
-  const expenses = await getExpenses();
-  const currentDeviceId = await getDeviceId();
-
-  return {
-    expenses,
-    timestamp: Date.now(),
-    deviceId: currentDeviceId,
-  };
-};
-
-export const applySyncPayload = async (payload: SyncPayload) => {
-  const currentDeviceId = await getDeviceId();
-
-  // Only process if payload is newer than our last sync
-  if (payload.timestamp <= lastSyncTimestamp) {
-    console.log('Payload is older than last sync, skipping');
-    return;
-  }
-
-  lastSyncTimestamp = payload.timestamp;
-
-  // Process expenses
-  for (const expense of payload.expenses) {
-    // Skip expenses from our own device
-    if (expense.deviceId === currentDeviceId) continue;
-
-    // Check if expense already exists
-    const existingExpense = await getExpenseById(expense.id);
-
-    if (existingExpense) {
-      // Update existing expense if it's newer
-      if (expense.updatedAt > existingExpense.updatedAt) {
-        await updateExpense(expense.id, expense);
-      }
-    } else {
-      // Add new expense
-      await addExpense(expense);
-    }
-  }
-
-  // Update the store
-  const allExpenses = await getExpenses();
-  useStore.getState().setExpenses(allExpenses);
-};
-
 export const sendSyncPayload = async () => {
-  if (!dataChannel || dataChannel.readyState !== 'open') {
-    console.log('Data channel not ready');
+  if (!dataChannel || dataChannel.readyState !== 'open' || !encryptionKey) {
+    console.log('Data channel not ready or no encryption key');
     return;
   }
 
   try {
-    const payload = await createSyncPayload();
-    if (!encryptionKey) {
-      console.error('No encryption key available');
-      return;
-    }
+    const expenses = await getExpenses();
+    const currentDeviceId = await getDeviceId();
+
+    const payload: SyncPayload = {
+      expenses,
+      timestamp: Date.now(),
+      deviceId: currentDeviceId,
+    };
 
     const encryptedPayload = await encryptMessage(JSON.stringify(payload), encryptionKey);
     dataChannel.send(encryptedPayload);
+    console.log('Sync payload sent');
   } catch (error) {
     console.error('Error sending sync payload:', error);
   }
 };
 
+export const applySyncPayload = async (payload: SyncPayload) => {
+  try {
+    const currentDeviceId = await getDeviceId();
+
+    // Only process payloads from other devices
+    if (payload.deviceId === currentDeviceId) {
+      return;
+    }
+
+    // Only process newer payloads
+    if (payload.timestamp <= lastSyncTimestamp) {
+      return;
+    }
+
+    lastSyncTimestamp = payload.timestamp;
+
+    // Process expenses
+    for (const expense of payload.expenses) {
+      const existingExpense = await getExpenseById(expense.id);
+
+      if (!existingExpense) {
+        await addExpense(expense);
+      } else if (existingExpense.updatedAt < expense.updatedAt) {
+        await updateExpense(expense);
+      }
+    }
+
+    console.log('Sync payload applied successfully');
+  } catch (error) {
+    console.error('Error applying sync payload:', error);
+  }
+};
+
 export const closeConnection = () => {
+  if (dataChannel) {
+    dataChannel.close();
+  }
+
   if (peerConnection) {
     peerConnection.close();
-    peerConnection = null;
   }
+
+  peerConnection = null;
   dataChannel = null;
   useStore.getState().setSyncStatus('offline');
+};
+
+// Helper function to get expense by ID
+const getExpenseById = async (id: string): Promise<Expense | null> => {
+  const expenses = await getExpenses();
+  return expenses.find(expense => expense.id === id) || null;
 };

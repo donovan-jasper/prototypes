@@ -8,7 +8,6 @@ export interface Expense {
   date: string;
   createdAt: number;
   updatedAt: number;
-  deviceId: string;
 }
 
 export interface User {
@@ -16,14 +15,7 @@ export interface User {
   name: string;
   deviceId: string;
   publicKey: string;
+  isCurrentUser: boolean;
 }
 
-export type SyncStatus = 'offline' | 'connecting' | 'connected' | 'syncing';
-
-export interface VoiceInputResult {
-  description: string;
-  amount: number;
-  category: string;
-  splitType: 'even' | 'custom';
-  customSplit?: Record<string, number>;
-}
+export type SyncStatus = 'idle' | 'connecting' | 'connected' | 'offline';
