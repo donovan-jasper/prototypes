@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, Button, StyleSheet, FlatList, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Animated } from 'react-native';
 
 const ReplayView = ({ log }) => {
   const [currentStep, setCurrentStep] = useState(0);
@@ -178,21 +178,21 @@ const styles = StyleSheet.create({
   controls: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 10,
+    marginBottom: 15,
   },
   controlButton: {
-    padding: 10,
     backgroundColor: '#3498db',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 5,
   },
   disabledButton: {
     backgroundColor: '#bdc3c7',
   },
   playButton: {
-    padding: 15,
     backgroundColor: '#2ecc71',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     borderRadius: 5,
   },
   controlText: {
@@ -206,44 +206,37 @@ const styles = StyleSheet.create({
   },
   progressContainer: {
     marginBottom: 15,
-    paddingHorizontal: 10,
   },
   progressBarBackground: {
     height: 5,
     backgroundColor: '#ecf0f1',
     borderRadius: 2.5,
     marginBottom: 5,
-    overflow: 'hidden',
   },
   progressBar: {
-    height: '100%',
+    height: 5,
     backgroundColor: '#3498db',
     borderRadius: 2.5,
   },
   progressText: {
-    fontSize: 12,
-    color: '#7f8c8d',
     textAlign: 'center',
+    color: '#7f8c8d',
+    fontSize: 12,
   },
   stepsList: {
     flex: 1,
   },
   stepItem: {
+    backgroundColor: 'white',
     padding: 15,
     marginBottom: 10,
-    backgroundColor: 'white',
     borderRadius: 5,
     borderLeftWidth: 3,
-    borderLeftColor: 'transparent',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderLeftColor: '#ecf0f1',
   },
   activeStep: {
     borderLeftColor: '#3498db',
-    backgroundColor: '#f0f7fc',
+    backgroundColor: '#f0f7ff',
   },
   stepHeader: {
     flexDirection: 'row',
@@ -265,9 +258,8 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   detailsContainer: {
-    marginTop: 5,
-    padding: 8,
     backgroundColor: '#f9f9f9',
+    padding: 10,
     borderRadius: 3,
   },
   detailsTitle: {
