@@ -1,11 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, Button, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Button, Image, StyleSheet, Alert } from 'react-native';
 import { Camera } from 'expo-camera';
+import { useNavigation } from '@react-navigation/native';
+import { convertImageToPDF } from '../utils/pdfProcessor';
 
-const ImageScanner = ({ onScan }) => {
+const ImageScanner = () => {
   const [hasPermission, setHasPermission] = useState(null);
   const [type, setType] = useState(Camera.Constants.Type.back);
   const [image, setImage] = useState(null);
+  const cameraRef = useRef(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
     (async () => {
@@ -15,23 +19,42 @@ const ImageScanner = ({ onScan }) => {
   }, []);
 
   const takePicture = async () => {
-    if (cameraRef) {
-      const photo = await cameraRef.takePictureAsync();
-      setImage(photo.uri);
-      onScan(photo.uri);
+    if (cameraRef.current) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync();
+        setImage(photo.uri);
+
+        // Convert image to PDF
+        const pdfBytes = await convertImageToPDF(photo.uri);
+
+        // Navigate to EditorScreen with the PDF data
+        navigation.navigate('EditorScreen', { pdfData: pdfBytes });
+      } catch (error) {
+        console.error('Error processing image:', error);
+        Alert.alert('Error', 'Failed to process the image. Please try again.');
+      }
     }
   };
 
   if (hasPermission === null) {
-    return <View />;
+    return <View style={styles.container} />;
   }
   if (hasPermission === false) {
-    return <Text>No access to camera</Text>;
+    return (
+      <View style={styles.container}>
+        <Text>No access to camera. Please enable camera permissions in settings.</Text>
+      </View>
+    );
   }
 
   return (
     <View style={styles.container}>
-      <Camera style={styles.camera} type={type} ref={(ref) => { cameraRef = ref; }}>
+      <Camera
+        style={styles.camera}
+        type={type}
+        ref={cameraRef}
+        ratio="16:9"
+      >
         <View style={styles.buttonContainer}>
           <Button
             title="Flip"
@@ -46,7 +69,11 @@ const ImageScanner = ({ onScan }) => {
           <Button title="Take Picture" onPress={takePicture} />
         </View>
       </Camera>
-      {image && <Image source={{ uri: image }} style={styles.image} />}
+      {image && (
+        <View style={styles.previewContainer}>
+          <Image source={{ uri: image }} style={styles.previewImage} />
+        </View>
+      )}
     </View>
   );
 };
@@ -62,10 +89,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'transparent',
     flexDirection: 'row',
+    justifyContent: 'space-around',
     margin: 20,
+    alignItems: 'flex-end',
   },
-  image: {
+  previewContainer: {
     flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 10,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
   },
 });
 

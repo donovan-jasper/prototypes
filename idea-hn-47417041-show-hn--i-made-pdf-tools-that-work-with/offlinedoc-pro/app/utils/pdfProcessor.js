@@ -1,5 +1,6 @@
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, degrees } from 'pdf-lib';
 import * as FileSystem from 'expo-file-system';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 export const mergePDFs = async (pdfs) => {
   const mergedPdf = await PDFDocument.create();
@@ -18,21 +19,26 @@ export const convertImageToPDF = async (imageUri) => {
       encoding: FileSystem.EncodingType.Base64,
     });
 
+    // Get image dimensions
+    const manipResult = await ImageManipulator.manipulateAsync(
+      imageUri,
+      [],
+      { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
+    );
+
     // Create a new PDF document
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 800]);
+    const page = pdfDoc.addPage([manipResult.width, manipResult.height]);
 
-    // In a real implementation, you would:
-    // 1. Get image dimensions
-    // 2. Embed the image in the PDF
-    // 3. Draw the image on the page
+    // Embed the image in the PDF
+    const jpgImage = await pdfDoc.embedJpg(imageData);
 
-    // For this example, we'll just add a placeholder
-    page.drawText('Converted Image', {
-      x: 50,
-      y: 750,
-      size: 30,
-      color: rgb(0, 0, 0),
+    // Draw the image on the page
+    page.drawImage(jpgImage, {
+      x: 0,
+      y: 0,
+      width: manipResult.width,
+      height: manipResult.height,
     });
 
     // Save the PDF
