@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { db } from '../../../utils/api';
-import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
 
 const CommunityScreen = () => {
   const [questions, setQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
@@ -22,24 +24,37 @@ const CommunityScreen = () => {
       });
       setQuestions(questionsData);
       setLoading(false);
+    }, (error) => {
+      setError('Failed to load questions. Please check your connection.');
+      setLoading(false);
     });
 
     return () => unsubscribe();
   }, []);
 
   const handleAddQuestion = async () => {
-    if (newQuestion.trim()) {
-      try {
-        await addDoc(collection(db, 'questions'), {
-          question: newQuestion,
-          answer: 'This question is awaiting an answer...',
-          createdAt: new Date()
-        });
-        setNewQuestion('');
-        setShowForm(false);
-      } catch (error) {
-        console.error('Error adding question: ', error);
-      }
+    if (!newQuestion.trim()) {
+      Alert.alert('Error', 'Please enter a question');
+      return;
+    }
+
+    setSubmitting(true);
+    setError(null);
+
+    try {
+      await addDoc(collection(db, 'questions'), {
+        question: newQuestion.trim(),
+        answer: 'This question is awaiting an answer...',
+        createdAt: serverTimestamp(),
+        status: 'unanswered'
+      });
+      setNewQuestion('');
+      setShowForm(false);
+    } catch (error) {
+      console.error('Error adding question: ', error);
+      setError('Failed to submit question. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -47,6 +62,12 @@ const CommunityScreen = () => {
     <View style={styles.questionCard}>
       <Text style={styles.questionText}>{item.question}</Text>
       <Text style={styles.answerText}>{item.answer}</Text>
+      <Text style={[
+        styles.statusText,
+        item.status === 'answered' ? styles.answered : styles.unanswered
+      ]}>
+        {item.status === 'answered' ? 'Answered' : 'Unanswered'}
+      </Text>
     </View>
   );
 
@@ -61,6 +82,12 @@ const CommunityScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Community Q&A</Text>
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
 
       <FlatList
         data={questions}
@@ -82,19 +109,26 @@ const CommunityScreen = () => {
             value={newQuestion}
             onChangeText={setNewQuestion}
             multiline
+            editable={!submitting}
           />
           <View style={styles.buttonContainer}>
             <TouchableOpacity
               style={[styles.button, styles.cancelButton]}
               onPress={() => setShowForm(false)}
+              disabled={submitting}
             >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.button, styles.submitButton]}
+              style={[styles.button, styles.submitButton, submitting && styles.disabledButton]}
               onPress={handleAddQuestion}
+              disabled={submitting}
             >
-              <Text style={styles.buttonText}>Submit</Text>
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Submit</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -104,6 +138,7 @@ const CommunityScreen = () => {
         style={styles.fab}
         icon="plus"
         onPress={() => setShowForm(true)}
+        disabled={submitting}
       />
     </SafeAreaView>
   );
@@ -144,6 +179,18 @@ const styles = StyleSheet.create({
   answerText: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 8,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    alignSelf: 'flex-end',
+  },
+  answered: {
+    color: '#4CAF50',
+  },
+  unanswered: {
+    color: '#F44336',
   },
   formContainer: {
     position: 'absolute',
@@ -173,12 +220,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 4,
     marginLeft: 8,
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelButton: {
     backgroundColor: '#f0f0f0',
   },
   submitButton: {
     backgroundColor: '#6200ee',
+  },
+  disabledButton: {
+    opacity: 0.7,
   },
   buttonText: {
     color: '#fff',
@@ -200,11 +253,19 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 32,
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+  },
+  errorContainer: {
+    padding: 16,
+    backgroundColor: '#ffebee',
+  },
+  errorText: {
+    color: '#d32f2f',
     textAlign: 'center',
   },
 });
