@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, TouchableOpacity, Text } from 'react-native';
 import RecordButton from '../components/RecordButton';
 import NoteList from '../components/NoteList';
 import { Audio } from 'expo-av';
 import { initializeDatabase, addNote, getNotes } from '../services/database';
+import { useNavigation } from '@react-navigation/native';
 
 const HomeScreen = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recording, setRecording] = useState(null);
   const [notes, setNotes] = useState([]);
+  const navigation = useNavigation();
 
   useEffect(() => {
     const setupDatabase = async () => {
@@ -79,6 +81,16 @@ const HomeScreen = () => {
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.title}>EchoVault</Text>
+        <TouchableOpacity
+          style={styles.crisisButton}
+          onPress={() => navigation.navigate('CrisisMode')}
+        >
+          <Text style={styles.crisisButtonText}>Crisis Mode</Text>
+        </TouchableOpacity>
+      </View>
+
       <NoteList notes={notes} onNotePress={handleNotePress} />
       <View style={styles.recordButtonContainer}>
         <RecordButton onPress={handleRecordPress} isRecording={isRecording} />
@@ -91,6 +103,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  crisisButton: {
+    backgroundColor: '#ff6b6b',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+  },
+  crisisButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   recordButtonContainer: {
     position: 'absolute',
