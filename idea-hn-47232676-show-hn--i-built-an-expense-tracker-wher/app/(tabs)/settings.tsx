@@ -132,22 +132,23 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Premium Features</Text>
 
           <View style={styles.premiumFeature}>
-            <Ionicons name="mic-outline" size={20} color="#FFD700" />
-            <Text style={styles.premiumFeatureText}>Voice-to-Expense</Text>
+            <Ionicons name="mic-outline" size={24} color="#2e78b7" />
+            <View style={styles.premiumFeatureText}>
+              <Text style={styles.premiumFeatureTitle}>Voice Input</Text>
+              <Text style={styles.premiumFeatureDescription}>Add expenses by speaking naturally</Text>
+            </View>
           </View>
 
           <View style={styles.premiumFeature}>
-            <Ionicons name="receipt-outline" size={20} color="#FFD700" />
-            <Text style={styles.premiumFeatureText}>Receipt Scanning</Text>
+            <Ionicons name="people-outline" size={24} color="#2e78b7" />
+            <View style={styles.premiumFeatureText}>
+              <Text style={styles.premiumFeatureTitle}>Multi-Device Sync</Text>
+              <Text style={styles.premiumFeatureDescription}>Connect up to 5 devices</Text>
+            </View>
           </View>
 
-          <View style={styles.premiumFeature}>
-            <Ionicons name="people-outline" size={20} color="#FFD700" />
-            <Text style={styles.premiumFeatureText}>Multi-Device Sync</Text>
-          </View>
-
-          <TouchableOpacity style={styles.premiumButton}>
-            <Text style={styles.premiumButtonText}>Upgrade to Premium</Text>
+          <TouchableOpacity style={styles.upgradeButton}>
+            <Text style={styles.upgradeButtonText}>Upgrade to Premium</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -163,35 +164,35 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   section: {
     backgroundColor: 'white',
     marginBottom: 20,
-    padding: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   sectionTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 10,
+    fontWeight: 'bold',
+    padding: 16,
+    color: '#666',
   },
   option: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   optionTextContainer: {
     flex: 1,
-    marginLeft: 15,
+    marginLeft: 16,
   },
   optionText: {
     fontSize: 16,
-    color: '#333',
   },
   optionSubtext: {
     fontSize: 14,
@@ -199,35 +200,45 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   dangerOption: {
-    borderBottomWidth: 0,
+    borderTopWidth: 1,
+    borderTopColor: '#ffebee',
   },
   dangerText: {
     color: '#F44336',
   },
   premiumSection: {
-    backgroundColor: '#f5f5f5',
-    borderColor: '#ddd',
+    marginBottom: 0,
   },
   premiumFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   premiumFeatureText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#333',
+    marginLeft: 16,
+    flex: 1,
   },
-  premiumButton: {
-    backgroundColor: '#FFD700',
-    padding: 15,
-    borderRadius: 5,
+  premiumFeatureTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  premiumFeatureDescription: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 2,
+  },
+  upgradeButton: {
+    backgroundColor: '#2e78b7',
+    padding: 16,
     alignItems: 'center',
-    marginTop: 15,
+    margin: 16,
+    borderRadius: 8,
   },
-  premiumButtonText: {
-    fontSize: 16,
+  upgradeButtonText: {
+    color: 'white',
     fontWeight: 'bold',
-    color: '#333',
+    fontSize: 16,
   },
 });

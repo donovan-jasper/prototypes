@@ -175,43 +175,52 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
   }
 };
 
-export const handleSignalingData = async (data: string): Promise<string | null> => {
+export const handleSignalingData = async (qrData: string): Promise<string | null> => {
   try {
-    const parsedData: { signalingData: string; deviceId: string; publicKey: string } = JSON.parse(data);
+    const parsedData = JSON.parse(qrData);
+    const signalingData: SignalingData = JSON.parse(parsedData.signalingData);
 
     if (!peerConnection) {
       await initializePeerConnection(false);
     }
 
-    const signalingData: SignalingData = JSON.parse(parsedData.signalingData);
-
     if (signalingData.type === 'offer') {
-      if (!peerConnection?.localDescription) {
-        await peerConnection?.setRemoteDescription(new RTCSessionDescription({
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({
           type: 'offer',
           sdp: signalingData.sdp,
-        }));
+        })
+      );
 
-        const answer = await peerConnection?.createAnswer();
-        await peerConnection?.setLocalDescription(answer);
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
 
-        const responseData: SignalingData = {
-          type: 'answer',
-          sdp: answer?.sdp,
-          deviceId: await getDeviceId(),
-        };
+      const response: SignalingData = {
+        type: 'answer',
+        sdp: answer.sdp,
+        deviceId: await getDeviceId(),
+      };
 
-        return JSON.stringify(responseData);
-      }
+      return JSON.stringify(response);
     } else if (signalingData.type === 'answer') {
-      if (peerConnection?.localDescription?.type === 'offer') {
-        await peerConnection?.setRemoteDescription(new RTCSessionDescription({
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({
           type: 'answer',
           sdp: signalingData.sdp,
-        }));
-      }
+        })
+      );
+
+      return null;
     } else if (signalingData.type === 'candidate' && signalingData.candidate) {
-      await peerConnection?.addIceCandidate(new RTCIceCandidate(signalingData.candidate));
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.addIceCandidate(
+        new RTCIceCandidate(signalingData.candidate)
+      );
     }
 
     return null;
@@ -223,7 +232,7 @@ export const handleSignalingData = async (data: string): Promise<string | null> 
 
 export const sendSyncPayload = async () => {
   if (!dataChannel || dataChannel.readyState !== 'open' || !encryptionKey) {
-    console.log('Data channel not ready or no encryption key');
+    console.log('Data channel not ready for sending');
     return;
   }
 
@@ -239,7 +248,7 @@ export const sendSyncPayload = async () => {
 
     const encryptedPayload = await encryptMessage(JSON.stringify(payload), encryptionKey);
     dataChannel.send(encryptedPayload);
-    console.log('Sync payload sent');
+    console.log('Sent sync payload');
   } catch (error) {
     console.error('Error sending sync payload:', error);
   }
@@ -247,53 +256,41 @@ export const sendSyncPayload = async () => {
 
 export const applySyncPayload = async (payload: SyncPayload) => {
   try {
-    const currentDeviceId = await getDeviceId();
+    // Filter expenses that are newer than our last sync
+    const newExpenses = payload.expenses.filter(
+      expense => expense.timestamp > lastSyncTimestamp
+    );
 
-    // Only process payloads from other devices
-    if (payload.deviceId === currentDeviceId) {
-      return;
-    }
+    // Apply each new expense
+    for (const expense of newExpenses) {
+      // Check if we already have this expense
+      const existingExpense = await getExpenses(expense.id);
 
-    // Only process newer payloads
-    if (payload.timestamp <= lastSyncTimestamp) {
-      return;
-    }
-
-    lastSyncTimestamp = payload.timestamp;
-
-    // Process expenses
-    for (const expense of payload.expenses) {
-      const existingExpense = await getExpenseById(expense.id);
-
-      if (!existingExpense) {
+      if (existingExpense) {
+        // Update existing expense if it's newer
+        if (expense.timestamp > existingExpense.timestamp) {
+          await updateExpense(expense);
+        }
+      } else {
+        // Add new expense
         await addExpense(expense);
-      } else if (existingExpense.updatedAt < expense.updatedAt) {
-        await updateExpense(expense);
       }
     }
 
-    console.log('Sync payload applied successfully');
+    // Update last sync timestamp
+    lastSyncTimestamp = Math.max(lastSyncTimestamp, payload.timestamp);
+
+    console.log('Applied sync payload with', newExpenses.length, 'new expenses');
   } catch (error) {
     console.error('Error applying sync payload:', error);
   }
 };
 
 export const closeConnection = () => {
-  if (dataChannel) {
-    dataChannel.close();
-  }
-
   if (peerConnection) {
     peerConnection.close();
+    peerConnection = null;
   }
-
-  peerConnection = null;
   dataChannel = null;
   useStore.getState().setSyncStatus('offline');
-};
-
-// Helper function to get expense by ID
-const getExpenseById = async (id: string): Promise<Expense | null> => {
-  const expenses = await getExpenses();
-  return expenses.find(expense => expense.id === id) || null;
 };
