@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, 
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
+import { Ionicons } from '@expo/vector-icons';
 
 interface Group {
   id: string;
@@ -156,17 +157,19 @@ const GroupDetail: React.FC = () => {
           });
         }
 
-        // Refresh challenges
-        const challengesQuery = query(
-          collection(db, 'challenges'),
-          where('groupId', '==', groupId)
+        // Update local state
+        setChallenges(prevChallenges =>
+          prevChallenges.map(challenge =>
+            challenge.id === challengeId
+              ? {
+                  ...challenge,
+                  completedBy: isCompleted
+                    ? challenge.completedBy?.filter(id => id !== currentUser.uid)
+                    : [...(challenge.completedBy || []), currentUser.uid]
+                }
+              : challenge
+          )
         );
-        const challengesSnapshot = await getDocs(challengesQuery);
-        const challengesData = challengesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Challenge[];
-        setChallenges(challengesData);
       }
     } catch (error) {
       console.error('Error toggling challenge completion:', error);
@@ -174,74 +177,51 @@ const GroupDetail: React.FC = () => {
     }
   };
 
-  const handlePromoteMember = async (memberId: string) => {
-    try {
-      if (!group) return;
+  const renderChallengeItem = ({ item }: { item: Challenge }) => {
+    const currentUser = auth.currentUser;
+    const isCompleted = currentUser && item.completedBy?.includes(currentUser.uid);
 
-      await updateDoc(doc(db, 'groups', group.id), {
-        adminId: memberId
-      });
-
-      // Refresh group data
-      const groupDoc = await getDoc(doc(db, 'groups', groupId));
-      if (groupDoc.exists()) {
-        const groupData = { id: groupDoc.id, ...groupDoc.data() } as Group;
-        setGroup(groupData);
-        setIsAdmin(groupData.adminId === auth.currentUser?.uid);
-      }
-
-      setShowMemberModal(false);
-      Alert.alert('Success', 'Member promoted to admin');
-    } catch (error) {
-      console.error('Error promoting member:', error);
-      Alert.alert('Error', 'Failed to promote member');
-    }
-  };
-
-  const handleRemoveMember = async (memberId: string) => {
-    try {
-      if (!group) return;
-
-      await updateDoc(doc(db, 'groups', group.id), {
-        members: arrayRemove(memberId)
-      });
-
-      // Refresh members
-      const memberPromises = group.members.filter(id => id !== memberId).map(async (memberId) => {
-        const userDoc = await getDoc(doc(db, 'users', memberId));
-        return userDoc.exists() ? { id: userDoc.id, ...userDoc.data() } as User : null;
-      });
-
-      const membersData = (await Promise.all(memberPromises)).filter(Boolean) as User[];
-      setMembers(membersData);
-
-      setShowMemberModal(false);
-      Alert.alert('Success', 'Member removed from group');
-    } catch (error) {
-      console.error('Error removing member:', error);
-      Alert.alert('Error', 'Failed to remove member');
-    }
+    return (
+      <View style={styles.challengeItem}>
+        <View style={styles.challengeHeader}>
+          <Text style={styles.challengeTitle}>{item.title}</Text>
+          <TouchableOpacity
+            style={[
+              styles.completionButton,
+              isCompleted && styles.completedButton
+            ]}
+            onPress={() => handleToggleChallengeCompletion(item.id)}
+          >
+            <Ionicons
+              name={isCompleted ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={24}
+              color={isCompleted ? '#4CAF50' : '#757575'}
+            />
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.challengeDescription}>{item.description}</Text>
+        <View style={styles.challengeFooter}>
+          <Text style={styles.xpReward}>+{item.xpReward} XP</Text>
+          <Text style={styles.completionCount}>
+            {item.completedBy?.length || 0} completed
+          </Text>
+        </View>
+      </View>
+    );
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6200EE" />
-        <Text style={styles.loadingText}>Loading group details...</Text>
       </View>
     );
   }
 
   if (!group) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Group not found</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Group not found</Text>
       </View>
     );
   }
@@ -250,81 +230,32 @@ const GroupDetail: React.FC = () => {
     <ScrollView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.groupName}>{group.name}</Text>
-        <Text style={styles.groupPrivacy}>
-          {group.privacy === 'public' ? 'Public Group' : 'Private Group'}
-        </Text>
         <Text style={styles.groupDescription}>{group.description}</Text>
+        <Text style={styles.memberCount}>{members.length} members</Text>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Challenges</Text>
-        {isAdmin && (
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => setShowChallengeModal(true)}
-          >
-            <Text style={styles.addButtonText}>+ Add Challenge</Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Challenges</Text>
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowChallengeModal(true)}
+            >
+              <Ionicons name="add-circle-outline" size={24} color="#6200EE" />
+            </TouchableOpacity>
+          )}
+        </View>
 
         {challenges.length > 0 ? (
           <FlatList
             data={challenges}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.challengeItem}
-                onPress={() => handleToggleChallengeCompletion(item.id)}
-              >
-                <View style={styles.challengeHeader}>
-                  <Text style={styles.challengeTitle}>{item.title}</Text>
-                  <Text style={styles.challengeXP}>{item.xpReward} XP</Text>
-                </View>
-                <Text style={styles.challengeDescription}>{item.description}</Text>
-                <View style={styles.challengeStatus}>
-                  <Text style={styles.challengeStatusText}>
-                    {item.completedBy?.includes(auth.currentUser?.uid || '') ? 'Completed' : 'Not completed'}
-                  </Text>
-                  <Text style={styles.challengeCompletionCount}>
-                    {item.completedBy?.length || 0} members completed
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            )}
+            renderItem={renderChallengeItem}
+            keyExtractor={item => item.id}
             scrollEnabled={false}
           />
         ) : (
-          <Text style={styles.emptySectionText}>No challenges yet</Text>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Members ({members.length})</Text>
-        {members.length > 0 ? (
-          <FlatList
-            data={members}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.memberItem}
-                onPress={() => {
-                  if (isAdmin && item.id !== auth.currentUser?.uid) {
-                    setSelectedMember(item);
-                    setShowMemberModal(true);
-                  }
-                }}
-              >
-                <Text style={styles.memberName}>{item.displayName}</Text>
-                <Text style={styles.memberEmail}>{item.email}</Text>
-                {group.adminId === item.id && (
-                  <Text style={styles.adminBadge}>Admin</Text>
-                )}
-              </TouchableOpacity>
-            )}
-            scrollEnabled={false}
-          />
-        ) : (
-          <Text style={styles.emptySectionText}>No members yet</Text>
+          <Text style={styles.noChallengesText}>No challenges yet</Text>
         )}
       </View>
 
@@ -372,7 +303,7 @@ const GroupDetail: React.FC = () => {
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateChallenge}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -381,46 +312,6 @@ const GroupDetail: React.FC = () => {
           </View>
         </View>
       </Modal>
-
-      {/* Member Management Modal */}
-      {selectedMember && (
-        <Modal
-          visible={showMemberModal}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setShowMemberModal(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Manage Member</Text>
-              <Text style={styles.memberModalName}>{selectedMember.displayName}</Text>
-
-              <View style={styles.memberModalActions}>
-                <TouchableOpacity
-                  style={[styles.memberActionButton, styles.promoteButton]}
-                  onPress={() => handlePromoteMember(selectedMember.id)}
-                >
-                  <Text style={styles.memberActionText}>Promote to Admin</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.memberActionButton, styles.removeButton]}
-                  onPress={() => handleRemoveMember(selectedMember.id)}
-                >
-                  <Text style={styles.memberActionText}>Remove from Group</Text>
-                </TouchableOpacity>
-              </View>
-
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setShowMemberModal(false)}
-              >
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
-      )}
     </ScrollView>
   );
 };
@@ -435,165 +326,130 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
+  errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
-  emptyText: {
+  errorText: {
     fontSize: 18,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  backButton: {
-    backgroundColor: '#6200EE',
-    padding: 12,
-    borderRadius: 8,
-  },
-  backButtonText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#666',
   },
   header: {
     padding: 20,
-    backgroundColor: 'white',
-    marginBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#6200EE',
   },
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  groupPrivacy: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
+    color: 'white',
+    marginBottom: 8,
   },
   groupDescription: {
     fontSize: 16,
-    color: '#333',
+    color: 'rgba(255, 255, 255, 0.8)',
+    marginBottom: 8,
+  },
+  memberCount: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.6)',
   },
   section: {
-    backgroundColor: 'white',
-    marginBottom: 10,
-    padding: 15,
+    marginTop: 20,
+    paddingHorizontal: 20,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    color: '#333',
   },
   addButton: {
-    backgroundColor: '#6200EE',
-    padding: 10,
-    borderRadius: 5,
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 14,
+    padding: 8,
   },
   challengeItem: {
-    backgroundColor: '#f9f9f9',
-    padding: 15,
+    backgroundColor: 'white',
     borderRadius: 8,
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1,
+    elevation: 2,
   },
   challengeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    alignItems: 'center',
+    marginBottom: 8,
   },
   challengeTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
   },
-  challengeXP: {
-    fontSize: 14,
-    color: '#6200EE',
-    fontWeight: 'bold',
+  completionButton: {
+    padding: 4,
+  },
+  completedButton: {
+    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+    borderRadius: 20,
   },
   challengeDescription: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 5,
+    marginBottom: 12,
   },
-  challengeStatus: {
+  challengeFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  challengeStatusText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  challengeCompletionCount: {
-    fontSize: 12,
-    color: '#666',
-  },
-  memberItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  memberName: {
-    fontSize: 16,
+  xpReward: {
+    fontSize: 14,
+    color: '#4CAF50',
     fontWeight: 'bold',
   },
-  memberEmail: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
-  },
-  adminBadge: {
-    backgroundColor: '#6200EE',
-    color: 'white',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
+  completionCount: {
     fontSize: 12,
-    alignSelf: 'flex-start',
-    marginTop: 5,
+    color: '#757575',
   },
-  emptySectionText: {
+  noChallengesText: {
     fontSize: 14,
-    color: '#999',
+    color: '#757575',
     textAlign: 'center',
-    padding: 20,
+    marginTop: 20,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: 'white',
-    width: '80%',
+    borderRadius: 8,
     padding: 20,
-    borderRadius: 10,
+    width: '80%',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 20,
     textAlign: 'center',
   },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderRadius: 4,
+    padding: 12,
+    marginBottom: 16,
     fontSize: 16,
   },
   multilineInput: {
@@ -603,57 +459,24 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
   modalButton: {
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 4,
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
   },
-  confirmButton: {
+  createButton: {
     backgroundColor: '#6200EE',
   },
   modalButtonText: {
     color: 'white',
-    fontSize: 16,
-  },
-  memberModalName: {
-    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  memberModalActions: {
-    marginBottom: 20,
-  },
-  memberActionButton: {
-    padding: 12,
-    borderRadius: 5,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  promoteButton: {
-    backgroundColor: '#4CAF50',
-  },
-  removeButton: {
-    backgroundColor: '#F44336',
-  },
-  memberActionText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  closeButton: {
-    backgroundColor: '#f0f0f0',
-    padding: 12,
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
   },
 });
 
