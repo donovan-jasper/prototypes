@@ -3,11 +3,25 @@ import { WasmModuleLoader } from '../wasm/loader';
 
 export class X86Compiler {
   private wasmInstance: WebAssembly.Instance | null = null;
+  private isInitialized: boolean = false;
 
   async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
     try {
       const loader = WasmModuleLoader.getInstance();
-      this.wasmInstance = await loader.instantiateModule('x86');
+      const module = await loader.loadModule('x86');
+      this.wasmInstance = await WebAssembly.instantiate(module, {
+        env: {
+          memory: new WebAssembly.Memory({ initial: 256, maximum: 256 }),
+          console_log: (ptr: number, length: number) => {
+            const memory = new Uint8Array(this.wasmInstance.exports.memory.buffer);
+            const message = new TextDecoder().decode(memory.subarray(ptr, ptr + length));
+            console.log('[WASM]', message);
+          }
+        }
+      });
+      this.isInitialized = true;
     } catch (error) {
       console.error('Failed to initialize x86 compiler:', error);
       throw error;
@@ -15,7 +29,7 @@ export class X86Compiler {
   }
 
   async compile(code: string): Promise<CompilationResult> {
-    if (!this.wasmInstance) {
+    if (!this.isInitialized) {
       await this.initialize();
     }
 
@@ -163,13 +177,20 @@ export class X86Compiler {
       // Check for labels
       if (line.endsWith(':')) continue;
 
-      // Check for basic instruction format
-      const parts = line.split(/\s+/);
-      if (parts.length < 1) {
+      // Check for common x86 instructions
+      const instruction = line.split(/[ \t]/)[0].toLowerCase();
+      const validInstructions = [
+        'mov', 'add', 'sub', 'mul', 'div', 'inc', 'dec',
+        'push', 'pop', 'call', 'ret', 'jmp', 'je', 'jne',
+        'jg', 'jl', 'cmp', 'test', 'and', 'or', 'xor',
+        'not', 'shl', 'shr', 'nop', 'int', 'hlt'
+      ];
+
+      if (!validInstructions.includes(instruction)) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Invalid instruction format',
+          message: `Unknown instruction: ${instruction}`,
           severity: 'error'
         });
       }

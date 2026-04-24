@@ -34,9 +34,14 @@ export enum CompilationTarget {
 export class CompilerEngine {
   private compilers: Map<CompilationTarget, any> = new Map();
   private wasmLoader: WasmModuleLoader;
+  private isInitialized: boolean = false;
 
   constructor() {
     this.wasmLoader = WasmModuleLoader.getInstance();
+    this.initializeCompilers();
+  }
+
+  private initializeCompilers(): void {
     this.compilers.set(CompilationTarget.X86, new X86Compiler());
     this.compilers.set(CompilationTarget.ARM, new ARMCompiler());
     this.compilers.set(CompilationTarget.AVR, new AVRCompiler());
@@ -45,11 +50,30 @@ export class CompilerEngine {
     this.compilers.set(CompilationTarget.GAMEBOY, new GameBoyCompiler());
   }
 
+  async initialize(): Promise<void> {
+    if (this.isInitialized) return;
+
+    try {
+      // Preload all WASM modules in the background
+      const targets = Object.values(CompilationTarget);
+      await Promise.all(targets.map(target => this.loadWasmModule(target)));
+
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('Failed to initialize CompilerEngine:', error);
+      throw error;
+    }
+  }
+
   async loadWasmModule(target: CompilationTarget): Promise<WebAssembly.Module> {
     return this.wasmLoader.loadModule(target);
   }
 
   async compile(code: string, target: CompilationTarget): Promise<CompilationResult> {
+    if (!this.isInitialized) {
+      await this.initialize();
+    }
+
     const logs: string[] = [];
     const errors: CompilationError[] = [];
 
@@ -108,5 +132,11 @@ export class CompilerEngine {
   // Clear WASM module cache
   clearWasmCache(): void {
     this.wasmLoader.clearCache();
+    this.isInitialized = false;
+  }
+
+  // Get available compilation targets
+  getAvailableTargets(): CompilationTarget[] {
+    return Array.from(this.compilers.keys());
   }
 }
