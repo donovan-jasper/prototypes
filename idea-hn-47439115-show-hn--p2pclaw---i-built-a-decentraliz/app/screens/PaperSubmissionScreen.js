@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { submitPaper, initNetworkMonitoring, checkNetworkStatus, processPendingSubmissions } from '../services/network';
+import { submitPaper, initNetworkMonitoring, checkNetworkStatus, processPendingSubmissions, addNetworkListener } from '../services/network';
 import { generateProof, verifyProof } from '../utils/crypto';
 
 const PaperSubmissionScreen = () => {
@@ -9,11 +9,37 @@ const PaperSubmissionScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [proof, setProof] = useState(null);
+  const [syncStatus, setSyncStatus] = useState('idle');
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
-    initNetworkMonitoring(setIsOnline);
+    const unsubscribe = initNetworkMonitoring(setIsOnline);
     processPendingSubmissions();
+
+    const networkListener = (online) => {
+      setIsOnline(online);
+      if (online) {
+        setSyncStatus('syncing');
+        processPendingSubmissions().then(() => {
+          setSyncStatus('idle');
+          updatePendingCount();
+        });
+      }
+    };
+
+    addNetworkListener(networkListener);
+    updatePendingCount();
+
+    return () => {
+      unsubscribe();
+      networkListener();
+    };
   }, []);
+
+  const updatePendingCount = async () => {
+    const pending = await getPendingSubmissions();
+    setPendingCount(pending.length);
+  };
 
   const handleGenerateProof = () => {
     if (!title.trim() || !content.trim()) {
@@ -55,6 +81,7 @@ const PaperSubmissionScreen = () => {
         'Your paper has been queued for submission when you come back online',
         [{ text: 'OK' }]
       );
+      updatePendingCount();
     } else if (!result.success) {
       Alert.alert('Error', 'Failed to submit paper. Please try again.');
     } else {
@@ -119,9 +146,22 @@ const PaperSubmissionScreen = () => {
         )}
       </TouchableOpacity>
 
-      <Text style={[styles.statusText, { color: isOnline ? 'green' : 'red' }]}>
-        {isOnline ? 'Online' : 'Offline (submissions will be queued)'}
-      </Text>
+      <View style={styles.statusContainer}>
+        <Text style={[styles.statusText, { color: isOnline ? 'green' : 'red' }]}>
+          {isOnline ? 'Online' : 'Offline (submissions will be queued)'}
+        </Text>
+        {pendingCount > 0 && (
+          <Text style={styles.pendingText}>
+            {pendingCount} pending submission{pendingCount !== 1 ? 's' : ''}
+          </Text>
+        )}
+        {syncStatus === 'syncing' && (
+          <View style={styles.syncIndicator}>
+            <ActivityIndicator size="small" color="#4CAF50" />
+            <Text style={styles.syncText}>Syncing pending submissions...</Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 };
@@ -160,30 +200,26 @@ const styles = StyleSheet.create({
   proofButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
   },
   proofContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: '#e3f2fd',
     padding: 15,
     borderRadius: 8,
     marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   proofLabel: {
     fontWeight: 'bold',
     marginBottom: 5,
   },
   proofText: {
-    fontFamily: 'monospace',
-    color: '#666',
+    color: '#1976d2',
   },
   button: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 10,
+    marginBottom: 15,
   },
   offlineButton: {
     backgroundColor: '#FF9800',
@@ -191,12 +227,31 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#fff',
     fontWeight: 'bold',
-    fontSize: 16,
+  },
+  statusContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   statusText: {
-    marginTop: 20,
-    textAlign: 'center',
-    fontSize: 14,
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  pendingText: {
+    color: '#FF9800',
+    marginBottom: 5,
+  },
+  syncIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  syncText: {
+    marginLeft: 10,
+    color: '#4CAF50',
   },
 });
 

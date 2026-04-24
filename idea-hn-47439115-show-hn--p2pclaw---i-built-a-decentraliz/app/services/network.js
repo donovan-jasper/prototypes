@@ -1,42 +1,55 @@
-import NetInfo from '@react-native-community/netinfo';
 import { addPendingSubmission, getPendingSubmissions, removePendingSubmission } from './database';
+import NetInfo from '@react-native-community/netinfo';
+import { submitPaperToServer } from './api';
 
-let isOnline = false;
+let networkListeners = [];
 
-export const initNetworkMonitoring = (onStatusChange) => {
-  NetInfo.addEventListener(state => {
-    isOnline = state.isConnected;
-    onStatusChange(isOnline);
-    if (isOnline) {
-      processPendingSubmissions();
-    }
+export const initNetworkMonitoring = (setIsOnline) => {
+  const unsubscribe = NetInfo.addEventListener(state => {
+    setIsOnline(state.isConnected);
   });
+
+  return unsubscribe;
 };
 
-export const checkNetworkStatus = () => isOnline;
+export const addNetworkListener = (listener) => {
+  networkListeners.push(listener);
+};
+
+export const checkNetworkStatus = async () => {
+  const state = await NetInfo.fetch();
+  return state.isConnected;
+};
 
 export const submitPaper = async (paperData) => {
+  const isOnline = await checkNetworkStatus();
+
   if (!isOnline) {
     await addPendingSubmission(paperData);
-    return { success: false, offline: true };
+    return { success: true, offline: true };
   }
 
   try {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    return { success: true };
+    const result = await submitPaperToServer(paperData);
+    return { success: true, offline: false, data: result };
   } catch (error) {
-    return { success: false, error };
+    console.error('Network submission failed:', error);
+    await addPendingSubmission(paperData);
+    return { success: false, offline: true };
   }
 };
 
 export const processPendingSubmissions = async () => {
+  const isOnline = await checkNetworkStatus();
   if (!isOnline) return;
 
-  const pending = await getPendingSubmissions();
-  for (const submission of pending) {
+  const pendingSubmissions = await getPendingSubmissions();
+
+  for (const submission of pendingSubmissions) {
     try {
-      const result = await submitPaper(JSON.parse(submission.paper_data));
+      const paperData = JSON.parse(submission.paper_data);
+      const result = await submitPaperToServer(paperData);
+
       if (result.success) {
         await removePendingSubmission(submission.id);
       }

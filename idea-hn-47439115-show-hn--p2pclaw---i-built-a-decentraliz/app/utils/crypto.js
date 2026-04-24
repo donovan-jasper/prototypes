@@ -1,42 +1,35 @@
-import sodium from 'libsodium-wrappers';
+import * as Libsodium from 'libsodium-wrappers';
+
+let sodium;
+
+(async () => {
+  await Libsodium.ready;
+  sodium = Libsodium;
+})();
 
 export const generateProof = (data) => {
-  // Ensure libsodium is ready
-  if (!sodium.isReady) {
-    throw new Error('Libsodium is not ready');
+  if (!sodium) {
+    throw new Error('Libsodium not ready');
   }
 
-  // Convert data to Uint8Array
-  const dataBuffer = new TextEncoder().encode(data);
+  // Create a hash of the data
+  const hash = sodium.crypto_generichash(
+    sodium.crypto_generichash_BYTES,
+    sodium.to_string(data)
+  );
 
-  // Generate a random key pair
-  const keyPair = sodium.crypto_sign_keypair();
-
-  // Sign the data
-  const signature = sodium.crypto_sign_detached(dataBuffer, keyPair.privateKey);
-
-  // Convert signature to hex string
-  const proof = sodium.to_hex(signature);
-
-  return proof;
+  // Convert to hex string
+  return sodium.to_hex(hash);
 };
 
 export const verifyProof = (data, proof) => {
-  // Ensure libsodium is ready
-  if (!sodium.isReady) {
-    throw new Error('Libsodium is not ready');
+  if (!sodium) {
+    throw new Error('Libsodium not ready');
   }
 
-  // Convert data to Uint8Array
-  const dataBuffer = new TextEncoder().encode(data);
+  // Generate the expected proof
+  const expectedProof = generateProof(data);
 
-  // Convert proof from hex string to Uint8Array
-  const signature = sodium.from_hex(proof);
-
-  // In a real implementation, you would have the public key stored somewhere
-  // For this example, we'll use a placeholder public key
-  const publicKey = sodium.crypto_sign_seed_keypair(sodium.randombytes_buf(32)).publicKey;
-
-  // Verify the signature
-  return sodium.crypto_sign_verify_detached(signature, dataBuffer, publicKey);
+  // Compare with the provided proof
+  return sodium.to_string(proof) === sodium.to_string(expectedProof);
 };

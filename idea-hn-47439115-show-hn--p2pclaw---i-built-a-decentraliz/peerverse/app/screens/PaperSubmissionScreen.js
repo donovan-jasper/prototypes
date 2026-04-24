@@ -1,16 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Alert, ActivityIndicator, TouchableOpacity } from 'react-native';
 import PaperSubmissionForm from '../components/PaperSubmissionForm';
 import { uploadToIPFS } from '../services/ipfs';
 import { generateProof, verifyProof } from '../utils/crypto';
 import { db } from '../services/firebase';
 import { collection, addDoc } from 'firebase/firestore';
+import { saveSubmissionLocally, initializeDatabase, processSubmissionQueue } from '../services/localStorage';
+import NetInfo from '@react-native-community/netinfo';
 
 const PaperSubmissionScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [proofStatus, setProofStatus] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [submissionStep, setSubmissionStep] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
+
+  useEffect(() => {
+    // Initialize database
+    initializeDatabase();
+
+    // Check network status
+    const unsubscribe = NetInfo.addEventListener(state => {
+      setIsOnline(state.isConnected);
+    });
+
+    // Process any pending submissions when component mounts
+    processSubmissionQueue();
+
+    return () => unsubscribe();
+  }, []);
 
   const handleSubmit = async (paper) => {
     setIsSubmitting(true);
@@ -35,25 +53,39 @@ const PaperSubmissionScreen = () => {
       setVerificationStatus('Proof verified successfully');
       setSubmissionStep(4);
 
-      // Upload to IPFS
-      setVerificationStatus('Uploading to IPFS...');
-      setSubmissionStep(5);
-      const cid = await uploadToIPFS(JSON.stringify(paper));
+      if (isOnline) {
+        // Online submission flow
+        setVerificationStatus('Uploading to IPFS...');
+        setSubmissionStep(5);
+        const cid = await uploadToIPFS(JSON.stringify(paper));
 
-      // Store in Firebase
-      setVerificationStatus('Storing in database...');
-      setSubmissionStep(6);
-      await addDoc(collection(db, 'papers'), {
-        cid,
-        proof,
-        title: paper.title,
-        authors: paper.authors,
-        abstract: paper.abstract,
-        createdAt: new Date(),
-      });
+        // Store in Firebase
+        setVerificationStatus('Storing in database...');
+        setSubmissionStep(6);
+        await addDoc(collection(db, 'papers'), {
+          cid,
+          proof,
+          title: paper.title,
+          authors: paper.authors,
+          abstract: paper.abstract,
+          createdAt: new Date(),
+        });
 
-      setSubmissionStep(7);
-      Alert.alert('Success', 'Your paper has been successfully submitted and verified!');
+        setSubmissionStep(7);
+        Alert.alert('Success', 'Your paper has been successfully submitted and verified!');
+      } else {
+        // Offline submission flow
+        await saveSubmissionLocally({
+          ...paper,
+          proof
+        });
+
+        setSubmissionStep(7);
+        Alert.alert(
+          'Saved Offline',
+          'Your paper has been saved locally and will be submitted when you come back online.'
+        );
+      }
     } catch (error) {
       console.error('Submission error:', error);
       Alert.alert('Error', error.message || 'Failed to submit paper. Please try again.');
@@ -68,8 +100,8 @@ const PaperSubmissionScreen = () => {
       'Proof generated',
       'Verifying proof',
       'Proof verified',
-      'Uploading to IPFS',
-      'Storing in database',
+      isOnline ? 'Uploading to IPFS' : 'Saving locally',
+      isOnline ? 'Storing in database' : 'Queueing for sync',
       'Complete'
     ];
 
@@ -97,6 +129,12 @@ const PaperSubmissionScreen = () => {
     <View style={styles.container}>
       <Text style={styles.title}>Submit Your Research Paper</Text>
 
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineText}>You are offline. Your submission will be saved and synced when you're back online.</Text>
+        </View>
+      )}
+
       {isSubmitting ? (
         <View style={styles.statusContainer}>
           <ActivityIndicator size="large" color="#0000ff" />
@@ -123,6 +161,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#333',
     textAlign: 'center',
+  },
+  offlineBanner: {
+    backgroundColor: '#ffcc00',
+    padding: 10,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  offlineText: {
+    color: '#333',
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
   statusContainer: {
     flex: 1,
