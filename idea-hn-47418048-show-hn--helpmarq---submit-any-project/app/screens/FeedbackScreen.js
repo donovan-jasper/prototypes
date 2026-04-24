@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList } from 'react-native';
 import FeedbackForm from '../components/FeedbackForm';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
@@ -7,6 +7,7 @@ import { db } from '../../firebase';
 const FeedbackScreen = ({ route }) => {
   const { submissionId } = route.params;
   const [feedbackResults, setFeedbackResults] = useState(null);
+  const [individualFeedback, setIndividualFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,8 +48,12 @@ const FeedbackScreen = ({ route }) => {
           score: averageScore,
           count: feedbackData.length
         });
+
+        // Store individual feedback for display
+        setIndividualFeedback(feedbackData);
       } else {
         setFeedbackResults(null);
+        setIndividualFeedback([]);
       }
       setLoading(false);
     }, (error) => {
@@ -64,6 +69,36 @@ const FeedbackScreen = ({ route }) => {
     // Feedback is automatically saved to Firestore via FeedbackForm
     // This callback is just for any additional UI updates if needed
   };
+
+  const renderFeedbackItem = ({ item }) => (
+    <View style={styles.feedbackItem}>
+      <Text style={styles.reviewerName}>{item.reviewerName || 'Anonymous'}</Text>
+
+      <View style={styles.scoresContainer}>
+        <View style={styles.scoreItem}>
+          <Text style={styles.scoreLabel}>Clarity:</Text>
+          <Text style={styles.scoreValue}>{item.question1 || 'N/A'}/10</Text>
+        </View>
+
+        <View style={styles.scoreItem}>
+          <Text style={styles.scoreLabel}>Would Use:</Text>
+          <Text style={styles.scoreValue}>{item.question2 || 'N/A'}/10</Text>
+        </View>
+
+        <View style={styles.scoreItem}>
+          <Text style={styles.scoreLabel}>Rating:</Text>
+          <Text style={styles.scoreValue}>{item.question3 || 'N/A'}/10</Text>
+        </View>
+      </View>
+
+      {item.comment && (
+        <View style={styles.commentContainer}>
+          <Text style={styles.commentLabel}>Comment:</Text>
+          <Text style={styles.commentText}>{item.comment}</Text>
+        </View>
+      )}
+    </View>
+  );
 
   if (loading) {
     return (
@@ -106,6 +141,18 @@ const FeedbackScreen = ({ route }) => {
         <View style={styles.noFeedbackContainer}>
           <Text style={styles.noFeedbackText}>No feedback received yet</Text>
           <Text style={styles.noFeedbackSubtext}>Share your submission link to get feedback</Text>
+        </View>
+      )}
+
+      {individualFeedback.length > 0 && (
+        <View style={styles.individualFeedbackContainer}>
+          <Text style={styles.sectionTitle}>Individual Reviews</Text>
+          <FlatList
+            data={individualFeedback}
+            renderItem={renderFeedbackItem}
+            keyExtractor={(item, index) => index.toString()}
+            scrollEnabled={false}
+          />
         </View>
       )}
 
@@ -152,10 +199,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     marginBottom: 10,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#333',
   },
   feedbackCount: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 15,
   },
@@ -163,13 +210,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginBottom: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
   },
   resultLabel: {
     fontSize: 16,
-    color: '#333',
+    color: '#444',
   },
   resultValue: {
     fontSize: 16,
@@ -178,21 +222,23 @@ const styles = StyleSheet.create({
   },
   scoreContainer: {
     marginTop: 15,
-    padding: 15,
-    backgroundColor: '#e6f2ff',
-    borderRadius: 5,
-    alignItems: 'center',
+    paddingTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
   },
   scoreText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#2E86DE',
+    textAlign: 'center',
   },
   noFeedbackContainer: {
     marginBottom: 30,
     padding: 20,
     backgroundColor: '#f8f8f8',
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
     alignItems: 'center',
   },
   noFeedbackText: {
@@ -203,19 +249,72 @@ const styles = StyleSheet.create({
   },
   noFeedbackSubtext: {
     fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
+    color: '#888',
   },
-  formContainer: {
-    marginTop: 20,
+  individualFeedbackContainer: {
+    marginBottom: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  feedbackItem: {
     padding: 15,
+    marginBottom: 15,
     backgroundColor: '#f8f8f8',
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  reviewerName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  scoresContainer: {
+    marginBottom: 10,
+  },
+  scoreItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 5,
+  },
+  scoreLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  scoreValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#444',
+  },
+  commentContainer: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  commentLabel: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#444',
+    marginBottom: 5,
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#333',
+    lineHeight: 20,
+  },
+  formContainer: {
+    marginBottom: 30,
   },
   formTitle: {
-    fontSize: 18,
-    marginBottom: 15,
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 15,
     color: '#333',
   },
 });
