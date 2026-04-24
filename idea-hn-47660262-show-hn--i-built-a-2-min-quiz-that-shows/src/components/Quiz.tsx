@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
-import { saveDecision } from '../utils/storage';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { saveDecision, initDatabase } from '../utils/storage';
 import { calculateBetaDistribution } from '../utils/betaDistribution';
 
 interface QuizProps {
@@ -12,8 +12,25 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
   const [actualValue, setActualValue] = useState('');
   const [estimatedValue, setEstimatedValue] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const initializeDB = async () => {
+      try {
+        await initDatabase();
+        setIsLoading(false);
+      } catch (error) {
+        Alert.alert('Database Error', 'Failed to initialize database');
+        setIsLoading(false);
+      }
+    };
+
+    initializeDB();
+  }, []);
 
   const handleSubmit = async () => {
+    if (isLoading) return;
+
     if (!description || !actualValue || !estimatedValue) {
       setFeedback('Please fill all fields');
       return;
@@ -27,28 +44,40 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
       return;
     }
 
-    const difference = Math.abs(actual - estimated);
-    const percentageError = (difference / actual) * 100;
+    try {
+      const difference = Math.abs(actual - estimated);
+      const percentageError = (difference / actual) * 100;
 
-    // Simple calibration: 1 success if within 20%, otherwise 1 failure
-    const successes = percentageError <= 20 ? 1 : 0;
-    const failures = percentageError > 20 ? 1 : 0;
+      // Simple calibration: 1 success if within 20%, otherwise 1 failure
+      const successes = percentageError <= 20 ? 1 : 0;
+      const failures = percentageError > 20 ? 1 : 0;
 
-    await saveDecision({
-      description,
-      actualValue: actual,
-      estimatedValue: estimated,
-      successes,
-      failures
-    });
+      await saveDecision({
+        description,
+        actualValue: actual,
+        estimatedValue: estimated,
+        successes,
+        failures
+      });
 
-    const betaResult = calculateBetaDistribution(successes, failures);
-    setFeedback(`Your calibration score: ${betaResult.mean.toFixed(2)} (${betaResult.confidenceInterval[0].toFixed(2)}-${betaResult.confidenceInterval[1].toFixed(2)})`);
+      const betaResult = calculateBetaDistribution(successes, failures);
+      setFeedback(`Your calibration score: ${betaResult.mean.toFixed(2)} (${betaResult.confidenceInterval[0].toFixed(2)}-${betaResult.confidenceInterval[1].toFixed(2)})`);
 
-    setTimeout(() => {
-      onComplete();
-    }, 2000);
+      setTimeout(() => {
+        onComplete();
+      }, 2000);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save decision');
+    }
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -59,6 +88,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         placeholder="What decision did you make?"
         value={description}
         onChangeText={setDescription}
+        placeholderTextColor="#999"
       />
 
       <TextInput
@@ -67,6 +97,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         keyboardType="numeric"
         value={actualValue}
         onChangeText={setActualValue}
+        placeholderTextColor="#999"
       />
 
       <TextInput
@@ -75,9 +106,14 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         keyboardType="numeric"
         value={estimatedValue}
         onChangeText={setEstimatedValue}
+        placeholderTextColor="#999"
       />
 
-      <TouchableOpacity style={styles.button} onPress={handleSubmit}>
+      <TouchableOpacity
+        style={[styles.button, (!description || !actualValue || !estimatedValue) && styles.disabledButton]}
+        onPress={handleSubmit}
+        disabled={!description || !actualValue || !estimatedValue}
+      >
         <Text style={styles.buttonText}>Submit</Text>
       </TouchableOpacity>
 
@@ -97,6 +133,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+    color: '#333',
   },
   input: {
     height: 50,
@@ -106,22 +143,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 15,
     backgroundColor: 'white',
+    color: '#333',
   },
   button: {
     backgroundColor: '#4CAF50',
     padding: 15,
     borderRadius: 5,
     alignItems: 'center',
+    marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   feedback: {
     marginTop: 20,
     textAlign: 'center',
     fontSize: 16,
     color: '#333',
+    paddingHorizontal: 10,
   },
 });
 

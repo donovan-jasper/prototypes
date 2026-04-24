@@ -9,9 +9,9 @@ export const initDatabase = async () => {
       tx.executeSql(
         'CREATE TABLE IF NOT EXISTS decisions (' +
         'id INTEGER PRIMARY KEY AUTOINCREMENT,' +
-        'description TEXT,' +
-        'actualValue REAL,' +
-        'estimatedValue REAL,' +
+        'description TEXT NOT NULL,' +
+        'actualValue REAL NOT NULL,' +
+        'estimatedValue REAL NOT NULL,' +
         'timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,' +
         'successes INTEGER DEFAULT 0,' +
         'failures INTEGER DEFAULT 0' +
@@ -45,6 +45,38 @@ export const getDecisions = async (): Promise<Decision[]> => {
         'SELECT * FROM decisions ORDER BY timestamp DESC;',
         [],
         (_, { rows }) => resolve(rows._array as Decision[]),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getRecentDecisions = async (limit: number = 5): Promise<Decision[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM decisions ORDER BY timestamp DESC LIMIT ?;',
+        [limit],
+        (_, { rows }) => resolve(rows._array as Decision[]),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getCalibrationStats = async (): Promise<{ totalSuccesses: number; totalFailures: number }> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT SUM(successes) as totalSuccesses, SUM(failures) as totalFailures FROM decisions;',
+        [],
+        (_, { rows }) => {
+          const result = rows._array[0];
+          resolve({
+            totalSuccesses: result.totalSuccesses || 0,
+            totalFailures: result.totalFailures || 0
+          });
+        },
         (_, error) => reject(error)
       );
     });
