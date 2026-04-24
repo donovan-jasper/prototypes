@@ -1,143 +1,147 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialIcons } from '@expo/vector-icons';
 import { Directory } from '@/lib/database';
+import { Category } from '@/constants/categories';
 
 interface DirectoryCardProps {
   directory: Directory;
   onPress: () => void;
+  showPriorityScore?: boolean;
 }
 
-export default function DirectoryCard({ directory, onPress }: DirectoryCardProps) {
-  const getDifficultyColor = (difficulty: string) => {
-    switch (difficulty.toLowerCase()) {
-      case 'easy':
+const DirectoryCard: React.FC<DirectoryCardProps> = ({
+  directory,
+  onPress,
+  showPriorityScore = false
+}) => {
+  const getCategoryColor = (category: string) => {
+    switch (category) {
+      case 'App Stores':
+        return '#FF5722';
+      case 'Startup Lists':
         return '#4CAF50';
-      case 'medium':
-        return '#FF9800';
-      case 'hard':
-        return '#F44336';
+      case 'Dev Tools':
+        return '#2196F3';
+      case 'Communities':
+        return '#9C27B0';
+      case 'Newsletters':
+        return '#FFC107';
       default:
-        return '#999';
+        return '#607D8B';
     }
   };
 
-  const getCostColor = (cost: string) => {
-    return cost.toLowerCase() === 'free' ? '#4CAF50' : '#FF9800';
+  const formatApprovalRate = (rate: number) => {
+    return `${Math.round(rate * 100)}%`;
   };
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} onPress={onPress}>
       <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.name} numberOfLines={1}>
-            {directory.name}
-          </Text>
-          <Text style={styles.category} numberOfLines={1}>
-            {directory.category}
-          </Text>
+        <Text style={styles.name} numberOfLines={1}>{directory.name}</Text>
+        {directory.isPremium && (
+          <MaterialIcons name="lock" size={16} color="#FF5722" style={styles.premiumIcon} />
+        )}
+      </View>
+
+      <View style={styles.categoryContainer}>
+        <View style={[styles.categoryBadge, { backgroundColor: getCategoryColor(directory.category) }]}>
+          <Text style={styles.categoryText}>{directory.category}</Text>
         </View>
-        <View style={styles.drBadge}>
-          <Text style={styles.drScore}>{directory.drScore}</Text>
-          <Text style={styles.drLabel}>DR</Text>
+      </View>
+
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>DR</Text>
+          <Text style={styles.statValue}>{directory.drScore}</Text>
         </View>
+
+        <View style={styles.statItem}>
+          <Text style={styles.statLabel}>Approval</Text>
+          <Text style={styles.statValue}>{formatApprovalRate(directory.approvalRate)}</Text>
+        </View>
+
+        {showPriorityScore && (
+          <View style={styles.statItem}>
+            <Text style={styles.statLabel}>Priority</Text>
+            <Text style={styles.statValue}>
+              {directory.priorityScore ? directory.priorityScore.toFixed(1) : 'N/A'}
+            </Text>
+          </View>
+        )}
       </View>
 
       <Text style={styles.description} numberOfLines={2}>
         {directory.description}
       </Text>
-
-      <View style={styles.footer}>
-        <View style={styles.tag}>
-          <Text style={[styles.tagText, { color: getDifficultyColor(directory.submissionDifficulty) }]}>
-            {directory.submissionDifficulty}
-          </Text>
-        </View>
-        <View style={styles.tag}>
-          <Text style={[styles.tagText, { color: getCostColor(directory.cost) }]}>
-            {directory.cost}
-          </Text>
-        </View>
-        <Text style={styles.approvalTime}>{directory.avgApprovalTime}</Text>
-      </View>
     </TouchableOpacity>
   );
-}
+};
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFF',
     borderRadius: 12,
     padding: 16,
-    marginHorizontal: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  titleContainer: {
-    flex: 1,
-    marginRight: 12,
-  },
   name: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#000',
-    marginBottom: 4,
-  },
-  category: {
-    fontSize: 13,
-    color: '#666',
-  },
-  drBadge: {
-    backgroundColor: '#007AFF',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    alignItems: 'center',
-    minWidth: 50,
-  },
-  drScore: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  drLabel: {
-    fontSize: 10,
-    color: '#FFFFFF',
-    marginTop: 2,
-  },
-  description: {
-    fontSize: 14,
     color: '#333',
-    lineHeight: 20,
+    flex: 1,
+  },
+  premiumIcon: {
+    marginLeft: 4,
+  },
+  categoryContainer: {
     marginBottom: 12,
   },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tag: {
+  categoryBadge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 4,
-    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    alignSelf: 'flex-start',
   },
-  tagText: {
+  categoryText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '500',
+    color: '#FFF',
   },
-  approvalTime: {
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
     fontSize: 12,
     color: '#666',
-    marginLeft: 'auto',
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#333',
+  },
+  description: {
+    fontSize: 13,
+    color: '#666',
+    lineHeight: 18,
   },
 });
+
+export default DirectoryCard;
