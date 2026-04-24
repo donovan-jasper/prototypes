@@ -102,4 +102,44 @@ describe('CrisisModeScreen', () => {
 
     expect(mockGoBack).toHaveBeenCalled();
   });
+
+  it('shows PIN and link when crisis mode is enabled', async () => {
+    isCrisisModeEnabled.mockResolvedValue(true);
+    getShareableLink.mockResolvedValue('https://echovault.app/crisis?pin=654321');
+
+    const { getByText } = render(<CrisisModeScreen />);
+
+    await waitFor(() => {
+      expect(getByText('654321')).toBeTruthy();
+      expect(getByText('https://echovault.app/crisis?pin=654321')).toBeTruthy();
+    });
+  });
+
+  it('copies PIN to clipboard when copy button is pressed', async () => {
+    isCrisisModeEnabled.mockResolvedValue(true);
+    getShareableLink.mockResolvedValue('https://echovault.app/crisis?pin=654321');
+
+    const { getByText } = render(<CrisisModeScreen />);
+
+    await waitFor(() => {
+      const copyButton = getByText('Copy PIN');
+      fireEvent.press(copyButton);
+      expect(getByText('Success')).toBeTruthy();
+      expect(getByText('PIN copied to clipboard')).toBeTruthy();
+    });
+  });
+
+  it('copies link to clipboard when copy link button is pressed', async () => {
+    isCrisisModeEnabled.mockResolvedValue(true);
+    getShareableLink.mockResolvedValue('https://echovault.app/crisis?pin=654321');
+
+    const { getByText } = render(<CrisisModeScreen />);
+
+    await waitFor(() => {
+      const copyLinkButton = getByText('Copy Link');
+      fireEvent.press(copyLinkButton);
+      expect(getByText('Success')).toBeTruthy();
+      expect(getByText('Shareable link copied to clipboard')).toBeTruthy();
+    });
+  });
 });

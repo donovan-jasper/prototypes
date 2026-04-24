@@ -162,83 +162,67 @@ const CrisisModeScreen = () => {
       </View>
 
       {isEnabled && (
-        <View style={styles.enabledContainer}>
-          <Text style={styles.sectionTitle}>Your Crisis Access</Text>
+        <View style={styles.pinContainer}>
+          <Text style={styles.pinLabel}>Your Crisis PIN:</Text>
+          <View style={styles.pinDisplay}>
+            <Text style={styles.pinText}>{generatedPin || 'Not generated yet'}</Text>
+            <TouchableOpacity
+              style={styles.copyButton}
+              onPress={handleCopyPin}
+              disabled={!generatedPin}
+            >
+              <Text style={styles.copyButtonText}>Copy PIN</Text>
+            </TouchableOpacity>
+          </View>
 
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>Your Crisis PIN:</Text>
-            <View style={styles.pinContainer}>
-              <Text style={styles.pinText}>{generatedPin || 'Generating...'}</Text>
+          <Text style={styles.linkLabel}>Shareable Link:</Text>
+          <View style={styles.linkContainer}>
+            <Text style={styles.linkText} numberOfLines={1} ellipsizeMode="middle">
+              {shareableLink || 'Not generated yet'}
+            </Text>
+            <View style={styles.linkButtons}>
               <TouchableOpacity
                 style={styles.copyButton}
-                onPress={handleCopyPin}
-                disabled={!generatedPin}
+                onPress={handleCopyLink}
+                disabled={!shareableLink}
               >
-                <Text style={styles.copyButtonText}>Copy</Text>
+                <Text style={styles.copyButtonText}>Copy Link</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.shareButton}
+                onPress={handleShareLink}
+                disabled={!shareableLink}
+              >
+                <Text style={styles.shareButtonText}>Share</Text>
               </TouchableOpacity>
             </View>
           </View>
-
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>Shareable Link:</Text>
-            <View style={styles.linkContainer}>
-              <Text style={styles.linkText} numberOfLines={1}>
-                {shareableLink || 'Generating...'}
-              </Text>
-              <View style={styles.linkButtons}>
-                <TouchableOpacity
-                  style={styles.linkButton}
-                  onPress={handleCopyLink}
-                  disabled={!shareableLink}
-                >
-                  <Text style={styles.linkButtonText}>Copy</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.linkButton, styles.shareButton]}
-                  onPress={handleShareLink}
-                  disabled={!shareableLink}
-                >
-                  <Text style={styles.linkButtonText}>Share</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.verifyButton}
-            onPress={handleVerifyPin}
-            disabled={isVerifying || !generatedPin}
-          >
-            {isVerifying ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.verifyButtonText}>Verify PIN</Text>
-            )}
-          </TouchableOpacity>
         </View>
       )}
 
-      <TextInput
-        style={styles.input}
-        placeholder="Enter 6-digit PIN"
-        keyboardType="numeric"
-        maxLength={6}
-        value={pin}
-        onChangeText={setPin}
-        secureTextEntry
-      />
-
-      <TouchableOpacity
-        style={styles.submitButton}
-        onPress={handlePinSubmit}
-        disabled={isLoading || pin.length !== 6}
-      >
-        {isLoading ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.submitButtonText}>Access Vault</Text>
-        )}
-      </TouchableOpacity>
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Enter PIN to Access Vault</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter 6-digit PIN"
+          keyboardType="numeric"
+          maxLength={6}
+          value={pin}
+          onChangeText={setPin}
+          secureTextEntry
+        />
+        <TouchableOpacity
+          style={styles.submitButton}
+          onPress={handlePinSubmit}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Access Vault</Text>
+          )}
+        </TouchableOpacity>
+      </View>
 
       <TouchableOpacity
         style={styles.backButton}
@@ -269,8 +253,8 @@ const styles = StyleSheet.create({
   },
   toggleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
@@ -282,57 +266,45 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  enabledContainer: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
     color: '#333',
   },
-  infoBox: {
-    backgroundColor: '#fff',
+  pinContainer: {
+    marginBottom: 20,
     padding: 15,
+    backgroundColor: '#fff',
     borderRadius: 10,
-    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  infoLabel: {
+  pinLabel: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
+    marginBottom: 10,
     color: '#333',
   },
-  pinContainer: {
+  pinDisplay: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 15,
   },
   pinText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#333',
   },
-  copyButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  copyButtonText: {
-    color: '#fff',
+  linkLabel: {
+    fontSize: 16,
     fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
   },
   linkContainer: {
-    marginTop: 5,
+    marginBottom: 15,
   },
   linkText: {
     fontSize: 14,
@@ -343,63 +315,68 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  linkButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-    flex: 1,
-    marginRight: 5,
-    alignItems: 'center',
-  },
-  shareButton: {
-    marginLeft: 5,
-    marginRight: 0,
-  },
-  linkButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  verifyButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+  inputContainer: {
     marginBottom: 20,
-  },
-  verifyButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  input: {
+    padding: 15,
     backgroundColor: '#fff',
-    padding: 15,
     borderRadius: 10,
-    fontSize: 16,
-    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+  inputLabel: {
+    fontSize: 16,
+    fontWeight: '600',
     marginBottom: 10,
+    color: '#333',
+  },
+  input: {
+    height: 50,
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    marginBottom: 15,
+    fontSize: 18,
+  },
+  copyButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  copyButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  shareButton: {
+    backgroundColor: '#2196F3',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    marginLeft: 10,
+  },
+  shareButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  submitButton: {
+    backgroundColor: '#3F51B5',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   backButton: {
     backgroundColor: '#f5f5f5',
-    padding: 15,
-    borderRadius: 10,
+    paddingVertical: 15,
+    borderRadius: 8,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#ddd',
@@ -407,6 +384,7 @@ const styles = StyleSheet.create({
   backButtonText: {
     color: '#333',
     fontSize: 16,
+    fontWeight: '600',
   },
 });
 
