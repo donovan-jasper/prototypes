@@ -1,3 +1,5 @@
+import { faker } from '@faker-js/faker';
+
 const ACTIVITY_TYPES = [
   { name: 'Basketball', emoji: '🏀' },
   { name: 'Yoga', emoji: '🧘' },
@@ -11,171 +13,165 @@ const ACTIVITY_TYPES = [
   { name: 'Pickleball', emoji: '🏓' },
 ];
 
-const VENUE_NAMES = [
-  'Central Park Courts',
-  'Riverside Recreation Center',
-  'Downtown Fitness Plaza',
-  'Lakeside Sports Complex',
-  'Community Wellness Hub',
-  'Greenway Trail Head',
-  'Sunset Park Fields',
-  'Urban Fitness Studio',
-  'Northside Athletic Center',
-  'Eastside Community Gym',
-  'Westwood Sports Arena',
-  'Hillside Recreation Area',
+const LOCATION_NAMES = [
+  'Central Park',
+  'Brooklyn Bridge Park',
+  'Washington Square Park',
+  'Prospect Park',
+  'High Line',
+  'Madison Square Park',
+  'Bryant Park',
+  'Chelsea Piers',
+  'Fort Tryon Park',
+  'Hudson River Park'
 ];
 
-// Constants for geographical calculations
-const EARTH_RADIUS_MILES = 3958.8; // Earth's radius in miles
-
-// Helper functions for degrees/radians conversion
-const toRadians = (degrees) => degrees * (Math.PI / 180);
-const toDegrees = (radians) => radians * (180 / Math.PI);
-
-// Haversine formula to calculate distance between two points on Earth
-const haversineDistance = (lat1, lon1, lat2, lon2) => {
-  const R = EARTH_RADIUS_MILES; // Earth's radius in miles
-
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-
-  const rLat1 = toRadians(lat1);
-  const rLat2 = toRadians(lat2);
-
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(rLat1) * Math.cos(rLat2) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // Distance in miles
-};
-
-/**
- * Generates random coordinates within a given radius from a central point.
- * Uses a random distance and bearing from the center.
- * @param {number} centerLat - Latitude of the central point.
- * @param {number} centerLon - Longitude of the central point.
- * @param {number} minRadiusMiles - Minimum radius in miles.
- * @param {number} maxRadiusMiles - Maximum radius in miles.
- * @returns {object} An object containing the generated latitude and longitude.
- */
-const generateRandomCoordsInRadius = (centerLat, centerLon, minRadiusMiles, maxRadiusMiles) => {
-  const R = EARTH_RADIUS_MILES;
-
-  // Generate a random distance within the specified range
-  const distance = Math.random() * (maxRadiusMiles - minRadiusMiles) + minRadiusMiles; // in miles
-
-  // Generate a random bearing (angle) from 0 to 360 degrees
-  const bearing = Math.random() * 2 * Math.PI; // in radians
-
-  const lat1 = toRadians(centerLat);
-  const lon1 = toRadians(centerLon);
-
-  const lat2 = Math.asin(
-    Math.sin(lat1) * Math.cos(distance / R) +
-    Math.cos(lat1) * Math.sin(distance / R) * Math.cos(bearing)
-  );
-
-  let lon2 =
-    lon1 +
-    Math.atan2(
-      Math.sin(bearing) * Math.sin(distance / R) * Math.cos(lat1),
-      Math.cos(distance / R) - Math.sin(lat1) * Math.sin(lat2)
-    );
-
-  // Normalize longitude to -180 to +180
-  lon2 = (lon2 + 3 * Math.PI) % (2 * Math.PI) - Math.PI;
-
-  return {
-    latitude: toDegrees(lat2),
-    longitude: toDegrees(lon2),
-  };
-};
-
-
-const getRandomElement = (array) => {
-  return array[Math.floor(Math.random() * array.length)];
-};
-
-const getRandomInt = (min, max) => {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-};
-
-const getStartTime = () => {
+const generateTime = () => {
   const now = new Date();
-  const minutesToAdd = getRandomInt(10, 120); // Events start 10 to 120 minutes from now
-  const startTime = new Date(now.getTime() + minutesToAdd * 60000);
+  const minutes = now.getMinutes();
+  const roundedMinutes = Math.ceil(minutes / 15) * 15;
+  now.setMinutes(roundedMinutes);
+  now.setSeconds(0);
 
-  const hours = startTime.getHours();
-  const minutes = startTime.getMinutes();
+  const hours = now.getHours();
+  const mins = now.getMinutes();
   const ampm = hours >= 12 ? 'PM' : 'AM';
-  const displayHours = hours % 12 || 12; // Convert 24h to 12h format
-  const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+  const displayHours = hours % 12 || 12;
+  const displayMinutes = mins < 10 ? `0${mins}` : mins;
 
   return `${displayHours}:${displayMinutes} ${ampm}`;
 };
 
-/**
- * Generates a list of mock events based on a user's current location.
- * Events will have coordinates within a specified radius of the user and their distance will be calculated.
- * @param {number} userLatitude - The user's current latitude.
- * @param {number} userLongitude - The user's current longitude.
- * @param {number} [count=5-10] - The number of mock events to generate.
- * @returns {Array<object>} An array of mock event objects, sorted by distance.
- */
-export const generateMockEvents = (userLatitude, userLongitude, count = getRandomInt(5, 10)) => {
-  if (userLatitude === undefined || userLongitude === undefined) {
-    console.warn("User location not provided to generateMockEvents. Using a default location for event generation.");
-    // Fallback to a default location (e.g., a central point in a major city)
-    // This ensures the app doesn't crash if location permission is denied or not yet fetched.
-    userLatitude = 34.052235; // Default to Los Angeles, CA
-    userLongitude = -118.243683;
-  }
+const generateDescription = (activity) => {
+  const descriptions = {
+    'Basketball': [
+      'Casual pickup game looking for 2-3 more players. Bring your own ball!',
+      'Looking for a fun game of one-on-one. All skill levels welcome.',
+      'Quick 30-minute game to get some exercise. Come join!'
+    ],
+    'Yoga': [
+      'Relaxing yoga session for all levels. Bring your mat if you have one.',
+      'Guided yoga session to start your day. All are welcome!',
+      'Outdoor yoga in the park. Perfect for stretching and relaxation.'
+    ],
+    'Frisbee': [
+      'Frisbee golf anyone? Let\'s play a casual round.',
+      'Looking for a few more players for a friendly game.',
+      'Bring your disc and join us for some outdoor fun!'
+    ],
+    'Soccer': [
+      'Casual 5v5 game looking for players. All skill levels welcome.',
+      'Quick 30-minute scrimmage. Come join the fun!',
+      'Looking for a few more players to complete our team.'
+    ],
+    'Tennis': [
+      'Singles match anyone? Let\'s play a friendly game.',
+      'Looking for a partner for a doubles match.',
+      'Casual tennis game. All skill levels welcome.'
+    ],
+    'Running': [
+      'Morning run group. Let\'s go!',
+      'Evening jog through the park. Join us!',
+      'Casual running group. All paces welcome.'
+    ],
+    'Volleyball': [
+      'Beach volleyball anyone? Let\'s play!',
+      'Looking for a few more players for a casual game.',
+      'Quick 30-minute volleyball match. Come join!'
+    ],
+    'Cycling': [
+      'Group ride through the park. Let\'s go!',
+      'Casual cycling group. All levels welcome.',
+      'Evening bike ride. Join us for some fresh air!'
+    ],
+    'Hiking': [
+      'Easy trail hike. Let\'s explore!',
+      'Group hike for beginners. Join us!',
+      'Casual hike through the park. All are welcome.'
+    ],
+    'Pickleball': [
+      'Casual pickleball game. All skill levels welcome.',
+      'Looking for a partner for a doubles match.',
+      'Quick 30-minute pickleball game. Come join!'
+    ]
+  };
 
+  const options = descriptions[activity] || [
+    'Casual activity looking for more participants. Come join!',
+    'Fun group activity. All are welcome to participate.',
+    'Quick session to get some exercise. Join us!'
+  ];
+
+  return faker.helpers.arrayElement(options);
+};
+
+const generateMockEvents = (userLat, userLon) => {
   const events = [];
-  const usedVenues = new Set(); // To ensure unique venue names for mock events
+  const now = new Date();
+  const currentHour = now.getHours();
 
-  for (let i = 0; i < count; i++) {
-    let venue;
-    // Ensure venue names are unique for each event if possible
-    do {
-      venue = getRandomElement(VENUE_NAMES);
-    } while (usedVenues.has(venue) && usedVenues.size < VENUE_NAMES.length);
-    usedVenues.add(venue);
+  // Generate 5-10 events
+  const eventCount = faker.datatype.number({ min: 5, max: 10 });
 
-    const activity = getRandomElement(ACTIVITY_TYPES);
-    const currentParticipants = getRandomInt(1, 8);
-    const maxCapacity = getRandomInt(currentParticipants + 2, 12);
+  for (let i = 0; i < eventCount; i++) {
+    const activity = faker.helpers.arrayElement(ACTIVITY_TYPES);
+    const location = faker.helpers.arrayElement(LOCATION_NAMES);
+    const time = generateTime();
 
-    // Generate event coordinates within 0.5 to 5 miles of the user's location
-    const { latitude: eventLat, longitude: eventLon } = generateRandomCoordsInRadius(
-      userLatitude,
-      userLongitude,
-      0.5, // Minimum radius for events (miles)
-      5.0  // Maximum radius for events (miles)
-    );
+    // Generate coordinates within 1-3 miles of user
+    const distance = faker.datatype.float({ min: 0.5, max: 3, precision: 0.1 });
+    const bearing = faker.datatype.float({ min: 0, max: 360 });
 
-    // Calculate the actual distance between the user and the generated event location
-    const distance = haversineDistance(userLatitude, userLongitude, eventLat, eventLon).toFixed(1);
+    const latOffset = distance * Math.cos(bearing * Math.PI / 180) / 69;
+    const lonOffset = distance * Math.sin(bearing * Math.PI / 180) / (69 * Math.cos(userLat * Math.PI / 180));
+
+    const eventLat = userLat + latOffset;
+    const eventLon = userLon + lonOffset;
+
+    // Generate participant counts based on time of day
+    let minParticipants, maxParticipants;
+    if (currentHour >= 6 && currentHour < 12) {
+      // Morning
+      minParticipants = 2;
+      maxParticipants = 6;
+    } else if (currentHour >= 12 && currentHour < 18) {
+      // Afternoon
+      minParticipants = 3;
+      maxParticipants = 8;
+    } else {
+      // Evening
+      minParticipants = 1;
+      maxParticipants = 5;
+    }
+
+    const currentParticipants = faker.datatype.number({
+      min: minParticipants,
+      max: maxParticipants
+    });
+
+    const maxCapacity = faker.datatype.number({
+      min: currentParticipants + 1,
+      max: currentParticipants + 4
+    });
 
     events.push({
-      id: `event-${Date.now()}-${i}`,
+      id: `mock-${i}`,
       title: activity.name,
       emoji: activity.emoji,
-      location: venue, // Display name for the location
-      latitude: eventLat, // Actual latitude of the event
-      longitude: eventLon, // Actual longitude of the event
-      distance: parseFloat(distance), // Calculated distance from user to event
-      time: getStartTime(),
-      currentParticipants,
-      maxCapacity,
-      description: `Join us for a spontaneous ${activity.name.toLowerCase()} session! All skill levels welcome.`,
+      location: location,
+      latitude: eventLat,
+      longitude: eventLon,
+      distance: parseFloat(distance.toFixed(1)),
+      time: time,
+      currentParticipants: currentParticipants,
+      maxCapacity: maxCapacity,
+      description: generateDescription(activity.name),
+      createdBy: 'system',
+      createdAt: new Date(Date.now() - faker.datatype.number({ min: 0, max: 3600000 })).toISOString(),
     });
   }
 
-  // Sort events by distance, closest first
-  return events.sort((a, b) => a.distance - b.distance);
+  return events;
 };
+
+export { generateMockEvents };
