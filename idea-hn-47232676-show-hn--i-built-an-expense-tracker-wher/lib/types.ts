@@ -5,17 +5,17 @@ export interface Expense {
   category: string;
   paidBy: string;
   splitWith: string[];
+  splitRatios?: number[];
   date: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface User {
   id: string;
   name: string;
-  deviceId: string;
-  publicKey: string;
-  isCurrentUser: boolean;
+  publicKey?: string;
+  deviceId?: string;
 }
 
-export type SyncStatus = 'idle' | 'connecting' | 'connected' | 'offline';
+export type SyncStatus = 'offline' | 'connecting' | 'connected' | 'syncing';

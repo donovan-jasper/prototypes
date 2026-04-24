@@ -175,27 +175,24 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
   }
 };
 
-export const handleSignalingData = async (qrData: string): Promise<string | null> => {
+export const handleSignalingData = async (data: string): Promise<string | null> => {
   try {
-    const parsedData = JSON.parse(qrData);
-    const signalingData: SignalingData = JSON.parse(parsedData.signalingData);
+    const signalingData: SignalingData = JSON.parse(data);
 
     if (!peerConnection) {
       await initializePeerConnection(false);
     }
 
     if (signalingData.type === 'offer') {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
-
-      await peerConnection.setRemoteDescription(
+      await peerConnection!.setRemoteDescription(
         new RTCSessionDescription({
           type: 'offer',
           sdp: signalingData.sdp,
         })
       );
 
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
+      const answer = await peerConnection!.createAnswer();
+      await peerConnection!.setLocalDescription(answer);
 
       const response: SignalingData = {
         type: 'answer',
@@ -205,22 +202,14 @@ export const handleSignalingData = async (qrData: string): Promise<string | null
 
       return JSON.stringify(response);
     } else if (signalingData.type === 'answer') {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
-
-      await peerConnection.setRemoteDescription(
+      await peerConnection!.setRemoteDescription(
         new RTCSessionDescription({
           type: 'answer',
           sdp: signalingData.sdp,
         })
       );
-
-      return null;
     } else if (signalingData.type === 'candidate' && signalingData.candidate) {
-      if (!peerConnection) throw new Error('Peer connection not initialized');
-
-      await peerConnection.addIceCandidate(
-        new RTCIceCandidate(signalingData.candidate)
-      );
+      await peerConnection!.addIceCandidate(new RTCIceCandidate(signalingData.candidate));
     }
 
     return null;
@@ -231,24 +220,27 @@ export const handleSignalingData = async (qrData: string): Promise<string | null
 };
 
 export const sendSyncPayload = async () => {
-  if (!dataChannel || dataChannel.readyState !== 'open' || !encryptionKey) {
-    console.log('Data channel not ready for sending');
-    return;
-  }
-
   try {
-    const expenses = await getExpenses();
-    const currentDeviceId = await getDeviceId();
+    if (!dataChannel || dataChannel.readyState !== 'open') {
+      console.log('Data channel not ready');
+      return;
+    }
 
+    if (!encryptionKey) {
+      console.error('No encryption key available');
+      return;
+    }
+
+    const expenses = await getExpenses();
     const payload: SyncPayload = {
       expenses,
       timestamp: Date.now(),
-      deviceId: currentDeviceId,
+      deviceId: await getDeviceId(),
     };
 
     const encryptedPayload = await encryptMessage(JSON.stringify(payload), encryptionKey);
     dataChannel.send(encryptedPayload);
-    console.log('Sent sync payload');
+    lastSyncTimestamp = payload.timestamp;
   } catch (error) {
     console.error('Error sending sync payload:', error);
   }
@@ -256,31 +248,23 @@ export const sendSyncPayload = async () => {
 
 export const applySyncPayload = async (payload: SyncPayload) => {
   try {
-    // Filter expenses that are newer than our last sync
-    const newExpenses = payload.expenses.filter(
-      expense => expense.timestamp > lastSyncTimestamp
-    );
+    const currentExpenses = await getExpenses();
+    const remoteExpenses = payload.expenses;
 
-    // Apply each new expense
-    for (const expense of newExpenses) {
-      // Check if we already have this expense
-      const existingExpense = await getExpenses(expense.id);
+    // Simple last-write-wins conflict resolution
+    for (const remoteExpense of remoteExpenses) {
+      const existingExpense = currentExpenses.find(e => e.id === remoteExpense.id);
 
-      if (existingExpense) {
-        // Update existing expense if it's newer
-        if (expense.timestamp > existingExpense.timestamp) {
-          await updateExpense(expense);
-        }
-      } else {
-        // Add new expense
-        await addExpense(expense);
+      if (!existingExpense) {
+        await addExpense(remoteExpense);
+      } else if (new Date(remoteExpense.updatedAt || 0) > new Date(existingExpense.updatedAt || 0)) {
+        await updateExpense(remoteExpense.id, remoteExpense);
       }
     }
 
-    // Update last sync timestamp
-    lastSyncTimestamp = Math.max(lastSyncTimestamp, payload.timestamp);
-
-    console.log('Applied sync payload with', newExpenses.length, 'new expenses');
+    // Update Zustand store
+    const updatedExpenses = await getExpenses();
+    useStore.getState().setExpenses(updatedExpenses);
   } catch (error) {
     console.error('Error applying sync payload:', error);
   }

@@ -157,7 +157,7 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
       <Modal visible={visible} onRequestClose={onClose}>
         <View style={styles.container}>
           <Text>No access to camera</Text>
-          <Button title="Grant Permission" onPress={() => BarCodeScanner.requestPermissionsAsync().then(({ status }) => setHasPermission(status === 'granted'))} />
+          <Button title="Grant Permission" onPress={() => BarCodeScanner.requestPermissionsAsync()} />
         </View>
       </Modal>
     );
@@ -173,57 +173,64 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
-          {renderConnectionStatus()}
+        <View style={styles.modeSelector}>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'generate' && styles.activeMode]}
+            onPress={() => setMode('generate')}
+          >
+            <Text style={styles.modeText}>Generate QR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeButton, mode === 'scan' && styles.activeMode]}
+            onPress={() => setMode('scan')}
+          >
+            <Text style={styles.modeText}>Scan QR</Text>
+          </TouchableOpacity>
+        </View>
 
-          {mode === 'generate' && (
-            <View style={styles.qrContainer}>
-              {isProcessing ? (
-                <ActivityIndicator size="large" color="#2e78b7" />
+        {renderConnectionStatus()}
+
+        {mode === 'generate' ? (
+          <View style={styles.qrContainer}>
+            {isProcessing ? (
+              <ActivityIndicator size="large" color="#2e78b7" />
+            ) : (
+              qrCode ? (
+                <QRCode
+                  value={qrCode}
+                  size={250}
+                  color="#2e78b7"
+                  backgroundColor="white"
+                />
               ) : (
-                qrCode ? (
-                  <QRCode
-                    value={qrCode}
-                    size={250}
-                    color="#2e78b7"
-                    backgroundColor="white"
-                  />
-                ) : (
-                  <Text>Generating QR code...</Text>
-                )
-              )}
-              <Text style={styles.instructionText}>
-                Scan this QR code on another device to pair
-              </Text>
-            </View>
-          )}
-
-          {mode === 'scan' && (
-            <View style={styles.scannerContainer}>
-              <BarCodeScanner
-                onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View style={styles.scannerOverlay}>
-                <Text style={styles.scannerText}>Scan the QR code from another device</Text>
-              </View>
-            </View>
-          )}
-        </ScrollView>
+                <Text>Generating QR code...</Text>
+              )
+            )}
+            <Text style={styles.instructionText}>
+              Scan this QR code on another device to pair
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.scannerContainer}>
+            <BarCodeScanner
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {scanned && (
+              <TouchableOpacity
+                style={styles.rescanButton}
+                onPress={() => setScanned(false)}
+              >
+                <Text style={styles.rescanText}>Tap to Scan Again</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.modeButton}
-            onPress={() => {
-              setMode(mode === 'generate' ? 'scan' : 'generate');
-              setScanned(false);
-            }}
-            disabled={isProcessing}
-          >
-            <Text style={styles.modeButtonText}>
-              {mode === 'generate' ? 'Switch to Scanner' : 'Switch to QR Code'}
-            </Text>
-          </TouchableOpacity>
+          <Text style={styles.footerText}>
+            Keep devices close for best results
+          </Text>
         </View>
       </View>
     </Modal>
@@ -233,40 +240,68 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
     backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    marginBottom: 20,
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#2e78b7',
   },
   closeButton: {
-    padding: 8,
+    padding: 5,
   },
-  content: {
-    flexGrow: 1,
-    padding: 20,
+  modeSelector: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  modeButton: {
+    flex: 1,
+    padding: 10,
     alignItems: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  activeMode: {
+    borderBottomColor: '#2e78b7',
+  },
+  modeText: {
+    fontSize: 16,
+    color: '#333',
   },
   statusContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
   },
   statusText: {
-    marginLeft: 8,
+    marginLeft: 10,
     fontSize: 16,
   },
+  retryButton: {
+    marginLeft: 10,
+    padding: 5,
+    backgroundColor: '#2e78b7',
+    borderRadius: 5,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 14,
+  },
   qrContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginVertical: 20,
+    justifyContent: 'center',
   },
   instructionText: {
     marginTop: 20,
@@ -275,47 +310,27 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   scannerContainer: {
-    width: '100%',
-    height: 300,
-    marginVertical: 20,
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  scannerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  scannerText: {
+  rescanButton: {
+    position: 'absolute',
+    bottom: 20,
+    padding: 15,
+    backgroundColor: 'rgba(46, 120, 183, 0.8)',
+    borderRadius: 5,
+  },
+  rescanText: {
     color: 'white',
     fontSize: 16,
-    textAlign: 'center',
-    padding: 20,
   },
   footer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  modeButton: {
-    backgroundColor: '#2e78b7',
-    padding: 12,
-    borderRadius: 8,
+    padding: 10,
     alignItems: 'center',
   },
-  modeButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  retryButton: {
-    marginLeft: 10,
-    padding: 5,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 4,
-  },
-  retryText: {
-    color: '#2e78b7',
+  footerText: {
+    color: '#666',
     fontSize: 14,
   },
 });
