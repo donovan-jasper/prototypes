@@ -5,7 +5,7 @@ import useAIRuleInjection from '../hooks/useAIRuleInjection';
 import { injectRulesIntoAISuggestion, getAISuggestions, analyzeCodeWithAI } from '../api/realAIIntegration';
 
 const AISuggestionDisplay = ({ prompt }) => {
-  const { rules, isLoading: rulesLoading, error: rulesError, injectRulesIntoAISuggestion } = useAIRuleInjection();
+  const { rules, isLoading: rulesLoading, error: rulesError, injectRulesIntoAISuggestion: localInjectRules } = useAIRuleInjection();
   const [isLoading, setIsLoading] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [selectedSuggestion, setSelectedSuggestion] = useState(null);
@@ -48,8 +48,8 @@ const AISuggestionDisplay = ({ prompt }) => {
     setIsRejected(false);
 
     try {
-      // Process with rules
-      const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
+      // Process with both local rules and AI refinement
+      const processedSuggestion = await localInjectRules(suggestion);
       setModifiedSuggestion(processedSuggestion);
 
       // Check for violations
@@ -169,7 +169,10 @@ const AISuggestionDisplay = ({ prompt }) => {
   if (rulesError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Error loading rules: {rulesError.message}</Text>
+        <Text style={styles.errorText}>{rulesError}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={() => window.location.reload()}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -186,7 +189,7 @@ const AISuggestionDisplay = ({ prompt }) => {
   if (apiError) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>Error: {apiError}</Text>
+        <Text style={styles.errorText}>{apiError}</Text>
         <TouchableOpacity style={styles.retryButton} onPress={fetchSuggestions}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
@@ -203,72 +206,121 @@ const AISuggestionDisplay = ({ prompt }) => {
   }
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.scrollContainer}>
-        <View style={styles.suggestionContainer}>
-          <Text style={styles.sectionTitle}>AI Suggestion</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerText}>AI Suggestions</Text>
+        {violations.length > 0 && (
+          <ConflictAlert
+            violations={violations}
+            onPress={() => Alert.alert('Rule Violations', violations.map(v => `${v.name} (${v.severity})`).join('\n'))}
+          />
+        )}
+      </View>
+
+      <View style={styles.suggestionContainer}>
+        <Text style={styles.suggestionTitle}>Original Suggestion:</Text>
+        <ScrollView horizontal style={styles.codeContainer}>
+          <Text style={styles.suggestionText}>{selectedSuggestion}</Text>
+        </ScrollView>
+
+        <Text style={styles.suggestionTitle}>Modified Suggestion:</Text>
+        <ScrollView horizontal style={styles.codeContainer}>
           {renderHighlightedCode()}
+        </ScrollView>
+      </View>
 
-          {violations.length > 0 && (
-            <View style={styles.violationsContainer}>
-              <Text style={styles.sectionTitle}>Rule Violations</Text>
-              {violations.map((violation, index) => (
-                <ConflictAlert
-                  key={index}
-                  ruleName={violation.name}
-                  severity={violation.severity}
-                  message={`Pattern: ${violation.pattern}`}
-                />
-              ))}
-            </View>
-          )}
-
-          {aiAnalysis && (
-            <View style={styles.analysisContainer}>
-              <Text style={styles.sectionTitle}>AI Analysis</Text>
-              <Text style={styles.analysisText}>
-                Complexity: {aiAnalysis.complexity || 'N/A'}
-              </Text>
-              <Text style={styles.analysisText}>
-                Maintainability: {aiAnalysis.maintainability || 'N/A'}
-              </Text>
-              <Text style={styles.analysisText}>
-                Performance: {aiAnalysis.performance || 'N/A'}
-              </Text>
-            </View>
-          )}
+      {aiAnalysis && (
+        <View style={styles.analysisContainer}>
+          <Text style={styles.analysisTitle}>AI Analysis:</Text>
+          <Text style={styles.analysisText}>
+            Complexity: {aiAnalysis.complexity || 'N/A'} | Maintainability: {aiAnalysis.maintainability || 'N/A'}
+          </Text>
         </View>
-      </ScrollView>
+      )}
 
-      <View style={styles.actionButtonsContainer}>
-        <TouchableOpacity
-          style={[styles.actionButton, styles.rejectButton]}
-          onPress={handleReject}
-          disabled={isRejected}
-        >
-          <Text style={styles.actionButtonText}>Reject</Text>
-        </TouchableOpacity>
-
+      <View style={styles.actionButtons}>
         <TouchableOpacity
           style={[styles.actionButton, styles.acceptButton]}
           onPress={handleAccept}
           disabled={isAccepted}
         >
-          <Text style={styles.actionButtonText}>Accept</Text>
+          <Text style={styles.actionButtonText}>
+            {isAccepted ? 'Accepted' : 'Accept Suggestion'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.rejectButton]}
+          onPress={handleReject}
+          disabled={isRejected}
+        >
+          <Text style={styles.actionButtonText}>
+            {isRejected ? 'Rejected' : 'Reject Suggestion'}
+          </Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      {suggestions.length > 1 && (
+        <View style={styles.moreSuggestions}>
+          <Text style={styles.moreSuggestionsText}>More suggestions available:</Text>
+          {suggestions.slice(1).map((suggestion, index) => (
+            <TouchableOpacity
+              key={index}
+              style={styles.suggestionItem}
+              onPress={() => processSuggestion(suggestion)}
+            >
+              <Text style={styles.suggestionItemText} numberOfLines={1}>
+                {suggestion.substring(0, 50)}...
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     padding: 16,
+    backgroundColor: '#f5f5f5',
   },
-  scrollContainer: {
-    flex: 1,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  headerText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  loadingText: {
+    marginTop: 16,
+    textAlign: 'center',
+    color: '#666',
+  },
+  errorText: {
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  noSuggestionsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
   },
   suggestionContainer: {
     backgroundColor: 'white',
@@ -281,52 +333,61 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  sectionTitle: {
-    fontSize: 18,
+  suggestionTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 8,
     color: '#333',
+  },
+  codeContainer: {
+    backgroundColor: '#f8f8f8',
+    borderRadius: 4,
+    padding: 8,
+    marginBottom: 16,
+    maxHeight: 200,
   },
   suggestionText: {
     fontFamily: 'monospace',
     fontSize: 14,
-    lineHeight: 20,
     color: '#333',
   },
   violationText: {
-    backgroundColor: 'rgba(255, 204, 204, 0.5)',
-    color: '#d32f2f',
+    backgroundColor: 'rgba(255, 204, 0, 0.3)',
+    color: '#D4A017',
   },
   errorViolation: {
-    backgroundColor: 'rgba(255, 152, 152, 0.7)',
-    color: '#b71c1c',
-    fontWeight: 'bold',
-  },
-  violationsContainer: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    backgroundColor: 'rgba(255, 0, 0, 0.2)',
+    color: '#D32F2F',
   },
   analysisContainer: {
-    marginTop: 20,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  analysisTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+    color: '#333',
   },
   analysisText: {
     fontSize: 14,
-    marginBottom: 8,
-    color: '#555',
+    color: '#666',
   },
-  actionButtonsContainer: {
+  actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginBottom: 16,
   },
   actionButton: {
     flex: 1,
-    padding: 14,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginHorizontal: 4,
@@ -339,33 +400,31 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     color: 'white',
+    fontWeight: 'bold',
+  },
+  moreSuggestions: {
+    marginTop: 16,
+  },
+  moreSuggestionsText: {
+    fontSize: 16,
     fontWeight: '600',
-    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
   },
-  loadingText: {
-    marginTop: 10,
-    textAlign: 'center',
-    color: '#666',
-  },
-  errorText: {
-    color: '#F44336',
-    textAlign: 'center',
-    marginBottom: 16,
-  },
-  noSuggestionsText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 16,
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
+  suggestionItem: {
+    backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    alignItems: 'center',
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: '600',
+  suggestionItemText: {
+    fontSize: 14,
+    color: '#333',
   },
 });
 

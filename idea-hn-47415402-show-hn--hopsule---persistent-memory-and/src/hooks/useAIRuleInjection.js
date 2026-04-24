@@ -101,11 +101,12 @@ const useAIRuleInjection = () => {
     return validateRule(code, rule);
   };
 
-  const injectRulesIntoAISuggestion = (codeSuggestion) => {
+  const injectRulesIntoAISuggestion = async (codeSuggestion) => {
     if (!codeSuggestion || !rules.length) return codeSuggestion;
 
     let modifiedSuggestion = codeSuggestion;
 
+    // First apply local rules
     rules.forEach(rule => {
       try {
         const regex = new RegExp(rule.pattern, 'g');
@@ -121,6 +122,31 @@ const useAIRuleInjection = () => {
         console.error(`Error processing rule ${rule.name}:`, error);
       }
     });
+
+    // Then call AI API to further refine
+    try {
+      const response = await fetch('https://api.cursor.so/v1/refine', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.CURSOR_API_KEY}`
+        },
+        body: JSON.stringify({
+          code: modifiedSuggestion,
+          rules: rules.map(rule => ({
+            pattern: rule.pattern,
+            severity: rule.severity
+          }))
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        modifiedSuggestion = data.refinedCode || modifiedSuggestion;
+      }
+    } catch (error) {
+      console.error('Error calling AI refinement API:', error);
+    }
 
     return modifiedSuggestion;
   };
