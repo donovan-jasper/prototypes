@@ -31,13 +31,13 @@ export default function HomeScreen() {
       if (isPassiveMode) {
         const entropy = getRecentEntropy();
         const reputation = await getDeviceReputation();
-        
+
         const passiveScore = calculatePassiveTrustScore(
           entropy,
           reputation,
           verificationCount
         );
-        
+
         setTrustScore(passiveScore);
       }
     }, 5000);
@@ -114,23 +114,23 @@ export default function HomeScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>HumanGuard</Text>
       <Text style={styles.subtitle}>Prove you're human, instantly</Text>
-      
+
       <View style={styles.statusContainer}>
         <View style={[styles.statusDot, isMonitoring && styles.statusDotActive]} />
         <Text style={styles.statusText}>
           {isMonitoring ? 'Monitoring Active' : 'Monitoring Inactive'}
         </Text>
       </View>
-      
+
       <TrustScoreGauge score={trustScore} isPassive={isPassiveMode} />
-      
+
       <View style={styles.reputationContainer}>
         <Text style={styles.reputationLabel}>Device Reputation</Text>
         <Text style={styles.reputationValue}>{Math.round(deviceReputation * 100)}%</Text>
       </View>
-      
+
       <VerificationButton onVerify={handleVerify} />
-      
+
       <Text style={styles.count}>
         {verificationCount} verification{verificationCount !== 1 ? 's' : ''} completed
       </Text>
@@ -175,43 +175,34 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderRadius: 20,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#8E8E93',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#FF3B30',
     marginRight: 8,
   },
   statusDotActive: {
     backgroundColor: '#34C759',
   },
   statusText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#8E8E93',
   },
   reputationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
     marginBottom: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    alignItems: 'center',
   },
   reputationLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#8E8E93',
+    marginBottom: 4,
   },
   reputationValue: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#1C1C1E',
   },
   count: {
     marginTop: 20,
@@ -221,7 +212,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
 });
