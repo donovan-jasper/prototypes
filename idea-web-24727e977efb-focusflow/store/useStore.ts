@@ -9,14 +9,27 @@ interface FocusSession {
   completed?: boolean;
 }
 
+interface Room {
+  code: string;
+  creator: string;
+  duration: number;
+  participants: string[];
+}
+
 interface StoreState {
   activeSession: FocusSession | null;
+  activeRoom: Room | null;
   setActiveSession: (session: FocusSession) => void;
   clearActiveSession: () => void;
+  setActiveRoom: (room: Room) => void;
+  clearActiveRoom: () => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
   activeSession: null,
+  activeRoom: null,
   setActiveSession: (session) => set({ activeSession: session }),
   clearActiveSession: () => set({ activeSession: null }),
+  setActiveRoom: (room) => set({ activeRoom: room }),
+  clearActiveRoom: () => set({ activeRoom: null }),
 }));

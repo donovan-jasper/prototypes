@@ -1,84 +1,146 @@
 import * as SQLite from 'expo-sqlite';
 
-let db: SQLite.SQLiteDatabase | null = null;
+const db = SQLite.openDatabase('zenblock.db');
 
-export async function initDB(): Promise<void> {
-  db = await SQLite.openDatabaseAsync('zenblock.db');
-  
-  await db.execAsync(`
-    CREATE TABLE IF NOT EXISTS focus_sessions (
-      id TEXT PRIMARY KEY,
-      start_time INTEGER NOT NULL,
-      end_time INTEGER NOT NULL,
-      duration INTEGER NOT NULL,
-      completed INTEGER NOT NULL DEFAULT 0
+// Initialize all database tables
+export const initDB = () => {
+  // Focus sessions table
+  db.transaction(tx => {
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS focus_sessions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        start_time INTEGER,
+        end_time INTEGER,
+        duration INTEGER,
+        mode TEXT,
+        completed INTEGER
+      );`
     );
-  `);
-}
 
-export async function saveFocusSession(
-  id: string,
-  startTime: number,
-  endTime: number,
-  duration: number,
-  completed: boolean
-): Promise<void> {
-  if (!db) await initDB();
-  
-  await db!.runAsync(
-    'INSERT INTO focus_sessions (id, start_time, end_time, duration, completed) VALUES (?, ?, ?, ?, ?)',
-    [id, startTime, endTime, duration, completed ? 1 : 0]
-  );
-}
+    // Blocked apps table
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS blocked_apps (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id INTEGER,
+        app_name TEXT,
+        FOREIGN KEY(session_id) REFERENCES focus_sessions(id)
+      );`
+    );
 
-export async function getFocusSessions(): Promise<Array<{
-  id: string;
-  start_time: number;
-  end_time: number;
+    // Rooms table
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS rooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        code TEXT UNIQUE,
+        creator TEXT,
+        duration INTEGER,
+        created_at INTEGER
+      );`
+    );
+
+    // Room participants table
+    tx.executeSql(
+      `CREATE TABLE IF NOT EXISTS room_participants (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_id INTEGER,
+        username TEXT,
+        joined_at INTEGER,
+        FOREIGN KEY(room_id) REFERENCES rooms(id)
+      );`
+    );
+  });
+};
+
+// Save a focus session to the database
+export const saveFocusSession = (session: {
+  startTime: number;
+  endTime: number;
   duration: number;
+  mode: string;
   completed: boolean;
-}>> {
-  if (!db) await initDB();
-  
-  const result = await db!.getAllAsync<{
-    id: string;
-    start_time: number;
-    end_time: number;
-    duration: number;
-    completed: number;
-  }>('SELECT * FROM focus_sessions ORDER BY start_time DESC');
-  
-  return result.map(row => ({
-    id: row.id,
-    start_time: row.start_time,
-    end_time: row.end_time,
-    duration: row.duration,
-    completed: row.completed === 1,
-  }));
-}
+  blockedApps: string[];
+}) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO focus_sessions (start_time, end_time, duration, mode, completed) VALUES (?, ?, ?, ?, ?)',
+        [session.startTime, session.endTime, session.duration, session.mode, session.completed ? 1 : 0],
+        (_, result) => {
+          const sessionId = result.insertId;
 
-export async function getCompletedSessions(): Promise<Array<{
-  id: string;
-  start_time: number;
-  end_time: number;
+          // Insert blocked apps
+          session.blockedApps.forEach(app => {
+            tx.executeSql(
+              'INSERT INTO blocked_apps (session_id, app_name) VALUES (?, ?)',
+              [sessionId, app]
+            );
+          });
+
+          resolve(sessionId);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Get all focus sessions
+export const getFocusSessions = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM focus_sessions ORDER BY start_time DESC',
+        [],
+        (_, { rows }) => {
+          const sessions = [];
+          for (let i = 0; i < rows.length; i++) {
+            sessions.push(rows.item(i));
+          }
+          resolve(sessions);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Save a room to the database
+export const saveRoom = (room: {
+  code: string;
+  creator: string;
   duration: number;
-  completed: boolean;
-}>> {
-  if (!db) await initDB();
-  
-  const result = await db!.getAllAsync<{
-    id: string;
-    start_time: number;
-    end_time: number;
-    duration: number;
-    completed: number;
-  }>('SELECT * FROM focus_sessions WHERE completed = 1 ORDER BY start_time DESC');
-  
-  return result.map(row => ({
-    id: row.id,
-    start_time: row.start_time,
-    end_time: row.end_time,
-    duration: row.duration,
-    completed: row.completed === 1,
-  }));
-}
+  createdAt: number;
+}) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO rooms (code, creator, duration, created_at) VALUES (?, ?, ?, ?)',
+        [room.code, room.creator, room.duration, room.createdAt],
+        (_, result) => {
+          resolve(result.insertId);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Get all rooms
+export const getRooms = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT * FROM rooms ORDER BY created_at DESC',
+        [],
+        (_, { rows }) => {
+          const rooms = [];
+          for (let i = 0; i < rows.length; i++) {
+            rooms.push(rows.item(i));
+          }
+          resolve(rooms);
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
