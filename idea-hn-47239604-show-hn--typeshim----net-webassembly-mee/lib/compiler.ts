@@ -1,6 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 import { WebView } from 'react-native-webview';
 import { validateWasmOutput } from './validation';
+import { v4 as uuidv4 } from 'uuid';
 
 const db = SQLite.openDatabase('typebridge.db');
 
@@ -8,10 +9,12 @@ interface CompilationResult {
   success: boolean;
   wasmBytes?: Uint8Array;
   error?: string;
+  requestId: string;
 }
 
 interface CompilationRequest {
   code: string;
+  requestId: string;
   resolve: (result: CompilationResult) => void;
   reject: (error: Error) => void;
 }
@@ -22,6 +25,7 @@ class WebViewCompiler {
   private queue: CompilationRequest[] = [];
   private isProcessing = false;
   private webViewReady = false;
+  private compilationProgress: Record<string, number> = {};
 
   private constructor() {
     this.webViewRef = React.createRef();
@@ -53,38 +57,60 @@ class WebViewCompiler {
                 return;
               }
 
-              try {
-                const code = event.data.code;
+              if (event.data.type === 'compile') {
+                try {
+                  const code = event.data.code;
+                  const requestId = event.data.requestId;
 
-                // Compile TypeScript to JavaScript
-                const jsCode = ts.transpileModule(code, {
-                  compilerOptions: {
-                    module: ts.ModuleKind.ES2020,
-                    target: ts.ScriptTarget.ES2020,
-                    strict: true
-                  }
-                }).outputText;
+                  // Notify progress
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'progress',
+                    progress: 10,
+                    requestId: requestId
+                  }));
 
-                // Compile JavaScript to WASM using AssemblyScript
-                const result = await asc.compileString(jsCode, {
-                  optimizeLevel: 3,
-                  runtime: 'stub',
-                  target: 'web'
-                });
+                  // Compile TypeScript to JavaScript
+                  const jsCode = ts.transpileModule(code, {
+                    compilerOptions: {
+                      module: ts.ModuleKind.ES2020,
+                      target: ts.ScriptTarget.ES2020,
+                      strict: true
+                    }
+                  }).outputText;
 
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'compilationResult',
-                  success: true,
-                  wasmBytes: Array.from(result.buffer),
-                  requestId: event.data.requestId
-                }));
-              } catch (error) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'compilationResult',
-                  success: false,
-                  error: error.message || 'Unknown compilation error',
-                  requestId: event.data.requestId
-                }));
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'progress',
+                    progress: 40,
+                    requestId: requestId
+                  }));
+
+                  // Compile JavaScript to WASM using AssemblyScript
+                  const result = await asc.compileString(jsCode, {
+                    optimizeLevel: 3,
+                    runtime: 'stub',
+                    target: 'web'
+                  });
+
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'progress',
+                    progress: 80,
+                    requestId: requestId
+                  }));
+
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'compilationResult',
+                    success: true,
+                    wasmBytes: Array.from(result.buffer),
+                    requestId: requestId
+                  }));
+                } catch (error) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'compilationResult',
+                    success: false,
+                    error: error.message || 'Unknown compilation error',
+                    requestId: event.data.requestId
+                  }));
+                }
               }
             });
 
@@ -125,20 +151,41 @@ class WebViewCompiler {
         return;
       }
 
+      if (data.type === 'progress') {
+        this.compilationProgress[data.requestId] = data.progress;
+        return;
+      }
+
       if (data.type === 'compilationResult') {
-        const request = this.queue.find(req => req.requestId === data.requestId);
-        if (request) {
+        const requestIndex = this.queue.findIndex(req => req.requestId === data.requestId);
+        if (requestIndex !== -1) {
+          const request = this.queue[requestIndex];
+
           if (data.success) {
             const wasmBytes = new Uint8Array(data.wasmBytes);
             if (validateWasmOutput(wasmBytes)) {
-              request.resolve({ success: true, wasmBytes });
+              request.resolve({
+                success: true,
+                wasmBytes,
+                requestId: data.requestId
+              });
             } else {
-              request.resolve({ success: false, error: 'Invalid WASM output format' });
+              request.resolve({
+                success: false,
+                error: 'Invalid WASM output format',
+                requestId: data.requestId
+              });
             }
           } else {
-            request.resolve({ success: false, error: data.error });
+            request.resolve({
+              success: false,
+              error: data.error,
+              requestId: data.requestId
+            });
           }
-          this.queue = this.queue.filter(req => req.requestId !== data.requestId);
+
+          this.queue.splice(requestIndex, 1);
+          delete this.compilationProgress[data.requestId];
           this.isProcessing = false;
           this.processQueue();
         }
@@ -170,61 +217,43 @@ class WebViewCompiler {
     }
   }
 
-  public async compile(code: string): Promise<CompilationResult> {
-    // Check cache first
-    const cached = await this.checkCache(code);
-    if (cached) return cached;
-
+  public compile(code: string): Promise<CompilationResult> {
     return new Promise((resolve, reject) => {
-      const requestId = Date.now().toString();
-      this.queue.push({ code, resolve, reject, requestId });
+      const requestId = uuidv4();
+      this.queue.push({ code, requestId, resolve, reject });
       this.processQueue();
     });
   }
 
-  private async checkCache(code: string): Promise<CompilationResult | null> {
-    return new Promise((resolve) => {
-      db.transaction(tx => {
-        tx.executeSql(
-          'SELECT wasmBytes FROM compilations WHERE codeHash = ?',
-          [this.hashCode(code)],
-          (_, { rows }) => {
-            if (rows.length > 0) {
-              resolve({
-                success: true,
-                wasmBytes: new Uint8Array(rows.item(0).wasmBytes)
-              });
-            } else {
-              resolve(null);
-            }
-          },
-          (_, error) => {
-            console.error('Cache check failed:', error);
-            resolve(null);
-          }
-        );
-      });
-    });
+  public getCompilationProgress(requestId: string): number {
+    return this.compilationProgress[requestId] || 0;
   }
 
-  private hashCode(str: string): string {
-    let hash = 0;
-    for (let i = 0; i < str.length; i++) {
-      const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32bit integer
-    }
-    return hash.toString();
-  }
+  public cancelCompilation(requestId: string): boolean {
+    const index = this.queue.findIndex(req => req.requestId === requestId);
+    if (index !== -1) {
+      this.queue[index].reject(new Error('Compilation cancelled'));
+      this.queue.splice(index, 1);
+      delete this.compilationProgress[requestId];
 
-  public cleanup() {
-    // Clean up the WebView instance
-    if (this.webViewRef.current) {
-      ReactDOM.unmountComponentAtNode(this.webViewRef.current);
+      if (index === 0) {
+        this.isProcessing = false;
+        this.processQueue();
+      }
+      return true;
     }
-    WebViewCompiler.instance = null;
+    return false;
   }
 }
 
-export const compileTypeScriptToWasm = (code: string) => WebViewCompiler.getInstance().compile(code);
-export const cleanupCompiler = () => WebViewCompiler.getInstance().cleanup();
+export const compileTypeScriptToWasm = (code: string): Promise<CompilationResult> => {
+  return WebViewCompiler.getInstance().compile(code);
+};
+
+export const getCompilationProgress = (requestId: string): number => {
+  return WebViewCompiler.getInstance().getCompilationProgress(requestId);
+};
+
+export const cancelCompilation = (requestId: string): boolean => {
+  return WebViewCompiler.getInstance().cancelCompilation(requestId);
+};
