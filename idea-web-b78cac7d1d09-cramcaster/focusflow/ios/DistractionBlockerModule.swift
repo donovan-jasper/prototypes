@@ -50,5 +50,7 @@ public class DistractionBlockerModule: Module {
     private func handleScreenTimeChange(_ notification: Notification) {
         // Handle app usage changes here
         // You can check which apps are being used and take appropriate action
+        // For example, you could force-quit blocked apps
+        print("Screen time usage changed")
     }
 }

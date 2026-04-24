@@ -1,11 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, Switch } from 'react-native';
+import { View, StyleSheet, Text, Switch, Alert, Platform } from 'react-native';
 import FocusTimer from '../components/FocusTimer';
 import ProgressBar from '../components/ProgressBar';
 import FocusIndicator from '../components/FocusIndicator';
 import { getCalendarEvents, isEventInProgress } from '../services/calendarService';
 import { registerBackgroundTask } from '../services/backgroundService';
-import { registerDistractionBlocker, unregisterDistractionBlocker } from '../services/distractionBlocker';
+import {
+  registerDistractionBlocker,
+  unregisterDistractionBlocker,
+  isDistractionBlockerActive,
+  requestScreenTimePermission
+} from '../services/distractionBlocker';
 import { blockNotifications, unblockNotifications } from '../services/notificationService';
 
 const FocusTimerScreen: React.FC = () => {
@@ -13,6 +18,7 @@ const FocusTimerScreen: React.FC = () => {
   const [isFocusActive, setIsFocusActive] = useState(false);
   const [currentEvent, setCurrentEvent] = useState<Calendar.Event | null>(null);
   const [isDistractionBlockingEnabled, setIsDistractionBlockingEnabled] = useState(true);
+  const [hasScreenTimePermission, setHasScreenTimePermission] = useState(false);
   const duration = 60 * 25; // 25 minutes in seconds
 
   useEffect(() => {
@@ -34,11 +40,9 @@ const FocusTimerScreen: React.FC = () => {
 
         // Handle distraction blocking when focus state changes
         if (!!activeEvent && !wasFocusActive && isDistractionBlockingEnabled) {
-          await blockNotifications();
-          await registerDistractionBlocker();
+          await handleEnableDistractionBlocking();
         } else if (!activeEvent && wasFocusActive) {
-          await unblockNotifications();
-          await unregisterDistractionBlocker();
+          await handleDisableDistractionBlocking();
         }
       } catch (error) {
         console.error('Failed to check focus status:', error);
@@ -51,11 +55,20 @@ const FocusTimerScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [isDistractionBlockingEnabled]);
 
+  useEffect(() => {
+    // Check if distraction blocker is already active
+    const checkBlockerStatus = async () => {
+      const isActive = await isDistractionBlockerActive();
+      setIsDistractionBlockingEnabled(isActive);
+    };
+
+    checkBlockerStatus();
+  }, []);
+
   const handleComplete = () => {
     console.log('Focus session completed!');
     if (isFocusActive && isDistractionBlockingEnabled) {
-      unblockNotifications();
-      unregisterDistractionBlocker();
+      handleDisableDistractionBlocking();
     }
   };
 
@@ -64,20 +77,53 @@ const FocusTimerScreen: React.FC = () => {
     setProgress(newProgress);
   };
 
-  const toggleDistractionBlocking = () => {
-    setIsDistractionBlockingEnabled(!isDistractionBlockingEnabled);
-    if (!isDistractionBlockingEnabled && isFocusActive) {
-      blockNotifications();
-      registerDistractionBlocker();
-    } else if (isDistractionBlockingEnabled && isFocusActive) {
-      unblockNotifications();
-      unregisterDistractionBlocker();
+  const handleEnableDistractionBlocking = async () => {
+    try {
+      if (Platform.OS === 'ios' && !hasScreenTimePermission) {
+        const granted = await requestScreenTimePermission();
+        if (!granted) {
+          Alert.alert(
+            'Permission Required',
+            'Please enable Screen Time permission in Settings to use distraction blocking',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        setHasScreenTimePermission(true);
+      }
+
+      await blockNotifications();
+      await registerDistractionBlocker();
+      setIsDistractionBlockingEnabled(true);
+    } catch (error) {
+      console.error('Failed to enable distraction blocking:', error);
+    }
+  };
+
+  const handleDisableDistractionBlocking = async () => {
+    try {
+      await unblockNotifications();
+      await unregisterDistractionBlocker();
+      setIsDistractionBlockingEnabled(false);
+    } catch (error) {
+      console.error('Failed to disable distraction blocking:', error);
+    }
+  };
+
+  const toggleDistractionBlocking = async () => {
+    if (isDistractionBlockingEnabled) {
+      await handleDisableDistractionBlocking();
+    } else {
+      await handleEnableDistractionBlocking();
     }
   };
 
   return (
     <View style={styles.container}>
-      <FocusIndicator isFocusActive={isFocusActive} isDistractionBlockingActive={isFocusActive && isDistractionBlockingEnabled} />
+      <FocusIndicator
+        isFocusActive={isFocusActive}
+        isDistractionBlockingActive={isFocusActive && isDistractionBlockingEnabled}
+      />
       {currentEvent && (
         <View style={styles.eventInfo}>
           <Text style={styles.eventTitle}>{currentEvent.title}</Text>

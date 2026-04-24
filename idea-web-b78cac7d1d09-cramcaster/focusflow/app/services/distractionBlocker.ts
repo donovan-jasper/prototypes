@@ -1,6 +1,8 @@
 import * as Notifications from 'expo-notifications';
 import * as Application from 'expo-application';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
+import * as ExpoDistractionBlocker from 'expo-distraction-blocker';
 
 const BLOCKED_APPS_KEY = 'blocked_apps';
 const DISTRACTION_BLOCKER_KEY = 'distraction_blocker_active';
@@ -50,9 +52,15 @@ export const registerDistractionBlocker = async () => {
     // Store the active state
     await AsyncStorage.setItem(DISTRACTION_BLOCKER_KEY, 'true');
 
-    // In a real app, you would also implement app blocking logic here
-    // This would require platform-specific code and might need to be implemented
-    // as a native module or using device-specific APIs
+    // Platform-specific blocking
+    if (Platform.OS === 'ios') {
+      // Use native module for iOS ScreenTime
+      await ExpoDistractionBlocker.enableScreenTimeBlocking();
+    } else if (Platform.OS === 'android') {
+      // Android implementation would go here
+      // This would require a native module for Android's Digital Wellbeing API
+    }
+
     console.log('Distraction blocker registered');
   } catch (error) {
     console.error('Failed to register distraction blocker:', error);
@@ -72,6 +80,13 @@ export const unregisterDistractionBlocker = async () => {
     // Remove the active state
     await AsyncStorage.removeItem(DISTRACTION_BLOCKER_KEY);
 
+    // Platform-specific unblocking
+    if (Platform.OS === 'ios') {
+      await ExpoDistractionBlocker.disableScreenTimeBlocking();
+    } else if (Platform.OS === 'android') {
+      // Android implementation would go here
+    }
+
     console.log('Distraction blocker unregistered');
   } catch (error) {
     console.error('Failed to unregister distraction blocker:', error);
@@ -86,4 +101,11 @@ export const isDistractionBlockerActive = async (): Promise<boolean> => {
     console.error('Failed to check distraction blocker status:', error);
     return false;
   }
+};
+
+export const requestScreenTimePermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'ios') {
+    return await ExpoDistractionBlocker.requestScreenTimePermission();
+  }
+  return true; // Android doesn't need explicit permission for this API
 };
