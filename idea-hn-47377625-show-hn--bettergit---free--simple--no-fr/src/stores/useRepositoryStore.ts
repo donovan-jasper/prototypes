@@ -1,99 +1,53 @@
 import { create } from 'zustand';
+import { Repository } from '../types/repository';
+import { DatabaseService } from '../services/storage/DatabaseService';
 
-export interface Repository {
-  id: string;
-  name: string;
-  description: string;
-  stars: number;
-  forks: number;
-  language: string;
-  languageColor: string;
-  url: string;
-  isCloned: boolean;
-  cloneProgress?: number;
-}
-
-interface RepositoryStore {
+interface RepositoryState {
   repositories: Repository[];
-  updateRepository: (id: string, updates: Partial<Repository>) => void;
-  setCloneProgress: (id: string, progress: number) => void;
-  setCloned: (id: string, isCloned: boolean) => void;
+  loading: boolean;
+  error: string | null;
+  loadRepositories: () => Promise<void>;
+  addRepository: (repository: Repository) => void;
+  removeRepository: (repoId: string) => void;
+  updateRepository: (repoId: string, updates: Partial<Repository>) => void;
 }
 
-export const useRepositoryStore = create<RepositoryStore>((set) => ({
-  repositories: [
-    {
-      id: '1',
-      name: 'marketing-site',
-      description: 'Company marketing website built with Next.js and Tailwind CSS',
-      stars: 42,
-      forks: 8,
-      language: 'TypeScript',
-      languageColor: '#3178c6',
-      url: 'https://github.com/vercel/next.js',
-      isCloned: false,
-    },
-    {
-      id: '2',
-      name: 'backend-api',
-      description: 'RESTful API service for mobile and web applications',
-      stars: 156,
-      forks: 23,
-      language: 'Python',
-      languageColor: '#3572A5',
-      url: 'https://github.com/pallets/flask',
-      isCloned: false,
-    },
-    {
-      id: '3',
-      name: 'design-system',
-      description: 'Shared component library and design tokens',
-      stars: 89,
-      forks: 12,
-      language: 'JavaScript',
-      languageColor: '#f1e05a',
-      url: 'https://github.com/facebook/react',
-      isCloned: false,
-    },
-    {
-      id: '4',
-      name: 'mobile-app',
-      description: 'React Native mobile application for iOS and Android',
-      stars: 234,
-      forks: 45,
-      language: 'TypeScript',
-      languageColor: '#3178c6',
-      url: 'https://github.com/expo/expo',
-      isCloned: false,
-    },
-    {
-      id: '5',
-      name: 'docs',
-      description: 'Product documentation and API reference',
-      stars: 67,
-      forks: 34,
-      language: 'Markdown',
-      languageColor: '#083fa1',
-      url: 'https://github.com/facebook/docusaurus',
-      isCloned: false,
-    },
-  ],
-  updateRepository: (id, updates) =>
+export const useRepositoryStore = create<RepositoryState>((set) => ({
+  repositories: [],
+  loading: false,
+  error: null,
+
+  loadRepositories: async () => {
+    set({ loading: true, error: null });
+    try {
+      const repositories = await DatabaseService.getAllRepositories();
+      set({ repositories, loading: false });
+    } catch (error) {
+      console.error('Failed to load repositories:', error);
+      set({
+        error: error instanceof Error ? error.message : 'Failed to load repositories',
+        loading: false
+      });
+    }
+  },
+
+  addRepository: (repository) => {
     set((state) => ({
-      repositories: state.repositories.map((repo) =>
-        repo.id === id ? { ...repo, ...updates } : repo
-      ),
-    })),
-  setCloneProgress: (id, progress) =>
+      repositories: [...state.repositories, repository]
+    }));
+  },
+
+  removeRepository: (repoId) => {
     set((state) => ({
-      repositories: state.repositories.map((repo) =>
-        repo.id === id ? { ...repo, cloneProgress: progress } : repo
-      ),
-    })),
-  setCloned: (id, isCloned) =>
+      repositories: state.repositories.filter(repo => repo.id !== repoId)
+    }));
+  },
+
+  updateRepository: (repoId, updates) => {
     set((state) => ({
-      repositories: state.repositories.map((repo) =>
-        repo.id === id ? { ...repo, isCloned, cloneProgress: undefined } : repo
-      ),
-    })),
+      repositories: state.repositories.map(repo =>
+        repo.id === repoId ? { ...repo, ...updates } : repo
+      )
+    }));
+  }
 }));

@@ -2,6 +2,7 @@ import { GitService, CloneProgress } from './GitService';
 import { GitProviderService } from './GitProviderService';
 import { FileSystemService } from '../storage/FileSystemService';
 import { DatabaseService } from '../storage/DatabaseService';
+import { useRepositoryStore } from '../../stores/useRepositoryStore';
 
 export interface CloneOptions {
   url: string;
@@ -36,13 +37,13 @@ export class CloneService {
       // Validate the repository URL
       const isValid = await GitProviderService.validateRepositoryUrl(url);
       if (!isValid) {
-        throw new Error('Invalid repository URL');
+        throw new Error('Invalid repository URL. Please check the URL and try again.');
       }
 
       // Check if repo already exists
       const exists = await GitService.repoExists(repoId);
       if (exists) {
-        throw new Error('Repository already exists');
+        throw new Error('A repository with this ID already exists.');
       }
 
       // Create directory for the repository
@@ -69,22 +70,31 @@ export class CloneService {
 
       // Save repository metadata to database
       const repoInfo = await this.getRepositoryInfo(url, authToken);
-      await DatabaseService.saveRepository({
+      const repository = {
         id: repoId,
         name: repoInfo.name,
         fullName: repoInfo.fullName,
-        description: repoInfo.description,
+        description: repoInfo.description || 'No description available',
         cloneUrl: url,
         defaultBranch: repoInfo.defaultBranch,
         lastUpdated: new Date().toISOString(),
-        path: repoPath
-      });
+        path: repoPath,
+        stars: repoInfo.stars || 0,
+        forks: repoInfo.forks || 0,
+        language: repoInfo.language || 'Unknown',
+        languageColor: repoInfo.languageColor || '#6a737d'
+      };
+
+      await DatabaseService.saveRepository(repository);
+
+      // Update the repository store
+      useRepositoryStore.getState().addRepository(repository);
 
       status.isComplete = true;
       status.progress = 100;
 
     } catch (error) {
-      status.error = error instanceof Error ? error.message : 'Unknown error occurred';
+      status.error = error instanceof Error ? error.message : 'Failed to clone repository. Please try again.';
       status.isComplete = true;
 
       // Clean up if clone failed
@@ -94,8 +104,7 @@ export class CloneService {
         console.error('Failed to clean up after clone failure:', cleanupError);
       }
 
-      // Re-throw the original error with user-friendly message
-      throw new Error(status.error || 'Failed to clone repository. Please try again later.');
+      throw new Error(status.error);
     } finally {
       this.activeClones.delete(repoId);
     }
@@ -112,11 +121,14 @@ export class CloneService {
 
       // Remove from active clones if present
       this.activeClones.delete(repoId);
+
+      // Update the repository store
+      useRepositoryStore.getState().removeRepository(repoId);
     } catch (error) {
       console.error('Error deleting repository:', error);
       if (error instanceof Error) {
         if (error.message.includes('permission')) {
-          throw new Error('Permission denied. Unable to delete repository.');
+          throw new Error('Permission denied. Unable to delete repository. Please check your permissions.');
         }
       }
       throw new Error('Failed to delete repository. Please try again.');
@@ -137,7 +149,7 @@ export class CloneService {
     try {
       const provider = await GitProviderService.detectProvider(url);
       if (!provider) {
-        throw new Error('Unsupported Git provider');
+        throw new Error('Unsupported Git provider. Currently only GitHub, GitLab, and Bitbucket are supported.');
       }
 
       return await GitProviderService.getRepositoryInfo(url, authToken ? { provider, token: authToken } : undefined);
@@ -145,42 +157,18 @@ export class CloneService {
       console.error('Error fetching repository info:', error);
       if (error instanceof Error) {
         if (error.message.includes('timeout')) {
-          throw new Error('Network timeout while fetching repository information.');
+          throw new Error('Network timeout while fetching repository information. Please check your connection.');
         } else if (error.message.includes('authentication') || error.message.includes('401')) {
-          throw new Error('Authentication failed. Please check your credentials.');
+          throw new Error('Authentication failed. Please check your credentials and try again.');
+        } else if (error.message.includes('404')) {
+          throw new Error('Repository not found. Please verify the URL is correct.');
         }
       }
       throw new Error('Failed to fetch repository information. Please try again.');
     }
   }
 
-  static getCloneProgress(repoId: string): CloneStatus {
-    const status = this.activeClones.get(repoId);
-    if (!status) {
-      return {
-        progress: 0,
-        isComplete: false,
-        error: 'No active clone operation found'
-      };
-    }
-    return status;
-  }
-
-  static async cancelClone(repoId: string): Promise<void> {
-    try {
-      const status = this.activeClones.get(repoId);
-      if (status) {
-        status.isComplete = true;
-        status.error = 'Clone operation was cancelled';
-        this.activeClones.delete(repoId);
-
-        // Clean up filesystem
-        const repoPath = await FileSystemService.getRepositoryPath(repoId);
-        await FileSystemService.deleteDirectory(repoPath);
-      }
-    } catch (error) {
-      console.error('Error cancelling clone:', error);
-      throw new Error('Failed to cancel clone operation');
-    }
+  static getCloneStatus(repoId: string): CloneStatus | undefined {
+    return this.activeClones.get(repoId);
   }
 }
