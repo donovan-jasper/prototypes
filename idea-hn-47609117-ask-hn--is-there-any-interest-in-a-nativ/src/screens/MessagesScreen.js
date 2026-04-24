@@ -1,8 +1,7 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
 import { getOfflineMessages, syncMessages } from '../services/discordApi';
 import { getStoredToken } from '../services/auth';
-import { Ionicons } from '@expo/vector-icons';
 
 const MessagesScreen = ({ route, navigation }) => {
   const { channelId } = route.params;
@@ -10,8 +9,6 @@ const MessagesScreen = ({ route, navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [newMessage, setNewMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const flatListRef = useRef(null);
 
   const loadMessages = async () => {
     try {
@@ -54,39 +51,28 @@ const MessagesScreen = ({ route, navigation }) => {
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
-    setIsSending(true);
     try {
       const token = await getStoredToken();
       if (!token) {
-        Alert.alert('Error', 'Not authenticated. Please login again.');
-        navigation.replace('Login');
+        Alert.alert('Error', 'You need to be logged in to send messages');
         return;
       }
 
-      // Send message to Discord API
-      const response = await fetch(`https://discord.com/api/v9/channels/${channelId}/messages`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: newMessage,
-        }),
-      });
+      // In a real app, you would send the message to Discord API here
+      // For now, we'll just add it to our local state
+      const newMsg = {
+        id: Date.now().toString(),
+        channel_id: channelId,
+        content: newMessage,
+        author: 'You',
+        timestamp: new Date().toISOString()
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to send message');
-      }
-
-      // Clear input and refresh messages
+      setMessages([newMsg, ...messages]);
       setNewMessage('');
-      await handleRefresh();
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', 'Failed to send message. Please try again.');
-    } finally {
-      setIsSending(false);
     }
   };
 
@@ -94,20 +80,11 @@ const MessagesScreen = ({ route, navigation }) => {
     loadMessages();
   }, []);
 
-  useEffect(() => {
-    // Scroll to bottom when messages change
-    if (flatListRef.current && messages.length > 0) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  }, [messages]);
-
   const renderMessageItem = ({ item }) => (
-    <View style={styles.messageContainer}>
-      <View style={styles.messageHeader}>
-        <Text style={styles.authorName}>{item.author}</Text>
-        <Text style={styles.timestamp}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
-      </View>
+    <View style={styles.messageItem}>
+      <Text style={styles.messageAuthor}>{item.author}</Text>
       <Text style={styles.messageContent}>{item.content}</Text>
+      <Text style={styles.messageTime}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
     </View>
   );
 
@@ -120,22 +97,15 @@ const MessagesScreen = ({ route, navigation }) => {
   }
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 90 : 0}
-    >
+    <View style={styles.container}>
       <FlatList
-        ref={flatListRef}
         data={messages}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item.id}
         refreshing={refreshing}
         onRefresh={handleRefresh}
+        inverted
         contentContainerStyle={styles.messagesList}
-        ListHeaderComponent={
-          <Text style={styles.header}>Messages</Text>
-        }
       />
 
       <View style={styles.inputContainer}>
@@ -148,18 +118,14 @@ const MessagesScreen = ({ route, navigation }) => {
           multiline
         />
         <TouchableOpacity
-          style={[styles.sendButton, !newMessage.trim() && styles.sendButtonDisabled]}
+          style={styles.sendButton}
           onPress={handleSendMessage}
-          disabled={!newMessage.trim() || isSending}
+          disabled={!newMessage.trim()}
         >
-          {isSending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <Ionicons name="send" size={20} color="#fff" />
-          )}
+          <Text style={styles.sendButtonText}>Send</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -174,68 +140,56 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#36393F',
   },
-  header: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#fff',
-    padding: 15,
-    backgroundColor: '#2F3136',
-  },
   messagesList: {
-    paddingBottom: 10,
+    padding: 10,
   },
-  messageContainer: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2F3136',
+  messageItem: {
+    backgroundColor: '#2F3136',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
   },
-  messageHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-  },
-  authorName: {
-    color: '#fff',
+  messageAuthor: {
+    color: '#5865F2',
     fontWeight: 'bold',
-    fontSize: 14,
-  },
-  timestamp: {
-    color: '#72767D',
-    fontSize: 12,
+    marginBottom: 4,
   },
   messageContent: {
     color: '#DCDDDE',
     fontSize: 16,
   },
+  messageTime: {
+    color: '#72767D',
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'right',
+  },
   inputContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     padding: 10,
-    backgroundColor: '#40444B',
+    backgroundColor: '#2F3136',
     borderTopWidth: 1,
-    borderTopColor: '#2F3136',
+    borderTopColor: '#202225',
   },
   input: {
     flex: 1,
-    minHeight: 40,
-    maxHeight: 100,
     backgroundColor: '#40444B',
+    borderRadius: 8,
+    padding: 12,
     color: '#DCDDDE',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    marginRight: 10,
+    marginRight: 8,
+    maxHeight: 100,
   },
   sendButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: '#5865F2',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  sendButtonDisabled: {
-    backgroundColor: '#2F3136',
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 
