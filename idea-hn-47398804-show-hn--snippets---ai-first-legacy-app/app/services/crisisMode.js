@@ -26,6 +26,11 @@ const generateCrisisPin = () => {
 
 const setCrisisPin = (pin) => {
   return new Promise((resolve, reject) => {
+    if (!pin || pin.length !== 6 || !/^\d+$/.test(pin)) {
+      reject(new Error('PIN must be a 6-digit number'));
+      return;
+    }
+
     const encryptedPin = encrypt(pin, 'crisis-pin-key');
 
     db.transaction(
@@ -68,6 +73,10 @@ const getCrisisPin = () => {
 
 const verifyCrisisPin = async (inputPin) => {
   try {
+    if (!inputPin || inputPin.length !== 6 || !/^\d+$/.test(inputPin)) {
+      return false;
+    }
+
     const storedPin = await getCrisisPin();
     return storedPin === inputPin;
   } catch (error) {
@@ -113,6 +122,22 @@ const getShareableLink = async () => {
   }
 };
 
+const disableCrisisMode = () => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        tx.executeSql(
+          'UPDATE crisis_settings SET isEnabled = 0 WHERE id = 1;',
+          [],
+          () => resolve(),
+          (_, error) => reject(error)
+        );
+      },
+      (error) => reject(error)
+    );
+  });
+};
+
 export {
   initializeCrisisMode,
   generateCrisisPin,
@@ -120,5 +145,6 @@ export {
   getCrisisPin,
   verifyCrisisPin,
   isCrisisModeEnabled,
-  getShareableLink
+  getShareableLink,
+  disableCrisisMode
 };

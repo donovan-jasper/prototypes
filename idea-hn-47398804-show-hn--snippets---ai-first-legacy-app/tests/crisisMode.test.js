@@ -1,4 +1,4 @@
-import { generateCrisisPin, setCrisisPin, getCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink } from '../app/services/crisisMode';
+import { generateCrisisPin, setCrisisPin, getCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink, disableCrisisMode } from '../app/services/crisisMode';
 import * as SQLite from 'expo-sqlite';
 import { encrypt, decrypt } from '../app/services/encryption';
 
@@ -13,9 +13,11 @@ jest.mock('expo-sqlite', () => {
           } else if (sql.includes('INSERT OR REPLACE')) {
             successCallback();
           } else if (sql.includes('SELECT pin')) {
-            successCallback(null, { rows: { length: 1, item: () => ({ pin: 'encrypted-pin' }) } });
+            successCallback(null, { rows: { length: 1, item: () => ({ pin: 'encrypted-123456' }) } });
           } else if (sql.includes('SELECT isEnabled')) {
             successCallback(null, { rows: { length: 1, item: () => ({ isEnabled: 1 }) } });
+          } else if (sql.includes('UPDATE crisis_settings')) {
+            successCallback();
           }
         })
       };
@@ -50,20 +52,33 @@ describe('Crisis Mode Service', () => {
     expect(encrypt).toHaveBeenCalledWith('123456', 'crisis-pin-key');
   });
 
+  test('setCrisisPin should reject invalid PINs', async () => {
+    await expect(setCrisisPin('123')).rejects.toThrow('PIN must be a 6-digit number');
+    await expect(setCrisisPin('abc123')).rejects.toThrow('PIN must be a 6-digit number');
+  });
+
   test('getCrisisPin should return the decrypted PIN', async () => {
     const pin = await getCrisisPin();
-    expect(pin).toBe('encrypted-pin');
-    expect(decrypt).toHaveBeenCalledWith('encrypted-pin', 'crisis-pin-key');
+    expect(pin).toBe('123456');
+    expect(decrypt).toHaveBeenCalledWith('encrypted-123456', 'crisis-pin-key');
   });
 
   test('verifyCrisisPin should return true for correct PIN', async () => {
-    const isValid = await verifyCrisisPin('encrypted-pin');
+    const isValid = await verifyCrisisPin('123456');
     expect(isValid).toBe(true);
   });
 
   test('verifyCrisisPin should return false for incorrect PIN', async () => {
-    const isValid = await verifyCrisisPin('wrong-pin');
+    const isValid = await verifyCrisisPin('654321');
     expect(isValid).toBe(false);
+  });
+
+  test('verifyCrisisPin should reject invalid PINs', async () => {
+    const isValid1 = await verifyCrisisPin('123');
+    expect(isValid1).toBe(false);
+
+    const isValid2 = await verifyCrisisPin('abc123');
+    expect(isValid2).toBe(false);
   });
 
   test('isCrisisModeEnabled should return true when enabled', async () => {
@@ -74,5 +89,10 @@ describe('Crisis Mode Service', () => {
   test('getShareableLink should return a valid URL with PIN', async () => {
     const link = await getShareableLink();
     expect(link).toMatch(/^https:\/\/echovault\.app\/crisis\?pin=\d{6}$/);
+  });
+
+  test('disableCrisisMode should disable crisis mode', async () => {
+    await disableCrisisMode();
+    expect(SQLite.openDatabase().transaction).toHaveBeenCalled();
   });
 });
