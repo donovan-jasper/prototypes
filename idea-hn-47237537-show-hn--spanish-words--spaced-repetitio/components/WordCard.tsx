@@ -1,10 +1,10 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Animated, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import AudioPlayer from './AudioPlayer';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
+import { useStore } from '../store/useStore';
 
 interface Word {
   id: number;
@@ -27,8 +27,18 @@ interface WordCardProps {
 
 export default function WordCard({ word, onSwipe }: WordCardProps) {
   const [showTranslation, setShowTranslation] = useState(false);
-  const pan = useRef(new Animated.ValueXY()).current;
   const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const pan = useRef(new Animated.ValueXY()).current;
+  const { markWordReviewed } = useStore();
+
+  useEffect(() => {
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+    };
+  }, [sound]);
 
   const playPronunciation = async () => {
     try {
@@ -40,9 +50,18 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
         { uri: word.audioUrl },
         { shouldPlay: true }
       );
+
       setSound(newSound);
+      setIsPlaying(true);
+
+      newSound.setOnPlaybackStatusUpdate(status => {
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
     } catch (error) {
       console.error('Error playing sound:', error);
+      setIsPlaying(false);
     }
   };
 
@@ -51,7 +70,12 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
     // Play pronunciation on swipe
-    await playPronunciation();
+    if (!isPlaying) {
+      await playPronunciation();
+    }
+
+    // Update word progress in database
+    await markWordReviewed(word.id, direction);
 
     // Notify parent component
     onSwipe(direction);
@@ -76,6 +100,8 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
       Animated.spring(pan, {
         toValue: { x: 500, y: 0 },
         useNativeDriver: false,
+        speed: 20,
+        bounciness: 0,
       }).start(() => {
         handleSwipe('correct');
         pan.setValue({ x: 0, y: 0 });
@@ -84,6 +110,8 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
       Animated.spring(pan, {
         toValue: { x: -500, y: 0 },
         useNativeDriver: false,
+        speed: 20,
+        bounciness: 0,
       }).start(() => {
         handleSwipe('learning');
         pan.setValue({ x: 0, y: 0 });
@@ -92,6 +120,8 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
       Animated.spring(pan, {
         toValue: { x: 0, y: 500 },
         useNativeDriver: false,
+        speed: 20,
+        bounciness: 0,
       }).start(() => {
         handleSwipe('forgot');
         pan.setValue({ x: 0, y: 0 });
@@ -139,7 +169,18 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
               <>
                 <Text style={styles.translationText}>{word.translation}</Text>
                 <Text style={styles.exampleText}>{word.example}</Text>
-                <AudioPlayer audioUrl={word.audioUrl} />
+
+                <TouchableOpacity
+                  style={styles.audioButton}
+                  onPress={playPronunciation}
+                  disabled={isPlaying}
+                >
+                  <Ionicons
+                    name={isPlaying ? "volume-high" : "volume-medium"}
+                    size={24}
+                    color={isPlaying ? "#4CAF50" : "#2196F3"}
+                  />
+                </TouchableOpacity>
               </>
             ) : (
               <TouchableOpacity
@@ -176,21 +217,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   card: {
-    width: '90%',
+    width: '100%',
     maxWidth: 400,
+    height: 500,
     backgroundColor: 'white',
     borderRadius: 15,
-    padding: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
     elevation: 5,
+    padding: 20,
     position: 'relative',
   },
   cardContent: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   wordImage: {
@@ -201,40 +246,44 @@ const styles = StyleSheet.create({
   wordText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1E40AF',
     marginBottom: 10,
+    color: '#333',
   },
   translationText: {
     fontSize: 24,
-    color: '#4B5563',
+    color: '#666',
     marginBottom: 15,
   },
   exampleText: {
-    fontSize: 16,
-    color: '#6B7280',
+    fontSize: 18,
+    color: '#444',
     textAlign: 'center',
+    paddingHorizontal: 20,
     marginBottom: 20,
-    fontStyle: 'italic',
   },
   showTranslationButton: {
-    backgroundColor: '#1E40AF',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+    backgroundColor: '#2196F3',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 25,
-    marginTop: 15,
+    marginTop: 20,
   },
   showTranslationText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
+  audioButton: {
+    marginTop: 20,
+    padding: 10,
+  },
   swipeIndicators: {
     position: 'absolute',
-    bottom: -50,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     paddingHorizontal: 20,
   },
   indicator: {
@@ -246,12 +295,12 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   correct: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#4CAF50',
   },
   learning: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: '#FFC107',
   },
   forgot: {
-    backgroundColor: '#EF4444',
+    backgroundColor: '#F44336',
   },
 });

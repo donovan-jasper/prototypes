@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDueWords, getSettings, updateSettings, getTotalWordsLearned } from '../lib/database';
+import { getDueWords, getSettings, updateSettings, getTotalWordsLearned, updateProgress } from '../lib/database';
 import { calculateNextReview, updateCardState } from '../lib/fsrs';
 
 interface Word {
@@ -58,7 +58,10 @@ export const useStore = create<StoreState>()(
       loadDailyQueue: async () => {
         const { settings } = get();
         try {
+          // Get new words (words never reviewed before)
           const newWords = await getDueWords(settings.dailyGoal, true);
+
+          // Get review words (words due for review)
           const reviewWords = await getDueWords(10, false);
 
           // Combine and shuffle the queue
@@ -69,8 +72,11 @@ export const useStore = create<StoreState>()(
             dailyQueue: shuffledQueue,
             currentWord: shuffledQueue.length > 0 ? shuffledQueue[0] : null,
           });
+
+          return shuffledQueue;
         } catch (error) {
           console.error('Error loading daily queue:', error);
+          return [];
         }
       },
 
@@ -104,13 +110,19 @@ export const useStore = create<StoreState>()(
               incorrectCount: direction === 'forgot' ? (currentWord.incorrectCount || 0) + 1 : (currentWord.incorrectCount || 0),
             });
 
+            // Update total words learned if this is the first correct answer
+            if (direction === 'correct' && currentWord.correctCount === 0) {
+              const newTotal = await getTotalWordsLearned();
+              set({ totalWordsLearned: newTotal });
+            }
+
+            // Remove the word from the queue
             const updatedQueue = [...dailyQueue];
             updatedQueue.splice(wordIndex, 1);
 
             set({
               dailyQueue: updatedQueue,
               currentWord: updatedQueue.length > 0 ? updatedQueue[0] : null,
-              totalWordsLearned: direction === 'correct' ? totalWordsLearned + 1 : totalWordsLearned,
             });
           } catch (error) {
             console.error('Error updating word progress:', error);
@@ -151,7 +163,8 @@ export const useStore = create<StoreState>()(
       updateSettings: async (newSettings) => {
         try {
           await updateSettings(newSettings);
-          set({ settings: { ...get().settings, ...newSettings } });
+          const updatedSettings = await getSettings();
+          set({ settings: updatedSettings });
         } catch (error) {
           console.error('Error updating settings:', error);
         }
@@ -159,8 +172,8 @@ export const useStore = create<StoreState>()(
 
       loadTotalWordsLearned: async () => {
         try {
-          const count = await getTotalWordsLearned();
-          set({ totalWordsLearned: count });
+          const total = await getTotalWordsLearned();
+          set({ totalWordsLearned: total });
         } catch (error) {
           console.error('Error loading total words learned:', error);
         }

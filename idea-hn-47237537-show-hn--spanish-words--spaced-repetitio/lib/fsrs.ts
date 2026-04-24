@@ -82,32 +82,59 @@ export const updateCardState = (card: CardState, rating: 'forgot' | 'hard' | 'go
   };
 };
 
-export const getDueWords = async (limit: number): Promise<WordProgress[]> => {
+export const getDueWords = async (limit: number, isNew: boolean): Promise<WordProgress[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         const now = Date.now();
-        tx.executeSql(
-          `SELECT w.*, up.*
-           FROM words w
-           LEFT JOIN user_progress up ON w.id = up.wordId
-           WHERE up.nextReview <= ? OR up.nextReview IS NULL
-           ORDER BY up.nextReview ASC, w.frequency DESC
-           LIMIT ?`,
-          [now, limit],
-          (_, { rows }) => {
-            const words = rows._array.map(word => ({
-              ...word,
-              difficulty: word.difficulty || 2.5,
-              stability: word.stability || 1,
-              retrievability: word.retrievability || 0,
-              correctCount: word.correctCount || 0,
-              incorrectCount: word.incorrectCount || 0,
-            }));
-            resolve(words);
-          },
-          (_, error) => reject(error)
-        );
+
+        if (isNew) {
+          // Get words that have never been reviewed
+          tx.executeSql(
+            `SELECT w.*, up.*
+             FROM words w
+             LEFT JOIN user_progress up ON w.id = up.wordId
+             WHERE up.wordId IS NULL
+             ORDER BY w.frequency DESC
+             LIMIT ?`,
+            [limit],
+            (_, { rows }) => {
+              const words = rows._array.map(word => ({
+                ...word,
+                difficulty: word.difficulty || 2.5,
+                stability: word.stability || 1,
+                retrievability: word.retrievability || 0,
+                correctCount: word.correctCount || 0,
+                incorrectCount: word.incorrectCount || 0,
+              }));
+              resolve(words);
+            },
+            (_, error) => reject(error)
+          );
+        } else {
+          // Get words that are due for review
+          tx.executeSql(
+            `SELECT w.*, up.*
+             FROM words w
+             JOIN user_progress up ON w.id = up.wordId
+             WHERE up.nextReview <= ? AND up.nextReview IS NOT NULL
+             ORDER BY up.nextReview ASC, w.frequency DESC
+             LIMIT ?`,
+            [now, limit],
+            (_, { rows }) => {
+              const words = rows._array.map(word => ({
+                ...word,
+                difficulty: word.difficulty || 2.5,
+                stability: word.stability || 1,
+                retrievability: word.retrievability || 0,
+                correctCount: word.correctCount || 0,
+                incorrectCount: word.incorrectCount || 0,
+              }));
+              resolve(words);
+            },
+            (_, error) => reject(error)
+          );
+        }
       }
     );
   });
