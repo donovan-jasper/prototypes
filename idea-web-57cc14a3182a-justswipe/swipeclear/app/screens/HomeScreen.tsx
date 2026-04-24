@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, FlatList } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import SwipeAction from '../components/SwipeAction';
@@ -30,14 +30,14 @@ const HomeScreen = () => {
   const requestPermissions = async () => {
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
-    
+
     if (existingStatus !== 'granted') {
       const { status } = await Notifications.requestPermissionsAsync();
       finalStatus = status;
     }
-    
+
     setPermissionStatus(finalStatus);
-    
+
     if (finalStatus === 'granted') {
       syncNotifications();
     } else {
@@ -52,7 +52,7 @@ const HomeScreen = () => {
   const syncNotifications = async () => {
     try {
       const presentedNotifications = await Notifications.getPresentedNotificationsAsync();
-      
+
       for (const notification of presentedNotifications) {
         const notificationData = {
           id: notification.request.identifier,
@@ -61,10 +61,10 @@ const HomeScreen = () => {
           app: notification.request.content.data?.app || 'Unknown App',
           timestamp: notification.date,
         };
-        
+
         await insertNotification(notificationData);
       }
-      
+
       loadItems();
     } catch (error) {
       console.error('Error syncing notifications:', error);
@@ -98,7 +98,7 @@ const HomeScreen = () => {
 
   const handleSwipeLeft = async (item) => {
     animateAndUpdate(item, { archived: true });
-    
+
     try {
       await Notifications.dismissNotificationAsync(item.id);
     } catch (error) {
@@ -118,7 +118,7 @@ const HomeScreen = () => {
 
   const handleSwipeDown = async (item) => {
     animateAndUpdate(item, { deleted: true });
-    
+
     try {
       await Notifications.dismissNotificationAsync(item.id);
       await deleteNotification(item.id);
@@ -166,95 +166,75 @@ const HomeScreen = () => {
     return date.toLocaleDateString();
   };
 
+  const renderItem = ({ item }) => {
+    const fadeAnim = animatingItems[item.id] || new Animated.Value(1);
+
+    return (
+      <Animated.View style={[styles.itemContainer, { opacity: fadeAnim }]}>
+        <SwipeAction
+          item={item}
+          onSwipeLeft={handleSwipeLeft}
+          onSwipeRight={handleSwipeRight}
+          onSwipeUp={handleSwipeUp}
+          onSwipeDown={handleSwipeDown}
+        >
+          <View style={styles.itemContent}>
+            <View style={styles.itemHeader}>
+              <Text style={[styles.itemTitle, item.pinned && styles.pinnedItem]}>
+                {item.title}
+              </Text>
+              <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
+            </View>
+            <Text style={styles.itemBody}>{item.body}</Text>
+            <View style={styles.itemFooter}>
+              <Text style={styles.itemApp}>{item.app}</Text>
+              {item.muted && (
+                <Ionicons
+                  name="volume-mute-outline"
+                  size={16}
+                  color="#666"
+                  style={styles.mutedIcon}
+                />
+              )}
+            </View>
+          </View>
+        </SwipeAction>
+      </Animated.View>
+    );
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
+        <Text style={styles.title}>SwipeClear</Text>
         <TouchableOpacity
-          style={[styles.filterButton, showArchived && styles.filterButtonActive]}
+          style={styles.toggleButton}
           onPress={() => setShowArchived(!showArchived)}
         >
-          <Ionicons 
-            name={showArchived ? "archive" : "archive-outline"} 
-            size={20} 
-            color={showArchived ? "#fff" : "#4285f4"} 
-          />
-          <Text style={[styles.filterButtonText, showArchived && styles.filterButtonTextActive]}>
-            {showArchived ? 'Archived' : 'Active'}
+          <Text style={styles.toggleText}>
+            {showArchived ? 'Show Active' : 'Show Archived'}
           </Text>
         </TouchableOpacity>
-        
-        {permissionStatus !== 'granted' && (
-          <TouchableOpacity
-            style={styles.permissionButton}
-            onPress={requestPermissions}
-          >
-            <Ionicons name="warning-outline" size={20} color="#ff9800" />
-            <Text style={styles.permissionButtonText}>Grant Access</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
-      <View style={styles.itemsContainer}>
-        {sortedItems.map((item) => {
-          const fadeAnim = animatingItems[item.id];
-          const itemContent = (
-            <View style={styles.item}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.appName}>{item.app}</Text>
-                <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
-              </View>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              {item.body ? <Text style={styles.itemBody}>{item.body}</Text> : null}
-              <View style={styles.badges}>
-                {item.pinned && (
-                  <View style={[styles.badge, styles.pinnedBadge]}>
-                    <Ionicons name="pin" size={12} color="#ffc107" />
-                  </View>
-                )}
-                {item.muted && (
-                  <View style={[styles.badge, styles.mutedBadge]}>
-                    <Ionicons name="volume-mute" size={12} color="#9e9e9e" />
-                  </View>
-                )}
-              </View>
-            </View>
-          );
-
-          if (fadeAnim) {
-            return (
-              <Animated.View key={item.id} style={{ opacity: fadeAnim }}>
-                {itemContent}
-              </Animated.View>
-            );
-          }
-
-          return (
-            <SwipeAction
-              key={item.id}
-              onSwipeLeft={() => handleSwipeLeft(item)}
-              onSwipeRight={() => handleSwipeRight(item)}
-              onSwipeUp={() => handleSwipeUp(item)}
-              onSwipeDown={() => handleSwipeDown(item)}
-            >
-              {itemContent}
-            </SwipeAction>
-          );
-        })}
-        {sortedItems.length === 0 && (
-          <View style={styles.emptyState}>
-            <Ionicons 
-              name={showArchived ? "archive-outline" : "checkmark-circle-outline"} 
-              size={64} 
-              color="#ccc" 
-            />
-            <Text style={styles.emptyStateText}>
-              {showArchived ? 'No archived notifications' : permissionStatus === 'granted' ? 'No notifications' : 'Grant notification access to get started'}
+      <FlatList
+        data={sortedItems}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>
+              {showArchived ? 'No archived items' : 'No notifications'}
             </Text>
           </View>
-        )}
-      </View>
+        }
+      />
 
-      <QuickAccessBar items={quickAccessItems} onItemPress={handleQuickAccessPress} />
+      <QuickAccessBar
+        items={quickAccessItems}
+        onPress={handleQuickAccessPress}
+      />
     </View>
   );
 };
@@ -262,117 +242,93 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   header: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  filterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#4285f4',
-  },
-  filterButtonActive: {
-    backgroundColor: '#4285f4',
-    borderColor: '#4285f4',
-  },
-  filterButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#4285f4',
-  },
-  filterButtonTextActive: {
-    color: '#fff',
-  },
-  permissionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
-    backgroundColor: '#fff3e0',
-  },
-  permissionButtonText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#ff9800',
-  },
-  itemsContainer: {
-    flex: 1,
-  },
-  item: {
     padding: 16,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  toggleButton: {
+    padding: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+  },
+  toggleText: {
+    color: '#666',
+    fontSize: 14,
+  },
+  listContent: {
+    paddingBottom: 80,
+  },
+  itemContainer: {
+    marginBottom: 8,
     backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  itemContent: {
+    padding: 16,
   },
   itemHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-    textTransform: 'uppercase',
-  },
-  timestamp: {
-    fontSize: 12,
-    color: '#999',
+    marginBottom: 4,
   },
   itemTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    flex: 1,
+  },
+  pinnedItem: {
+    color: '#007AFF',
+  },
+  itemTime: {
+    fontSize: 12,
+    color: '#666',
+    marginLeft: 8,
   },
   itemBody: {
     fontSize: 14,
-    color: '#666',
+    color: '#444',
     marginBottom: 8,
   },
-  badges: {
+  itemFooter: {
     flexDirection: 'row',
-    gap: 8,
-  },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  pinnedBadge: {
-    backgroundColor: '#fff8e1',
+  itemApp: {
+    fontSize: 12,
+    color: '#888',
+    fontWeight: '500',
   },
-  mutedBadge: {
-    backgroundColor: '#f5f5f5',
+  mutedIcon: {
+    marginLeft: 8,
   },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 32,
+    padding: 32,
   },
-  emptyStateText: {
-    marginTop: 16,
+  emptyText: {
     fontSize: 16,
-    color: '#999',
-    fontWeight: '500',
+    color: '#888',
     textAlign: 'center',
   },
 });
