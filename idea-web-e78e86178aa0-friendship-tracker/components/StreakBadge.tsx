@@ -27,7 +27,7 @@ export default function StreakBadge({ streak, onFreeze, isPremium }: StreakBadge
     <View style={styles.container}>
       <View style={[styles.badge, { backgroundColor: getStreakColor() }]}>
         <Text style={styles.badgeText}>
-          {streak.currentDays > 0 ? 'ðŸ”¥' : 'ðŸ’¤'} {streakText}
+          {streak.currentDays > 0 ? '🔥' : '💤'} {streakText}
         </Text>
       </View>
 
