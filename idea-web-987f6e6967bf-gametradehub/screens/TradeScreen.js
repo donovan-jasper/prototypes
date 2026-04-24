@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getGameDetails } from '../utils/api';
+import { createTradeRecord } from '../utils/firebase';
+import { Ionicons } from '@expo/vector-icons';
 
 const TradeScreen = ({ route }) => {
   const { barcode } = route.params;
   const [gameData, setGameData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tradeInProgress, setTradeInProgress] = useState(false);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -16,7 +19,7 @@ const TradeScreen = ({ route }) => {
         const data = await getGameDetails(barcode);
         setGameData(data);
       } catch (err) {
-        setError(err.message);
+        setError(err.message || 'Failed to fetch game data');
       } finally {
         setLoading(false);
       }
@@ -24,6 +27,34 @@ const TradeScreen = ({ route }) => {
 
     fetchGameData();
   }, [barcode]);
+
+  const handleExecuteTrade = async () => {
+    if (!gameData) return;
+
+    setTradeInProgress(true);
+    try {
+      const tradeId = await createTradeRecord({
+        gameId: gameData.id,
+        gameName: gameData.name,
+        price: gameData.price,
+        condition: gameData.condition,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      });
+
+      Alert.alert(
+        'Trade Submitted',
+        `Your trade for ${gameData.name} has been submitted successfully.`,
+        [
+          { text: 'OK', onPress: () => navigation.navigate('Inventory') }
+        ]
+      );
+    } catch (err) {
+      Alert.alert('Trade Failed', err.message || 'Failed to execute trade. Please try again.');
+    } finally {
+      setTradeInProgress(false);
+    }
+  };
 
   const renderGameDetails = () => {
     if (loading) {
@@ -38,6 +69,7 @@ const TradeScreen = ({ route }) => {
     if (error) {
       return (
         <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={50} color="#d32f2f" />
           <Text style={styles.errorText}>Error: {error}</Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -52,6 +84,7 @@ const TradeScreen = ({ route }) => {
     if (!gameData) {
       return (
         <View style={styles.errorContainer}>
+          <Ionicons name="game-controller-outline" size={50} color="#6200EE" />
           <Text style={styles.errorText}>No game data found</Text>
           <TouchableOpacity
             style={styles.retryButton}
@@ -73,10 +106,26 @@ const TradeScreen = ({ route }) => {
           />
         )}
         <Text style={styles.gameTitle}>{gameData.name}</Text>
-        <Text style={styles.gamePrice}>Market Price: ${gameData.price.toFixed(2)}</Text>
-        <Text style={styles.gameCondition}>Condition: {gameData.condition}</Text>
-        <Text style={styles.gamePlatforms}>Platforms: {gameData.platforms}</Text>
-        <Text style={styles.gameRelease}>Release Date: {gameData.releaseDate}</Text>
+
+        <View style={styles.priceContainer}>
+          <Text style={styles.gamePrice}>Market Price: ${gameData.price?.toFixed(2) || 'N/A'}</Text>
+          <Ionicons name="pricetag-outline" size={20} color="#2E7D32" />
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="star-outline" size={18} color="#555" />
+          <Text style={styles.gameCondition}>Condition: {gameData.condition || 'N/A'}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="logo-game-controller-b" size={18} color="#555" />
+          <Text style={styles.gamePlatforms}>Platforms: {gameData.platforms || 'N/A'}</Text>
+        </View>
+
+        <View style={styles.infoRow}>
+          <Ionicons name="calendar-outline" size={18} color="#555" />
+          <Text style={styles.gameRelease}>Release Date: {gameData.releaseDate || 'N/A'}</Text>
+        </View>
 
         {gameData.summary && (
           <View style={styles.summaryContainer}>
@@ -88,9 +137,14 @@ const TradeScreen = ({ route }) => {
         <View style={styles.actionButtons}>
           <TouchableOpacity
             style={[styles.button, styles.tradeButton]}
-            onPress={() => navigation.navigate('TradeExecution', { gameData })}
+            onPress={handleExecuteTrade}
+            disabled={tradeInProgress}
           >
-            <Text style={styles.buttonText}>Execute Trade</Text>
+            {tradeInProgress ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>Execute Trade</Text>
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.button, styles.addButton]}
@@ -143,6 +197,7 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
     marginBottom: 20,
     textAlign: 'center',
+    marginTop: 10,
   },
   retryButton: {
     backgroundColor: '#6200EE',
@@ -174,31 +229,44 @@ const styles = StyleSheet.create({
   gameTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
+    textAlign: 'center',
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
   },
   gamePrice: {
     fontSize: 18,
     color: '#2E7D32',
-    marginBottom: 8,
+    marginRight: 5,
+    fontWeight: 'bold',
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   gameCondition: {
     fontSize: 16,
     color: '#555',
-    marginBottom: 8,
+    marginLeft: 5,
   },
   gamePlatforms: {
     fontSize: 16,
     color: '#555',
-    marginBottom: 8,
+    marginLeft: 5,
   },
   gameRelease: {
     fontSize: 16,
     color: '#555',
-    marginBottom: 20,
+    marginLeft: 5,
   },
   summaryContainer: {
-    marginVertical: 20,
+    marginTop: 20,
     padding: 15,
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
@@ -206,7 +274,7 @@ const styles = StyleSheet.create({
   summaryTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 8,
+    marginBottom: 10,
     color: '#6200EE',
   },
   summaryText: {
@@ -215,9 +283,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   actionButtons: {
+    marginTop: 25,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 20,
   },
   button: {
     padding: 12,
@@ -227,10 +295,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tradeButton: {
-    backgroundColor: '#6200EE',
+    backgroundColor: '#2E7D32',
   },
   addButton: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#6200EE',
   },
   buttonText: {
     color: 'white',
