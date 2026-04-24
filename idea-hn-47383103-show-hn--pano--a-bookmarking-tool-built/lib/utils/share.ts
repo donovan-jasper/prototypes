@@ -1,6 +1,8 @@
 import { Linking } from 'react-native';
 import { useShelvesStore } from '../store/shelves';
 import { useItemsStore } from '../store/items';
+import { ShelfQueries, ItemQueries } from '../db/queries';
+import { initDatabase } from '../db/init';
 
 export function generateShareLink(shelfId: number): string {
   // In a real app, this would generate a signed URL with expiration
@@ -26,36 +28,50 @@ export async function shareShelf(shelfId: number, shelfName: string): Promise<vo
 }
 
 export async function cloneShelf(shelfId: number, userId: string): Promise<void> {
-  const shelvesStore = useShelvesStore.getState();
-  const itemsStore = useItemsStore.getState();
+  const db = await initDatabase();
+  const shelfQueries = new ShelfQueries(db);
+  const itemQueries = new ItemQueries(db);
 
   // Get the original shelf and items
-  const originalShelf = await shelvesStore.getShelf(shelfId);
-  const originalItems = await itemsStore.getItems(shelfId);
+  const originalShelf = await shelfQueries.getShelf(shelfId);
+  const originalItems = await itemQueries.getItems(shelfId);
 
   if (!originalShelf) {
     throw new Error('Shelf not found');
   }
 
   // Create a new shelf for the user
-  const newShelfId = await shelvesStore.createShelf({
-    name: `${originalShelf.name} (Copy)`,
-    description: originalShelf.description,
-    coverImage: originalShelf.coverImage,
-    userId: userId,
-  });
+  const newShelfId = await shelfQueries.createShelf(
+    `${originalShelf.name} (Copy)`,
+    originalShelf.description || undefined
+  );
 
   // Copy all items to the new shelf
   for (const item of originalItems) {
-    await itemsStore.createItem({
-      shelfId: newShelfId,
-      url: item.url,
-      title: item.title,
-      description: item.description,
-      imageUrl: item.imageUrl,
-      faviconUrl: item.faviconUrl,
-      tags: item.tags,
-    });
+    await itemQueries.createItem(
+      newShelfId,
+      item.url,
+      {
+        title: item.title,
+        description: item.description || undefined,
+        image_url: item.image_url || undefined,
+        favicon_url: item.favicon_url || undefined,
+        tags: item.tags || undefined,
+      }
+    );
+  }
+
+  // Update Zustand stores
+  const shelvesStore = useShelvesStore.getState();
+  const itemsStore = useItemsStore.getState();
+
+  // Refresh shelves and items
+  const updatedShelves = await shelfQueries.getShelves();
+  shelvesStore.setShelves(updatedShelves);
+
+  if (originalItems.length > 0) {
+    const updatedItems = await itemQueries.getItems(newShelfId);
+    itemsStore.setItems(newShelfId, updatedItems);
   }
 }
 
@@ -65,5 +81,6 @@ export async function trackShelfView(shelfId: number): Promise<number> {
   console.log(`Tracking view for shelf ${shelfId}`);
 
   // Simulate getting the view count
+  // In a real implementation, this would fetch from a database or API
   return Math.floor(Math.random() * 100) + 1;
 }

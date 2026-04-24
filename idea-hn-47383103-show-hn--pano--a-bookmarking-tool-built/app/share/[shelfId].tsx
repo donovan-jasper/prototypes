@@ -5,9 +5,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useItems } from '../../hooks/useItems';
 import { useShelves } from '../../hooks/useShelves';
 import { ItemCard } from '../../components/ItemCard';
-import { parseShareLink } from '../../lib/utils/share';
+import { parseShareLink, cloneShelf } from '../../lib/utils/share';
 import { useUserStore } from '../../lib/store/user';
-import { trackShelfView } from '../../lib/api/analytics';
+import { trackShelfView } from '../../lib/utils/share';
 
 export default function PublicShelfScreen() {
   const theme = useTheme();
@@ -51,14 +51,7 @@ export default function PublicShelfScreen() {
 
     setIsCloning(true);
     try {
-      // In a real app, this would:
-      // 1. Create a new shelf in the user's library
-      // 2. Copy all items to the new shelf
-      // 3. Show success message
-
-      // For this prototype, we'll just simulate the process
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      await cloneShelf(shelfId, user.id);
       Alert.alert(
         'Success',
         `Shelf "${shelf.name}" has been cloned to your library.`,
@@ -153,25 +146,7 @@ export default function PublicShelfScreen() {
   if (shelvesLoading || itemsLoading) {
     return (
       <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
-  if (!shelf) {
-    return (
-      <View style={[styles.container, styles.center]}>
-        <Text variant="headlineSmall">Shelf not found</Text>
-        <Text style={{ marginTop: 16, textAlign: 'center' }}>
-          The shelf you're looking for doesn't exist or has been removed.
-        </Text>
-        <Button
-          mode="contained"
-          onPress={() => router.back()}
-          style={{ marginTop: 24 }}
-        >
-          Go Back
-        </Button>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
@@ -183,26 +158,39 @@ export default function PublicShelfScreen() {
         <Appbar.Content title="Shared Shelf" />
       </Appbar.Header>
 
-      <FlatList
-        data={items}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id.toString()}
-        ListHeaderComponent={renderHeader}
-        ListEmptyComponent={renderEmpty}
-        contentContainerStyle={styles.listContent}
-      />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {renderHeader()}
 
-      <View style={styles.cloneButtonContainer}>
-        <Button
-          mode="contained"
-          onPress={handleCloneShelf}
-          loading={isCloning}
-          icon="content-copy"
-          style={styles.cloneButton}
-        >
-          Clone to My Library
-        </Button>
-      </View>
+        <FlatList
+          data={items}
+          renderItem={renderItem}
+          keyExtractor={(item) => item.id.toString()}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={styles.listContent}
+          scrollEnabled={false}
+        />
+
+        <View style={styles.actionButtons}>
+          <Button
+            mode="contained"
+            onPress={handleCloneShelf}
+            loading={isCloning}
+            disabled={isCloning}
+            icon="content-copy"
+            style={styles.cloneButton}
+          >
+            Clone to My Library
+          </Button>
+
+          <Button
+            mode="outlined"
+            onPress={() => router.push('/')}
+            icon="home"
+          >
+            Go to Home
+          </Button>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -215,16 +203,15 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
   },
-  listContent: {
+  scrollContent: {
     padding: 16,
   },
   header: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   shelfName: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
   shelfDescription: {
     marginBottom: 8,
@@ -234,18 +221,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+  listContent: {
+    paddingBottom: 24,
   },
-  cloneButtonContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  actionButtons: {
+    marginTop: 24,
+    gap: 12,
   },
   cloneButton: {
-    marginBottom: 16,
+    marginBottom: 8,
   },
 });
