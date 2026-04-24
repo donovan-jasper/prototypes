@@ -1,7 +1,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import CrisisModeScreen from '../app/screens/CrisisModeScreen';
-import { verifyCrisisPin } from '../app/services/crisisMode';
+import { verifyCrisisPin, isCrisisModeEnabled, getShareableLink } from '../app/services/crisisMode';
 import { useNavigation } from '@react-navigation/native';
 
 // Mock the navigation and crisisMode service
@@ -11,6 +11,10 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('../app/services/crisisMode', () => ({
   verifyCrisisPin: jest.fn(),
+  isCrisisModeEnabled: jest.fn(),
+  getShareableLink: jest.fn(),
+  generateCrisisPin: jest.fn(),
+  setCrisisPin: jest.fn(),
 }));
 
 describe('CrisisModeScreen', () => {
@@ -23,15 +27,21 @@ describe('CrisisModeScreen', () => {
       goBack: mockGoBack,
     });
     verifyCrisisPin.mockClear();
+    isCrisisModeEnabled.mockClear();
+    getShareableLink.mockClear();
     mockNavigate.mockClear();
     mockGoBack.mockClear();
+
+    // Default mock implementations
+    isCrisisModeEnabled.mockResolvedValue(false);
+    getShareableLink.mockResolvedValue('https://echovault.app/crisis?pin=123456');
   });
 
   it('renders correctly', () => {
     const { getByText, getByPlaceholderText } = render(<CrisisModeScreen />);
 
-    expect(getByText('Crisis Mode Access')).toBeTruthy();
-    expect(getByText('Enter your family\'s shared PIN to access the encrypted vault')).toBeTruthy();
+    expect(getByText('Crisis Mode Setup')).toBeTruthy();
+    expect(getByText('Generate a 6-digit PIN for family members to access your vault in emergencies.')).toBeTruthy();
     expect(getByPlaceholderText('Enter 6-digit PIN')).toBeTruthy();
     expect(getByText('Access Vault')).toBeTruthy();
     expect(getByText('Back to Home')).toBeTruthy();

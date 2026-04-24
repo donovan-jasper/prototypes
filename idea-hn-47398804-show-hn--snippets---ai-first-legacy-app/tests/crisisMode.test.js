@@ -1,24 +1,26 @@
 import { generateCrisisPin, setCrisisPin, getCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink } from '../app/services/crisisMode';
 import * as SQLite from 'expo-sqlite';
+import { encrypt, decrypt } from '../app/services/encryption';
 
 // Mock SQLite
 jest.mock('expo-sqlite', () => {
   const mockDb = {
-    transaction: jest.fn((callback) => {
+    transaction: jest.fn((callback, error, success) => {
       const mockTx = {
-        executeSql: jest.fn((sql, params, success, error) => {
+        executeSql: jest.fn((sql, params, successCallback, errorCallback) => {
           if (sql.includes('CREATE TABLE')) {
-            success();
+            successCallback();
           } else if (sql.includes('INSERT OR REPLACE')) {
-            success();
+            successCallback();
           } else if (sql.includes('SELECT pin')) {
-            success(null, { rows: { length: 1, item: () => ({ pin: 'encrypted-pin' }) } });
+            successCallback(null, { rows: { length: 1, item: () => ({ pin: 'encrypted-pin' }) } });
           } else if (sql.includes('SELECT isEnabled')) {
-            success(null, { rows: { length: 1, item: () => ({ isEnabled: 1 }) } });
+            successCallback(null, { rows: { length: 1, item: () => ({ isEnabled: 1 }) } });
           }
         })
       };
       callback(mockTx);
+      if (success) success();
     })
   };
   return {
@@ -45,11 +47,13 @@ describe('Crisis Mode Service', () => {
   test('setCrisisPin should store the encrypted PIN', async () => {
     await setCrisisPin('123456');
     expect(SQLite.openDatabase().transaction).toHaveBeenCalled();
+    expect(encrypt).toHaveBeenCalledWith('123456', 'crisis-pin-key');
   });
 
   test('getCrisisPin should return the decrypted PIN', async () => {
     const pin = await getCrisisPin();
     expect(pin).toBe('encrypted-pin');
+    expect(decrypt).toHaveBeenCalledWith('encrypted-pin', 'crisis-pin-key');
   });
 
   test('verifyCrisisPin should return true for correct PIN', async () => {
