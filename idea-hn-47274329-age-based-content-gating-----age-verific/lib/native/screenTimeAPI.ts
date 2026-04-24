@@ -1,11 +1,8 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
 
 /**
  * iOS Screen Time API wrapper
  * Enables/disables content filtering based on age profiles
- * 
- * Note: This requires native module implementation in Objective-C/Swift
- * For MVP, this is a stub that logs actions
  */
 
 export interface ScreenTimeStatus {
@@ -40,12 +37,13 @@ class ScreenTimeAPI {
    */
   private async checkAvailability(): Promise<void> {
     try {
-      // In production, this would call native module:
-      // const available = await NativeModules.ScreenTimeModule.isAvailable();
-      
-      // For MVP stub, assume available on iOS 13.4+
-      this.isAvailable = Platform.OS === 'ios' && parseInt(Platform.Version as string, 10) >= 13;
-      
+      if (Platform.OS === 'ios') {
+        const available = await NativeModules.ScreenTimeModule.isAvailable();
+        this.isAvailable = available;
+      } else {
+        this.isAvailable = false;
+      }
+
       if (this.isAvailable) {
         console.log('[ScreenTimeAPI] Screen Time API available');
       } else {
@@ -70,14 +68,11 @@ class ScreenTimeAPI {
     }
 
     try {
-      // In production:
-      // const status = await NativeModules.ScreenTimeModule.getStatus();
-      
-      // MVP stub
+      const status = await NativeModules.ScreenTimeModule.getStatus();
       return {
         available: this.isAvailable,
-        enabled: this.currentProfile !== null,
-        profileType: this.currentProfile || undefined
+        enabled: status.enabled,
+        profileType: status.profileType
       };
     } catch (error) {
       return {
@@ -104,33 +99,32 @@ class ScreenTimeAPI {
 
     try {
       console.log('[ScreenTimeAPI] Enabling content filter:', config.profileType);
-      
-      // In production, this would call native module:
-      // await NativeModules.ScreenTimeModule.enableContentFilter({
-      //   profileType: config.profileType,
-      //   blockAdultContent: config.blockAdultContent,
-      //   blockExplicitContent: config.blockExplicitContent,
-      //   allowedDomains: config.allowedDomains || [],
-      //   blockedDomains: config.blockedDomains || [],
-      //   restrictWebSearch: config.restrictWebSearch,
-      //   restrictSiri: config.restrictSiri
-      // });
 
-      // MVP stub - simulate success
-      this.currentProfile = config.profileType;
-      
-      console.log('[ScreenTimeAPI] Content filter enabled successfully');
-      console.log('[ScreenTimeAPI] Configuration:', {
+      const success = await NativeModules.ScreenTimeModule.enableContentFilter({
         profileType: config.profileType,
         blockAdultContent: config.blockAdultContent,
         blockExplicitContent: config.blockExplicitContent,
-        allowedDomainsCount: config.allowedDomains?.length || 0,
-        blockedDomainsCount: config.blockedDomains?.length || 0,
+        allowedDomains: config.allowedDomains || [],
+        blockedDomains: config.blockedDomains || [],
         restrictWebSearch: config.restrictWebSearch,
         restrictSiri: config.restrictSiri
       });
 
-      return true;
+      if (success) {
+        this.currentProfile = config.profileType;
+        console.log('[ScreenTimeAPI] Content filter enabled successfully');
+        console.log('[ScreenTimeAPI] Configuration:', {
+          profileType: config.profileType,
+          blockAdultContent: config.blockAdultContent,
+          blockExplicitContent: config.blockExplicitContent,
+          allowedDomainsCount: config.allowedDomains?.length || 0,
+          blockedDomainsCount: config.blockedDomains?.length || 0,
+          restrictWebSearch: config.restrictWebSearch,
+          restrictSiri: config.restrictSiri
+        });
+      }
+
+      return success;
     } catch (error) {
       console.error('[ScreenTimeAPI] Error enabling content filter:', error);
       return false;
@@ -153,15 +147,15 @@ class ScreenTimeAPI {
 
     try {
       console.log('[ScreenTimeAPI] Disabling content filter');
-      
-      // In production:
-      // await NativeModules.ScreenTimeModule.disableContentFilter();
 
-      // MVP stub
-      this.currentProfile = null;
-      
-      console.log('[ScreenTimeAPI] Content filter disabled successfully');
-      return true;
+      const success = await NativeModules.ScreenTimeModule.disableContentFilter();
+
+      if (success) {
+        this.currentProfile = null;
+        console.log('[ScreenTimeAPI] Content filter disabled successfully');
+      }
+
+      return success;
     } catch (error) {
       console.error('[ScreenTimeAPI] Error disabling content filter:', error);
       return false;
@@ -169,50 +163,80 @@ class ScreenTimeAPI {
   }
 
   /**
-   * Update content filter configuration
+   * Update content filtering rules
    */
-  async updateContentFilter(config: ContentFilterConfig): Promise<boolean> {
+  async updateContentFilter(config: Partial<ContentFilterConfig>): Promise<boolean> {
     if (Platform.OS !== 'ios') {
       console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
       return false;
     }
 
-    // Disable current filter and enable new one
-    const disabled = await this.disableContentFilter();
-    if (!disabled) {
-      return false;
-    }
-
-    return await this.enableContentFilter(config);
-  }
-
-  /**
-   * Request Screen Time permissions from user
-   * This will show iOS system dialog
-   */
-  async requestPermissions(): Promise<boolean> {
-    if (Platform.OS !== 'ios') {
-      console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
+    if (!this.isAvailable) {
+      console.error('[ScreenTimeAPI] Screen Time API not available');
       return false;
     }
 
     try {
-      console.log('[ScreenTimeAPI] Requesting Screen Time permissions');
-      
-      // In production:
-      // const granted = await NativeModules.ScreenTimeModule.requestPermissions();
-      
-      // MVP stub - simulate user granting permission
-      this.isAvailable = true;
-      
-      console.log('[ScreenTimeAPI] Permissions granted');
-      return true;
+      console.log('[ScreenTimeAPI] Updating content filter');
+
+      const success = await NativeModules.ScreenTimeModule.updateContentFilter(config);
+
+      if (success && config.profileType) {
+        this.currentProfile = config.profileType;
+      }
+
+      return success;
     } catch (error) {
-      console.error('[ScreenTimeAPI] Error requesting permissions:', error);
+      console.error('[ScreenTimeAPI] Error updating content filter:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Block specific domains
+   */
+  async blockDomains(domains: string[]): Promise<boolean> {
+    if (Platform.OS !== 'ios') {
+      console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
+      return false;
+    }
+
+    if (!this.isAvailable) {
+      console.error('[ScreenTimeAPI] Screen Time API not available');
+      return false;
+    }
+
+    try {
+      console.log('[ScreenTimeAPI] Blocking domains:', domains);
+      return await NativeModules.ScreenTimeModule.blockDomains(domains);
+    } catch (error) {
+      console.error('[ScreenTimeAPI] Error blocking domains:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Unblock specific domains
+   */
+  async unblockDomains(domains: string[]): Promise<boolean> {
+    if (Platform.OS !== 'ios') {
+      console.warn('[ScreenTimeAPI] Screen Time API only available on iOS');
+      return false;
+    }
+
+    if (!this.isAvailable) {
+      console.error('[ScreenTimeAPI] Screen Time API not available');
+      return false;
+    }
+
+    try {
+      console.log('[ScreenTimeAPI] Unblocking domains:', domains);
+      return await NativeModules.ScreenTimeModule.unblockDomains(domains);
+    } catch (error) {
+      console.error('[ScreenTimeAPI] Error unblocking domains:', error);
       return false;
     }
   }
 }
 
-// Export singleton instance
-export const screenTimeAPI = new ScreenTimeAPI();
+export default new ScreenTimeAPI();
