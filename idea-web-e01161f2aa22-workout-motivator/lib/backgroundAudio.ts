@@ -5,30 +5,34 @@ import { speakPrompt } from './audio';
 import { useSessionStore } from './store';
 import { generatePrompt } from './prompts';
 
-const BACKGROUND_TASK_NAME = 'motivate-mate-background-audio';
+const BACKGROUND_TASK_NAME = 'motivemate-background-audio';
 const AUDIO_DUCKING_DURATION = 3000; // 3 seconds
+const MIN_INTERVAL = 15 * 60; // 15 minutes in seconds
+const MAX_INTERVAL = 30 * 60; // 30 minutes in seconds
 
 let backgroundTaskRegistered = false;
 let soundObject: Audio.Sound | null = null;
 let isPlaying = false;
+let lastPlayTime = 0;
 
 export async function registerBackgroundAudioTask() {
   if (backgroundTaskRegistered) return;
 
   try {
     await BackgroundFetch.registerTaskAsync(BACKGROUND_TASK_NAME, {
-      minimumInterval: 60 * 15, // 15 minutes
+      minimumInterval: MIN_INTERVAL,
       stopOnTerminate: false,
       startOnBoot: true,
     });
 
     TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
-      const now = new Date();
+      const now = Date.now() / 1000; // Current time in seconds
       const sessionState = useSessionStore.getState();
 
-      // Only play if no active foreground session
-      if (!sessionState.isActive) {
+      // Only play if no active foreground session and enough time has passed
+      if (!sessionState.isActive && now - lastPlayTime >= getRandomInterval()) {
         await playBackgroundPrompt();
+        lastPlayTime = now;
       }
 
       return BackgroundFetch.BackgroundFetchResult.NewData;
@@ -38,6 +42,10 @@ export async function registerBackgroundAudioTask() {
   } catch (error) {
     console.error('Failed to register background task:', error);
   }
+}
+
+function getRandomInterval(): number {
+  return Math.floor(Math.random() * (MAX_INTERVAL - MIN_INTERVAL + 1)) + MIN_INTERVAL;
 }
 
 export async function playBackgroundPrompt() {
@@ -60,8 +68,8 @@ export async function playBackgroundPrompt() {
       interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
     });
 
-    // Play the prompt
-    await speakPrompt(prompt, coachId);
+    // Play the prompt at low volume
+    await speakPrompt(prompt, coachId, 0.5); // 0.5 volume for ambient mode
 
     // Wait for ducking to complete
     await new Promise(resolve => setTimeout(resolve, AUDIO_DUCKING_DURATION));

@@ -2,7 +2,7 @@ import * as Speech from 'expo-speech';
 
 let isSpeaking = false;
 
-export async function speakPrompt(text: string, coachId: string): Promise<void> {
+export async function speakPrompt(text: string, coachId: string, volume: number = 1.0): Promise<void> {
   if (isSpeaking) {
     await stopSpeaking();
   }
@@ -14,6 +14,7 @@ export async function speakPrompt(text: string, coachId: string): Promise<void> 
       language: 'en-US',
       pitch: getCoachPitch(coachId),
       rate: getCoachRate(coachId),
+      volume: volume, // Add volume parameter
       onDone: () => {
         isSpeaking = false;
         resolve();
