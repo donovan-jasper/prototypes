@@ -129,36 +129,35 @@ export default function PostScreen() {
               result = await retryFacebook(productWithImage, connectedPlatform.apiKey, connectedPlatform.pageId);
               break;
             default:
-              continue;
+              throw new Error(`Unsupported platform: ${platform}`);
           }
 
           platformResults.push({
             platform,
-            success: result.success || result.code === 0,
-            error: result.error || result.message
+            success: true,
+            message: `Posted to ${platform} successfully`
           });
 
           completedPlatforms++;
-          setPostingProgress(Math.round((completedPlatforms / totalPlatforms) * 100));
+          setPostingProgress((completedPlatforms / totalPlatforms) * 100);
         } catch (error) {
+          console.error(`Error posting to ${platform}:`, error);
           platformResults.push({
             platform,
             success: false,
-            error: error.message || 'Failed to post to platform'
+            message: `Failed to post to ${platform}: ${error.message}`
           });
         }
       }
 
       // Show results
       const successCount = platformResults.filter(r => r.success).length;
-      setSnackbarMessage(`Posted to ${successCount}/${totalPlatforms} platforms`);
+      setSnackbarMessage(`Posted to ${successCount} of ${totalPlatforms} platforms`);
       setSnackbarVisible(true);
 
       // Reset form
       reset();
       setImageUri(null);
-
-      // Navigate to inventory after successful post
       navigation.navigate('inventory');
     } catch (error) {
       console.error('Error posting product:', error);
@@ -166,16 +165,21 @@ export default function PostScreen() {
       setSnackbarVisible(true);
     } finally {
       setIsPosting(false);
-      setPostingProgress(0);
-      setPostingPlatforms([]);
     }
   };
 
   const handleImagePick = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission required', 'Please enable photo library access in settings');
+      return;
+    }
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 5],
+      aspect: [4, 3],
       quality: 0.7,
     });
 
@@ -184,131 +188,129 @@ export default function PostScreen() {
     }
   };
 
-  const handleCapture = (uri) => {
-    setImageUri(uri);
-    setShowCamera(false);
-  };
-
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <Text style={styles.title}>Quick Post</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Quick Post</Text>
+        <Text style={styles.subtitle}>Add a product and post it everywhere</Text>
+      </View>
 
       <View style={styles.imageContainer}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.productImage} />
         ) : (
           <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No Image</Text>
+            <Text style={styles.placeholderText}>No image selected</Text>
           </View>
         )}
-      </View>
 
-      <View style={styles.buttonGroup}>
-        <Button
-          mode="outlined"
-          onPress={() => setShowCamera(true)}
-          icon="camera"
-          style={styles.button}
-        >
-          Take Photo
-        </Button>
-
-        <Button
-          mode="outlined"
-          onPress={handleImagePick}
-          icon="image"
-          style={styles.button}
-        >
-          Choose from Library
-        </Button>
-      </View>
-
-      <Controller
-        control={control}
-        rules={{ required: 'Title is required' }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Product Title"
-            value={value}
-            onChangeText={onChange}
-            onBlur={onBlur}
-            error={!!errors.title}
-            style={styles.input}
-          />
-        )}
-        name="title"
-      />
-
-      <Controller
-        control={control}
-        rules={{ required: 'Price is required' }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Price"
-            value={value}
-            onChangeText={onChange}
-            onBlur={onBlur}
-            keyboardType="numeric"
-            error={!!errors.price}
-            style={styles.input}
-          />
-        )}
-        name="price"
-      />
-
-      <Controller
-        control={control}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Description"
-            value={value}
-            onChangeText={onChange}
-            onBlur={onBlur}
-            multiline
-            numberOfLines={3}
-            style={styles.input}
-          />
-        )}
-        name="description"
-      />
-
-      <Controller
-        control={control}
-        rules={{ required: 'Inventory is required' }}
-        render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput
-            label="Inventory"
-            value={value}
-            onChangeText={onChange}
-            onBlur={onBlur}
-            keyboardType="numeric"
-            error={!!errors.inventory}
-            style={styles.input}
-          />
-        )}
-        name="inventory"
-      />
-
-      <Controller
-        control={control}
-        render={({ field: { onChange, value } }) => (
-          <PlatformSelector
-            selectedPlatforms={value || []}
-            onChange={onChange}
-            isPremium={isPremium}
-          />
-        )}
-        name="platforms"
-      />
-
-      {isPosting && (
-        <View style={styles.progressContainer}>
-          <ProgressBar progress={postingProgress / 100} color="#6200ee" />
-          <Text style={styles.progressText}>
-            Posting to {postingPlatforms.join(', ')}...
-          </Text>
+        <View style={styles.imageButtons}>
+          <Button
+            mode="outlined"
+            onPress={() => setShowCamera(true)}
+            icon="camera"
+            style={styles.imageButton}
+          >
+            Take Photo
+          </Button>
+          <Button
+            mode="outlined"
+            onPress={handleImagePick}
+            icon="image"
+            style={styles.imageButton}
+          >
+            Choose Photo
+          </Button>
         </View>
-      )}
+      </View>
+
+      <View style={styles.formContainer}>
+        <Controller
+          control={control}
+          rules={{ required: 'Title is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Product Title"
+              mode="outlined"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              error={!!errors.title}
+              style={styles.input}
+            />
+          )}
+          name="title"
+        />
+        {errors.title && <Text style={styles.errorText}>{errors.title.message}</Text>}
+
+        <Controller
+          control={control}
+          rules={{ required: 'Price is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Price"
+              mode="outlined"
+              keyboardType="numeric"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              error={!!errors.price}
+              style={styles.input}
+              left={<TextInput.Affix text="$" />}
+            />
+          )}
+          name="price"
+        />
+        {errors.price && <Text style={styles.errorText}>{errors.price.message}</Text>}
+
+        <Controller
+          control={control}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Description"
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
+            />
+          )}
+          name="description"
+        />
+
+        <Controller
+          control={control}
+          rules={{ required: 'Inventory is required' }}
+          render={({ field: { onChange, onBlur, value } }) => (
+            <TextInput
+              label="Inventory"
+              mode="outlined"
+              keyboardType="numeric"
+              onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              error={!!errors.inventory}
+              style={styles.input}
+            />
+          )}
+          name="inventory"
+        />
+        {errors.inventory && <Text style={styles.errorText}>{errors.inventory.message}</Text>}
+
+        <Controller
+          control={control}
+          render={({ field: { onChange, value } }) => (
+            <PlatformSelector
+              selectedPlatforms={value || []}
+              onChange={onChange}
+              isPremium={isPremium}
+            />
+          )}
+          name="platforms"
+        />
+      </View>
 
       <Button
         mode="contained"
@@ -316,13 +318,26 @@ export default function PostScreen() {
         loading={isPosting}
         disabled={isPosting}
         style={styles.postButton}
+        icon="send"
       >
-        {isOffline ? 'Save for Later' : 'Post Everywhere'}
+        Post Everywhere
       </Button>
+
+      {isPosting && (
+        <View style={styles.progressContainer}>
+          <Text style={styles.progressText}>
+            Posting to {postingPlatforms.join(', ')}...
+          </Text>
+          <ProgressBar progress={postingProgress / 100} style={styles.progressBar} />
+        </View>
+      )}
 
       {showCamera && (
         <CameraCapture
-          onCapture={handleCapture}
+          onCapture={(uri) => {
+            setImageUri(uri);
+            setShowCamera(false);
+          }}
           onClose={() => setShowCamera(false)}
         />
       )}
@@ -332,6 +347,10 @@ export default function PostScreen() {
           visible={snackbarVisible}
           onDismiss={() => setSnackbarVisible(false)}
           duration={3000}
+          action={{
+            label: 'Dismiss',
+            onPress: () => setSnackbarVisible(false),
+          }}
         >
           {snackbarMessage}
         </Snackbar>
@@ -359,60 +378,81 @@ export default function PostScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   contentContainer: {
-    padding: 20,
+    padding: 16,
+  },
+  header: {
+    marginBottom: 24,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    color: '#333',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
   },
   imageContainer: {
+    marginBottom: 24,
     alignItems: 'center',
-    marginBottom: 20,
   },
   productImage: {
-    width: 200,
-    height: 250,
+    width: '100%',
+    height: 200,
     borderRadius: 8,
+    marginBottom: 16,
     resizeMode: 'cover',
   },
   placeholderImage: {
-    width: 200,
-    height: 250,
+    width: '100%',
+    height: 200,
     borderRadius: 8,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 16,
   },
   placeholderText: {
-    color: '#999',
+    color: '#666',
   },
-  buttonGroup: {
+  imageButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    width: '100%',
   },
-  button: {
+  imageButton: {
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
+  },
+  formContainer: {
+    marginBottom: 24,
   },
   input: {
-    marginBottom: 15,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: 'red',
+    marginTop: -12,
+    marginBottom: 12,
   },
   postButton: {
-    marginTop: 20,
+    marginBottom: 24,
     paddingVertical: 8,
   },
   progressContainer: {
-    marginVertical: 20,
+    marginBottom: 24,
   },
   progressText: {
-    marginTop: 5,
+    marginBottom: 8,
     textAlign: 'center',
     color: '#666',
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
   },
 });

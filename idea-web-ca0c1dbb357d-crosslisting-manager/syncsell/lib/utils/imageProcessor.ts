@@ -1,7 +1,8 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 
-export const compressImage = async (uri: string, maxWidth = 1024, maxHeight = 1024, compress = 0.7): Promise<string> => {
+export const compressImage = async (uri: string): Promise<string> => {
   try {
     // Get image info to determine dimensions
     const imageInfo = await FileSystem.getInfoAsync(uri);
@@ -9,18 +10,26 @@ export const compressImage = async (uri: string, maxWidth = 1024, maxHeight = 10
       throw new Error('Image file does not exist');
     }
 
-    // Calculate new dimensions while maintaining aspect ratio
+    // Calculate new dimensions to maintain aspect ratio but reduce size
+    const maxWidth = 1024;
+    const maxHeight = 1024;
+
     const manipResult = await ImageManipulator.manipulateAsync(
       uri,
       [{ resize: { width: maxWidth, height: maxHeight } }],
-      { compress, format: ImageManipulator.SaveFormat.JPEG }
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: false }
     );
 
-    // Verify the compressed image size
-    const compressedInfo = await FileSystem.getInfoAsync(manipResult.uri);
-    if (compressedInfo.size > 2 * 1024 * 1024) { // 2MB limit
-      // If still too large, try again with more compression
-      return compressImage(uri, maxWidth, maxHeight, compress * 0.8);
+    // Verify the file size is under 2MB
+    const fileInfo = await FileSystem.getInfoAsync(manipResult.uri);
+    if (fileInfo.size > 2 * 1024 * 1024) {
+      // If still too large, compress further
+      const furtherCompressed = await ImageManipulator.manipulateAsync(
+        manipResult.uri,
+        [],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+      );
+      return furtherCompressed.uri;
     }
 
     return manipResult.uri;
@@ -32,36 +41,29 @@ export const compressImage = async (uri: string, maxWidth = 1024, maxHeight = 10
 
 export const formatImageForPlatform = async (uri: string, platform: string): Promise<string> => {
   try {
-    let aspectRatio;
-    let maxWidth;
-    let maxHeight;
+    let aspectRatio = { width: 1024, height: 1024 }; // Default square
 
     switch (platform) {
       case 'TikTok Shop':
-        aspectRatio = { width: 1, height: 1 }; // Square
-        maxWidth = 1080;
-        maxHeight = 1080;
+        // TikTok prefers square images
+        aspectRatio = { width: 1024, height: 1024 };
         break;
       case 'Instagram Shopping':
-        aspectRatio = { width: 4, height: 5 }; // Portrait
-        maxWidth = 1080;
-        maxHeight = 1350;
+        // Instagram prefers portrait images
+        aspectRatio = { width: 1080, height: 1350 };
         break;
       case 'Facebook Marketplace':
-        aspectRatio = { width: 1, height: 1 }; // Square
-        maxWidth = 1080;
-        maxHeight = 1080;
+        // Facebook prefers square images
+        aspectRatio = { width: 1024, height: 1024 };
         break;
       default:
-        aspectRatio = { width: 1, height: 1 }; // Square
-        maxWidth = 1080;
-        maxHeight = 1080;
+        aspectRatio = { width: 1024, height: 1024 };
     }
 
     const manipResult = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: maxWidth, height: maxHeight } }],
-      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      [{ resize: aspectRatio }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: false }
     );
 
     return manipResult.uri;
@@ -73,55 +75,37 @@ export const formatImageForPlatform = async (uri: string, platform: string): Pro
 
 export const addWatermark = async (uri: string, isPremium: boolean): Promise<string> => {
   if (isPremium) {
-    return uri; // No watermark for premium users
+    // Premium users don't get watermarks
+    return uri;
   }
 
   try {
-    // In a real app, you would have a watermark image asset
-    // For this example, we'll just return the original image
-    // with a simulated watermark by adding a text overlay
+    // Create a watermark text
+    const watermarkText = 'SyncSell - Free Tier';
 
+    // Add watermark to the image
     const manipResult = await ImageManipulator.manipulateAsync(
       uri,
       [
         {
-          text: 'SyncSell - Free Tier',
+          text: watermarkText,
           position: { x: 50, y: 50 },
+          fontSize: 30,
           color: 'rgba(255,255,255,0.7)',
-          fontSize: 24,
-          fontName: 'Arial',
-        }
+          shadow: {
+            color: 'black',
+            offset: { width: 2, height: 2 },
+            blur: 3,
+          },
+        },
       ],
-      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: false }
     );
 
     return manipResult.uri;
   } catch (error) {
     console.error('Error adding watermark:', error);
-    throw error;
-  }
-};
-
-export const getImageSize = async (uri: string): Promise<{ width: number; height: number }> => {
-  try {
-    const imageInfo = await FileSystem.getInfoAsync(uri);
-    if (!imageInfo.exists) {
-      throw new Error('Image file does not exist');
-    }
-
-    // In a real app, you would use a more reliable method to get image dimensions
-    // This is a simplified version
-    const manipResult = await ImageManipulator.manipulateAsync(
-      uri,
-      [],
-      { compress: 1, format: ImageManipulator.SaveFormat.JPEG }
-    );
-
-    // This is a workaround since ImageManipulator doesn't directly provide dimensions
-    // In production, you might need to use a different approach
-    return { width: 1080, height: 1080 };
-  } catch (error) {
-    console.error('Error getting image size:', error);
-    throw error;
+    // Return original image if watermark fails
+    return uri;
   }
 };

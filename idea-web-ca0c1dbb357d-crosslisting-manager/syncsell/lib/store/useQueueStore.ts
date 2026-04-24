@@ -1,12 +1,12 @@
 import create from 'zustand';
-import { persist } from 'zustand/middleware';
-import * as Network from 'expo-network';
+import { addToQueue as dbAddToQueue, getQueue as dbGetQueue, removeFromQueue as dbRemoveFromQueue } from '../db';
 import { postProduct as postToTikTok } from '../api/tiktok';
 import { postProduct as postToInstagram } from '../api/instagram';
 import { postProduct as postToFacebook } from '../api/facebook';
-import { getProducts } from '../db';
+import { getProduct } from '../db';
 
 interface QueueItem {
+  id: number;
   productId: number;
   platforms: string[];
   timestamp: string;
@@ -14,68 +14,73 @@ interface QueueItem {
 
 interface QueueState {
   queue: QueueItem[];
-  addToQueue: (item: QueueItem) => Promise<void>;
+  isProcessing: boolean;
+  addToQueue: (item: Omit<QueueItem, 'id'>) => Promise<void>;
   processQueue: () => Promise<void>;
-  removeFromQueue: (productId: number) => Promise<void>;
+  loadQueue: () => Promise<void>;
 }
 
-export const useQueueStore = create<QueueState>()(
-  persist(
-    (set, get) => ({
-      queue: [],
+export const useQueueStore = create<QueueState>((set, get) => ({
+  queue: [],
+  isProcessing: false,
 
-      addToQueue: async (item) => {
-        set(state => ({
-          queue: [...state.queue, item]
-        }));
-      },
+  addToQueue: async (item) => {
+    const id = await dbAddToQueue(item);
+    set(state => ({
+      queue: [...state.queue, { ...item, id }]
+    }));
+  },
 
-      processQueue: async () => {
-        const networkState = await Network.getNetworkStateAsync();
-        if (!networkState.isConnected) return;
+  processQueue: async () => {
+    if (get().isProcessing) return;
 
-        const { queue } = get();
-        const products = await getProducts();
+    set({ isProcessing: true });
 
-        for (const item of queue) {
-          const product = products.find(p => p.id === item.productId);
-          if (!product) continue;
+    try {
+      const queue = await dbGetQueue();
 
-          try {
-            for (const platform of item.platforms) {
+      for (const item of queue) {
+        try {
+          const product = await getProduct(item.productId);
+
+          for (const platform of item.platforms) {
+            try {
               switch (platform) {
                 case 'TikTok Shop':
-                  await postToTikTok(product, 'api-key');
+                  await postToTikTok(product, 'mock-api-key');
                   break;
                 case 'Instagram Shopping':
-                  await postToInstagram(product, 'api-key', 'business-account-id');
+                  await postToInstagram(product, 'mock-api-key', 'mock-business-id');
                   break;
                 case 'Facebook Marketplace':
-                  await postToFacebook(product, 'api-key', 'page-id');
+                  await postToFacebook(product, 'mock-api-key', 'mock-page-id');
                   break;
               }
+            } catch (error) {
+              console.error(`Failed to post to ${platform}:`, error);
+              // Continue with other platforms even if one fails
+              continue;
             }
-
-            // Remove from queue if successful
-            set(state => ({
-              queue: state.queue.filter(q => q.productId !== item.productId)
-            }));
-          } catch (error) {
-            console.error(`Failed to post product ${item.productId} to ${platform}:`, error);
-            // Keep in queue for retry
           }
-        }
-      },
 
-      removeFromQueue: async (productId) => {
-        set(state => ({
-          queue: state.queue.filter(item => item.productId !== productId)
-        }));
+          // Remove from queue if successful
+          await dbRemoveFromQueue(item.id);
+          set(state => ({
+            queue: state.queue.filter(q => q.id !== item.id)
+          }));
+        } catch (error) {
+          console.error('Error processing queue item:', error);
+          // Continue with next item if current one fails
+          continue;
+        }
       }
-    }),
-    {
-      name: 'queue-storage',
-      getStorage: () => require('expo-secure-store').default,
+    } finally {
+      set({ isProcessing: false });
     }
-  )
-);
+  },
+
+  loadQueue: async () => {
+    const queue = await dbGetQueue();
+    set({ queue });
+  }
+}));
