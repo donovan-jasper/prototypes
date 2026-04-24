@@ -40,6 +40,7 @@ const CrisisModeScreen = () => {
       const link = await getShareableLink();
       setShareableLink(link);
       setIsEnabled(true);
+      Alert.alert('Success', 'Crisis mode enabled successfully!');
     } catch (error) {
       console.error('Failed to generate PIN:', error);
       Alert.alert('Error', 'Failed to generate crisis PIN');
@@ -133,6 +134,7 @@ const CrisisModeScreen = () => {
         setIsEnabled(false);
         setGeneratedPin('');
         setShareableLink('');
+        Alert.alert('Success', 'Crisis mode disabled');
       } else {
         await handleGeneratePin();
       }
@@ -145,6 +147,9 @@ const CrisisModeScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Crisis Mode Setup</Text>
+      <Text style={styles.description}>
+        Generate a 6-digit PIN for family members to access your vault in emergencies.
+      </Text>
 
       <View style={styles.toggleContainer}>
         <Text style={styles.toggleLabel}>Enable Crisis Mode</Text>
@@ -156,91 +161,84 @@ const CrisisModeScreen = () => {
         />
       </View>
 
-      {isEnabled ? (
+      {isEnabled && (
         <View style={styles.enabledContainer}>
           <Text style={styles.sectionTitle}>Your Crisis Access</Text>
 
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>Your Crisis PIN:</Text>
-            <Text style={styles.infoValue}>{generatedPin || '••••••'}</Text>
+            <View style={styles.pinContainer}>
+              <Text style={styles.pinText}>{generatedPin || 'Generating...'}</Text>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={handleCopyPin}
+                disabled={!generatedPin}
+              >
+                <Text style={styles.copyButtonText}>Copy</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.infoBox}>
             <Text style={styles.infoLabel}>Shareable Link:</Text>
-            <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="middle">
-              {shareableLink || 'Generating link...'}
-            </Text>
-          </View>
-
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.copyButton]}
-              onPress={handleCopyPin}
-              disabled={!generatedPin}
-            >
-              <Text style={styles.buttonText}>Copy PIN</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.actionButton, styles.copyButton]}
-              onPress={handleCopyLink}
-              disabled={!shareableLink}
-            >
-              <Text style={styles.buttonText}>Copy Link</Text>
-            </TouchableOpacity>
+            <View style={styles.linkContainer}>
+              <Text style={styles.linkText} numberOfLines={1}>
+                {shareableLink || 'Generating...'}
+              </Text>
+              <View style={styles.linkButtons}>
+                <TouchableOpacity
+                  style={styles.linkButton}
+                  onPress={handleCopyLink}
+                  disabled={!shareableLink}
+                >
+                  <Text style={styles.linkButtonText}>Copy</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.linkButton, styles.shareButton]}
+                  onPress={handleShareLink}
+                  disabled={!shareableLink}
+                >
+                  <Text style={styles.linkButtonText}>Share</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
 
           <TouchableOpacity
-            style={[styles.actionButton, styles.shareButton]}
-            onPress={handleShareLink}
-            disabled={!shareableLink}
-          >
-            <Text style={styles.buttonText}>Share Link</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.verifyButton]}
+            style={styles.verifyButton}
             onPress={handleVerifyPin}
             disabled={isVerifying || !generatedPin}
           >
             {isVerifying ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>Verify PIN</Text>
+              <Text style={styles.verifyButtonText}>Verify PIN</Text>
             )}
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.disabledContainer}>
-          <Text style={styles.instructionText}>
-            Crisis Mode is currently disabled. Enable it to generate a secure PIN and shareable link for family members to access your vault in emergencies.
-          </Text>
-        </View>
       )}
 
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Enter Crisis PIN to Access Vault</Text>
-        <TextInput
-          style={styles.pinInput}
-          placeholder="Enter 6-digit PIN"
-          keyboardType="numeric"
-          maxLength={6}
-          secureTextEntry={true}
-          value={pin}
-          onChangeText={setPin}
-        />
-        <TouchableOpacity
-          style={[styles.actionButton, styles.accessButton]}
-          onPress={handlePinSubmit}
-          disabled={isLoading || pin.length !== 6}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Access Vault</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter 6-digit PIN"
+        keyboardType="numeric"
+        maxLength={6}
+        value={pin}
+        onChangeText={setPin}
+        secureTextEntry
+      />
+
+      <TouchableOpacity
+        style={styles.submitButton}
+        onPress={handlePinSubmit}
+        disabled={isLoading || pin.length !== 6}
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.submitButtonText}>Access Vault</Text>
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.backButton}
@@ -261,9 +259,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 10,
     color: '#333',
+  },
+  description: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
   },
   toggleContainer: {
     flexDirection: 'row',
@@ -286,16 +288,10 @@ const styles = StyleSheet.create({
   enabledContainer: {
     marginBottom: 20,
   },
-  disabledContainer: {
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    marginBottom: 20,
-  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
   },
   infoBox: {
@@ -310,88 +306,106 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   infoLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  infoValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginBottom: 8,
     color: '#333',
   },
-  buttonRow: {
+  pinContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 15,
-  },
-  actionButton: {
-    padding: 12,
-    borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    marginHorizontal: 5,
+    justifyContent: 'space-between',
+  },
+  pinText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#007AFF',
   },
   copyButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  copyButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  linkContainer: {
+    marginTop: 5,
+  },
+  linkText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 10,
+  },
+  linkButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  linkButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+    flex: 1,
+    marginRight: 5,
+    alignItems: 'center',
   },
   shareButton: {
-    backgroundColor: '#2196F3',
-    marginBottom: 15,
+    marginLeft: 5,
+    marginRight: 0,
+  },
+  linkButtonText: {
+    color: '#fff',
+    fontWeight: '600',
   },
   verifyButton: {
-    backgroundColor: '#FF9800',
-  },
-  accessButton: {
-    backgroundColor: '#9C27B0',
-    marginTop: 10,
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  inputContainer: {
-    marginTop: 20,
+    backgroundColor: '#4CAF50',
     padding: 15,
-    backgroundColor: '#fff',
     borderRadius: 10,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  verifyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  input: {
+    backgroundColor: '#fff',
+    padding: 15,
+    borderRadius: 10,
+    fontSize: 16,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  inputLabel: {
-    fontSize: 16,
+  submitButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
     marginBottom: 10,
-    color: '#333',
   },
-  pinInput: {
-    height: 50,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    marginBottom: 15,
-    fontSize: 18,
-    backgroundColor: '#f9f9f9',
-  },
-  instructionText: {
+  submitButtonText: {
+    color: '#fff',
     fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-    textAlign: 'center',
+    fontWeight: 'bold',
   },
   backButton: {
-    marginTop: 20,
+    backgroundColor: '#f5f5f5',
     padding: 15,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   backButtonText: {
-    color: '#666',
+    color: '#333',
     fontSize: 16,
   },
 });
