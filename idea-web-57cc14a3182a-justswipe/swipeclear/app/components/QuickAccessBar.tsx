@@ -8,10 +8,10 @@ const QuickAccessBar = ({ items, onPress }) => {
       {items.map((item, index) => (
         <TouchableOpacity
           key={index}
-          style={styles.button}
+          style={styles.item}
           onPress={() => onPress(item)}
         >
-          <Ionicons name={item.icon} size={24} color="#6C757D" />
+          <Ionicons name={item.icon} size={24} color="#333" />
         </TouchableOpacity>
       ))}
     </View>
@@ -21,18 +21,25 @@ const QuickAccessBar = ({ items, onPress }) => {
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 20,
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    backgroundColor: 'white',
-    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderTopWidth: 1,
-    borderTopColor: '#E9ECEF',
+    borderTopColor: '#eee',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
   },
-  button: {
-    padding: 8,
+  item: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
   },
 });
 
