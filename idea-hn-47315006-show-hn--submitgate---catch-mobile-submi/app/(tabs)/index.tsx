@@ -1,18 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons } from '@expo/vector-icons';
-import { scanIPA } from '../../lib/scanner/iosScanner';
+import { scanBuild } from '../../lib/scanner';
 import { useStore } from '../../store/useStore';
+import { saveScan } from '../../lib/database';
 
 export default function ScannerScreen() {
   const router = useRouter();
   const [isScanning, setIsScanning] = useState(false);
-  const { scanCount, isPremium, incrementScanCount, setCurrentScan } = useStore();
-  
+  const { scanCount, isPremium, incrementScanCount, setCurrentScan, addScan } = useStore();
+
   const maxFreeScans = 3;
   const scansRemaining = maxFreeScans - scanCount;
+
+  useEffect(() => {
+    // Initialize database when component mounts
+    const initDB = async () => {
+      try {
+        await initDatabase();
+        // Load initial data if needed
+      } catch (error) {
+        console.error('Database initialization failed:', error);
+      }
+    };
+
+    initDB();
+  }, []);
 
   const handleSelectFile = async () => {
     if (!isPremium && scanCount >= maxFreeScans) {
@@ -55,28 +70,14 @@ export default function ScannerScreen() {
       const platform = fileName.endsWith('.ipa') ? 'ios' : 'android';
 
       // Scan the file
-      let issues;
-      if (platform === 'ios') {
-        issues = await scanIPA(file.uri);
-      } else {
-        // Android scanner not implemented yet
-        Alert.alert('Coming Soon', 'Android scanning will be available in the next update.');
-        setIsScanning(false);
-        return;
-      }
+      const scanResult = await scanBuild(file.uri, platform);
 
-      // Create scan result
-      const scanResult = {
-        id: Date.now().toString(),
-        timestamp: Date.now(),
-        platform,
-        fileName: file.name,
-        issues,
-        passed: issues.filter(i => i.severity === 'critical').length === 0,
-      };
+      // Save to database
+      await saveScan(scanResult);
 
-      // Save to store
+      // Update store
       setCurrentScan(scanResult);
+      addScan(scanResult);
       incrementScanCount();
 
       setIsScanning(false);
@@ -128,7 +129,7 @@ export default function ScannerScreen() {
         {!isPremium && (
           <View style={styles.limitContainer}>
             <Text style={styles.limitText}>
-              {scansRemaining > 0 
+              {scansRemaining > 0
                 ? `${scansRemaining} of ${maxFreeScans} free scans remaining`
                 : 'No free scans remaining'}
             </Text>
@@ -160,25 +161,26 @@ export default function ScannerScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    backgroundColor: '#FFFFFF',
+    padding: 20,
+    paddingTop: 40,
+    backgroundColor: '#F8F8F8',
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
+    borderBottomColor: '#E0E0E0',
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 4,
+    color: '#007AFF',
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#666666',
+    textAlign: 'center',
+    marginTop: 4,
   },
   content: {
     flex: 1,
@@ -187,49 +189,45 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   instruction: {
     fontSize: 16,
-    color: '#3C3C43',
+    color: '#333333',
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 30,
     paddingHorizontal: 20,
   },
   scanButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    backgroundColor: '#007AFF',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginBottom: 20,
   },
   scanButtonDisabled: {
-    opacity: 0.6,
+    opacity: 0.7,
+  },
+  scanButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
   buttonIcon: {
     marginRight: 8,
   },
-  scanButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '600',
-  },
   limitContainer: {
-    marginTop: 24,
     alignItems: 'center',
+    marginBottom: 30,
   },
   limitText: {
     fontSize: 14,
-    color: '#8E8E93',
-    marginBottom: 8,
+    color: '#666666',
+    marginBottom: 4,
   },
   upgradeLink: {
     fontSize: 14,
@@ -237,8 +235,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   featuresContainer: {
-    marginTop: 48,
     width: '100%',
+    marginTop: 20,
   },
   feature: {
     flexDirection: 'row',
@@ -246,8 +244,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   featureText: {
-    fontSize: 15,
-    color: '#3C3C43',
-    marginLeft: 12,
+    fontSize: 14,
+    color: '#333333',
+    marginLeft: 8,
   },
 });

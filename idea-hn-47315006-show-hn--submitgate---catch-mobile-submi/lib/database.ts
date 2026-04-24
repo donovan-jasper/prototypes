@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { ScanResult, ComplianceRule } from './types';
-import complianceRulesData from '../assets/compliance-rules.json';
+import { ComplianceIssue, ScanResult } from './types';
 
 const db = SQLite.openDatabase('submitguard.db');
 
@@ -42,45 +41,11 @@ export const initDatabase = async () => {
             title TEXT,
             description TEXT,
             severity TEXT,
-            check TEXT,
+            checkType TEXT,
             path TEXT,
             fix TEXT,
             documentationUrl TEXT
           );`
-        );
-
-        // Check if rules table is empty
-        tx.executeSql(
-          'SELECT COUNT(*) as count FROM compliance_rules;',
-          [],
-          (_, result) => {
-            if (result.rows.item(0).count === 0) {
-              // Seed the rules table
-              const rules: ComplianceRule[] = [
-                ...complianceRulesData.ios.map(rule => ({ ...rule, platform: 'ios' })),
-                ...complianceRulesData.android.map(rule => ({ ...rule, platform: 'android' }))
-              ];
-
-              rules.forEach(rule => {
-                tx.executeSql(
-                  `INSERT INTO compliance_rules (
-                    id, platform, title, description, severity, check, path, fix, documentationUrl
-                  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-                  [
-                    rule.id,
-                    rule.platform,
-                    rule.title,
-                    rule.description,
-                    rule.severity,
-                    rule.check,
-                    rule.path || null,
-                    rule.fix,
-                    rule.documentationUrl || null
-                  ]
-                );
-              });
-            }
-          }
         );
       },
       (error) => {
@@ -88,6 +53,7 @@ export const initDatabase = async () => {
         reject(error);
       },
       () => {
+        console.log('Database initialized successfully');
         resolve();
       }
     );
@@ -106,11 +72,10 @@ export const saveScan = async (scan: ScanResult) => {
         );
 
         // Insert issues
-        scan.issues.forEach(issue => {
+        scan.issues.forEach((issue) => {
           tx.executeSql(
-            `INSERT INTO issues (
-              id, scanId, ruleId, title, description, severity, fix, documentationUrl
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
+            `INSERT INTO issues (id, scanId, ruleId, title, description, severity, fix, documentationUrl)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
             [
               issue.id,
               scan.id,
@@ -129,66 +94,78 @@ export const saveScan = async (scan: ScanResult) => {
         reject(error);
       },
       () => {
+        console.log('Scan saved successfully');
         resolve();
       }
     );
   });
 };
 
-export const getScans = async (): Promise<ScanResult[]> => {
+export const getScans = async (limit?: number): Promise<ScanResult[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
-        tx.executeSql(
-          `SELECT * FROM scans ORDER BY timestamp DESC;`,
-          [],
-          (_, { rows }) => {
-            const scans: ScanResult[] = [];
+        const query = limit
+          ? 'SELECT * FROM scans ORDER BY timestamp DESC LIMIT ?'
+          : 'SELECT * FROM scans ORDER BY timestamp DESC';
 
-            for (let i = 0; i < rows.length; i++) {
-              const scan = rows.item(i);
-              scans.push({
-                id: scan.id,
-                timestamp: scan.timestamp,
-                platform: scan.platform,
-                fileName: scan.fileName,
-                passed: scan.passed === 1,
-                issues: []
-              });
-            }
+        tx.executeSql(
+          query,
+          limit ? [limit] : [],
+          (_, { rows }) => {
+            const scans: ScanResult[] = rows._array.map((row) => ({
+              id: row.id,
+              timestamp: row.timestamp,
+              platform: row.platform,
+              fileName: row.fileName,
+              passed: row.passed === 1,
+              issues: []
+            }));
 
             // Get issues for each scan
-            const promises = scans.map(scan => {
-              return new Promise<void>((resolveIssues) => {
-                tx.executeSql(
-                  `SELECT * FROM issues WHERE scanId = ?;`,
-                  [scan.id],
-                  (_, { rows: issueRows }) => {
-                    scan.issues = [];
-                    for (let j = 0; j < issueRows.length; j++) {
-                      const issue = issueRows.item(j);
-                      scan.issues.push({
-                        id: issue.id,
-                        ruleId: issue.ruleId,
-                        title: issue.title,
-                        description: issue.description,
-                        severity: issue.severity as 'critical' | 'warning' | 'info',
-                        fix: issue.fix,
-                        documentationUrl: issue.documentationUrl
-                      });
-                    }
-                    resolveIssues();
-                  }
-                );
-              });
-            });
+            const scanIds = scans.map((scan) => scan.id);
+            if (scanIds.length > 0) {
+              tx.executeSql(
+                `SELECT * FROM issues WHERE scanId IN (${scanIds.map(() => '?').join(',')})`,
+                scanIds,
+                (_, { rows: issueRows }) => {
+                  const issuesMap: Record<string, ComplianceIssue[]> = {};
 
-            Promise.all(promises).then(() => {
+                  issueRows._array.forEach((issueRow) => {
+                    if (!issuesMap[issueRow.scanId]) {
+                      issuesMap[issueRow.scanId] = [];
+                    }
+
+                    issuesMap[issueRow.scanId].push({
+                      id: issueRow.id,
+                      ruleId: issueRow.ruleId,
+                      title: issueRow.title,
+                      description: issueRow.description,
+                      severity: issueRow.severity as 'critical' | 'warning' | 'info',
+                      fix: issueRow.fix,
+                      documentationUrl: issueRow.documentationUrl || undefined
+                    });
+                  });
+
+                  // Assign issues to scans
+                  const scansWithIssues = scans.map((scan) => ({
+                    ...scan,
+                    issues: issuesMap[scan.id] || []
+                  }));
+
+                  resolve(scansWithIssues);
+                },
+                (_, error) => {
+                  console.error('Failed to fetch issues:', error);
+                  reject(error);
+                }
+              );
+            } else {
               resolve(scans);
-            });
+            }
           },
           (_, error) => {
-            console.error('Failed to get scans:', error);
+            console.error('Failed to fetch scans:', error);
             reject(error);
           }
         );
@@ -197,36 +174,63 @@ export const getScans = async (): Promise<ScanResult[]> => {
   });
 };
 
-export const getRules = async (platform: 'ios' | 'android'): Promise<ComplianceRule[]> => {
+export const getRules = async (platform?: 'ios' | 'android'): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
+        const query = platform
+          ? 'SELECT * FROM compliance_rules WHERE platform = ?'
+          : 'SELECT * FROM compliance_rules';
+
         tx.executeSql(
-          `SELECT * FROM compliance_rules WHERE platform = ?;`,
-          [platform],
+          query,
+          platform ? [platform] : [],
           (_, { rows }) => {
-            const rules: ComplianceRule[] = [];
-            for (let i = 0; i < rows.length; i++) {
-              const rule = rows.item(i);
-              rules.push({
-                id: rule.id,
-                platform: rule.platform as 'ios' | 'android',
-                title: rule.title,
-                description: rule.description,
-                severity: rule.severity as 'critical' | 'warning' | 'info',
-                check: rule.check,
-                path: rule.path,
-                fix: rule.fix,
-                documentationUrl: rule.documentationUrl
-              });
-            }
-            resolve(rules);
+            resolve(rows._array);
           },
           (_, error) => {
-            console.error('Failed to get rules:', error);
+            console.error('Failed to fetch rules:', error);
             reject(error);
           }
         );
+      }
+    );
+  });
+};
+
+export const seedRules = async (rules: any[]) => {
+  return new Promise<void>((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        // Clear existing rules
+        tx.executeSql('DELETE FROM compliance_rules');
+
+        // Insert new rules
+        rules.forEach((rule) => {
+          tx.executeSql(
+            `INSERT INTO compliance_rules (id, platform, title, description, severity, checkType, path, fix, documentationUrl)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);`,
+            [
+              rule.id,
+              rule.platform,
+              rule.title,
+              rule.description,
+              rule.severity,
+              rule.checkType,
+              rule.path,
+              rule.fix,
+              rule.documentationUrl || null
+            ]
+          );
+        });
+      },
+      (error) => {
+        console.error('Failed to seed rules:', error);
+        reject(error);
+      },
+      () => {
+        console.log('Rules seeded successfully');
+        resolve();
       }
     );
   });

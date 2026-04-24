@@ -1,199 +1,172 @@
+import * as FileSystem from 'expo-file-system';
 import JSZip from 'jszip';
 import plist from 'plist';
-import * as FileSystem from 'expo-file-system';
 import { ComplianceIssue } from '../types';
+import { getRules } from '../database';
 
-interface InfoPlist {
-  CFBundleIdentifier?: string;
-  CFBundleVersion?: string;
-  CFBundleShortVersionString?: string;
-  NSPrivacyTracking?: boolean;
-  NSPrivacyTrackingDomains?: string[];
-  CFBundleIcons?: any;
-  CFBundleIconFiles?: string[];
-  UIRequiredDeviceCapabilities?: string[];
-  NSAppTransportSecurity?: any;
-}
-
-export async function scanIPA(fileUri: string): Promise<ComplianceIssue[]> {
-  const issues: ComplianceIssue[] = [];
-
+export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
   try {
     // Read the IPA file
     const fileContent = await FileSystem.readAsStringAsync(fileUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // Load as zip
+    // Load the IPA as a ZIP file
     const zip = await JSZip.loadAsync(fileContent, { base64: true });
+    const issues: ComplianceIssue[] = [];
 
-    // Find Info.plist (usually in Payload/*.app/Info.plist)
-    let infoPlistFile: JSZip.JSZipObject | null = null;
-    let appDirectory = '';
+    // Get iOS compliance rules
+    const rules = await getRules('ios');
 
-    zip.forEach((relativePath, file) => {
-      if (relativePath.match(/Payload\/[^/]+\.app\/Info\.plist$/)) {
-        infoPlistFile = file;
-        appDirectory = relativePath.replace(/Info\.plist$/, '');
-      }
-    });
-
-    if (!infoPlistFile) {
+    // Check for Payload directory
+    const payloadDir = zip.folder('Payload');
+    if (!payloadDir) {
       issues.push({
-        id: 'ios_no_infoplist',
-        ruleId: 'ios_infoplist_required',
-        title: 'Info.plist Not Found',
-        description: 'The IPA file does not contain a valid Info.plist file in the expected location.',
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_missing_payload',
+        title: 'Missing Payload Directory',
+        description: 'The IPA file is missing the required Payload directory',
         severity: 'critical',
-        fix: 'Ensure your Xcode project includes an Info.plist file and that the IPA was built correctly.',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list',
+        fix: 'Recreate the IPA file using Xcode Archive → Export',
+        documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
+      });
+      return issues;
+    }
+
+    // Get the first app directory in Payload
+    const appDirName = Object.keys(payloadDir.files).find(name => name.endsWith('.app'));
+    if (!appDirName) {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_missing_app_dir',
+        title: 'Missing App Directory',
+        description: 'The IPA file is missing the .app directory inside Payload',
+        severity: 'critical',
+        fix: 'Recreate the IPA file using Xcode Archive → Export',
+        documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
+      });
+      return issues;
+    }
+
+    const appDir = payloadDir.folder(appDirName);
+    if (!appDir) {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_invalid_app_dir',
+        title: 'Invalid App Directory',
+        description: 'The .app directory inside Payload is invalid',
+        severity: 'critical',
+        fix: 'Recreate the IPA file using Xcode Archive → Export',
+        documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
       });
       return issues;
     }
 
     // Parse Info.plist
-    const plistContent = await infoPlistFile.async('text');
-    const infoPlist = plist.parse(plistContent) as InfoPlist;
-
-    // Check for required keys
-    if (!infoPlist.CFBundleIdentifier) {
+    const infoPlistFile = appDir.file('Info.plist');
+    if (!infoPlistFile) {
       issues.push({
-        id: 'ios_missing_bundle_id',
-        ruleId: 'ios_bundle_identifier_required',
-        title: 'Missing Bundle Identifier',
-        description: 'CFBundleIdentifier is required but not found in Info.plist.',
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_missing_info_plist',
+        title: 'Missing Info.plist',
+        description: 'The app bundle is missing the required Info.plist file',
         severity: 'critical',
-        fix: 'Add CFBundleIdentifier to your Info.plist:\n<key>CFBundleIdentifier</key>\n<string>com.yourcompany.yourapp</string>',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/cfbundleidentifier',
+        fix: 'Ensure your Xcode project has a properly configured Info.plist file',
+        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list'
       });
-    }
+    } else {
+      const infoPlistContent = await infoPlistFile.async('text');
+      const infoPlist = plist.parse(infoPlistContent);
 
-    if (!infoPlist.CFBundleVersion) {
-      issues.push({
-        id: 'ios_missing_bundle_version',
-        ruleId: 'ios_bundle_version_required',
-        title: 'Missing Bundle Version',
-        description: 'CFBundleVersion is required but not found in Info.plist.',
-        severity: 'critical',
-        fix: 'Add CFBundleVersion to your Info.plist:\n<key>CFBundleVersion</key>\n<string>1</string>',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/cfbundleversion',
+      // Check required fields
+      const requiredFields = [
+        { key: 'CFBundleIdentifier', title: 'Bundle Identifier' },
+        { key: 'CFBundleVersion', title: 'Bundle Version' },
+        { key: 'CFBundleShortVersionString', title: 'Version String' },
+        { key: 'CFBundleDisplayName', title: 'Display Name' },
+      ];
+
+      requiredFields.forEach(field => {
+        if (!infoPlist[field.key]) {
+          issues.push({
+            id: `issue-${Date.now()}`,
+            ruleId: `ios_missing_${field.key.toLowerCase()}`,
+            title: `Missing ${field.title}`,
+            description: `The Info.plist is missing the required ${field.key} field`,
+            severity: 'critical',
+            fix: `Add the ${field.key} field to your Info.plist file`,
+            documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list'
+          });
+        }
       });
-    }
 
-    if (!infoPlist.CFBundleShortVersionString) {
-      issues.push({
-        id: 'ios_missing_short_version',
-        ruleId: 'ios_short_version_required',
-        title: 'Missing Short Version String',
-        description: 'CFBundleShortVersionString is required but not found in Info.plist.',
-        severity: 'critical',
-        fix: 'Add CFBundleShortVersionString to your Info.plist:\n<key>CFBundleShortVersionString</key>\n<string>1.0</string>',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/cfbundleshortversionstring',
-      });
-    }
-
-    // Check for privacy tracking declaration (iOS 14.5+)
-    if (infoPlist.NSPrivacyTracking === undefined) {
-      issues.push({
-        id: 'ios_missing_privacy_tracking',
-        ruleId: 'ios_privacy_tracking_required',
-        title: 'Missing Privacy Tracking Declaration',
-        description: 'NSPrivacyTracking key is missing. Apps must declare if they track users for advertising or data broker purposes.',
-        severity: 'warning',
-        fix: 'Add NSPrivacyTracking to your Info.plist:\n<key>NSPrivacyTracking</key>\n<false/>\n\nSet to true only if your app tracks users across apps/websites.',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/nsprivacytracking',
-      });
-    }
-
-    // Check for privacy manifest (iOS 17+)
-    let hasPrivacyManifest = false;
-    zip.forEach((relativePath) => {
-      if (relativePath.includes('PrivacyInfo.xcprivacy')) {
-        hasPrivacyManifest = true;
+      // Check for privacy manifest (iOS 17+)
+      const privacyManifestFile = appDir.file('PrivacyInfo.xcprivacy');
+      if (!privacyManifestFile) {
+        issues.push({
+          id: `issue-${Date.now()}`,
+          ruleId: 'ios_missing_privacy_manifest',
+          title: 'Missing Privacy Manifest',
+          description: 'The app bundle is missing the required PrivacyInfo.xcprivacy file for iOS 17+',
+          severity: 'critical',
+          fix: 'Add a PrivacyInfo.xcprivacy file to your Xcode project',
+          documentationUrl: 'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files'
+        });
       }
-    });
 
-    if (!hasPrivacyManifest) {
-      issues.push({
-        id: 'ios_missing_privacy_manifest',
-        ruleId: 'ios_privacy_manifest_required',
-        title: 'Privacy Manifest Not Found',
-        description: 'iOS 17+ requires a PrivacyInfo.xcprivacy file for apps using certain APIs.',
-        severity: 'critical',
-        fix: 'Add a PrivacyInfo.xcprivacy file to your Xcode project. Go to File > New > File, search for "App Privacy", and configure required API usage declarations.',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/privacy_manifest_files',
+      // Check icon files
+      const iconFiles = [
+        'AppIcon60x60@2x.png',
+        'AppIcon60x60@3x.png',
+        'AppIcon83.5x83.5@2x.png',
+        'AppIcon1024x1024@1x.png'
+      ];
+
+      iconFiles.forEach(icon => {
+        if (!appDir.file(`Assets.xcassets/AppIcon.appiconset/${icon}`)) {
+          issues.push({
+            id: `issue-${Date.now()}`,
+            ruleId: `ios_missing_icon_${icon}`,
+            title: `Missing Icon: ${icon}`,
+            description: `The app bundle is missing the required icon file: ${icon}`,
+            severity: 'warning',
+            fix: 'Add the missing icon to your AppIcon.appiconset',
+            documentationUrl: 'https://developer.apple.com/design/human-interface-guidelines/app-icons'
+          });
+        }
       });
     }
 
-    // Check for app icons
-    const iconFiles: string[] = [];
-    zip.forEach((relativePath) => {
-      if (relativePath.startsWith(appDirectory) && 
-          (relativePath.includes('AppIcon') || relativePath.match(/Icon.*\.png$/i))) {
-        iconFiles.push(relativePath);
+    // Apply additional rules from database
+    for (const rule of rules) {
+      if (rule.checkType === 'file_exists') {
+        const filePath = rule.path;
+        if (!appDir.file(filePath)) {
+          issues.push({
+            id: `issue-${Date.now()}`,
+            ruleId: rule.id,
+            title: rule.title,
+            description: rule.description,
+            severity: rule.severity,
+            fix: rule.fix,
+            documentationUrl: rule.documentationUrl
+          });
+        }
       }
-    });
-
-    if (iconFiles.length === 0) {
-      issues.push({
-        id: 'ios_missing_icons',
-        ruleId: 'ios_app_icons_required',
-        title: 'App Icons Not Found',
-        description: 'No app icon files were detected in the IPA bundle.',
-        severity: 'critical',
-        fix: 'Add app icons to your Xcode project using an Asset Catalog. Ensure you have icons for all required sizes (20pt, 29pt, 40pt, 60pt, 76pt, 83.5pt, 1024pt).',
-        documentationUrl: 'https://developer.apple.com/design/human-interface-guidelines/app-icons',
-      });
-    } else if (iconFiles.length < 7) {
-      issues.push({
-        id: 'ios_incomplete_icons',
-        ruleId: 'ios_app_icons_incomplete',
-        title: 'Incomplete App Icon Set',
-        description: `Only ${iconFiles.length} icon file(s) found. iOS requires icons for multiple sizes.`,
-        severity: 'warning',
-        fix: 'Ensure your Asset Catalog includes all required icon sizes: 20pt, 29pt, 40pt, 60pt, 76pt, 83.5pt (iPad Pro), and 1024pt (App Store).',
-        documentationUrl: 'https://developer.apple.com/design/human-interface-guidelines/app-icons',
-      });
+      // Add more rule types as needed
     }
 
-    // Check for App Transport Security
-    if (!infoPlist.NSAppTransportSecurity) {
-      issues.push({
-        id: 'ios_missing_ats',
-        ruleId: 'ios_ats_configuration',
-        title: 'App Transport Security Not Configured',
-        description: 'NSAppTransportSecurity is not defined. This may cause network requests to fail.',
-        severity: 'info',
-        fix: 'Add NSAppTransportSecurity to Info.plist if your app makes network requests:\n<key>NSAppTransportSecurity</key>\n<dict>\n  <key>NSAllowsArbitraryLoads</key>\n  <false/>\n</dict>',
-        documentationUrl: 'https://developer.apple.com/documentation/security/preventing_insecure_network_connections',
-      });
-    }
-
-    // Check for required device capabilities
-    if (!infoPlist.UIRequiredDeviceCapabilities || 
-        (Array.isArray(infoPlist.UIRequiredDeviceCapabilities) && 
-         infoPlist.UIRequiredDeviceCapabilities.length === 0)) {
-      issues.push({
-        id: 'ios_missing_capabilities',
-        ruleId: 'ios_device_capabilities',
-        title: 'Device Capabilities Not Specified',
-        description: 'UIRequiredDeviceCapabilities is empty or missing. This may affect device compatibility.',
-        severity: 'info',
-        fix: 'Add UIRequiredDeviceCapabilities to Info.plist to specify required hardware features:\n<key>UIRequiredDeviceCapabilities</key>\n<array>\n  <string>arm64</string>\n</array>',
-        documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities',
-      });
-    }
-
+    return issues;
   } catch (error) {
-    issues.push({
-      id: 'ios_scan_error',
-      ruleId: 'ios_scan_failed',
-      title: 'Scan Failed',
-      description: `Failed to scan IPA file: ${error instanceof Error ? error.message : 'Unknown error'}`,
+    console.error('Error scanning IPA:', error);
+    return [{
+      id: `issue-${Date.now()}`,
+      ruleId: 'ios_scan_error',
+      title: 'Scan Error',
+      description: 'An error occurred while scanning the IPA file',
       severity: 'critical',
-      fix: 'Ensure the file is a valid IPA archive. Try rebuilding your app in Xcode and exporting a new IPA.',
-    });
+      fix: 'Try scanning a different IPA file or contact support',
+      documentationUrl: 'https://support.submitguard.com'
+    }];
   }
-
-  return issues;
-}
+};
