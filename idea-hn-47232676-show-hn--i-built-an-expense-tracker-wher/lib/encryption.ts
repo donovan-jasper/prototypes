@@ -1,4 +1,5 @@
 import * as Crypto from 'expo-crypto';
+import * as SecureStore from 'expo-secure-store';
 
 export const generateKeyPair = () => {
   // Generate 32-byte hex strings suitable for PBKDF2 derivation
@@ -8,7 +9,15 @@ export const generateKeyPair = () => {
   const privateKey = Array.from(Crypto.getRandomBytes(32))
     .map(b => b.toString(16).padStart(2, '0'))
     .join('');
+
+  // Store private key securely
+  SecureStore.setItemAsync('privateKey', privateKey);
+
   return { publicKey, privateKey };
+};
+
+export const getPrivateKey = async (): Promise<string | null> => {
+  return await SecureStore.getItemAsync('privateKey');
 };
 
 const deriveKey = async (keyString: string, salt: Uint8Array): Promise<CryptoKey> => {
@@ -41,7 +50,7 @@ export const encryptMessage = async (message: string, keyString: string): Promis
 
   // Generate random IV (12 bytes for GCM)
   const iv = Crypto.getRandomBytes(12);
-  
+
   // Generate salt for PBKDF2
   const salt = Crypto.getRandomBytes(16);
 

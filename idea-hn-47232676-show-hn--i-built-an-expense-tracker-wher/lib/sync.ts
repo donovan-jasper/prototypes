@@ -2,6 +2,8 @@ import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices
 import { encryptMessage, decryptMessage } from './encryption';
 import { getExpenses, addExpense, updateExpense, useSQLiteContext } from './database';
 import { useStore } from './store';
+import * as SecureStore from 'expo-secure-store';
+import * as Application from 'expo-application';
 import type { Expense } from './types';
 
 interface SyncPayload {
@@ -18,12 +20,51 @@ interface SignalingData {
 let peerConnection: RTCPeerConnection | null = null;
 let dataChannel: RTCDataChannel | null = null;
 let encryptionKey: string | null = null;
+let deviceId: string | null = null;
 
 const configuration = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
   ],
+};
+
+export const getDeviceId = async (): Promise<string> => {
+  if (deviceId) return deviceId;
+
+  try {
+    // Try to get existing device ID
+    deviceId = await SecureStore.getItemAsync('deviceId');
+
+    if (!deviceId) {
+      // Generate new device ID if none exists
+      deviceId = Application.androidId || Application.iosId || Math.random().toString(36).substring(2, 15);
+      await SecureStore.setItemAsync('deviceId', deviceId);
+    }
+
+    return deviceId;
+  } catch (error) {
+    console.error('Error getting device ID:', error);
+    // Fallback to random ID if SecureStore fails
+    return Math.random().toString(36).substring(2, 15);
+  }
+};
+
+export const setEncryptionKey = (key: string) => {
+  encryptionKey = key;
+};
+
+export const generateQRCode = async (signalingData: string): Promise<string> => {
+  const currentDeviceId = await getDeviceId();
+
+  // Include device ID and public key in the QR code data
+  const qrData = JSON.stringify({
+    signalingData,
+    deviceId: currentDeviceId,
+    publicKey: encryptionKey,
+  });
+
+  return qrData;
 };
 
 export const initializePeerConnection = async (isInitiator: boolean): Promise<string> => {
@@ -33,7 +74,7 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
     peerConnection.oniceconnectionstatechange = () => {
       const state = peerConnection?.iceConnectionState;
       console.log('ICE connection state:', state);
-      
+
       if (state === 'connected' || state === 'completed') {
         useStore.getState().setSyncStatus('connected');
       } else if (state === 'disconnected' || state === 'failed' || state === 'closed') {
@@ -86,9 +127,15 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
   }
 };
 
-export const handleSignalingData = async (signalingDataString: string): Promise<string> => {
+export const handleSignalingData = async (qrDataString: string): Promise<string> => {
   try {
-    const signalingData: SignalingData = JSON.parse(signalingDataString);
+    const qrData = JSON.parse(qrDataString);
+    const signalingData: SignalingData = JSON.parse(qrData.signalingData);
+
+    // Store the peer's public key
+    if (qrData.publicKey) {
+      setEncryptionKey(qrData.publicKey);
+    }
 
     if (signalingData.type === 'offer') {
       if (!peerConnection) {
@@ -169,9 +216,7 @@ const setupDataChannel = (channel: RTCDataChannel) => {
 };
 
 export const createSyncPayload = async (): Promise<SyncPayload> => {
-  const db = useSQLiteContext();
-  const expenses = await getExpenses(db);
-  
+  const expenses = await getExpenses();
   return {
     expenses,
     timestamp: Date.now(),
@@ -179,40 +224,31 @@ export const createSyncPayload = async (): Promise<SyncPayload> => {
 };
 
 export const applySyncPayload = async (payload: SyncPayload) => {
-  try {
-    const db = useSQLiteContext();
-    const localExpenses = await getExpenses(db);
-    const localExpenseMap = new Map(localExpenses.map(e => [e.id, e]));
+  const db = useSQLiteContext();
 
-    for (const remoteExpense of payload.expenses) {
-      const localExpense = localExpenseMap.get(remoteExpense.id);
+  for (const expense of payload.expenses) {
+    // Check if expense already exists
+    const existing = await db.getFirstAsync<Expense>(
+      'SELECT * FROM expenses WHERE id = ?',
+      [expense.id]
+    );
 
-      if (!localExpense) {
-        await addExpense(db, {
-          description: remoteExpense.description,
-          amount: remoteExpense.amount,
-          category: remoteExpense.category,
-          paidBy: remoteExpense.paidBy,
-          splitWith: remoteExpense.splitWith,
-          date: remoteExpense.date,
-        });
-      } else if (remoteExpense.updatedAt > localExpense.updatedAt) {
-        await updateExpense(db, remoteExpense.id, {
-          description: remoteExpense.description,
-          amount: remoteExpense.amount,
-          category: remoteExpense.category,
-          paidBy: remoteExpense.paidBy,
-          splitWith: remoteExpense.splitWith,
-          date: remoteExpense.date,
-        });
+    if (existing) {
+      // Update if remote expense is newer
+      if (expense.updatedAt > existing.updatedAt) {
+        await updateExpense(expense);
       }
+    } else {
+      // Add new expense
+      await addExpense(expense);
     }
-
-    console.log('Sync payload applied successfully');
-  } catch (error) {
-    console.error('Error applying sync payload:', error);
-    throw error;
   }
+
+  // Update last sync timestamp
+  await db.runAsync(
+    'INSERT OR REPLACE INTO sync_log (device_id, last_sync) VALUES (?, ?)',
+    [await getDeviceId(), payload.timestamp]
+  );
 };
 
 export const performSync = async () => {
@@ -221,50 +257,24 @@ export const performSync = async () => {
     return;
   }
 
-  if (!encryptionKey) {
-    console.error('No encryption key set for sync');
-    return;
-  }
-
   try {
-    useStore.getState().setSyncStatus('syncing');
-
     const payload = await createSyncPayload();
+    if (!encryptionKey) {
+      console.error('No encryption key available');
+      return;
+    }
+
     const encrypted = await encryptMessage(JSON.stringify(payload), encryptionKey);
-
     dataChannel.send(encrypted);
-
-    useStore.getState().setSyncStatus('connected');
-    console.log('Sync completed successfully');
   } catch (error) {
     console.error('Error performing sync:', error);
-    useStore.getState().setSyncStatus('connected');
   }
 };
 
-export const setEncryptionKey = (key: string) => {
-  encryptionKey = key;
-};
-
-export const closePeerConnection = () => {
-  if (dataChannel) {
-    dataChannel.close();
-    dataChannel = null;
-  }
-
+export const closeConnection = () => {
   if (peerConnection) {
     peerConnection.close();
     peerConnection = null;
   }
-
-  useStore.getState().setSyncStatus('offline');
-};
-
-const getDeviceId = async (): Promise<string> => {
-  return 'device-' + Math.random().toString(36).substring(2, 15);
-};
-
-export const generateQRCode = async (): Promise<string> => {
-  const signalingData = await initializePeerConnection(true);
-  return signalingData;
+  dataChannel = null;
 };

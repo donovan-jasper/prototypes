@@ -1,31 +1,19 @@
 export interface Expense {
-  id: number;
-  description: string;
+  id: string;
   amount: number;
+  description: string;
   category: string;
   paidBy: string;
   splitWith: string[];
+  splitRatios?: number[];
   date: string;
   createdAt: number;
   updatedAt: number;
-  syncStatus: string;
 }
 
 export interface User {
   id: string;
   name: string;
   publicKey: string;
-  createdAt: number;
+  isCurrentUser: boolean;
 }
-
-export interface SyncLog {
-  id: number;
-  deviceId: string;
-  timestamp: number;
-  action: string;
-  recordId?: number;
-  recordType: string;
-  syncStatus: string;
-}
-
-export type SyncStatus = 'connected' | 'syncing' | 'offline';

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, Button, StyleSheet, Alert, ScrollView } from 'react-native';
+import { View, Text, Modal, Button, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { BarCodeScanner } from 'expo-barcode-scanner';
-import { generateQRCode, handleSignalingData, setEncryptionKey } from '../lib/sync';
+import { generateQRCode, handleSignalingData, setEncryptionKey, initializePeerConnection } from '../lib/sync';
 import { generateKeyPair } from '../lib/encryption';
+import { useStore } from '../lib/store';
 
 export default function QRPairingModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -10,6 +11,7 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
   const [qrCode, setQrCode] = useState('');
   const [mode, setMode] = useState<'generate' | 'scan'>('generate');
   const [isProcessing, setIsProcessing] = useState(false);
+  const { setPairedDevice } = useStore();
 
   useEffect(() => {
     (async () => {
@@ -29,8 +31,9 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
       setIsProcessing(true);
       const keys = generateKeyPair();
       setEncryptionKey(keys.publicKey);
-      
-      const code = await generateQRCode();
+
+      const signalingData = await initializePeerConnection(true);
+      const code = await generateQRCode(signalingData);
       setQrCode(code);
     } catch (error) {
       console.error('Error generating QR code:', error);
@@ -49,23 +52,21 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
       setEncryptionKey(keys.publicKey);
 
       const response = await handleSignalingData(data);
-      
+
       if (response) {
+        // We received an answer, now generate our own QR code to show to the other device
+        const code = await generateQRCode(response);
+        setQrCode(code);
+        setMode('generate');
         Alert.alert(
           'Connection Established',
           'Show this QR code to the other device to complete pairing',
-          [
-            {
-              text: 'OK',
-              onPress: () => {
-                setQrCode(response);
-                setMode('generate');
-              },
-            },
-          ]
+          [{ text: 'OK' }]
         );
       } else {
+        // Pairing complete
         Alert.alert('Success', 'Devices paired successfully!');
+        setPairedDevice(true);
         onClose();
       }
     } catch (error) {
@@ -81,6 +82,7 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
     return (
       <Modal visible={visible} onRequestClose={onClose}>
         <View style={styles.container}>
+          <ActivityIndicator size="large" />
           <Text>Requesting camera permission...</Text>
         </View>
       </Modal>
@@ -129,7 +131,10 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
               Scan this QR code on the other device:
             </Text>
             {isProcessing ? (
-              <Text>Generating...</Text>
+              <View style={styles.processingContainer}>
+                <ActivityIndicator size="large" color="#2e78b7" />
+                <Text>Generating connection...</Text>
+              </View>
             ) : (
               <ScrollView style={styles.qrCodeScroll}>
                 <Text style={styles.qrCodeText} selectable>
@@ -156,13 +161,16 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
                 onPress={() => setScanned(false)}
               />
             )}
-            {isProcessing && <Text style={styles.processingText}>Processing...</Text>}
+            {isProcessing && (
+              <View style={styles.processingContainer}>
+                <ActivityIndicator size="large" color="#2e78b7" />
+                <Text>Processing connection...</Text>
+              </View>
+            )}
           </View>
         )}
 
-        <View style={styles.buttonContainer}>
-          <Button title="Close" onPress={onClose} color="#666" />
-        </View>
+        <Button title="Cancel" onPress={onClose} color="#999" />
       </View>
     </Modal>
   );
@@ -171,73 +179,65 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
+    padding: 20,
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
   },
   modeSelector: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   buttonSpacer: {
-    width: 16,
+    width: 20,
   },
   qrContainer: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   instructionText: {
     fontSize: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     textAlign: 'center',
   },
   qrCodeScroll: {
-    maxHeight: 300,
-    width: '100%',
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    maxHeight: 200,
+    marginBottom: 20,
   },
   qrCodeText: {
-    fontSize: 10,
+    fontSize: 16,
     fontFamily: 'monospace',
-    color: '#333',
+    textAlign: 'center',
   },
   noteText: {
     fontSize: 12,
     color: '#666',
-    fontStyle: 'italic',
     textAlign: 'center',
-  },
-  scannerContainer: {
-    flex: 1,
-    alignItems: 'center',
+    marginBottom: 20,
   },
   scanner: {
-    width: 300,
+    width: '100%',
     height: 300,
-    marginVertical: 16,
-  },
-  processingText: {
-    fontSize: 16,
-    color: '#2e78b7',
-    marginTop: 16,
-  },
-  buttonContainer: {
-    marginTop: 16,
+    marginBottom: 20,
   },
   errorText: {
-    fontSize: 16,
-    color: '#d32f2f',
+    color: 'red',
+    marginBottom: 20,
     textAlign: 'center',
-    marginBottom: 16,
+  },
+  processingContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
   },
 });
