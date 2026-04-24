@@ -1,7 +1,7 @@
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { Audio } from 'expo-av';
-import { speakPrompt } from './audio';
+import { speakPrompt, stopSpeaking } from './audio';
 import { useSessionStore } from './store';
 import { generatePrompt } from './prompts';
 
@@ -11,9 +11,9 @@ const MIN_INTERVAL = 15 * 60; // 15 minutes in seconds
 const MAX_INTERVAL = 30 * 60; // 30 minutes in seconds
 
 let backgroundTaskRegistered = false;
-let soundObject: Audio.Sound | null = null;
 let isPlaying = false;
 let lastPlayTime = 0;
+let audioModeSet = false;
 
 export async function registerBackgroundAudioTask() {
   if (backgroundTaskRegistered) return;
@@ -60,13 +60,17 @@ export async function playBackgroundPrompt() {
     // Generate a prompt
     const prompt = generatePrompt(coachId, taskName || 'general');
 
-    // Duck other audio briefly
-    await Audio.setAudioModeAsync({
-      playsInSilentModeIOS: true,
-      staysActiveInBackground: true,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
-    });
+    // Set audio mode for ducking
+    if (!audioModeSet) {
+      await Audio.setAudioModeAsync({
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+        shouldDuckAndroid: true,
+        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DUCK_OTHERS,
+        interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DUCK_OTHERS,
+      });
+      audioModeSet = true;
+    }
 
     // Play the prompt at low volume
     await speakPrompt(prompt, coachId, 0.5); // 0.5 volume for ambient mode
@@ -80,19 +84,21 @@ export async function playBackgroundPrompt() {
       staysActiveInBackground: true,
       shouldDuckAndroid: false,
       interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+      interruptionModeIOS: Audio.INTERRUPTION_MODE_IOS_DO_NOT_MIX,
     });
+    audioModeSet = false;
 
     isPlaying = false;
   } catch (error) {
     console.error('Error playing background prompt:', error);
     isPlaying = false;
+    audioModeSet = false;
   }
 }
 
 export async function cleanupBackgroundAudio() {
-  if (soundObject) {
-    await soundObject.unloadAsync();
-    soundObject = null;
+  if (isPlaying) {
+    await stopSpeaking();
   }
 
   if (backgroundTaskRegistered) {
@@ -105,4 +111,5 @@ export async function cleanupBackgroundAudio() {
   }
 
   isPlaying = false;
+  audioModeSet = false;
 }

@@ -1,6 +1,8 @@
 import * as Speech from 'expo-speech';
+import { Audio } from 'expo-av';
 
 let isSpeaking = false;
+let soundObject: Audio.Sound | null = null;
 
 export async function speakPrompt(text: string, coachId: string, volume: number = 1.0): Promise<void> {
   if (isSpeaking) {
@@ -14,7 +16,7 @@ export async function speakPrompt(text: string, coachId: string, volume: number 
       language: 'en-US',
       pitch: getCoachPitch(coachId),
       rate: getCoachRate(coachId),
-      volume: volume, // Add volume parameter
+      volume: volume,
       onDone: () => {
         isSpeaking = false;
         resolve();
@@ -29,10 +31,36 @@ export async function speakPrompt(text: string, coachId: string, volume: number 
   });
 }
 
+export async function playSoundEffect(soundFile: string, volume: number = 1.0): Promise<void> {
+  if (soundObject) {
+    await soundObject.unloadAsync();
+  }
+
+  try {
+    const { sound } = await Audio.Sound.createAsync(
+      require(`../assets/audio/${soundFile}`),
+      { volume }
+    );
+    soundObject = sound;
+    await sound.playAsync();
+  } catch (error) {
+    console.error('Error playing sound effect:', error);
+  }
+}
+
 export async function stopSpeaking(): Promise<void> {
   if (isSpeaking) {
     await Speech.stop();
     isSpeaking = false;
+  }
+}
+
+export async function stopAllAudio(): Promise<void> {
+  await stopSpeaking();
+  if (soundObject) {
+    await soundObject.stopAsync();
+    await soundObject.unloadAsync();
+    soundObject = null;
   }
 }
 

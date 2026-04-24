@@ -11,6 +11,8 @@ interface SessionState {
   togglePause: () => void;
   reset: () => void;
   tick: () => void;
+  setAudioMode: (mode: 'foreground' | 'background' | 'ambient') => void;
+  audioMode: 'foreground' | 'background' | 'ambient';
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
@@ -19,6 +21,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   isActive: false,
   isPaused: false,
   elapsedSeconds: 0,
+  audioMode: 'foreground',
 
   startSession: (taskName, coachId) =>
     set({
@@ -27,12 +30,14 @@ export const useSessionStore = create<SessionState>((set) => ({
       isActive: true,
       isPaused: false,
       elapsedSeconds: 0,
+      audioMode: 'foreground',
     }),
 
   stopSession: () =>
     set({
       isActive: false,
       isPaused: false,
+      audioMode: 'foreground',
     }),
 
   togglePause: () =>
@@ -47,6 +52,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       isActive: false,
       isPaused: false,
       elapsedSeconds: 0,
+      audioMode: 'foreground',
     }),
 
   tick: () =>
@@ -54,4 +60,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       if (!state.isActive || state.isPaused) return state;
       return { elapsedSeconds: state.elapsedSeconds + 1 };
     }),
+
+  setAudioMode: (mode) =>
+    set({ audioMode: mode }),
 }));
