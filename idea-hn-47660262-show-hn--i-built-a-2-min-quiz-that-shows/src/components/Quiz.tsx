@@ -16,6 +16,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete, currentQuestion, totalQuestions
   const [feedback, setFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [calibrationScore, setCalibrationScore] = useState<number | null>(null);
 
   useEffect(() => {
     const initializeDB = async () => {
@@ -67,7 +68,9 @@ const Quiz: React.FC<QuizProps> = ({ onComplete, currentQuestion, totalQuestions
       });
 
       const betaResult = calculateBetaDistribution(successes, failures);
-      setFeedback(`Your calibration score: ${betaResult.mean.toFixed(2)} (${betaResult.confidenceInterval[0].toFixed(2)}-${betaResult.confidenceInterval[1].toFixed(2)})`);
+      const score = betaResult.mean;
+      setCalibrationScore(score);
+      setFeedback(`Your calibration score: ${score.toFixed(2)} (${betaResult.confidenceInterval[0].toFixed(2)}-${betaResult.confidenceInterval[1].toFixed(2)})`);
 
       // Reset form
       setDescription('');
@@ -148,7 +151,20 @@ const Quiz: React.FC<QuizProps> = ({ onComplete, currentQuestion, totalQuestions
         )}
       </TouchableOpacity>
 
-      {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
+      {feedback ? (
+        <View style={styles.feedbackContainer}>
+          <Text style={styles.feedback}>{feedback}</Text>
+          {calibrationScore !== null && (
+            <View style={styles.scoreContainer}>
+              <Text style={styles.scoreLabel}>Calibration Score:</Text>
+              <View style={styles.scoreBar}>
+                <View style={[styles.scoreFill, { width: `${calibrationScore * 100}%` }]} />
+              </View>
+              <Text style={styles.scoreValue}>{calibrationScore.toFixed(2)}</Text>
+            </View>
+          )}
+        </View>
+      ) : null}
     </View>
   );
 };
@@ -210,14 +226,43 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  feedback: {
+  feedbackContainer: {
     marginTop: 20,
-    textAlign: 'center',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    borderColor: '#ddd',
+    borderWidth: 1,
+  },
+  feedback: {
     fontSize: 16,
     color: '#333',
-    padding: 10,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  scoreContainer: {
+    marginTop: 10,
+  },
+  scoreLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  scoreBar: {
+    height: 10,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 5,
+    overflow: 'hidden',
+    marginBottom: 5,
+  },
+  scoreFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+  },
+  scoreValue: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'right',
   },
 });
 
