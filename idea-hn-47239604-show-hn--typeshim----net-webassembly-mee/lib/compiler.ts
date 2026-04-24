@@ -20,21 +20,25 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
     const webViewRef = React.createRef<WebView>();
 
     const handleMessage = (event: any) => {
-      const data = JSON.parse(event.nativeEvent.data);
+      try {
+        const data = JSON.parse(event.nativeEvent.data);
 
-      if (data.type === 'compilationResult') {
-        if (data.success) {
-          const wasmBytes = new Uint8Array(data.wasmBytes);
-          if (validateWasmOutput(wasmBytes)) {
-            // Cache successful compilation
-            cacheCompilation(code, wasmBytes);
-            resolve({ success: true, wasmBytes });
+        if (data.type === 'compilationResult') {
+          if (data.success) {
+            const wasmBytes = new Uint8Array(data.wasmBytes);
+            if (validateWasmOutput(wasmBytes)) {
+              // Cache successful compilation
+              cacheCompilation(code, wasmBytes);
+              resolve({ success: true, wasmBytes });
+            } else {
+              resolve({ success: false, error: 'Invalid WASM output format' });
+            }
           } else {
-            resolve({ success: false, error: 'Invalid WASM output format' });
+            resolve({ success: false, error: data.error });
           }
-        } else {
-          resolve({ success: false, error: data.error });
         }
+      } catch (error) {
+        resolve({ success: false, error: 'Failed to parse compilation result' });
       }
     };
 
@@ -53,13 +57,18 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
 
                 // Compile TypeScript to JavaScript
                 const jsCode = ts.transpileModule(code, {
-                  compilerOptions: { module: ts.ModuleKind.ES2020 }
+                  compilerOptions: {
+                    module: ts.ModuleKind.ES2020,
+                    target: ts.ScriptTarget.ES2020,
+                    strict: true
+                  }
                 }).outputText;
 
                 // Compile JavaScript to WASM using AssemblyScript
                 const result = await asc.compileString(jsCode, {
                   optimizeLevel: 3,
-                  runtime: 'stub'
+                  runtime: 'stub',
+                  target: 'web'
                 });
 
                 window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -71,7 +80,7 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'compilationResult',
                   success: false,
-                  error: error.message
+                  error: error.message || 'Unknown compilation error'
                 }));
               }
             });
@@ -80,6 +89,10 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
       </html>
     `;
 
+    // Create a temporary container for the WebView
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
     // Render WebView and send code
     ReactDOM.render(
       <WebView
@@ -87,10 +100,18 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
         source={{ html }}
         onMessage={handleMessage}
         javaScriptEnabled={true}
+        originWhitelist={['*']}
         injectedJavaScript={`window.postMessage({ code: ${JSON.stringify(code)} }, '*');`}
+        style={{ display: 'none' }}
       />,
-      document.createElement('div')
+      container
     );
+
+    // Clean up after a delay to prevent memory leaks
+    setTimeout(() => {
+      ReactDOM.unmountComponentAtNode(container);
+      document.body.removeChild(container);
+    }, 5000);
   });
 }
 
@@ -136,4 +157,13 @@ function hashCode(str: string): string {
     hash = hash & hash; // Convert to 32bit integer
   }
   return hash.toString();
+}
+
+export function validateWasmOutput(wasmBytes: Uint8Array): boolean {
+  // Check for WASM magic number (0x00, 0x61, 0x73, 0x6d)
+  if (wasmBytes.length < 4) return false;
+  return wasmBytes[0] === 0x00 &&
+         wasmBytes[1] === 0x61 &&
+         wasmBytes[2] === 0x73 &&
+         wasmBytes[3] === 0x6d;
 }

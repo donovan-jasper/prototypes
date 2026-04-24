@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { useNavigation } from '@react-navigation/native';
 import { compileTypeScriptToWasm } from '../../lib/compiler';
-import { updateProject } from '../../lib/database';
+import { updateProject, getProjectById } from '../../lib/database';
 
 export default function EditorScreen({ route }) {
   const { projectId } = route.params;
@@ -10,15 +11,22 @@ export default function EditorScreen({ route }) {
   const [isCompiling, setIsCompiling] = useState(false);
   const [compilationError, setCompilationError] = useState(null);
   const webViewRef = useRef(null);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    // Load project code
     loadProject();
   }, []);
 
   const loadProject = async () => {
-    const project = await getProjectById(projectId);
-    setCode(project.code);
+    try {
+      const project = await getProjectById(projectId);
+      if (project) {
+        setCode(project.code || '');
+      }
+    } catch (error) {
+      console.error('Failed to load project:', error);
+      Alert.alert('Error', 'Failed to load project');
+    }
   };
 
   const handleCodeChange = (newCode) => {
@@ -29,10 +37,19 @@ export default function EditorScreen({ route }) {
   };
 
   const saveProject = async (codeToSave) => {
-    await updateProject({ id: projectId, code: codeToSave });
+    try {
+      await updateProject({ id: projectId, code: codeToSave });
+    } catch (error) {
+      console.error('Failed to save project:', error);
+    }
   };
 
   const compileCode = async () => {
+    if (!code.trim()) {
+      Alert.alert('Error', 'Please enter some code to compile');
+      return;
+    }
+
     setIsCompiling(true);
     setCompilationError(null);
 
@@ -45,12 +62,13 @@ export default function EditorScreen({ route }) {
           code,
           wasmBytes: result.wasmBytes
         });
-        // Navigate to preview screen
+        navigation.navigate('preview', { projectId });
       } else {
-        setCompilationError(result.error);
+        setCompilationError(result.error || 'Compilation failed');
       }
     } catch (error) {
-      setCompilationError(error.message);
+      console.error('Compilation error:', error);
+      setCompilationError(error.message || 'Unknown compilation error');
     } finally {
       setIsCompiling(false);
     }
@@ -75,7 +93,14 @@ export default function EditorScreen({ route }) {
               value: ${JSON.stringify(code)},
               language: 'typescript',
               theme: 'vs-dark',
-              automaticLayout: true
+              automaticLayout: true,
+              minimap: { enabled: false },
+              fontSize: 14,
+              lineNumbers: 'on',
+              roundedSelection: false,
+              scrollBeyondLastLine: false,
+              readOnly: false,
+              wordWrap: 'on'
             });
 
             editor.onDidChangeModelContent(() => {
@@ -104,13 +129,18 @@ export default function EditorScreen({ route }) {
         ref={webViewRef}
         source={{ html: editorHtml }}
         onMessage={(event) => {
-          const data = JSON.parse(event.nativeEvent.data);
-          if (data.type === 'codeChange') {
-            handleCodeChange(data.code);
+          try {
+            const data = JSON.parse(event.nativeEvent.data);
+            if (data.type === 'codeChange') {
+              handleCodeChange(data.code);
+            }
+          } catch (error) {
+            console.error('Error parsing WebView message:', error);
           }
         }}
         javaScriptEnabled={true}
         style={styles.editor}
+        originWhitelist={['*']}
       />
 
       {compilationError && (
@@ -121,7 +151,7 @@ export default function EditorScreen({ route }) {
 
       <View style={styles.toolbar}>
         <TouchableOpacity
-          style={styles.button}
+          style={[styles.button, styles.compileButton]}
           onPress={compileCode}
           disabled={isCompiling}
         >
@@ -130,6 +160,14 @@ export default function EditorScreen({ route }) {
           ) : (
             <Text style={styles.buttonText}>Compile</Text>
           )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.button, styles.previewButton]}
+          onPress={() => navigation.navigate('preview', { projectId })}
+          disabled={isCompiling}
+        >
+          <Text style={styles.buttonText}>Preview</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -152,12 +190,19 @@ const styles = StyleSheet.create({
     borderTopColor: '#333',
   },
   button: {
-    backgroundColor: '#007acc',
-    padding: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderRadius: 5,
     marginRight: 10,
-    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compileButton: {
+    backgroundColor: '#007acc',
+    flex: 1,
+  },
+  previewButton: {
+    backgroundColor: '#6c757d',
   },
   buttonText: {
     color: 'white',
@@ -169,5 +214,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: 'white',
+    fontSize: 14,
   },
 });
