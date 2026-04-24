@@ -1,91 +1,91 @@
 import type { Project } from '@/types/project';
 
-export interface IntentResult {
+interface IntentResult {
   appType: string;
-  targetAudience: string[];
-  features: string[];
+  targetAudience: string;
+  keyFeatures: string[];
   monetizationIdeas: string[];
   needsClarification: boolean;
-  questions: string[];
+  questions?: string[];
 }
 
-/**
- * Mocks the AI intent parsing.
- * In a real scenario, this would call an OpenAI API (e.g., GPT-4)
- * with a sophisticated prompt to extract structured data from the description.
- */
 export async function parseIntent(description: string): Promise<IntentResult> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 800));
+  // In a real implementation, this would call the OpenAI API
+  // For this prototype, we'll use simple pattern matching
 
-  const lowerDescription = description.toLowerCase();
+  const lowerDesc = description.toLowerCase();
 
-  let appType = 'general';
-  const features: string[] = [];
-  const targetAudience: string[] = [];
-  const monetizationIdeas: string[] = [];
-  let needsClarification = false;
+  // Determine app type
+  let appType = 'utility'; // default
+  const appTypeKeywords: Record<string, string[]> = {
+    social: ['social', 'network', 'community', 'friends', 'followers', 'sharing', 'posts', 'feed'],
+    ecommerce: ['shop', 'store', 'buy', 'sell', 'marketplace', 'checkout', 'cart', 'payment'],
+    fitness: ['fitness', 'workout', 'exercise', 'gym', 'health', 'track', 'progress'],
+    education: ['learn', 'study', 'teach', 'course', 'lesson', 'quiz', 'tutorial'],
+    productivity: ['task', 'todo', 'organize', 'schedule', 'calendar', 'reminder', 'planner'],
+    travel: ['travel', 'trip', 'hotel', 'flight', 'booking', 'map', 'navigation'],
+  };
+
+  for (const [type, keywords] of Object.entries(appTypeKeywords)) {
+    if (keywords.some(keyword => lowerDesc.includes(keyword))) {
+      appType = type;
+      break;
+    }
+  }
+
+  // Extract target audience
+  let targetAudience = 'general users';
+  const audienceKeywords = ['for', 'who', 'users', 'people', 'customers', 'students', 'professionals'];
+  const audiencePattern = new RegExp(`(${audienceKeywords.join('|')})\\s+(.+?)(?=\\s*(?:and|or|with|,|$))`, 'i');
+  const audienceMatch = lowerDesc.match(audiencePattern);
+  if (audienceMatch && audienceMatch[2]) {
+    targetAudience = audienceMatch[2].trim();
+  }
+
+  // Extract key features
+  const featureKeywords = ['can', 'will', 'allow', 'enable', 'feature', 'function', 'include'];
+  const featurePattern = new RegExp(`(${featureKeywords.join('|')})\\s+(.+?)(?=\\s*(?:and|or|with|,|$))`, 'i');
+  const featureMatches = [...lowerDesc.matchAll(featurePattern)];
+  const keyFeatures = featureMatches.map(match => match[2].trim()).filter(f => f.length > 3);
+
+  // Generate monetization ideas
+  const monetizationIdeas = [];
+  if (lowerDesc.includes('pay') || lowerDesc.includes('purchase') || lowerDesc.includes('subscription')) {
+    monetizationIdeas.push('Paid features or subscriptions');
+  }
+  if (lowerDesc.includes('sell') || lowerDesc.includes('buy') || lowerDesc.includes('marketplace')) {
+    monetizationIdeas.push('E-commerce transactions');
+  }
+  if (lowerDesc.includes('ad') || lowerDesc.includes('ads') || lowerDesc.includes('advertisement')) {
+    monetizationIdeas.push('Advertising');
+  }
+  if (monetizationIdeas.length === 0) {
+    monetizationIdeas.push('Freemium model', 'In-app purchases');
+  }
+
+  // Check if description needs clarification
+  const needsClarification = description.length < 50 || keyFeatures.length < 2;
+
+  // Generate clarifying questions if needed
   const questions: string[] = [];
-
-  // Simple keyword-based parsing for mock data
-  if (lowerDescription.includes('social') || lowerDescription.includes('community')) {
-    appType = 'social';
-    features.push('user_profiles', 'feed', 'messaging');
-    monetizationIdeas.push('ads', 'premium_features');
-  } else if (lowerDescription.includes('fitness') || lowerDescription.includes('workout')) {
-    appType = 'fitness';
-    features.push('workout_logging', 'progress_tracking', 'goal_setting');
-    monetizationIdeas.push('subscription', 'premium_plans');
-  } else if (lowerDescription.includes('e-commerce') || lowerDescription.includes('shop') || lowerDescription.includes('store')) {
-    appType = 'ecommerce';
-    features.push('product_catalog', 'cart', 'checkout', 'order_history');
-    monetizationIdeas.push('transaction_fees');
-  } else if (lowerDescription.includes('task') || lowerDescription.includes('todo') || lowerDescription.includes('productivity')) {
-    appType = 'productivity';
-    features.push('task_management', 'reminders', 'project_tracking');
-    monetizationIdeas.push('subscription', 'one_time_purchase');
-  } else if (lowerDescription.includes('blog') || lowerDescription.includes('news')) {
-    appType = 'content';
-    features.push('articles', 'categories', 'search');
-    monetizationIdeas.push('ads', 'premium_content');
-  } else if (lowerDescription.includes('recipe') || lowerDescription.includes('food')) {
-    appType = 'food';
-    features.push('recipe_search', 'meal_planning', 'shopping_list');
-    monetizationIdeas.push('ads', 'premium_recipes');
-  }
-
-  if (lowerDescription.includes('users can post')) {
-    features.push('post_creation');
-  }
-  if (lowerDescription.includes('track progress')) {
-    features.push('progress_tracking');
-  }
-  if (lowerDescription.includes('buy products')) {
-    features.push('checkout');
-  }
-  if (lowerDescription.includes('login') || lowerDescription.includes('sign up')) {
-    features.push('authentication');
-  }
-
-  if (lowerDescription.includes('dog owners')) {
-    targetAudience.push('dog owners');
-  }
-  if (lowerDescription.includes('students')) {
-    targetAudience.push('students');
-  }
-
-  // Simulate clarification for vague descriptions
-  if (description.split(' ').length < 5 || appType === 'general') {
-    needsClarification = true;
-    questions.push('What is the main purpose of your app?', 'Who are the primary users?', 'What is one key feature you envision?');
+  if (needsClarification) {
+    if (description.length < 50) {
+      questions.push('Could you please provide more details about your app idea?');
+    }
+    if (keyFeatures.length < 2) {
+      questions.push('What are the main features you want to include in your app?');
+    }
+    if (!lowerDesc.includes('who')) {
+      questions.push('Who is your target audience for this app?');
+    }
   }
 
   return {
     appType,
-    targetAudience: targetAudience.length > 0 ? targetAudience : ['general users'],
-    features: features.length > 0 ? features : ['basic_info_display'],
-    monetizationIdeas: monetizationIdeas.length > 0 ? monetizationIdeas : ['none'],
+    targetAudience,
+    keyFeatures,
+    monetizationIdeas,
     needsClarification,
-    questions,
+    questions: needsClarification ? questions : undefined,
   };
 }

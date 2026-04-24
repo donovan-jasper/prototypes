@@ -1,41 +1,46 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { Text, IconButton } from 'react-native-paper';
 import { Screen } from '@/types/project';
-import { Button } from 'react-native-paper'; // Using Paper Button for consistency
 
 interface ScreenNavigatorProps {
   screens: Screen[];
-  activeScreenId: string | null;
-  onSelectScreen: (screenId: string) => void;
-  onAddScreen: () => void;
+  activeScreenId: string;
+  onScreenSelect: (screenId: string) => void;
 }
 
-export default function ScreenNavigator({ screens, activeScreenId, onSelectScreen, onAddScreen }: ScreenNavigatorProps) {
+export default function ScreenNavigator({ screens, activeScreenId, onScreenSelect }: ScreenNavigatorProps) {
   return (
     <View style={styles.container}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scrollViewContent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
         {screens.map((screen) => (
           <TouchableOpacity
             key={screen.id}
             style={[
-              styles.screenTab,
-              screen.id === activeScreenId && styles.activeScreenTab,
+              styles.screenItem,
+              activeScreenId === screen.id && styles.activeScreenItem,
             ]}
-            onPress={() => onSelectScreen(screen.id)}
+            onPress={() => onScreenSelect(screen.id)}
           >
             <Text
               style={[
-                styles.screenTabText,
-                screen.id === activeScreenId && styles.activeScreenTabText,
+                styles.screenName,
+                activeScreenId === screen.id && styles.activeScreenName,
               ]}
+              numberOfLines={1}
             >
               {screen.name}
             </Text>
           </TouchableOpacity>
         ))}
-        <Button icon="plus" mode="text" onPress={onAddScreen} style={styles.addScreenButton}>
-          Add Screen
-        </Button>
+
+        <TouchableOpacity style={styles.addScreenButton}>
+          <IconButton icon="plus" size={20} />
+        </TouchableOpacity>
       </ScrollView>
     </View>
   );
@@ -43,34 +48,39 @@ export default function ScreenNavigator({ screens, activeScreenId, onSelectScree
 
 const styles = StyleSheet.create({
   container: {
-    height: 60, // Fixed height for the navigator
-    backgroundColor: '#fff',
+    height: 50,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    justifyContent: 'center',
+    borderBottomColor: '#e0e0e0',
+    backgroundColor: '#f5f5f5',
   },
-  scrollViewContent: {
-    alignItems: 'center',
+  scrollContent: {
     paddingHorizontal: 8,
+    alignItems: 'center',
   },
-  screenTab: {
-    paddingVertical: 8,
+  screenItem: {
     paddingHorizontal: 16,
-    borderRadius: 20,
-    marginHorizontal: 4,
-    backgroundColor: '#f0f0f0',
+    paddingVertical: 8,
+    marginRight: 8,
+    borderRadius: 4,
+    backgroundColor: '#e0e0e0',
   },
-  activeScreenTab: {
+  activeScreenItem: {
     backgroundColor: '#6200ee',
   },
-  screenTabText: {
+  screenName: {
     color: '#333',
-    fontWeight: '500',
   },
-  activeScreenTabText: {
+  activeScreenName: {
     color: '#fff',
+    fontWeight: 'bold',
   },
   addScreenButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: 8,
   },
 });
