@@ -2,7 +2,7 @@ export interface Course {
   id: string;
   title: string;
   description: string;
-  price?: number;
+  price: number;
   published: boolean;
   createdAt: string;
   lessons: Lesson[];
@@ -28,15 +28,14 @@ export interface QuizQuestion {
   id: string;
   type: 'multiple_choice' | 'short_answer';
   question: string;
-  options?: string[]; // For multiple choice
-  correctAnswer: string | string[]; // For multiple choice or short answer
+  options?: string[];
+  correctAnswer: string | number;
 }
 
 export interface User {
   id: string;
   email: string;
-  name?: string;
-  avatarUrl?: string;
+  name: string;
   createdAt: string;
   subscriptionPlan: 'free' | 'pro';
   subscriptionEndsAt?: string;
@@ -47,8 +46,8 @@ export interface Student {
   courseId: string;
   userId: string;
   enrolledAt: string;
-  completedLessons: string[]; // Array of lesson IDs
-  quizScores: Record<string, number>; // Key is quiz ID, value is score
+  completedLessons: string[];
+  quizScores: Record<string, number>;
 }
 
 export interface SyncQueueItem {
@@ -57,5 +56,4 @@ export interface SyncQueueItem {
           'CREATE_LESSON' | 'UPDATE_LESSON' | 'DELETE_LESSON';
   data: any;
   synced: boolean;
-  createdAt: string;
 }

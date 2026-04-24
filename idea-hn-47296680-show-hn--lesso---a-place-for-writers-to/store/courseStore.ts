@@ -74,6 +74,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                       resolveCourse({
                         ...course,
                         published: !!course.published,
+                        price: course.price ? parseFloat(course.price) : 0,
                         lessons: lessons.map(lesson => ({
                           ...lesson,
                           order: Number(lesson.order)
@@ -153,12 +154,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                 )
               }));
               resolve();
+            },
+            (_, error) => {
+              console.error('Error updating course:', error);
+              reject(error);
             }
           );
-        },
-        error => {
-          console.error('Error updating course:', error);
-          reject(error);
         }
       );
     });
@@ -201,29 +202,29 @@ export const useCourseStore = create<CourseState>((set, get) => ({
       db.transaction(
         tx => {
           tx.executeSql(
-            'INSERT INTO lessons (id, courseId, title, content, "order", createdAt) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO lessons (id, courseId, title, content, order, createdAt) VALUES (?, ?, ?, ?, ?, ?)',
             [id, courseId, lesson.title, lesson.content || '', lesson.order, createdAt],
             () => {
-              const newLesson: Lesson = {
-                id,
-                courseId,
-                title: lesson.title,
-                content: lesson.content || '',
-                order: lesson.order,
-                createdAt
-              };
-
               set(state => ({
                 courses: state.courses.map(course =>
                   course.id === courseId
                     ? {
                         ...course,
-                        lessons: [...course.lessons, newLesson]
+                        lessons: [
+                          ...course.lessons,
+                          {
+                            id,
+                            courseId,
+                            title: lesson.title,
+                            content: lesson.content || '',
+                            order: lesson.order,
+                            createdAt
+                          }
+                        ]
                       }
                     : course
                 )
               }));
-
               resolve(id);
             }
           );
@@ -260,12 +261,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                 )
               }));
               resolve();
+            },
+            (_, error) => {
+              console.error('Error updating lesson:', error);
+              reject(error);
             }
           );
-        },
-        error => {
-          console.error('Error updating lesson:', error);
-          reject(error);
         }
       );
     });
@@ -290,12 +291,12 @@ export const useCourseStore = create<CourseState>((set, get) => ({
                 )
               }));
               resolve();
+            },
+            (_, error) => {
+              console.error('Error deleting lesson:', error);
+              reject(error);
             }
           );
-        },
-        error => {
-          console.error('Error deleting lesson:', error);
-          reject(error);
         }
       );
     });
@@ -305,11 +306,15 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     return new Promise((resolve, reject) => {
       db.transaction(
         tx => {
-          // Update each lesson's order in the database
+          // Update order for each lesson in the database
           lessons.forEach((lesson, index) => {
             tx.executeSql(
               'UPDATE lessons SET "order" = ? WHERE id = ?',
-              [index, lesson.id]
+              [index, lesson.id],
+              () => {},
+              (_, error) => {
+                console.error('Error updating lesson order:', error);
+              }
             );
           });
 
@@ -319,9 +324,9 @@ export const useCourseStore = create<CourseState>((set, get) => ({
               course.id === courseId
                 ? {
                     ...course,
-                    lessons: lessons.map(lesson => ({
+                    lessons: lessons.map((lesson, index) => ({
                       ...lesson,
-                      order: lessons.findIndex(l => l.id === lesson.id)
+                      order: index
                     }))
                   }
                 : course
@@ -336,8 +341,5 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         }
       );
     });
-  }
+  },
 }));
-
-// Load courses when the store is initialized
-useCourseStore.getState().loadCourses();

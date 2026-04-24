@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert, Switch } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useCourseStore } from '../../store/courseStore';
 import { Ionicons } from '@expo/vector-icons';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import Markdown from 'react-native-markdown-display';
+import { Lesson } from '../../types';
 
 export default function CourseEditorScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -14,13 +15,27 @@ export default function CourseEditorScreen() {
   const updateLesson = useCourseStore((state) => state.updateLesson);
   const deleteLesson = useCourseStore((state) => state.deleteLesson);
   const reorderLessons = useCourseStore((state) => state.reorderLessons);
+  const loadCourses = useCourseStore((state) => state.loadCourses);
 
-  const course = courses.find((c) => c.id === id);
+  const [course, setCourse] = useState<Course | null>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [newLessonTitle, setNewLessonTitle] = useState('');
   const [newLessonContent, setNewLessonContent] = useState('');
   const [editingLessonId, setEditingLessonId] = useState<string | null>(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [price, setPrice] = useState('');
+  const [isPublished, setIsPublished] = useState(false);
+
+  useEffect(() => {
+    loadCourses().then(() => {
+      const foundCourse = courses.find((c) => c.id === id);
+      if (foundCourse) {
+        setCourse(foundCourse);
+        setPrice(foundCourse.price?.toString() || '');
+        setIsPublished(foundCourse.published || false);
+      }
+    });
+  }, [id, courses]);
 
   if (!course) {
     return (
@@ -46,16 +61,15 @@ export default function CourseEditorScreen() {
       return;
     }
 
-    const lessonId = addLesson(course.id, {
+    addLesson(course.id, {
       title: newLessonTitle,
       content: newLessonContent,
       order: course.lessons.length,
+    }).then(() => {
+      setNewLessonTitle('');
+      setNewLessonContent('');
+      setIsModalVisible(false);
     });
-
-    setNewLessonTitle('');
-    setNewLessonContent('');
-    setIsModalVisible(false);
-    setEditingLessonId(lessonId);
   };
 
   const handleLessonPress = (lessonId: string) => {
@@ -69,8 +83,9 @@ export default function CourseEditorScreen() {
         updateLesson(course.id, editingLessonId, {
           title: lesson.title,
           content: lesson.content
+        }).then(() => {
+          setEditingLessonId(null);
         });
-        setEditingLessonId(null);
       }
     }
   };
@@ -85,13 +100,46 @@ export default function CourseEditorScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: () => {
-            deleteLesson(course.id, lessonId);
-            if (editingLessonId === lessonId) {
-              setEditingLessonId(null);
-            }
+            deleteLesson(course.id, lessonId).then(() => {
+              if (editingLessonId === lessonId) {
+                setEditingLessonId(null);
+              }
+            });
           }
         }
       ]
+    );
+  };
+
+  const handleReorderLessons = (lessons: Lesson[]) => {
+    reorderLessons(course.id, lessons);
+  };
+
+  const handlePriceChange = (text: string) => {
+    const numericValue = text.replace(/[^0-9.]/g, '');
+    setPrice(numericValue);
+    updateCourse(course.id, { price: parseFloat(numericValue) || 0 });
+  };
+
+  const handlePublishToggle = () => {
+    const newPublishedStatus = !isPublished;
+    setIsPublished(newPublishedStatus);
+    updateCourse(course.id, { published: newPublishedStatus });
+
+    if (newPublishedStatus) {
+      Alert.alert(
+        'Course Published',
+        'Your course is now live and students can enroll!',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleSaveChanges = () => {
+    Alert.alert(
+      'Changes Saved',
+      'Your course has been successfully updated.',
+      [{ text: 'OK' }]
     );
   };
 
@@ -139,12 +187,10 @@ export default function CourseEditorScreen() {
               <Ionicons name="book-outline" size={16} color="#8E8E93" />
               <Text style={styles.metaText}>{course.lessons.length} lessons</Text>
             </View>
-            {course.price && (
-              <View style={styles.metaItem}>
-                <Ionicons name="pricetag-outline" size={16} color="#8E8E93" />
-                <Text style={styles.metaText}>${course.price}</Text>
-              </View>
-            )}
+            <View style={styles.metaItem}>
+              <Ionicons name="pricetag-outline" size={16} color="#8E8E93" />
+              <Text style={styles.metaText}>${price || '0'}</Text>
+            </View>
           </View>
         </View>
 
@@ -154,59 +200,72 @@ export default function CourseEditorScreen() {
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => setIsModalVisible(true)}
+              activeOpacity={0.7}
             >
               <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Text style={styles.addButtonText}>Add Lesson</Text>
             </TouchableOpacity>
           </View>
 
-          {course.lessons.length === 0 ? (
-            <View style={styles.emptyLessons}>
-              <Ionicons name="document-text-outline" size={48} color="#C7C7CC" />
-              <Text style={styles.emptyLessonsText}>No lessons yet</Text>
-              <Text style={styles.emptyLessonsSubtext}>
-                Add your first lesson to start building your course
-              </Text>
-              <TouchableOpacity
-                style={styles.addLessonButton}
-                onPress={() => setIsModalVisible(true)}
-              >
-                <Text style={styles.addLessonText}>Add Lesson</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <DraggableFlatList
-              data={course.lessons.sort((a, b) => a.order - b.order)}
-              renderItem={renderLessonItem}
-              keyExtractor={(item) => item.id}
-              onDragEnd={({ data }) => {
-                const reorderedLessons = data.map((item, index) => ({
-                  ...item,
-                  order: index
-                }));
-                reorderLessons(course.id, reorderedLessons);
-              }}
-              activationDistance={20}
-            />
-          )}
+          <DraggableFlatList
+            data={course.lessons}
+            renderItem={renderLessonItem}
+            keyExtractor={(item) => item.id}
+            onDragEnd={({ data }) => handleReorderLessons(data)}
+            activationDistance={20}
+          />
         </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Pricing & Publishing</Text>
+          </View>
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceLabel}>Price ($)</Text>
+            <TextInput
+              style={styles.priceInput}
+              value={price}
+              onChangeText={handlePriceChange}
+              keyboardType="numeric"
+              placeholder="0"
+            />
+          </View>
+          <View style={styles.publishContainer}>
+            <Text style={styles.publishLabel}>Publish Course</Text>
+            <Switch
+              value={isPublished}
+              onValueChange={handlePublishToggle}
+              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+              thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
+            />
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveChanges}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* Add Lesson Modal */}
       <Modal
         visible={isModalVisible}
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Add New Lesson</Text>
+            <TouchableOpacity
+              onPress={() => setIsModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#8E8E93" />
+            </TouchableOpacity>
+          </View>
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Lesson</Text>
-              <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-                <Ionicons name="close" size={24} color="#8E8E93" />
-              </TouchableOpacity>
-            </View>
-
             <TextInput
               style={styles.modalInput}
               placeholder="Lesson Title"
@@ -214,100 +273,88 @@ export default function CourseEditorScreen() {
               onChangeText={setNewLessonTitle}
               autoFocus
             />
-
             <TextInput
               style={[styles.modalInput, styles.modalTextArea]}
               placeholder="Lesson Content (Markdown)"
               value={newLessonContent}
               onChangeText={setNewLessonContent}
               multiline
-              numberOfLines={8}
             />
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={handleAddLesson}
-              >
-                <Text style={styles.modalButtonText}>Add Lesson</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleAddLesson}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.modalButtonText}>Add Lesson</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
 
-      {/* Lesson Editor Modal */}
       {currentLesson && (
         <Modal
           visible={!!editingLessonId}
           animationType="slide"
           onRequestClose={() => setEditingLessonId(null)}
         >
-          <View style={styles.editorContainer}>
-            <View style={styles.editorHeader}>
-              <TouchableOpacity onPress={() => setEditingLessonId(null)}>
-                <Ionicons name="arrow-back" size={24} color="#000000" />
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Lesson</Text>
+              <TouchableOpacity
+                onPress={() => setEditingLessonId(null)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color="#8E8E93" />
               </TouchableOpacity>
-              <Text style={styles.editorTitle}>Edit Lesson</Text>
-              <View style={styles.editorActions}>
+            </View>
+            <View style={styles.modalContent}>
+              <TextInput
+                style={styles.modalInput}
+                value={currentLesson.title}
+                onChangeText={(text) => {
+                  const updatedLesson = { ...currentLesson, title: text };
+                  updateLesson(course.id, currentLesson.id, updatedLesson);
+                }}
+              />
+              <TextInput
+                style={[styles.modalInput, styles.modalTextArea]}
+                value={currentLesson.content}
+                onChangeText={(text) => {
+                  const updatedLesson = { ...currentLesson, content: text };
+                  updateLesson(course.id, currentLesson.id, updatedLesson);
+                }}
+                multiline
+              />
+              <View style={styles.previewToggle}>
+                <Text style={styles.previewLabel}>Preview</Text>
+                <Switch
+                  value={isPreviewVisible}
+                  onValueChange={setIsPreviewVisible}
+                />
+              </View>
+              {isPreviewVisible && (
+                <View style={styles.previewContainer}>
+                  <Markdown style={markdownStyles}>
+                    {currentLesson.content || 'Preview will appear here'}
+                  </Markdown>
+                </View>
+              )}
+              <View style={styles.modalActions}>
                 <TouchableOpacity
-                  onPress={() => setIsPreviewVisible(!isPreviewVisible)}
-                  style={styles.previewToggle}
+                  style={[styles.modalButton, styles.deleteButton]}
+                  onPress={() => handleDeleteLesson(currentLesson.id)}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.previewToggleText}>
-                    {isPreviewVisible ? 'Edit' : 'Preview'}
-                  </Text>
+                  <Text style={styles.modalButtonText}>Delete</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  style={styles.modalButton}
                   onPress={handleSaveLesson}
-                  style={styles.saveButton}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={styles.modalButtonText}>Save</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
-            <View style={styles.editorContent}>
-              {isPreviewVisible ? (
-                <ScrollView style={styles.previewContainer}>
-                  <Markdown style={markdownStyles}>
-                    {currentLesson.content || 'No content yet'}
-                  </Markdown>
-                </ScrollView>
-              ) : (
-                <>
-                  <TextInput
-                    style={styles.lessonTitleInput}
-                    value={currentLesson.title}
-                    onChangeText={(text) => updateLesson(course.id, currentLesson.id, { title: text })}
-                    placeholder="Lesson Title"
-                  />
-                  <TextInput
-                    style={styles.lessonContentInput}
-                    value={currentLesson.content}
-                    onChangeText={(text) => updateLesson(course.id, currentLesson.id, { content: text })}
-                    placeholder="Lesson Content (Markdown)"
-                    multiline
-                    numberOfLines={20}
-                  />
-                </>
-              )}
-            </View>
-
-            <View style={styles.editorFooter}>
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => handleDeleteLesson(currentLesson.id)}
-              >
-                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                <Text style={styles.deleteButtonText}>Delete Lesson</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -342,19 +389,15 @@ const markdownStyles = {
   },
   code: {
     fontFamily: 'monospace',
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F5F5F5',
     padding: 4,
     borderRadius: 4,
   },
-  list_item: {
-    flexDirection: 'row',
+  list: {
+    marginLeft: 20,
+  },
+  listItem: {
     marginBottom: 4,
-  },
-  list_item_icon: {
-    marginRight: 8,
-  },
-  list_item_text: {
-    flex: 1,
   },
 };
 
@@ -367,42 +410,39 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   header: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   titleInput: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#000000',
+    fontSize: 28,
+    fontWeight: 'bold',
     marginBottom: 8,
-    padding: 0,
+    color: '#1C1C1E',
   },
   descriptionInput: {
     fontSize: 16,
     color: '#8E8E93',
-    lineHeight: 22,
-    marginBottom: 12,
-    padding: 0,
+    marginBottom: 16,
+    minHeight: 60,
   },
   metaRow: {
     flexDirection: 'row',
-    gap: 16,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
   },
   metaText: {
-    fontSize: 14,
+    marginLeft: 4,
     color: '#8E8E93',
+    fontSize: 14,
   },
   section: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -411,57 +451,36 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyLessons: {
-    alignItems: 'center',
-    paddingVertical: 32,
-  },
-  emptyLessonsText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#000000',
-    marginTop: 12,
+    color: '#1C1C1E',
   },
-  emptyLessonsSubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-    textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  addLessonButton: {
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 8,
   },
-  addLessonText: {
+  addButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+    marginLeft: 4,
+    fontSize: 14,
   },
   lessonCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#F2F2F7',
+    padding: 12,
+    backgroundColor: '#FFFFFF',
     borderRadius: 8,
     marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
   },
   activeLessonCard: {
-    opacity: 0.8,
-    backgroundColor: '#E5E5EA',
+    opacity: 0.7,
+    backgroundColor: '#F2F2F7',
   },
   lessonNumber: {
     width: 32,
@@ -474,72 +493,58 @@ const styles = StyleSheet.create({
   },
   lessonNumberText: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   lessonTitle: {
     flex: 1,
     fontSize: 16,
-    color: '#000000',
+    color: '#1C1C1E',
   },
-  modalContainer: {
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  priceLabel: {
+    fontSize: 16,
+    color: '#1C1C1E',
+    marginRight: 16,
+  },
+  priceInput: {
     flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 12,
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
-  },
-  modalHeader: {
+  publishContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-  },
-  modalInput: {
-    backgroundColor: '#F2F2F7',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 12,
+  publishLabel: {
     fontSize: 16,
+    color: '#1C1C1E',
   },
-  modalTextArea: {
-    height: 160,
-    textAlignVertical: 'top',
+  saveButton: {
+    backgroundColor: '#34C759',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-    marginTop: 16,
-  },
-  modalButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#F2F2F7',
-  },
-  addButton: {
-    backgroundColor: '#007AFF',
-  },
-  modalButtonText: {
+  saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  editorContainer: {
+  modalContainer: {
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
-  editorHeader: {
+  modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -547,72 +552,65 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
   },
-  editorTitle: {
+  modalTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#1C1C1E',
   },
-  editorActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  previewToggle: {
+  closeButton: {
     padding: 8,
   },
-  previewToggleText: {
-    color: '#007AFF',
+  modalContent: {
+    flex: 1,
+    padding: 16,
+  },
+  modalInput: {
     fontSize: 16,
-  },
-  saveButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
   },
-  saveButtonText: {
+  modalTextArea: {
+    minHeight: 200,
+    textAlignVertical: 'top',
+  },
+  modalButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  editorContent: {
-    flex: 1,
-    padding: 16,
+  deleteButton: {
+    backgroundColor: '#FF3B30',
   },
-  lessonTitleInput: {
-    fontSize: 20,
-    fontWeight: '600',
+  previewToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 16,
-    padding: 0,
   },
-  lessonContentInput: {
-    flex: 1,
+  previewLabel: {
     fontSize: 16,
-    lineHeight: 24,
-    textAlignVertical: 'top',
-    padding: 0,
+    color: '#1C1C1E',
   },
   previewContainer: {
-    flex: 1,
-    padding: 16,
-  },
-  editorFooter: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E5EA',
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
   },
-  deleteButtonText: {
-    color: '#FF3B30',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   errorState: {
     flex: 1,
@@ -623,13 +621,15 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
+    color: '#1C1C1E',
     marginTop: 16,
     marginBottom: 24,
+    textAlign: 'center',
   },
   backButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
     paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   backButtonText: {
