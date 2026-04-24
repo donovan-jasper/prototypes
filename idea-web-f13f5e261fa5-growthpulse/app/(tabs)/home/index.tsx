@@ -6,6 +6,7 @@ import { calculateStreak } from '../../../lib/habitTracker';
 import HealthMetricsCard from '../../../components/HealthMetricsCard';
 import StreakCounter from '../../../components/StreakCounter';
 import ProgressChart from '../../../components/ProgressChart';
+import HabitCard from '../../../components/HabitCard';
 
 interface Habit {
   id: string;
@@ -169,39 +170,37 @@ const HomeScreen = () => {
       {/* Streak Counter */}
       <StreakCounter
         habitName={topHabit?.name || 'No habits'}
-        streak={topHabit?.currentStreak || 0}
+        currentStreak={topHabit?.currentStreak || 0}
       />
 
-      {/* Habits Section */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Your Habits</Text>
-      </View>
-
-      {habits.length > 0 ? (
-        habits.map(habit => (
-          <View key={habit.id} style={styles.habitCard}>
-            <View style={styles.habitHeader}>
-              <Text style={styles.habitName}>{habit.name}</Text>
-              <Text style={styles.habitProgress}>{habit.progress.toFixed(0)}%</Text>
-            </View>
-
-            <ProgressChart
-              data={habit.chartData}
-              habitName={habit.name}
-            />
-
-            <View style={styles.habitFooter}>
-              <Text style={styles.habitStreak}>Current streak: {habit.currentStreak} days</Text>
-              <Text style={styles.habitFrequency}>Frequency: {habit.frequency} times</Text>
-            </View>
-          </View>
-        ))
-      ) : (
-        <View style={styles.noHabitsContainer}>
-          <Text style={styles.noHabitsText}>No habits detected yet</Text>
-          <Text style={styles.noHabitsSubtext}>Add some events to your calendar to track them</Text>
-        </View>
+      {/* Progress Chart */}
+      {topHabit && (
+        <ProgressChart
+          title={topHabit.name}
+          data={topHabit.chartData}
+        />
       )}
+
+      {/* Habits List */}
+      <View style={styles.habitsSection}>
+        <Text style={styles.sectionTitle}>Your Habits</Text>
+        {habits.length > 0 ? (
+          habits.map(habit => (
+            <HabitCard
+              key={habit.id}
+              name={habit.name}
+              streak={habit.currentStreak}
+              progress={habit.progress}
+              chartData={habit.chartData}
+            />
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No habits detected yet.</Text>
+            <Text style={styles.emptySubtext}>Add events to your calendar to track them automatically.</Text>
+          </View>
+        )}
+      </View>
     </ScrollView>
   );
 };
@@ -215,10 +214,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
     color: '#666',
   },
@@ -229,8 +228,8 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: 16,
     color: '#d32f2f',
+    marginBottom: 10,
     textAlign: 'center',
-    marginBottom: 8,
   },
   errorSubtext: {
     fontSize: 14,
@@ -245,71 +244,35 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 4,
+    marginBottom: 5,
   },
   subtitle: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.8)',
+    color: 'rgba(255, 255, 255, 0.8)',
   },
-  sectionHeader: {
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    backgroundColor: 'white',
+  habitsSection: {
+    padding: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    marginBottom: 15,
     color: '#333',
   },
-  habitCard: {
-    backgroundColor: 'white',
-    margin: 12,
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  habitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  habitName: {
-    fontSize: 18,
-    fontWeight: '500',
-    color: '#333',
-  },
-  habitProgress: {
-    fontSize: 16,
-    color: '#6200EE',
-    fontWeight: '600',
-  },
-  habitFooter: {
-    marginTop: 12,
-  },
-  habitStreak: {
-    fontSize: 14,
-    color: '#4CAF50',
-    marginBottom: 4,
-  },
-  habitFrequency: {
-    fontSize: 14,
-    color: '#666',
-  },
-  noHabitsContainer: {
+  emptyState: {
     padding: 20,
     alignItems: 'center',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    marginTop: 10,
   },
-  noHabitsText: {
+  emptyText: {
     fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 5,
     color: '#666',
-    marginBottom: 8,
   },
-  noHabitsSubtext: {
+  emptySubtext: {
     fontSize: 14,
     color: '#999',
     textAlign: 'center',
