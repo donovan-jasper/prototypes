@@ -58,3 +58,12 @@ export async function cloneShelf(shelfId: number, userId: string): Promise<void>
     });
   }
 }
+
+export async function trackShelfView(shelfId: number): Promise<number> {
+  // In a real app, this would call an API to track the view
+  // and return the updated view count
+  console.log(`Tracking view for shelf ${shelfId}`);
+
+  // Simulate getting the view count
+  return Math.floor(Math.random() * 100) + 1;
+}

@@ -124,6 +124,14 @@ export default function PublicShelfScreen() {
     </View>
   );
 
+  const renderItem = ({ item }: { item: any }) => (
+    <ItemCard
+      item={item}
+      onPress={() => handleOpenInBrowser(item.url)}
+      showActions={false}
+    />
+  );
+
   if (!isValidLink) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -155,14 +163,14 @@ export default function PublicShelfScreen() {
       <View style={[styles.container, styles.center]}>
         <Text variant="headlineSmall">Shelf not found</Text>
         <Text style={{ marginTop: 16, textAlign: 'center' }}>
-          The shelf you're trying to view doesn't exist or has been removed.
+          The shelf you're looking for doesn't exist or has been removed.
         </Text>
         <Button
           mode="contained"
-          onPress={() => router.push('/')}
+          onPress={() => router.back()}
           style={{ marginTop: 24 }}
         >
-          Go to My Library
+          Go Back
         </Button>
       </View>
     );
@@ -173,43 +181,28 @@ export default function PublicShelfScreen() {
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="Shared Shelf" />
-        <Appbar.Action icon="dots-vertical" onPress={() => {}} />
       </Appbar.Header>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {renderHeader()}
+      <FlatList
+        data={items}
+        renderItem={renderItem}
+        keyExtractor={(item) => item.id.toString()}
+        ListHeaderComponent={renderHeader}
+        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={styles.listContent}
+      />
 
-        <View style={styles.actionButtons}>
-          <Button
-            mode="contained"
-            onPress={handleCloneShelf}
-            loading={isCloning}
-            disabled={isCloning}
-            icon="content-copy"
-            style={styles.cloneButton}
-          >
-            Clone to My Library
-          </Button>
-        </View>
-
-        {items.length === 0 ? (
-          renderEmpty()
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => item.id.toString()}
-            renderItem={({ item }) => (
-              <ItemCard
-                item={item}
-                onPress={() => handleOpenInBrowser(item.url)}
-                readOnly
-              />
-            )}
-            contentContainerStyle={styles.itemsList}
-            scrollEnabled={false}
-          />
-        )}
-      </ScrollView>
+      <View style={styles.cloneButtonContainer}>
+        <Button
+          mode="contained"
+          onPress={handleCloneShelf}
+          loading={isCloning}
+          icon="content-copy"
+          style={styles.cloneButton}
+        >
+          Clone to My Library
+        </Button>
+      </View>
     </View>
   );
 }
@@ -219,18 +212,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   center: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
   },
-  scrollContent: {
+  listContent: {
     padding: 16,
   },
   header: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
   shelfName: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   shelfDescription: {
     marginBottom: 8,
@@ -240,18 +234,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
-  actionButtons: {
-    marginBottom: 24,
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  cloneButtonContainer: {
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
   },
   cloneButton: {
     marginBottom: 16,
-  },
-  itemsList: {
-    paddingBottom: 16,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
   },
 });

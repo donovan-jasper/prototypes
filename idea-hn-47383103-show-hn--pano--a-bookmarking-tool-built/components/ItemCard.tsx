@@ -1,70 +1,72 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity, Image } from 'react-native';
-import { Text, useTheme, IconButton } from 'react-native-paper';
+import { Text, useTheme, IconButton, Avatar } from 'react-native-paper';
 
 interface ItemCardProps {
   item: {
     id: number;
+    url: string;
     title: string;
     description?: string;
     image_url?: string;
     favicon_url?: string;
-    url: string;
   };
   onPress?: () => void;
   onDelete?: () => void;
-  readOnly?: boolean;
+  onOpenInBrowser?: () => void;
+  showActions?: boolean;
 }
 
 export const ItemCard: React.FC<ItemCardProps> = ({
   item,
   onPress,
   onDelete,
-  readOnly = false,
+  onOpenInBrowser,
+  showActions = true,
 }) => {
   const theme = useTheme();
 
-  const renderImage = () => {
-    if (item.image_url) {
-      return (
+  const getDomain = (url: string) => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname.replace('www.', '');
+    } catch {
+      return url;
+    }
+  };
+
+  const domain = getDomain(item.url);
+
+  return (
+    <TouchableOpacity
+      style={[styles.card, { backgroundColor: theme.colors.surface }]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      {item.image_url ? (
         <Image
           source={{ uri: item.image_url }}
           style={styles.image}
           resizeMode="cover"
         />
-      );
-    }
-
-    if (item.favicon_url) {
-      return (
-        <View style={styles.faviconContainer}>
-          <Image
-            source={{ uri: item.favicon_url }}
-            style={styles.favicon}
-            resizeMode="contain"
-          />
+      ) : (
+        <View style={[styles.placeholderImage, { backgroundColor: theme.colors.surfaceVariant }]}>
+          {item.favicon_url ? (
+            <Image
+              source={{ uri: item.favicon_url }}
+              style={styles.favicon}
+              resizeMode="contain"
+            />
+          ) : (
+            <Avatar.Icon
+              icon="link-variant"
+              size={40}
+              style={{ backgroundColor: theme.colors.surfaceVariant }}
+              color={theme.colors.onSurfaceVariant}
+            />
+          )}
         </View>
-      );
-    }
-
-    return (
-      <View style={[styles.faviconContainer, styles.placeholderFavicon]}>
-        <Text style={styles.placeholderText}>
-          {item.title.charAt(0).toUpperCase()}
-        </Text>
-      </View>
-    );
-  };
-
-  return (
-    <TouchableOpacity
-      style={[styles.container, { backgroundColor: theme.colors.surface }]}
-      onPress={onPress}
-      activeOpacity={0.8}
-    >
-      <View style={styles.imageContainer}>
-        {renderImage()}
-      </View>
+      )}
 
       <View style={styles.content}>
         <Text
@@ -85,87 +87,107 @@ export const ItemCard: React.FC<ItemCardProps> = ({
           </Text>
         )}
 
-        <Text
-          variant="labelSmall"
-          numberOfLines={1}
-          style={[styles.url, { color: theme.colors.primary }]}
-        >
-          {new URL(item.url).hostname.replace('www.', '')}
-        </Text>
-      </View>
+        <View style={styles.footer}>
+          <View style={styles.domainContainer}>
+            {item.favicon_url && !item.image_url && (
+              <Image
+                source={{ uri: item.favicon_url }}
+                style={styles.smallFavicon}
+                resizeMode="contain"
+              />
+            )}
+            <Text
+              variant="labelSmall"
+              style={[styles.domain, { color: theme.colors.onSurfaceVariant }]}
+            >
+              {domain}
+            </Text>
+          </View>
 
-      {!readOnly && onDelete && (
-        <IconButton
-          icon="delete"
-          size={20}
-          onPress={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-          style={styles.deleteButton}
-        />
-      )}
+          {showActions && (
+            <View style={styles.actions}>
+              {onOpenInBrowser && (
+                <IconButton
+                  icon="open-in-new"
+                  size={20}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onOpenInBrowser();
+                  }}
+                  style={styles.actionButton}
+                />
+              )}
+              {onDelete && (
+                <IconButton
+                  icon="delete"
+                  size={20}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
+                  style={styles.actionButton}
+                />
+              )}
+            </View>
+          )}
+        </View>
+      </View>
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    margin: 8,
+  card: {
     borderRadius: 8,
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-  },
-  imageContainer: {
-    height: 120,
-    width: '100%',
-    backgroundColor: '#f0f0f0',
+    marginBottom: 16,
+    elevation: 1,
   },
   image: {
     width: '100%',
-    height: '100%',
+    height: 160,
   },
-  faviconContainer: {
+  placeholderImage: {
     width: '100%',
-    height: '100%',
+    height: 160,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
   },
   favicon: {
-    width: 48,
-    height: 48,
-  },
-  placeholderFavicon: {
-    backgroundColor: '#e0e0e0',
-  },
-  placeholderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#666',
+    width: 40,
+    height: 40,
   },
   content: {
-    padding: 12,
+    padding: 16,
   },
   title: {
-    fontWeight: '500',
     marginBottom: 4,
   },
   description: {
-    marginBottom: 4,
+    marginBottom: 8,
   },
-  url: {
-    marginTop: 4,
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  deleteButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    margin: 0,
+  domainContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  smallFavicon: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
+  },
+  domain: {
+    fontSize: 12,
+  },
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  actionButton: {
+    marginLeft: 4,
   },
 });
