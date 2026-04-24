@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, Share } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 
 interface Props {
@@ -40,17 +39,11 @@ export default function QRCodeGenerator({ token, expiryTime, onClose }: Props) {
   const handleShare = async () => {
     try {
       setIsLoading(true);
-      const isAvailable = await Sharing.isAvailableAsync();
-      if (!isAvailable) {
-        Alert.alert('Error', 'Sharing is not available on this device');
-        return;
-      }
-
       const message = `HumanGuard Verification Token:\n${token}\n\nExpires: ${new Date(expiryTime).toLocaleString()}`;
 
-      await Sharing.shareAsync('data:text/plain;base64,' + btoa(message), {
-        mimeType: 'text/plain',
-        dialogTitle: 'Share Verification Token',
+      await Share.share({
+        message: message,
+        title: 'Share Verification Token'
       });
     } catch (error) {
       Alert.alert('Error', 'Failed to share token');
@@ -173,6 +166,7 @@ const styles = StyleSheet.create({
   },
   closeText: {
     fontSize: 18,
+    fontWeight: '600',
     color: '#8E8E93',
   },
   expiredContainer: {
@@ -257,7 +251,7 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
 });
