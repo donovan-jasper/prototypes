@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, StyleSheet, ActivityIndicator, Text } from 'react-native';
+import { View, ScrollView, StyleSheet, ActivityIndicator, Text, Alert } from 'react-native';
 import InvestmentSimulator from '../components/InvestmentSimulator';
 import DebtRoadmap from '../components/DebtRoadmap';
 import { calculateDebtPayoffPlan } from '../utils/debt';
@@ -17,6 +17,7 @@ const InsightsScreen = () => {
         setDebtData(data);
       } catch (err) {
         setError(err.message);
+        Alert.alert('Error', 'Failed to load debt information. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -29,6 +30,7 @@ const InsightsScreen = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading your financial data...</Text>
       </View>
     );
   }
@@ -68,13 +70,19 @@ const InsightsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff'
+    backgroundColor: '#f5f5f5'
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
+    padding: 20
+  },
+  loadingText: {
+    marginTop: 20,
+    fontSize: 16,
+    color: '#666'
   },
   errorContainer: {
     flex: 1,

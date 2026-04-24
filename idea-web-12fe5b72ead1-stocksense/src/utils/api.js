@@ -1,3 +1,17 @@
+import { PlaidApi, Configuration, PlaidEnvironments } from 'plaid';
+
+const configuration = new Configuration({
+  basePath: PlaidEnvironments.sandbox,
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': 'YOUR_PLAID_CLIENT_ID',
+      'PLAID-SECRET': 'YOUR_PLAID_SECRET',
+    },
+  },
+});
+
+const plaidClient = new PlaidApi(configuration);
+
 export const fetchMarketData = async () => {
   // Fetch market data from Alpha Vantage API
   return "Market is up 2%";
@@ -25,29 +39,27 @@ export const fetchTransactions = async () => {
 };
 
 export const fetchUserDebtInfo = async () => {
-  // Mock data for the DebtRoadmap component
-  return {
-    debts: [
-      {
-        id: 1,
-        balance: 5000,
-        interestRate: 18.5,
-        minimumPayment: 150
-      },
-      {
-        id: 2,
-        balance: 12000,
-        interestRate: 6.2,
-        minimumPayment: 200
-      },
-      {
-        id: 3,
-        balance: 3000,
-        interestRate: 12.0,
-        minimumPayment: 100
-      }
-    ],
-    monthlyIncome: 4500,
-    totalDebt: 20000
-  };
+  try {
+    // Mock data for the DebtRoadmap component
+    return {
+      debts: [
+        {
+          amount: 5000,
+          interestRate: 18.5
+        },
+        {
+          amount: 12000,
+          interestRate: 6.2
+        },
+        {
+          amount: 3000,
+          interestRate: 12.0
+        }
+      ],
+      monthlyIncome: 4500
+    };
+  } catch (error) {
+    console.error('Error fetching debt info:', error);
+    throw error;
+  }
 };

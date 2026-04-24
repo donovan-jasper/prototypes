@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { ProgressBar } from 'react-native-paper';
 
-const DebtRoadmap = ({ debts, monthlyIncome, totalDebt }) => {
+const DebtRoadmap = ({ debts, monthlyIncome, totalDebt, totalPayoffMonths, totalInterestSaved }) => {
   if (!debts || debts.length === 0) {
     return (
       <View style={styles.container}>
@@ -15,21 +15,9 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt }) => {
   // Calculate total monthly payment
   const totalMonthlyPayment = debts.reduce((sum, debt) => sum + debt.monthlyPayment, 0);
 
-  // Calculate payoff time in months
-  const payoffTimeMonths = Math.ceil(totalDebt / totalMonthlyPayment);
-
   // Calculate payoff time in years and months
-  const payoffYears = Math.floor(payoffTimeMonths / 12);
-  const payoffMonths = payoffTimeMonths % 12;
-
-  // Calculate total interest paid
-  const totalInterest = debts.reduce((sum, debt) => {
-    const interest = (debt.amount * (debt.interestRate / 100)) * (Math.ceil(debt.amount / debt.monthlyPayment) / 12);
-    return sum + interest;
-  }, 0);
-
-  // Calculate savings from paying off early
-  const savings = (totalInterest / (payoffTimeMonths / 12)) * (payoffTimeMonths / 12);
+  const payoffYears = Math.floor(totalPayoffMonths / 12);
+  const payoffMonths = totalPayoffMonths % 12;
 
   return (
     <View style={styles.container}>
@@ -52,12 +40,8 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt }) => {
           </Text>
         </View>
         <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Total Interest</Text>
-          <Text style={styles.summaryValue}>${totalInterest.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
-        </View>
-        <View style={styles.summaryItem}>
-          <Text style={styles.summaryLabel}>Potential Savings</Text>
-          <Text style={styles.summaryValue}>${savings.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
+          <Text style={styles.summaryLabel}>Total Interest Saved</Text>
+          <Text style={styles.summaryValue}>${totalInterestSaved.toLocaleString(undefined, { maximumFractionDigits: 0 })}</Text>
         </View>
       </View>
 
@@ -66,17 +50,30 @@ const DebtRoadmap = ({ debts, monthlyIncome, totalDebt }) => {
         {debts.map((debt, index) => (
           <View key={index} style={styles.debtItem}>
             <View style={styles.debtHeader}>
+              <Text style={styles.debtName}>{debt.name}</Text>
               <Text style={styles.debtAmount}>${debt.amount.toLocaleString()}</Text>
+            </View>
+            <View style={styles.debtDetails}>
               <Text style={styles.debtInterest}>{debt.interestRate}% APR</Text>
+              <Text style={styles.debtPayment}>Monthly Payment: ${debt.monthlyPayment.toFixed(2)}</Text>
             </View>
             <ProgressBar
               progress={debt.monthlyPayment / debt.amount}
               color="#007AFF"
               style={styles.progressBar}
             />
-            <Text style={styles.debtPayment}>Monthly Payment: ${debt.monthlyPayment.toFixed(2)}</Text>
+            <Text style={styles.debtPayoffTime}>
+              Payoff Time: {Math.ceil(debt.amount / debt.monthlyPayment)} months
+            </Text>
           </View>
         ))}
+      </View>
+
+      <View style={styles.tipContainer}>
+        <Text style={styles.tipTitle}>Pro Tip:</Text>
+        <Text style={styles.tipText}>
+          Paying off your highest-interest debt first saves you the most money over time.
+        </Text>
       </View>
     </View>
   );
@@ -102,6 +99,9 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 8,
   },
   summaryItem: {
     flexDirection: 'row',
@@ -135,26 +135,56 @@ const styles = StyleSheet.create({
   debtHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 5,
+  },
+  debtName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
   },
   debtAmount: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#007AFF',
   },
+  debtDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
   debtInterest: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#FF3B30',
+  },
+  debtPayment: {
+    fontSize: 14,
+    color: '#666',
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
     marginVertical: 10,
   },
-  debtPayment: {
+  debtPayoffTime: {
     fontSize: 14,
     color: '#666',
     marginTop: 5,
+  },
+  tipContainer: {
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 8,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 5,
+  },
+  tipText: {
+    fontSize: 14,
+    color: '#333',
   },
   emptyText: {
     fontSize: 16,
