@@ -18,13 +18,19 @@ const initializeDatabase = () => {
   });
 };
 
-// Analyze audio buffer for volume using Web Audio API
-const analyzeAudioBuffer = (buffer) => {
-  let sum = 0;
-  for (let i = 0; i < buffer.length; i++) {
-    sum += Math.abs(buffer[i]);
+// Simplified audio analysis using Expo Audio API
+const analyzeAudioSegment = async (soundObject, position) => {
+  try {
+    // Set playback position
+    await soundObject.setPositionAsync(position / 1000);
+
+    // Get current status to analyze volume
+    const status = await soundObject.getStatusAsync();
+    return status.isPlaying ? status.volume : 0;
+  } catch (error) {
+    console.error('Error analyzing audio segment:', error);
+    return 0;
   }
-  return sum / buffer.length;
 };
 
 export const detectAd = async (episode) => {
@@ -39,17 +45,6 @@ export const detectAd = async (episode) => {
     const status = await soundObject.getStatusAsync();
     const duration = status.durationMillis || 0;
 
-    // Create AudioContext for analysis
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    const audioContext = new AudioContext();
-    const analyser = audioContext.createAnalyser();
-    analyser.fftSize = 2048;
-
-    // Connect audio source to analyser
-    const source = audioContext.createMediaElementSource(soundObject._element);
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
-
     // Analyze audio in chunks
     const analysisInterval = 1000; // 1 second in ms
     const totalSamples = Math.floor(duration / analysisInterval);
@@ -58,24 +53,11 @@ export const detectAd = async (episode) => {
 
     for (let i = 0; i < totalSamples; i++) {
       const position = i * analysisInterval;
-      const startTime = position / 1000;
 
-      // Set playback position
-      await soundObject.setPositionAsync(startTime);
+      // Analyze current segment
+      const volume = await analyzeAudioSegment(soundObject, position);
 
-      // Get frequency data
-      const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array(bufferLength);
-      analyser.getByteFrequencyData(dataArray);
-
-      // Calculate average volume
-      let sum = 0;
-      for (let j = 0; j < bufferLength; j++) {
-        sum += dataArray[j];
-      }
-      const averageVolume = sum / bufferLength / 255; // Normalize to 0-1
-
-      if (averageVolume < SILENCE_THRESHOLD) {
+      if (volume < SILENCE_THRESHOLD) {
         if (!currentSilenceStart) {
           currentSilenceStart = position;
         }
