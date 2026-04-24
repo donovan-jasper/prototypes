@@ -23,3 +23,63 @@ export const fetchTransactions = async () => {
     { amount: 72.00, description: 'Medical Clinic Visit' }
   ];
 };
+
+export const fetchUserDebtInfo = async () => {
+  // Real implementation using Plaid API
+  try {
+    // In a production app, you would:
+    // 1. Get an access token from your backend
+    // 2. Make authenticated requests to Plaid API
+    // 3. Handle errors and retries
+
+    // For this prototype, we'll simulate a successful API call
+    // with realistic but mock data
+
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    return {
+      debts: [
+        {
+          id: 'debt_1',
+          name: 'Credit Card',
+          balance: 5000,
+          interestRate: 18.5,
+          minimumPayment: 150,
+          type: 'credit',
+          apr: 18.5,
+          lastPaymentDate: '2023-05-15',
+          nextPaymentDue: '2023-06-15'
+        },
+        {
+          id: 'debt_2',
+          name: 'Student Loan',
+          balance: 12000,
+          interestRate: 6.2,
+          minimumPayment: 200,
+          type: 'student',
+          apr: 6.2,
+          lastPaymentDate: '2023-05-10',
+          nextPaymentDue: '2023-06-10'
+        },
+        {
+          id: 'debt_3',
+          name: 'Personal Loan',
+          balance: 3000,
+          interestRate: 12.0,
+          minimumPayment: 100,
+          type: 'personal',
+          apr: 12.0,
+          lastPaymentDate: '2023-05-05',
+          nextPaymentDue: '2023-06-05'
+        }
+      ],
+      totalDebt: 20000,
+      monthlyIncome: 4500,
+      lastUpdated: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('Error fetching debt information:', error);
+    throw new Error('Failed to fetch debt information. Please check your connection and try again.');
+  }
+};
