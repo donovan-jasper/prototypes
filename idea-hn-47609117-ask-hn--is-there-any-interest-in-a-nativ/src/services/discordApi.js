@@ -20,6 +20,10 @@ const initializeDatabase = () => {
       'CREATE TABLE IF NOT EXISTS messages (id TEXT PRIMARY KEY, channel_id TEXT, content TEXT, author TEXT, timestamp TEXT);',
       []
     );
+    tx.executeSql(
+      'CREATE TABLE IF NOT EXISTS offline_status (key TEXT PRIMARY KEY, value TEXT);',
+      []
+    );
   });
 };
 
@@ -38,6 +42,11 @@ const fetchWithAuth = async (endpoint, token) => {
       return fetchWithAuth(endpoint, newToken);
     }
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
     return response.json();
   } catch (error) {
     console.error('API request failed:', error);
@@ -49,54 +58,96 @@ const syncServers = async () => {
   const token = await getStoredToken();
   if (!token) throw new Error('No authentication token');
 
-  const servers = await fetchWithAuth('/users/@me/guilds', token);
+  try {
+    const servers = await fetchWithAuth('/users/@me/guilds', token);
 
-  db.transaction(tx => {
-    servers.forEach(server => {
+    db.transaction(tx => {
+      // Clear existing servers
+      tx.executeSql('DELETE FROM servers;');
+
+      servers.forEach(server => {
+        tx.executeSql(
+          'INSERT INTO servers (id, name, icon) VALUES (?, ?, ?);',
+          [server.id, server.name, server.icon]
+        );
+      });
+
+      // Update last sync time
       tx.executeSql(
-        'INSERT OR REPLACE INTO servers (id, name, icon) VALUES (?, ?, ?);',
-        [server.id, server.name, server.icon]
+        'INSERT OR REPLACE INTO offline_status (key, value) VALUES (?, ?);',
+        ['last_server_sync', new Date().toISOString()]
       );
     });
-  });
 
-  return servers;
+    return servers;
+  } catch (error) {
+    console.error('Failed to sync servers:', error);
+    throw error;
+  }
 };
 
 const syncChannels = async (serverId) => {
   const token = await getStoredToken();
   if (!token) throw new Error('No authentication token');
 
-  const channels = await fetchWithAuth(`/guilds/${serverId}/channels`, token);
+  try {
+    const channels = await fetchWithAuth(`/guilds/${serverId}/channels`, token);
 
-  db.transaction(tx => {
-    channels.forEach(channel => {
+    db.transaction(tx => {
+      // Clear existing channels for this server
+      tx.executeSql('DELETE FROM channels WHERE server_id = ?;', [serverId]);
+
+      channels.forEach(channel => {
+        tx.executeSql(
+          'INSERT INTO channels (id, server_id, name, type) VALUES (?, ?, ?, ?);',
+          [channel.id, serverId, channel.name, channel.type]
+        );
+      });
+
+      // Update last sync time
       tx.executeSql(
-        'INSERT OR REPLACE INTO channels (id, server_id, name, type) VALUES (?, ?, ?, ?);',
-        [channel.id, serverId, channel.name, channel.type]
+        'INSERT OR REPLACE INTO offline_status (key, value) VALUES (?, ?);',
+        ['last_channel_sync', new Date().toISOString()]
       );
     });
-  });
 
-  return channels;
+    return channels;
+  } catch (error) {
+    console.error('Failed to sync channels:', error);
+    throw error;
+  }
 };
 
 const syncMessages = async (channelId) => {
   const token = await getStoredToken();
   if (!token) throw new Error('No authentication token');
 
-  const messages = await fetchWithAuth(`/channels/${channelId}/messages`, token);
+  try {
+    const messages = await fetchWithAuth(`/channels/${channelId}/messages`, token);
 
-  db.transaction(tx => {
-    messages.forEach(message => {
+    db.transaction(tx => {
+      // Clear existing messages for this channel
+      tx.executeSql('DELETE FROM messages WHERE channel_id = ?;', [channelId]);
+
+      messages.forEach(message => {
+        tx.executeSql(
+          'INSERT INTO messages (id, channel_id, content, author, timestamp) VALUES (?, ?, ?, ?, ?);',
+          [message.id, channelId, message.content, message.author.username, message.timestamp]
+        );
+      });
+
+      // Update last sync time
       tx.executeSql(
-        'INSERT OR REPLACE INTO messages (id, channel_id, content, author, timestamp) VALUES (?, ?, ?, ?, ?);',
-        [message.id, channelId, message.content, message.author.username, message.timestamp]
+        'INSERT OR REPLACE INTO offline_status (key, value) VALUES (?, ?);',
+        ['last_message_sync', new Date().toISOString()]
       );
     });
-  });
 
-  return messages;
+    return messages;
+  } catch (error) {
+    console.error('Failed to sync messages:', error);
+    throw error;
+  }
 };
 
 const getOfflineServers = () => {
@@ -138,6 +189,61 @@ const getOfflineMessages = (channelId) => {
   });
 };
 
+const getLastSyncTime = (key) => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'SELECT value FROM offline_status WHERE key = ?;',
+        [key],
+        (_, { rows }) => {
+          if (rows.length > 0) {
+            resolve(new Date(rows.item(0).value));
+          } else {
+            resolve(null);
+          }
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+const sendMessage = async (channelId, content) => {
+  const token = await getStoredToken();
+  if (!token) throw new Error('No authentication token');
+
+  try {
+    const response = await fetch(`${BASE_URL}/channels/${channelId}/messages`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ content }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+
+    const message = await response.json();
+
+    // Save to local database
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO messages (id, channel_id, content, author, timestamp) VALUES (?, ?, ?, ?, ?);',
+        [message.id, channelId, message.content, message.author.username, message.timestamp]
+      );
+    });
+
+    return message;
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    throw error;
+  }
+};
+
 export {
   initializeDatabase,
   syncServers,
@@ -146,4 +252,6 @@ export {
   getOfflineServers,
   getOfflineChannels,
   getOfflineMessages,
+  getLastSyncTime,
+  sendMessage,
 };

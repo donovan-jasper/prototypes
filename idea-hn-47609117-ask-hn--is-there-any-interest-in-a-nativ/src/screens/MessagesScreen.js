@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity } from 'react-native';
-import { getOfflineMessages, syncMessages } from '../services/discordApi';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import { getOfflineMessages, syncMessages, sendMessage } from '../services/discordApi';
 import { getStoredToken } from '../services/auth';
+import { useFocusEffect } from '@react-navigation/native';
 
 const MessagesScreen = ({ route, navigation }) => {
   const { channelId } = route.params;
@@ -9,48 +10,51 @@ const MessagesScreen = ({ route, navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [newMessage, setNewMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
 
-  const loadMessages = async () => {
+  const loadMessages = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
+
     try {
       const offlineMessages = await getOfflineMessages(channelId);
-      if (offlineMessages.length > 0) {
-        setMessages(offlineMessages);
-      } else {
-        // If no offline data, try to sync with Discord
-        const token = await getStoredToken();
-        if (token) {
-          const syncedMessages = await syncMessages(channelId);
-          setMessages(syncedMessages);
-        } else {
-          // No token, redirect to login
-          navigation.replace('Login');
-        }
+      setMessages(offlineMessages);
+
+      // Try to sync with Discord if we have a token
+      const token = await getStoredToken();
+      if (token) {
+        const syncedMessages = await syncMessages(channelId);
+        setMessages(syncedMessages);
       }
     } catch (error) {
       console.error('Error loading messages:', error);
-      Alert.alert('Error', 'Failed to load messages. Please try again.');
+      if (error.message.includes('No authentication token')) {
+        // Show offline data if available
+        const offlineMessages = await getOfflineMessages(channelId);
+        if (offlineMessages.length > 0) {
+          setMessages(offlineMessages);
+          Alert.alert('Offline Mode', 'You are viewing cached messages. Connect to the internet to sync with Discord.');
+        } else {
+          Alert.alert('Error', 'No messages available offline. Please connect to the internet.');
+        }
+      } else {
+        Alert.alert('Error', 'Failed to load messages. Please try again.');
+      }
     } finally {
       setIsLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [channelId]);
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    try {
-      const syncedMessages = await syncMessages(channelId);
-      setMessages(syncedMessages);
-    } catch (error) {
-      console.error('Error refreshing messages:', error);
-      Alert.alert('Error', 'Failed to refresh messages. Please check your connection.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
+    await loadMessages(false);
+  }, [loadMessages]);
 
   const handleSendMessage = async () => {
     if (!newMessage.trim()) return;
 
+    setIsSending(true);
     try {
       const token = await getStoredToken();
       if (!token) {
@@ -58,27 +62,22 @@ const MessagesScreen = ({ route, navigation }) => {
         return;
       }
 
-      // In a real app, you would send the message to Discord API here
-      // For now, we'll just add it to our local state
-      const newMsg = {
-        id: Date.now().toString(),
-        channel_id: channelId,
-        content: newMessage,
-        author: 'You',
-        timestamp: new Date().toISOString()
-      };
-
-      setMessages([newMsg, ...messages]);
+      const message = await sendMessage(channelId, newMessage);
+      setMessages(prev => [message, ...prev]);
       setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to send message. Please try again.');
+    } finally {
+      setIsSending(false);
     }
   };
 
-  useEffect(() => {
-    loadMessages();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadMessages();
+    }, [loadMessages])
+  );
 
   const renderMessageItem = ({ item }) => (
     <View style={styles.messageItem}>
@@ -97,7 +96,11 @@ const MessagesScreen = ({ route, navigation }) => {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    >
       <FlatList
         data={messages}
         renderItem={renderMessageItem}
@@ -106,6 +109,13 @@ const MessagesScreen = ({ route, navigation }) => {
         onRefresh={handleRefresh}
         inverted
         contentContainerStyle={styles.messagesList}
+        ListHeaderComponent={
+          lastSyncTime && (
+            <Text style={styles.syncStatus}>
+              Last synced: {lastSyncTime.toLocaleString()}
+            </Text>
+          )
+        }
       />
 
       <View style={styles.inputContainer}>
@@ -116,16 +126,21 @@ const MessagesScreen = ({ route, navigation }) => {
           placeholder="Type a message..."
           placeholderTextColor="#72767D"
           multiline
+          editable={!isSending}
         />
         <TouchableOpacity
-          style={styles.sendButton}
+          style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
           onPress={handleSendMessage}
-          disabled={!newMessage.trim()}
+          disabled={!newMessage.trim() || isSending}
         >
-          <Text style={styles.sendButtonText}>Send</Text>
+          {isSending ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.sendButtonText}>Send</Text>
+          )}
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -183,13 +198,23 @@ const styles = StyleSheet.create({
   sendButton: {
     backgroundColor: '#5865F2',
     borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    padding: 12,
     justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 60,
+  },
+  sendButtonDisabled: {
+    backgroundColor: '#4F5D95',
   },
   sendButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  syncStatus: {
+    color: '#72767D',
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: 10,
   },
 });
 
