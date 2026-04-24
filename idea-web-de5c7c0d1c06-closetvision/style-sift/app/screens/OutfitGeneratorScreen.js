@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { generateOutfit } from '../utils/outfitGenerator';
+import { useNavigation } from '@react-navigation/native';
 
 const OutfitGeneratorScreen = () => {
   const [outfits, setOutfits] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const navigation = useNavigation();
 
   const handleGenerateOutfits = async (occasion) => {
     setIsLoading(true);
@@ -16,6 +18,10 @@ const OutfitGeneratorScreen = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleTryOn = (outfit) => {
+    navigation.navigate('ARTryOn', { outfit });
   };
 
   return (
@@ -52,6 +58,12 @@ const OutfitGeneratorScreen = () => {
               <Text style={styles.itemText}>Top: {item.top}</Text>
               <Text style={styles.itemText}>Bottom: {item.bottom}</Text>
               <Text style={styles.itemText}>Accessory: {item.accessory}</Text>
+              <TouchableOpacity
+                style={styles.tryOnButton}
+                onPress={() => handleTryOn(item)}
+              >
+                <Text style={styles.tryOnButtonText}>Try On</Text>
+              </TouchableOpacity>
             </View>
           )}
           ListEmptyComponent={
@@ -123,6 +135,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 5,
     color: '#444',
+  },
+  tryOnButton: {
+    marginTop: 10,
+    backgroundColor: '#9b59b6',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  tryOnButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   emptyContainer: {
     flex: 1,
