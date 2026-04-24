@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, TouchableOpacity, TextInput, Modal, Alert } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { getFirestore, doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { getFirestore, doc, getDoc, collection, query, where, getDocs, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 interface Group {
@@ -11,6 +11,7 @@ interface Group {
   privacy: 'public' | 'private';
   members: string[];
   createdAt: Date;
+  adminId: string;
 }
 
 interface Challenge {
@@ -36,6 +37,13 @@ const GroupDetail: React.FC = () => {
   const [challenges, setChallenges] = useState<Challenge[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [showChallengeModal, setShowChallengeModal] = useState(false);
+  const [newChallenge, setNewChallenge] = useState({
+    title: '',
+    description: '',
+    xpReward: 0
+  });
   const db = getFirestore();
   const auth = getAuth();
 
@@ -47,6 +55,12 @@ const GroupDetail: React.FC = () => {
         if (groupDoc.exists()) {
           const groupData = { id: groupDoc.id, ...groupDoc.data() } as Group;
           setGroup(groupData);
+
+          // Check if current user is admin
+          const currentUser = auth.currentUser;
+          if (currentUser && groupData.adminId === currentUser.uid) {
+            setIsAdmin(true);
+          }
 
           // Fetch challenges for this group
           const challengesQuery = query(
@@ -78,6 +92,40 @@ const GroupDetail: React.FC = () => {
 
     fetchGroupData();
   }, [groupId]);
+
+  const handleCreateChallenge = async () => {
+    if (!newChallenge.title || !newChallenge.description || newChallenge.xpReward <= 0) {
+      Alert.alert('Error', 'Please fill all fields with valid values');
+      return;
+    }
+
+    try {
+      await addDoc(collection(db, 'challenges'), {
+        ...newChallenge,
+        groupId,
+        createdAt: serverTimestamp()
+      });
+
+      // Refresh challenges
+      const challengesQuery = query(
+        collection(db, 'challenges'),
+        where('groupId', '==', groupId)
+      );
+      const challengesSnapshot = await getDocs(challengesQuery);
+      const challengesData = challengesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Challenge[];
+      setChallenges(challengesData);
+
+      setShowChallengeModal(false);
+      setNewChallenge({ title: '', description: '', xpReward: 0 });
+      Alert.alert('Success', 'Challenge created successfully!');
+    } catch (error) {
+      console.error('Error creating challenge:', error);
+      Alert.alert('Error', 'Failed to create challenge');
+    }
+  };
 
   if (loading) {
     return (
@@ -129,7 +177,17 @@ const GroupDetail: React.FC = () => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Group Challenges</Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Group Challenges</Text>
+          {isAdmin && (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setShowChallengeModal(true)}
+            >
+              <Text style={styles.addButtonText}>+ Add Challenge</Text>
+            </TouchableOpacity>
+          )}
+        </View>
         <FlatList
           data={challenges}
           keyExtractor={(item) => item.id}
@@ -152,6 +210,60 @@ const GroupDetail: React.FC = () => {
       >
         <Text style={styles.backButtonText}>Back to Groups</Text>
       </TouchableOpacity>
+
+      {/* Challenge Creation Modal */}
+      <Modal
+        visible={showChallengeModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowChallengeModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Create New Challenge</Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Challenge Title"
+              value={newChallenge.title}
+              onChangeText={(text) => setNewChallenge({...newChallenge, title: text})}
+            />
+
+            <TextInput
+              style={[styles.input, styles.multilineInput]}
+              placeholder="Description"
+              multiline
+              numberOfLines={4}
+              value={newChallenge.description}
+              onChangeText={(text) => setNewChallenge({...newChallenge, description: text})}
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="XP Reward"
+              keyboardType="numeric"
+              value={newChallenge.xpReward.toString()}
+              onChangeText={(text) => setNewChallenge({...newChallenge, xpReward: parseInt(text) || 0})}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowChallengeModal(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.createButton]}
+                onPress={handleCreateChallenge}
+              >
+                <Text style={styles.modalButtonText}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -166,28 +278,27 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
-    color: '#6200EE',
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
   emptyText: {
     fontSize: 18,
-    color: '#333',
     marginBottom: 20,
+    color: '#666',
   },
   header: {
     marginBottom: 20,
-    padding: 16,
-    backgroundColor: 'white',
+    padding: 15,
+    backgroundColor: '#fff',
     borderRadius: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -198,84 +309,152 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#6200EE',
-    marginBottom: 4,
+    color: '#333',
+    marginBottom: 5,
   },
   groupPrivacy: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   groupDescription: {
     fontSize: 16,
-    color: '#333',
+    color: '#444',
   },
   section: {
     marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6200EE',
-    marginBottom: 12,
-  },
-  memberItem: {
-    padding: 12,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 8,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  memberName: {
-    fontSize: 16,
-    color: '#333',
-  },
-  challengeItem: {
-    padding: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    marginBottom: 12,
+    padding: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  addButton: {
+    backgroundColor: '#6200EE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
+  },
+  addButtonText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  memberItem: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  memberName: {
+    fontSize: 16,
+    color: '#333',
+  },
+  challengeItem: {
+    padding: 12,
+    marginBottom: 8,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: '#6200EE',
+  },
   challengeTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#6200EE',
+    color: '#333',
     marginBottom: 4,
   },
   challengeDescription: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   challengeXP: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#6200EE',
     fontWeight: 'bold',
   },
   emptyListText: {
     fontSize: 14,
-    color: '#666',
+    color: '#999',
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 10,
   },
   backButton: {
     backgroundColor: '#6200EE',
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 10,
   },
   backButtonText: {
-    color: 'white',
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    padding: 10,
+    borderRadius: 5,
+    flex: 1,
+    marginHorizontal: 5,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  createButton: {
+    backgroundColor: '#6200EE',
+  },
+  modalButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
   },
