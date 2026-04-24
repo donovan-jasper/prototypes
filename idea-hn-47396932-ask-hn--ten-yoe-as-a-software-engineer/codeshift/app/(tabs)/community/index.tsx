@@ -46,7 +46,8 @@ const CommunityScreen = () => {
         question: newQuestion.trim(),
         answer: 'This question is awaiting an answer...',
         createdAt: serverTimestamp(),
-        status: 'unanswered'
+        status: 'unanswered',
+        upvotes: 0
       });
       setNewQuestion('');
       setShowForm(false);
@@ -62,12 +63,15 @@ const CommunityScreen = () => {
     <View style={styles.questionCard}>
       <Text style={styles.questionText}>{item.question}</Text>
       <Text style={styles.answerText}>{item.answer}</Text>
-      <Text style={[
-        styles.statusText,
-        item.status === 'answered' ? styles.answered : styles.unanswered
-      ]}>
-        {item.status === 'answered' ? 'Answered' : 'Unanswered'}
-      </Text>
+      <View style={styles.questionFooter}>
+        <Text style={[
+          styles.statusText,
+          item.status === 'answered' ? styles.answered : styles.unanswered
+        ]}>
+          {item.status === 'answered' ? 'Answered' : 'Unanswered'}
+        </Text>
+        <Text style={styles.upvoteText}>↑ {item.upvotes || 0}</Text>
+      </View>
     </View>
   );
 
@@ -110,6 +114,7 @@ const CommunityScreen = () => {
             onChangeText={setNewQuestion}
             multiline
             editable={!submitting}
+            placeholderTextColor="#999"
           />
           <View style={styles.buttonContainer}>
             <TouchableOpacity
@@ -139,6 +144,7 @@ const CommunityScreen = () => {
         icon="plus"
         onPress={() => setShowForm(true)}
         disabled={submitting}
+        color="#6200ee"
       />
     </SafeAreaView>
   );
@@ -175,22 +181,57 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
+    color: '#333',
   },
   answerText: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  questionFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   statusText: {
     fontSize: 12,
-    fontWeight: 'bold',
-    alignSelf: 'flex-end',
+    fontWeight: '500',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   answered: {
-    color: '#4CAF50',
+    backgroundColor: '#e8f5e9',
+    color: '#2e7d32',
   },
   unanswered: {
-    color: '#F44336',
+    backgroundColor: '#ffebee',
+    color: '#c62828',
+  },
+  upvoteText: {
+    fontSize: 12,
+    color: '#666',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    padding: 16,
+    backgroundColor: '#ffebee',
+  },
+  errorText: {
+    color: '#c62828',
+    textAlign: 'center',
+  },
+  emptyContainer: {
+    padding: 32,
+    alignItems: 'center',
+  },
+  emptyText: {
+    color: '#666',
+    fontSize: 16,
   },
   formContainer: {
     position: 'absolute',
@@ -220,12 +261,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 4,
     marginLeft: 8,
-    minWidth: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#f5f5f5',
   },
   submitButton: {
     backgroundColor: '#6200ee',
@@ -243,30 +281,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#6200ee',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-  },
-  errorContainer: {
-    padding: 16,
-    backgroundColor: '#ffebee',
-  },
-  errorText: {
-    color: '#d32f2f',
-    textAlign: 'center',
   },
 });
 
