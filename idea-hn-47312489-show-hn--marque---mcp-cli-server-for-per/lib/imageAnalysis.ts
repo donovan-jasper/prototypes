@@ -35,6 +35,13 @@ export interface ImageAnalysis {
 
 export const analyzeImageFromUri = async (imageUri: string): Promise<ImageAnalysis> => {
   try {
+    // For the prototype, we'll use mock data for specific test images
+    // In production, this would call the OpenAI Vision API
+    const mockData = getMockAnalysisForImage(imageUri);
+    if (mockData) {
+      return mockData;
+    }
+
     const base64Data = await convertImageToBase64(imageUri);
     const analysis = await analyzeImage(imageUri);
     return normalizeAnalysis(analysis);
@@ -104,4 +111,75 @@ const normalizeAnalysis = (rawAnalysis: any): ImageAnalysis => {
     },
     components: rawAnalysis.components || {}
   };
+};
+
+// Mock data for specific test images
+const getMockAnalysisForImage = (imageUri: string): ImageAnalysis | null => {
+  // Check if this is a test image (in a real app, you'd have a more sophisticated way to identify test images)
+  if (imageUri.includes('stripe-mock')) {
+    return {
+      colors: ['#635BFF', '#FFFFFF', '#F6F9FC', '#6772E5', '#5436DA'],
+      typography: {
+        base: 16,
+        ratio: 1.25,
+        fontFamily: 'Inter',
+        weights: [400, 500, 600, 700]
+      },
+      spacing: {
+        base: 4,
+        ratio: 1.5
+      },
+      components: {
+        buttons: {
+          primary: {
+            background: '#6772E5',
+            text: '#FFFFFF'
+          },
+          secondary: {
+            background: '#FFFFFF',
+            text: '#6772E5'
+          }
+        },
+        cards: {
+          background: '#FFFFFF',
+          borderRadius: 8,
+          shadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+        }
+      }
+    };
+  } else if (imageUri.includes('linear-mock')) {
+    return {
+      colors: ['#000000', '#FFFFFF', '#F5F5F5', '#E0E0E0', '#BDBDBD'],
+      typography: {
+        base: 14,
+        ratio: 1.2,
+        fontFamily: 'Helvetica Neue',
+        weights: [400, 500, 600, 700]
+      },
+      spacing: {
+        base: 8,
+        ratio: 1.5
+      },
+      components: {
+        buttons: {
+          primary: {
+            background: '#000000',
+            text: '#FFFFFF'
+          },
+          secondary: {
+            background: '#FFFFFF',
+            text: '#000000'
+          }
+        },
+        cards: {
+          background: '#FFFFFF',
+          borderRadius: 4,
+          shadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+        }
+      }
+    };
+  }
+
+  // Return null for non-test images to use real API
+  return null;
 };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Button, ActivityIndicator, Text, Alert, TouchableOpacity } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import CameraCapture from '../../components/CameraCapture';
+import DesignSystemPreview from '../../components/DesignSystemPreview';
 import { analyzeImageFromUri } from '../../lib/imageAnalysis';
 import { generateSystem } from '../../lib/designSystem';
 import { useDesignStore } from '../../store/useDesignStore';
@@ -12,6 +13,7 @@ const CreateScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCamera, setShowCamera] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
   const { saveSystem } = useDesignStore();
   const router = useRouter();
 
@@ -20,12 +22,26 @@ const CreateScreen = () => {
     setError(null);
     try {
       const analysis = await analyzeImageFromUri(imageUri);
-      const system = generateSystem(analysis);
+      setAnalysisResult(analysis);
+    } catch (error) {
+      console.error('Error analyzing image:', error);
+      setError(error.message || 'Failed to analyze image');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSaveSystem = async () => {
+    if (!analysisResult) return;
+
+    setIsLoading(true);
+    try {
+      const system = generateSystem(analysisResult);
       await saveSystem(system);
       router.push('/library');
     } catch (error) {
-      console.error('Error creating system:', error);
-      setError(error.message || 'Failed to create design system');
+      console.error('Error saving system:', error);
+      setError('Failed to save design system');
     } finally {
       setIsLoading(false);
     }
@@ -71,6 +87,11 @@ const CreateScreen = () => {
             />
           </View>
         </View>
+      ) : analysisResult ? (
+        <DesignSystemPreview
+          analysis={analysisResult}
+          onSave={handleSaveSystem}
+        />
       ) : showCamera ? (
         <CameraCapture
           onCapture={handleImageCapture}
