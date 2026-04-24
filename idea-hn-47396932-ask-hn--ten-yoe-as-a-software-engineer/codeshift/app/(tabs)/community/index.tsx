@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
 import { FAB } from 'react-native-paper';
 import { db } from '../../../utils/api';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 
 const CommunityScreen = () => {
   const [questions, setQuestions] = useState([]);
@@ -59,6 +59,18 @@ const CommunityScreen = () => {
     }
   };
 
+  const handleUpvote = async (questionId) => {
+    try {
+      const questionRef = doc(db, 'questions', questionId);
+      await updateDoc(questionRef, {
+        upvotes: increment(1)
+      });
+    } catch (error) {
+      console.error('Error upvoting question: ', error);
+      Alert.alert('Error', 'Failed to upvote question. Please try again.');
+    }
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.questionCard}>
       <Text style={styles.questionText}>{item.question}</Text>
@@ -70,7 +82,9 @@ const CommunityScreen = () => {
         ]}>
           {item.status === 'answered' ? 'Answered' : 'Unanswered'}
         </Text>
-        <Text style={styles.upvoteText}>↑ {item.upvotes || 0}</Text>
+        <TouchableOpacity onPress={() => handleUpvote(item.id)} style={styles.upvoteButton}>
+          <Text style={styles.upvoteText}>↑ {item.upvotes || 0}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -208,9 +222,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffebee',
     color: '#c62828',
   },
+  upvoteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   upvoteText: {
-    fontSize: 12,
-    color: '#666',
+    fontSize: 14,
+    color: '#6200ee',
+    marginLeft: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -257,8 +276,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   button: {
-    paddingVertical: 8,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 4,
     marginLeft: 8,
   },
@@ -280,7 +299,7 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-    backgroundColor: '#6200ee',
+    backgroundColor: '#fff',
   },
 });
 
