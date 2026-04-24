@@ -11,6 +11,7 @@ const TradeScreen = ({ route }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [tradeInProgress, setTradeInProgress] = useState(false);
+  const [priceHistory, setPriceHistory] = useState([]);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -18,6 +19,18 @@ const TradeScreen = ({ route }) => {
       try {
         const data = await getGameDetails(barcode);
         setGameData(data);
+
+        // Generate mock price history for demonstration
+        const history = [];
+        const basePrice = data.price;
+        for (let i = 0; i < 7; i++) {
+          const variation = (Math.random() - 0.5) * 5; // Random variation between -2.5 and +2.5
+          history.push({
+            date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
+            price: Math.max(5, basePrice + variation) // Ensure price doesn't go below $5
+          });
+        }
+        setPriceHistory(history);
       } catch (err) {
         setError(err.message || 'Failed to fetch game data');
       } finally {
@@ -44,7 +57,7 @@ const TradeScreen = ({ route }) => {
 
       Alert.alert(
         'Trade Submitted',
-        `Your trade for ${gameData.name} has been submitted successfully.`,
+        `Your trade for ${gameData.name} has been submitted successfully. Trade ID: ${tradeId}`,
         [
           { text: 'OK', onPress: () => navigation.navigate('Inventory') }
         ]
@@ -54,6 +67,31 @@ const TradeScreen = ({ route }) => {
     } finally {
       setTradeInProgress(false);
     }
+  };
+
+  const renderPriceHistory = () => {
+    if (priceHistory.length === 0) return null;
+
+    const maxPrice = Math.max(...priceHistory.map(item => item.price));
+    const minPrice = Math.min(...priceHistory.map(item => item.price));
+
+    return (
+      <View style={styles.priceHistoryContainer}>
+        <Text style={styles.sectionTitle}>Price History (7 days)</Text>
+        <View style={styles.priceChart}>
+          {priceHistory.map((item, index) => {
+            const height = ((item.price - minPrice) / (maxPrice - minPrice)) * 100;
+            return (
+              <View key={index} style={styles.priceBarContainer}>
+                <View style={[styles.priceBar, { height: `${height}%` }]} />
+                <Text style={styles.priceBarLabel}>${item.price.toFixed(2)}</Text>
+                <Text style={styles.priceBarDate}>{item.date}</Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+    );
   };
 
   const renderGameDetails = () => {
@@ -111,6 +149,8 @@ const TradeScreen = ({ route }) => {
           <Text style={styles.gamePrice}>Market Price: ${gameData.price?.toFixed(2) || 'N/A'}</Text>
           <Ionicons name="pricetag-outline" size={20} color="#2E7D32" />
         </View>
+
+        {renderPriceHistory()}
 
         <View style={styles.infoRow}>
           <Ionicons name="star-outline" size={18} color="#555" />
@@ -178,7 +218,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#6200EE',
+    color: '#666',
   },
   errorContainer: {
     flex: 1,
@@ -200,16 +240,16 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontWeight: 'bold',
   },
   gameContainer: {
     flex: 1,
-    padding: 20,
+    padding: 15,
   },
   gameCover: {
     width: '100%',
-    height: 300,
-    marginBottom: 20,
+    height: 250,
+    marginBottom: 15,
     borderRadius: 8,
   },
   gameTitle: {
@@ -229,6 +269,49 @@ const styles = StyleSheet.create({
     color: '#2E7D32',
     marginRight: 5,
   },
+  priceHistoryContainer: {
+    marginVertical: 20,
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
+  },
+  priceChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 150,
+    alignItems: 'flex-end',
+  },
+  priceBarContainer: {
+    alignItems: 'center',
+    width: 30,
+  },
+  priceBar: {
+    width: 20,
+    backgroundColor: '#6200EE',
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  priceBarLabel: {
+    fontSize: 10,
+    marginTop: 5,
+    color: '#555',
+  },
+  priceBarDate: {
+    fontSize: 8,
+    marginTop: 2,
+    color: '#888',
+  },
   infoRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -236,21 +319,21 @@ const styles = StyleSheet.create({
   },
   gameCondition: {
     fontSize: 16,
-    marginLeft: 5,
+    marginLeft: 8,
     color: '#555',
   },
   gamePlatforms: {
     fontSize: 16,
-    marginLeft: 5,
+    marginLeft: 8,
     color: '#555',
   },
   gameRelease: {
     fontSize: 16,
-    marginLeft: 5,
+    marginLeft: 8,
     color: '#555',
   },
   summaryContainer: {
-    marginTop: 20,
+    marginVertical: 15,
     padding: 15,
     backgroundColor: 'white',
     borderRadius: 8,
@@ -261,18 +344,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   summaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
     color: '#333',
   },
   summaryText: {
     fontSize: 14,
-    color: '#555',
     lineHeight: 20,
+    color: '#555',
   },
   actionButtons: {
-    marginTop: 30,
+    marginTop: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
@@ -291,8 +374,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: 'white',
-    fontSize: 16,
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

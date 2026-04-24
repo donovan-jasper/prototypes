@@ -38,10 +38,21 @@ export const getGameDetails = async (barcode) => {
 
     const gameData = gameResponse.data[0];
 
-    // Get market price (mock implementation - replace with real pricing API)
-    const mockPrice = Math.floor(Math.random() * 50) + 10; // Random price between $10-$60
-    const conditions = ['New', 'Used - Like New', 'Used - Good', 'Used - Fair'];
-    const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
+    // Get market price from a real pricing API (mock implementation)
+    // In a real app, you would use a dedicated game pricing API like PriceChartingAPI
+    const priceResponse = await axios.get(`https://api.pricecharting.com/api/products?q=${encodeURIComponent(gameData.name)}&key=YOUR_PRICECHARTING_KEY`);
+
+    let priceData;
+    if (priceResponse.data && priceResponse.data.products && priceResponse.data.products.length > 0) {
+      // Use the first product's price as our market price
+      priceData = priceResponse.data.products[0];
+    } else {
+      // Fallback to mock price if real API fails
+      priceData = {
+        price: Math.floor(Math.random() * 50) + 10,
+        condition: ['New', 'Used - Like New', 'Used - Good', 'Used - Fair'][Math.floor(Math.random() * 4)]
+      };
+    }
 
     return {
       id: gameId,
@@ -50,8 +61,8 @@ export const getGameDetails = async (barcode) => {
       summary: gameData.summary,
       platforms: gameData.platforms?.map(p => p.name).join(', ') || 'Unknown',
       releaseDate: gameData.release_dates?.[0]?.human || 'Unknown',
-      price: mockPrice,
-      condition: randomCondition,
+      price: priceData.price,
+      condition: priceData.condition,
       genres: gameData.genres?.map(g => g.name).join(', ') || 'Unknown',
       developer: gameData.involved_companies?.find(ic => ic.developer)?.company?.name || 'Unknown'
     };
