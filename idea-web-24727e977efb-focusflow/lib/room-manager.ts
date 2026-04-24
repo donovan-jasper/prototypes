@@ -1,6 +1,5 @@
 import * as SQLite from 'expo-sqlite';
 import { useSQLiteContext } from 'expo-sqlite';
-import { io } from 'socket.io-client';
 
 interface Room {
   id: number;
@@ -228,49 +227,17 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
   }
 };
 
-// WebSocket connection for real-time updates
-let socket = null;
-
-export const connectToRoomSocket = (code: string, onUpdate: (status: RoomStatus) => void) => {
-  if (socket) {
-    socket.disconnect();
-  }
-
-  socket = io('https://your-websocket-server.com', {
-    query: { roomCode: code }
-  });
-
-  socket.on('connect', () => {
-    console.log('Connected to WebSocket server');
-  });
-
-  socket.on('roomUpdate', (status: RoomStatus) => {
-    onUpdate(status);
-  });
-
-  socket.on('disconnect', () => {
-    console.log('Disconnected from WebSocket server');
-  });
-
-  return () => {
-    if (socket) {
-      socket.disconnect();
-    }
-  };
-};
-
-// Polling fallback for when WebSocket isn't available
-export const pollRoomUpdates = (code: string, onUpdate: (status: RoomStatus) => void, interval = 5000) => {
-  let pollingInterval = setInterval(async () => {
+// Poll for room updates
+export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => void): (() => void) => {
+  const interval = setInterval(async () => {
     try {
       const status = await getRoomStatus(code);
-      onUpdate(status);
+      callback(status);
     } catch (error) {
       console.error('Error polling room updates:', error);
     }
-  }, interval);
+  }, 5000); // Poll every 5 seconds
 
-  return () => {
-    clearInterval(pollingInterval);
-  };
+  // Return cleanup function
+  return () => clearInterval(interval);
 };
