@@ -137,31 +137,25 @@ const FocusTimerScreen: React.FC = () => {
       <ProgressBar progress={progress} />
 
       <View style={styles.settingsRow}>
-        <Text style={styles.settingsLabel}>Distraction Blocking</Text>
-        <TouchableOpacity
-          style={styles.shieldButton}
-          onPress={toggleDistractionBlocking}
-          disabled={!isFocusActive}
-        >
-          <Ionicons
-            name={isDistractionBlockingEnabled ? "shield-checkmark" : "shield-outline"}
-            size={24}
-            color={isDistractionBlockingEnabled ? "#4CAF50" : "#9E9E9E"}
-          />
-        </TouchableOpacity>
+        <Text style={styles.settingLabel}>Distraction Blocking</Text>
         <Switch
           value={isDistractionBlockingEnabled}
           onValueChange={toggleDistractionBlocking}
-          disabled={!isFocusActive}
-          trackColor={{ false: "#767577", true: "#81b0ff" }}
-          thumbColor={isDistractionBlockingEnabled ? "#f5dd4b" : "#f4f3f4"}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={isDistractionBlockingEnabled ? '#f5dd4b' : '#f4f3f4'}
         />
       </View>
 
-      {!isFocusActive && (
-        <Text style={styles.hintText}>
-          Distraction blocking is only available during calendar events
-        </Text>
+      {isDistractionBlockingEnabled && (
+        <View style={styles.blockingStatus}>
+          <Ionicons
+            name="shield-checkmark"
+            size={24}
+            color="#4CAF50"
+            style={styles.blockingIcon}
+          />
+          <Text style={styles.blockingText}>Distraction blocking active</Text>
+        </View>
       )}
     </View>
   );
@@ -176,9 +170,13 @@ const styles = StyleSheet.create({
   eventInfo: {
     marginVertical: 20,
     padding: 15,
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
     borderRadius: 10,
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   eventTitle: {
     fontSize: 18,
@@ -191,23 +189,30 @@ const styles = StyleSheet.create({
   },
   settingsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 20,
+    alignItems: 'center',
+    marginVertical: 20,
     paddingHorizontal: 10,
   },
-  settingsLabel: {
+  settingLabel: {
     fontSize: 16,
     color: '#333',
   },
-  shieldButton: {
-    padding: 10,
-  },
-  hintText: {
+  blockingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 10,
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+    padding: 10,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 8,
+  },
+  blockingIcon: {
+    marginRight: 8,
+  },
+  blockingText: {
+    color: '#4CAF50',
+    fontWeight: '500',
   },
 });
 
