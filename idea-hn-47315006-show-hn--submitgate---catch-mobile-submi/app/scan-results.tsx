@@ -1,12 +1,13 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore } from '../store/useStore';
 import { ComplianceIssue } from '../lib/types';
+import { saveScan } from '../lib/database';
 
 export default function ScanResultsScreen() {
   const router = useRouter();
-  const { currentScan } = useStore();
+  const { currentScan, addScan, isPremium, scanCount, incrementScanCount } = useStore();
 
   if (!currentScan) {
     return (
@@ -41,10 +42,10 @@ export default function ScanResultsScreen() {
   const renderIssueCard = (issue: ComplianceIssue) => (
     <View key={issue.id} style={[styles.issueCard, { borderLeftColor: getSeverityColor(issue.severity) }]}>
       <View style={styles.issueHeader}>
-        <Ionicons 
-          name={getSeverityIcon(issue.severity)} 
-          size={24} 
-          color={getSeverityColor(issue.severity)} 
+        <Ionicons
+          name={getSeverityIcon(issue.severity)}
+          size={24}
+          color={getSeverityColor(issue.severity)}
         />
         <Text style={styles.issueTitle}>{issue.title}</Text>
       </View>
@@ -62,6 +63,32 @@ export default function ScanResultsScreen() {
     </View>
   );
 
+  const handleSaveScan = async () => {
+    if (!isPremium && scanCount >= 3) {
+      Alert.alert(
+        'Scan Limit Reached',
+        'You\'ve reached your free scan limit. Upgrade to save unlimited scans.',
+        [
+          { text: 'Cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/settings') }
+        ]
+      );
+      return;
+    }
+
+    try {
+      await saveScan(currentScan);
+      addScan(currentScan);
+      if (!isPremium) {
+        incrementScanCount();
+      }
+      Alert.alert('Success', 'Scan saved to your history');
+    } catch (error) {
+      console.error('Failed to save scan:', error);
+      Alert.alert('Error', 'Failed to save scan. Please try again.');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -76,16 +103,16 @@ export default function ScanResultsScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         <View style={[styles.summaryCard, currentScan.passed ? styles.passedCard : styles.failedCard]}>
-          <Ionicons 
-            name={currentScan.passed ? 'checkmark-circle' : 'close-circle'} 
-            size={48} 
-            color={currentScan.passed ? '#34C759' : '#FF3B30'} 
+          <Ionicons
+            name={currentScan.passed ? 'checkmark-circle' : 'close-circle'}
+            size={48}
+            color={currentScan.passed ? '#34C759' : '#FF3B30'}
           />
           <Text style={styles.summaryTitle}>
             {currentScan.passed ? 'Ready to Submit' : 'Issues Found'}
           </Text>
           <Text style={styles.summaryText}>
-            {currentScan.passed 
+            {currentScan.passed
               ? 'No critical issues detected. Your build looks good!'
               : `Found ${currentScan.issues.length} issue${currentScan.issues.length !== 1 ? 's' : ''} that need attention`}
           </Text>
@@ -127,6 +154,14 @@ export default function ScanResultsScreen() {
           </View>
         )}
 
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveScan}
+        >
+          <Ionicons name="save" size={20} color="#FFFFFF" />
+          <Text style={styles.saveButtonText}>Save Scan</Text>
+        </TouchableOpacity>
+
         <View style={styles.bottomPadding} />
       </ScrollView>
     </View>
@@ -136,27 +171,25 @@ export default function ScanResultsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F5',
   },
   header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
     backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5EA',
-    flexDirection: 'row',
-    alignItems: 'center',
   },
   backButton: {
-    marginRight: 12,
+    marginRight: 16,
   },
   headerContent: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '600',
     color: '#000000',
   },
   headerSubtitle: {
@@ -168,38 +201,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
+    padding: 16,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 20,
     alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
   passedCard: {
-    borderWidth: 2,
-    borderColor: '#34C759',
+    backgroundColor: '#E5F9F0',
   },
   failedCard: {
-    borderWidth: 2,
-    borderColor: '#FF3B30',
+    backgroundColor: '#FFEBEE',
   },
   summaryTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: '600',
     marginTop: 12,
     marginBottom: 8,
   },
   summaryText: {
-    fontSize: 15,
-    color: '#8E8E93',
+    fontSize: 16,
+    color: '#5A5A5A',
     textAlign: 'center',
   },
   section: {
@@ -217,15 +241,10 @@ const styles = StyleSheet.create({
   },
   issueCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     borderLeftWidth: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   issueHeader: {
     flexDirection: 'row',
@@ -233,55 +252,63 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   issueTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '600',
+    marginLeft: 8,
     color: '#000000',
-    marginLeft: 10,
-    flex: 1,
   },
   issueDescription: {
-    fontSize: 15,
-    color: '#3C3C43',
+    fontSize: 14,
+    color: '#5A5A5A',
     marginBottom: 12,
-    lineHeight: 20,
   },
   fixContainer: {
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
   },
   fixLabel: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#8E8E93',
-    marginBottom: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#5A5A5A',
+    marginBottom: 4,
   },
   fixText: {
     fontSize: 14,
-    color: '#3C3C43',
-    lineHeight: 20,
-    fontFamily: 'Courier',
+    color: '#000000',
   },
   docLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    marginTop: 12,
   },
   docLinkText: {
     fontSize: 14,
     color: '#007AFF',
-    marginLeft: 6,
+    marginLeft: 4,
+  },
+  saveButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  bottomPadding: {
+    height: 32,
   },
   errorText: {
     fontSize: 16,
-    color: '#8E8E93',
+    color: '#FF3B30',
     textAlign: 'center',
-    marginTop: 40,
-  },
-  bottomPadding: {
-    height: 40,
+    marginTop: 20,
   },
 });
