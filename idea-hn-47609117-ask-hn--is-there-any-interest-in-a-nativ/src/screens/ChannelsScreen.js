@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
-import { getOfflineChannels, syncChannels, getLastSyncTime } from '../services/discordApi';
+import { getChannels, saveChannels, getLastSyncTime } from '../storage/channelStorage';
 import { getStoredToken } from '../services/auth';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -11,6 +11,7 @@ const ChannelsScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
   const [authError, setAuthError] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
 
   const loadChannels = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
@@ -18,11 +19,11 @@ const ChannelsScreen = ({ route, navigation }) => {
 
     try {
       // Get last sync time
-      const syncTime = await getLastSyncTime('last_channel_sync');
+      const syncTime = await getLastSyncTime(serverId);
       setLastSyncTime(syncTime);
 
       // Try to get offline data first
-      const offlineChannels = await getOfflineChannels(serverId);
+      const offlineChannels = await getChannels(serverId);
       if (offlineChannels.length > 0) {
         setChannels(offlineChannels);
       }
@@ -30,21 +31,37 @@ const ChannelsScreen = ({ route, navigation }) => {
       // Try to sync with Discord if we have a token
       const token = await getStoredToken();
       if (token) {
-        const syncedChannels = await syncChannels(serverId);
-        setChannels(syncedChannels);
-        setLastSyncTime(new Date());
+        try {
+          const response = await fetch(`https://discord.com/api/v9/guilds/${serverId}/channels`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
+
+          if (response.ok) {
+            const syncedChannels = await response.json();
+            await saveChannels(serverId, syncedChannels);
+            setChannels(syncedChannels);
+            setLastSyncTime(new Date());
+            setOfflineMode(false);
+          } else if (offlineChannels.length === 0) {
+            throw new Error('Failed to fetch channels and no offline data available');
+          }
+        } catch (syncError) {
+          console.error('Sync failed, using offline data:', syncError);
+          setOfflineMode(true);
+        }
       } else {
         setAuthError(true);
+        if (offlineChannels.length === 0) {
+          throw new Error('No authentication token and no offline data available');
+        }
       }
     } catch (error) {
       console.error('Error loading channels:', error);
       if (error.message.includes('No authentication token')) {
         setAuthError(true);
-        // Show offline data if available
-        const offlineChannels = await getOfflineChannels(serverId);
-        if (offlineChannels.length > 0) {
-          setChannels(offlineChannels);
-        }
       } else {
         Alert.alert('Error', 'Failed to load channels. Please try again.');
       }
@@ -137,6 +154,11 @@ const ChannelsScreen = ({ route, navigation }) => {
                 Last synced: {lastSyncTime.toLocaleString()}
               </Text>
             )}
+            {offlineMode && (
+              <Text style={styles.offlineStatus}>
+                Offline mode: Showing cached data
+              </Text>
+            )}
           </View>
         }
       />
@@ -170,62 +192,67 @@ const styles = StyleSheet.create({
     backgroundColor: '#36393F',
   },
   headerContainer: {
-    padding: 15,
-    backgroundColor: '#2F3136',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#2F3136',
   },
   header: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFFFFF',
+    marginBottom: 8,
   },
   syncStatus: {
-    color: '#72767D',
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: 14,
+    color: '#B9BBBE',
+    marginBottom: 4,
+  },
+  offlineStatus: {
+    fontSize: 14,
+    color: '#F04747',
+    marginBottom: 4,
   },
   channelItem: {
-    padding: 15,
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#2F3136',
   },
   channelName: {
-    color: '#b9bbbe',
     fontSize: 16,
+    color: '#FFFFFF',
   },
   errorTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'center',
+    color: '#FFFFFF',
+    marginBottom: 16,
   },
   errorMessage: {
     fontSize: 16,
-    color: '#b9bbbe',
-    marginBottom: 20,
+    color: '#B9BBBE',
     textAlign: 'center',
+    marginBottom: 24,
   },
   emptyTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 10,
-    textAlign: 'center',
+    color: '#FFFFFF',
+    marginBottom: 16,
   },
   emptyMessage: {
     fontSize: 16,
-    color: '#b9bbbe',
-    marginBottom: 20,
+    color: '#B9BBBE',
     textAlign: 'center',
+    marginBottom: 24,
   },
   tryAgainButton: {
     backgroundColor: '#5865F2',
     paddingVertical: 12,
     paddingHorizontal: 24,
-    borderRadius: 5,
+    borderRadius: 4,
   },
   tryAgainButtonText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
