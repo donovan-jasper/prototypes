@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Dimensions } from 'react-native';
+import { ProgressBar } from 'react-native-paper';
 
-const DebtRoadmap = ({ debts, totalDebt, monthlyIncome }) => {
+const DebtRoadmap = ({ debts, monthlyIncome, totalDebt }) => {
   if (!debts || debts.length === 0) {
     return (
       <View style={styles.container}>
@@ -23,7 +24,7 @@ const DebtRoadmap = ({ debts, totalDebt, monthlyIncome }) => {
 
   // Calculate total interest paid
   const totalInterest = debts.reduce((sum, debt) => {
-    const interest = (debt.amount * (debt.interestRate / 100)) * (payoffTimeMonths / 12);
+    const interest = (debt.amount * (debt.interestRate / 100)) * (Math.ceil(debt.amount / debt.monthlyPayment) / 12);
     return sum + interest;
   }, 0);
 
@@ -60,42 +61,23 @@ const DebtRoadmap = ({ debts, totalDebt, monthlyIncome }) => {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView}>
+      <View style={styles.debtsContainer}>
+        <Text style={styles.sectionTitle}>Your Debts</Text>
         {debts.map((debt, index) => (
-          <View key={debt.id} style={styles.debtCard}>
+          <View key={index} style={styles.debtItem}>
             <View style={styles.debtHeader}>
-              <Text style={styles.debtName}>{debt.name}</Text>
-              <Text style={styles.interestRate}>{debt.interestRate}% APR</Text>
+              <Text style={styles.debtAmount}>${debt.amount.toLocaleString()}</Text>
+              <Text style={styles.debtInterest}>{debt.interestRate}% APR</Text>
             </View>
-            <View style={styles.debtDetails}>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Balance:</Text>
-                <Text style={styles.detailValue}>${debt.balance.toLocaleString()}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Minimum Payment:</Text>
-                <Text style={styles.detailValue}>${debt.minimumPayment.toFixed(2)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Recommended Payment:</Text>
-                <Text style={styles.detailValueHighlight}>${debt.monthlyPayment.toFixed(2)}</Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Payoff Time:</Text>
-                <Text style={styles.detailValue}>
-                  {Math.ceil(debt.balance / debt.monthlyPayment)} months
-                </Text>
-              </View>
-              <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Interest Paid:</Text>
-                <Text style={styles.detailValue}>
-                  ${Math.round((debt.balance * (debt.interestRate / 100)) * (Math.ceil(debt.balance / debt.monthlyPayment) / 12)).toLocaleString()}
-                </Text>
-              </View>
-            </View>
+            <ProgressBar
+              progress={debt.monthlyPayment / debt.amount}
+              color="#007AFF"
+              style={styles.progressBar}
+            />
+            <Text style={styles.debtPayment}>Monthly Payment: ${debt.monthlyPayment.toFixed(2)}</Text>
           </View>
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 };
@@ -103,96 +85,83 @@ const DebtRoadmap = ({ debts, totalDebt, monthlyIncome }) => {
 const styles = StyleSheet.create({
   container: {
     padding: 20,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     borderRadius: 10,
-    margin: 10
+    margin: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333'
+    marginBottom: 20,
+    color: '#333',
   },
   summaryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
     marginBottom: 20,
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0'
   },
   summaryItem: {
-    width: '48%',
-    marginBottom: 10
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 3
   },
   summaryValue: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#333'
+    color: '#333',
   },
-  scrollView: {
-    maxHeight: 400
+  debtsContainer: {
+    marginTop: 20,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 20
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
   },
-  debtCard: {
-    backgroundColor: '#fff',
+  debtItem: {
+    marginBottom: 15,
     padding: 15,
+    backgroundColor: '#f8f8f8',
     borderRadius: 8,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF5722'
   },
   debtHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10
+    marginBottom: 10,
   },
-  debtName: {
+  debtAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#007AFF',
+  },
+  debtInterest: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333'
+    color: '#FF3B30',
   },
-  interestRate: {
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    marginVertical: 10,
+  },
+  debtPayment: {
     fontSize: 14,
-    color: '#FF5722',
-    fontWeight: '600'
+    color: '#666',
+    marginTop: 5,
   },
-  debtDetails: {
-    marginTop: 5
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 20,
   },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666'
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#333'
-  },
-  detailValueHighlight: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#2E7D32'
-  }
 });
 
 export default DebtRoadmap;
