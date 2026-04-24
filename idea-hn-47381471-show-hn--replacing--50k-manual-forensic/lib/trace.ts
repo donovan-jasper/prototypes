@@ -4,12 +4,15 @@ interface TraceResult {
   explained: boolean;
   gap: number;
   timeline: Transaction[];
+  missingTransactions: boolean;
 }
 
 export const traceMoney = (
   startBalance: number,
   endBalance: number,
-  transactions: Transaction[]
+  transactions: Transaction[],
+  tolerance: number = 0.01,
+  fee: number = 0
 ): TraceResult => {
   // Sort transactions by date
   const sortedTransactions = [...transactions].sort((a, b) =>
@@ -28,12 +31,21 @@ export const traceMoney = (
     });
   }
 
+  // Apply transaction fee if specified
+  if (fee > 0) {
+    runningBalance -= fee;
+  }
+
   // Calculate gap
   const gap = endBalance - runningBalance;
 
+  // Check if gap exceeds tolerance
+  const missingTransactions = Math.abs(gap) > tolerance;
+
   return {
-    explained: Math.abs(gap) < 0.01, // Account for floating point precision
+    explained: Math.abs(gap) <= tolerance,
     gap,
-    timeline
+    timeline,
+    missingTransactions
   };
 };

@@ -7,6 +7,7 @@ export interface Transaction {
   documentId?: string;
   documentHash?: string;
   runningBalance?: number; // Added for trace results
+  fee?: number; // Added for transaction fees
 }
 
 export interface Document {
