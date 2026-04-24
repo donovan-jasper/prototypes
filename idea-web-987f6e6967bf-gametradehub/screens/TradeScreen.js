@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { getGameDetails } from '../utils/api';
 
@@ -27,7 +27,12 @@ const TradeScreen = ({ route }) => {
 
   const renderGameDetails = () => {
     if (loading) {
-      return <ActivityIndicator size="large" color="#6200EE" style={styles.loader} />;
+      return (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#6200EE" />
+          <Text style={styles.loadingText}>Fetching game details...</Text>
+        </View>
+      );
     }
 
     if (error) {
@@ -59,7 +64,7 @@ const TradeScreen = ({ route }) => {
     }
 
     return (
-      <View style={styles.gameContainer}>
+      <ScrollView style={styles.gameContainer}>
         {gameData.cover && (
           <Image
             source={{ uri: gameData.cover }}
@@ -72,6 +77,13 @@ const TradeScreen = ({ route }) => {
         <Text style={styles.gameCondition}>Condition: {gameData.condition}</Text>
         <Text style={styles.gamePlatforms}>Platforms: {gameData.platforms}</Text>
         <Text style={styles.gameRelease}>Release Date: {gameData.releaseDate}</Text>
+
+        {gameData.summary && (
+          <View style={styles.summaryContainer}>
+            <Text style={styles.summaryTitle}>Summary</Text>
+            <Text style={styles.summaryText}>{gameData.summary}</Text>
+          </View>
+        )}
 
         <View style={styles.actionButtons}>
           <TouchableOpacity
@@ -87,7 +99,7 @@ const TradeScreen = ({ route }) => {
             <Text style={styles.buttonText}>Add to Inventory</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     );
   };
 
@@ -111,8 +123,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     color: '#6200EE',
   },
-  loader: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginTop: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#6200EE',
   },
   errorContainer: {
     alignItems: 'center',
@@ -122,15 +142,18 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#d32f2f',
     marginBottom: 20,
+    textAlign: 'center',
   },
   retryButton: {
     backgroundColor: '#6200EE',
     padding: 12,
     borderRadius: 8,
+    minWidth: 150,
   },
   retryButtonText: {
     color: 'white',
     fontSize: 16,
+    textAlign: 'center',
   },
   gameContainer: {
     backgroundColor: 'white',
@@ -174,9 +197,27 @@ const styles = StyleSheet.create({
     color: '#555',
     marginBottom: 20,
   },
+  summaryContainer: {
+    marginVertical: 20,
+    padding: 15,
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    color: '#6200EE',
+  },
+  summaryText: {
+    fontSize: 14,
+    color: '#555',
+    lineHeight: 20,
+  },
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
   button: {
     padding: 12,
