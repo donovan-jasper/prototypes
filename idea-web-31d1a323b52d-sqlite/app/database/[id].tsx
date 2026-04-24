@@ -161,8 +161,8 @@ export default function DatabaseScreen() {
               if (key === 'id') return null;
               return (
                 <View key={key} style={styles.row}>
-                  <Paragraph style={styles.label}>{key.replace(/_/g, ' ')}:</Paragraph>
-                  <Paragraph style={styles.value}>{value}</Paragraph>
+                  <Text style={styles.label}>{key.replace(/_/g, ' ')}:</Text>
+                  <Text style={styles.value}>{value}</Text>
                 </View>
               );
             })}
@@ -172,27 +172,21 @@ export default function DatabaseScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      {/* Schema Header */}
-      <View style={[styles.schemaHeader, { backgroundColor: theme.colors.surfaceVariant }]}>
-        <Title style={styles.schemaTitle}>Table Schema</Title>
-        <View style={styles.schemaFields}>
-          {schema.map((field, index) => (
-            <View key={index} style={styles.schemaField}>
-              <Paragraph style={styles.fieldName}>{field.name}</Paragraph>
-              <Paragraph style={styles.fieldType}>{field.type}</Paragraph>
-            </View>
-          ))}
-        </View>
+      {/* Schema Display */}
+      <View style={styles.schemaContainer}>
+        <Title style={styles.schemaTitle}>Schema</Title>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.schemaFields}>
+            {schema.map((field, index) => (
+              <View key={index} style={styles.schemaField}>
+                <Text style={styles.schemaFieldName}>{field.name}</Text>
+                <Text style={styles.schemaFieldType}>{field.type}</Text>
+              </View>
+            ))}
+          </View>
+        </ScrollView>
       </View>
 
       {/* Search Bar */}
@@ -204,17 +198,31 @@ export default function DatabaseScreen() {
         style={styles.searchBar}
       />
 
-      {/* Results Display */}
-      {searchResults.length > 0 ? (
-        <QueryResults data={searchResults} />
+      {/* Content */}
+      {loading ? (
+        <ActivityIndicator size="large" style={styles.loading} />
       ) : (
-        <FlatList
-          data={rows}
-          renderItem={renderRow}
-          keyExtractor={(item) => item.id.toString()}
-          contentContainerStyle={styles.list}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-        />
+        <>
+          {searchQuery ? (
+            isSearching ? (
+              <ActivityIndicator size="large" style={styles.loading} />
+            ) : (
+              <QueryResults data={searchResults} />
+            )
+          ) : (
+            <FlatList
+              data={rows}
+              renderItem={renderRow}
+              keyExtractor={(item) => item.id.toString()}
+              contentContainerStyle={styles.list}
+              ListEmptyComponent={
+                <View style={styles.emptyContainer}>
+                  <Text style={styles.emptyText}>No rows found. Add some data!</Text>
+                </View>
+              }
+            />
+          )}
+        </>
       )}
 
       {/* Add Row Modal */}
@@ -224,17 +232,16 @@ export default function DatabaseScreen() {
           onDismiss={() => setModalVisible(false)}
           contentContainerStyle={styles.modal}
         >
-          <Title>Add New Record</Title>
+          <Title>Add New Row</Title>
 
           <VoiceInput
-            onTranscription={handleVoiceInput}
-            placeholder="Speak to add a new record..."
-            style={styles.voiceInput}
+            onResult={handleVoiceInput}
+            placeholder="Say: 'Add product: Laptop, quantity 5'"
           />
 
-          {transcription ? (
-            <Paragraph style={styles.transcription}>Transcription: {transcription}</Paragraph>
-          ) : null}
+          {transcription && (
+            <Text style={styles.transcriptionText}>Transcription: {transcription}</Text>
+          )}
 
           <ScrollView style={styles.formContainer}>
             {schema.map((field, index) => {
@@ -246,19 +253,29 @@ export default function DatabaseScreen() {
                   value={formData[field.name] || ''}
                   onChangeText={(text) => updateFormField(field.name, text)}
                   style={styles.formField}
-                  keyboardType={field.type === 'INTEGER' || field.type === 'REAL' ? 'numeric' : 'default'}
+                  keyboardType={
+                    field.type === 'INTEGER' || field.type === 'REAL'
+                      ? 'numeric'
+                      : 'default'
+                  }
                 />
               );
             })}
           </ScrollView>
 
           <View style={styles.modalActions}>
-            <Button onPress={() => setModalVisible(false)}>Cancel</Button>
+            <Button
+              mode="outlined"
+              onPress={() => setModalVisible(false)}
+              style={styles.cancelButton}
+            >
+              Cancel
+            </Button>
             <Button
               mode="contained"
               onPress={handleAddRow}
               loading={saving}
-              disabled={Object.keys(formData).length === 0}
+              disabled={saving}
             >
               Save
             </Button>
@@ -266,7 +283,7 @@ export default function DatabaseScreen() {
         </Modal>
       </Portal>
 
-      {/* Floating Action Button */}
+      {/* FAB */}
       <FAB
         icon="plus"
         style={styles.fab}
@@ -281,34 +298,30 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  schemaHeader: {
-    padding: 16,
-    borderRadius: 8,
+  schemaContainer: {
     marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
   },
   schemaTitle: {
     marginBottom: 8,
   },
   schemaFields: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
   },
   schemaField: {
-    flexDirection: 'row',
     marginRight: 16,
-    marginBottom: 8,
+    alignItems: 'center',
   },
-  fieldName: {
+  schemaFieldName: {
     fontWeight: 'bold',
-    marginRight: 4,
+    marginBottom: 4,
   },
-  fieldType: {
+  schemaFieldType: {
     color: '#666',
+    fontSize: 12,
   },
   searchBar: {
     marginBottom: 16,
@@ -317,7 +330,7 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   card: {
-    marginBottom: 8,
+    marginBottom: 12,
   },
   row: {
     flexDirection: 'row',
@@ -331,25 +344,33 @@ const styles = StyleSheet.create({
   value: {
     flex: 1,
   },
-  separator: {
-    height: 8,
+  loading: {
+    marginTop: 32,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    color: '#666',
+    textAlign: 'center',
   },
   modal: {
     backgroundColor: 'white',
     padding: 20,
     margin: 20,
     borderRadius: 8,
+    maxHeight: '80%',
   },
-  voiceInput: {
-    marginVertical: 16,
-  },
-  transcription: {
-    marginBottom: 16,
+  transcriptionText: {
+    marginVertical: 12,
     color: '#666',
   },
   formContainer: {
     maxHeight: 300,
-    marginBottom: 16,
+    marginVertical: 16,
   },
   formField: {
     marginBottom: 12,
@@ -359,6 +380,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     marginTop: 16,
   },
+  cancelButton: {
+    marginRight: 8,
+  },
   fab: {
     position: 'absolute',
     margin: 16,
@@ -366,10 +390,10 @@ const styles = StyleSheet.create({
     bottom: 0,
   },
   deleteAction: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#ff3333',
     justifyContent: 'center',
-    alignItems: 'flex-end',
-    width: 80,
+    alignItems: 'center',
+    width: 70,
     height: '100%',
   },
 });

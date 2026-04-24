@@ -213,13 +213,3 @@ export const useDatabase = () => {
     deleteRow
   };
 };
-
-export const {
-  createDatabase,
-  insertRow,
-  queryDatabase,
-  getDatabaseSchema,
-  deleteDatabase,
-  listDatabases,
-  deleteRow
-} = useDatabase();
