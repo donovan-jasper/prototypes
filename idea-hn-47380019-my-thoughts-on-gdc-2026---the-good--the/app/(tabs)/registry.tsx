@@ -159,68 +159,68 @@ export default function RegistryScreen() {
     </TouchableOpacity>
   );
 
-  const renderArtistWork = ({ item }: { item: ArtistWork }) => (
+  const renderWorkItem = ({ item }: { item: ArtistWork }) => (
     <Card style={styles.workCard}>
       <Card.Cover source={{ uri: item.imageUrl }} />
-      <Card.Content>
-        <Paragraph>{item.description}</Paragraph>
-      </Card.Content>
+      {item.description && (
+        <Card.Content>
+          <Paragraph>{item.description}</Paragraph>
+        </Card.Content>
+      )}
     </Card>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Creator Credit Registry</Text>
+      <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#666" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search artists or styles..."
           value={searchQuery}
           onChangeText={setSearchQuery}
-          autoCapitalize="none"
         />
       </View>
 
       {isLoading ? (
-        <ActivityIndicator size="large" style={styles.loading} />
+        <ActivityIndicator size="large" style={styles.loadingIndicator} />
       ) : selectedArtist ? (
         <ScrollView style={styles.artistDetailContainer}>
           <View style={styles.artistHeader}>
             <Avatar.Image
-              size={100}
+              size={80}
               source={{ uri: selectedArtist.profileImage }}
               style={styles.artistDetailAvatar}
             />
             <View style={styles.artistDetailInfo}>
               <Title>{selectedArtist.name}</Title>
-              <Paragraph style={styles.artistDetailStyle}>{selectedArtist.style}</Paragraph>
-              <Paragraph>{selectedArtist.followers} followers</Paragraph>
-              <Paragraph style={styles.artistEarnings}>Earnings: ${artistEarnings.toFixed(2)}</Paragraph>
+              <Paragraph>{selectedArtist.style}</Paragraph>
+              <Text style={styles.artistFollowers}>{selectedArtist.followers} followers</Text>
             </View>
           </View>
 
-          <Divider style={styles.divider} />
-
-          <View style={styles.bioContainer}>
+          <View style={styles.artistBioContainer}>
             <Title>About</Title>
             <Paragraph>{selectedArtist.bio}</Paragraph>
           </View>
 
-          <Divider style={styles.divider} />
+          <View style={styles.earningsContainer}>
+            <Title>Earnings</Title>
+            <Text style={styles.earningsAmount}>${artistEarnings.toFixed(2)}</Text>
+          </View>
 
-          <View style={styles.portfolioContainer}>
+          <View style={styles.worksContainer}>
             <Title>Portfolio</Title>
             {artistWorks.length > 0 ? (
               <FlatList
                 data={artistWorks}
-                renderItem={renderArtistWork}
+                renderItem={renderWorkItem}
                 keyExtractor={(item) => item.id.toString()}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.workList}
+                numColumns={2}
+                columnWrapperStyle={styles.worksGrid}
               />
             ) : (
-              <Paragraph>No works in portfolio yet.</Paragraph>
+              <Text style={styles.noWorksText}>No works available yet</Text>
             )}
           </View>
 
@@ -242,27 +242,28 @@ export default function RegistryScreen() {
           </Button>
         </ScrollView>
       ) : (
-        <View style={styles.artistListContainer}>
-          <FlatList
-            data={filteredArtists}
-            renderItem={renderArtistItem}
-            keyExtractor={(item) => item.id.toString()}
-            ListEmptyComponent={
-              <View style={styles.emptyList}>
-                <Text>No artists found. Be the first to register!</Text>
-              </View>
-            }
-          />
-          <Button
-            mode="contained"
-            onPress={() => setShowRegisterModal(true)}
-            style={styles.registerButton}
-            icon="add"
-          >
-            Register as Artist
-          </Button>
-        </View>
+        <FlatList
+          data={filteredArtists}
+          renderItem={renderArtistItem}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.artistList}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Ionicons name="people" size={60} color="#ccc" />
+              <Text style={styles.emptyText}>No artists found</Text>
+            </View>
+          }
+        />
       )}
+
+      <Button
+        mode="contained"
+        onPress={() => setShowRegisterModal(true)}
+        style={styles.registerButton}
+        icon="add"
+      >
+        Register as Artist
+      </Button>
 
       {/* Register Artist Modal */}
       <Modal
@@ -276,24 +277,25 @@ export default function RegistryScreen() {
 
             <TextInput
               style={styles.input}
-              placeholder="Name"
+              placeholder="Full Name"
               value={newArtist.name}
               onChangeText={(text) => setNewArtist({...newArtist, name: text})}
             />
 
             <TextInput
               style={styles.input}
-              placeholder="Style (e.g., 'Surrealism, Digital Art')"
+              placeholder="Artistic Style"
               value={newArtist.style}
               onChangeText={(text) => setNewArtist({...newArtist, style: text})}
             />
 
             <TextInput
               style={[styles.input, styles.bioInput]}
-              placeholder="Bio (describe your style and work)"
+              placeholder="Bio (describe your work)"
               value={newArtist.bio}
               onChangeText={(text) => setNewArtist({...newArtist, bio: text})}
               multiline
+              numberOfLines={4}
             />
 
             <TextInput
@@ -305,18 +307,20 @@ export default function RegistryScreen() {
 
             <View style={styles.buttonGroup}>
               <Button
-                mode="contained"
-                onPress={handleRegisterSubmit}
-                disabled={isLoading}
-                loading={isLoading}
-              >
-                Register
-              </Button>
-              <Button
                 mode="outlined"
                 onPress={() => setShowRegisterModal(false)}
+                style={styles.cancelButton}
               >
                 Cancel
+              </Button>
+
+              <Button
+                mode="contained"
+                onPress={handleRegisterSubmit}
+                loading={isLoading}
+                disabled={isLoading}
+              >
+                Register
               </Button>
             </View>
           </ScrollView>
@@ -334,33 +338,35 @@ export default function RegistryScreen() {
             <Title style={styles.modalTitle}>Send Tip to {selectedArtist?.name}</Title>
 
             <TextInput
-              style={styles.input}
+              style={styles.tipInput}
               placeholder="Amount ($)"
               value={tipAmount}
               onChangeText={setTipAmount}
               keyboardType="numeric"
             />
 
-            <Text style={styles.feeInfo}>
+            <Text style={styles.tipInfo}>
               {user.premiumStatus
-                ? '10% fee (premium user)'
-                : '15% fee (free user)'}
+                ? 'Premium users pay 10% fee'
+                : 'Standard users pay 15% fee'}
             </Text>
 
             <View style={styles.buttonGroup}>
               <Button
-                mode="contained"
-                onPress={handleTipSubmit}
-                disabled={isLoading}
-                loading={isLoading}
-              >
-                Send Tip
-              </Button>
-              <Button
                 mode="outlined"
                 onPress={() => setShowTipModal(false)}
+                style={styles.cancelButton}
               >
                 Cancel
+              </Button>
+
+              <Button
+                mode="contained"
+                onPress={handleTipSubmit}
+                loading={isLoading}
+                disabled={isLoading}
+              >
+                Send Tip
               </Button>
             </View>
           </View>
@@ -375,60 +381,67 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    padding: 16,
-    backgroundColor: '#f5f5f5',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  searchInput: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  artistListContainer: {
-    flex: 1,
-  },
-  artistItem: {
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
+  searchIcon: {
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    fontSize: 16,
+  },
+  artistList: {
+    padding: 16,
+  },
+  artistItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
   artistAvatar: {
-    marginRight: 16,
+    marginRight: 12,
   },
   artistInfo: {
     flex: 1,
   },
   artistName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   artistStyle: {
+    fontSize: 14,
     color: '#666',
-    marginVertical: 4,
+    marginVertical: 2,
   },
   artistFollowers: {
-    color: '#888',
     fontSize: 12,
+    color: '#999',
   },
-  emptyList: {
-    padding: 16,
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
+  },
+  emptyText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
   },
   registerButton: {
     margin: 16,
+    paddingVertical: 8,
+  },
+  loadingIndicator: {
+    marginTop: 32,
   },
   artistDetailContainer: {
     flex: 1,
@@ -437,7 +450,7 @@ const styles = StyleSheet.create({
   artistHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   artistDetailAvatar: {
     marginRight: 16,
@@ -445,52 +458,57 @@ const styles = StyleSheet.create({
   artistDetailInfo: {
     flex: 1,
   },
-  artistDetailStyle: {
-    color: '#666',
-    marginVertical: 4,
+  artistBioContainer: {
+    marginBottom: 24,
   },
-  artistEarnings: {
+  earningsContainer: {
+    marginBottom: 24,
+  },
+  earningsAmount: {
+    fontSize: 24,
     fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  worksContainer: {
+    marginBottom: 24,
+  },
+  worksGrid: {
+    justifyContent: 'space-between',
     marginTop: 8,
-  },
-  divider: {
-    marginVertical: 16,
-  },
-  bioContainer: {
-    marginBottom: 16,
-  },
-  portfolioContainer: {
-    marginBottom: 16,
-  },
-  workList: {
-    paddingVertical: 8,
   },
   workCard: {
-    width: 200,
-    marginRight: 12,
+    width: '48%',
+    marginBottom: 16,
   },
-  tipButton: {
+  noWorksText: {
+    textAlign: 'center',
+    color: '#666',
     marginTop: 16,
   },
+  tipButton: {
+    marginBottom: 16,
+  },
   backButton: {
-    marginTop: 8,
+    marginBottom: 16,
   },
   modalContainer: {
     flex: 1,
     backgroundColor: '#fff',
   },
   modalContent: {
-    padding: 16,
+    padding: 24,
   },
   modalTitle: {
-    marginBottom: 16,
+    marginBottom: 24,
     textAlign: 'center',
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
     padding: 12,
-    borderRadius: 8,
-    marginBottom: 12,
+    marginBottom: 16,
+    fontSize: 16,
   },
   bioInput: {
     height: 100,
@@ -499,11 +517,23 @@ const styles = StyleSheet.create({
   buttonGroup: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 24,
   },
-  feeInfo: {
-    color: '#666',
-    textAlign: 'center',
+  cancelButton: {
+    marginRight: 8,
+  },
+  tipInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 12,
     marginBottom: 16,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  tipInfo: {
+    textAlign: 'center',
+    color: '#666',
+    marginBottom: 24,
   },
 });

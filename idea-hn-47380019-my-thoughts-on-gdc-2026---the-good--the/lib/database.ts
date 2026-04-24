@@ -167,14 +167,50 @@ export const updateArtistFollowers = async (artistId: number, increment: number)
   });
 };
 
-// New function to search artists by style
-export const searchArtistsByStyle = async (styleQuery: string): Promise<Artist[]> => {
+// New function to get user data
+export const getUser = async (): Promise<any> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        'SELECT * FROM artists WHERE style LIKE ? ORDER BY followers DESC;',
-        [`%${styleQuery}%`],
-        (_, { rows }) => resolve(rows._array as Artist[]),
+        'SELECT * FROM users LIMIT 1;',
+        [],
+        (_, { rows }) => {
+          if (rows.length > 0) {
+            resolve(rows.item(0));
+          } else {
+            // Create default user if none exists
+            tx.executeSql(
+              'INSERT INTO users (premiumStatus, generationCount, totalScore, balance) VALUES (0, 0, 0, 100);',
+              [],
+              () => {
+                tx.executeSql(
+                  'SELECT * FROM users LIMIT 1;',
+                  [],
+                  (_, { rows }) => resolve(rows.item(0)),
+                  (_, error) => reject(error)
+                );
+              },
+              (_, error) => reject(error)
+            );
+          }
+        },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// New function to update user data
+export const updateUser = async (updates: Partial<any>): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
+      const values = Object.values(updates);
+
+      tx.executeSql(
+        `UPDATE users SET ${fields} WHERE id = 1;`,
+        values,
+        () => resolve(),
         (_, error) => reject(error)
       );
     });
