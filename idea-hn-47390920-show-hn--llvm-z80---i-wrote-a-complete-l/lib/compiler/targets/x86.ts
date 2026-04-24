@@ -1,25 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
+import { WasmModuleLoader } from '../wasm/loader';
 
 export class X86Compiler {
-  private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for x86 compilation
-      const response = await fetch('lib/compiler/wasm/x86.wasm');
-      const buffer = await response.arrayBuffer();
-      this.wasmModule = await WebAssembly.compile(buffer);
-      this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
-        env: {
-          memory: new WebAssembly.Memory({ initial: 256 }),
-          table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
-          // Add any required imports here
-          abort: () => {
-            throw new Error('WASM module aborted');
-          }
-        }
-      });
+      const loader = WasmModuleLoader.getInstance();
+      this.wasmInstance = await loader.instantiateModule('x86');
     } catch (error) {
       console.error('Failed to initialize x86 compiler:', error);
       throw error;

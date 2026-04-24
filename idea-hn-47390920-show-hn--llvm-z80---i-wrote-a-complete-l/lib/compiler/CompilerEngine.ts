@@ -1,9 +1,10 @@
-import { X86Compiler } from './targets/x80';
+import { X86Compiler } from './targets/x86';
 import { ARMCompiler } from './targets/arm';
 import { AVRCompiler } from './targets/avr';
 import { Z80Compiler } from './targets/z80';
 import { MOS6502Compiler } from './targets/mos6502';
 import { GameBoyCompiler } from './targets/gameboy';
+import { WasmModuleLoader } from './wasm/loader';
 
 export interface CompilationResult {
   success: boolean;
@@ -32,9 +33,10 @@ export enum CompilationTarget {
 
 export class CompilerEngine {
   private compilers: Map<CompilationTarget, any> = new Map();
-  private wasmModules: Map<string, WebAssembly.Module> = new Map();
+  private wasmLoader: WasmModuleLoader;
 
   constructor() {
+    this.wasmLoader = WasmModuleLoader.getInstance();
     this.compilers.set(CompilationTarget.X86, new X86Compiler());
     this.compilers.set(CompilationTarget.ARM, new ARMCompiler());
     this.compilers.set(CompilationTarget.AVR, new AVRCompiler());
@@ -43,21 +45,8 @@ export class CompilerEngine {
     this.compilers.set(CompilationTarget.GAMEBOY, new GameBoyCompiler());
   }
 
-  async loadWasmModule(target: string): Promise<WebAssembly.Module> {
-    if (this.wasmModules.has(target)) {
-      return this.wasmModules.get(target)!;
-    }
-
-    try {
-      const response = await fetch(`lib/compiler/wasm/${target}.wasm`);
-      const buffer = await response.arrayBuffer();
-      const module = await WebAssembly.compile(buffer);
-      this.wasmModules.set(target, module);
-      return module;
-    } catch (error) {
-      console.error(`Failed to load WASM module for ${target}:`, error);
-      throw error;
-    }
+  async loadWasmModule(target: CompilationTarget): Promise<WebAssembly.Module> {
+    return this.wasmLoader.loadModule(target);
   }
 
   async compile(code: string, target: CompilationTarget): Promise<CompilationResult> {
@@ -114,5 +103,10 @@ export class CompilerEngine {
     }
 
     return compiler.validateSyntax(code);
+  }
+
+  // Clear WASM module cache
+  clearWasmCache(): void {
+    this.wasmLoader.clearCache();
   }
 }
