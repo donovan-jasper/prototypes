@@ -5,8 +5,6 @@ import { useCourseStore } from '../../store/courseStore';
 import { Ionicons } from '@expo/vector-icons';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import Markdown from 'react-native-markdown-display';
-import CourseCard from '../../components/CourseCard';
-import LessonEditor from '../../components/LessonEditor';
 import { Lesson } from '../../types';
 
 export default function CourseEditorScreen() {
@@ -29,6 +27,7 @@ export default function CourseEditorScreen() {
   const [isPublished, setIsPublished] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [isPriceModalVisible, setIsPriceModalVisible] = useState(false);
 
   useEffect(() => {
     loadCourses().then(() => {
@@ -110,7 +109,19 @@ export default function CourseEditorScreen() {
   const handlePriceChange = (text: string) => {
     const numericValue = text.replace(/[^0-9.]/g, '');
     setPrice(numericValue);
-    updateCourse(course.id, { price: parseFloat(numericValue) || 0 });
+  };
+
+  const handleSavePrice = () => {
+    const priceValue = parseFloat(price) || 0;
+    if (priceValue < 0) {
+      Alert.alert('Error', 'Price cannot be negative');
+      return;
+    }
+
+    updateCourse(course.id, { price: priceValue }).then(() => {
+      setIsPriceModalVisible(false);
+      Alert.alert('Success', 'Price updated successfully');
+    });
   };
 
   const handlePublishToggle = () => {
@@ -153,177 +164,172 @@ export default function CourseEditorScreen() {
   const renderLessonItem = ({ item, drag, isActive }: RenderItemParams<Lesson>) => {
     return (
       <TouchableOpacity
-        onPress={() => handleLessonPress(item.id)}
-        onLongPress={drag}
         style={[styles.lessonItem, isActive && styles.activeLessonItem]}
+        onLongPress={drag}
+        onPress={() => handleLessonPress(item.id)}
         activeOpacity={0.8}
       >
-        <View style={styles.lessonItemContent}>
-          <Ionicons name="reorder-three-outline" size={24} color="#8E8E93" style={styles.dragHandle} />
-          <View style={styles.lessonTextContainer}>
-            <Text style={styles.lessonTitle}>{item.title}</Text>
-            <Text style={styles.lessonPreview} numberOfLines={1}>
-              {item.content || 'No content yet'}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => handleDeleteLesson(item.id)}
-            style={styles.deleteButton}
-          >
-            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-          </TouchableOpacity>
+        <View style={styles.lessonContent}>
+          <Text style={styles.lessonTitle}>{item.title}</Text>
+          <Text style={styles.lessonPreview} numberOfLines={2}>
+            {item.content || 'No content yet'}
+          </Text>
         </View>
+        <TouchableOpacity
+          style={styles.deleteLessonButton}
+          onPress={() => handleDeleteLesson(item.id)}
+        >
+          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={100}
+      style={styles.container}
     >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-back" size={24} color="#007AFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Edit Course</Text>
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSaveChanges}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.saveButtonText}>Save</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.courseInfoContainer}>
           <TextInput
             style={styles.titleInput}
-            placeholder="Course Title"
-            placeholderTextColor="#C7C7CC"
             value={title}
             onChangeText={handleTitleChange}
-            autoCapitalize="words"
+            placeholder="Course Title"
+            placeholderTextColor="#8E8E93"
           />
           <TextInput
             style={styles.descriptionInput}
-            placeholder="Course Description"
-            placeholderTextColor="#C7C7CC"
             value={description}
             onChangeText={handleDescriptionChange}
+            placeholder="Course Description"
+            placeholderTextColor="#8E8E93"
             multiline
-            numberOfLines={3}
           />
         </View>
 
-        <View style={styles.priceContainer}>
-          <Text style={styles.priceLabel}>Price ($)</Text>
-          <TextInput
-            style={styles.priceInput}
-            placeholder="0.00"
-            placeholderTextColor="#C7C7CC"
-            value={price}
-            onChangeText={handlePriceChange}
-            keyboardType="numeric"
-          />
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Lessons</Text>
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => setIsModalVisible(true)}
+            >
+              <Ionicons name="add" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+
+          {course.lessons.length > 0 ? (
+            <DraggableFlatList
+              data={course.lessons}
+              renderItem={renderLessonItem}
+              keyExtractor={(item) => item.id}
+              onDragEnd={({ data }) => handleReorderLessons(data)}
+              activationDistance={20}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="book-outline" size={48} color="#C7C7CC" />
+              <Text style={styles.emptyText}>No lessons yet</Text>
+              <Text style={styles.emptySubtext}>Add your first lesson to get started</Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.publishContainer}>
-          <Text style={styles.publishLabel}>Publish Course</Text>
-          <Switch
-            value={isPublished}
-            onValueChange={handlePublishToggle}
-            trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-            thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
-          />
-        </View>
+        <View style={styles.controls}>
+          <View style={styles.controlRow}>
+            <Text style={styles.controlLabel}>Publish Course</Text>
+            <Switch
+              value={isPublished}
+              onValueChange={handlePublishToggle}
+              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+              thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
+            />
+          </View>
 
-        <View style={styles.lessonsHeader}>
-          <Text style={styles.lessonsTitle}>Lessons</Text>
           <TouchableOpacity
-            style={styles.addLessonButton}
-            onPress={() => setIsModalVisible(true)}
-            activeOpacity={0.7}
+            style={styles.priceButton}
+            onPress={() => setIsPriceModalVisible(true)}
           >
-            <Ionicons name="add" size={20} color="#007AFF" />
-            <Text style={styles.addLessonButtonText}>Add Lesson</Text>
+            <Text style={styles.priceButtonText}>
+              {price ? `$${price}` : 'Set Price'}
+            </Text>
           </TouchableOpacity>
         </View>
-
-        {course.lessons.length > 0 ? (
-          <DraggableFlatList
-            data={course.lessons}
-            renderItem={renderLessonItem}
-            keyExtractor={(item) => item.id}
-            onDragEnd={({ data }) => handleReorderLessons(data)}
-            activationDistance={20}
-            style={styles.lessonsList}
-          />
-        ) : (
-          <View style={styles.emptyLessonsContainer}>
-            <Ionicons name="book-outline" size={48} color="#C7C7CC" />
-            <Text style={styles.emptyLessonsText}>No lessons yet</Text>
-            <Text style={styles.emptyLessonsSubtext}>Add your first lesson to get started</Text>
-          </View>
-        )}
       </ScrollView>
 
       <Modal
         visible={isModalVisible}
         animationType="slide"
-        transparent={true}
         onRequestClose={() => setIsModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add New Lesson</Text>
+            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#000000" />
+            </TouchableOpacity>
+          </View>
 
+          <View style={styles.modalContent}>
             <TextInput
               style={styles.modalInput}
-              placeholder="Lesson Title"
-              placeholderTextColor="#C7C7CC"
               value={newLessonTitle}
               onChangeText={setNewLessonTitle}
-              autoCapitalize="words"
+              placeholder="Lesson Title"
+              placeholderTextColor="#8E8E93"
             />
 
             <TextInput
-              style={[styles.modalInput, styles.modalContentInput]}
-              placeholder="Lesson Content (Markdown)"
-              placeholderTextColor="#C7C7CC"
+              style={[styles.modalInput, styles.modalTextArea]}
               value={newLessonContent}
               onChangeText={setNewLessonContent}
+              placeholder="Lesson Content (Markdown supported)"
+              placeholderTextColor="#8E8E93"
               multiline
-              numberOfLines={5}
             />
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsModalVisible(false)}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleAddLesson}
+            >
+              <Text style={styles.modalButtonText}>Add Lesson</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
-              <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={handleAddLesson}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.modalButtonText, styles.addButtonText]}>Add Lesson</Text>
-              </TouchableOpacity>
-            </View>
+      <Modal
+        visible={isPriceModalVisible}
+        animationType="slide"
+        onRequestClose={() => setIsPriceModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Set Course Price</Text>
+            <TouchableOpacity onPress={() => setIsPriceModalVisible(false)}>
+              <Ionicons name="close" size={24} color="#000000" />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.modalContent}>
+            <Text style={styles.priceLabel}>Price ($)</Text>
+            <TextInput
+              style={styles.priceInput}
+              value={price}
+              onChangeText={handlePriceChange}
+              placeholder="0.00"
+              placeholderTextColor="#8E8E93"
+              keyboardType="numeric"
+            />
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={handleSavePrice}
+            >
+              <Text style={styles.modalButtonText}>Save Price</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -334,257 +340,203 @@ export default function CourseEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
+    backgroundColor: '#FFFFFF',
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
+  scrollContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 24,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1C1C1E',
-  },
-  saveButton: {
-    padding: 8,
-  },
-  saveButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  courseInfoContainer: {
     marginBottom: 24,
   },
   titleInput: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#1C1C1E',
+    fontWeight: 'bold',
+    color: '#000000',
     marginBottom: 8,
     padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
   descriptionInput: {
     fontSize: 16,
     color: '#8E8E93',
     padding: 8,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
-    minHeight: 80,
-    textAlignVertical: 'top',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+    minHeight: 60,
   },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  section: {
     marginBottom: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
   },
-  priceLabel: {
-    fontSize: 16,
-    color: '#1C1C1E',
-    marginRight: 16,
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1C1C1E',
-    textAlign: 'right',
-  },
-  publishContainer: {
+  sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
-  },
-  publishLabel: {
-    fontSize: 16,
-    color: '#1C1C1E',
-  },
-  lessonsHeader: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     marginBottom: 16,
   },
-  lessonsTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#000000',
   },
-  addLessonButton: {
-    flexDirection: 'row',
+  addButton: {
+    backgroundColor: '#007AFF',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
     alignItems: 'center',
-    padding: 8,
-  },
-  addLessonButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 4,
-  },
-  lessonsList: {
-    marginBottom: 24,
   },
   lessonItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
+    padding: 16,
     marginBottom: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   activeLessonItem: {
     opacity: 0.8,
     backgroundColor: '#E5E5EA',
   },
-  lessonItemContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  dragHandle: {
-    marginRight: 12,
-  },
-  lessonTextContainer: {
+  lessonContent: {
     flex: 1,
   },
   lessonTitle: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1C1C1E',
+    color: '#000000',
     marginBottom: 4,
   },
   lessonPreview: {
     fontSize: 14,
     color: '#8E8E93',
   },
-  deleteButton: {
+  deleteLessonButton: {
     padding: 8,
   },
-  emptyLessonsContainer: {
+  emptyState: {
     alignItems: 'center',
-    justifyContent: 'center',
     padding: 32,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
   },
-  emptyLessonsText: {
+  emptyText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#1C1C1E',
+    color: '#000000',
     marginTop: 16,
-    marginBottom: 8,
   },
-  emptyLessonsSubtext: {
+  emptySubtext: {
     fontSize: 14,
     color: '#8E8E93',
-    textAlign: 'center',
+    marginTop: 4,
+  },
+  controls: {
+    marginTop: 16,
+  },
+  controlRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  controlLabel: {
+    fontSize: 16,
+    color: '#000000',
+  },
+  priceButton: {
+    backgroundColor: '#34C759',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  priceButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    width: '90%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
   },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 20,
-    textAlign: 'center',
+    color: '#000000',
+  },
+  modalContent: {
+    padding: 16,
   },
   modalInput: {
-    backgroundColor: '#F2F2F7',
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: '#1C1C1E',
-    borderWidth: 1,
-    borderColor: '#D1D1D6',
   },
-  modalContentInput: {
+  modalTextArea: {
     minHeight: 120,
     textAlignVertical: 'top',
   },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
-  },
   modalButton: {
-    padding: 12,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  cancelButton: {
-    backgroundColor: '#E5E5EA',
-  },
-  addButton: {
     backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
   },
   modalButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  addButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  priceLabel: {
+    fontSize: 16,
+    color: '#000000',
+    marginBottom: 8,
+  },
+  priceInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5EA',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    fontSize: 16,
+    textAlign: 'center',
   },
   errorState: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 32,
   },
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1C1C1E',
+    color: '#000000',
     marginTop: 16,
     marginBottom: 24,
-    textAlign: 'center',
   },
   backButton: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#007AFF',
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 8,
   },
   backButtonText: {
-    color: '#007AFF',
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
