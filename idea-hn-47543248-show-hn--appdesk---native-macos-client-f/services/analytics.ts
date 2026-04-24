@@ -29,10 +29,19 @@ export const fetchAnalytics = async (appId: string): Promise<AnalyticsData[]> =>
     // First try to get fresh data from API
     const freshData = await getAppStoreData(appId);
 
-    // Store fresh data in SQLite
-    await storeAnalytics(appId, freshData);
+    // Transform API response to AnalyticsData format
+    const transformedData: AnalyticsData[] = freshData.map((item: any) => ({
+      date: item.date,
+      sales: item.sales,
+      downloads: item.downloads,
+      ratings: parseFloat(item.ratings),
+      reviews: item.reviews
+    }));
 
-    return freshData;
+    // Store fresh data in SQLite
+    await storeAnalytics(appId, transformedData);
+
+    return transformedData;
   } catch (error) {
     console.log('Failed to fetch fresh data, falling back to cache:', error);
     // If API fails, get cached data
@@ -70,7 +79,7 @@ const getCachedAnalytics = async (appId: string): Promise<AnalyticsData[]> => {
           for (let i = 0; i < rows.length; i++) {
             data.push(rows.item(i));
           }
-          resolve(data);
+          resolve(data.reverse()); // Return in chronological order
         },
         (_, error) => reject(error)
       );

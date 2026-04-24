@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ScrollView, Alert } from 'react-native';
 import { VictoryChart, VictoryLine, VictoryAxis, VictoryTheme } from 'victory-native';
 import { fetchAnalytics, AnalyticsData } from '../services/analytics';
 
@@ -7,14 +7,19 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
   const { appId } = route.params;
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadAnalytics = async () => {
       try {
+        setIsLoading(true);
+        setError(null);
         const data = await fetchAnalytics(appId);
         setAnalyticsData(data);
       } catch (error) {
         console.error('Failed to load analytics:', error);
+        setError('Failed to load analytics data. Please check your connection and try again.');
+        Alert.alert('Error', 'Failed to load analytics data. Showing cached data if available.');
       } finally {
         setIsLoading(false);
       }
@@ -32,10 +37,11 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
     );
   }
 
-  if (analyticsData.length === 0) {
+  if (error && analyticsData.length === 0) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>No analytics data available</Text>
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <Text style={styles.errorSubtext}>No cached data available</Text>
       </View>
     );
   }
@@ -43,6 +49,12 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
   return (
     <ScrollView style={styles.container}>
       <Text style={styles.title}>App Analytics</Text>
+
+      {error && (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText}>⚠️ {error}</Text>
+        </View>
+      )}
 
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Sales Over Time</Text>
@@ -151,6 +163,37 @@ const AnalyticsScreen = ({ route }: { route: any }) => {
           />
         </VictoryChart>
       </View>
+
+      <View style={styles.summaryContainer}>
+        <Text style={styles.summaryTitle}>Summary</Text>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Sales:</Text>
+          <Text style={styles.summaryValue}>
+            {analyticsData.reduce((sum, item) => sum + item.sales, 0)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Downloads:</Text>
+          <Text style={styles.summaryValue}>
+            {analyticsData.reduce((sum, item) => sum + item.downloads, 0)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Average Rating:</Text>
+          <Text style={styles.summaryValue}>
+            {(
+              analyticsData.reduce((sum, item) => sum + item.ratings, 0) /
+              analyticsData.length
+            ).toFixed(1)}
+          </Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabel}>Total Reviews:</Text>
+          <Text style={styles.summaryValue}>
+            {analyticsData.reduce((sum, item) => sum + item.reviews, 0)}
+          </Text>
+        </View>
+      </View>
     </ScrollView>
   );
 };
@@ -172,25 +215,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  emptyContainer: {
+  errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f8f8',
+    padding: 20,
   },
-  emptyText: {
+  errorText: {
     fontSize: 16,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  errorSubtext: {
+    fontSize: 14,
     color: '#666',
+    textAlign: 'center',
+  },
+  errorBanner: {
+    backgroundColor: '#FFF9C4',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  errorBannerText: {
+    color: '#856404',
+    fontSize: 14,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
     color: '#333',
+    marginBottom: 24,
+    textAlign: 'center',
   },
   chartContainer: {
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     shadowColor: '#000',
@@ -202,7 +263,40 @@ const styles = StyleSheet.create({
   chartTitle: {
     fontSize: 18,
     fontWeight: '600',
+    color: '#333',
     marginBottom: 12,
+  },
+  summaryContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '500',
     color: '#333',
   },
 });

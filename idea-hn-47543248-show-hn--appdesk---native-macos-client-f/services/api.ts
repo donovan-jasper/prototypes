@@ -23,3 +23,33 @@ export const setupApp = async () => {
     return false;
   }
 };
+
+export const getAppStoreData = async (appId: string): Promise<any> => {
+  try {
+    // In a real implementation, this would call the App Store Connect API
+    // For this prototype, we'll return mock data
+    console.log(`Fetching data for app: ${appId}`);
+
+    // Generate mock data for the last 30 days
+    const mockData = [];
+    const today = new Date();
+
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(today);
+      date.setDate(today.getDate() - i);
+
+      mockData.push({
+        date: date.toISOString().split('T')[0],
+        sales: Math.floor(Math.random() * 1000) + 100,
+        downloads: Math.floor(Math.random() * 5000) + 500,
+        ratings: (Math.random() * 2 + 3).toFixed(1),
+        reviews: Math.floor(Math.random() * 50) + 5
+      });
+    }
+
+    return mockData.reverse(); // Return in chronological order
+  } catch (error) {
+    console.error('Failed to fetch App Store data:', error);
+    throw error;
+  }
+};
