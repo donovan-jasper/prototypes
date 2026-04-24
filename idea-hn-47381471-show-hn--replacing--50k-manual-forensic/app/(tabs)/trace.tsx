@@ -1,53 +1,40 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, ScrollView } from 'react-native';
 import { traceMoney } from '../../lib/trace';
 import { getTransactions } from '../../lib/database';
 import TraceResult from '../../components/TraceResult';
 
-const TraceScreen = () => {
+export default function TraceScreen() {
   const [startBalance, setStartBalance] = useState('');
   const [endBalance, setEndBalance] = useState('');
-  const [tolerance, setTolerance] = useState('0.01');
-  const [fee, setFee] = useState('');
-  const [traceResult, setTraceResult] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [transactionFee, setTransactionFee] = useState('');
+  const [overallFee, setOverallFee] = useState('');
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   const handleTrace = async () => {
-    if (!startBalance || !endBalance) {
-      Alert.alert('Error', 'Please enter both start and end balances');
-      return;
-    }
-
-    setIsLoading(true);
-
+    setLoading(true);
     try {
       const transactions = await getTransactions();
-      const result = traceMoney(
-        parseFloat(startBalance),
-        parseFloat(endBalance),
+      const traceResult = traceMoney(
+        parseFloat(startBalance) || 0,
+        parseFloat(endBalance) || 0,
         transactions,
-        parseFloat(tolerance),
-        parseFloat(fee) || 0
+        0.01,
+        parseFloat(transactionFee) || 0,
+        parseFloat(overallFee) || 0
       );
-
-      setTraceResult({
-        ...result,
-        startBalance: parseFloat(startBalance),
-        endBalance: parseFloat(endBalance),
-      });
+      setResult(traceResult);
     } catch (error) {
-      Alert.alert('Error', 'Failed to trace transactions');
-      console.error(error);
+      console.error('Trace error:', error);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Deterministic Trace</Text>
-
-      <View style={styles.inputGroup}>
+    <ScrollView style={styles.container}>
+      <View style={styles.form}>
         <Text style={styles.label}>Starting Balance</Text>
         <TextInput
           style={styles.input}
@@ -56,9 +43,7 @@ const TraceScreen = () => {
           onChangeText={setStartBalance}
           placeholder="0.00"
         />
-      </View>
 
-      <View style={styles.inputGroup}>
         <Text style={styles.label}>Ending Balance</Text>
         <TextInput
           style={styles.input}
@@ -67,72 +52,63 @@ const TraceScreen = () => {
           onChangeText={setEndBalance}
           placeholder="0.00"
         />
-      </View>
 
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Tolerance (default: 0.01)</Text>
+        <Text style={styles.label}>Transaction Fee (per withdrawal)</Text>
         <TextInput
           style={styles.input}
           keyboardType="numeric"
-          value={tolerance}
-          onChangeText={setTolerance}
-          placeholder="0.01"
-        />
-      </View>
-
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>Transaction Fee (optional)</Text>
-        <TextInput
-          style={styles.input}
-          keyboardType="numeric"
-          value={fee}
-          onChangeText={setFee}
+          value={transactionFee}
+          onChangeText={setTransactionFee}
           placeholder="0.00"
         />
+
+        <Text style={styles.label}>Overall Fee</Text>
+        <TextInput
+          style={styles.input}
+          keyboardType="numeric"
+          value={overallFee}
+          onChangeText={setOverallFee}
+          placeholder="0.00"
+        />
+
+        <Button
+          title={loading ? "Tracing..." : "Trace Money"}
+          onPress={handleTrace}
+          disabled={loading}
+        />
       </View>
 
-      <Button
-        title={isLoading ? 'Tracing...' : 'Trace Transactions'}
-        onPress={handleTrace}
-        disabled={isLoading}
-      />
-
-      {traceResult && (
-        <TraceResult
-          result={traceResult}
-          startBalance={traceResult.startBalance}
-          endBalance={traceResult.endBalance}
-        />
+      {result && (
+        <View style={styles.resultContainer}>
+          <TraceResult result={result} />
+        </View>
       )}
-    </View>
+    </ScrollView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+  form: {
     marginBottom: 20,
-    textAlign: 'center',
-  },
-  inputGroup: {
-    marginBottom: 16,
   },
   label: {
     fontSize: 16,
     marginBottom: 8,
+    fontWeight: 'bold',
   },
   input: {
+    height: 40,
+    borderColor: 'gray',
     borderWidth: 1,
-    borderColor: '#ccc',
+    marginBottom: 16,
+    paddingHorizontal: 8,
     borderRadius: 4,
-    padding: 8,
-    fontSize: 16,
+  },
+  resultContainer: {
+    marginTop: 20,
   },
 });
-
-export default TraceScreen;

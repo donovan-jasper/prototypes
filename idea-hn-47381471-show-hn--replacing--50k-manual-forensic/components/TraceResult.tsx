@@ -1,133 +1,134 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
-import { Transaction } from '../lib/types';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { format } from 'date-fns';
+import ExportButton from './ExportButton';
 
 interface TraceResultProps {
   result: {
     explained: boolean;
     gap: number;
-    timeline: Transaction[];
+    timeline: any[];
     missingTransactions: boolean;
+    totalFees: number;
   };
-  startBalance: number;
-  endBalance: number;
 }
 
-const TraceResult: React.FC<TraceResultProps> = ({ result, startBalance, endBalance }) => {
-  const renderTransaction = ({ item }: { item: Transaction }) => (
-    <View style={styles.transactionRow}>
-      <Text style={styles.date}>{item.date.toLocaleDateString()}</Text>
-      <Text style={styles.payee}>{item.payee}</Text>
-      <Text style={[styles.amount, item.amount >= 0 ? styles.positive : styles.negative]}>
-        {item.amount >= 0 ? '+' : ''}${Math.abs(item.amount).toFixed(2)}
-      </Text>
-      <Text style={styles.balance}>${item.runningBalance?.toFixed(2)}</Text>
-    </View>
-  );
-
+const TraceResult: React.FC<TraceResultProps> = ({ result }) => {
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <View style={styles.summary}>
-        <Text style={styles.summaryText}>Starting Balance: ${startBalance.toFixed(2)}</Text>
-        <Text style={styles.summaryText}>Ending Balance: ${endBalance.toFixed(2)}</Text>
-        <Text style={styles.summaryText}>Calculated Balance: ${(startBalance + result.gap).toFixed(2)}</Text>
-        <Text style={[styles.summaryText, result.explained ? styles.success : styles.error]}>
-          {result.explained ? 'Balance explained' : 'Balance not explained'}
+        <Text style={styles.title}>Trace Result</Text>
+        <Text style={result.explained ? styles.success : styles.error}>
+          {result.explained ? 'Balance explained' : 'Gap detected'}
         </Text>
+        <Text>Gap: ${result.gap.toFixed(2)}</Text>
+        <Text>Total Fees Applied: ${result.totalFees.toFixed(2)}</Text>
         {result.missingTransactions && (
-          <Text style={[styles.summaryText, styles.warning]}>
-            Potential missing transactions detected
-          </Text>
+          <Text style={styles.warning}>Missing transactions detected</Text>
         )}
       </View>
 
-      <Text style={styles.sectionTitle}>Transaction Timeline</Text>
-      <View style={styles.tableHeader}>
-        <Text style={[styles.headerCell, styles.date]}>Date</Text>
-        <Text style={[styles.headerCell, styles.payee]}>Payee</Text>
-        <Text style={[styles.headerCell, styles.amount]}>Amount</Text>
-        <Text style={[styles.headerCell, styles.balance]}>Balance</Text>
+      <View style={styles.timeline}>
+        <Text style={styles.sectionTitle}>Transaction Timeline</Text>
+        {result.timeline.map((tx, index) => (
+          <View key={index} style={styles.transactionRow}>
+            <Text style={styles.date}>{format(new Date(tx.date), 'MM/dd/yyyy')}</Text>
+            <Text style={styles.payee}>{tx.payee}</Text>
+            <Text style={[
+              styles.amount,
+              tx.type === 'deposit' ? styles.deposit : styles.withdrawal
+            ]}>
+              {tx.type === 'deposit' ? '+' : '-'}${Math.abs(tx.amount).toFixed(2)}
+            </Text>
+            {tx.fee > 0 && (
+              <Text style={styles.fee}>Fee: -${tx.fee.toFixed(2)}</Text>
+            )}
+            <Text style={styles.balance}>Balance: ${tx.runningBalance.toFixed(2)}</Text>
+          </View>
+        ))}
       </View>
 
-      <FlatList
-        data={result.timeline}
-        renderItem={renderTransaction}
-        keyExtractor={(item) => item.id}
-        style={styles.transactionList}
-      />
-    </View>
+      {result.explained && (
+        <ExportButton
+          transactions={result.timeline}
+          startDate={result.timeline[0]?.date}
+          endDate={result.timeline[result.timeline.length - 1]?.date}
+        />
+      )}
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
   },
   summary: {
     marginBottom: 20,
-    padding: 12,
+    padding: 16,
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
   },
-  summaryText: {
-    fontSize: 16,
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   success: {
     color: 'green',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   error: {
     color: 'red',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   warning: {
     color: 'orange',
     fontWeight: 'bold',
+    marginTop: 8,
+  },
+  timeline: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
   },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ccc',
-  },
-  headerCell: {
-    fontWeight: 'bold',
-  },
-  date: {
-    width: '25%',
-  },
-  payee: {
-    width: '35%',
-  },
-  amount: {
-    width: '20%',
-    textAlign: 'right',
-  },
-  balance: {
-    width: '20%',
-    textAlign: 'right',
-  },
   transactionRow: {
-    flexDirection: 'row',
-    paddingVertical: 8,
+    padding: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  positive: {
+  date: {
+    fontSize: 14,
+    color: '#666',
+  },
+  payee: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginVertical: 4,
+  },
+  amount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  deposit: {
     color: 'green',
   },
-  negative: {
+  withdrawal: {
     color: 'red',
   },
-  transactionList: {
-    maxHeight: 400,
+  fee: {
+    fontSize: 14,
+    color: '#999',
+  },
+  balance: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 4,
   },
 });
 

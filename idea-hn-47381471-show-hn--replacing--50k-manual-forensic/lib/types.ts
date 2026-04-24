@@ -3,11 +3,11 @@ export interface Transaction {
   date: Date;
   amount: number;
   payee: string;
-  type: 'deposit' | 'withdrawal' | 'transfer';
+  type: 'deposit' | 'withdrawal';
   documentId?: string;
   documentHash?: string;
-  runningBalance?: number; // Added for trace results
-  fee?: number; // Added for transaction fees
+  runningBalance?: number;
+  fee?: number;
 }
 
 export interface Document {
@@ -16,6 +16,4 @@ export interface Document {
   hash: string;
   uploadDate: Date;
   ocrText: string;
-  fileName?: string;
-  fileSize?: number;
 }

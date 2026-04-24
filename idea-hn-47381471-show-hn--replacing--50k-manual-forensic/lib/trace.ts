@@ -5,6 +5,7 @@ interface TraceResult {
   gap: number;
   timeline: Transaction[];
   missingTransactions: boolean;
+  totalFees: number;
 }
 
 export const traceMoney = (
@@ -12,7 +13,8 @@ export const traceMoney = (
   endBalance: number,
   transactions: Transaction[],
   tolerance: number = 0.01,
-  fee: number = 0
+  transactionFee: number = 0,
+  overallFee: number = 0
 ): TraceResult => {
   // Sort transactions by date
   const sortedTransactions = [...transactions].sort((a, b) =>
@@ -21,23 +23,29 @@ export const traceMoney = (
 
   // Calculate running balance
   let runningBalance = startBalance;
+  let totalFees = 0;
   const timeline: Transaction[] = [];
 
   for (const tx of sortedTransactions) {
-    runningBalance += tx.amount;
-    // Apply transaction fee if this is a withdrawal
-    if (tx.type === 'withdrawal' && tx.fee) {
-      runningBalance -= tx.fee;
+    // Apply transaction fee if this is a withdrawal and fee is specified
+    let feeAmount = 0;
+    if (tx.type === 'withdrawal' && transactionFee > 0) {
+      feeAmount = transactionFee;
+      totalFees += feeAmount;
     }
+
+    runningBalance += tx.amount - feeAmount;
     timeline.push({
       ...tx,
-      runningBalance
+      runningBalance,
+      fee: feeAmount
     });
   }
 
   // Apply overall fee if specified
-  if (fee > 0) {
-    runningBalance -= fee;
+  if (overallFee > 0) {
+    runningBalance -= overallFee;
+    totalFees += overallFee;
   }
 
   // Calculate gap
@@ -50,6 +58,7 @@ export const traceMoney = (
     explained: Math.abs(gap) <= tolerance,
     gap,
     timeline,
-    missingTransactions
+    missingTransactions,
+    totalFees
   };
 };
