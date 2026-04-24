@@ -177,38 +177,31 @@ class ScreenTimeAPI {
     }
 
     try {
-      console.log('[ScreenTimeAPI] Updating content filter rules');
+      console.log('[ScreenTimeAPI] Updating content filter');
 
       const success = await NativeModules.ScreenTimeModule.updateContentFilter({
         profileType: config.profileType,
         blockAdultContent: config.blockAdultContent,
         blockExplicitContent: config.blockExplicitContent,
-        allowedDomains: config.allowedDomains || [],
-        blockedDomains: config.blockedDomains || [],
+        allowedDomains: config.allowedDomains,
+        blockedDomains: config.blockedDomains,
         restrictWebSearch: config.restrictWebSearch,
         restrictSiri: config.restrictSiri
       });
 
       if (success) {
-        console.log('[ScreenTimeAPI] Content filter rules updated successfully');
-        console.log('[ScreenTimeAPI] Updated configuration:', {
-          profileType: config.profileType,
-          blockAdultContent: config.blockAdultContent,
-          blockExplicitContent: config.blockExplicitContent,
-          allowedDomainsCount: config.allowedDomains?.length || 0,
-          blockedDomainsCount: config.blockedDomains?.length || 0,
-          restrictWebSearch: config.restrictWebSearch,
-          restrictSiri: config.restrictSiri
-        });
+        console.log('[ScreenTimeAPI] Content filter updated successfully');
+        if (config.profileType) {
+          this.currentProfile = config.profileType;
+        }
       }
 
       return success;
     } catch (error) {
-      console.error('[ScreenTimeAPI] Error updating content filter rules:', error);
+      console.error('[ScreenTimeAPI] Error updating content filter:', error);
       return false;
     }
   }
 }
 
-// Singleton instance
 export const screenTimeAPI = new ScreenTimeAPI();

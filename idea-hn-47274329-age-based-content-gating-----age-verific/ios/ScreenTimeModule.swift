@@ -196,8 +196,8 @@ class ScreenTimeManager {
       newConfig.restrictSiri = restrictSiri
     }
 
-    // Update the filter
-    try currentFilter.update(with: newConfig)
+    // Update the content filter with new configuration
+    contentFilter?.configuration = newConfig
 
     return true
   }
