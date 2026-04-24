@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Banner } from 'react-native-paper';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
@@ -8,15 +8,32 @@ import ConnectionLine from './ConnectionLine';
 import { Build, Component } from '@/lib/types';
 import { validateSignalChain } from '@/lib/validation/chain';
 import { saveComponentPosition } from '@/lib/db/queries';
+import useBuildStore from '@/lib/store/buildStore';
 
 interface BuildCanvasProps {
   build?: Build | null;
 }
 
 const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
+  const { currentBuild, setCurrentBuild } = useBuildStore();
   const positions = useSharedValue<{ [key: number]: { x: number; y: number } }>({});
 
-  if (!build) {
+  useEffect(() => {
+    if (build) {
+      setCurrentBuild(build);
+      // Initialize positions from build components
+      const initialPositions: { [key: number]: { x: number; y: number } } = {};
+      build.components.forEach(component => {
+        initialPositions[component.id] = {
+          x: component.position?.x || 0,
+          y: component.position?.y || 0
+        };
+      });
+      positions.value = initialPositions;
+    }
+  }, [build]);
+
+  if (!currentBuild) {
     return (
       <View style={styles.container}>
         <Text>No build selected</Text>
@@ -24,11 +41,22 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
     );
   }
 
-  const validation = build.components.length > 0 ? validateSignalChain(build.components) : { isValid: true, suggestions: [], issues: [] };
+  const validation = currentBuild.components.length > 0
+    ? validateSignalChain(currentBuild.components)
+    : { isValid: true, suggestions: [], issues: [] };
 
   const handleDragEnd = (componentId: number, x: number, y: number) => {
-    if (build.id) {
-      saveComponentPosition(build.id, componentId, x, y);
+    if (currentBuild.id) {
+      saveComponentPosition(currentBuild.id, componentId, x, y);
+      // Update Zustand store with new position
+      setCurrentBuild({
+        ...currentBuild,
+        components: currentBuild.components.map(component =>
+          component.id === componentId
+            ? { ...component, position: { x, y } }
+            : component
+        )
+      });
     }
   };
 
@@ -52,8 +80,8 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       )}
 
       <View style={styles.canvas}>
-        {build.components.map((component, index) => {
-          const nextComponent = build.components[index + 1];
+        {currentBuild.components.map((component, index) => {
+          const nextComponent = currentBuild.components[index + 1];
           let connectionStatus: 'compatible' | 'warning' | 'incompatible' = 'compatible';
 
           if (nextComponent) {

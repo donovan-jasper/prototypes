@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Line } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 import { Component } from '@/lib/types';
 
 interface ConnectionLineProps {
@@ -23,16 +23,24 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
     }
   };
 
+  // Calculate positions based on component positions
+  const fromX = from.position?.x || 0;
+  const fromY = from.position?.y || 0;
+  const toX = to.position?.x || 0;
+  const toY = to.position?.y || 0;
+
+  // Calculate control points for a smooth curve
+  const midX = (fromX + toX) / 2;
+  const controlY = Math.abs(toY - fromY) / 2;
+
   return (
     <View style={styles.container}>
-      <Svg height="40" width="100%">
-        <Line
-          x1="50%"
-          y1="0"
-          x2="50%"
-          y2="40"
+      <Svg height="100" width="100%">
+        <Path
+          d={`M ${fromX} ${fromY} C ${midX} ${fromY + controlY}, ${midX} ${toY - controlY}, ${toX} ${toY}`}
           stroke={getColor()}
           strokeWidth="3"
+          fill="none"
         />
       </Svg>
     </View>
@@ -41,7 +49,11 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
 
 const styles = StyleSheet.create({
   container: {
-    height: 40,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
