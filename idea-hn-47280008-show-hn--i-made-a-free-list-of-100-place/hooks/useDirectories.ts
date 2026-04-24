@@ -1,31 +1,19 @@
 import { useState, useEffect } from 'react';
+import { getAllDirectories, searchDirectories, getTopDirectories, getDirectoriesByCategory, getPriorityRecommendations as getPriorityRecs } from '@/lib/directories';
 import { Directory } from '@/lib/database';
-import { 
-  getAllDirectories, 
-  searchDirectories as searchDirectoriesDb,
-  getDirectoriesByCategories 
-} from '@/lib/directories';
-import { initDatabase, seedDatabase } from '@/lib/seed';
+import { Category } from '@/constants/categories';
 
-export function useDirectories() {
+export const useDirectories = () => {
   const [directories, setDirectories] = useState<Directory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
   const loadDirectories = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
-      // Initialize database and seed if needed
-      await initDatabase();
-      await seedDatabase();
-      
       const data = await getAllDirectories();
       setDirectories(data);
-    } catch (err) {
-      console.error('Error loading directories:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load directories');
+    } catch (error) {
+      console.error('Error loading directories:', error);
     } finally {
       setLoading(false);
     }
@@ -35,47 +23,64 @@ export function useDirectories() {
     loadDirectories();
   }, []);
 
-  const refresh = async () => {
-    await loadDirectories();
-  };
-
-  const searchDirectories = async (query: string) => {
-    if (!query.trim()) {
+  const search = async (query: string) => {
+    if (!query) {
       await loadDirectories();
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
-      const results = await searchDirectoriesDb(query);
+      const results = await searchDirectories(query);
       setDirectories(results);
-    } catch (err) {
-      console.error('Error searching directories:', err);
-      setError(err instanceof Error ? err.message : 'Failed to search directories');
+    } catch (error) {
+      console.error('Error searching directories:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterByCategory = async (categories: string[]) => {
+  const filterByCategory = async (category: Category) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      const results = await getDirectoriesByCategories(categories);
+      const results = await getDirectoriesByCategory(category);
       setDirectories(results);
-    } catch (err) {
-      console.error('Error filtering directories:', err);
-      setError(err instanceof Error ? err.message : 'Failed to filter directories');
+    } catch (error) {
+      console.error('Error filtering directories:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getTopDirectoriesForCategory = async (category: Category, limit: number = 10) => {
+    try {
+      return await getTopDirectories(category, limit);
+    } catch (error) {
+      console.error('Error getting top directories:', error);
+      return [];
+    }
+  };
+
+  const getPriorityRecommendations = async (category: Category, limit: number = 10) => {
+    try {
+      return await getPriorityRecs(category, limit);
+    } catch (error) {
+      console.error('Error getting priority recommendations:', error);
+      return [];
+    }
+  };
+
+  const refresh = async () => {
+    await loadDirectories();
   };
 
   return {
     directories,
     loading,
-    error,
-    refresh,
-    searchDirectories,
+    searchDirectories: search,
     filterByCategory,
+    getTopDirectories: getTopDirectoriesForCategory,
+    getPriorityRecommendations,
+    refresh,
   };
-}
+};

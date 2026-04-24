@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
-import { useRouter } from 'expo-router';
-import { getPriorityRecommendations } from '@/lib/directories';
-import DirectoryCard from '@/components/DirectoryCard';
+import { useDirectories } from '@/hooks/useDirectories';
+import DirectoryCard from './DirectoryCard';
+import { Directory } from '@/lib/database';
 import { Category } from '@/constants/categories';
 
 interface PriorityRecommendationsProps {
@@ -14,16 +14,16 @@ const PriorityRecommendations: React.FC<PriorityRecommendationsProps> = ({
   category,
   limit = 10
 }) => {
-  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const { getPriorityRecommendations } = useDirectories();
+  const [recommendations, setRecommendations] = useState<Directory[]>([]);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     const fetchRecommendations = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        const results = await getPriorityRecommendations(category, limit);
-        setRecommendations(results);
+        const recs = await getPriorityRecommendations(category, limit);
+        setRecommendations(recs);
       } catch (error) {
         console.error('Error fetching recommendations:', error);
       } finally {
@@ -34,15 +34,11 @@ const PriorityRecommendations: React.FC<PriorityRecommendationsProps> = ({
     fetchRecommendations();
   }, [category, limit]);
 
-  const handleDirectoryPress = (id: string) => {
-    router.push(`/directory/${id}`);
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading recommendations...</Text>
+        <Text style={styles.loadingText}>Finding best directories...</Text>
       </View>
     );
   }
@@ -53,20 +49,22 @@ const PriorityRecommendations: React.FC<PriorityRecommendationsProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Priority Recommendations</Text>
-      <Text style={styles.subtitle}>Top {limit} directories for {category}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>Start Here</Text>
+        <Text style={styles.subtitle}>Top {limit} directories for {category}</Text>
+      </View>
 
       <FlatList
         data={recommendations}
-        keyExtractor={(item) => item.id}
         horizontal
         showsHorizontalScrollIndicator={false}
+        keyExtractor={(item) => `recommendation-${item.id}`}
         renderItem={({ item }) => (
           <View style={styles.cardContainer}>
             <DirectoryCard
               directory={item}
-              onPress={() => handleDirectoryPress(item.id)}
-              showPriorityScore
+              onPress={() => {}}
+              showPriorityScore={true}
             />
           </View>
         )}
@@ -78,19 +76,20 @@ const PriorityRecommendations: React.FC<PriorityRecommendationsProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 20,
+    marginBottom: 16,
     paddingHorizontal: 16,
+  },
+  header: {
+    marginBottom: 12,
   },
   title: {
     fontSize: 18,
     fontWeight: '700',
     color: '#333',
-    marginBottom: 4,
   },
   subtitle: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 12,
   },
   loadingContainer: {
     flexDirection: 'row',
