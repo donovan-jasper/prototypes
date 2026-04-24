@@ -31,14 +31,56 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "permissions": [
-      "RECORD_AUDIO",
-      "VIBRATE",
-      "RECEIVE_BOOT_COMPLETED"
+    "plugins": [
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow $(PRODUCT_NAME) to access motion and fitness data."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access microphone."
+        }
+      ],
+      [
+        "expo-brightness",
+        {
+          "brightnessPermission": "Allow $(PRODUCT_NAME) to adjust screen brightness."
+        }
+      ],
+      [
+        "expo-sqlite",
+        {
+          "iosDatabaseLocation": "Library/Application Support"
+        }
+      ],
+      [
+        "expo-background-fetch",
+        {
+          "backgroundFetchPermission": "Allow $(PRODUCT_NAME) to run in the background."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ffffff"
+        }
+      ],
+      [
+        "expo-sms",
+        {
+          "smsPermission": "Allow $(PRODUCT_NAME) to send SMS messages."
+        }
+      ]
     ],
-    "backgroundModes": [
-      "audio",
-      "fetch"
+    "permissions": [
+      "CAMERA",
+      "MICROPHONE",
+      "VIBRATE",
+      "SEND_SMS"
     ]
   }
 }
