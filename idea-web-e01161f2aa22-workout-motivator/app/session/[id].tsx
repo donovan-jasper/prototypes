@@ -2,8 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSessionStore } from '../../lib/store';
+import { sessionManager } from '../../lib/sessionManager';
 import SessionTimer from '../../components/SessionTimer';
-import { generatePrompt, selectPromptByIntensity, getRandomInterval } from '../../lib/prompts';
 import { speakPrompt, stopSpeaking } from '../../lib/audio';
 import { CoachId } from '../../constants/Prompts';
 import { saveSession, calculateXP } from '../../lib/database';
@@ -21,76 +21,53 @@ export default function SessionScreen() {
   const router = useRouter();
   const { taskName, coachId, isActive, stopSession, reset, elapsedSeconds, togglePause } = useSessionStore();
   const [lastPrompt, setLastPrompt] = useState<string>('');
-  const [nextPromptIn, setNextPromptIn] = useState<number>(getRandomInterval());
+  const [nextPromptIn, setNextPromptIn] = useState<number>(0);
   const [isPaused, setIsPaused] = useState<boolean>(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const lastPromptTimeRef = useRef<number>(0);
-  const pauseTimeRef = useRef<number>(0);
 
   const coach = COACHES[coachId as keyof typeof COACHES];
 
   useEffect(() => {
-    if (!isActive || isPaused) return;
+    if (!isActive) return;
 
     const interval = setInterval(() => {
+      if (isPaused) return;
+
       setNextPromptIn((prev) => {
         if (prev <= 1) {
-          playMotivationalPrompt();
-          return getRandomInterval();
+          return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isActive, isPaused, coachId]);
+  }, [isActive, isPaused]);
 
-  const playMotivationalPrompt = async () => {
-    if (!coachId || isPaused) return;
+  useEffect(() => {
+    if (!isActive) return;
 
-    const secondsSinceLastPrompt = elapsedSeconds - lastPromptTimeRef.current;
-    const prompt = selectPromptByIntensity(coachId as CoachId, secondsSinceLastPrompt);
+    const unsubscribe = useSessionStore.subscribe(
+      (state) => state.elapsedSeconds,
+      (elapsedSeconds) => {
+        // This will be called whenever elapsedSeconds changes
+        // We can use it to update the next prompt time display
+      }
+    );
 
-    setLastPrompt(prompt);
-    lastPromptTimeRef.current = elapsedSeconds;
-
-    Animated.sequence([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.delay(3000),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start();
-
-    try {
-      await speakPrompt(prompt, coachId);
-    } catch (error) {
-      console.error('Error speaking prompt:', error);
-    }
-  };
+    return () => unsubscribe();
+  }, [isActive]);
 
   const handleTogglePause = () => {
     togglePause();
     setIsPaused(!isPaused);
-
-    if (!isPaused) {
-      pauseTimeRef.current = Date.now();
-    } else {
-      const pauseDuration = (Date.now() - pauseTimeRef.current) / 1000;
-      // Adjust next prompt time based on pause duration
-      setNextPromptIn(prev => Math.max(60, prev - Math.floor(pauseDuration)));
-    }
+    sessionManager.handlePause();
   };
 
   const handleEndSession = async () => {
     await stopSpeaking();
     stopSession();
+    sessionManager.cleanup();
 
     const xpEarned = calculateXP(elapsedSeconds);
 
@@ -111,6 +88,7 @@ export default function SessionScreen() {
             text: 'OK',
             onPress: () => {
               reset();
+              sessionManager.reset();
               router.push('/');
             },
           },
@@ -119,6 +97,7 @@ export default function SessionScreen() {
     } catch (error) {
       console.error('Error saving session:', error);
       reset();
+      sessionManager.reset();
       router.push('/');
     }
   };
@@ -161,16 +140,17 @@ export default function SessionScreen() {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={[styles.controlButton, isPaused ? styles.resumeButton : styles.pauseButton]}
+          style={[styles.button, styles.pauseButton]}
           onPress={handleTogglePause}
         >
-          <Text style={styles.controlButtonText}>
-            {isPaused ? 'Resume' : 'Pause'}
-          </Text>
+          <Text style={styles.buttonText}>{isPaused ? 'Resume' : 'Pause'}</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.endButton} onPress={handleEndSession}>
-          <Text style={styles.endButtonText}>End Session</Text>
+        <TouchableOpacity
+          style={[styles.button, styles.endButton]}
+          onPress={handleEndSession}
+        >
+          <Text style={styles.buttonText}>End Session</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -180,122 +160,100 @@ export default function SessionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 60,
-    marginBottom: 40,
+    marginBottom: 20,
   },
   coachEmoji: {
-    fontSize: 64,
-    marginBottom: 12,
+    fontSize: 32,
+    marginRight: 10,
   },
   coachName: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
   },
   taskContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 20,
-    alignItems: 'center',
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   taskLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 5,
   },
   taskName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#333',
   },
   promptContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    alignItems: 'center',
+    marginVertical: 20,
+    padding: 15,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196f3',
   },
   promptLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 5,
   },
   promptText: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#333',
-    textAlign: 'center',
   },
   nextPromptContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    marginVertical: 20,
     alignItems: 'center',
   },
   nextPromptLabel: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+    marginBottom: 5,
   },
   nextPromptTime: {
     fontSize: 24,
-    fontWeight: '600',
-    color: '#007AFF',
+    fontWeight: 'bold',
+    color: '#2196f3',
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     marginTop: 'auto',
-    marginBottom: 40,
   },
-  controlButton: {
+  button: {
     flex: 1,
-    padding: 16,
-    borderRadius: 12,
-    marginRight: 10,
+    padding: 15,
+    borderRadius: 10,
     alignItems: 'center',
+    marginHorizontal: 5,
   },
   pauseButton: {
-    backgroundColor: '#FF9500',
-  },
-  resumeButton: {
-    backgroundColor: '#34C759',
-  },
-  controlButtonText: {
-    color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    backgroundColor: '#ffc107',
   },
   endButton: {
-    flex: 1,
-    backgroundColor: '#FF3B30',
-    padding: 16,
-    borderRadius: 12,
-    marginLeft: 10,
-    alignItems: 'center',
+    backgroundColor: '#f44336',
   },
-  endButtonText: {
+  buttonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   errorText: {
     fontSize: 18,
-    color: '#FF3B30',
+    color: 'red',
     textAlign: 'center',
-    marginTop: 40,
+    marginTop: 50,
   },
 });
