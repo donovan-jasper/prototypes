@@ -33,6 +33,10 @@ export const detectChaptersBySilence = async (
     const durationOutput = await durationResult.getOutput();
     const totalDuration = parseFloat(durationOutput);
 
+    if (isNaN(totalDuration) || totalDuration <= 0) {
+      throw new Error('Invalid audio duration');
+    }
+
     // Detect silence segments
     const silenceCommand = `-i "${audioPath}" -af "silencedetect=n=${threshold}dB:d=${minDuration}" -f null -`;
     const silenceResult = await FFmpegKit.execute(silenceCommand);
@@ -71,14 +75,33 @@ export const detectChaptersBySilence = async (
       });
     }
 
-    return chapters.length > 0 ? chapters : detectChaptersByTime(totalDuration * 1000, 4);
+    // If no silence detected, fall back to time-based chapters
+    if (chapters.length === 0) {
+      return detectChaptersByTime(totalDuration * 1000, 4);
+    }
+
+    return chapters;
   } catch (error) {
     console.error('Error detecting silence:', error);
     // Fallback to time-based chapters if silence detection fails
-    const durationCommand = `-i "${audioPath}" -show_entries format=duration -v quiet -of csv=p=0`;
-    const durationResult = await FFprobeKit.execute(durationCommand);
-    const durationOutput = await durationResult.getOutput();
-    const totalDuration = parseFloat(durationOutput);
-    return detectChaptersByTime(totalDuration * 1000, 4);
+    try {
+      const durationCommand = `-i "${audioPath}" -show_entries format=duration -v quiet -of csv=p=0`;
+      const durationResult = await FFprobeKit.execute(durationCommand);
+      const durationOutput = await durationResult.getOutput();
+      const totalDuration = parseFloat(durationOutput);
+
+      if (!isNaN(totalDuration) && totalDuration > 0) {
+        return detectChaptersByTime(totalDuration * 1000, 4);
+      }
+    } catch (fallbackError) {
+      console.error('Fallback chapter detection failed:', fallbackError);
+    }
+
+    // Final fallback - create a single chapter for the entire file
+    return [{
+      title: 'Chapter 1',
+      startTime: 0,
+      endTime: 3600000 // Default to 1 hour if we can't determine duration
+    }];
   }
 };

@@ -1,142 +1,196 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
+import { Audio } from 'expo-av';
+import ChapterEditor from '@/components/ChapterEditor';
 import { useRouter } from 'expo-router';
-import { detectChaptersByTime } from '@/lib/audio/chapterDetector';
-import { createAudiobook } from '@/lib/db/audiobooks';
-import { createChapters } from '@/lib/db/chapters';
-import { extractMultipleFileDurations, calculateTotalDuration } from '@/lib/audio/processor';
-import { extractMetadata } from '@/lib/audio/metadata';
 
-export default function ImportScreen() {
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(false);
+const ImportScreen = () => {
+  const [selectedFiles, setSelectedFiles] = useState<DocumentPicker.DocumentPickerResult[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerResult | null>(null);
+  const [fileDuration, setFileDuration] = useState<number>(0);
   const router = useRouter();
 
   const pickFiles = async () => {
     try {
+      setIsLoading(true);
+      setError(null);
+
       const result = await DocumentPicker.getDocumentAsync({
         type: 'audio/*',
         multiple: true,
+        copyToCacheDirectory: true,
       });
-      if (!result.canceled) {
-        setFiles(result.assets);
+
+      if (!result.canceled && result.assets) {
+        setSelectedFiles(result.assets);
       }
     } catch (err) {
       console.error('Error picking files:', err);
-      Alert.alert('Error', 'Failed to pick audio files');
+      setError('Failed to select files. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const autoChapter = async () => {
-    if (files.length === 0) return;
-
-    setLoading(true);
+  const getFileDuration = async (fileUri: string): Promise<number> => {
     try {
-      // Extract durations from all files
-      const fileUris = files.map(f => f.uri);
-      const durations = await extractMultipleFileDurations(fileUris);
-      const totalDuration = calculateTotalDuration(durations);
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: fileUri },
+        { shouldPlay: false }
+      );
 
-      // Extract metadata from first file
-      const metadata = await extractMetadata(fileUris[0]);
+      const status = await sound.getStatusAsync();
+      await sound.unloadAsync();
 
-      // Create temporary audiobook with all file URIs stored as JSON
-      const audiobook = await createAudiobook({
-        title: metadata.title,
-        author: metadata.author,
-        duration: totalDuration,
-        filePath: JSON.stringify(fileUris),
-      });
-
-      // Generate initial chapters based on actual total duration
-      const chapters = detectChaptersByTime(totalDuration, Math.max(4, files.length));
-      await createChapters(audiobook.id, chapters);
-
-      setLoading(false);
-      
-      // Navigate to chapter editor instead of player
-      router.push(`/chapter-editor/${audiobook.id}`);
-    } catch (error) {
-      setLoading(false);
-      console.error('Error processing audiobook:', error);
-      Alert.alert('Error', 'Failed to process audiobook');
+      return status.durationMillis || 0;
+    } catch (err) {
+      console.error('Error getting file duration:', err);
+      return 0;
     }
   };
+
+  const handleFileSelect = async (file: DocumentPicker.DocumentPickerResult) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const duration = await getFileDuration(file.uri);
+      if (duration <= 0) {
+        setError('Could not determine audio duration. Please select another file.');
+        return;
+      }
+
+      setSelectedFile(file);
+      setFileDuration(duration);
+    } catch (err) {
+      console.error('Error handling file selection:', err);
+      setError('Failed to process the selected file. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDuration = (milliseconds: number) => {
+    const totalSeconds = Math.floor(milliseconds / 1000);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  if (selectedFile) {
+    return (
+      <ChapterEditor
+        filePath={selectedFile.uri}
+        fileName={selectedFile.name || 'Unknown'}
+        duration={fileDuration}
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.button} onPress={pickFiles} disabled={loading}>
-        <Text style={styles.buttonText}>Select Audio Files</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>Import Audio Files</Text>
 
-      {loading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
-          <Text style={styles.loadingText}>Processing audio files...</Text>
-        </View>
-      )}
+      {error && <Text style={styles.errorText}>{error}</Text>}
 
-      <FlatList
-        data={files}
-        keyExtractor={(item) => item.uri}
-        renderItem={({ item }) => (
-          <View style={styles.fileItem}>
-            <Text style={styles.fileName}>{item.name}</Text>
-            <Text style={styles.fileSize}>{(item.size / 1024 / 1024).toFixed(2)} MB</Text>
-          </View>
-        )}
-      />
+      {isLoading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={styles.loadingIndicator} />
+      ) : (
+        <>
+          <TouchableOpacity style={styles.importButton} onPress={pickFiles}>
+            <Text style={styles.importButtonText}>Select Audio Files</Text>
+          </TouchableOpacity>
 
-      {files.length > 0 && !loading && (
-        <TouchableOpacity style={styles.button} onPress={autoChapter}>
-          <Text style={styles.buttonText}>Create Audiobook ({files.length} files)</Text>
-        </TouchableOpacity>
+          {selectedFiles.length > 0 && (
+            <>
+              <Text style={styles.sectionTitle}>Selected Files ({selectedFiles.length})</Text>
+              <FlatList
+                data={selectedFiles}
+                keyExtractor={(item, index) => index.toString()}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.fileItem}
+                    onPress={() => handleFileSelect(item)}
+                  >
+                    <Text style={styles.fileName}>{item.name}</Text>
+                    {item.size && (
+                      <Text style={styles.fileSize}>
+                        {(item.size / (1024 * 1024)).toFixed(2)} MB
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+              />
+            </>
+          )}
+        </>
       )}
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: '#fff',
+    padding: 16,
   },
-  button: {
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 24,
+  },
+  importButton: {
     backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 5,
+    padding: 16,
+    borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
-  buttonText: {
+  importButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
   fileItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    borderRadius: 8,
+    marginBottom: 8,
   },
   fileName: {
-    flex: 1,
-    fontSize: 14,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
   },
   fileSize: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
-  loadingContainer: {
-    alignItems: 'center',
-    marginVertical: 20,
+  loadingIndicator: {
+    marginTop: 24,
   },
-  loadingText: {
-    marginTop: 10,
-    color: '#666',
+  errorText: {
+    color: 'red',
+    marginBottom: 16,
+    textAlign: 'center',
   },
 });
+
+export default ImportScreen;

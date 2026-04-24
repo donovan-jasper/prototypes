@@ -1,237 +1,344 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, Alert } from 'react-native';
-import { useLocalSearchParams } from 'expo-router';
-import { Audio } from 'expo-av';
-import { getAudiobookById, updateProgress } from '@/lib/db/audiobooks';
-import { getChaptersByAudiobookId } from '@/lib/db/chapters';
-import PlayerControls from '@/components/PlayerControls';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { usePlayer } from '@/hooks/usePlayer';
+import { State } from 'react-native-track-player';
+import Slider from '@react-native-community/slider';
+import { Ionicons } from '@expo/vector-icons';
+import { useAudiobooks } from '@/hooks/useAudiobooks';
 
-export default function AudiobookScreen() {
+const AudiobookPlayerScreen = () => {
   const { id } = useLocalSearchParams();
-  const [audiobook, setAudiobook] = useState(null);
-  const [chapters, setChapters] = useState([]);
-  const [sound, setSound] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [position, setPosition] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [fileUris, setFileUris] = useState([]);
-  const [currentFileIndex, setCurrentFileIndex] = useState(0);
-  const [fileDurations, setFileDurations] = useState([]);
+  const router = useRouter();
+  const {
+    currentAudiobook,
+    currentChapter,
+    playbackState,
+    position,
+    duration,
+    speed,
+    setupPlayer,
+    play,
+    pause,
+    seekTo,
+    setPlaybackSpeed,
+    skipToChapter,
+    skipForward,
+    skipBackward,
+    formatTime,
+  } = usePlayer();
+  const { getAudiobookById } = useAudiobooks();
+  const [isLoading, setIsLoading] = useState(true);
+  const [showChapters, setShowChapters] = useState(false);
 
   useEffect(() => {
     const loadAudiobook = async () => {
-      const book = await getAudiobookById(id);
-      setAudiobook(book);
-      setPosition(book.currentPosition || 0);
-      setDuration(book.duration);
-
-      // Parse file URIs from JSON
-      try {
-        const uris = JSON.parse(book.filePath);
-        setFileUris(Array.isArray(uris) ? uris : [book.filePath]);
-      } catch {
-        setFileUris([book.filePath]);
+      if (id) {
+        try {
+          setIsLoading(true);
+          await setupPlayer(Number(id));
+        } catch (error) {
+          console.error('Error loading audiobook:', error);
+        } finally {
+          setIsLoading(false);
+        }
       }
-
-      const chapterList = await getChaptersByAudiobookId(id);
-      setChapters(chapterList);
     };
+
     loadAudiobook();
-
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
   }, [id]);
 
-  useEffect(() => {
-    if (fileUris.length > 0) {
-      loadCurrentFile();
-    }
-  }, [fileUris, currentFileIndex]);
-
-  const loadCurrentFile = async () => {
-    try {
-      if (sound) {
-        await sound.unloadAsync();
-      }
-
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: fileUris[currentFileIndex] },
-        { shouldPlay: false },
-        onPlaybackStatusUpdate
-      );
-      
-      setSound(newSound);
-      
-      const status = await newSound.getStatusAsync();
-      if (status.isLoaded && status.durationMillis) {
-        const newDurations = [...fileDurations];
-        newDurations[currentFileIndex] = status.durationMillis;
-        setFileDurations(newDurations);
-      }
-    } catch (error) {
-      console.error('Error loading audio file:', error);
-      Alert.alert('Error', 'Failed to load audio file');
-    }
-  };
-
-  const onPlaybackStatusUpdate = async (status) => {
-    if (status.isLoaded) {
-      setPosition(status.positionMillis);
-      setIsPlaying(status.isPlaying);
-
-      // Check if current file finished and move to next
-      if (status.didJustFinish && currentFileIndex < fileUris.length - 1) {
-        setCurrentFileIndex(currentFileIndex + 1);
-        setIsPlaying(false);
-      } else if (status.didJustFinish) {
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  const playPause = async () => {
-    if (!sound) {
-      await loadCurrentFile();
-    }
-
-    if (isPlaying) {
-      await sound.pauseAsync();
-    } else {
-      await sound.playAsync();
-    }
-  };
-
-  const skipForward = async () => {
-    if (sound) {
-      const status = await sound.getStatusAsync();
-      if (status.isLoaded && status.durationMillis) {
-        const newPosition = Math.min(position + 15000, status.durationMillis);
-        await sound.setPositionAsync(newPosition);
-        setPosition(newPosition);
-      }
-    }
-  };
-
-  const skipBackward = async () => {
-    if (sound) {
-      const newPosition = Math.max(position - 15000, 0);
-      await sound.setPositionAsync(newPosition);
-      setPosition(newPosition);
-    }
-  };
-
-  const jumpToChapter = async (chapter) => {
-    if (sound) {
-      await sound.setPositionAsync(chapter.startTime);
-      setPosition(chapter.startTime);
-    }
-  };
-
-  useEffect(() => {
-    if (audiobook && position > 0) {
-      updateProgress(audiobook.id, position);
-    }
-  }, [position]);
-
-  if (!audiobook) {
+  if (isLoading || !currentAudiobook) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading audiobook...</Text>
       </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>{audiobook.title}</Text>
-      <Text style={styles.author}>{audiobook.author}</Text>
-      
-      {fileUris.length > 1 && (
-        <Text style={styles.fileInfo}>
-          Playing file {currentFileIndex + 1} of {fileUris.length}
-        </Text>
-      )}
-
-      <PlayerControls
-        isPlaying={isPlaying}
-        position={position}
-        duration={duration}
-        onPlayPause={playPause}
-        onSkipForward={skipForward}
-        onSkipBackward={skipBackward}
-      />
-
-      <Text style={styles.chaptersTitle}>Chapters</Text>
-      <FlatList
-        data={chapters}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.chapterItem}
-            onPress={() => jumpToChapter(item)}
-          >
-            <Text style={styles.chapterTitle}>{item.title}</Text>
-            <Text style={styles.chapterTime}>{formatTime(item.startTime)}</Text>
-          </TouchableOpacity>
-        )}
-      />
-    </View>
   );
 }
 
-const formatTime = (millis) => {
-  const hours = Math.floor(millis / 3600000);
-  const minutes = Math.floor((millis % 3600000) / 60000);
-  const seconds = Math.floor((millis % 60000) / 1000);
-  
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  const isPlaying = playbackState === State.Playing;
+  const progress = duration > 0 ? position / duration : 0;
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={24} color="#000" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Now Playing</Text>
+        <TouchableOpacity onPress={() => setShowChapters(!showChapters)}>
+          <Ionicons name="list" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Cover Art */}
+      <View style={styles.coverContainer}>
+        {currentAudiobook.coverArt ? (
+          <Image
+            source={{ uri: currentAudiobook.coverArt }}
+            style={styles.coverArt}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={styles.placeholderCover}>
+            <Ionicons name="musical-notes" size={64} color="#666" />
+          </View>
+        )}
+      </View>
+
+      {/* Audiobook Info */}
+      <View style={styles.infoContainer}>
+        <Text style={styles.title} numberOfLines={1}>{currentAudiobook.title}</Text>
+        <Text style={styles.author}>{currentAudiobook.author}</Text>
+        {currentChapter && (
+          <Text style={styles.chapterTitle}>{currentChapter.title}</Text>
+        )}
+      </View>
+
+      {/* Progress Bar */}
+      <View style={styles.progressContainer}>
+        <Text style={styles.timeText}>{formatTime(position)}</Text>
+        <Slider
+          style={styles.progressBar}
+          minimumValue={0}
+          maximumValue={duration}
+          value={position}
+          onSlidingComplete={seekTo}
+          minimumTrackTintColor="#007AFF"
+          maximumTrackTintColor="#ddd"
+          thumbTintColor="#007AFF"
+        />
+        <Text style={styles.timeText}>{formatTime(duration)}</Text>
+      </View>
+
+      {/* Playback Controls */}
+      <View style={styles.controlsContainer}>
+        <TouchableOpacity style={styles.controlButton} onPress={skipBackward}>
+          <Ionicons name="play-back" size={24} color="#000" />
+          <Text style={styles.controlText}>15s</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.playButton} onPress={isPlaying ? pause : play}>
+          <Ionicons
+            name={isPlaying ? "pause" : "play"}
+            size={32}
+            color="#fff"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.controlButton} onPress={skipForward}>
+          <Ionicons name="play-forward" size={24} color="#000" />
+          <Text style={styles.controlText}>15s</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Speed Control */}
+      <View style={styles.speedContainer}>
+        <Text style={styles.speedLabel}>Speed: {speed}x</Text>
+        <View style={styles.speedButtons}>
+          {[0.5, 0.75, 1.0, 1.25, 1.5, 2.0].map((rate) => (
+            <TouchableOpacity
+              key={rate}
+              style={[
+                styles.speedButton,
+                speed === rate && styles.activeSpeedButton
+              ]}
+              onPress={() => setPlaybackSpeed(rate)}
+            >
+              <Text style={[
+                styles.speedButtonText,
+                speed === rate && styles.activeSpeedButtonText
+              ]}>
+                {rate}x
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+
+      {/* Chapters List */}
+      {showChapters && currentAudiobook.chapters && (
+        <ScrollView style={styles.chaptersContainer}>
+          {currentAudiobook.chapters.map((chapter, index) => (
+            <TouchableOpacity
+              key={chapter.id}
+              style={[
+                styles.chapterItem,
+                currentChapter?.id === chapter.id && styles.activeChapter
+              ]}
+              onPress={() => skipToChapter(index)}
+            >
+              <View style={styles.chapterInfo}>
+                <Text style={styles.chapterTitle}>{chapter.title}</Text>
+                <Text style={styles.chapterDuration}>
+                  {formatTime(chapter.startTime)} - {formatTime(chapter.endTime)}
+                </Text>
+              </View>
+              {currentChapter?.id === chapter.id && (
+                <Ionicons name="checkmark" size={20} color="#007AFF" />
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    backgroundColor: '#fff',
+    padding: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#fff',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  author: {
-    fontSize: 18,
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
     color: '#666',
-    marginBottom: 10,
   },
-  fileInfo: {
-    fontSize: 14,
-    color: '#007AFF',
-    marginBottom: 20,
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
-  chaptersTitle: {
+  headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
   },
-  chapterItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+  coverContainer: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  coverArt: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+  },
+  placeholderCover: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  infoContainer: {
+    marginBottom: 16,
+    alignItems: 'center',
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  author: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 4,
+  },
+  chapterTitle: {
+    fontSize: 14,
+    color: '#007AFF',
+    fontWeight: '500',
+  },
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  timeText: {
+    fontSize: 12,
+    color: '#666',
+    width: 40,
+    textAlign: 'center',
+  },
+  progressBar: {
+    flex: 1,
+    height: 40,
+    marginHorizontal: 8,
+  },
+  controlsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  controlButton: {
+    alignItems: 'center',
+  },
+  controlText: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
+  playButton: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  speedContainer: {
+    marginBottom: 24,
+  },
+  speedLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 8,
+  },
+  speedButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  chapterTitle: {
-    fontSize: 16,
+  speedButton: {
+    padding: 8,
+    borderRadius: 4,
+    backgroundColor: '#f0f0f0',
   },
-  chapterTime: {
+  activeSpeedButton: {
+    backgroundColor: '#007AFF',
+  },
+  speedButtonText: {
     fontSize: 14,
     color: '#666',
   },
+  activeSpeedButtonText: {
+    color: '#fff',
+  },
+  chaptersContainer: {
+    maxHeight: 200,
+    marginTop: 16,
+  },
+  chapterItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  activeChapter: {
+    backgroundColor: '#f0f8ff',
+  },
+  chapterInfo: {
+    flex: 1,
+  },
+  chapterDuration: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 4,
+  },
 });
+
+export default AudiobookPlayerScreen;

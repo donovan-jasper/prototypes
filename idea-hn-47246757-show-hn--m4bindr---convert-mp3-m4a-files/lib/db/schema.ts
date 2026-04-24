@@ -1,9 +1,37 @@
 import * as SQLite from 'expo-sqlite';
 
+export interface Chapter {
+  id?: number;
+  audiobookId: number;
+  title: string;
+  startTime: number;
+  endTime: number;
+  order: number;
+}
+
+export interface Audiobook {
+  id?: number;
+  title: string;
+  author: string;
+  duration: number;
+  filePath: string;
+  coverArt?: string;
+  currentPosition?: number;
+  createdAt?: string;
+  chapters?: Chapter[];
+}
+
+export interface Settings {
+  id?: number;
+  isPremium: boolean;
+  lastBackup?: string;
+  storageUsage?: number;
+}
+
 const db = SQLite.openDatabase('chaptercast.db');
 
-export const initDatabase = async () => {
-  return new Promise((resolve, reject) => {
+export const initializeDatabase = async () => {
+  return new Promise<void>((resolve, reject) => {
     db.transaction(
       (tx) => {
         // Create audiobooks table
@@ -16,7 +44,7 @@ export const initDatabase = async () => {
             filePath TEXT NOT NULL,
             coverArt TEXT,
             currentPosition INTEGER DEFAULT 0,
-            createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            createdAt TEXT DEFAULT CURRENT_TIMESTAMP
           );`
         );
 
@@ -28,8 +56,8 @@ export const initDatabase = async () => {
             title TEXT NOT NULL,
             startTime INTEGER NOT NULL,
             endTime INTEGER NOT NULL,
-            \`order\` INTEGER NOT NULL,
-            FOREIGN KEY (audiobookId) REFERENCES audiobooks (id)
+            "order" INTEGER NOT NULL,
+            FOREIGN KEY (audiobookId) REFERENCES audiobooks (id) ON DELETE CASCADE
           );`
         );
 
@@ -37,9 +65,15 @@ export const initDatabase = async () => {
         tx.executeSql(
           `CREATE TABLE IF NOT EXISTS settings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            key TEXT NOT NULL UNIQUE,
-            value TEXT
+            isPremium BOOLEAN DEFAULT 0,
+            lastBackup TEXT,
+            storageUsage INTEGER DEFAULT 0
           );`
+        );
+
+        // Initialize settings if empty
+        tx.executeSql(
+          `INSERT OR IGNORE INTO settings (id, isPremium) VALUES (1, 0);`
         );
       },
       (error) => {
@@ -48,8 +82,10 @@ export const initDatabase = async () => {
       },
       () => {
         console.log('Database initialized successfully');
-        resolve(true);
+        resolve();
       }
     );
   });
 };
+
+export const getDatabase = () => db;

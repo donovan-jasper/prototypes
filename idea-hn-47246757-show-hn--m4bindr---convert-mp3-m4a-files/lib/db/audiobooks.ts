@@ -1,23 +1,39 @@
-import * as SQLite from 'expo-sqlite';
+import { getDatabase } from './schema';
+import { Audiobook, Chapter } from './schema';
 
-const db = SQLite.openDatabase('chaptercast.db');
+const db = getDatabase();
 
-export const createAudiobook = async (audiobook) => {
+export const createAudiobook = async (audiobook: Audiobook): Promise<Audiobook> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'INSERT INTO audiobooks (title, author, duration, filePath, coverArt, currentPosition) VALUES (?, ?, ?, ?, ?, ?)',
-          [
-            audiobook.title,
-            audiobook.author,
-            audiobook.duration,
-            audiobook.filePath,
-            audiobook.coverArt || null,
-            audiobook.currentPosition || 0,
-          ],
+          `INSERT INTO audiobooks (title, author, duration, filePath, coverArt)
+           VALUES (?, ?, ?, ?, ?);`,
+          [audiobook.title, audiobook.author, audiobook.duration, audiobook.filePath, audiobook.coverArt || null],
           (_, result) => {
-            resolve({ id: result.insertId, ...audiobook });
+            const newAudiobookId = result.insertId;
+
+            // Insert chapters if they exist
+            if (audiobook.chapters && audiobook.chapters.length > 0) {
+              const chapterValues = audiobook.chapters.map((chapter, index) => [
+                newAudiobookId,
+                chapter.title,
+                chapter.startTime,
+                chapter.endTime,
+                index + 1
+              ]);
+
+              chapterValues.forEach((chapter) => {
+                tx.executeSql(
+                  `INSERT INTO chapters (audiobookId, title, startTime, endTime, "order")
+                   VALUES (?, ?, ?, ?, ?);`,
+                  chapter
+                );
+              });
+            }
+
+            resolve({ ...audiobook, id: newAudiobookId });
           },
           (_, error) => {
             reject(error);
@@ -25,20 +41,45 @@ export const createAudiobook = async (audiobook) => {
           }
         );
       },
-      (error) => reject(error)
+      (error) => {
+        console.error('Transaction error:', error);
+        reject(error);
+      }
     );
   });
 };
 
-export const getAudiobooks = async () => {
+export const getAudiobooks = async (): Promise<Audiobook[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT * FROM audiobooks ORDER BY createdAt DESC',
+          `SELECT * FROM audiobooks ORDER BY createdAt DESC;`,
           [],
           (_, { rows }) => {
-            resolve(rows._array);
+            const audiobooks: Audiobook[] = rows._array;
+
+            // Get chapters for each audiobook
+            const audiobookPromises = audiobooks.map(audiobook => {
+              return new Promise<Audiobook>((resolveAudiobook) => {
+                tx.executeSql(
+                  `SELECT * FROM chapters WHERE audiobookId = ? ORDER BY "order";`,
+                  [audiobook.id],
+                  (_, { rows: chapterRows }) => {
+                    const chapters: Chapter[] = chapterRows._array;
+                    resolveAudiobook({ ...audiobook, chapters });
+                  },
+                  (_, error) => {
+                    console.error('Error fetching chapters:', error);
+                    resolveAudiobook(audiobook);
+                  }
+                );
+              });
+            });
+
+            Promise.all(audiobookPromises).then(resolvedAudiobooks => {
+              resolve(resolvedAudiobooks);
+            });
           },
           (_, error) => {
             reject(error);
@@ -46,20 +87,42 @@ export const getAudiobooks = async () => {
           }
         );
       },
-      (error) => reject(error)
+      (error) => {
+        console.error('Transaction error:', error);
+        reject(error);
+      }
     );
   });
 };
 
-export const getAudiobookById = async (id) => {
+export const getAudiobookById = async (id: number): Promise<Audiobook | null> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT * FROM audiobooks WHERE id = ?',
+          `SELECT * FROM audiobooks WHERE id = ?;`,
           [id],
           (_, { rows }) => {
-            resolve(rows._array[0]);
+            if (rows.length === 0) {
+              resolve(null);
+              return;
+            }
+
+            const audiobook: Audiobook = rows.item(0);
+
+            // Get chapters
+            tx.executeSql(
+              `SELECT * FROM chapters WHERE audiobookId = ? ORDER BY "order";`,
+              [id],
+              (_, { rows: chapterRows }) => {
+                const chapters: Chapter[] = chapterRows._array;
+                resolve({ ...audiobook, chapters });
+              },
+              (_, error) => {
+                reject(error);
+                return false;
+              }
+            );
           },
           (_, error) => {
             reject(error);
@@ -67,20 +130,23 @@ export const getAudiobookById = async (id) => {
           }
         );
       },
-      (error) => reject(error)
+      (error) => {
+        console.error('Transaction error:', error);
+        reject(error);
+      }
     );
   });
 };
 
-export const updateProgress = async (id, position) => {
+export const updateProgress = async (id: number, position: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'UPDATE audiobooks SET currentPosition = ? WHERE id = ?',
+          `UPDATE audiobooks SET currentPosition = ? WHERE id = ?;`,
           [position, id],
-          (_, result) => {
-            resolve(result);
+          () => {
+            resolve();
           },
           (_, error) => {
             reject(error);
@@ -88,7 +154,46 @@ export const updateProgress = async (id, position) => {
           }
         );
       },
-      (error) => reject(error)
+      (error) => {
+        console.error('Transaction error:', error);
+        reject(error);
+      }
+    );
+  });
+};
+
+export const deleteAudiobook = async (id: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        // First delete chapters
+        tx.executeSql(
+          `DELETE FROM chapters WHERE audiobookId = ?;`,
+          [id],
+          () => {
+            // Then delete the audiobook
+            tx.executeSql(
+              `DELETE FROM audiobooks WHERE id = ?;`,
+              [id],
+              () => {
+                resolve();
+              },
+              (_, error) => {
+                reject(error);
+                return false;
+              }
+            );
+          },
+          (_, error) => {
+            reject(error);
+            return false;
+          }
+        );
+      },
+      (error) => {
+        console.error('Transaction error:', error);
+        reject(error);
+      }
     );
   });
 };
