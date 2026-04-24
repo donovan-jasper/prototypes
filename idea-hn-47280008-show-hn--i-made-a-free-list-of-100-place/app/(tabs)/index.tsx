@@ -192,19 +192,20 @@ const styles = StyleSheet.create({
   },
   filterButtonText: {
     color: '#FFF',
+    fontSize: 14,
     fontWeight: '600',
   },
   listContent: {
-    paddingBottom: 32,
+    paddingBottom: 20,
   },
   emptyContainer: {
-    padding: 32,
+    padding: 20,
     alignItems: 'center',
   },
   emptyText: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   emptySubtext: {
     fontSize: 14,
