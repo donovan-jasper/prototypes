@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, RefreshControl, Dimensions } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateMockEvents } from '../utils/mockEventGenerator';
+import MapView, { Marker } from 'react-native-maps';
+import { Ionicons } from '@expo/vector-icons';
 
 const ACTIVITY_TYPES = [
   { name: 'Basketball', emoji: '🏀' },
@@ -17,6 +19,8 @@ const ACTIVITY_TYPES = [
   { name: 'Pickleball', emoji: '🏓' },
 ];
 
+const { width, height } = Dimensions.get('window');
+
 const HomeScreen = ({ navigation }) => {
   const [location, setLocation] = useState(null);
   const [events, setEvents] = useState([]);
@@ -26,7 +30,9 @@ const HomeScreen = ({ navigation }) => {
   const [distanceFilter, setDistanceFilter] = useState(10);
   const [selectedActivity, setSelectedActivity] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('list');
   const flatListRef = useRef(null);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     (async () => {
@@ -149,151 +155,157 @@ const HomeScreen = ({ navigation }) => {
             <Text style={styles.eventTitle}>{item.title}</Text>
             <Text style={styles.eventLocation}>{item.location}</Text>
           </View>
-          <View style={styles.eventDetails}>
-            <Text style={styles.eventTime}>{item.time}</Text>
+          <View style={styles.eventDistanceContainer}>
             <Text style={styles.eventDistance}>{item.distance} mi</Text>
           </View>
         </View>
-        <View style={styles.eventFooter}>
-          <Text style={styles.eventParticipants}>
-            {item.currentParticipants}/{item.maxCapacity} spots
-          </Text>
-          <TouchableOpacity
-            style={styles.joinButton}
-            onPress={() => handleJoinEvent(item)}
-          >
-            <Text style={styles.joinButtonText}>Join</Text>
-          </TouchableOpacity>
+        <View style={styles.eventDetails}>
+          <Text style={styles.eventTime}>{item.time}</Text>
+          <Text style={styles.eventParticipants}>{item.participants} joining</Text>
         </View>
       </View>
     </TouchableOpacity>
   );
 
-  const handleJoinEvent = async (event) => {
-    try {
-      // Check if event is full
-      if (event.currentParticipants >= event.maxCapacity) {
-        Alert.alert('Event Full', 'This event has reached its maximum capacity.');
-        return;
-      }
+  const renderActivityFilter = () => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.activityFilterContainer}
+    >
+      {ACTIVITY_TYPES.map((activity, index) => (
+        <TouchableOpacity
+          key={index}
+          style={[
+            styles.activityFilterItem,
+            selectedActivity === activity.name && styles.activityFilterItemSelected
+          ]}
+          onPress={() => setSelectedActivity(selectedActivity === activity.name ? null : activity.name)}
+        >
+          <Text style={styles.activityFilterEmoji}>{activity.emoji}</Text>
+          <Text style={styles.activityFilterText}>{activity.name}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
 
-      // Update participant count
-      const updatedEvent = {
-        ...event,
-        currentParticipants: event.currentParticipants + 1
-      };
+  const renderMapView = () => {
+    if (!location) return null;
 
-      // Update in AsyncStorage if it's a user-created event
-      if (event.createdBy === 'user') {
-        const storedEvents = await AsyncStorage.getItem('userEvents');
-        const userEvents = storedEvents ? JSON.parse(storedEvents) : [];
-        const updatedEvents = userEvents.map(e =>
-          e.id === event.id ? updatedEvent : e
-        );
-        await AsyncStorage.setItem('userEvents', JSON.stringify(updatedEvents));
-      }
-
-      // Update local state
-      setEvents(prevEvents =>
-        prevEvents.map(e => e.id === event.id ? updatedEvent : e)
-      );
-
-      Alert.alert('Success', 'You have joined the event!');
-    } catch (error) {
-      console.error('Error joining event:', error);
-      Alert.alert('Error', 'Could not join the event. Please try again.');
-    }
+    return (
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        initialRegion={{
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.0922,
+          longitudeDelta: 0.0421,
+        }}
+        showsUserLocation={true}
+      >
+        {filteredEvents.map((event, index) => (
+          <Marker
+            key={index}
+            coordinate={{
+              latitude: event.latitude,
+              longitude: event.longitude
+            }}
+            title={event.title}
+            description={`${event.location} - ${event.distance} mi`}
+            onCalloutPress={() => navigation.navigate('Event', { event })}
+          >
+            <View style={styles.markerContainer}>
+              <Text style={styles.markerEmoji}>{event.emoji}</Text>
+            </View>
+          </Marker>
+        ))}
+      </MapView>
+    );
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007AFF" />
-        <Text style={styles.loadingText}>Loading events...</Text>
+        <Text style={styles.loadingText}>Finding nearby activities...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>SpontaPlay</Text>
-        <TouchableOpacity
-          style={styles.createButton}
-          onPress={() => navigation.navigate('CreateEvent')}
-        >
-          <Text style={styles.createButtonText}>+ Create Event</Text>
-        </TouchableOpacity>
-      </View>
-
       <View style={styles.searchContainer}>
+        <Ionicons name="search" size={20} color="#888" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search events..."
+          placeholder="Search activities or locations"
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
       </View>
 
-      <View style={styles.filtersContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity
-            style={[
-              styles.filterButton,
-              !selectedActivity && styles.selectedFilter
-            ]}
-            onPress={() => setSelectedActivity(null)}
-          >
-            <Text style={styles.filterText}>All</Text>
-          </TouchableOpacity>
-          {ACTIVITY_TYPES.map(activity => (
+      {renderActivityFilter()}
+
+      <View style={styles.distanceFilterContainer}>
+        <Text style={styles.distanceFilterLabel}>Show events within:</Text>
+        <View style={styles.distanceFilterButtons}>
+          {[5, 10, 20].map((distance) => (
             <TouchableOpacity
-              key={activity.name}
+              key={distance}
               style={[
-                styles.filterButton,
-                selectedActivity === activity.name && styles.selectedFilter
+                styles.distanceFilterButton,
+                distanceFilter === distance && styles.distanceFilterButtonSelected
               ]}
-              onPress={() => setSelectedActivity(activity.name)}
+              onPress={() => setDistanceFilter(distance)}
             >
-              <Text style={styles.filterText}>{activity.emoji} {activity.name}</Text>
+              <Text style={styles.distanceFilterButtonText}>{distance} mi</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
-      <View style={styles.distanceFilter}>
-        <Text style={styles.distanceText}>Distance: Within {distanceFilter} miles</Text>
-        <TextInput
-          style={styles.distanceInput}
-          value={distanceFilter.toString()}
-          onChangeText={(text) => {
-            const num = parseFloat(text);
-            if (!isNaN(num) && num >= 0) {
-              setDistanceFilter(num);
-            }
-          }}
-          keyboardType="numeric"
+      <View style={styles.viewToggleContainer}>
+        <TouchableOpacity
+          style={[styles.viewToggleButton, viewMode === 'list' && styles.viewToggleButtonActive]}
+          onPress={() => setViewMode('list')}
+        >
+          <Ionicons name="list" size={20} color={viewMode === 'list' ? '#007AFF' : '#888'} />
+          <Text style={[styles.viewToggleText, viewMode === 'list' && styles.viewToggleTextActive]}>List</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewToggleButton, viewMode === 'map' && styles.viewToggleButtonActive]}
+          onPress={() => setViewMode('map')}
+        >
+          <Ionicons name="map" size={20} color={viewMode === 'map' ? '#007AFF' : '#888'} />
+          <Text style={[styles.viewToggleText, viewMode === 'map' && styles.viewToggleTextActive]}>Map</Text>
+        </TouchableOpacity>
+      </View>
+
+      {viewMode === 'list' ? (
+        <FlatList
+          ref={flatListRef}
+          data={filteredEvents}
+          renderItem={renderItem}
+          keyExtractor={(item, index) => index.toString()}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyListContainer}>
+              <Text style={styles.emptyListText}>No events found matching your criteria</Text>
+            </View>
+          }
         />
-      </View>
-
-      <FlatList
-        ref={flatListRef}
-        data={filteredEvents}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={handleRefresh}
-          />
-        }
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No events found matching your filters</Text>
-          </View>
-        }
-      />
+      ) : (
+        <View style={styles.mapContainer}>
+          {renderMapView()}
+        </View>
+      )}
     </View>
   );
 };
@@ -301,7 +313,7 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f8f8f8',
   },
   loadingContainer: {
     flex: 1,
@@ -313,89 +325,121 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  createButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-  },
-  createButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   searchContainer: {
-    padding: 10,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    margin: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 8,
   },
   searchInput: {
-    backgroundColor: '#F0F0F0',
-    padding: 10,
-    borderRadius: 8,
+    flex: 1,
     fontSize: 16,
   },
-  filtersContainer: {
+  activityFilterContainer: {
     paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    paddingHorizontal: 10,
   },
-  filterButton: {
+  activityFilterItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 8,
-    marginHorizontal: 5,
-    borderRadius: 20,
-    backgroundColor: '#F0F0F0',
+    marginRight: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  selectedFilter: {
+  activityFilterItemSelected: {
     backgroundColor: '#007AFF',
   },
-  filterText: {
+  activityFilterEmoji: {
+    fontSize: 16,
+    marginRight: 6,
+  },
+  activityFilterText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  distanceFilterContainer: {
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  distanceFilterLabel: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 8,
+  },
+  distanceFilterButtons: {
+    flexDirection: 'row',
+  },
+  distanceFilterButton: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginRight: 8,
+  },
+  distanceFilterButtonSelected: {
+    backgroundColor: '#007AFF',
+  },
+  distanceFilterButtonText: {
     color: '#333',
     fontSize: 14,
   },
-  distanceFilter: {
+  viewToggleContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#eee',
   },
-  distanceText: {
+  viewToggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+  },
+  viewToggleButtonActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  viewToggleText: {
+    marginLeft: 5,
+    color: '#888',
     fontSize: 14,
-    color: '#555',
   },
-  distanceInput: {
-    width: 50,
-    padding: 5,
-    backgroundColor: '#F0F0F0',
-    borderRadius: 4,
-    textAlign: 'center',
+  viewToggleTextActive: {
+    color: '#007AFF',
+    fontWeight: '500',
   },
-  listContent: {
-    padding: 10,
+  listContainer: {
+    paddingBottom: 20,
   },
   eventItem: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#fff',
     borderRadius: 8,
+    marginHorizontal: 10,
+    marginVertical: 6,
     padding: 15,
-    marginBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
@@ -405,11 +449,10 @@ const styles = StyleSheet.create({
   eventHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
   },
   eventEmoji: {
     fontSize: 24,
-    marginRight: 10,
+    marginRight: 12,
   },
   eventInfo: {
     flex: 1,
@@ -424,50 +467,59 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 2,
   },
-  eventDetails: {
-    alignItems: 'flex-end',
-  },
-  eventTime: {
-    fontSize: 14,
-    color: '#007AFF',
-    fontWeight: '500',
+  eventDistanceContainer: {
+    backgroundColor: '#f0f0f0',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   eventDistance: {
     fontSize: 12,
-    color: '#666',
-    marginTop: 2,
+    color: '#333',
   },
-  eventFooter: {
+  eventDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
     marginTop: 10,
+  },
+  eventTime: {
+    fontSize: 14,
+    color: '#666',
   },
   eventParticipants: {
     fontSize: 14,
-    color: '#555',
+    color: '#666',
   },
-  joinButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-  },
-  joinButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  emptyContainer: {
+  emptyListContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
-  emptyText: {
+  emptyListText: {
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  mapContainer: {
+    flex: 1,
+  },
+  map: {
+    width: '100%',
+    height: '100%',
+  },
+  markerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.3,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  markerEmoji: {
+    fontSize: 20,
   },
 });
 
