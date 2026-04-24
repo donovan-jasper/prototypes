@@ -155,86 +155,22 @@ export const getGenerations = async (): Promise<Generation[]> => {
           [],
           (_, result) => {
             const generations: Generation[] = [];
+
             for (let i = 0; i < result.rows.length; i++) {
-              const row = result.rows.item(i) as any;
+              const row = result.rows.item(i);
               generations.push({
                 id: row.id,
                 prompt: row.prompt,
                 imageUri: row.imageUri,
                 attribution: JSON.parse(row.attribution),
-                timestamp: new Date(row.timestamp),
+                timestamp: new Date(row.timestamp)
               });
             }
+
             resolve(generations);
           },
           (_, error) => {
             console.error('Error getting generations:', error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      error => {
-        console.error('Transaction failed:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-// User profile functions
-export const updateUserProfile = async (updates: Partial<{ totalScore: number; generationCount: number; premiumStatus: boolean; balance: number }>) => {
-  return new Promise<void>((resolve, reject) => {
-    db.transaction(
-      tx => {
-        let query = 'UPDATE user_profile SET ';
-        const values: any[] = [];
-        const fields = Object.keys(updates);
-
-        fields.forEach((field, index) => {
-          if (index > 0) query += ', ';
-          query += `${field} = ?`;
-          values.push((updates as any)[field]);
-        });
-
-        query += ' WHERE id = 1';
-        values.push(1);
-
-        tx.executeSql(
-          query,
-          values,
-          () => resolve(),
-          (_, error) => {
-            console.error('Error updating user profile:', error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      error => {
-        console.error('Transaction failed:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-export const getUserProfile = async () => {
-  return new Promise<any>((resolve, reject) => {
-    db.transaction(
-      tx => {
-        tx.executeSql(
-          `SELECT * FROM user_profile WHERE id = 1`,
-          [],
-          (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0));
-            } else {
-              resolve(null);
-            }
-          },
-          (_, error) => {
-            console.error('Error getting user profile:', error);
             reject(error);
             return true;
           }
@@ -254,8 +190,15 @@ export const saveArtist = async (artist: Omit<Artist, 'id'>): Promise<number> =>
     db.transaction(
       tx => {
         tx.executeSql(
-          `INSERT INTO artists (name, style, bio, profileImage, followers) VALUES (?, ?, ?, ?, ?)`,
-          [artist.name, artist.style, artist.bio, artist.profileImage, artist.followers || 0],
+          `INSERT INTO artists (name, style, bio, profileImage, followers, createdAt) VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            artist.name,
+            artist.style,
+            artist.bio,
+            artist.profileImage,
+            artist.followers,
+            artist.createdAt
+          ],
           (_, result) => resolve(result.insertId!),
           (_, error) => {
             console.error('Error saving artist:', error);
@@ -281,66 +224,24 @@ export const getArtists = async (): Promise<Artist[]> => {
           [],
           (_, result) => {
             const artists: Artist[] = [];
+
             for (let i = 0; i < result.rows.length; i++) {
-              artists.push(result.rows.item(i) as Artist);
+              const row = result.rows.item(i);
+              artists.push({
+                id: row.id,
+                name: row.name,
+                style: row.style,
+                bio: row.bio,
+                profileImage: row.profileImage,
+                followers: row.followers,
+                createdAt: row.createdAt
+              });
             }
+
             resolve(artists);
           },
           (_, error) => {
             console.error('Error getting artists:', error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      error => {
-        console.error('Transaction failed:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-export const getArtistById = async (id: number): Promise<Artist | null> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      tx => {
-        tx.executeSql(
-          `SELECT * FROM artists WHERE id = ?`,
-          [id],
-          (_, result) => {
-            if (result.rows.length > 0) {
-              resolve(result.rows.item(0) as Artist);
-            } else {
-              resolve(null);
-            }
-          },
-          (_, error) => {
-            console.error('Error getting artist by ID:', error);
-            reject(error);
-            return true;
-          }
-        );
-      },
-      error => {
-        console.error('Transaction failed:', error);
-        reject(error);
-      }
-    );
-  });
-};
-
-// Artist works functions
-export const saveArtistWork = async (work: Omit<ArtistWork, 'id'>): Promise<number> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      tx => {
-        tx.executeSql(
-          `INSERT INTO artist_works (artistId, imageUrl, description) VALUES (?, ?, ?)`,
-          [work.artistId, work.imageUrl, work.description || ''],
-          (_, result) => resolve(result.insertId!),
-          (_, error) => {
-            console.error('Error saving artist work:', error);
             reject(error);
             return true;
           }
@@ -363,9 +264,18 @@ export const getArtistWorks = async (artistId: number): Promise<ArtistWork[]> =>
           [artistId],
           (_, result) => {
             const works: ArtistWork[] = [];
+
             for (let i = 0; i < result.rows.length; i++) {
-              works.push(result.rows.item(i) as ArtistWork);
+              const row = result.rows.item(i);
+              works.push({
+                id: row.id,
+                artistId: row.artistId,
+                imageUrl: row.imageUrl,
+                description: row.description,
+                createdAt: row.createdAt
+              });
             }
+
             resolve(works);
           },
           (_, error) => {
@@ -383,7 +293,7 @@ export const getArtistWorks = async (artistId: number): Promise<ArtistWork[]> =>
   });
 };
 
-// Tips functions
+// Tip functions
 export const saveTip = async (tip: Omit<Tip, 'id'>): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
@@ -391,19 +301,7 @@ export const saveTip = async (tip: Omit<Tip, 'id'>): Promise<number> => {
         tx.executeSql(
           `INSERT INTO tips (artistId, amount, fee, timestamp) VALUES (?, ?, ?, ?)`,
           [tip.artistId, tip.amount, tip.fee, tip.timestamp],
-          (_, result) => {
-            // Update artist's follower count
-            tx.executeSql(
-              `UPDATE artists SET followers = followers + 1 WHERE id = ?`,
-              [tip.artistId],
-              () => resolve(result.insertId!),
-              (_, error) => {
-                console.error('Error updating artist followers:', error);
-                reject(error);
-                return true;
-              }
-            );
-          },
+          (_, result) => resolve(result.insertId!),
           (_, error) => {
             console.error('Error saving tip:', error);
             reject(error);
@@ -419,22 +317,112 @@ export const saveTip = async (tip: Omit<Tip, 'id'>): Promise<number> => {
   });
 };
 
-export const getArtistTips = async (artistId: number): Promise<Tip[]> => {
+export const getArtistEarnings = async (artistId: number): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       tx => {
         tx.executeSql(
-          `SELECT * FROM tips WHERE artistId = ? ORDER BY timestamp DESC`,
+          `SELECT SUM(amount) as total FROM tips WHERE artistId = ?`,
           [artistId],
           (_, result) => {
-            const tips: Tip[] = [];
-            for (let i = 0; i < result.rows.length; i++) {
-              tips.push(result.rows.item(i) as Tip);
-            }
-            resolve(tips);
+            const total = result.rows.item(0).total || 0;
+            resolve(total);
           },
           (_, error) => {
-            console.error('Error getting artist tips:', error);
+            console.error('Error getting artist earnings:', error);
+            reject(error);
+            return true;
+          }
+        );
+      },
+      error => {
+        console.error('Transaction failed:', error);
+        reject(error);
+      }
+    );
+  });
+};
+
+// User profile functions
+export const getUserProfile = async (): Promise<{totalScore: number, generationCount: number, premiumStatus: boolean, balance: number}> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        tx.executeSql(
+          `SELECT totalScore, generationCount, premiumStatus, balance FROM user_profile WHERE id = 1`,
+          [],
+          (_, result) => {
+            if (result.rows.length > 0) {
+              const row = result.rows.item(0);
+              resolve({
+                totalScore: row.totalScore,
+                generationCount: row.generationCount,
+                premiumStatus: row.premiumStatus === 1,
+                balance: row.balance
+              });
+            } else {
+              resolve({
+                totalScore: 0,
+                generationCount: 0,
+                premiumStatus: false,
+                balance: 0
+              });
+            }
+          },
+          (_, error) => {
+            console.error('Error getting user profile:', error);
+            reject(error);
+            return true;
+          }
+        );
+      },
+      error => {
+        console.error('Transaction failed:', error);
+        reject(error);
+      }
+    );
+  });
+};
+
+export const updateUserProfile = async (updates: Partial<{totalScore: number, generationCount: number, premiumStatus: boolean, balance: number}>): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      tx => {
+        const fields = [];
+        const values = [];
+
+        if (updates.totalScore !== undefined) {
+          fields.push('totalScore = ?');
+          values.push(updates.totalScore);
+        }
+
+        if (updates.generationCount !== undefined) {
+          fields.push('generationCount = ?');
+          values.push(updates.generationCount);
+        }
+
+        if (updates.premiumStatus !== undefined) {
+          fields.push('premiumStatus = ?');
+          values.push(updates.premiumStatus ? 1 : 0);
+        }
+
+        if (updates.balance !== undefined) {
+          fields.push('balance = ?');
+          values.push(updates.balance);
+        }
+
+        if (fields.length === 0) {
+          resolve();
+          return;
+        }
+
+        const query = `UPDATE user_profile SET ${fields.join(', ')} WHERE id = 1`;
+        tx.executeSql(
+          query,
+          values,
+          () => resolve(),
+          (_, error) => {
+            console.error('Error updating user profile:', error);
             reject(error);
             return true;
           }
