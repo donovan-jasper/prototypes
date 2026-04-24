@@ -60,6 +60,13 @@ export const initDatabase = async () => {
           balance REAL DEFAULT 0
         );`
       );
+
+      // Create indexes for better performance
+      tx.executeSql('CREATE INDEX IF NOT EXISTS idx_artists_name ON artists(name);');
+      tx.executeSql('CREATE INDEX IF NOT EXISTS idx_artists_style ON artists(style);');
+      tx.executeSql('CREATE INDEX IF NOT EXISTS idx_artist_works_artistId ON artist_works(artistId);');
+      tx.executeSql('CREATE INDEX IF NOT EXISTS idx_tips_artistId ON tips(artistId);');
+      tx.executeSql('CREATE INDEX IF NOT EXISTS idx_generations_timestamp ON generations(timestamp);');
     }, reject, resolve);
   });
 };
@@ -126,6 +133,34 @@ export const getArtistEarnings = async (artistId: number): Promise<number> => {
           const total = rows._array[0].total || 0;
           resolve(total);
         },
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// New function to add a work to an artist's portfolio
+export const addArtistWork = async (work: Omit<ArtistWork, 'id'>): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO artist_works (artistId, imageUrl, description, createdAt) VALUES (?, ?, ?, ?);',
+        [work.artistId, work.imageUrl, work.description || '', work.createdAt],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// New function to increment artist followers
+export const incrementArtistFollowers = async (artistId: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        'UPDATE artists SET followers = followers + 1 WHERE id = ?;',
+        [artistId],
+        () => resolve(),
         (_, error) => reject(error)
       );
     });

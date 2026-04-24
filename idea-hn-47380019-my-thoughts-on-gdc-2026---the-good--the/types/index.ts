@@ -13,6 +13,7 @@ export interface Generation {
   imageUri: string;
   attribution: Attribution;
   timestamp: Date;
+  ethicalScore: number;
 }
 
 export interface User {

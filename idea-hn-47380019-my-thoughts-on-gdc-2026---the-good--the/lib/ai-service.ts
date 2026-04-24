@@ -2,7 +2,8 @@ import OpenAI from 'openai';
 import Anthropic from '@anthropic-ai/sdk';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
-import { Attribution } from '../types';
+import { Attribution, Artist } from '../types';
+import { getArtists } from './database';
 
 const OPENAI_KEY_STORAGE = '@credigen_openai_key';
 const ANTHROPIC_KEY_STORAGE = '@credigen_anthropic_key';
@@ -10,6 +11,7 @@ const ANTHROPIC_KEY_STORAGE = '@credigen_anthropic_key';
 export interface GenerationResult {
   imageUrl: string;
   attribution: Attribution;
+  creditedArtists?: Artist[];
 }
 
 const getApiKeys = async () => {
@@ -17,7 +19,7 @@ const getApiKeys = async () => {
     AsyncStorage.getItem(OPENAI_KEY_STORAGE),
     AsyncStorage.getItem(ANTHROPIC_KEY_STORAGE)
   ]);
-  
+
   return {
     openaiKey: openaiKey?.trim() || '',
     anthropicKey: anthropicKey?.trim() || ''
@@ -30,7 +32,7 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
   }
 
   const { openaiKey } = await getApiKeys();
-  
+
   if (!openaiKey) {
     throw new Error('OpenAI API key not configured. Please add your API key in the Profile tab.');
   }
@@ -54,23 +56,29 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
 
     const filename = `credigen_${Date.now()}.png`;
     const localUri = `${FileSystem.documentDirectory}${filename}`;
-    
+
     const downloadResult = await FileSystem.downloadAsync(imageUrl, localUri);
-    
+
     if (downloadResult.status !== 200) {
       throw new Error(`Failed to download image: ${downloadResult.status}`);
     }
+
+    // Check for style matches in registered artists
+    const artists = await getArtists();
+    const creditedArtists = detectStyleMatches(prompt, artists);
 
     const attribution: Attribution = {
       model: 'dall-e-3',
       prompt: prompt,
       timestamp: new Date().toISOString(),
-      attributionId: `attribution-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      attributionId: `attribution-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      styleInfluences: creditedArtists.map(artist => artist.style)
     };
 
     return {
       imageUrl: downloadResult.uri,
-      attribution
+      attribution,
+      creditedArtists
     };
   } catch (error: any) {
     if (error?.status === 429) {
@@ -82,7 +90,7 @@ export const generateImage = async (prompt: string): Promise<GenerationResult> =
     } else if (error?.code === 'ENOTFOUND' || error?.message?.includes('network')) {
       throw new Error('Network error. Please check your internet connection.');
     }
-    
+
     console.error('Error generating image:', error);
     throw new Error(error?.message || 'Failed to generate image. Please try again.');
   }
@@ -94,7 +102,7 @@ export const generateText = async (prompt: string): Promise<string> => {
   }
 
   const { anthropicKey } = await getApiKeys();
-  
+
   if (!anthropicKey) {
     throw new Error('Anthropic API key not configured. Please add your API key in the Profile tab.');
   }
@@ -128,4 +136,30 @@ export const generateText = async (prompt: string): Promise<string> => {
     console.error('Error generating text:', error);
     throw new Error(error?.message || 'Failed to generate text. Please try again.');
   }
+};
+
+// New function to detect style matches between prompt and registered artists
+const detectStyleMatches = (prompt: string, artists: Artist[]): Artist[] => {
+  const promptLower = prompt.toLowerCase();
+  const matches: Artist[] = [];
+
+  for (const artist of artists) {
+    // Check if artist's style appears in the prompt
+    if (promptLower.includes(artist.style.toLowerCase())) {
+      matches.push(artist);
+    }
+
+    // Additional checks for style keywords
+    const styleKeywords = artist.style.toLowerCase().split(/[ ,]+/);
+    for (const keyword of styleKeywords) {
+      if (promptLower.includes(keyword)) {
+        if (!matches.includes(artist)) {
+          matches.push(artist);
+        }
+        break;
+      }
+    }
+  }
+
+  return matches;
 };
