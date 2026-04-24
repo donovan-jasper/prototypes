@@ -168,50 +168,77 @@ export function parseTicketFromText(text: string): ParsedTicket {
 
         // Handle absolute dates
         if (!date) {
-          // Try to parse as MM/DD/YYYY or similar
-          if (match[1] && match[2] && match[3]) {
-            const month = parseInt(match[1]);
-            const day = parseInt(match[2]);
-            const year = parseInt(match[3]) > 1000 ? parseInt(match[3]) : parseInt(match[3]) + 2000;
-
-            date = new Date(year, month - 1, day);
-          }
-
-          // Handle month name formats
-          if (match[4] && match[5] && match[6]) {
+          // Month name format
+          if (match[1] && match[2] && match[3] && isNaN(parseInt(match[1]))) {
             const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
                                'july', 'august', 'september', 'october', 'november', 'december'];
-            const monthIndex = monthNames.indexOf(match[4].toLowerCase());
-            const day = parseInt(match[5]);
-            const year = parseInt(match[6]);
+            const month = monthNames.indexOf(match[1].toLowerCase());
+            const day = parseInt(match[2]);
+            const year = parseInt(match[3]);
 
-            date = new Date(year, monthIndex, day);
+            if (month >= 0 && day > 0 && year > 0) {
+              date = new Date(year, month, day);
+            }
           }
+          // Numeric format (MM/DD/YYYY or DD/MM/YYYY)
+          else if (match[1] && match[2] && match[3]) {
+            const day1 = parseInt(match[1]);
+            const day2 = parseInt(match[2]);
+            const year = parseInt(match[3]);
 
-          // Handle today/yesterday/tomorrow
-          if (match[7]) {
-            const now = new Date();
-            if (match[7].toLowerCase() === 'today') {
-              date = now;
-            } else if (match[7].toLowerCase() === 'yesterday') {
-              now.setDate(now.getDate() - 1);
-              date = now;
-            } else if (match[7].toLowerCase() === 'tomorrow') {
-              now.setDate(now.getDate() + 1);
-              date = now;
+            // Check which format makes more sense
+            if (day1 > 12 && day2 <= 12) {
+              // DD/MM/YYYY
+              date = new Date(year, day2 - 1, day1);
+            } else if (day2 > 12 && day1 <= 12) {
+              // MM/DD/YYYY
+              date = new Date(year, day1 - 1, day2);
+            } else if (year > 31) {
+              // YYYY/MM/DD
+              date = new Date(year, day1 - 1, day2);
             }
           }
         }
 
-        // Validate date
-        if (date && !isNaN(date.getTime())) {
+        // Handle time if present
+        if (date && match[5] && match[6]) {
+          let hours = parseInt(match[5]);
+          const minutes = parseInt(match[6]);
+          const period = match[7] ? match[7].toLowerCase() : '';
+
+          if (period === 'pm' && hours < 12) {
+            hours += 12;
+          } else if (period === 'am' && hours === 12) {
+            hours = 0;
+          }
+
+          date.setHours(hours, minutes);
+        }
+
+        // Handle today/yesterday
+        if (!date && match[1]) {
+          const now = new Date();
+          const lowerMatch = match[1].toLowerCase();
+
+          if (lowerMatch === 'today') {
+            date = now;
+          } else if (lowerMatch === 'yesterday') {
+            now.setDate(now.getDate() - 1);
+            date = now;
+          } else if (lowerMatch === 'tomorrow') {
+            now.setDate(now.getDate() + 1);
+            date = now;
+          }
+        }
+
+        if (date) {
           result.submittedAt = {
             value: date,
             confidence: 0.8
           };
         }
       } catch (e) {
-        console.error('Error parsing date:', e);
+        console.log('Date parsing error:', e);
       }
     }
   }
