@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSessionStore } from '../../lib/store';
 import { getUserStats, UserStats } from '../../lib/database';
 import StreakCalendar from '../../components/StreakCalendar';
+import { registerBackgroundAudioTask, cleanupBackgroundAudio } from '../../lib/backgroundAudio';
 
 const COACHES = [
   { id: 'drill-sergeant', name: 'Drill Sergeant', emoji: '🎖️', description: 'No excuses, soldier!' },
@@ -17,12 +18,24 @@ export default function HomeScreen() {
   const [taskName, setTaskName] = useState('');
   const [selectedCoach, setSelectedCoach] = useState(COACHES[0].id);
   const [stats, setStats] = useState<UserStats>({ totalXP: 0, streakFreezeTokens: 1, currentStreak: 0 });
+  const [ambientModeEnabled, setAmbientModeEnabled] = useState(false);
   const router = useRouter();
   const startSession = useSessionStore((state) => state.startSession);
 
   useEffect(() => {
     loadStats();
+    return () => {
+      cleanupBackgroundAudio();
+    };
   }, []);
+
+  useEffect(() => {
+    if (ambientModeEnabled) {
+      registerBackgroundAudioTask();
+    } else {
+      cleanupBackgroundAudio();
+    }
+  }, [ambientModeEnabled]);
 
   const loadStats = async () => {
     const userStats = await getUserStats();
@@ -37,6 +50,10 @@ export default function HomeScreen() {
     const sessionId = Date.now().toString();
     startSession(sessionId, taskName.trim(), selectedCoach);
     router.push(`/session/${sessionId}`);
+  };
+
+  const toggleAmbientMode = () => {
+    setAmbientModeEnabled(!ambientModeEnabled);
   };
 
   return (
@@ -97,6 +114,16 @@ export default function HomeScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      </View>
+
+      <View style={styles.ambientModeContainer}>
+        <Text style={styles.ambientModeLabel}>Ambient Mode</Text>
+        <Switch
+          value={ambientModeEnabled}
+          onValueChange={toggleAmbientMode}
+          trackColor={{ false: '#767577', true: '#81b0ff' }}
+          thumbColor={ambientModeEnabled ? '#f5dd4b' : '#f4f3f4'}
+        />
       </View>
 
       <TouchableOpacity
@@ -165,61 +192,71 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   input: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: 10,
+    padding: 15,
     fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
-    color: '#333',
   },
   coachGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 12,
+    justifyContent: 'space-between',
+    gap: 10,
   },
   coachCard: {
+    width: '48%',
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 16,
-    width: '48%',
-    borderWidth: 2,
-    borderColor: '#ddd',
+    padding: 15,
+    marginBottom: 10,
     alignItems: 'center',
   },
   coachCardSelected: {
+    borderWidth: 2,
     borderColor: '#007AFF',
-    backgroundColor: '#E3F2FD',
   },
   coachEmoji: {
     fontSize: 32,
     marginBottom: 8,
   },
   coachName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    textAlign: 'center',
     marginBottom: 4,
   },
   coachDescription: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
     textAlign: 'center',
   },
+  ambientModeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+  },
+  ambientModeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
   startButton: {
     backgroundColor: '#007AFF',
-    borderRadius: 12,
     padding: 18,
+    borderRadius: 12,
     alignItems: 'center',
     marginTop: 10,
-    marginBottom: 40,
   },
   startButtonDisabled: {
     backgroundColor: '#ccc',
