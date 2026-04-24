@@ -3,20 +3,23 @@ import { View, StyleSheet, TouchableOpacity, Platform } from 'react-native';
 import { Video, AVPlaybackStatus, ResizeMode } from 'expo-av';
 import { ActivityIndicator, Text, IconButton } from 'react-native-paper';
 import * as ScreenOrientation from 'expo-screen-orientation';
+import * as Cast from 'expo-cast';
 
 interface VideoPlayerProps {
   streamUrl: string;
   channelName: string;
   currentProgram: string;
+  onError: (error: string) => void;
 }
 
-const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, currentProgram }) => {
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, currentProgram, onError }) => {
   const videoRef = useRef<Video>(null);
   const [status, setStatus] = useState<AVPlaybackStatus>({} as AVPlaybackStatus);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
+  const [isCasting, setIsCasting] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -25,6 +28,16 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
 
     return () => clearTimeout(timer);
   }, [showControls]);
+
+  useEffect(() => {
+    const subscription = Cast.addCastStateListener((state) => {
+      setIsCasting(state === Cast.CastState.Connected);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   const handleLoadStart = () => {
     setIsLoading(true);
@@ -38,6 +51,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
   const handleError = () => {
     setIsLoading(false);
     setError('Failed to load stream. Please check your connection and try again.');
+    onError('Failed to load stream. Please check your connection and try again.');
   };
 
   const togglePlayPause = async () => {
@@ -72,6 +86,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
         setShowControls(false);
       }, 3000);
       return () => clearTimeout(timer);
+    }
+  };
+
+  const handleCast = async () => {
+    if (isCasting) {
+      await Cast.stopCast();
+    } else {
+      await Cast.startCast();
     }
   };
 
@@ -152,6 +174,14 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
                   color="#fff"
                 />
               </TouchableOpacity>
+
+              <TouchableOpacity onPress={handleCast} style={styles.controlButton}>
+                <IconButton
+                  icon={isCasting ? 'cast-connected' : 'cast'}
+                  size={24}
+                  color="#fff"
+                />
+              </TouchableOpacity>
             </View>
           </>
         )}
@@ -163,7 +193,6 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   videoContainer: {
     flex: 1,
@@ -182,61 +211,59 @@ const styles = StyleSheet.create({
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: 20,
-    borderRadius: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    width: '100%',
+    height: '100%',
   },
   loadingText: {
     color: '#fff',
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
   },
   errorContainer: {
     position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    width: '100%',
+    height: '100%',
     padding: 20,
-    borderRadius: 10,
   },
   errorText: {
     color: '#fff',
-    marginBottom: 10,
     fontSize: 16,
     textAlign: 'center',
+    marginBottom: 20,
   },
   infoOverlay: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
-    borderRadius: 5,
+    top: 16,
+    left: 16,
+    right: 16,
   },
   channelName: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   programTitle: {
     color: '#fff',
     fontSize: 14,
-    marginTop: 5,
+    marginTop: 4,
   },
   controlsOverlay: {
     position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
+    bottom: 16,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    padding: 10,
   },
   controlButton: {
-    marginHorizontal: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 8,
   },
 });
 
