@@ -7,6 +7,7 @@ const AUDIO_SAMPLE_RATE = 44100; // Standard sample rate
 const SILENCE_THRESHOLD = 0.01; // Volume threshold for silence detection
 const MIN_SILENCE_DURATION = 1000; // Minimum silence duration in ms
 const MIN_AD_DURATION = 5000; // Minimum ad duration in ms
+const ANALYSIS_WINDOW = 1024; // Samples per analysis window
 
 // Initialize database tables
 const initializeDatabase = () => {
@@ -17,7 +18,7 @@ const initializeDatabase = () => {
   });
 };
 
-// Analyze audio buffer for volume
+// Analyze audio buffer for volume using Web Audio API
 const analyzeAudioBuffer = (buffer) => {
   let sum = 0;
   for (let i = 0; i < buffer.length; i++) {
@@ -38,29 +39,43 @@ export const detectAd = async (episode) => {
     const status = await soundObject.getStatusAsync();
     const duration = status.durationMillis || 0;
 
-    // Analyze audio in 1-second chunks
+    // Create AudioContext for analysis
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    const audioContext = new AudioContext();
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+
+    // Connect audio source to analyser
+    const source = audioContext.createMediaElementSource(soundObject._element);
+    source.connect(analyser);
+    analyser.connect(audioContext.destination);
+
+    // Analyze audio in chunks
     const analysisInterval = 1000; // 1 second in ms
     const totalSamples = Math.floor(duration / analysisInterval);
     let silentSegments = [];
     let currentSilenceStart = null;
 
-    // Process audio in chunks
     for (let i = 0; i < totalSamples; i++) {
       const position = i * analysisInterval;
       const startTime = position / 1000;
-      const endTime = (position + analysisInterval) / 1000;
-
-      // Get audio data for this chunk
-      const { isLoaded } = await soundObject.getStatusAsync();
-      if (!isLoaded) continue;
 
       // Set playback position
       await soundObject.setPositionAsync(startTime);
 
-      // Get volume data (simplified approach)
-      const volume = await getCurrentVolume(soundObject);
+      // Get frequency data
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteFrequencyData(dataArray);
 
-      if (volume < SILENCE_THRESHOLD) {
+      // Calculate average volume
+      let sum = 0;
+      for (let j = 0; j < bufferLength; j++) {
+        sum += dataArray[j];
+      }
+      const averageVolume = sum / bufferLength / 255; // Normalize to 0-1
+
+      if (averageVolume < SILENCE_THRESHOLD) {
         if (!currentSilenceStart) {
           currentSilenceStart = position;
         }
@@ -110,18 +125,6 @@ export const detectAd = async (episode) => {
     console.error('Ad detection failed:', error);
     return [];
   }
-};
-
-// Helper function to get current volume (simplified)
-const getCurrentVolume = async (soundObject) => {
-  // In a real implementation, this would use the Web Audio API or similar
-  // For this prototype, we'll simulate volume detection
-  const status = await soundObject.getStatusAsync();
-  if (status.isPlaying) {
-    // Simulate volume detection (0-1 range)
-    return Math.random() * 0.5; // Random value for prototype
-  }
-  return 0;
 };
 
 export const getAdSegments = async (episodeId) => {
