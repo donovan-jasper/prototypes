@@ -31,6 +31,7 @@ export default function CreateProduct() {
   const [imageUri, setImageUri] = useState<string | undefined>(undefined);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraft, setIsDraft] = useState(false);
 
   const pickImage = async () => {
     try {
@@ -82,14 +83,15 @@ export default function CreateProduct() {
       Alert.alert('Validation Error', 'Please enter a valid quantity');
       return false;
     }
-    if (selectedPlatforms.length === 0) {
+    if (!isDraft && selectedPlatforms.length === 0) {
       Alert.alert('Validation Error', 'Please select at least one platform');
       return false;
     }
     return true;
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (asDraft: boolean = false) => {
+    setIsDraft(asDraft);
     if (!validateForm()) {
       return;
     }
@@ -97,28 +99,35 @@ export default function CreateProduct() {
     setIsSubmitting(true);
 
     try {
-      addProduct({
+      const productData = {
         title: title.trim(),
         description: description.trim(),
         price: parseFloat(price),
         quantity: parseInt(quantity),
         imageUri,
-        platforms: selectedPlatforms,
-      });
+        platforms: asDraft ? [] : selectedPlatforms,
+        isDraft: asDraft,
+      };
+
+      addProduct(productData);
 
       Toast.show({
         type: 'success',
-        text1: 'Product Created',
-        text2: 'Your product has been successfully added',
+        text1: asDraft ? 'Draft Saved' : 'Product Published',
+        text2: asDraft
+          ? 'Your product has been saved as a draft'
+          : 'Your product has been successfully published',
         visibilityTime: 3000,
       });
 
-      setTitle('');
-      setDescription('');
-      setPrice('');
-      setQuantity('');
-      setImageUri(undefined);
-      setSelectedPlatforms([]);
+      if (!asDraft) {
+        setTitle('');
+        setDescription('');
+        setPrice('');
+        setQuantity('');
+        setImageUri(undefined);
+        setSelectedPlatforms([]);
+      }
       router.push('/(tabs)');
     } catch (error) {
       console.error('Product creation error:', error);
@@ -162,40 +171,32 @@ export default function CreateProduct() {
             placeholder="Description"
             value={description}
             onChangeText={setDescription}
+            placeholderTextColor="#C7C7CC"
             multiline
             numberOfLines={4}
-            textAlignVertical="top"
-            placeholderTextColor="#C7C7CC"
           />
           <View style={styles.row}>
-            <View style={styles.halfInput}>
-              <Text style={styles.inputLabel}>Price</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0.00"
-                value={price}
-                onChangeText={setPrice}
-                keyboardType="decimal-pad"
-                placeholderTextColor="#C7C7CC"
-              />
-            </View>
-            <View style={styles.halfInput}>
-              <Text style={styles.inputLabel}>Quantity</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                value={quantity}
-                onChangeText={setQuantity}
-                keyboardType="number-pad"
-                placeholderTextColor="#C7C7CC"
-              />
-            </View>
+            <TextInput
+              style={[styles.input, styles.halfWidth]}
+              placeholder="Price"
+              value={price}
+              onChangeText={setPrice}
+              placeholderTextColor="#C7C7CC"
+              keyboardType="numeric"
+            />
+            <TextInput
+              style={[styles.input, styles.halfWidth]}
+              placeholder="Quantity"
+              value={quantity}
+              onChangeText={setQuantity}
+              placeholderTextColor="#C7C7CC"
+              keyboardType="numeric"
+            />
           </View>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Platforms</Text>
-          <Text style={styles.sectionSubtitle}>Select where to list this product</Text>
+          <Text style={styles.sectionTitle}>Publish To</Text>
           <View style={styles.platformContainer}>
             {PLATFORMS.map((platform) => (
               <TouchableOpacity
@@ -219,17 +220,26 @@ export default function CreateProduct() {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handleSubmit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Create Product</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.draftButton]}
+            onPress={() => handleSubmit(true)}
+            disabled={isSubmitting}
+          >
+            <Text style={styles.buttonText}>Save Draft</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.button, styles.publishButton]}
+            onPress={() => handleSubmit(false)}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>Publish</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -238,11 +248,11 @@ export default function CreateProduct() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
   },
   content: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   section: {
     marginBottom: 24,
@@ -253,16 +263,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: '#333',
   },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 12,
-  },
   imagePicker: {
     width: '100%',
     aspectRatio: 1,
+    backgroundColor: '#fff',
     borderRadius: 8,
-    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -282,27 +287,23 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   input: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#fff',
     padding: 12,
     borderRadius: 8,
-    fontSize: 16,
     marginBottom: 12,
+    fontSize: 16,
+    color: '#333',
   },
   textArea: {
-    height: 120,
+    height: 100,
     textAlignVertical: 'top',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  halfInput: {
+  halfWidth: {
     width: '48%',
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
   },
   platformContainer: {
     flexDirection: 'row',
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#e5e5ea',
     margin: 4,
   },
   platformButtonSelected: {
@@ -326,14 +327,26 @@ const styles = StyleSheet.create({
   platformButtonTextSelected: {
     color: '#fff',
   },
-  submitButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
-    borderRadius: 8,
-    alignItems: 'center',
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginTop: 24,
   },
-  submitButtonText: {
+  button: {
+    flex: 1,
+    padding: 16,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  draftButton: {
+    backgroundColor: '#e5e5ea',
+  },
+  publishButton: {
+    backgroundColor: '#007AFF',
+  },
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',

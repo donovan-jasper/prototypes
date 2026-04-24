@@ -18,6 +18,7 @@ export const useProductStore = create<ProductStore>((set) => ({
       quantity: 1,
       platforms: ['eBay', 'Shopify'],
       createdAt: Date.now() - 86400000,
+      isDraft: false,
     },
     {
       id: '2',
@@ -27,6 +28,7 @@ export const useProductStore = create<ProductStore>((set) => ({
       quantity: 3,
       platforms: ['Etsy', 'Amazon'],
       createdAt: Date.now() - 172800000,
+      isDraft: false,
     },
     {
       id: '3',
@@ -36,6 +38,7 @@ export const useProductStore = create<ProductStore>((set) => ({
       quantity: 5,
       platforms: ['Amazon', 'eBay'],
       createdAt: Date.now() - 259200000,
+      isDraft: false,
     },
   ],
   addProduct: (input) =>

@@ -7,6 +7,7 @@ export interface Product {
   imageUri?: string;
   platforms: string[];
   createdAt: number;
+  isDraft?: boolean;
 }
 
 export interface CreateProductInput {
@@ -16,4 +17,5 @@ export interface CreateProductInput {
   quantity: number;
   imageUri?: string;
   platforms: string[];
+  isDraft?: boolean;
 }
