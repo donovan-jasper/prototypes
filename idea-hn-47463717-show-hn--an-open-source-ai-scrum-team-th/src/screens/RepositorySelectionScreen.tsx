@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, TextInput } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Octokit } from '@octokit/rest';
@@ -9,11 +9,14 @@ interface Repository {
   name: string;
   full_name: string;
   description: string | null;
+  stargazers_count: number;
 }
 
 const RepositorySelectionScreen: React.FC = () => {
   const [repositories, setRepositories] = useState<Repository[]>([]);
+  const [filteredRepositories, setFilteredRepositories] = useState<Repository[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -32,6 +35,7 @@ const RepositorySelectionScreen: React.FC = () => {
         });
 
         setRepositories(response.data);
+        setFilteredRepositories(response.data);
       } catch (error) {
         console.error('Error fetching repositories:', error);
         Alert.alert('Error', 'Could not fetch repositories');
@@ -44,8 +48,26 @@ const RepositorySelectionScreen: React.FC = () => {
     fetchRepositories();
   }, []);
 
-  const handleRepositorySelect = (repo: Repository) => {
-    navigation.navigate('IssueList', { repo: repo.full_name });
+  useEffect(() => {
+    if (searchQuery === '') {
+      setFilteredRepositories(repositories);
+    } else {
+      const filtered = repositories.filter(repo =>
+        repo.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (repo.description && repo.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      );
+      setFilteredRepositories(filtered);
+    }
+  }, [searchQuery, repositories]);
+
+  const handleRepositorySelect = async (repo: Repository) => {
+    try {
+      await AsyncStorage.setItem('selectedRepository', repo.full_name);
+      navigation.navigate('IssueList', { repo: repo.full_name });
+    } catch (error) {
+      console.error('Error saving repository:', error);
+      Alert.alert('Error', 'Could not save repository selection');
+    }
   };
 
   if (loading) {
@@ -60,22 +82,42 @@ const RepositorySelectionScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Select a Repository</Text>
-      <FlatList
-        data={repositories}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.repoItem}
-            onPress={() => handleRepositorySelect(item)}
-          >
-            <Text style={styles.repoName}>{item.name}</Text>
-            {item.description && (
-              <Text style={styles.repoDescription}>{item.description}</Text>
-            )}
-          </TouchableOpacity>
-        )}
-        contentContainerStyle={styles.listContent}
+
+      <TextInput
+        style={styles.searchBar}
+        placeholder="Search repositories..."
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        autoCapitalize="none"
       />
+
+      {filteredRepositories.length === 0 && searchQuery !== '' ? (
+        <View style={styles.noResultsContainer}>
+          <Text style={styles.noResultsText}>No repositories found</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredRepositories}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.repoItem}
+              onPress={() => handleRepositorySelect(item)}
+            >
+              <View style={styles.repoHeader}>
+                <Text style={styles.repoName}>{item.name}</Text>
+                <View style={styles.starsContainer}>
+                  <Text style={styles.starsText}>⭐ {item.stargazers_count}</Text>
+                </View>
+              </View>
+              {item.description && (
+                <Text style={styles.repoDescription}>{item.description}</Text>
+              )}
+            </TouchableOpacity>
+          )}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
     </View>
   );
 };
@@ -91,6 +133,18 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
+  },
+  searchBar: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   loadingContainer: {
     flex: 1,
@@ -116,14 +170,40 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
+  repoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   repoName: {
     fontSize: 16,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    flex: 1,
+  },
+  starsContainer: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  starsText: {
+    fontSize: 12,
+    color: '#666',
   },
   repoDescription: {
     fontSize: 14,
+    color: '#666',
+    marginTop: 4,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  noResultsText: {
+    fontSize: 16,
     color: '#666',
   },
 });
