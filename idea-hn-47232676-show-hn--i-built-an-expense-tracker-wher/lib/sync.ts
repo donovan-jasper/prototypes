@@ -169,9 +169,15 @@ export const handleSignalingData = async (qrDataString: string): Promise<string>
 
       return JSON.stringify(responseData);
     } else if (signalingData.type === 'answer') {
-      await peerConnection!.setRemoteDescription(
+      if (!peerConnection) {
+        throw new Error('Peer connection not initialized');
+      }
+
+      await peerConnection.setRemoteDescription(
         new RTCSessionDescription({ type: 'answer', sdp: signalingData.sdp })
       );
+
+      // Connection is now established
       return '';
     }
 
@@ -183,36 +189,54 @@ export const handleSignalingData = async (qrDataString: string): Promise<string>
 };
 
 const setupDataChannel = (channel: RTCDataChannel) => {
-  channel.onopen = async () => {
+  channel.onopen = () => {
     console.log('Data channel opened');
     useStore.getState().setSyncStatus('connected');
-    await performSync();
+    syncExpenses();
+  };
+
+  channel.onmessage = async (event) => {
+    try {
+      if (!encryptionKey) {
+        throw new Error('No encryption key available');
+      }
+
+      const decrypted = await decryptMessage(event.data, encryptionKey);
+      const payload: SyncPayload = JSON.parse(decrypted);
+
+      // Apply the received expenses to local database
+      await applySyncPayload(payload);
+
+      // Respond with our own expenses
+      await syncExpenses();
+    } catch (error) {
+      console.error('Error processing received message:', error);
+    }
   };
 
   channel.onclose = () => {
     console.log('Data channel closed');
     useStore.getState().setSyncStatus('offline');
   };
+};
 
-  channel.onerror = (error) => {
-    console.error('Data channel error:', error);
-    useStore.getState().setSyncStatus('offline');
-  };
+export const syncExpenses = async () => {
+  if (!dataChannel || dataChannel.readyState !== 'open') {
+    console.log('Data channel not ready for sync');
+    return;
+  }
 
-  channel.onmessage = async (event) => {
-    try {
-      if (!encryptionKey) {
-        console.error('No encryption key available');
-        return;
-      }
-
-      const decrypted = await decryptMessage(event.data, encryptionKey);
-      const payload: SyncPayload = JSON.parse(decrypted);
-      await applySyncPayload(payload);
-    } catch (error) {
-      console.error('Error handling incoming message:', error);
+  try {
+    const payload = await createSyncPayload();
+    if (!encryptionKey) {
+      throw new Error('No encryption key available');
     }
-  };
+
+    const encrypted = await encryptMessage(JSON.stringify(payload), encryptionKey);
+    dataChannel.send(encrypted);
+  } catch (error) {
+    console.error('Error during sync:', error);
+  }
 };
 
 export const createSyncPayload = async (): Promise<SyncPayload> => {
@@ -243,32 +267,6 @@ export const applySyncPayload = async (payload: SyncPayload) => {
       await addExpense(expense);
     }
   }
-
-  // Update last sync timestamp
-  await db.runAsync(
-    'INSERT OR REPLACE INTO sync_log (device_id, last_sync) VALUES (?, ?)',
-    [await getDeviceId(), payload.timestamp]
-  );
-};
-
-export const performSync = async () => {
-  if (!dataChannel || dataChannel.readyState !== 'open') {
-    console.log('Data channel not ready for sync');
-    return;
-  }
-
-  try {
-    const payload = await createSyncPayload();
-    if (!encryptionKey) {
-      console.error('No encryption key available');
-      return;
-    }
-
-    const encrypted = await encryptMessage(JSON.stringify(payload), encryptionKey);
-    dataChannel.send(encrypted);
-  } catch (error) {
-    console.error('Error performing sync:', error);
-  }
 };
 
 export const closeConnection = () => {
@@ -276,5 +274,9 @@ export const closeConnection = () => {
     peerConnection.close();
     peerConnection = null;
   }
-  dataChannel = null;
+  if (dataChannel) {
+    dataChannel.close();
+    dataChannel = null;
+  }
+  useStore.getState().setSyncStatus('offline');
 };

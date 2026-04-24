@@ -5,7 +5,6 @@ export interface Expense {
   category: string;
   paidBy: string;
   splitWith: string[];
-  splitRatios?: number[];
   date: string;
   createdAt: number;
   updatedAt: number;
@@ -15,5 +14,7 @@ export interface User {
   id: string;
   name: string;
   publicKey: string;
-  isCurrentUser: boolean;
+  isPaired: boolean;
 }
+
+export type SyncStatus = 'offline' | 'connecting' | 'connected' | 'syncing';
