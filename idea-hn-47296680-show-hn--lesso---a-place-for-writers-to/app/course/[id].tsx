@@ -147,26 +147,18 @@ export default function CourseEditorScreen() {
     }).then(() => {
       Alert.alert(
         'Changes Saved',
-        'Your course has been successfully updated.',
+        'Your course changes have been saved successfully!',
         [{ text: 'OK' }]
       );
     });
-  };
-
-  const handleTitleChange = (text: string) => {
-    setTitle(text);
-  };
-
-  const handleDescriptionChange = (text: string) => {
-    setDescription(text);
   };
 
   const renderLessonItem = ({ item, drag, isActive }: RenderItemParams<Lesson>) => {
     return (
       <TouchableOpacity
         style={[styles.lessonItem, isActive && styles.activeLessonItem]}
-        onLongPress={drag}
         onPress={() => handleLessonPress(item.id)}
+        onLongPress={drag}
         activeOpacity={0.8}
       >
         <View style={styles.lessonContent}>
@@ -175,12 +167,15 @@ export default function CourseEditorScreen() {
             {item.content || 'No content yet'}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.deleteLessonButton}
-          onPress={() => handleDeleteLesson(item.id)}
-        >
-          <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-        </TouchableOpacity>
+        <View style={styles.lessonActions}>
+          <TouchableOpacity
+            onPress={() => handleDeleteLesson(item.id)}
+            style={styles.deleteButton}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          </TouchableOpacity>
+          <Ionicons name="reorder-three-outline" size={24} color="#C7C7CC" />
+        </View>
       </TouchableOpacity>
     );
   };
@@ -195,59 +190,21 @@ export default function CourseEditorScreen() {
           <TextInput
             style={styles.titleInput}
             value={title}
-            onChangeText={handleTitleChange}
+            onChangeText={setTitle}
             placeholder="Course Title"
             placeholderTextColor="#8E8E93"
           />
           <TextInput
             style={styles.descriptionInput}
             value={description}
-            onChangeText={handleDescriptionChange}
+            onChangeText={setDescription}
             placeholder="Course Description"
             placeholderTextColor="#8E8E93"
             multiline
           />
         </View>
 
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Lessons</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => setIsModalVisible(true)}
-            >
-              <Ionicons name="add" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-
-          {course.lessons.length > 0 ? (
-            <DraggableFlatList
-              data={course.lessons}
-              renderItem={renderLessonItem}
-              keyExtractor={(item) => item.id}
-              onDragEnd={({ data }) => handleReorderLessons(data)}
-              activationDistance={20}
-            />
-          ) : (
-            <View style={styles.emptyState}>
-              <Ionicons name="book-outline" size={48} color="#C7C7CC" />
-              <Text style={styles.emptyText}>No lessons yet</Text>
-              <Text style={styles.emptySubtext}>Add your first lesson to get started</Text>
-            </View>
-          )}
-        </View>
-
         <View style={styles.controls}>
-          <View style={styles.controlRow}>
-            <Text style={styles.controlLabel}>Publish Course</Text>
-            <Switch
-              value={isPublished}
-              onValueChange={handlePublishToggle}
-              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
-              thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
-            />
-          </View>
-
           <TouchableOpacity
             style={styles.priceButton}
             onPress={() => setIsPriceModalVisible(true)}
@@ -256,9 +213,46 @@ export default function CourseEditorScreen() {
               {price ? `$${price}` : 'Set Price'}
             </Text>
           </TouchableOpacity>
+
+          <View style={styles.publishContainer}>
+            <Text style={styles.publishLabel}>Published</Text>
+            <Switch
+              value={isPublished}
+              onValueChange={handlePublishToggle}
+              trackColor={{ false: '#E5E5EA', true: '#34C759' }}
+              thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
+            />
+          </View>
         </View>
+
+        <View style={styles.lessonsHeader}>
+          <Text style={styles.lessonsTitle}>Lessons</Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => setIsModalVisible(true)}
+          >
+            <Ionicons name="add" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+        </View>
+
+        <DraggableFlatList
+          data={course.lessons}
+          renderItem={renderLessonItem}
+          keyExtractor={(item) => item.id}
+          onDragEnd={({ data }) => handleReorderLessons(data)}
+          activationDistance={20}
+          containerStyle={styles.lessonsList}
+        />
+
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSaveChanges}
+        >
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </TouchableOpacity>
       </ScrollView>
 
+      {/* Add Lesson Modal */}
       <Modal
         visible={isModalVisible}
         animationType="slide"
@@ -267,8 +261,11 @@ export default function CourseEditorScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Add New Lesson</Text>
-            <TouchableOpacity onPress={() => setIsModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#000000" />
+            <TouchableOpacity
+              onPress={() => setIsModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#8E8E93" />
             </TouchableOpacity>
           </View>
 
@@ -290,16 +287,49 @@ export default function CourseEditorScreen() {
               multiline
             />
 
-            <TouchableOpacity
-              style={styles.modalButton}
-              onPress={handleAddLesson}
-            >
-              <Text style={styles.modalButtonText}>Add Lesson</Text>
-            </TouchableOpacity>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.previewButton]}
+                onPress={() => setIsPreviewVisible(true)}
+              >
+                <Text style={styles.modalButtonText}>Preview</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.addLessonButton]}
+                onPress={handleAddLesson}
+              >
+                <Text style={styles.modalButtonText}>Add Lesson</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
 
+      {/* Preview Modal */}
+      <Modal
+        visible={isPreviewVisible}
+        animationType="slide"
+        onRequestClose={() => setIsPreviewVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Preview</Text>
+            <TouchableOpacity
+              onPress={() => setIsPreviewVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#8E8E93" />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.previewContainer}>
+            <Markdown style={markdownStyles}>{newLessonContent}</Markdown>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      {/* Price Modal */}
       <Modal
         visible={isPriceModalVisible}
         animationType="slide"
@@ -308,8 +338,11 @@ export default function CourseEditorScreen() {
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Set Course Price</Text>
-            <TouchableOpacity onPress={() => setIsPriceModalVisible(false)}>
-              <Ionicons name="close" size={24} color="#000000" />
+            <TouchableOpacity
+              onPress={() => setIsPriceModalVisible(false)}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#8E8E93" />
             </TouchableOpacity>
           </View>
 
@@ -319,16 +352,25 @@ export default function CourseEditorScreen() {
               style={styles.priceInput}
               value={price}
               onChangeText={handlePriceChange}
+              keyboardType="numeric"
               placeholder="0.00"
               placeholderTextColor="#8E8E93"
-              keyboardType="numeric"
             />
 
+            <View style={styles.priceInfo}>
+              <Text style={styles.priceInfoText}>
+                You'll receive 85% of each sale (we take 15%).
+              </Text>
+              <Text style={styles.priceInfoText}>
+                Minimum price is $0 (free course).
+              </Text>
+            </View>
+
             <TouchableOpacity
-              style={styles.modalButton}
+              style={styles.savePriceButton}
               onPress={handleSavePrice}
             >
-              <Text style={styles.modalButtonText}>Save Price</Text>
+              <Text style={styles.savePriceButtonText}>Save Price</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -337,6 +379,50 @@ export default function CourseEditorScreen() {
   );
 }
 
+const markdownStyles = {
+  heading1: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  heading2: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  heading3: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 10,
+    marginBottom: 4,
+  },
+  text: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 8,
+  },
+  list_item: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 4,
+  },
+  code_inline: {
+    fontFamily: 'monospace',
+    backgroundColor: '#F5F5F5',
+    padding: 2,
+    borderRadius: 3,
+  },
+  blockquote: {
+    backgroundColor: '#F5F5F5',
+    padding: 12,
+    marginVertical: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#C7C7CC',
+  },
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -344,13 +430,12 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 16,
-    paddingBottom: 32,
   },
   header: {
     marginBottom: 24,
   },
   titleInput: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#000000',
     marginBottom: 8,
@@ -366,27 +451,53 @@ const styles = StyleSheet.create({
     borderBottomColor: '#E5E5EA',
     minHeight: 60,
   },
-  section: {
+  controls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 24,
   },
-  sectionHeader: {
+  priceButton: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  priceButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  publishContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  publishLabel: {
+    fontSize: 16,
+    color: '#8E8E93',
+    marginRight: 8,
+  },
+  lessonsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: 18,
+  lessonsTitle: {
+    fontSize: 20,
     fontWeight: '600',
     color: '#000000',
   },
   addButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#34C759',
     width: 40,
     height: 40,
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  lessonsList: {
+    marginBottom: 24,
   },
   lessonItem: {
     backgroundColor: '#F2F2F7',
@@ -394,6 +505,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 8,
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
   activeLessonItem: {
@@ -405,7 +517,7 @@ const styles = StyleSheet.create({
   },
   lessonTitle: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#000000',
     marginBottom: 4,
   },
@@ -413,47 +525,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#8E8E93',
   },
-  deleteLessonButton: {
-    padding: 8,
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#8E8E93',
-    marginTop: 4,
-  },
-  controls: {
-    marginTop: 16,
-  },
-  controlRow: {
+  lessonActions: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
   },
-  controlLabel: {
-    fontSize: 16,
-    color: '#000000',
+  deleteButton: {
+    marginRight: 16,
   },
-  priceButton: {
-    backgroundColor: '#34C759',
+  saveButton: {
+    backgroundColor: '#007AFF',
     padding: 16,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 16,
   },
-  priceButtonText: {
+  saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
@@ -475,12 +561,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
   },
+  closeButton: {
+    padding: 8,
+  },
   modalContent: {
     padding: 16,
   },
   modalInput: {
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
@@ -490,36 +578,70 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
   },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
   modalButton: {
-    backgroundColor: '#007AFF',
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 8,
-    alignItems: 'center',
+    marginLeft: 8,
+  },
+  previewButton: {
+    backgroundColor: '#007AFF',
+  },
+  addLessonButton: {
+    backgroundColor: '#34C759',
   },
   modalButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
+  previewContainer: {
+    flex: 1,
+    padding: 16,
+  },
   priceLabel: {
     fontSize: 16,
-    color: '#000000',
+    color: '#8E8E93',
     marginBottom: 8,
   },
   priceInput: {
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 16,
     fontSize: 16,
-    textAlign: 'center',
+    marginBottom: 16,
+  },
+  priceInfo: {
+    backgroundColor: '#E5E5EA',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  priceInfoText: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginBottom: 4,
+  },
+  savePriceButton: {
+    backgroundColor: '#007AFF',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  savePriceButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
   errorState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 24,
   },
   errorTitle: {
     fontSize: 20,
@@ -527,6 +649,7 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginTop: 16,
     marginBottom: 24,
+    textAlign: 'center',
   },
   backButton: {
     backgroundColor: '#007AFF',

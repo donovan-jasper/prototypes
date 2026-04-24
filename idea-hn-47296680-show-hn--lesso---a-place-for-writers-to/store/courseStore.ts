@@ -306,6 +306,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
     return new Promise((resolve, reject) => {
       db.transaction(
         tx => {
+          // Update each lesson's order in the database
           lessons.forEach((lesson, index) => {
             tx.executeSql(
               'UPDATE lessons SET "order" = ? WHERE id = ?',
@@ -313,6 +314,7 @@ export const useCourseStore = create<CourseState>((set, get) => ({
             );
           });
 
+          // Update the state
           set(state => ({
             courses: state.courses.map(course =>
               course.id === courseId
@@ -335,5 +337,5 @@ export const useCourseStore = create<CourseState>((set, get) => ({
         }
       );
     });
-  }
+  },
 }));
