@@ -177,7 +177,6 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   nextButton: {
-    marginTop: 16,
     alignSelf: 'flex-end',
   },
   navigationButtons: {

@@ -169,7 +169,9 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
             </Button>
           </View>
         )}
+      </View>
 
+      <View style={styles.navigationButtons}>
         {currentQuestionIndex > 0 && (
           <Button
             mode="outlined"
@@ -177,6 +179,27 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
             style={styles.backButton}
           >
             Back
+          </Button>
+        )}
+        {currentQuestionIndex < questions.length - 1 && (
+          <Button
+            mode="contained"
+            onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
+            style={styles.nextButton}
+            disabled={!answers[currentQuestion.id]}
+          >
+            Next
+          </Button>
+        )}
+        {currentQuestionIndex === questions.length - 1 && (
+          <Button
+            mode="contained"
+            onPress={submitAnswers}
+            style={styles.nextButton}
+            disabled={!answers[currentQuestion.id] || submitting}
+            loading={submitting}
+          >
+            {submitting ? 'Submitting...' : 'Complete'}
           </Button>
         )}
       </View>
@@ -187,11 +210,15 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
   },
   header: {
     marginBottom: 16,
   },
   title: {
+    marginBottom: 4,
     textAlign: 'center',
   },
   subtitle: {
@@ -200,27 +227,20 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     marginBottom: 24,
-    height: 8,
-    borderRadius: 4,
+    height: 6,
+    borderRadius: 3,
   },
   questionContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 24,
   },
   questionText: {
     marginBottom: 16,
   },
   textInput: {
-    marginBottom: 16,
+    backgroundColor: '#f5f5f5',
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginTop: 8,
   },
   optionButton: {
     marginBottom: 8,
@@ -228,14 +248,24 @@ const styles = StyleSheet.create({
   booleanContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 16,
+    marginTop: 16,
   },
   booleanButton: {
     flex: 1,
     marginHorizontal: 4,
   },
+  navigationButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 24,
+  },
   backButton: {
-    marginTop: 16,
+    flex: 1,
+    marginRight: 8,
+  },
+  nextButton: {
+    flex: 1,
+    marginLeft: 8,
   },
   loadingContainer: {
     flex: 1,
@@ -245,7 +275,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 16,
-    fontSize: 16,
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,
