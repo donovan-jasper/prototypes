@@ -200,5 +200,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: 'white',
     marginTop: 10,
+    fontSize: 16,
   },
 });

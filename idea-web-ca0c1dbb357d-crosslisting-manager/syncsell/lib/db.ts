@@ -189,6 +189,19 @@ export const getPlatforms = (): Promise<any[]> => {
   });
 };
 
+export const getPlatformByName = (name: string): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM platforms WHERE name = ?;`,
+        [name],
+        (_, { rows: { _array } }) => resolve(_array[0]),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
 export const deletePlatform = (id: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
@@ -202,17 +215,18 @@ export const deletePlatform = (id: number): Promise<void> => {
   });
 };
 
-// Queue operations
-export const addToQueue = (item: any): Promise<number> => {
+// Sales operations
+export const addSale = (sale: any): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        `INSERT INTO queue (product_id, platforms, timestamp)
-         VALUES (?, ?, ?);`,
+        `INSERT INTO sales (product_id, platform_id, amount, sold_at)
+         VALUES (?, ?, ?, ?);`,
         [
-          item.productId,
-          JSON.stringify(item.platforms),
-          item.timestamp
+          sale.productId,
+          sale.platformId,
+          parseFloat(sale.amount),
+          new Date().toISOString()
         ],
         (_, result) => resolve(result.insertId),
         (_, error) => reject(error)
@@ -221,18 +235,97 @@ export const addToQueue = (item: any): Promise<number> => {
   });
 };
 
-export const getQueue = (): Promise<any[]> => {
+export const getSalesForProduct = (productId: number): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM sales WHERE product_id = ? ORDER BY sold_at DESC;`,
+        [productId],
+        (_, { rows: { _array } }) => resolve(_array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Message operations
+export const addMessage = (message: any): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `INSERT INTO messages (platform_id, buyer_name, content, read, received_at)
+         VALUES (?, ?, ?, ?, ?);`,
+        [
+          message.platformId,
+          message.buyerName,
+          message.content,
+          message.read ? 1 : 0,
+          new Date().toISOString()
+        ],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getMessages = (): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM messages ORDER BY received_at DESC;`,
+        [],
+        (_, { rows: { _array } }) => resolve(_array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const markMessageAsRead = (id: number): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE messages SET read = 1 WHERE id = ?;`,
+        [id],
+        () => resolve(),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+// Queue operations
+export const addToQueue = (queueItem: any): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `INSERT INTO queue (product_id, platforms, timestamp)
+         VALUES (?, ?, ?);`,
+        [
+          queueItem.productId,
+          JSON.stringify(queueItem.platforms),
+          queueItem.timestamp
+        ],
+        (_, result) => resolve(result.insertId),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getQueueItems = (): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
         `SELECT * FROM queue ORDER BY timestamp ASC;`,
         [],
         (_, { rows: { _array } }) => {
-          const queueItems = _array.map(item => ({
+          const items = _array.map(item => ({
             ...item,
             platforms: JSON.parse(item.platforms)
           }));
-          resolve(queueItems);
+          resolve(items);
         },
         (_, error) => reject(error)
       );

@@ -35,11 +35,11 @@ export const formatProductForInstagram = (product: any): InstagramProduct => {
   };
 };
 
-export const postProduct = async (product: any, apiKey: string): Promise<InstagramResponse> => {
+export const postProduct = async (product: any, apiKey: string, businessAccountId: string): Promise<InstagramResponse> => {
   try {
     const formattedProduct = formatProductForInstagram(product);
 
-    const response = await axios.post(`${API_BASE_URL}/v12.0/${product.instagramBusinessAccountId}/products`, formattedProduct, {
+    const response = await axios.post(`${API_BASE_URL}/v12.0/${businessAccountId}/products`, formattedProduct, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
@@ -87,27 +87,27 @@ export const fetchMessages = async (apiKey: string, businessAccountId: string): 
 export const recordSale = async (productId: string, apiKey: string, amount: number): Promise<InstagramResponse> => {
   try {
     const response = await axios.post(`${API_BASE_URL}/v12.0/${productId}/orders`, {
-      amount: amount.toFixed(2),
-      currency: 'USD',
-      timestamp: Math.floor(Date.now() / 1000)
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    amount: amount.toFixed(2),
+    currency: 'USD',
+    timestamp: Math.floor(Date.now() / 1000)
+  }, {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
 
-    return {
-      success: true,
-      data: response.data
-    };
-  } catch (error) {
-    console.error('Error recording sale on Instagram:', error);
-    return {
-      success: false,
-      error: handleInstagramError(error)
-    };
-  }
+  return {
+    success: true,
+    data: response.data
+  };
+} catch (error) {
+  console.error('Error recording sale on Instagram:', error);
+  return {
+    success: false,
+    error: handleInstagramError(error)
+  };
+}
 };
 
 export const handleInstagramError = (error: any): string => {
@@ -130,12 +130,12 @@ export const handleInstagramError = (error: any): string => {
   return 'Network error. Please check your internet connection.';
 };
 
-export const retryPostProduct = async (product: any, apiKey: string, maxRetries = 3, delay = 1000): Promise<InstagramResponse> => {
+export const retryPostProduct = async (product: any, apiKey: string, businessAccountId: string, maxRetries = 3, delay = 1000): Promise<InstagramResponse> => {
   let lastError = null;
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const result = await postProduct(product, apiKey);
+      const result = await postProduct(product, apiKey, businessAccountId);
       if (result.success) {
         return result;
       }

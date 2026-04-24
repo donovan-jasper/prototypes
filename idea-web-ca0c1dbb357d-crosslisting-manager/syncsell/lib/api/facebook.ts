@@ -87,27 +87,27 @@ export const fetchMessages = async (apiKey: string, pageId: string): Promise<Fac
 export const recordSale = async (productId: string, apiKey: string, amount: number): Promise<FacebookResponse> => {
   try {
     const response = await axios.post(`${API_BASE_URL}/v12.0/${productId}/orders`, {
-      amount: amount.toFixed(2),
-      currency: 'USD',
-      timestamp: Math.floor(Date.now() / 1000)
-    }, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    amount: amount.toFixed(2),
+    currency: 'USD',
+    timestamp: Math.floor(Date.now() / 1000)
+  }, {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
 
-    return {
-      success: true,
-      data: response.data
-    };
-  } catch (error) {
-    console.error('Error recording sale on Facebook:', error);
-    return {
-      success: false,
-      error: handleFacebookError(error)
-    };
-  }
+  return {
+    success: true,
+    data: response.data
+  };
+} catch (error) {
+  console.error('Error recording sale on Facebook:', error);
+  return {
+    success: false,
+    error: handleFacebookError(error)
+  };
+}
 };
 
 export const handleFacebookError = (error: any): string => {
