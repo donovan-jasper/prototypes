@@ -30,3 +30,8 @@ export function isValidShareLink(url: string): boolean {
   const parsed = parseShareLink(url);
   return parsed !== null;
 }
+
+export function getShelfIdFromLink(url: string): number | null {
+  const parsed = parseShareLink(url);
+  return parsed ? parsed.shelfId : null;
+}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
-import { Text, useTheme, Button, Appbar } from 'react-native-paper';
+import { View, StyleSheet, FlatList, ActivityIndicator, Alert, Linking } from 'react-native';
+import { Text, useTheme, Button, Appbar, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useItems } from '../../hooks/useItems';
 import { useShelves } from '../../hooks/useShelves';
@@ -19,20 +19,21 @@ export default function PublicShelfScreen() {
   const { user } = useUserStore();
 
   const [isCloning, setIsCloning] = useState(false);
+  const [isValidLink, setIsValidLink] = useState(true);
 
   const shelf = shelves.find(s => s.id === shelfId);
 
   useEffect(() => {
     // Verify the share link is valid
-    if (!parseShareLink(`https://shelflife.app/share/${shelfId}?token=${token}`)) {
-      Alert.alert('Invalid Link', 'This share link is not valid.');
-      router.back();
+    const linkValid = parseShareLink(`https://shelflife.app/share/${shelfId}?token=${token}`);
+    if (!linkValid) {
+      setIsValidLink(false);
     }
-  }, [shelfId, token, router]);
+  }, [shelfId, token]);
 
   const handleCloneShelf = async () => {
     if (!shelf || !user) {
-      Alert.alert('Error', 'Unable to clone shelf at this time.');
+      Alert.alert('Error', 'You must be logged in to clone a shelf.');
       return;
     }
 
@@ -66,6 +67,12 @@ export default function PublicShelfScreen() {
     }
   };
 
+  const handleOpenInBrowser = (url: string) => {
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Failed to open URL');
+    });
+  };
+
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <Text variant="displaySmall" style={{ marginBottom: 16 }}>🔗</Text>
@@ -91,6 +98,24 @@ export default function PublicShelfScreen() {
     </View>
   );
 
+  if (!isValidLink) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        <Text variant="headlineSmall">Invalid Share Link</Text>
+        <Text style={{ marginTop: 16, textAlign: 'center' }}>
+          The link you followed is not valid or has expired.
+        </Text>
+        <Button
+          mode="contained"
+          onPress={() => router.back()}
+          style={{ marginTop: 24 }}
+        >
+          Go Back
+        </Button>
+      </View>
+    );
+  }
+
   if (shelvesLoading || itemsLoading) {
     return (
       <View style={[styles.container, styles.center]}>
@@ -112,6 +137,11 @@ export default function PublicShelfScreen() {
       <Appbar.Header>
         <Appbar.BackAction onPress={() => router.back()} />
         <Appbar.Content title="Shared Shelf" />
+        <Appbar.Action
+          icon="open-in-new"
+          onPress={() => router.push('/')}
+          title="Open in App"
+        />
       </Appbar.Header>
 
       <FlatList
@@ -121,7 +151,7 @@ export default function PublicShelfScreen() {
         renderItem={({ item }) => (
           <ItemCard
             item={item}
-            onPress={() => router.push(`/item/${item.id}`)}
+            onPress={() => handleOpenInBrowser(item.url)}
             readOnly
           />
         )}
@@ -137,6 +167,7 @@ export default function PublicShelfScreen() {
           loading={isCloning}
           disabled={isCloning}
           style={styles.cloneButton}
+          icon="content-copy"
         >
           Clone to My Library
         </Button>
@@ -152,6 +183,7 @@ const styles = StyleSheet.create({
   center: {
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   header: {
     padding: 16,
@@ -182,6 +214,6 @@ const styles = StyleSheet.create({
     borderTopColor: '#e0e0e0',
   },
   cloneButton: {
-    marginTop: 8,
+    paddingVertical: 8,
   },
 });

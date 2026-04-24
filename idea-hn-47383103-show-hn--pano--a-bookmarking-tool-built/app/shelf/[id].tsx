@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl, Share, Alert } from 'react-native';
-import { FAB, Text, useTheme, Portal, Dialog, Button, TextInput, IconButton } from 'react-native-paper';
+import { View, StyleSheet, FlatList, RefreshControl, Share, Alert, Linking } from 'react-native';
+import { FAB, Text, useTheme, Portal, Dialog, Button, TextInput, IconButton, Appbar } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useItems } from '../../hooks/useItems';
 import { useShelves } from '../../hooks/useShelves';
@@ -15,7 +15,7 @@ export default function ShelfDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const shelfId = parseInt(id, 10);
 
-  const { shelves } = useShelves();
+  const { shelves, updateShelf } = useShelves();
   const { items, loading, createItem, removeItem, refresh } = useItems(shelfId);
   const { isPremium } = useUserStore();
   const { checkItemLimit } = usePremium();
@@ -26,6 +26,9 @@ export default function ShelfDetailScreen() {
   const [itemToDelete, setItemToDelete] = useState<number | null>(null);
   const [url, setUrl] = useState('');
   const [saving, setSaving] = useState(false);
+  const [editShelfDialogVisible, setEditShelfDialogVisible] = useState(false);
+  const [shelfName, setShelfName] = useState('');
+  const [shelfDescription, setShelfDescription] = useState('');
 
   const shelf = shelves.find(s => s.id === shelfId);
 
@@ -39,6 +42,7 @@ export default function ShelfDetailScreen() {
       const urlObj = new URL(itemUrl);
       const domain = urlObj.hostname.replace('www.', '');
 
+      // In a real app, this would call an API to fetch metadata
       return {
         title: domain,
         description: itemUrl,
@@ -105,6 +109,30 @@ export default function ShelfDetailScreen() {
     }
   }, [shelf]);
 
+  const handleEditShelf = useCallback(() => {
+    if (shelf) {
+      setShelfName(shelf.name);
+      setShelfDescription(shelf.description || '');
+      setEditShelfDialogVisible(true);
+    }
+  }, [shelf]);
+
+  const handleSaveShelfChanges = useCallback(async () => {
+    if (shelf) {
+      await updateShelf(shelf.id, {
+        name: shelfName,
+        description: shelfDescription
+      });
+      setEditShelfDialogVisible(false);
+    }
+  }, [shelf, shelfName, shelfDescription, updateShelf]);
+
+  const handleOpenInBrowser = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {
+      Alert.alert('Error', 'Failed to open URL');
+    });
+  }, []);
+
   const renderEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
       <Text variant="displaySmall" style={{ marginBottom: 16 }}>🔗</Text>
@@ -123,12 +151,20 @@ export default function ShelfDetailScreen() {
         <Text variant="headlineMedium" style={styles.shelfName}>
           {shelf?.name || 'Shelf'}
         </Text>
-        <IconButton
-          icon="share-variant"
-          size={24}
-          onPress={handleShareShelf}
-          style={styles.shareButton}
-        />
+        <View style={styles.headerActions}>
+          <IconButton
+            icon="share-variant"
+            size={24}
+            onPress={handleShareShelf}
+            style={styles.actionButton}
+          />
+          <IconButton
+            icon="pencil"
+            size={24}
+            onPress={handleEditShelf}
+            style={styles.actionButton}
+          />
+        </View>
       </View>
       {shelf?.description && (
         <Text variant="bodyMedium" style={[styles.shelfDescription, { color: theme.colors.onSurfaceVariant }]}>
@@ -139,10 +175,15 @@ export default function ShelfDetailScreen() {
         {items.length} {items.length === 1 ? 'item' : 'items'}
       </Text>
     </View>
-  ), [shelf, items.length, theme.colors.onSurfaceVariant, theme.colors.primary, handleShareShelf]);
+  ), [shelf, items.length, theme.colors.onSurfaceVariant, theme.colors.primary, handleShareShelf, handleEditShelf]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <Appbar.Header>
+        <Appbar.BackAction onPress={() => router.back()} />
+        <Appbar.Content title={shelf?.name || 'Shelf'} />
+      </Appbar.Header>
+
       <FlatList
         data={items}
         keyExtractor={(item) => item.id.toString()}
@@ -152,50 +193,61 @@ export default function ShelfDetailScreen() {
             item={item}
             onPress={() => router.push(`/item/${item.id}`)}
             onDelete={() => handleDeleteItem(item.id)}
+            onOpenInBrowser={() => handleOpenInBrowser(item.url)}
           />
         )}
         contentContainerStyle={items.length === 0 ? styles.emptyList : styles.list}
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={renderEmpty}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={refresh} />
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
         }
       />
 
       <FAB
         icon="plus"
-        style={[styles.fab, { backgroundColor: theme.colors.primary }]}
+        style={styles.fab}
         onPress={handleAddItem}
+        color={theme.colors.onPrimary}
+        label="Add Item"
       />
 
+      {/* Add Item Dialog */}
       <Portal>
         <Dialog visible={addDialogVisible} onDismiss={() => setAddDialogVisible(false)}>
-          <Dialog.Title>Add Item</Dialog.Title>
+          <Dialog.Title>Add New Item</Dialog.Title>
           <Dialog.Content>
             <TextInput
               label="URL"
               value={url}
               onChangeText={setUrl}
+              autoFocus
               mode="outlined"
-              placeholder="https://example.com"
+              style={{ marginBottom: 16 }}
+              keyboardType="url"
               autoCapitalize="none"
               autoCorrect={false}
-              keyboardType="url"
-              style={styles.urlInput}
             />
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              Paste a link to save it to this shelf
+            </Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setAddDialogVisible(false)}>Cancel</Button>
-            <Button
-              onPress={handleSaveItem}
-              loading={saving}
-              disabled={!url.trim()}
-            >
+            <Button onPress={handleSaveItem} loading={saving} disabled={saving}>
               Save
             </Button>
           </Dialog.Actions>
         </Dialog>
+      </Portal>
 
+      {/* Delete Item Dialog */}
+      <Portal>
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
           <Dialog.Title>Delete Item</Dialog.Title>
           <Dialog.Content>
@@ -206,15 +258,46 @@ export default function ShelfDetailScreen() {
             <Button onPress={confirmDelete}>Delete</Button>
           </Dialog.Actions>
         </Dialog>
+      </Portal>
 
+      {/* Edit Shelf Dialog */}
+      <Portal>
+        <Dialog visible={editShelfDialogVisible} onDismiss={() => setEditShelfDialogVisible(false)}>
+          <Dialog.Title>Edit Shelf</Dialog.Title>
+          <Dialog.Content>
+            <TextInput
+              label="Shelf Name"
+              value={shelfName}
+              onChangeText={setShelfName}
+              mode="outlined"
+              style={{ marginBottom: 16 }}
+            />
+            <TextInput
+              label="Description"
+              value={shelfDescription}
+              onChangeText={setShelfDescription}
+              mode="outlined"
+              multiline
+              numberOfLines={3}
+            />
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setEditShelfDialogVisible(false)}>Cancel</Button>
+            <Button onPress={handleSaveShelfChanges}>Save</Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
+
+      {/* Paywall Dialog */}
+      <Portal>
         <Dialog visible={paywallVisible} onDismiss={() => setPaywallVisible(false)}>
           <Dialog.Title>Premium Feature</Dialog.Title>
           <Dialog.Content>
             <Text>You've reached the free tier limit of 50 items per shelf.</Text>
-            <Text style={{ marginTop: 8 }}>Upgrade to add more items.</Text>
+            <Text style={{ marginTop: 16 }}>Upgrade to add more items to your shelves.</Text>
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setPaywallVisible(false)}>Later</Button>
+            <Button onPress={() => setPaywallVisible(false)}>Maybe Later</Button>
             <Button onPress={() => {
               setPaywallVisible(false);
               router.push('/paywall');
@@ -236,15 +319,19 @@ const styles = StyleSheet.create({
   },
   headerTop: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  headerActions: {
+    flexDirection: 'row',
+  },
+  actionButton: {
+    marginLeft: 8,
   },
   shelfName: {
     fontWeight: 'bold',
     flex: 1,
-  },
-  shareButton: {
-    margin: 0,
   },
   shelfDescription: {
     marginTop: 4,
@@ -267,8 +354,5 @@ const styles = StyleSheet.create({
     margin: 16,
     right: 0,
     bottom: 0,
-  },
-  urlInput: {
-    marginTop: 8,
   },
 });
