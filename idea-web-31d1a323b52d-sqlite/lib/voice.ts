@@ -135,7 +135,7 @@ export const startListening = (): Promise<string> => {
           removeSpeechRecognitionListener(resultListener);
           removeSpeechRecognitionListener(errorListener);
           removeSpeechRecognitionListener(endListener);
-          
+
           if (currentReject) {
             currentReject({
               code: 'NO_SPEECH',
@@ -152,35 +152,35 @@ export const startListening = (): Promise<string> => {
           interimResults: false,
           maxAlternatives: 1,
           continuous: false,
+          prompt: 'Speak now...'
         });
       }
     } catch (error) {
       reject({
         code: 'UNKNOWN_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown error occurred'
+        message: 'An unknown error occurred'
       } as VoiceRecognitionError);
     }
   });
 };
 
-export const stopListening = async () => {
-  if (Platform.OS === 'web') {
-    if (recognition) {
-      recognition.stop();
-      recognition = null;
-    }
-  } else {
+export const stopListening = async (): Promise<void> => {
+  if (Platform.OS === 'web' && recognition) {
+    recognition.stop();
+    recognition = null;
+  } else if (Platform.OS !== 'web') {
     try {
       await ExpoSpeechRecognitionModule.stop();
     } catch (error) {
       console.error('Error stopping speech recognition:', error);
     }
   }
-  
-  currentResolve = null;
-  currentReject = null;
 };
 
-export const speak = (text: string) => {
-  Speech.speak(text);
+export const speak = async (text: string, options?: Speech.SpeechOptions): Promise<void> => {
+  try {
+    await Speech.speak(text, options);
+  } catch (error) {
+    console.error('Error speaking text:', error);
+  }
 };

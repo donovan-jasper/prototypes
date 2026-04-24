@@ -187,14 +187,39 @@ export const useDatabase = () => {
     return databaseList;
   };
 
+  const deleteRow = async (table: string, rowId: number): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      db.transaction(
+        tx => {
+          tx.executeSql(
+            `DELETE FROM ${table} WHERE id = ?`,
+            [rowId],
+            () => resolve(),
+            (_, error) => reject(error)
+          );
+        },
+        reject
+      );
+    });
+  };
+
   return {
     createDatabase,
     insertRow,
     queryDatabase,
     getDatabaseSchema,
     deleteDatabase,
-    listDatabases
+    listDatabases,
+    deleteRow
   };
 };
 
-export { createDatabase, insertRow, queryDatabase, getDatabaseSchema, deleteDatabase, listDatabases };
+export const {
+  createDatabase,
+  insertRow,
+  queryDatabase,
+  getDatabaseSchema,
+  deleteDatabase,
+  listDatabases,
+  deleteRow
+} = useDatabase();

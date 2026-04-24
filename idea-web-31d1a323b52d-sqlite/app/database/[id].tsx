@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, ScrollView, TextInput as RNTextInput } from 'react-native';
-import { FAB, ActivityIndicator, Card, Title, Paragraph, Portal, Modal, Button, TextInput, Searchbar, useTheme } from 'react-native-paper';
+import { View, FlatList, StyleSheet, ScrollView, TextInput as RNTextInput, Alert } from 'react-native';
+import { FAB, ActivityIndicator, Card, Title, Paragraph, Portal, Modal, Button, TextInput, Searchbar, useTheme, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import VoiceInput from '../../components/VoiceInput';
 import QueryResults from '../../components/QueryResults';
-import { queryDatabase, insertRow, getDatabaseSchema } from '../../lib/database';
+import { queryDatabase, insertRow, getDatabaseSchema, deleteRow } from '../../lib/database';
 import { useStore } from '../../lib/store';
 import { parseVoiceCommand, generateSQL } from '../../lib/ai';
+import { Swipeable } from 'react-native-gesture-handler';
 
 export default function DatabaseScreen() {
   const { id } = useLocalSearchParams();
@@ -125,6 +126,52 @@ export default function DatabaseScreen() {
     }
   };
 
+  const handleDeleteRow = async (rowId: number) => {
+    try {
+      await deleteRow(id as string, rowId);
+      await fetchRows();
+    } catch (error) {
+      console.error('Error deleting row:', error);
+      Alert.alert('Error', 'Failed to delete row');
+    }
+  };
+
+  const renderRightActions = (rowId: number) => {
+    return (
+      <View style={styles.deleteAction}>
+        <IconButton
+          icon="delete"
+          color="white"
+          size={24}
+          onPress={() => handleDeleteRow(rowId)}
+        />
+      </View>
+    );
+  };
+
+  const renderRow = ({ item }: { item: any }) => {
+    return (
+      <Swipeable
+        renderRightActions={() => renderRightActions(item.id)}
+        overshootRight={false}
+      >
+        <Card style={styles.card}>
+          <Card.Content>
+            {Object.entries(item).map(([key, value]) => {
+              if (key === 'id') return null;
+              return (
+                <View key={key} style={styles.row}>
+                  <Paragraph style={styles.label}>{key.replace(/_/g, ' ')}:</Paragraph>
+                  <Paragraph style={styles.value}>{value}</Paragraph>
+                </View>
+              );
+            })}
+          </Card.Content>
+        </Card>
+      </Swipeable>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -158,100 +205,73 @@ export default function DatabaseScreen() {
       />
 
       {/* Results Display */}
-      {searchQuery ? (
-        isSearching ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="small" />
-          </View>
-        ) : (
-          <QueryResults data={searchResults} />
-        )
+      {searchResults.length > 0 ? (
+        <QueryResults data={searchResults} />
       ) : (
         <FlatList
           data={rows}
-          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
-          renderItem={({ item }) => (
-            <Card style={styles.card}>
-              <Card.Content>
-                {Object.entries(item).map(([key, value]) => (
-                  <View key={key} style={styles.row}>
-                    <Title style={styles.fieldName}>{key}</Title>
-                    <Paragraph style={styles.fieldValue}>{String(value)}</Paragraph>
-                  </View>
-                ))}
-              </Card.Content>
-            </Card>
-          )}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Paragraph>No rows yet. Tap the + button to add data.</Paragraph>
-            </View>
-          }
+          renderItem={renderRow}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.list}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
         />
       )}
 
-      <FAB
-        style={styles.fab}
-        icon="plus"
-        onPress={() => setModalVisible(true)}
-        label="Add Record"
-      />
-
+      {/* Add Row Modal */}
       <Portal>
         <Modal
           visible={modalVisible}
           onDismiss={() => setModalVisible(false)}
-          contentContainerStyle={styles.modalContainer}
+          contentContainerStyle={styles.modal}
         >
-          <ScrollView>
-            <Title style={styles.modalTitle}>Add New Record</Title>
+          <Title>Add New Record</Title>
 
-            <VoiceInput
-              onResult={handleVoiceInput}
-              placeholder="Say 'Add product: Laptop, quantity 5'"
-            />
+          <VoiceInput
+            onTranscription={handleVoiceInput}
+            placeholder="Speak to add a new record..."
+            style={styles.voiceInput}
+          />
 
-            {transcription ? (
-              <Paragraph style={styles.transcriptionHint}>
-                Parsed: {JSON.stringify(formData, null, 2)}
-              </Paragraph>
-            ) : null}
+          {transcription ? (
+            <Paragraph style={styles.transcription}>Transcription: {transcription}</Paragraph>
+          ) : null}
 
-            {schema.map((field, index) => (
-              <TextInput
-                key={index}
-                label={field.name}
-                value={formData[field.name] || ''}
-                onChangeText={(text) => updateFormField(field.name, text)}
-                style={styles.input}
-                mode="outlined"
-                keyboardType={field.type === 'INTEGER' || field.type === 'REAL' ? 'numeric' : 'default'}
-              />
-            ))}
-
-            <View style={styles.buttonRow}>
-              <Button
-                mode="outlined"
-                onPress={() => {
-                  setModalVisible(false);
-                  setTranscription('');
-                  setFormData({});
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                mode="contained"
-                onPress={handleAddRow}
-                loading={saving}
-                disabled={Object.keys(formData).length === 0}
-              >
-                Save
-              </Button>
-            </View>
+          <ScrollView style={styles.formContainer}>
+            {schema.map((field, index) => {
+              if (field.name === 'id') return null;
+              return (
+                <TextInput
+                  key={index}
+                  label={field.name.replace(/_/g, ' ')}
+                  value={formData[field.name] || ''}
+                  onChangeText={(text) => updateFormField(field.name, text)}
+                  style={styles.formField}
+                  keyboardType={field.type === 'INTEGER' || field.type === 'REAL' ? 'numeric' : 'default'}
+                />
+              );
+            })}
           </ScrollView>
+
+          <View style={styles.modalActions}>
+            <Button onPress={() => setModalVisible(false)}>Cancel</Button>
+            <Button
+              mode="contained"
+              onPress={handleAddRow}
+              loading={saving}
+              disabled={Object.keys(formData).length === 0}
+            >
+              Save
+            </Button>
+          </View>
         </Modal>
       </Portal>
+
+      {/* Floating Action Button */}
+      <FAB
+        icon="plus"
+        style={styles.fab}
+        onPress={() => setModalVisible(true)}
+      />
     </View>
   );
 }
@@ -279,33 +299,65 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   schemaField: {
+    flexDirection: 'row',
     marginRight: 16,
     marginBottom: 8,
   },
   fieldName: {
     fontWeight: 'bold',
+    marginRight: 4,
   },
   fieldType: {
-    fontSize: 12,
     color: '#666',
   },
   searchBar: {
     marginBottom: 16,
   },
-  card: {
-    marginBottom: 16,
+  list: {
+    paddingBottom: 80,
   },
-  row: {
+  card: {
     marginBottom: 8,
   },
-  fieldValue: {
-    marginTop: 4,
+  row: {
+    flexDirection: 'row',
+    marginBottom: 4,
   },
-  emptyContainer: {
+  label: {
+    fontWeight: 'bold',
+    marginRight: 8,
+    textTransform: 'capitalize',
+  },
+  value: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 32,
+  },
+  separator: {
+    height: 8,
+  },
+  modal: {
+    backgroundColor: 'white',
+    padding: 20,
+    margin: 20,
+    borderRadius: 8,
+  },
+  voiceInput: {
+    marginVertical: 16,
+  },
+  transcription: {
+    marginBottom: 16,
+    color: '#666',
+  },
+  formContainer: {
+    maxHeight: 300,
+    marginBottom: 16,
+  },
+  formField: {
+    marginBottom: 12,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 16,
   },
   fab: {
     position: 'absolute',
@@ -313,29 +365,11 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    margin: 20,
-    borderRadius: 8,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    marginBottom: 16,
-  },
-  input: {
-    marginBottom: 16,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-    gap: 8,
-  },
-  transcriptionHint: {
-    marginVertical: 8,
-    padding: 8,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 4,
+  deleteAction: {
+    backgroundColor: '#f44336',
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+    width: 80,
+    height: '100%',
   },
 });
