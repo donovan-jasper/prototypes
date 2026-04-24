@@ -174,13 +174,10 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
       {isEnabled && (
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>
-            {isMonitoring ? 'Monitoring active' : 'Monitoring inactive'}
+            {isMonitoring
+              ? `Monitoring for stillness (${stillnessDuration}/10 minutes)`
+              : 'Not monitoring'}
           </Text>
-          {stillnessDuration > 0 && (
-            <Text style={styles.stillnessText}>
-              Stillness detected: {stillnessDuration} minutes
-            </Text>
-          )}
         </View>
       )}
     </View>
@@ -191,7 +188,7 @@ const styles = StyleSheet.create({
   container: {
     marginTop: 20,
     padding: 16,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f9f9f9',
     borderRadius: 8,
   },
   title: {
@@ -229,16 +226,11 @@ const styles = StyleSheet.create({
   statusContainer: {
     marginTop: 12,
     padding: 8,
-    backgroundColor: '#e8f5e9',
+    backgroundColor: '#e6f7ff',
     borderRadius: 4,
   },
   statusText: {
+    color: '#0050b3',
     fontSize: 14,
-    color: '#2e7d32',
-  },
-  stillnessText: {
-    fontSize: 14,
-    color: '#d32f2f',
-    marginTop: 4,
   },
 });
