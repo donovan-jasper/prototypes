@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import ConflictAlert from './ConflictAlert';
 import useAIRuleInjection from '../hooks/useAIRuleInjection';
-import { injectRulesIntoAISuggestion, getAISuggestions } from '../api/mockAIIntegration';
+import { injectRulesIntoAISuggestion, getAISuggestions, analyzeCodeWithAI } from '../api/realAIIntegration';
 
 const AISuggestionDisplay = ({ prompt }) => {
   const { rules, checkCode } = useAIRuleInjection();
@@ -13,6 +13,7 @@ const AISuggestionDisplay = ({ prompt }) => {
   const [isRejected, setIsRejected] = useState(false);
   const [modifiedSuggestion, setModifiedSuggestion] = useState('');
   const [violations, setViolations] = useState([]);
+  const [aiAnalysis, setAiAnalysis] = useState(null);
 
   useEffect(() => {
     if (prompt) {
@@ -26,22 +27,32 @@ const AISuggestionDisplay = ({ prompt }) => {
       const suggestions = await getAISuggestions(prompt);
       setSuggestions(suggestions);
       if (suggestions.length > 0) {
-        processSuggestion(suggestions[0]);
+        await processSuggestion(suggestions[0]);
       }
     } catch (error) {
       console.error('Error fetching suggestions:', error);
+      Alert.alert('Error', 'Failed to fetch AI suggestions. Please try again.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const processSuggestion = (suggestion) => {
+  const processSuggestion = async (suggestion) => {
     setSelectedSuggestion(suggestion);
     const processedSuggestion = injectRulesIntoAISuggestion(suggestion, rules);
     setModifiedSuggestion(processedSuggestion);
 
     const foundViolations = rules.filter(rule => !checkCode(processedSuggestion, rule));
     setViolations(foundViolations);
+
+    // Get AI analysis of the suggestion
+    try {
+      const analysis = await analyzeCodeWithAI(suggestion);
+      setAiAnalysis(analysis);
+    } catch (error) {
+      console.error('Error analyzing code with AI:', error);
+    }
+
     setIsAccepted(false);
     setIsRejected(false);
   };
@@ -49,11 +60,15 @@ const AISuggestionDisplay = ({ prompt }) => {
   const handleAccept = () => {
     if (violations.length === 0) {
       setIsAccepted(true);
+      Alert.alert('Success', 'Suggestion accepted and ready to use!');
+    } else {
+      Alert.alert('Warning', 'Cannot accept suggestion with rule violations');
     }
   };
 
   const handleReject = () => {
     setIsRejected(true);
+    Alert.alert('Rejected', 'Suggestion has been rejected');
   };
 
   const renderHighlightedCode = () => {
@@ -91,7 +106,7 @@ const AISuggestionDisplay = ({ prompt }) => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Fetching AI suggestions...</Text>
+        <Text>Fetching AI suggestions and analyzing code...</Text>
       </View>
     );
   }
@@ -140,6 +155,15 @@ const AISuggestionDisplay = ({ prompt }) => {
         </View>
       )}
 
+      {aiAnalysis && (
+        <View style={styles.aiAnalysisContainer}>
+          <Text style={styles.aiAnalysisTitle}>AI Analysis:</Text>
+          <Text style={styles.aiAnalysisText}>
+            Complexity: {aiAnalysis.complexity || 'N/A'} | Maintainability: {aiAnalysis.maintainability || 'N/A'}
+          </Text>
+        </View>
+      )}
+
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={[styles.button, styles.acceptButton, violations.length > 0 && styles.disabledButton]}
@@ -158,11 +182,15 @@ const AISuggestionDisplay = ({ prompt }) => {
       </View>
 
       {isAccepted && (
-        <Text style={styles.statusText}>Suggestion accepted!</Text>
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>Suggestion accepted!</Text>
+        </View>
       )}
 
       {isRejected && (
-        <Text style={styles.statusText}>Suggestion rejected.</Text>
+        <View style={styles.statusContainer}>
+          <Text style={styles.statusText}>Suggestion rejected</Text>
+        </View>
       )}
     </View>
   );
@@ -170,63 +198,88 @@ const AISuggestionDisplay = ({ prompt }) => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
     padding: 16,
     backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-    margin: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   suggestionSelector: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: 16,
   },
   suggestionButton: {
     padding: 8,
-    backgroundColor: '#ddd',
-    borderRadius: 4,
     marginRight: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 4,
   },
   selectedSuggestion: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#007AFF',
   },
   suggestionButtonText: {
-    color: 'black',
+    color: '#333',
   },
   suggestionContainer: {
-    maxHeight: 200,
-    marginBottom: 10,
-    padding: 10,
-    backgroundColor: 'white',
+    flex: 1,
+    backgroundColor: '#fff',
+    padding: 12,
     borderRadius: 4,
+    marginBottom: 16,
   },
   suggestionText: {
     fontFamily: 'monospace',
+    fontSize: 14,
   },
   violationText: {
-    color: 'red',
-    backgroundColor: 'rgba(255, 200, 200, 0.5)',
-    fontWeight: 'bold',
+    color: '#d32f2f',
+    backgroundColor: '#ffebee',
   },
   violationsContainer: {
-    marginBottom: 10,
+    marginBottom: 16,
   },
   violationsTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 8,
+  },
+  aiAnalysisContainer: {
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#e3f2fd',
+    borderRadius: 4,
+  },
+  aiAnalysisTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  aiAnalysisText: {
+    fontSize: 14,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginBottom: 16,
   },
   button: {
-    padding: 10,
+    padding: 12,
     borderRadius: 4,
     flex: 1,
-    marginHorizontal: 5,
+    marginHorizontal: 4,
     alignItems: 'center',
   },
   acceptButton: {
@@ -242,20 +295,15 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
+  statusContainer: {
+    padding: 12,
+    backgroundColor: '#e8f5e9',
+    borderRadius: 4,
+    marginTop: 16,
+  },
   statusText: {
-    marginTop: 10,
+    color: '#2e7d32',
     textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
   },
 });
 
