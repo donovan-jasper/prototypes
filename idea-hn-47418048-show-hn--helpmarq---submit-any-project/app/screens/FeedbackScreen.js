@@ -24,18 +24,32 @@ const FeedbackScreen = ({ route }) => {
       });
 
       if (feedbackData.length > 0) {
-        // Calculate average score if multiple feedbacks
-        const totalScore = feedbackData.reduce((sum, feedback) => sum + feedback.score, 0);
+        // Calculate average scores for each question
+        const totalQuestion1 = feedbackData.reduce((sum, feedback) => sum + (feedback.question1 || 0), 0);
+        const totalQuestion2 = feedbackData.reduce((sum, feedback) => sum + (feedback.question2 || 0), 0);
+        const totalQuestion3 = feedbackData.reduce((sum, feedback) => sum + (feedback.question3 || 0), 0);
+
+        const averageQuestion1 = (totalQuestion1 / feedbackData.length).toFixed(1);
+        const averageQuestion2 = (totalQuestion2 / feedbackData.length).toFixed(1);
+        const averageQuestion3 = (totalQuestion3 / feedbackData.length).toFixed(1);
+
+        // Calculate overall average score
+        const totalScore = feedbackData.reduce((sum, feedback) => sum + (feedback.score || 0), 0);
         const averageScore = (totalScore / feedbackData.length).toFixed(1);
 
         setFeedbackResults({
-          ...feedbackData[0],
+          question1: averageQuestion1,
+          question2: averageQuestion2,
+          question3: averageQuestion3,
           score: averageScore,
           count: feedbackData.length
         });
       } else {
         setFeedbackResults(null);
       }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching feedback:", error);
       setLoading(false);
     });
 
@@ -67,12 +81,12 @@ const FeedbackScreen = ({ route }) => {
 
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>Average Clarity:</Text>
-            <Text style={styles.resultValue}>{feedbackResults.question1}</Text>
+            <Text style={styles.resultValue}>{feedbackResults.question1}/10</Text>
           </View>
 
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>Would Use:</Text>
-            <Text style={styles.resultValue}>{feedbackResults.question2}</Text>
+            <Text style={styles.resultValue}>{feedbackResults.question2}/10</Text>
           </View>
 
           <View style={styles.resultItem}>
@@ -186,9 +200,13 @@ const styles = StyleSheet.create({
   noFeedbackSubtext: {
     fontSize: 14,
     color: '#888',
+    textAlign: 'center',
   },
   formContainer: {
     marginTop: 20,
+    padding: 15,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 10,
   },
   formTitle: {
     fontSize: 18,
