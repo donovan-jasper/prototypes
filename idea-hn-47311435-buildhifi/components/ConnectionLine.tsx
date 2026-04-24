@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, G, Circle } from 'react-native-svg';
 import { Component } from '@/lib/types';
 
 interface ConnectionLineProps {
@@ -46,12 +46,24 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
   const arrowRightX = arrowX + arrowWidth * Math.sin(angle);
   const arrowRightY = arrowY - arrowWidth * Math.cos(angle);
 
+  // Calculate connection points (bottom center of each component)
+  const fromConnectionX = fromX + 75;
+  const fromConnectionY = fromY + 200;
+  const toConnectionX = toX + 75;
+  const toConnectionY = toY;
+
+  // Calculate control points for the curve
+  const control1X = fromConnectionX + (toConnectionX - fromConnectionX) * 0.3;
+  const control1Y = fromConnectionY;
+  const control2X = toConnectionX - (toConnectionX - fromConnectionX) * 0.3;
+  const control2Y = toConnectionY;
+
   return (
     <View style={styles.container}>
       <Svg height="100%" width="100%">
         {/* Main connection line */}
         <Path
-          d={`M ${fromX} ${fromY} C ${midX} ${fromY + controlY}, ${midX} ${toY - controlY}, ${toX} ${toY}`}
+          d={`M ${fromConnectionX} ${fromConnectionY} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${toConnectionX} ${toConnectionY}`}
           stroke={getColor()}
           strokeWidth="3"
           fill="none"
@@ -60,11 +72,27 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
 
         {/* Arrowhead */}
         <Path
-          d={`M ${arrowLeftX} ${arrowLeftY} L ${toX} ${toY} L ${arrowRightX} ${arrowRightY}`}
+          d={`M ${arrowLeftX} ${arrowLeftY} L ${toConnectionX} ${toConnectionY} L ${arrowRightX} ${arrowRightY}`}
           fill={getColor()}
           stroke={getColor()}
           strokeWidth="1"
         />
+
+        {/* Connection points */}
+        <G>
+          <Circle
+            cx={fromConnectionX}
+            cy={fromConnectionY}
+            r="5"
+            fill={getColor()}
+          />
+          <Circle
+            cx={toConnectionX}
+            cy={toConnectionY}
+            r="5"
+            fill={getColor()}
+          />
+        </G>
       </Svg>
     </View>
   );

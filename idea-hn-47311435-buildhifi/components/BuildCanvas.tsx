@@ -14,7 +14,7 @@ interface BuildCanvasProps {
   build?: Build | null;
 }
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
   const { currentBuild, setCurrentBuild, updateComponentPosition } = useBuildStore();
@@ -27,10 +27,10 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
 
   // Snap positions for each component type
   const snapPositions = {
-    source: { x: SCREEN_WIDTH * 0.2, y: 100 },
-    preamp: { x: SCREEN_WIDTH * 0.4, y: 100 },
-    amp: { x: SCREEN_WIDTH * 0.6, y: 100 },
-    speaker: { x: SCREEN_WIDTH * 0.8, y: 100 }
+    source: { x: SCREEN_WIDTH * 0.2, y: SCREEN_HEIGHT * 0.3 },
+    preamp: { x: SCREEN_WIDTH * 0.4, y: SCREEN_HEIGHT * 0.3 },
+    amp: { x: SCREEN_WIDTH * 0.6, y: SCREEN_HEIGHT * 0.3 },
+    speaker: { x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.3 }
   };
 
   useEffect(() => {
@@ -122,6 +122,9 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
           { translateX: x.value },
           { translateY: y.value },
         ],
+        position: 'absolute',
+        width: 150,
+        height: 200,
       };
     });
 
@@ -141,76 +144,58 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       if (index === currentBuild.components.length - 1) return null;
 
       const nextComponent = currentBuild.components[index + 1];
-      const fromPosition = componentPositions[component.id];
-      const toPosition = componentPositions[nextComponent.id];
-
-      if (!fromPosition || !toPosition) return null;
+      const fromPosition = componentPositions[component.id] || { x: 0, y: 0 };
+      const toPosition = componentPositions[nextComponent.id] || { x: 0, y: 0 };
 
       // Determine connection status
-      let status: 'compatible' | 'warning' | 'incompatible' = 'compatible';
-      const issue = validation.issues.find(issue =>
-        issue.componentIndices.includes(index) && issue.componentIndices.includes(index + 1)
-      );
-
-      if (issue) {
-        status = issue.severity === 'error' ? 'incompatible' : 'warning';
-      }
+      const connectionStatus = validation.issues.find(
+        issue => issue.fromId === component.id && issue.toId === nextComponent.id
+      )?.status || 'compatible';
 
       return (
         <ConnectionLine
           key={`connection-${component.id}-${nextComponent.id}`}
           from={{ ...component, position: fromPosition }}
           to={{ ...nextComponent, position: toPosition }}
-          status={status}
+          status={connectionStatus}
         />
       );
     });
   };
 
-  if (!currentBuild) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.emptyText}>No build selected. Create a new build to start designing your audio system.</Text>
-        <IconButton
-          icon="plus"
-          size={24}
-          onPress={() => {
-            // Logic to create new build would go here
-          }}
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={styles.container}>
-      <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.canvas}>
-          {renderConnectionLines()}
-          {currentBuild.components.map(renderComponent)}
-        </View>
-      </ScrollView>
-
-      {validation.issues.length > 0 && (
+      {!validation.isValid && (
         <Banner
           visible={true}
-          icon={validation.isValid ? "alert-circle" : "close-circle"}
-          style={[styles.banner, validation.isValid ? styles.warningBanner : styles.errorBanner]}
           actions={[
             {
-              label: 'Dismiss',
-              onPress: () => {},
+              label: 'Fix Issues',
+              onPress: () => console.log('Show suggestions'),
             },
           ]}
+          icon={({ size }) => (
+            <IconButton
+              icon="alert-circle"
+              size={size}
+              color="#ff9800"
+            />
+          )}
         >
-          <Text style={styles.bannerTitle}>
-            {validation.isValid ? 'Potential Issues' : 'Incompatible Setup'}
-          </Text>
-          <Text style={styles.bannerContent}>
-            {validation.issues.length} issue{validation.issues.length !== 1 ? 's' : ''} found
-          </Text>
+          {validation.suggestions.length > 0 ? validation.suggestions[0] : 'Some components may not be compatible'}
         </Banner>
       )}
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        <View style={styles.canvas}>
+          {renderConnectionLines()}
+          {currentBuild?.components.map(renderComponent)}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -220,45 +205,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
     flexGrow: 1,
+    paddingVertical: 20,
   },
   canvas: {
     width: SCREEN_WIDTH * 2,
-    height: 600,
-    padding: 20,
+    height: SCREEN_HEIGHT * 0.7,
+    position: 'relative',
   },
   componentContainer: {
-    position: 'absolute',
     width: 150,
     height: 200,
-  },
-  emptyText: {
-    textAlign: 'center',
-    margin: 20,
-    color: '#666',
-  },
-  banner: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    margin: 10,
-  },
-  warningBanner: {
-    backgroundColor: '#fff8e1',
-  },
-  errorBanner: {
-    backgroundColor: '#ffebee',
-  },
-  bannerTitle: {
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  bannerContent: {
-    fontSize: 12,
+    borderRadius: 8,
+    overflow: 'hidden',
   },
 });
 
