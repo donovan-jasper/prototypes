@@ -58,7 +58,12 @@ export default function Canvas({
     message: string;
   } | null>(null);
 
-  const { moveNode, addConnection } = useWorkflowStore();
+  const {
+    moveNode,
+    addConnection,
+    validateConnection,
+    currentWorkflow
+  } = useWorkflowStore();
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
@@ -89,8 +94,10 @@ export default function Canvas({
   }));
 
   const handleNodeDragEnd = useCallback((nodeId: string, x: number, y: number) => {
-    moveNode(nodeId, x, y);
-  }, [moveNode]);
+    if (currentWorkflow) {
+      moveNode(nodeId, x, y);
+    }
+  }, [moveNode, currentWorkflow]);
 
   const handleOutputPress = useCallback((nodeId: string) => {
     setConnectingFrom(nodeId);
@@ -98,12 +105,12 @@ export default function Canvas({
   }, []);
 
   const handleInputPress = useCallback((nodeId: string) => {
-    if (connectingFrom && connectingFrom !== nodeId) {
+    if (connectingFrom && connectingFrom !== nodeId && currentWorkflow) {
       const fromNode = nodes.find(n => n.id === connectingFrom);
       const toNode = nodes.find(n => n.id === nodeId);
 
       if (fromNode && toNode) {
-        if (fromNode.outputType === toNode.inputType) {
+        if (validateConnection(fromNode, toNode)) {
           addConnection(connectingFrom, nodeId);
           setConnectionValidation({
             valid: true,
@@ -132,7 +139,7 @@ export default function Canvas({
     }
     setConnectingFrom(null);
     setTimeout(() => setConnectionValidation(null), 3000);
-  }, [connectingFrom, nodes, addConnection]);
+  }, [connectingFrom, nodes, addConnection, validateConnection, currentWorkflow]);
 
   const getNodePosition = useCallback((nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
@@ -157,47 +164,102 @@ export default function Canvas({
     };
   }, [nodes]);
 
+  const renderNodes = useCallback(() => {
+    return nodes.map((node) => (
+      <Node
+        key={node.id}
+        node={node}
+        isSelected={selectedNodeId === node.id}
+        onSelect={() => onNodeSelect(node.id)}
+        onDragEnd={(x, y) => handleNodeDragEnd(node.id, x, y)}
+        onOutputPress={() => handleOutputPress(node.id)}
+        onInputPress={() => handleInputPress(node.id)}
+        isConnectingFrom={connectingFrom === node.id}
+      />
+    ));
+  }, [
+    nodes,
+    selectedNodeId,
+    onNodeSelect,
+    handleNodeDragEnd,
+    handleOutputPress,
+    handleInputPress,
+    connectingFrom
+  ]);
+
+  const renderConnections = useCallback(() => {
+    return connections.map((connection, index) => {
+      const { start, end } = getConnectionPoints(connection.from, connection.to);
+
+      return (
+        <Line
+          key={`${connection.from}-${connection.to}-${index}`}
+          x1={start.x}
+          y1={start.y}
+          x2={end.x}
+          y2={end.y}
+          stroke={theme.colors.primary}
+          strokeWidth="2"
+        />
+      );
+    });
+  }, [connections, getConnectionPoints, theme.colors.primary]);
+
+  const renderConnectionPreview = useCallback(() => {
+    if (!connectingFrom) return null;
+
+    const fromNode = nodes.find(n => n.id === connectingFrom);
+    if (!fromNode) return null;
+
+    // Get the current touch position (this would need to be tracked separately)
+    // For now, we'll just show a line from the output port to the center
+    const startX = fromNode.x + 75;
+    const startY = fromNode.y + 50;
+
+    return (
+      <Line
+        x1={startX}
+        y1={startY}
+        x2={SCREEN_WIDTH / 2}
+        y2={SCREEN_HEIGHT / 2}
+        stroke={connectionValidation?.valid ? theme.colors.primary : theme.colors.error}
+        strokeWidth="2"
+        strokeDasharray="5,5"
+      />
+    );
+  }, [connectingFrom, nodes, connectionValidation, theme.colors]);
+
   return (
     <View style={styles.container}>
       <GestureDetector gesture={composed}>
         <Animated.View style={[styles.canvas, animatedStyle]}>
           <Svg style={StyleSheet.absoluteFill}>
-            {connections.map((connection) => {
-              const { start, end } = getConnectionPoints(connection.from, connection.to);
-              return (
-                <Line
-                  key={`${connection.from}-${connection.to}`}
-                  x1={start.x}
-                  y1={start.y}
-                  x2={end.x}
-                  y2={end.y}
-                  stroke={theme.colors.primary}
-                  strokeWidth={2}
-                />
-              );
-            })}
+            {renderConnections()}
+            {renderConnectionPreview()}
           </Svg>
-
-          {nodes.map((node) => (
-            <Node
-              key={node.id}
-              node={node}
-              isSelected={node.id === selectedNodeId}
-              onSelect={() => onNodeSelect(node.id)}
-              onDragEnd={handleNodeDragEnd}
-              onOutputPress={handleOutputPress}
-              onInputPress={handleInputPress}
-            />
-          ))}
+          {renderNodes()}
         </Animated.View>
       </GestureDetector>
 
       {connectionValidation && (
         <View style={[
           styles.validationMessage,
-          connectionValidation.valid ? styles.valid : styles.invalid
+          {
+            backgroundColor: connectionValidation.valid
+              ? theme.colors.primaryContainer
+              : theme.colors.errorContainer
+          }
         ]}>
-          <Text style={styles.validationText}>{connectionValidation.message}</Text>
+          <Text style={[
+            styles.validationText,
+            {
+              color: connectionValidation.valid
+                ? theme.colors.onPrimaryContainer
+                : theme.colors.onErrorContainer
+            }
+          ]}>
+            {connectionValidation.message}
+          </Text>
         </View>
       )}
     </View>
@@ -210,29 +272,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   canvas: {
-    width: SCREEN_WIDTH * 3,
-    height: SCREEN_HEIGHT * 3,
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    flex: 1,
+    width: SCREEN_WIDTH * 2,
+    height: SCREEN_HEIGHT * 2,
   },
   validationMessage: {
     position: 'absolute',
     bottom: 20,
     left: 20,
     right: 20,
-    padding: 10,
-    borderRadius: 5,
+    padding: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
-  valid: {
-    backgroundColor: 'rgba(76, 175, 80, 0.8)',
-  },
-  invalid: {
-    backgroundColor: 'rgba(244, 67, 54, 0.8)',
-  },
   validationText: {
-    color: 'white',
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

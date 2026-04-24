@@ -48,6 +48,7 @@ interface WorkflowState {
   addConnection: (from: string, to: string) => void;
   deleteConnection: (from: string, to: string) => void;
   selectNode: (nodeId: string | null) => void;
+  validateConnection: (fromNode: NodeData, toNode: NodeData) => boolean;
 }
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -176,10 +177,7 @@ export const useWorkflowStore = create<WorkflowState>()(
         set((state) => {
           if (!state.currentWorkflow) return state;
 
-          // Remove the node
           const updatedNodes = state.currentWorkflow.nodes.filter(node => node.id !== nodeId);
-
-          // Remove any connections involving this node
           const updatedConnections = state.currentWorkflow.connections.filter(
             conn => conn.from !== nodeId && conn.to !== nodeId
           );
@@ -231,9 +229,11 @@ export const useWorkflowStore = create<WorkflowState>()(
 
           if (connectionExists) return state;
 
+          const updatedConnections = [...state.currentWorkflow.connections, { from, to }];
+
           const updatedWorkflow = {
             ...state.currentWorkflow,
-            connections: [...state.currentWorkflow.connections, { from, to }],
+            connections: updatedConnections,
           };
 
           get().updateWorkflow(updatedWorkflow);
@@ -267,6 +267,16 @@ export const useWorkflowStore = create<WorkflowState>()(
 
       selectNode: (nodeId: string | null) => {
         set({ selectedNodeId: nodeId });
+      },
+
+      validateConnection: (fromNode: NodeData, toNode: NodeData) => {
+        // Check if output type matches input type
+        if (fromNode.outputType && toNode.inputType) {
+          return fromNode.outputType === toNode.inputType;
+        }
+
+        // If no type specified, allow connection
+        return true;
       },
     }),
     {
