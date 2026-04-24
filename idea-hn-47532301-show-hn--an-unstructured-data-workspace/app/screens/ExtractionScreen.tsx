@@ -14,12 +14,15 @@ const ExtractionScreen = () => {
   useEffect(() => {
     const processData = async () => {
       if (audio) {
-        // Handle audio data
-        const uri = FileSystem.documentDirectory + 'recording.m4a';
-        await FileSystem.writeAsStringAsync(uri, audio, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        setAudioUri(uri);
+        try {
+          const uri = FileSystem.documentDirectory + 'recording.m4a';
+          await FileSystem.writeAsStringAsync(uri, audio, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          setAudioUri(uri);
+        } catch (error) {
+          console.error('Audio processing error:', error);
+        }
       }
 
       await extractData({ text, audio, image });
@@ -27,6 +30,10 @@ const ExtractionScreen = () => {
 
     processData();
   }, [text, audio, image]);
+
+  const handleRetry = async () => {
+    await extractData({ text, audio, image });
+  };
 
   if (isLoading) {
     return (
@@ -41,9 +48,18 @@ const ExtractionScreen = () => {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>{result.error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={() => extractData({ text, audio, image })}>
+        <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
+      </View>
+    );
+  }
+
+  if (!result) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2196F3" />
+        <Text style={styles.loadingText}>Preparing your data...</Text>
       </View>
     );
   }
@@ -59,7 +75,7 @@ const ExtractionScreen = () => {
         </View>
       )}
 
-      {result?.entities && result.entities.length > 0 ? (
+      {result.entities && result.entities.length > 0 ? (
         <View style={styles.entitiesContainer}>
           <Text style={styles.sectionTitle}>Entities Found:</Text>
           {result.entities.map((entity, index) => (
@@ -73,7 +89,7 @@ const ExtractionScreen = () => {
         <Text style={styles.noDataText}>No entities found in the data.</Text>
       )}
 
-      {result?.summary && (
+      {result.summary && (
         <View style={styles.summaryContainer}>
           <Text style={styles.sectionTitle}>Summary:</Text>
           <Text style={styles.summaryText}>{result.summary}</Text>
@@ -88,26 +104,30 @@ const AudioPlayer = ({ uri }: { uri: string }) => {
   const [isPlaying, setIsPlaying] = useState(false);
 
   const playSound = async () => {
-    if (!sound) {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true }
-      );
-      setSound(newSound);
-      setIsPlaying(true);
+    try {
+      if (!sound) {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: true }
+        );
+        setSound(newSound);
+        setIsPlaying(true);
 
-      newSound.setOnPlaybackStatusUpdate(status => {
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-        }
-      });
-    } else {
-      if (isPlaying) {
-        await sound.pauseAsync();
+        newSound.setOnPlaybackStatusUpdate(status => {
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+          }
+        });
       } else {
-        await sound.playAsync();
+        if (isPlaying) {
+          await sound.pauseAsync();
+        } else {
+          await sound.playAsync();
+        }
+        setIsPlaying(!isPlaying);
       }
-      setIsPlaying(!isPlaying);
+    } catch (error) {
+      console.error('Audio playback error:', error);
     }
   };
 
@@ -143,6 +163,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: '#666',
+    fontSize: 16,
   },
   errorContainer: {
     flex: 1,
@@ -158,12 +179,14 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     backgroundColor: '#2196F3',
-    padding: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
   },
   retryButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   title: {
     fontSize: 24,
@@ -190,6 +213,7 @@ const styles = StyleSheet.create({
   audioButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   entitiesContainer: {
     marginBottom: 20,
@@ -202,23 +226,25 @@ const styles = StyleSheet.create({
   },
   entityType: {
     fontWeight: 'bold',
-    color: '#555',
+    color: '#2196F3',
     marginBottom: 4,
   },
   entityValue: {
     color: '#333',
   },
+  noDataText: {
+    color: '#666',
+    fontSize: 16,
+    textAlign: 'center',
+    marginVertical: 20,
+  },
   summaryContainer: {
     marginBottom: 20,
   },
   summaryText: {
+    fontSize: 16,
+    lineHeight: 24,
     color: '#333',
-    lineHeight: 22,
-  },
-  noDataText: {
-    color: '#666',
-    fontStyle: 'italic',
-    marginTop: 10,
   },
 });
 

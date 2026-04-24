@@ -28,8 +28,8 @@ export const useExtraction = () => {
         textToProcess = await extractTextFromImage(input.image);
       }
 
-      if (!textToProcess) {
-        throw new Error('No valid input provided');
+      if (!textToProcess || textToProcess.trim().length === 0) {
+        throw new Error('No valid text content found in the input');
       }
 
       const llmResult = await extractWithLLM(textToProcess);

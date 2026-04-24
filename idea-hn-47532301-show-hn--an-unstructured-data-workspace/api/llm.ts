@@ -39,6 +39,6 @@ export const extractWithLLM = async (text: string): Promise<LLMResponse> => {
     return JSON.parse(content);
   } catch (error) {
     console.error('LLM API error:', error);
-    throw error;
+    throw new Error('Failed to process text with LLM service');
   }
 };

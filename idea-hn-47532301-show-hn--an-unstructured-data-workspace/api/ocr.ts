@@ -2,7 +2,7 @@ import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { createWorker } from 'tesseract.js';
 
-export const processImageWithOCR = async (imageUri: string): Promise<string> => {
+export const extractTextFromImage = async (imageUri: string): Promise<string> => {
   try {
     // Preprocess the image for better OCR results
     const processedImage = await preprocessImage(imageUri);
@@ -17,10 +17,14 @@ export const processImageWithOCR = async (imageUri: string): Promise<string> => 
     // Clean up temporary files
     await FileSystem.deleteAsync(processedImage.uri, { idempotent: true });
 
+    if (!text || text.trim().length === 0) {
+      throw new Error('No text found in the image');
+    }
+
     return text;
   } catch (error) {
     console.error('OCR processing failed:', error);
-    throw error;
+    throw new Error('Failed to extract text from image');
   }
 };
 
