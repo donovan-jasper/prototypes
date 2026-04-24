@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    marginTop: 8,
+    marginBottom: 20,
   },
   picker: {
     height: 50,
@@ -175,7 +175,7 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 30,
+    marginTop: 20,
   },
   saveButtonText: {
     color: 'white',

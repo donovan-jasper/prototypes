@@ -9,7 +9,7 @@ interface SmartPasteButtonProps {
 }
 
 export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
-  const handlePaste = async () => {
+  const handleSmartPaste = async () => {
     try {
       const clipboardText = await Clipboard.getStringAsync();
 
@@ -21,19 +21,21 @@ export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
       const parsed = parseTicketFromText(clipboardText);
       onParsed(parsed);
 
-      let message = 'Parsed information:\n';
+      // Show confirmation
+      let message = 'Smart paste successful!\n';
       if (parsed.company) message += `Company: ${parsed.company.value}\n`;
       if (parsed.ticketId) message += `Ticket ID: ${parsed.ticketId.value}\n`;
-      if (parsed.submittedAt) message += `Date: ${parsed.submittedAt.value.toLocaleDateString()}\n`;
+      if (parsed.submittedAt) message += `Date: ${parsed.submittedAt.value.toLocaleDateString()}`;
 
-      Alert.alert('Smart Paste', message);
+      Alert.alert('Success', message);
     } catch (error) {
       Alert.alert('Error', 'Failed to parse clipboard content');
+      console.error('Smart paste error:', error);
     }
   };
 
   return (
-    <TouchableOpacity style={styles.button} onPress={handlePaste}>
+    <TouchableOpacity style={styles.button} onPress={handleSmartPaste}>
       <Text style={styles.buttonText}>Smart Paste</Text>
     </TouchableOpacity>
   );

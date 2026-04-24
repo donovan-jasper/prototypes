@@ -91,11 +91,6 @@ const TICKET_ID_PATTERNS = [
   /(?:ref|reference)\s*#?([A-Z0-9\-]+)/i
 ];
 
-interface ParsedField<T> {
-  value: T;
-  confidence: number;
-}
-
 export function parseTicketFromText(text: string): ParsedTicket {
   const result: ParsedTicket = {};
   const lowerText = text.toLowerCase();
@@ -166,65 +161,57 @@ export function parseTicketFromText(text: string): ParsedTicket {
             // Handle "2 days earlier" as 2 days ago
             if (unit.includes('day')) {
               now.setDate(now.getDate() - value);
-            } else if (unit.includes('week')) {
-              now.setDate(now.getDate() - value * 7);
+              date = now;
             }
-            date = now;
           }
         }
-        // Handle absolute dates
-        else if (match[1] && match[2] && match[3]) {
-          const month = match[1];
-          const day = match[2];
-          const year = match[3];
 
-          // Handle month names
-          if (isNaN(parseInt(month))) {
+        // Handle absolute dates
+        if (!date) {
+          // Try to parse as MM/DD/YYYY or similar
+          if (match[1] && match[2] && match[3]) {
+            const month = parseInt(match[1]);
+            const day = parseInt(match[2]);
+            const year = parseInt(match[3]) > 1000 ? parseInt(match[3]) : parseInt(match[3]) + 2000;
+
+            date = new Date(year, month - 1, day);
+          }
+
+          // Handle month name formats
+          if (match[4] && match[5] && match[6]) {
             const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
                                'july', 'august', 'september', 'october', 'november', 'december'];
-            const monthIndex = monthNames.indexOf(month.toLowerCase());
-            if (monthIndex !== -1) {
-              date = new Date(parseInt(year), monthIndex, parseInt(day));
-            }
-          } else {
-            // Handle numeric dates (MM/DD/YYYY or DD/MM/YYYY)
-            const dayNum = parseInt(day);
-            const monthNum = parseInt(month);
-            const yearNum = parseInt(year);
+            const monthIndex = monthNames.indexOf(match[4].toLowerCase());
+            const day = parseInt(match[5]);
+            const year = parseInt(match[6]);
 
-            // Check if it's likely MM/DD/YYYY (month first)
-            if (monthNum > 12 && dayNum <= 12) {
-              date = new Date(yearNum, dayNum - 1, monthNum);
-            } else {
-              date = new Date(yearNum, monthNum - 1, dayNum);
+            date = new Date(year, monthIndex, day);
+          }
+
+          // Handle today/yesterday/tomorrow
+          if (match[7]) {
+            const now = new Date();
+            if (match[7].toLowerCase() === 'today') {
+              date = now;
+            } else if (match[7].toLowerCase() === 'yesterday') {
+              now.setDate(now.getDate() - 1);
+              date = now;
+            } else if (match[7].toLowerCase() === 'tomorrow') {
+              now.setDate(now.getDate() + 1);
+              date = now;
             }
           }
         }
-        // Handle today/yesterday/tomorrow
-        else if (match[0]) {
-          const now = new Date();
-          const lowerMatch = match[0].toLowerCase();
 
-          if (lowerMatch.includes('today')) {
-            date = now;
-          } else if (lowerMatch.includes('yesterday')) {
-            now.setDate(now.getDate() - 1);
-            date = now;
-          } else if (lowerMatch.includes('tomorrow')) {
-            now.setDate(now.getDate() + 1);
-            date = now;
-          }
-        }
-
-        if (date) {
+        // Validate date
+        if (date && !isNaN(date.getTime())) {
           result.submittedAt = {
             value: date,
             confidence: 0.8
           };
-          break;
         }
       } catch (e) {
-        console.log('Date parsing error:', e);
+        console.error('Error parsing date:', e);
       }
     }
   }
