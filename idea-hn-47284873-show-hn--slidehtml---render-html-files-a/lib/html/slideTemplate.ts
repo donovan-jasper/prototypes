@@ -1,59 +1,25 @@
-export interface SlideTheme {
-  name: string;
-  background: string;
-  textColor: string;
-  accentColor: string;
-  fontFamily: string;
+import { themes } from './themes';
+
+interface SlideTemplateOptions {
+  theme?: string;
+  aspectRatio?: string;
+  fontFamily?: string;
 }
 
-export const themes: Record<string, SlideTheme> = {
-  minimal: {
-    name: 'Minimal',
-    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    textColor: '#ffffff',
-    accentColor: '#ffd700',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
-  },
-  corporate: {
-    name: 'Corporate',
-    background: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)',
-    textColor: '#ffffff',
-    accentColor: '#00d4ff',
-    fontFamily: 'Georgia, "Times New Roman", serif',
-  },
-  modern: {
-    name: 'Modern',
-    background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
-    textColor: '#ffffff',
-    accentColor: '#ffeb3b',
-    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
-  },
-  dark: {
-    name: 'Dark',
-    background: 'linear-gradient(135deg, #232526 0%, #414345 100%)',
-    textColor: '#ffffff',
-    accentColor: '#00ff88',
-    fontFamily: '"Courier New", Courier, monospace',
-  },
-  light: {
-    name: 'Light',
-    background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
-    textColor: '#333333',
-    accentColor: '#ff6b6b',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif',
-  },
-};
-
-export function createSlideHTML(slideContents: string[], themeName: string = 'minimal'): string {
+export function createSlideHTML(
+  slideContents: string[],
+  themeName: string = 'minimal',
+  options: SlideTemplateOptions = {}
+): string {
   const theme = themes[themeName] || themes.minimal;
-  
-  const slides = slideContents.map(content => `
-    <div class="slide">
-      <div class="slide-content">
-        ${content}
-      </div>
+  const aspectRatio = options.aspectRatio || '16/9';
+  const fontFamily = options.fontFamily || theme.fontFamily;
+
+  const slideHTML = slideContents.map((content, index) => `
+    <div class="slide" data-slide-index="${index}">
+      ${content}
     </div>
-  `).join('\n');
+  `).join('');
 
   return `
 <!DOCTYPE html>
@@ -61,129 +27,222 @@ export function createSlideHTML(slideContents: string[], themeName: string = 'mi
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SlideFlow Presentation</title>
   <style>
+    :root {
+      --primary-color: ${theme.colors.primary};
+      --secondary-color: ${theme.colors.secondary};
+      --text-color: ${theme.colors.text};
+      --background-color: ${theme.colors.background};
+      --heading-color: ${theme.colors.heading};
+      --font-family: ${fontFamily};
+    }
+
     * {
+      box-sizing: border-box;
       margin: 0;
       padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family);
+      color: var(--text-color);
+      background-color: var(--background-color);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+    }
+
+    .slide-container {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .slide {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 40px;
+      background-color: var(--background-color);
+      overflow: hidden;
+      aspect-ratio: ${aspectRatio};
+      margin: auto;
       box-sizing: border-box;
     }
-    
-    body {
-      font-family: ${theme.fontFamily};
-      background: #000;
-      overflow: hidden;
+
+    .slide h1 {
+      font-size: 2.5rem;
+      color: var(--heading-color);
+      margin-bottom: 20px;
+      text-align: center;
+      font-weight: 700;
     }
-    
-    .slide {
-      display: none;
-      width: 100vw;
-      height: 100vh;
-      background: ${theme.background};
-      align-items: center;
-      justify-content: center;
-      padding: 40px;
+
+    .slide h2 {
+      font-size: 2rem;
+      color: var(--heading-color);
+      margin-bottom: 15px;
+      text-align: center;
+      font-weight: 600;
     }
-    
-    .slide:first-child {
-      display: flex;
+
+    .slide h3 {
+      font-size: 1.5rem;
+      color: var(--heading-color);
+      margin-bottom: 10px;
+      font-weight: 500;
     }
-    
-    .slide-content {
-      max-width: 900px;
-      width: 100%;
-      color: ${theme.textColor};
+
+    .slide p {
+      font-size: 1.2rem;
+      line-height: 1.5;
+      margin-bottom: 15px;
+      max-width: 800px;
       text-align: center;
     }
-    
-    .slide-content h1 {
-      font-size: 3rem;
-      font-weight: 700;
-      margin-bottom: 1rem;
-      line-height: 1.2;
-      color: ${theme.textColor};
+
+    .slide ul {
+      font-size: 1.2rem;
+      line-height: 1.5;
+      max-width: 800px;
+      list-style-type: none;
+      padding-left: 0;
     }
-    
-    .slide-content h2 {
-      font-size: 2.5rem;
-      font-weight: 600;
-      margin-bottom: 1.5rem;
-      line-height: 1.3;
-      color: ${theme.textColor};
-    }
-    
-    .slide-content h3 {
-      font-size: 2rem;
-      font-weight: 500;
-      margin-bottom: 1rem;
-      color: ${theme.accentColor};
-    }
-    
-    .slide-content p {
-      font-size: 1.5rem;
-      line-height: 1.6;
-      margin-bottom: 1rem;
-      opacity: 0.95;
-    }
-    
-    .slide-content ul {
-      list-style: none;
-      text-align: left;
-      display: inline-block;
-      font-size: 1.5rem;
-    }
-    
-    .slide-content li {
-      margin-bottom: 1rem;
-      padding-left: 2rem;
+
+    .slide li {
+      margin-bottom: 10px;
       position: relative;
+      padding-left: 25px;
     }
-    
-    .slide-content li:before {
-      content: '•';
+
+    .slide li:before {
+      content: "•";
+      color: var(--primary-color);
       position: absolute;
       left: 0;
-      font-size: 2rem;
-      line-height: 1.5rem;
-      color: ${theme.accentColor};
+      font-size: 1.5rem;
     }
-    
-    .slide-content strong {
-      color: ${theme.accentColor};
-      font-weight: 700;
+
+    .slide strong {
+      color: var(--primary-color);
+      font-weight: 600;
     }
-    
-    .slide-content em {
-      font-style: italic;
-      opacity: 0.9;
+
+    .slide img {
+      max-width: 100%;
+      max-height: 60vh;
+      object-fit: contain;
+      margin: 20px 0;
     }
-    
-    @media (max-width: 768px) {
-      .slide {
-        padding: 20px;
-      }
-      
-      .slide-content h1 {
-        font-size: 2rem;
-      }
-      
-      .slide-content h2 {
-        font-size: 1.75rem;
-      }
-      
-      .slide-content h3 {
-        font-size: 1.5rem;
-      }
-      
-      .slide-content p,
-      .slide-content ul {
-        font-size: 1.25rem;
-      }
+
+    .slide .content-wrapper {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
     }
+
+    .slide .title-section {
+      margin-bottom: 30px;
+    }
+
+    .slide .body-section {
+      flex-grow: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .slide .footer {
+      font-size: 0.8rem;
+      color: var(--secondary-color);
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    /* Theme-specific styles */
+    ${theme.styles || ''}
   </style>
 </head>
 <body>
-  ${slides}
+  <div class="slide-container">
+    ${slideHTML}
+  </div>
+
+  <script>
+    // Initialize slides
+    const slides = document.querySelectorAll('.slide');
+    let currentIndex = 0;
+
+    // Show first slide
+    if (slides.length > 0) {
+      slides[0].style.display = 'flex';
+    }
+
+    // Handle touch events for swipe navigation
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    document.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, false);
+
+    document.addEventListener('touchend', (e) => {
+      touchEndX = e.changedTouches[0].screenX;
+      handleSwipe();
+    }, false);
+
+    function handleSwipe() {
+      if (touchEndX < touchStartX - 50) {
+        // Swipe left - next slide
+        if (currentIndex < slides.length - 1) {
+          slides[currentIndex].style.display = 'none';
+          currentIndex++;
+          slides[currentIndex].style.display = 'flex';
+        }
+      }
+
+      if (touchEndX > touchStartX + 50) {
+        // Swipe right - previous slide
+        if (currentIndex > 0) {
+          slides[currentIndex].style.display = 'none';
+          currentIndex--;
+          slides[currentIndex].style.display = 'flex';
+        }
+      }
+    }
+
+    // Handle keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') {
+        if (currentIndex < slides.length - 1) {
+          slides[currentIndex].style.display = 'none';
+          currentIndex++;
+          slides[currentIndex].style.display = 'flex';
+        }
+      } else if (e.key === 'ArrowLeft') {
+        if (currentIndex > 0) {
+          slides[currentIndex].style.display = 'none';
+          currentIndex--;
+          slides[currentIndex].style.display = 'flex';
+        }
+      }
+    });
+  </script>
 </body>
 </html>
-  `.trim();
+  `;
 }

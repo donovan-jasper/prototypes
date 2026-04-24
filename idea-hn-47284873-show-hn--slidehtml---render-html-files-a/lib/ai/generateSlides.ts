@@ -2,34 +2,13 @@ import Anthropic from '@anthropic-ai/sdk';
 import { createSlideHTML } from '../html/slideTemplate';
 import { getSettings } from '../db/queries';
 import { findBestTemplate } from './demoTemplates';
+import { SYSTEM_PROMPT } from './promptTemplates';
 
 interface GenerateSlidesResult {
   html: string;
   slideCount: number;
   isDemo?: boolean;
 }
-
-const SYSTEM_PROMPT = `You are an expert presentation designer. Generate slide content as an array of HTML strings based on the user's prompt.
-
-Rules:
-1. Return ONLY a valid JSON array of HTML strings, nothing else
-2. Each array element is the content for ONE slide
-3. Use semantic HTML: <h1> for titles, <h2> for subtitles, <h3> for section headers, <p> for body text, <ul>/<li> for lists
-4. Keep content concise - slides should be scannable, not text-heavy
-5. Use <strong> for emphasis and key terms
-6. Aim for 3-7 slides depending on topic complexity
-7. First slide should be a title slide with main topic
-8. Last slide should be a conclusion or call-to-action
-9. Middle slides should cover key points with clear hierarchy
-
-Example output format:
-[
-  "<h1>Main Title</h1><p>Subtitle or tagline</p>",
-  "<h2>Key Point 1</h2><ul><li>Supporting detail</li><li>Another detail</li></ul>",
-  "<h2>Conclusion</h2><p>Final thoughts</p>"
-]
-
-Do NOT include any markdown, explanations, or text outside the JSON array.`;
 
 export async function generateSlides(
   prompt: string,
