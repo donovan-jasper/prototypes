@@ -177,21 +177,38 @@ class DigitalWellbeingAPI {
     }
 
     try {
-      console.log('[DigitalWellbeingAPI] Updating content filter');
+      console.log('[DigitalWellbeingAPI] Updating content filter rules');
 
-      const success = await NativeModules.DigitalWellbeingModule.updateContentFilter(config);
+      const success = await NativeModules.DigitalWellbeingModule.updateContentFilter({
+        profileType: config.profileType,
+        blockAdultContent: config.blockAdultContent,
+        blockExplicitContent: config.blockExplicitContent,
+        allowedDomains: config.allowedDomains || [],
+        blockedDomains: config.blockedDomains || [],
+        restrictWebSearch: config.restrictWebSearch,
+        restrictAssistant: config.restrictAssistant
+      });
 
       if (success) {
-        console.log('[DigitalWellbeingAPI] Content filter updated successfully');
-        console.log('[DigitalWellbeingAPI] Updated configuration:', config);
+        console.log('[DigitalWellbeingAPI] Content filter rules updated successfully');
+        console.log('[DigitalWellbeingAPI] Updated configuration:', {
+          profileType: config.profileType,
+          blockAdultContent: config.blockAdultContent,
+          blockExplicitContent: config.blockExplicitContent,
+          allowedDomainsCount: config.allowedDomains?.length || 0,
+          blockedDomainsCount: config.blockedDomains?.length || 0,
+          restrictWebSearch: config.restrictWebSearch,
+          restrictAssistant: config.restrictAssistant
+        });
       }
 
       return success;
     } catch (error) {
-      console.error('[DigitalWellbeingAPI] Error updating content filter:', error);
+      console.error('[DigitalWellbeingAPI] Error updating content filter rules:', error);
       return false;
     }
   }
 }
 
+// Singleton instance
 export const digitalWellbeingAPI = new DigitalWellbeingAPI();
