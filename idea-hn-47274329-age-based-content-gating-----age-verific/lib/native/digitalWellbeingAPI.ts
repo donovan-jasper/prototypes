@@ -19,7 +19,7 @@ export interface ContentFilterConfig {
   allowedDomains?: string[];
   blockedDomains?: string[];
   restrictWebSearch: boolean;
-  restrictAssistant: boolean;
+  restrictSiri: boolean;
 }
 
 class DigitalWellbeingAPI {
@@ -107,7 +107,7 @@ class DigitalWellbeingAPI {
         allowedDomains: config.allowedDomains || [],
         blockedDomains: config.blockedDomains || [],
         restrictWebSearch: config.restrictWebSearch,
-        restrictAssistant: config.restrictAssistant
+        restrictSiri: config.restrictSiri
       });
 
       if (success) {
@@ -120,7 +120,7 @@ class DigitalWellbeingAPI {
           allowedDomainsCount: config.allowedDomains?.length || 0,
           blockedDomainsCount: config.blockedDomains?.length || 0,
           restrictWebSearch: config.restrictWebSearch,
-          restrictAssistant: config.restrictAssistant
+          restrictSiri: config.restrictSiri
         });
       }
 
@@ -186,14 +186,12 @@ class DigitalWellbeingAPI {
         allowedDomains: config.allowedDomains,
         blockedDomains: config.blockedDomains,
         restrictWebSearch: config.restrictWebSearch,
-        restrictAssistant: config.restrictAssistant
+        restrictSiri: config.restrictSiri
       });
 
-      if (success) {
+      if (success && config.profileType) {
+        this.currentProfile = config.profileType;
         console.log('[DigitalWellbeingAPI] Content filter updated successfully');
-        if (config.profileType) {
-          this.currentProfile = config.profileType;
-        }
       }
 
       return success;

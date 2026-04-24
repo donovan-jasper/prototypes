@@ -189,11 +189,9 @@ class ScreenTimeAPI {
         restrictSiri: config.restrictSiri
       });
 
-      if (success) {
+      if (success && config.profileType) {
+        this.currentProfile = config.profileType;
         console.log('[ScreenTimeAPI] Content filter updated successfully');
-        if (config.profileType) {
-          this.currentProfile = config.profileType;
-        }
       }
 
       return success;

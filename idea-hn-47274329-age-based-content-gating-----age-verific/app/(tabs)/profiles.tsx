@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,10 +9,15 @@ import {
   Modal,
   TextInput,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useStore, ChildProfile } from '@/lib/store/useStore';
 import { AgeProfileCard } from '@/components/AgeProfileCard';
+import { ParentPinModal } from '@/components/ParentPinModal';
+import { applyProfileFilter } from '@/lib/filtering/contentFilter';
+import { screenTimeAPI } from '@/lib/native/screenTimeAPI';
+import { digitalWellbeingAPI } from '@/lib/native/digitalWellbeingAPI';
 
 type ProfileType = 'toddler' | 'kid' | 'teen' | 'adult';
 
@@ -23,7 +28,7 @@ interface ProfileFormData {
 }
 
 export default function ProfilesScreen() {
-  const { profiles, addProfile, updateProfile, removeProfile } = useStore();
+  const { profiles, addProfile, updateProfile, removeProfile, activeProfile, setActiveProfile } = useStore();
   const [modalVisible, setModalVisible] = useState(false);
   const [editingProfile, setEditingProfile] = useState<ChildProfile | null>(null);
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
@@ -32,6 +37,28 @@ export default function ProfilesScreen() {
     age: '',
     profileType: 'kid',
   });
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState<{ available: boolean; enabled: boolean } | null>(null);
+
+  useEffect(() => {
+    checkApiStatus();
+  }, []);
+
+  const checkApiStatus = async () => {
+    try {
+      if (Platform.OS === 'ios') {
+        const status = await screenTimeAPI.getStatus();
+        setApiStatus(status);
+      } else if (Platform.OS === 'android') {
+        const status = await digitalWellbeingAPI.getStatus();
+        setApiStatus(status);
+      }
+    } catch (error) {
+      console.error('Error checking API status:', error);
+      setApiStatus({ available: false, enabled: false });
+    }
+  };
 
   const handleAddProfile = () => {
     setEditingProfile(null);
@@ -104,7 +131,30 @@ export default function ProfilesScreen() {
     setSelectedProfileId(selectedProfileId === profileId ? null : profileId);
   };
 
+  const handleActivateProfile = async (profile: ChildProfile) => {
+    setIsLoading(true);
+    try {
+      // Verify parent authentication
+      setPinModalVisible(true);
+
+      // If authentication succeeds, apply the profile
+      const success = await applyProfileFilter(profile.profileType);
+      if (success) {
+        setActiveProfile(profile.id);
+        Alert.alert('Success', `Content filtering activated for ${profile.name}'s profile`);
+      } else {
+        Alert.alert('Error', 'Failed to activate content filtering. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error activating profile:', error);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const getBlockedContentForProfile = (profileId: string) => {
+    // In a real app, this would fetch from the database
     const mockData = [
       { url: 'example-adult-site.com', reason: 'Adult content', timestamp: Date.now() - 3600000 },
       { url: 'gambling-site.com', reason: 'Gambling', timestamp: Date.now() - 7200000 },
@@ -157,6 +207,17 @@ export default function ProfilesScreen() {
           <Text style={styles.subtitle}>Manage child profiles and restrictions</Text>
         </View>
 
+        {apiStatus && !apiStatus.available && (
+          <View style={styles.warningContainer}>
+            <Ionicons name="warning-outline" size={20} color="#FF9500" />
+            <Text style={styles.warningText}>
+              {Platform.OS === 'ios'
+                ? 'Screen Time API not available on this device'
+                : 'Digital Wellbeing API not available on this device'}
+            </Text>
+          </View>
+        )}
+
         <TouchableOpacity style={styles.addButton} onPress={handleAddProfile}>
           <Ionicons name="add-circle" size={24} color="#007AFF" />
           <Text style={styles.addButtonText}>Add Profile</Text>
@@ -166,62 +227,71 @@ export default function ProfilesScreen() {
           <View style={styles.emptyState}>
             <Ionicons name="people-outline" size={64} color="#C7C7CC" />
             <Text style={styles.emptyStateText}>No profiles yet</Text>
-            <Text style={styles.emptyStateSubtext}>Tap "Add Profile" to create your first child profile</Text>
+            <Text style={styles.emptyStateSubtext}>Add a profile to get started</Text>
           </View>
         ) : (
           <View style={styles.profilesList}>
             {profiles.map((profile) => (
-              <View key={profile.id} style={styles.profileItem}>
+              <View key={profile.id} style={styles.profileContainer}>
                 <AgeProfileCard
                   name={profile.name}
                   age={profile.age}
                   profileType={profile.profileType}
+                  isActive={profile.id === activeProfile}
                   onPress={() => handleProfilePress(profile.id)}
+                  onEdit={() => handleEditProfile(profile)}
+                  onDelete={() => handleDeleteProfile(profile)}
                 />
-                <View style={styles.profileActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => handleEditProfile(profile)}
-                  >
-                    <Ionicons name="create-outline" size={20} color="#007AFF" />
-                    <Text style={styles.actionButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDeleteProfile(profile)}
-                  >
-                    <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
-
                 {selectedProfileId === profile.id && (
-                  <View style={styles.profileDetail}>
+                  <View style={styles.profileDetails}>
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailTitle}>Current Restrictions</Text>
+                      <Text style={styles.sectionTitle}>Restrictions</Text>
                       {getRestrictionsForProfile(profile.profileType).map((restriction, index) => (
                         <View key={index} style={styles.restrictionItem}>
-                          <Ionicons name="shield-checkmark" size={16} color="#34C759" />
+                          <Ionicons name="checkmark-circle" size={16} color="#34C759" />
                           <Text style={styles.restrictionText}>{restriction}</Text>
                         </View>
                       ))}
                     </View>
 
                     <View style={styles.detailSection}>
-                      <Text style={styles.detailTitle}>Recent Activity (Last 7 Days)</Text>
+                      <Text style={styles.sectionTitle}>Recent Blocks</Text>
                       {getBlockedContentForProfile(profile.id).map((item, index) => (
-                        <View key={index} style={styles.activityItem}>
-                          <View style={styles.activityHeader}>
-                            <Ionicons name="ban" size={16} color="#FF3B30" />
-                            <Text style={styles.activityUrl}>{item.url}</Text>
+                        <View key={index} style={styles.blockedItem}>
+                          <View style={styles.blockedItemHeader}>
+                            <Text style={styles.blockedUrl}>{item.url}</Text>
+                            <Text style={styles.blockedReason}>{item.reason}</Text>
                           </View>
-                          <Text style={styles.activityReason}>{item.reason}</Text>
-                          <Text style={styles.activityTime}>
+                          <Text style={styles.blockedTime}>
                             {new Date(item.timestamp).toLocaleString()}
                           </Text>
                         </View>
                       ))}
                     </View>
+
+                    <TouchableOpacity
+                      style={[
+                        styles.activateButton,
+                        profile.id === activeProfile && styles.activeButton
+                      ]}
+                      onPress={() => handleActivateProfile(profile)}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Ionicons
+                            name={profile.id === activeProfile ? "checkmark-circle" : "shield-checkmark"}
+                            size={20}
+                            color="#FFFFFF"
+                          />
+                          <Text style={styles.activateButtonText}>
+                            {profile.id === activeProfile ? 'Active Profile' : 'Activate Profile'}
+                          </Text>
+                        </>
+                      )}
+                    </TouchableOpacity>
                   </View>
                 )}
               </View>
@@ -231,87 +301,85 @@ export default function ProfilesScreen() {
       </ScrollView>
 
       <Modal
-        visible={modalVisible}
         animationType="slide"
-        presentationStyle="pageSheet"
+        transparent={true}
+        visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalContainer}>
-          <View style={styles.modalHeader}>
-            <TouchableOpacity onPress={() => setModalVisible(false)}>
-              <Text style={styles.modalCancelButton}>Cancel</Text>
-            </TouchableOpacity>
+          <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {editingProfile ? 'Edit Profile' : 'Add Profile'}
+              {editingProfile ? 'Edit Profile' : 'Add New Profile'}
             </Text>
-            <TouchableOpacity onPress={handleSaveProfile}>
-              <Text style={styles.modalSaveButton}>Save</Text>
-            </TouchableOpacity>
-          </View>
 
-          <ScrollView style={styles.modalContent}>
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Name</Text>
+              <Text style={styles.label}>Name</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.input}
+                placeholder="Child's name"
                 value={formData.name}
                 onChangeText={(text) => setFormData({ ...formData, name: text })}
-                placeholder="Enter child's name"
-                placeholderTextColor="#C7C7CC"
+                autoCapitalize="words"
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Age</Text>
+              <Text style={styles.label}>Age</Text>
               <TextInput
-                style={styles.formInput}
+                style={styles.input}
+                placeholder="Age"
                 value={formData.age}
                 onChangeText={(text) => setFormData({ ...formData, age: text })}
-                placeholder="Enter age"
-                placeholderTextColor="#C7C7CC"
-                keyboardType="number-pad"
+                keyboardType="numeric"
               />
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Profile Type</Text>
-              <View style={styles.profileTypeGrid}>
+              <Text style={styles.label}>Profile Type</Text>
+              <View style={styles.profileTypeSelector}>
                 {(['toddler', 'kid', 'teen', 'adult'] as ProfileType[]).map((type) => (
                   <TouchableOpacity
                     key={type}
                     style={[
                       styles.profileTypeButton,
-                      formData.profileType === type && styles.profileTypeButtonActive,
+                      formData.profileType === type && styles.selectedProfileType
                     ]}
                     onPress={() => setFormData({ ...formData, profileType: type })}
                   >
-                    <Text
-                      style={[
-                        styles.profileTypeButtonText,
-                        formData.profileType === type && styles.profileTypeButtonTextActive,
-                      ]}
-                    >
-                      {type.charAt(0).toUpperCase() + type.slice(1)}
-                    </Text>
+                    <Text style={styles.profileTypeText}>{type.charAt(0).toUpperCase() + type.slice(1)}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
 
-            <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Restrictions Preview</Text>
-              <View style={styles.restrictionsPreview}>
-                {getRestrictionsForProfile(formData.profileType).map((restriction, index) => (
-                  <View key={index} style={styles.previewItem}>
-                    <Ionicons name="checkmark-circle" size={16} color="#34C759" />
-                    <Text style={styles.previewText}>{restriction}</Text>
-                  </View>
-                ))}
-              </View>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSaveProfile}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
             </View>
-          </ScrollView>
+          </View>
         </View>
       </Modal>
+
+      <ParentPinModal
+        visible={pinModalVisible}
+        onClose={() => setPinModalVisible(false)}
+        onSuccess={() => {
+          setPinModalVisible(false);
+          // Profile activation will continue after successful auth
+        }}
+        title="Parent Verification"
+        description="Please verify your identity to activate this profile"
+      />
     </View>
   );
 }
@@ -323,250 +391,220 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     padding: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
   },
   header: {
     marginBottom: 24,
   },
   title: {
-    fontSize: 34,
-    fontWeight: '700',
-    color: '#000000',
-    marginBottom: 4,
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 17,
     color: '#8E8E93',
+  },
+  warningContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF9E6',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  warningText: {
+    marginLeft: 8,
+    color: '#FF9500',
+    fontSize: 14,
   },
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
     padding: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   addButtonText: {
     fontSize: 17,
-    fontWeight: '600',
     color: '#007AFF',
     marginLeft: 8,
+    fontWeight: '500',
   },
   emptyState: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 48,
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
+    justifyContent: 'center',
+    padding: 32,
   },
   emptyStateText: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000000',
+    fontSize: 20,
+    fontWeight: '500',
+    color: '#1C1C1E',
     marginTop: 16,
-    marginBottom: 4,
   },
   emptyStateSubtext: {
     fontSize: 15,
     color: '#8E8E93',
-    textAlign: 'center',
+    marginTop: 8,
   },
   profilesList: {
-    gap: 16,
+    marginBottom: 24,
   },
-  profileItem: {
-    gap: 8,
+  profileContainer: {
+    marginBottom: 16,
   },
-  profileActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  deleteButton: {
-    backgroundColor: '#FFF5F5',
-  },
-  actionButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#007AFF',
-    marginLeft: 6,
-  },
-  deleteButtonText: {
-    color: '#FF3B30',
-  },
-  profileDetail: {
+  profileDetails: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
-    gap: 20,
+    marginTop: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
   detailSection: {
-    gap: 12,
+    marginBottom: 16,
   },
-  detailTitle: {
+  sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#000000',
-    marginBottom: 4,
+    color: '#1C1C1E',
+    marginBottom: 8,
   },
   restrictionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    marginBottom: 4,
   },
   restrictionText: {
     fontSize: 15,
-    color: '#000000',
-    flex: 1,
+    color: '#1C1C1E',
+    marginLeft: 8,
   },
-  activityItem: {
+  blockedItem: {
     backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
-    gap: 4,
+    marginBottom: 8,
   },
-  activityHeader: {
+  blockedItemHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  activityUrl: {
+  blockedUrl: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#000000',
-    flex: 1,
+    color: '#1C1C1E',
   },
-  activityReason: {
+  blockedReason: {
     fontSize: 13,
     color: '#FF3B30',
-    marginLeft: 24,
+    fontWeight: '500',
   },
-  activityTime: {
-    fontSize: 12,
+  blockedTime: {
+    fontSize: 13,
     color: '#8E8E93',
-    marginLeft: 24,
+  },
+  activateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  activeButton: {
+    backgroundColor: '#34C759',
+  },
+  activateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '500',
+    marginLeft: 8,
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: '#F2F2F7',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5EA',
-  },
-  modalCancelButton: {
-    fontSize: 17,
-    color: '#007AFF',
-  },
-  modalTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  modalSaveButton: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#007AFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
-    flex: 1,
-    padding: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 24,
+    width: '90%',
+    maxWidth: 400,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 24,
+    textAlign: 'center',
   },
   formGroup: {
-    marginBottom: 24,
+    marginBottom: 16,
   },
-  formLabel: {
+  label: {
     fontSize: 15,
     fontWeight: '500',
-    color: '#000000',
+    color: '#1C1C1E',
     marginBottom: 8,
   },
-  formInput: {
-    backgroundColor: '#FFFFFF',
+  input: {
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
     fontSize: 17,
-    color: '#000000',
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
   },
-  profileTypeGrid: {
+  profileTypeSelector: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    justifyContent: 'space-between',
   },
   profileTypeButton: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 16,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E5E5EA',
-  },
-  profileTypeButtonActive: {
-    borderColor: '#007AFF',
-    backgroundColor: '#E5F2FF',
-  },
-  profileTypeButtonText: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: '#8E8E93',
-  },
-  profileTypeButtonTextActive: {
-    color: '#007AFF',
-    fontWeight: '600',
-  },
-  restrictionsPreview: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
-    gap: 8,
-  },
-  previewItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  previewText: {
-    fontSize: 14,
-    color: '#000000',
     flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  selectedProfileType: {
+    backgroundColor: '#007AFF',
+  },
+  profileTypeText: {
+    fontSize: 15,
+    color: '#1C1C1E',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 24,
+  },
+  modalButton: {
+    padding: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+  },
+  cancelButton: {
+    backgroundColor: '#F2F2F7',
+  },
+  saveButton: {
+    backgroundColor: '#007AFF',
+  },
+  modalButtonText: {
+    fontSize: 17,
+    fontWeight: '500',
   },
 });

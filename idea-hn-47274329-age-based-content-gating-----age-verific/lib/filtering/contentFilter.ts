@@ -1,11 +1,54 @@
 import { getAgeProfile } from '../../constants/ageProfiles';
 import { adultDomains, violenceDomains, gamblingDomains, socialMediaDomains } from './blocklists';
 import { keywordBlocklist } from './blocklists';
+import { screenTimeAPI } from '../native/screenTimeAPI';
+import { digitalWellbeingAPI } from '../native/digitalWellbeingAPI';
 
 export interface FilterResult {
   blocked: boolean;
   reason?: 'domain_blocklist' | 'keyword' | 'image_analysis' | 'profile_restriction';
   matchedItem?: string;
+}
+
+export async function applyProfileFilter(profileType: string): Promise<boolean> {
+  const profile = getAgeProfile(profileType);
+  if (!profile) {
+    console.error('[ContentFilter] Invalid profile type:', profileType);
+    return false;
+  }
+
+  const config = {
+    profileType: profileType,
+    blockAdultContent: profile.blockAdultContent,
+    blockExplicitContent: profile.blockExplicitContent,
+    allowedDomains: profile.allowedDomains,
+    blockedDomains: profile.blockedDomains,
+    restrictWebSearch: profile.restrictWebSearch,
+    restrictSiri: profile.restrictSiri
+  };
+
+  try {
+    // Apply to native API based on platform
+    if (Platform.OS === 'ios') {
+      const success = await screenTimeAPI.enableContentFilter(config);
+      if (!success) {
+        console.error('[ContentFilter] Failed to enable Screen Time API');
+        return false;
+      }
+    } else if (Platform.OS === 'android') {
+      const success = await digitalWellbeingAPI.enableContentFilter(config);
+      if (!success) {
+        console.error('[ContentFilter] Failed to enable Digital Wellbeing API');
+        return false;
+      }
+    }
+
+    console.log('[ContentFilter] Successfully applied profile:', profileType);
+    return true;
+  } catch (error) {
+    console.error('[ContentFilter] Error applying profile filter:', error);
+    return false;
+  }
 }
 
 export function filterURL(url: string, profileType: string): FilterResult {
