@@ -185,7 +185,9 @@ const HomeScreen = () => {
               <Text style={[styles.itemTitle, item.pinned && styles.pinnedItem]}>
                 {item.title}
               </Text>
-              {item.pinned && <Ionicons name="pin" size={16} color="#FF9500" />}
+              {item.pinned && (
+                <Ionicons name="pin" size={16} color="#FF9500" style={styles.pinIcon} />
+              )}
             </View>
             <Text style={styles.itemBody}>{item.body}</Text>
             <View style={styles.itemFooter}>
@@ -203,9 +205,11 @@ const HomeScreen = () => {
       <View style={styles.header}>
         <Text style={styles.title}>SwipeClear</Text>
         <TouchableOpacity onPress={() => setShowArchived(!showArchived)}>
-          <Text style={styles.toggleText}>
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </Text>
+          <Ionicons
+            name={showArchived ? 'archive' : 'archive-outline'}
+            size={24}
+            color="#333"
+          />
         </TouchableOpacity>
       </View>
 
@@ -215,10 +219,10 @@ const HomeScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={48} color="#999" />
             <Text style={styles.emptyText}>
-              {showArchived ? 'No archived notifications' : 'No new notifications'}
+              {showArchived ? 'No archived items' : 'No new notifications'}
             </Text>
           </View>
         }
@@ -235,7 +239,7 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f8f8f8',
   },
   header: {
     flexDirection: 'row',
@@ -243,26 +247,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#eee',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
   },
-  toggleText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
   listContent: {
     paddingBottom: 80,
   },
   itemContainer: {
-    marginBottom: 8,
-    backgroundColor: 'white',
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 8,
-    marginHorizontal: 12,
-    overflow: 'hidden',
+    backgroundColor: 'white',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   itemContent: {
     padding: 16,
@@ -280,6 +284,9 @@ const styles = StyleSheet.create({
   },
   pinnedItem: {
     color: '#FF9500',
+  },
+  pinIcon: {
+    marginLeft: 8,
   },
   itemBody: {
     fontSize: 14,
@@ -299,7 +306,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#999',
   },
-  emptyContainer: {
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
