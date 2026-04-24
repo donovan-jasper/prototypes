@@ -1,125 +1,51 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import Svg, { Path, G, Circle, Text as SvgText } from 'react-native-svg';
-import { Component } from '@/lib/types';
+import { View } from 'react-native';
+import Svg, { Path, Circle } from 'react-native-svg';
 
 interface ConnectionLineProps {
-  from: Component;
-  to: Component;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
   status: 'compatible' | 'warning' | 'incompatible';
 }
 
 const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => {
-  const getColor = () => {
-    switch (status) {
-      case 'compatible':
-        return '#4caf50';
-      case 'warning':
-        return '#ff9800';
-      case 'incompatible':
-        return '#f44336';
-      default:
-        return '#000000';
-    }
-  };
+  // Calculate control points for a smooth curve
+  const midX = (from.x + to.x) / 2;
+  const controlPoint1 = { x: midX, y: from.y };
+  const controlPoint2 = { x: midX, y: to.y };
 
-  // Calculate positions based on component positions
-  const fromX = from.position?.x || 0;
-  const fromY = from.position?.y || 0;
-  const toX = to.position?.x || 0;
-  const toY = to.position?.y || 0;
+  // Determine line color based on status
+  const lineColor = status === 'compatible' ? '#4CAF50' :
+                   status === 'warning' ? '#FFC107' :
+                   '#FF5252';
 
-  // Calculate connection points (bottom center of each component)
-  const fromConnectionX = fromX + 75;
-  const fromConnectionY = fromY + 200;
-  const toConnectionX = toX + 75;
-  const toConnectionY = toY;
-
-  // Calculate control points for the curve
-  const control1X = fromConnectionX + (toConnectionX - fromConnectionX) * 0.3;
-  const control1Y = fromConnectionY;
-  const control2X = toConnectionX - (toConnectionX - fromConnectionX) * 0.3;
-  const control2Y = toConnectionY;
-
-  // Calculate arrowhead points
-  const angle = Math.atan2(toConnectionY - fromConnectionY, toConnectionX - fromConnectionX);
-  const arrowLength = 15;
-  const arrowWidth = 8;
-
-  const arrowX = toConnectionX - arrowLength * Math.cos(angle);
-  const arrowY = toConnectionY - arrowLength * Math.sin(angle);
-
-  const arrowLeftX = arrowX - arrowWidth * Math.sin(angle);
-  const arrowLeftY = arrowY + arrowWidth * Math.cos(angle);
-  const arrowRightX = arrowX + arrowWidth * Math.sin(angle);
-  const arrowRightY = arrowY - arrowWidth * Math.cos(angle);
-
-  // Calculate midpoint for status text
-  const midX = (fromConnectionX + toConnectionX) / 2;
-  const midY = (fromConnectionY + toConnectionY) / 2 - 20;
+  // Calculate arrowhead position and angle
+  const angle = Math.atan2(to.y - from.y, to.x - from.x);
+  const arrowSize = 10;
+  const arrowX = to.x - arrowSize * Math.cos(angle);
+  const arrowY = to.y - arrowSize * Math.sin(angle);
 
   return (
-    <View style={styles.container}>
-      <Svg height="100%" width="100%">
-        {/* Main connection line */}
-        <Path
-          d={`M ${fromConnectionX} ${fromConnectionY} C ${control1X} ${control1Y}, ${control2X} ${control2Y}, ${toConnectionX} ${toConnectionY}`}
-          stroke={getColor()}
-          strokeWidth="3"
-          fill="none"
-          strokeLinecap="round"
-        />
+    <Svg style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%' }}>
+      {/* Main connection line */}
+      <Path
+        d={`M ${from.x} ${from.y} C ${controlPoint1.x} ${controlPoint1.y}, ${controlPoint2.x} ${controlPoint2.y}, ${to.x} ${to.y}`}
+        stroke={lineColor}
+        strokeWidth={3}
+        fill="none"
+      />
 
-        {/* Arrowhead */}
-        <Path
-          d={`M ${arrowLeftX} ${arrowLeftY} L ${toConnectionX} ${toConnectionY} L ${arrowRightX} ${arrowRightY}`}
-          fill={getColor()}
-          stroke={getColor()}
-          strokeWidth="1"
-        />
+      {/* Arrowhead */}
+      <Path
+        d={`M ${to.x} ${to.y} L ${arrowX + arrowSize * Math.cos(angle - Math.PI/6)} ${arrowY + arrowSize * Math.sin(angle - Math.PI/6)} L ${arrowX + arrowSize * Math.cos(angle + Math.PI/6)} ${arrowY + arrowSize * Math.sin(angle + Math.PI/6)} Z`}
+        fill={lineColor}
+      />
 
-        {/* Connection points */}
-        <G>
-          <Circle
-            cx={fromConnectionX}
-            cy={fromConnectionY}
-            r="5"
-            fill={getColor()}
-          />
-          <Circle
-            cx={toConnectionX}
-            cy={toConnectionY}
-            r="5"
-            fill={getColor()}
-          />
-        </G>
-
-        {/* Status text */}
-        {status !== 'compatible' && (
-          <SvgText
-            x={midX}
-            y={midY}
-            fill={getColor()}
-            fontSize="12"
-            textAnchor="middle"
-          >
-            {status === 'warning' ? '⚠️' : '❌'}
-          </SvgText>
-        )}
-      </Svg>
-    </View>
+      {/* Connection dots */}
+      <Circle cx={from.x} cy={from.y} r={5} fill={lineColor} />
+      <Circle cx={to.x} cy={to.y} r={5} fill={lineColor} />
+    </Svg>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -1,
-  },
-});
 
 export default ConnectionLine;

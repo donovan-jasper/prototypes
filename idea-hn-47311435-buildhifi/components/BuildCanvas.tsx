@@ -33,6 +33,34 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
     speaker: { x: SCREEN_WIDTH * 0.8, y: SCREEN_HEIGHT * 0.3 }
   };
 
+  // Drop zone areas for visual feedback
+  const dropZones = {
+    source: {
+      x: snapPositions.source.x - 75,
+      y: snapPositions.source.y - 100,
+      width: 150,
+      height: 200
+    },
+    preamp: {
+      x: snapPositions.preamp.x - 75,
+      y: snapPositions.preamp.y - 100,
+      width: 150,
+      height: 200
+    },
+    amp: {
+      x: snapPositions.amp.x - 75,
+      y: snapPositions.amp.y - 100,
+      width: 150,
+      height: 200
+    },
+    speaker: {
+      x: snapPositions.speaker.x - 75,
+      y: snapPositions.speaker.y - 100,
+      width: 150,
+      height: 200
+    }
+  };
+
   useEffect(() => {
     if (build) {
       setCurrentBuild(build);
@@ -74,23 +102,41 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       if (!component) return;
 
       let snapPosition = { x, y };
-      if (component.type === 'turntable' || component.type === 'streamer') {
+      let componentType = '';
+
+      // Check which drop zone the component is closest to
+      const distances = Object.entries(dropZones).map(([type, zone]) => {
+        const dx = Math.abs(x - zone.x - zone.width/2);
+        const dy = Math.abs(y - zone.y - zone.height/2);
+        return { type, distance: Math.sqrt(dx*dx + dy*dy) };
+      });
+
+      const closestZone = distances.reduce((prev, curr) =>
+        prev.distance < curr.distance ? prev : curr
+      );
+
+      // Snap to the closest valid drop zone
+      if (closestZone.type === 'source' && (component.type === 'turntable' || component.type === 'streamer')) {
         snapPosition = snapPositions.source;
-      } else if (component.type === 'preamp') {
+        componentType = 'source';
+      } else if (closestZone.type === 'preamp' && component.type === 'preamp') {
         snapPosition = snapPositions.preamp;
-      } else if (component.type === 'amplifier') {
+        componentType = 'preamp';
+      } else if (closestZone.type === 'amp' && component.type === 'amplifier') {
         snapPosition = snapPositions.amp;
-      } else if (component.type === 'speaker') {
+        componentType = 'amp';
+      } else if (closestZone.type === 'speaker' && component.type === 'speaker') {
         snapPosition = snapPositions.speaker;
+        componentType = 'speaker';
+      } else {
+        // If not in a valid zone, snap back to original position
+        snapPosition = componentPositions[componentId] || { x: 0, y: 0 };
       }
 
       // Update position with snap
       const newPositions = {
         ...componentPositions,
-        [componentId]: {
-          x: snapPosition.x,
-          y: snapPosition.y
-        }
+        [componentId]: snapPosition
       };
       setComponentPositions(newPositions);
 
@@ -138,11 +184,10 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
   };
 
   const renderConnectionLines = () => {
-    if (!currentBuild?.components.length) return null;
+    if (!currentBuild?.components || currentBuild.components.length < 2) return null;
 
-    const components = [...currentBuild.components];
-    // Sort components by their position to ensure proper connection order
-    components.sort((a, b) => {
+    const components = [...currentBuild.components].sort((a, b) => {
+      // Sort by position to ensure proper connection order
       const aPos = componentPositions[a.id] || { x: 0, y: 0 };
       const bPos = componentPositions[b.id] || { x: 0, y: 0 };
       return aPos.x - bPos.x;
@@ -152,34 +197,65 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       if (index === components.length - 1) return null;
 
       const nextComponent = components[index + 1];
-      const fromPos = componentPositions[component.id] || { x: 0, y: 0 };
-      const toPos = componentPositions[nextComponent.id] || { x: 0, y: 0 };
+      const currentPos = componentPositions[component.id] || { x: 0, y: 0 };
+      const nextPos = componentPositions[nextComponent.id] || { x: 0, y: 0 };
 
-      // Determine connection status
-      let status: 'compatible' | 'warning' | 'incompatible' = 'compatible';
-
-      // Check validation issues for this connection
-      const issue = validation.issues.find(
+      // Get validation status for this connection
+      const connectionValidation = validation.issues.find(
         issue => issue.fromId === component.id && issue.toId === nextComponent.id
       );
 
-      if (issue) {
-        status = issue.type;
+      let status = 'compatible';
+      if (connectionValidation) {
+        status = connectionValidation.status;
       }
 
       return (
         <ConnectionLine
           key={`connection-${component.id}-${nextComponent.id}`}
-          from={{ ...component, position: fromPos }}
-          to={{ ...nextComponent, position: toPos }}
+          from={{ x: currentPos.x + 75, y: currentPos.y + 200 }}
+          to={{ x: nextPos.x + 75, y: nextPos.y }}
           status={status}
         />
       );
     });
   };
 
+  const renderDropZones = () => {
+    return Object.entries(dropZones).map(([type, zone]) => (
+      <View
+        key={`drop-zone-${type}`}
+        style={[
+          styles.dropZone,
+          {
+            left: zone.x,
+            top: zone.y,
+            width: zone.width,
+            height: zone.height,
+            borderColor: type === 'source' ? '#4CAF50' :
+                        type === 'preamp' ? '#FFC107' :
+                        type === 'amp' ? '#2196F3' :
+                        '#9C27B0'
+          }
+        ]}
+      />
+    ));
+  };
+
   return (
     <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+      >
+        <View style={styles.canvas}>
+          {renderDropZones()}
+          {currentBuild?.components.map(renderComponent)}
+          {renderConnectionLines()}
+        </View>
+      </ScrollView>
+
       {!validation.isValid && (
         <Banner
           visible={true}
@@ -193,24 +269,13 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
             <IconButton
               icon="alert-circle"
               size={size}
-              color="#ff9800"
+              color="#FF5252"
             />
           )}
         >
-          {validation.suggestions.length > 0 ? validation.suggestions[0] : 'Some components may not be compatible'}
+          {validation.suggestions.length > 0 ? validation.suggestions[0] : 'Your build has issues'}
         </Banner>
       )}
-
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-      >
-        <View style={styles.canvas}>
-          {renderConnectionLines()}
-          {currentBuild?.components.map(renderComponent)}
-        </View>
-      </ScrollView>
     </View>
   );
 };
@@ -219,9 +284,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
+  scrollContainer: {
     flexGrow: 1,
-    paddingVertical: 20,
+    padding: 20,
   },
   canvas: {
     width: SCREEN_WIDTH * 2, // Wider than screen to allow horizontal scrolling
@@ -231,13 +296,14 @@ const styles = StyleSheet.create({
   componentContainer: {
     width: 150,
     height: 200,
+    position: 'absolute',
+  },
+  dropZone: {
+    position: 'absolute',
+    borderWidth: 2,
+    borderStyle: 'dashed',
     borderRadius: 8,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
+    opacity: 0.3,
   },
 });
 
