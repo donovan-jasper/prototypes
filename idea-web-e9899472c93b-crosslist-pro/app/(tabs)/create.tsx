@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -43,15 +43,17 @@ export default function CreateProduct() {
     platforms: '',
   });
 
+  useEffect(() => {
+    (async () => {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please allow access to your photo library');
+      }
+    })();
+  }, []);
+
   const pickImage = async () => {
     try {
-      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-      if (!permissionResult.granted) {
-        Alert.alert('Permission Required', 'Please allow access to your photo library');
-        return;
-      }
-
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -175,7 +177,12 @@ export default function CreateProduct() {
       router.push('/(tabs)');
     } catch (error) {
       console.error('Product creation error:', error);
-      Alert.alert('Error', 'Failed to create product. Please try again.');
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Failed',
+        text2: 'There was an error saving your product. Please try again.',
+        visibilityTime: 4000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -186,47 +193,46 @@ export default function CreateProduct() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Photo</Text>
-          <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Create New Product</Text>
+        </View>
+
+        <View style={styles.imageContainer}>
+          <TouchableOpacity onPress={pickImage} style={styles.imagePicker}>
             {imageUri ? (
-              <Image source={{ uri: imageUri }} style={styles.imagePreview} />
+              <Image source={{ uri: imageUri }} style={styles.image} />
             ) : (
-              <View style={styles.imagePickerPlaceholder}>
-                <Ionicons name="camera-outline" size={40} color="#007AFF" />
-                <Text style={styles.imagePickerText}>Add Photo</Text>
+              <View style={styles.imagePlaceholder}>
+                <Ionicons name="camera-outline" size={40} color="#999" />
+                <Text style={styles.imagePlaceholderText}>Add Photo</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Product Details</Text>
-
-          <View style={styles.inputGroup}>
+        <View style={styles.form}>
+          <View style={styles.formGroup}>
             <Text style={styles.label}>Title</Text>
             <TextInput
               style={[styles.input, errors.title && styles.inputError]}
-              placeholder="Enter product title"
+              placeholder="Product title"
               value={title}
               onChangeText={setTitle}
               onBlur={() => {
                 if (!title.trim()) {
                   setErrors(prev => ({ ...prev, title: 'Product title is required' }));
-                } else {
-                  setErrors(prev => ({ ...prev, title: '' }));
                 }
               }}
             />
             {errors.title ? <Text style={styles.errorText}>{errors.title}</Text> : null}
           </View>
 
-          <View style={styles.inputGroup}>
+          <View style={styles.formGroup}>
             <Text style={styles.label}>Description</Text>
             <TextInput
               style={[styles.input, styles.textArea, errors.description && styles.inputError]}
-              placeholder="Enter product description"
+              placeholder="Product description"
               value={description}
               onChangeText={setDescription}
               multiline
@@ -234,8 +240,6 @@ export default function CreateProduct() {
               onBlur={() => {
                 if (!description.trim()) {
                   setErrors(prev => ({ ...prev, description: 'Product description is required' }));
-                } else {
-                  setErrors(prev => ({ ...prev, description: '' }));
                 }
               }}
             />
@@ -243,7 +247,7 @@ export default function CreateProduct() {
           </View>
 
           <View style={styles.row}>
-            <View style={[styles.inputGroup, styles.halfWidth]}>
+            <View style={[styles.formGroup, styles.halfWidth]}>
               <Text style={styles.label}>Price ($)</Text>
               <TextInput
                 style={[styles.input, errors.price && styles.inputError]}
@@ -254,15 +258,13 @@ export default function CreateProduct() {
                 onBlur={() => {
                   if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
                     setErrors(prev => ({ ...prev, price: 'Please enter a valid price' }));
-                  } else {
-                    setErrors(prev => ({ ...prev, price: '' }));
                   }
                 }}
               />
               {errors.price ? <Text style={styles.errorText}>{errors.price}</Text> : null}
             </View>
 
-            <View style={[styles.inputGroup, styles.halfWidth]}>
+            <View style={[styles.formGroup, styles.halfWidth]}>
               <Text style={styles.label}>Quantity</Text>
               <TextInput
                 style={[styles.input, errors.quantity && styles.inputError]}
@@ -273,78 +275,58 @@ export default function CreateProduct() {
                 onBlur={() => {
                   if (!quantity || isNaN(parseInt(quantity)) || parseInt(quantity) <= 0) {
                     setErrors(prev => ({ ...prev, quantity: 'Please enter a valid quantity' }));
-                  } else {
-                    setErrors(prev => ({ ...prev, quantity: '' }));
                   }
                 }}
               />
               {errors.quantity ? <Text style={styles.errorText}>{errors.quantity}</Text> : null}
             </View>
           </View>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Platforms</Text>
-          <View style={styles.platformContainer}>
-            {PLATFORMS.map((platform) => (
-              <TouchableOpacity
-                key={platform}
-                style={[
-                  styles.platformButton,
-                  selectedPlatforms.includes(platform) && styles.platformButtonSelected,
-                ]}
-                onPress={() => togglePlatform(platform)}
-              >
-                <Text
+          <View style={styles.formGroup}>
+            <Text style={styles.label}>Publish to Platforms</Text>
+            <View style={styles.platformsContainer}>
+              {PLATFORMS.map((platform) => (
+                <TouchableOpacity
+                  key={platform}
                   style={[
-                    styles.platformButtonText,
-                    selectedPlatforms.includes(platform) && styles.platformButtonTextSelected,
+                    styles.platformButton,
+                    selectedPlatforms.includes(platform) && styles.platformButtonSelected
                   ]}
+                  onPress={() => togglePlatform(platform)}
                 >
-                  {platform}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text style={[
+                    styles.platformButtonText,
+                    selectedPlatforms.includes(platform) && styles.platformButtonTextSelected
+                  ]}>
+                    {platform}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {errors.platforms ? <Text style={styles.errorText}>{errors.platforms}</Text> : null}
           </View>
-          {errors.platforms ? <Text style={styles.errorText}>{errors.platforms}</Text> : null}
-        </View>
 
-        <View style={styles.section}>
-          <View style={styles.toggleContainer}>
-            <Text style={styles.toggleLabel}>Save as Draft</Text>
-            <Switch
-              value={isDraft}
-              onValueChange={setIsDraft}
-              trackColor={{ false: '#767577', true: '#81b0ff' }}
-              thumbColor={isDraft ? '#f5dd4b' : '#f4f3f4'}
-            />
+          <View style={styles.actions}>
+            <TouchableOpacity
+              style={[styles.button, styles.draftButton]}
+              onPress={() => handleSubmit(true)}
+              disabled={isSubmitting}
+            >
+              <Text style={styles.buttonText}>Save as Draft</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.button, styles.publishButton]}
+              onPress={() => handleSubmit(false)}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.buttonText}>Publish</Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
-
-        <View style={styles.buttonContainer}>
-          <TouchableOpacity
-            style={[styles.button, styles.draftButton]}
-            onPress={() => handleSubmit(true)}
-            disabled={isSubmitting}
-          >
-            {isSubmitting && isDraft ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Save Draft</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.button, styles.publishButton]}
-            onPress={() => handleSubmit(false)}
-            disabled={isSubmitting}
-          >
-            {isSubmitting && !isDraft ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Publish</Text>
-            )}
-          </TouchableOpacity>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -356,60 +338,74 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  content: {
+  scrollContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
-  section: {
-    marginBottom: 24,
+  header: {
+    marginBottom: 20,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
     color: '#333',
   },
+  imageContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
   imagePicker: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    width: 200,
+    height: 200,
+    borderRadius: 10,
+    backgroundColor: '#e9ecef',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    overflow: 'hidden',
   },
-  imagePreview: {
+  image: {
     width: '100%',
     height: '100%',
-    borderRadius: 8,
+    resizeMode: 'cover',
   },
-  imagePickerPlaceholder: {
+  imagePlaceholder: {
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  imagePickerText: {
-    color: '#007AFF',
-    marginTop: 8,
+  imagePlaceholderText: {
+    marginTop: 10,
+    color: '#666',
     fontSize: 16,
   },
-  inputGroup: {
-    marginBottom: 16,
+  form: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  formGroup: {
+    marginBottom: 15,
   },
   label: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
     marginBottom: 8,
-    color: '#555',
+    color: '#495057',
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#ced4da',
+    borderRadius: 8,
+    padding: 12,
     fontSize: 16,
+    backgroundColor: '#fff',
   },
   inputError: {
-    borderColor: '#ff3b30',
+    borderColor: '#dc3545',
   },
   textArea: {
     height: 100,
@@ -422,57 +418,47 @@ const styles = StyleSheet.create({
   halfWidth: {
     width: '48%',
   },
-  platformContainer: {
+  platformsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   platformButton: {
     paddingVertical: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 15,
     borderRadius: 20,
     backgroundColor: '#e9ecef',
     marginRight: 8,
     marginBottom: 8,
   },
   platformButtonSelected: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0d6efd',
   },
   platformButtonText: {
-    color: '#333',
+    color: '#495057',
     fontSize: 14,
   },
   platformButtonTextSelected: {
     color: '#fff',
   },
-  toggleContainer: {
+  actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  toggleLabel: {
-    fontSize: 16,
-    color: '#333',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
+    marginTop: 20,
   },
   button: {
     flex: 1,
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginHorizontal: 4,
+    marginHorizontal: 5,
   },
   draftButton: {
     backgroundColor: '#6c757d',
   },
   publishButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#0d6efd',
   },
   buttonText: {
     color: '#fff',
@@ -480,8 +466,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   errorText: {
-    color: '#ff3b30',
-    fontSize: 12,
-    marginTop: 4,
+    color: '#dc3545',
+    fontSize: 14,
+    marginTop: 5,
   },
 });
