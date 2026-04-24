@@ -12,7 +12,7 @@ interface PriorityRecommendationsProps {
 
 const PriorityRecommendations: React.FC<PriorityRecommendationsProps> = ({
   category,
-  limit = 5
+  limit = 10
 }) => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

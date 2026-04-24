@@ -82,12 +82,12 @@ export async function getPriorityRecommendations(
 ): Promise<Directory[]> {
   const db = await getDatabase();
 
-  // Calculate priority score: (DR score × 0.6) + (category match × 0.3) + (approval rate × 0.1)
+  // Calculate priority score: (DR score × 0.5) + (category match × 0.3) + (approval rate × 0.2)
   const recommendations = await db.getAllAsync<Directory>(
     `SELECT *,
-      (drScore * 0.6 +
+      (drScore * 0.5 +
        CASE WHEN category = ? THEN 1.0 ELSE 0.5 END * 0.3 +
-       approvalRate * 0.1) as priorityScore
+       approvalRate * 0.2) as priorityScore
      FROM directories
      ORDER BY priorityScore DESC
      LIMIT ?`,
@@ -101,7 +101,7 @@ export async function calculatePriorityScore(
   directory: Directory,
   userCategory: string
 ): Promise<number> {
-  // DR score (60%) + category match (30%) + approval rate (10%)
+  // DR score (50%) + category match (30%) + approval rate (20%)
   const categoryMatch = directory.category === userCategory ? 1.0 : 0.5;
-  return (directory.drScore * 0.6) + (categoryMatch * 0.3) + (directory.approvalRate * 0.1);
+  return (directory.drScore * 0.5) + (categoryMatch * 0.3) + (directory.approvalRate * 0.2);
 }

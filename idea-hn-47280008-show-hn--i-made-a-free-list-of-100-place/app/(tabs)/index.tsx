@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 import { useDirectories } from '@/hooks/useDirectories';
 import DirectoryCard from '@/components/DirectoryCard';
 import FilterSheet from '@/components/FilterSheet';
-import RecommendationsList from '@/components/RecommendationsList';
+import PriorityRecommendations from '@/components/PriorityRecommendations';
 import { Category } from '@/constants/categories';
 
 export default function DirectoryBrowserScreen() {
@@ -95,7 +95,7 @@ export default function DirectoryBrowserScreen() {
       </View>
 
       {selectedCategory && (
-        <RecommendationsList category={selectedCategory} />
+        <PriorityRecommendations category={selectedCategory} limit={10} />
       )}
 
       <FlatList
@@ -185,16 +185,14 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     height: 40,
     paddingHorizontal: 16,
-    backgroundColor: '#FFF',
+    backgroundColor: '#007AFF',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
   },
   filterButtonText: {
+    color: '#FFF',
     fontSize: 14,
-    color: '#007AFF',
     fontWeight: '600',
   },
   listContent: {
@@ -202,9 +200,10 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   emptyContainer: {
-    padding: 20,
-    alignItems: 'center',
+    flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   emptyText: {
     fontSize: 16,
