@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Switch, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Switch, Alert, ScrollView } from 'react-native';
 import { EmergencyAlert } from '@/components/EmergencyAlert';
 import { useAppStore } from '@/store/useAppStore';
 
@@ -47,7 +47,7 @@ export default function SettingsScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container}>
       <Text style={styles.title}>Settings</Text>
 
       <View style={styles.section}>
@@ -95,7 +95,7 @@ export default function SettingsScreen() {
       {isPremium && (
         <EmergencyAlert isPremium={isPremium} />
       )}
-    </View>
+    </ScrollView>
   );
 }
 

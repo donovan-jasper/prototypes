@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, Button, StyleSheet, Alert, Switch } from 'react-native';
 import { useAppStore } from '@/store/useAppStore';
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as Notifications from 'expo-notifications';
+import * as SMS from 'expo-sms';
 import { detectStillness } from '@/lib/sensors/motionDetector';
-import { sendTwilioSMS } from '@/lib/notifications/alertManager';
 
 const EMERGENCY_TASK_NAME = 'emergency-alert-task';
 
@@ -20,7 +20,7 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
   const [lastAlertTime, setLastAlertTime] = useState<Date | null>(null);
   const [isMonitoring, setIsMonitoring] = useState(false);
 
-  const { emergencyContact, setEmergencyContact } = useAppStore();
+  const { emergencyContact, setEmergencyContact, setLastAlertTime: storeLastAlertTime } = useAppStore();
 
   useEffect(() => {
     if (emergencyContact) {
@@ -35,23 +35,31 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
           return BackgroundFetch.BackgroundFetchResult.NoData;
         }
 
-        const stillnessDetected = await detectStillness(120); // Check last 2 minutes
+        const stillnessDetected = await detectStillness(600); // Check last 10 minutes
         if (stillnessDetected) {
           setStillnessDuration(prev => prev + 2); // Increment by 2 minutes
 
           if (stillnessDuration >= 10 && (!lastAlertTime || (new Date().getTime() - lastAlertTime.getTime()) > 3600000)) {
             // Send alert if stillness >10 minutes and not sent in last hour
-            await sendTwilioSMS(emergencyContact, 'Emergency alert: No movement detected for 10+ minutes');
-            setLastAlertTime(new Date());
-            setStillnessDuration(0);
+            const { result } = await SMS.sendSMSAsync(
+              [emergencyContact],
+              'Emergency alert: No movement detected for 10+ minutes'
+            );
 
-            await Notifications.scheduleNotificationAsync({
-              content: {
-                title: 'Emergency Alert Sent',
-                body: 'Your emergency contact has been notified',
-              },
-              trigger: null,
-            });
+            if (result === 'sent') {
+              const alertTime = new Date();
+              setLastAlertTime(alertTime);
+              storeLastAlertTime(alertTime);
+              setStillnessDuration(0);
+
+              await Notifications.scheduleNotificationAsync({
+                content: {
+                  title: 'Emergency Alert Sent',
+                  body: 'Your emergency contact has been notified',
+                },
+                trigger: null,
+              });
+            }
           }
         } else {
           setStillnessDuration(0);
@@ -68,7 +76,7 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
       // Clean up background task
       TaskManager.unregisterTaskAsync(EMERGENCY_TASK_NAME);
     };
-  }, [emergencyContact, stillnessDuration, lastAlertTime, isEnabled]);
+  }, [emergencyContact, stillnessDuration, lastAlertTime, isEnabled, storeLastAlertTime]);
 
   useEffect(() => {
     // Register/unregister background fetch based on isEnabled
@@ -156,9 +164,9 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
 
       <View style={styles.toggleContainer}>
         <Text style={styles.toggleLabel}>Enable Emergency Alert</Text>
-        <Button
-          title={isEnabled ? 'Disable' : 'Enable'}
-          onPress={toggleEmergencyAlert}
+        <Switch
+          value={isEnabled}
+          onValueChange={toggleEmergencyAlert}
           disabled={!isPremium}
         />
       </View>
@@ -166,18 +174,13 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
       {isEnabled && (
         <View style={styles.statusContainer}>
           <Text style={styles.statusText}>
-            {stillnessDuration >= 10
-              ? 'Alert sent!'
-              : `Stillness detected: ${stillnessDuration} minutes`}
+            {isMonitoring ? 'Monitoring for stillness...' : 'Not monitoring'}
           </Text>
-          {stillnessDuration > 0 && stillnessDuration < 10 && (
-            <Text style={styles.countdownText}>
-              Alert in: {10 - stillnessDuration} minutes
+          {stillnessDuration > 0 && (
+            <Text style={styles.durationText}>
+              Stillness detected: {stillnessDuration} minutes
             </Text>
           )}
-          <Text style={styles.monitoringStatus}>
-            {isMonitoring ? 'Monitoring active' : 'Monitoring inactive'}
-          </Text>
         </View>
       )}
     </View>
@@ -186,25 +189,15 @@ export const EmergencyAlert: React.FC<EmergencyAlertProps> = ({ isPremium }) => 
 
 const styles = StyleSheet.create({
   container: {
+    marginTop: 20,
     padding: 16,
-    backgroundColor: '#fff',
+    backgroundColor: '#f8f8f8',
     borderRadius: 8,
-    marginVertical: 8,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 12,
-  },
-  premiumNotice: {
-    backgroundColor: '#f0f8ff',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 12,
-  },
-  premiumText: {
-    color: '#0066cc',
-    fontSize: 14,
   },
   input: {
     height: 40,
@@ -223,24 +216,29 @@ const styles = StyleSheet.create({
   toggleLabel: {
     fontSize: 16,
   },
+  premiumNotice: {
+    backgroundColor: '#f0f8ff',
+    padding: 8,
+    borderRadius: 4,
+    marginBottom: 12,
+  },
+  premiumText: {
+    color: '#0066cc',
+    fontSize: 14,
+  },
   statusContainer: {
-    marginTop: 16,
-    padding: 12,
-    backgroundColor: '#f8f8f8',
+    marginTop: 12,
+    padding: 8,
+    backgroundColor: '#e6f7ff',
     borderRadius: 4,
   },
   statusText: {
-    fontSize: 16,
-    marginBottom: 8,
-  },
-  countdownText: {
-    fontSize: 16,
-    color: '#e67e22',
-    fontWeight: 'bold',
-  },
-  monitoringStatus: {
     fontSize: 14,
-    color: '#7f8c8d',
-    marginTop: 8,
+    color: '#0050b3',
+  },
+  durationText: {
+    fontSize: 14,
+    color: '#fa541c',
+    marginTop: 4,
   },
 });
