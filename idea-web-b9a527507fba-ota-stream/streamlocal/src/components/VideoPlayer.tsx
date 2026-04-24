@@ -193,11 +193,10 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   videoContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   video: {
     width: '100%',
@@ -208,25 +207,21 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   loadingContainer: {
-    position: 'absolute',
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    width: '100%',
-    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.7)',
   },
   loadingText: {
     color: '#fff',
-    marginTop: 16,
+    marginTop: 10,
     fontSize: 16,
   },
   errorContainer: {
-    position: 'absolute',
+    ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    width: '100%',
-    height: '100%',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     padding: 20,
   },
   errorText: {
@@ -237,33 +232,34 @@ const styles = StyleSheet.create({
   },
   infoOverlay: {
     position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
+    top: 20,
+    left: 20,
+    right: 20,
+    padding: 10,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 5,
   },
   channelName: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   programTitle: {
     color: '#fff',
     fontSize: 14,
-    marginTop: 4,
+    marginTop: 5,
   },
   controlsOverlay: {
     position: 'absolute',
-    bottom: 16,
-    left: 16,
-    right: 16,
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   controlButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    borderRadius: 20,
-    padding: 8,
+    marginHorizontal: 10,
   },
 });
 
