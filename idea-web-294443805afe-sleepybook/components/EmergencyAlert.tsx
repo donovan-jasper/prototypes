@@ -165,21 +165,21 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     color: '#0066cc',
-    textAlign: 'center',
+    fontSize: 14,
   },
   input: {
     height: 40,
     borderColor: 'gray',
     borderWidth: 1,
-    marginBottom: 12,
-    paddingHorizontal: 8,
     borderRadius: 4,
+    paddingHorizontal: 8,
+    marginBottom: 12,
   },
   toggleContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 12,
+    marginVertical: 12,
   },
   toggleLabel: {
     fontSize: 16,
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 16,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   countdownText: {
     fontSize: 14,
