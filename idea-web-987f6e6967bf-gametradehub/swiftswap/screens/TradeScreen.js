@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Button, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { database } from '../firebase';
 import { ref, onValue, update } from 'firebase/database';
-import { calculateTradeProfit } from '../utils/trade';
+import { calculateTradeProfit, formatCurrency } from '../utils/trade';
 
 const TradeScreen = ({ navigation }) => {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [marketPrices, setMarketPrices] = useState({});
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     const inventoryRef = ref(database, 'inventory');
-    onValue(inventoryRef, (snapshot) => {
+    const unsubscribe = onValue(inventoryRef, (snapshot) => {
       const data = snapshot.val();
       const items = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
       setInventory(items);
@@ -19,33 +20,60 @@ const TradeScreen = ({ navigation }) => {
 
       // Fetch market prices for each item
       items.forEach(item => {
-        fetchMarketPrice(item.barcode);
+        fetchMarketPrice(item.id, item.title);
       });
     });
+
+    return () => unsubscribe();
   }, []);
 
-  const fetchMarketPrice = async (barcode) => {
+  const fetchMarketPrice = async (itemId, gameTitle) => {
     try {
       // In a real app, this would call the IGDB API
-      // For demo purposes, we'll use mock data
+      // For now, we'll use mock data with some randomness
       const mockPrices = {
-        '123456789012': 59.99,
-        '987654321098': 39.99,
-        '555555555555': 29.99
+        'The Legend of Zelda: Breath of the Wild': 59.99,
+        'Super Mario Odyssey': 39.99,
+        'Elden Ring': 29.99,
+        'Minecraft': 24.99,
+        'Red Dead Redemption 2': 49.99
       };
+
+      // Add some random variation to simulate real market data
+      const basePrice = mockPrices[gameTitle] || 19.99;
+      const variation = (Math.random() * 10 - 5); // -5% to +5% variation
+      const currentPrice = basePrice * (1 + variation / 100);
 
       setMarketPrices(prev => ({
         ...prev,
-        [barcode]: mockPrices[barcode] || 0
+        [itemId]: currentPrice.toFixed(2)
       }));
     } catch (error) {
       console.error('Error fetching market price:', error);
+      setMarketPrices(prev => ({
+        ...prev,
+        [itemId]: 'N/A'
+      }));
     }
   };
 
+  const refreshPrices = () => {
+    setRefreshing(true);
+    inventory.forEach(item => {
+      fetchMarketPrice(item.id, item.title);
+    });
+    setTimeout(() => setRefreshing(false), 1000);
+  };
+
   const executeTrade = (item) => {
-    const currentPrice = marketPrices[item.barcode] || 0;
-    const profit = calculateTradeProfit(item.purchasePrice, currentPrice);
+    const currentPrice = parseFloat(marketPrices[item.id]);
+    const buyPrice = item.purchasePrice || 0;
+    const profit = calculateTradeProfit(buyPrice, currentPrice);
+
+    if (isNaN(currentPrice) || currentPrice <= 0) {
+      Alert.alert('Error', 'Market price not available for this item');
+      return;
+    }
 
     // Update trade status in Firebase
     const tradeRef = ref(database, `trades/${item.id}`);
@@ -56,23 +84,52 @@ const TradeScreen = ({ navigation }) => {
       timestamp: Date.now()
     });
 
-    alert(`Trade executed! Profit: $${profit.toFixed(2)}`);
+    Alert.alert(
+      'Trade Executed',
+      `Sold ${item.title} for ${formatCurrency(currentPrice)}\nProfit: ${formatCurrency(profit)}`
+    );
   };
 
-  const renderItem = ({ item }) => (
-    <View style={styles.itemContainer}>
-      <Text style={styles.itemTitle}>{item.title || 'Unknown Game'}</Text>
-      <Text>Barcode: {item.barcode}</Text>
-      <Text>Purchase Price: ${item.purchasePrice?.toFixed(2) || '0.00'}</Text>
-      <Text>Market Price: ${marketPrices[item.barcode]?.toFixed(2) || 'Loading...'}</Text>
-      <TouchableOpacity
-        style={styles.tradeButton}
-        onPress={() => executeTrade(item)}
-      >
-        <Text style={styles.tradeButtonText}>Execute Trade</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderItem = ({ item }) => {
+    const currentPrice = marketPrices[item.id];
+    const buyPrice = item.purchasePrice || 0;
+    const profit = calculateTradeProfit(buyPrice, parseFloat(currentPrice));
+
+    return (
+      <View style={styles.itemContainer}>
+        <Text style={styles.itemTitle}>{item.title || 'Unknown Game'}</Text>
+        {item.barcode && <Text style={styles.barcodeText}>Barcode: {item.barcode}</Text>}
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Purchase Price:</Text>
+          <Text style={styles.priceValue}>{formatCurrency(buyPrice)}</Text>
+        </View>
+        <View style={styles.priceRow}>
+          <Text style={styles.priceLabel}>Market Price:</Text>
+          <Text style={styles.priceValue}>
+            {currentPrice ? formatCurrency(parseFloat(currentPrice)) : 'Loading...'}
+          </Text>
+        </View>
+        {currentPrice && !isNaN(parseFloat(currentPrice)) && (
+          <View style={styles.priceRow}>
+            <Text style={styles.priceLabel}>Potential Profit:</Text>
+            <Text style={[styles.priceValue, { color: profit > 0 ? 'green' : 'red' }]}>
+              {formatCurrency(profit)}
+            </Text>
+          </View>
+        )}
+        <TouchableOpacity
+          style={[
+            styles.tradeButton,
+            { backgroundColor: currentPrice && !isNaN(parseFloat(currentPrice)) ? '#4CAF50' : '#CCCCCC' }
+          ]}
+          onPress={() => executeTrade(item)}
+          disabled={!currentPrice || isNaN(parseFloat(currentPrice))}
+        >
+          <Text style={styles.tradeButtonText}>Execute Trade</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -85,21 +142,32 @@ const TradeScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Your Inventory</Text>
+      <View style={styles.headerContainer}>
+        <Text style={styles.header}>Your Inventory</Text>
+        <Button
+          title="Refresh Prices"
+          onPress={refreshPrices}
+          disabled={refreshing}
+        />
+      </View>
       {inventory.length === 0 ? (
-        <Text style={styles.emptyText}>No items in your inventory. Add some first!</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>No items in your inventory. Add some first!</Text>
+          <Button
+            title="Add Items"
+            onPress={() => navigation.navigate('Inventory')}
+          />
+        </View>
       ) : (
         <FlatList
           data={inventory}
           renderItem={renderItem}
           keyExtractor={item => item.id}
           contentContainerStyle={styles.listContent}
+          refreshing={refreshing}
+          onRefresh={refreshPrices}
         />
       )}
-      <Button
-        title="Add More Items"
-        onPress={() => navigation.navigate('Inventory')}
-      />
     </View>
   );
 };
@@ -107,28 +175,41 @@ const TradeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  header: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   emptyText: {
     textAlign: 'center',
-    marginTop: 20,
+    marginBottom: 20,
     fontSize: 16,
     color: '#666',
   },
   listContent: {
     paddingBottom: 20,
+    paddingHorizontal: 16,
   },
   itemContainer: {
     backgroundColor: 'white',
@@ -146,8 +227,24 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 8,
   },
+  barcodeText: {
+    color: '#666',
+    marginBottom: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  priceLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  priceValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
   tradeButton: {
-    backgroundColor: '#4CAF50',
     padding: 12,
     borderRadius: 4,
     marginTop: 12,
