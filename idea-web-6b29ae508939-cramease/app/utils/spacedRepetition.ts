@@ -148,7 +148,13 @@ export const addReview = async (
 
   if (!card) return;
 
-  const { nextReviewDate, updatedCard } = calculateNextReview(card, quality);
+  // Convert nextReviewDate from string to Date object
+  const cardWithDate = {
+    ...card,
+    nextReviewDate: new Date(card.nextReviewDate)
+  };
+
+  const { nextReviewDate, updatedCard } = calculateNextReview(cardWithDate, quality);
 
   // Update card with new values
   await db.runAsync(
@@ -183,45 +189,22 @@ export const getDueCards = async (db: SQLiteDatabase, deckId: number): Promise<C
     [deckId, today]
   );
 
+  // Convert nextReviewDate strings to Date objects
   return cards.map(card => ({
     ...card,
     nextReviewDate: new Date(card.nextReviewDate)
   }));
 };
 
-export const getDeckStats = async (db: SQLiteDatabase, deckId: number): Promise<{
-  totalCards: number;
-  dueCards: number;
-  averageRecallStrength: number;
-}> => {
-  const today = new Date().toISOString();
+export const getCardReviewHistory = async (db: SQLiteDatabase, cardId: number): Promise<ReviewHistory[]> => {
+  const history = await db.getAllAsync<ReviewHistory>(
+    'SELECT * FROM review_history WHERE cardId = ? ORDER BY reviewDate DESC',
+    [cardId]
+  );
 
-  const stats = await db.getFirstAsync<{
-    totalCards: number;
-    dueCards: number;
-    sumRecallStrength: number;
-  }>(`
-    SELECT
-      COUNT(*) as totalCards,
-      SUM(CASE WHEN nextReviewDate <= ? THEN 1 ELSE 0 END) as dueCards,
-      SUM(recallStrength) as sumRecallStrength
-    FROM cards
-    WHERE deckId = ?
-  `, [today, deckId]);
-
-  if (!stats) {
-    return {
-      totalCards: 0,
-      dueCards: 0,
-      averageRecallStrength: 0
-    };
-  }
-
-  return {
-    totalCards: stats.totalCards,
-    dueCards: stats.dueCards,
-    averageRecallStrength: stats.totalCards > 0
-      ? stats.sumRecallStrength / stats.totalCards
-      : 0
-  };
+  // Convert reviewDate strings to Date objects
+  return history.map(entry => ({
+    ...entry,
+    reviewDate: new Date(entry.reviewDate)
+  }));
 };
