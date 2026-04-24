@@ -1,21 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
+import { WasmModuleLoader } from '../wasm/loader';
 
 export class ARMCompiler {
-  private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for ARM compilation
-      const response = await fetch('lib/compiler/wasm/arm-toolchain.wasm');
-      const buffer = await response.arrayBuffer();
-      this.wasmModule = await WebAssembly.compile(buffer);
-      this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
-        env: {
-          memory: new WebAssembly.Memory({ initial: 256 }),
-          table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
-        }
-      });
+      const loader = WasmModuleLoader.getInstance();
+      this.wasmInstance = await loader.instantiateModule('arm');
     } catch (error) {
       console.error('Failed to initialize ARM compiler:', error);
       throw error;
@@ -37,7 +29,7 @@ export class ARMCompiler {
       logs.push('[INFO] Compiling ARM code...');
 
       // Get the WASM exports
-      const exports = this.wasmInstance!.exports as any;
+      const exports = this.wasmInstance.exports as any;
 
       // Allocate memory for the input code
       const codePtr = exports.allocate(code.length + 1);
@@ -144,5 +136,45 @@ export class ARMCompiler {
       hexDump += `${address}  ${hex.padEnd(47, ' ')}  ${ascii}\n`;
     }
     return hexDump;
+  }
+
+  // Basic syntax validation for ARM assembly
+  validateSyntax(code: string): CompilationError[] {
+    const errors: CompilationError[] = [];
+    const lines = code.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === '') continue;
+
+      // Check for basic syntax errors
+      if (!line.includes(' ') && !line.includes('\t') && !line.startsWith('@')) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Missing instruction or operand',
+          severity: 'error'
+        });
+      }
+
+      // Check for comments
+      if (line.startsWith('@')) continue;
+
+      // Check for labels
+      if (line.endsWith(':')) continue;
+
+      // Check for basic instruction format
+      const parts = line.split(/\s+/);
+      if (parts.length < 1) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Invalid instruction format',
+          severity: 'error'
+        });
+      }
+    }
+
+    return errors;
   }
 }

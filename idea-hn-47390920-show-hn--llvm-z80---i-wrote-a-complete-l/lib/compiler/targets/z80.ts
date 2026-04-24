@@ -1,21 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
+import { WasmModuleLoader } from '../wasm/loader';
 
 export class Z80Compiler {
-  private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for Z80 compilation
-      const response = await fetch('lib/compiler/wasm/z80-toolchain.wasm');
-      const buffer = await response.arrayBuffer();
-      this.wasmModule = await WebAssembly.compile(buffer);
-      this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
-        env: {
-          memory: new WebAssembly.Memory({ initial: 256 }),
-          table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
-        }
-      });
+      const loader = WasmModuleLoader.getInstance();
+      this.wasmInstance = await loader.instantiateModule('z80');
     } catch (error) {
       console.error('Failed to initialize Z80 compiler:', error);
       throw error;
@@ -37,7 +29,7 @@ export class Z80Compiler {
       logs.push('[INFO] Compiling Z80 code...');
 
       // Get the WASM exports
-      const exports = this.wasmInstance!.exports as any;
+      const exports = this.wasmInstance.exports as any;
 
       // Allocate memory for the input code
       const codePtr = exports.allocate(code.length + 1);
@@ -137,7 +129,7 @@ export class Z80Compiler {
     let hexDump = '';
     for (let i = 0; i < binary.length; i += 16) {
       const chunk = binary.slice(i, i + 16);
-      const address = i.toString(16).padStart(8, '0');
+      const address = i.toString(16).padStart(4, '0'); // Z80 uses 16-bit addresses
       const hex = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ');
       const ascii = Array.from(chunk).map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.').join('');
 
@@ -146,67 +138,39 @@ export class Z80Compiler {
     return hexDump;
   }
 
-  // Z80-specific syntax validation
+  // Basic syntax validation for Z80 assembly
   validateSyntax(code: string): CompilationError[] {
     const errors: CompilationError[] = [];
     const lines = code.split('\n');
 
-    // Check for common Z80 syntax errors
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (!line) continue;
+      if (line === '') continue;
 
-      // Check for invalid opcodes
-      const opcodeMatch = line.match(/^\s*([A-Za-z]+)/);
-      if (opcodeMatch) {
-        const opcode = opcodeMatch[1].toUpperCase();
-        const validOpcodes = [
-          'LD', 'ADD', 'ADC', 'SUB', 'SBC', 'AND', 'OR', 'XOR', 'CP',
-          'INC', 'DEC', 'PUSH', 'POP', 'CALL', 'RET', 'JP', 'JR',
-          'NOP', 'HALT', 'DI', 'EI', 'IM', 'RLCA', 'RLA', 'RRCA',
-          'RRA', 'RLC', 'RL', 'RRC', 'RR', 'SLA', 'SRA', 'SRL',
-          'BIT', 'SET', 'RES', 'IN', 'OUT', 'EX', 'EXX', 'LDI',
-          'LDIR', 'LDD', 'LDDR', 'CPI', 'CPIR', 'CPD', 'CPDR'
-        ];
-
-        if (!validOpcodes.includes(opcode)) {
-          errors.push({
-            line: i + 1,
-            column: 0,
-            message: `Invalid Z80 opcode: ${opcode}`,
-            severity: 'error'
-          });
-        }
-      }
-
-      // Check for missing operands
-      if (line.match(/^\s*(LD|ADD|ADC|SUB|SBC|AND|OR|XOR|CP|INC|DEC|PUSH|POP|CALL|JP|JR|IN|OUT)\s*$/i)) {
+      // Check for basic syntax errors
+      if (!line.includes(' ') && !line.includes('\t') && !line.startsWith(';')) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Missing operand for instruction',
+          message: 'Missing instruction or operand',
           severity: 'error'
         });
       }
 
-      // Check for invalid register names
-      const registerMatch = line.match(/([A-Za-z]+)/g);
-      if (registerMatch) {
-        const validRegisters = [
-          'A', 'B', 'C', 'D', 'E', 'H', 'L', 'AF', 'BC', 'DE', 'HL',
-          'IX', 'IY', 'SP', 'PC', 'AF\'', 'BC\'', 'DE\'', 'HL\'',
-          'I', 'R', 'IXH', 'IXL', 'IYH', 'IYL'
-        ];
+      // Check for comments
+      if (line.startsWith(';')) continue;
 
-        registerMatch.forEach(reg => {
-          if (reg.length > 1 && !validRegisters.includes(reg.toUpperCase())) {
-            errors.push({
-              line: i + 1,
-              column: line.indexOf(reg),
-              message: `Invalid Z80 register: ${reg}`,
-              severity: 'error'
-            });
-          }
+      // Check for labels
+      if (line.endsWith(':')) continue;
+
+      // Check for basic instruction format
+      const parts = line.split(/\s+/);
+      if (parts.length < 1) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Invalid instruction format',
+          severity: 'error'
         });
       }
     }

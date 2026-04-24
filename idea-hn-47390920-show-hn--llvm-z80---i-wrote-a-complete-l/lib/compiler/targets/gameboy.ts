@@ -1,21 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
+import { WasmModuleLoader } from '../wasm/loader';
 
 export class GameBoyCompiler {
-  private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for Game Boy compilation
-      const response = await fetch('lib/compiler/wasm/gameboy-toolchain.wasm');
-      const buffer = await response.arrayBuffer();
-      this.wasmModule = await WebAssembly.compile(buffer);
-      this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
-        env: {
-          memory: new WebAssembly.Memory({ initial: 256 }),
-          table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
-        }
-      });
+      const loader = WasmModuleLoader.getInstance();
+      this.wasmInstance = await loader.instantiateModule('gameboy');
     } catch (error) {
       console.error('Failed to initialize Game Boy compiler:', error);
       throw error;
@@ -37,7 +29,7 @@ export class GameBoyCompiler {
       logs.push('[INFO] Compiling Game Boy code...');
 
       // Get the WASM exports
-      const exports = this.wasmInstance!.exports as any;
+      const exports = this.wasmInstance.exports as any;
 
       // Allocate memory for the input code
       const codePtr = exports.allocate(code.length + 1);
@@ -137,7 +129,7 @@ export class GameBoyCompiler {
     let hexDump = '';
     for (let i = 0; i < binary.length; i += 16) {
       const chunk = binary.slice(i, i + 16);
-      const address = i.toString(16).padStart(8, '0');
+      const address = i.toString(16).padStart(4, '0'); // Game Boy uses 16-bit addresses
       const hex = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ');
       const ascii = Array.from(chunk).map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.').join('');
 
@@ -146,79 +138,40 @@ export class GameBoyCompiler {
     return hexDump;
   }
 
-  // Game Boy-specific syntax validation
+  // Basic syntax validation for Game Boy assembly
   validateSyntax(code: string): CompilationError[] {
     const errors: CompilationError[] = [];
     const lines = code.split('\n');
 
-    // Check for common Game Boy syntax errors
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (!line) continue;
+      if (line === '') continue;
 
-      // Check for invalid opcodes
-      const opcodeMatch = line.match(/^\s*([A-Za-z]+)/);
-      if (opcodeMatch) {
-        const opcode = opcodeMatch[1].toUpperCase();
-        const validOpcodes = [
-          'NOP', 'LD', 'INC', 'DEC', 'RLCA', 'ADD', 'ADC', 'SUB',
-          'SBC', 'AND', 'XOR', 'OR', 'CP', 'POP', 'JP', 'CALL',
-          'PUSH', 'RET', 'RETI', 'RST', 'JR', 'DAA', 'CPL', 'CCF',
-          'SCF', 'HALT', 'STOP', 'DI', 'EI', 'RLC', 'RRC', 'RL',
-          'RR', 'SLA', 'SRA', 'SWAP', 'SRL', 'BIT', 'RES', 'SET'
-        ];
-
-        if (!validOpcodes.includes(opcode)) {
-          errors.push({
-            line: i + 1,
-            column: 0,
-            message: `Invalid Game Boy opcode: ${opcode}`,
-            severity: 'error'
-          });
-        }
-      }
-
-      // Check for missing operands
-      if (line.match(/^\s*(LD|INC|DEC|ADD|ADC|SUB|SBC|AND|XOR|OR|CP|POP|JP|CALL|PUSH|JR|RLC|RRC|RL|RR|SLA|SRA|SWAP|SRL|BIT|RES|SET)\s*$/i)) {
+      // Check for basic syntax errors
+      if (!line.includes(' ') && !line.includes('\t') && !line.startsWith(';')) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Missing operand for instruction',
+          message: 'Missing instruction or operand',
           severity: 'error'
         });
       }
 
-      // Check for invalid register names
-      const registerMatch = line.match(/([A-Za-z]+)/g);
-      if (registerMatch) {
-        const validRegisters = [
-          'A', 'B', 'C', 'D', 'E', 'H', 'L', 'AF', 'BC', 'DE', 'HL',
-          'SP', 'PC', 'F', 'BC', 'DE', 'HL', 'AF', 'BC', 'DE', 'HL', 'SP'
-        ];
+      // Check for comments
+      if (line.startsWith(';')) continue;
 
-        registerMatch.forEach(reg => {
-          if (reg.length > 1 && !validRegisters.includes(reg.toUpperCase())) {
-            errors.push({
-              line: i + 1,
-              column: line.indexOf(reg),
-              message: `Invalid Game Boy register: ${reg}`,
-              severity: 'error'
-            });
-          }
+      // Check for labels
+      if (line.endsWith(':')) continue;
+
+      // Check for basic instruction format
+      const parts = line.split(/\s+/);
+      if (parts.length < 1) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Invalid instruction format',
+          severity: 'error'
         });
-      }
-
-      // Check for Game Boy-specific instructions
-      if (line.match(/\b(STOP|HALT|DI|EI|SWAP)\b/i)) {
-        // These are valid, but we'll check for proper usage
-        if (line.match(/\bSTOP\b/i) && !line.match(/\bSTOP\s*0\b/i)) {
-          errors.push({
-            line: i + 1,
-            column: line.indexOf('STOP'),
-            message: 'STOP instruction requires 0 operand',
-            severity: 'error'
-          });
-        }
       }
     }
 

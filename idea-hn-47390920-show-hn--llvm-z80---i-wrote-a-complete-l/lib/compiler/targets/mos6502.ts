@@ -1,21 +1,13 @@
 import { CompilationResult, CompilationError } from '../CompilerEngine';
+import { WasmModuleLoader } from '../wasm/loader';
 
 export class MOS6502Compiler {
-  private wasmModule: WebAssembly.Module | null = null;
   private wasmInstance: WebAssembly.Instance | null = null;
 
   async initialize(): Promise<void> {
     try {
-      // Load the WASM module for MOS6502 compilation
-      const response = await fetch('lib/compiler/wasm/mos6502-toolchain.wasm');
-      const buffer = await response.arrayBuffer();
-      this.wasmModule = await WebAssembly.compile(buffer);
-      this.wasmInstance = await WebAssembly.instantiate(this.wasmModule, {
-        env: {
-          memory: new WebAssembly.Memory({ initial: 256 }),
-          table: new WebAssembly.Table({ initial: 1, element: 'anyfunc' }),
-        }
-      });
+      const loader = WasmModuleLoader.getInstance();
+      this.wasmInstance = await loader.instantiateModule('mos6502');
     } catch (error) {
       console.error('Failed to initialize MOS6502 compiler:', error);
       throw error;
@@ -37,7 +29,7 @@ export class MOS6502Compiler {
       logs.push('[INFO] Compiling MOS6502 code...');
 
       // Get the WASM exports
-      const exports = this.wasmInstance!.exports as any;
+      const exports = this.wasmInstance.exports as any;
 
       // Allocate memory for the input code
       const codePtr = exports.allocate(code.length + 1);
@@ -137,7 +129,7 @@ export class MOS6502Compiler {
     let hexDump = '';
     for (let i = 0; i < binary.length; i += 16) {
       const chunk = binary.slice(i, i + 16);
-      const address = i.toString(16).padStart(8, '0');
+      const address = i.toString(16).padStart(4, '0'); // 6502 uses 16-bit addresses
       const hex = Array.from(chunk).map(b => b.toString(16).padStart(2, '0')).join(' ');
       const ascii = Array.from(chunk).map(b => b >= 32 && b <= 126 ? String.fromCharCode(b) : '.').join('');
 
@@ -146,74 +138,39 @@ export class MOS6502Compiler {
     return hexDump;
   }
 
-  // 6502-specific syntax validation
+  // Basic syntax validation for MOS6502 assembly
   validateSyntax(code: string): CompilationError[] {
     const errors: CompilationError[] = [];
     const lines = code.split('\n');
 
-    // Check for common 6502 syntax errors
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      if (!line) continue;
+      if (line === '') continue;
 
-      // Check for invalid opcodes
-      const opcodeMatch = line.match(/^\s*([A-Za-z]+)/);
-      if (opcodeMatch) {
-        const opcode = opcodeMatch[1].toUpperCase();
-        const validOpcodes = [
-          'ADC', 'AND', 'ASL', 'BCC', 'BCS', 'BEQ', 'BIT', 'BMI',
-          'BNE', 'BPL', 'BRK', 'BVC', 'BVS', 'CLC', 'CLD', 'CLI',
-          'CLV', 'CMP', 'CPX', 'CPY', 'DEC', 'DEX', 'DEY', 'EOR',
-          'INC', 'INX', 'INY', 'JMP', 'JSR', 'LDA', 'LDX', 'LDY',
-          'LSR', 'NOP', 'ORA', 'PHA', 'PHP', 'PLA', 'PLP', 'ROL',
-          'ROR', 'RTI', 'RTS', 'SBC', 'SEC', 'SED', 'SEI', 'STA',
-          'STX', 'STY', 'TAX', 'TAY', 'TSX', 'TXA', 'TXS', 'TYA'
-        ];
-
-        if (!validOpcodes.includes(opcode)) {
-          errors.push({
-            line: i + 1,
-            column: 0,
-            message: `Invalid 6502 opcode: ${opcode}`,
-            severity: 'error'
-          });
-        }
-      }
-
-      // Check for missing operands
-      if (line.match(/^\s*(ADC|AND|ASL|CMP|CPX|CPY|DEC|EOR|INC|LDA|LDX|LDY|LSR|ORA|ROL|ROR|SBC|STA|STX|STY)\s*$/i)) {
+      // Check for basic syntax errors
+      if (!line.includes(' ') && !line.includes('\t') && !line.startsWith(';')) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Missing operand for instruction',
+          message: 'Missing instruction or operand',
           severity: 'error'
         });
       }
 
-      // Check for invalid addressing modes
-      if (line.match(/^\s*(ADC|AND|ASL|CMP|CPX|CPY|DEC|EOR|INC|LDA|LDX|LDY|LSR|ORA|ROL|ROR|SBC|STA|STX|STY)\s+([^,]+),([^,]+)/)) {
+      // Check for comments
+      if (line.startsWith(';')) continue;
+
+      // Check for labels
+      if (line.endsWith(':')) continue;
+
+      // Check for basic instruction format
+      const parts = line.split(/\s+/);
+      if (parts.length < 1) {
         errors.push({
           line: i + 1,
           column: 0,
-          message: 'Invalid addressing mode for instruction',
+          message: 'Invalid instruction format',
           severity: 'error'
-        });
-      }
-
-      // Check for invalid register names
-      const registerMatch = line.match(/([A-Za-z]+)/g);
-      if (registerMatch) {
-        const validRegisters = ['A', 'X', 'Y', 'SP', 'PC'];
-
-        registerMatch.forEach(reg => {
-          if (reg.length > 1 && !validRegisters.includes(reg.toUpperCase())) {
-            errors.push({
-              line: i + 1,
-              column: line.indexOf(reg),
-              message: `Invalid 6502 register: ${reg}`,
-              severity: 'error'
-            });
-          }
         });
       }
     }

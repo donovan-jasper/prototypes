@@ -137,4 +137,44 @@ export class X86Compiler {
     }
     return hexDump;
   }
+
+  // Basic syntax validation for x86 assembly
+  validateSyntax(code: string): CompilationError[] {
+    const errors: CompilationError[] = [];
+    const lines = code.split('\n');
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (line === '') continue;
+
+      // Check for basic syntax errors
+      if (!line.includes(' ') && !line.includes('\t') && !line.startsWith(';')) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Missing instruction or operand',
+          severity: 'error'
+        });
+      }
+
+      // Check for comments
+      if (line.startsWith(';')) continue;
+
+      // Check for labels
+      if (line.endsWith(':')) continue;
+
+      // Check for basic instruction format
+      const parts = line.split(/\s+/);
+      if (parts.length < 1) {
+        errors.push({
+          line: i + 1,
+          column: 0,
+          message: 'Invalid instruction format',
+          severity: 'error'
+        });
+      }
+    }
+
+    return errors;
+  }
 }
