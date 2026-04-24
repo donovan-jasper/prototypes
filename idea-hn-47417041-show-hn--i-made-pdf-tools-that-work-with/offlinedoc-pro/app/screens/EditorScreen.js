@@ -6,7 +6,8 @@ const EditorScreen = ({ route, navigation }) => {
   const { pdfData } = route.params;
 
   const handleSave = (editedPdf) => {
-    // Handle saved PDF
+    // In a real app, you would save the PDF to storage here
+    console.log('PDF saved:', editedPdf);
     navigation.navigate('Home');
   };
 
