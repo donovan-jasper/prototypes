@@ -10,38 +10,32 @@ interface CompilationResult {
   error?: string;
 }
 
-export async function compileTypeScriptToWasm(code: string): Promise<CompilationResult> {
-  // First check cache
-  const cached = await checkCache(code);
-  if (cached) return cached;
+interface CompilationRequest {
+  code: string;
+  resolve: (result: CompilationResult) => void;
+  reject: (error: Error) => void;
+}
 
-  // If not cached, compile fresh
-  return new Promise((resolve) => {
-    const webViewRef = React.createRef<WebView>();
+class WebViewCompiler {
+  private static instance: WebViewCompiler;
+  private webViewRef: React.RefObject<WebView>;
+  private queue: CompilationRequest[] = [];
+  private isProcessing = false;
+  private webViewReady = false;
 
-    const handleMessage = (event: any) => {
-      try {
-        const data = JSON.parse(event.nativeEvent.data);
+  private constructor() {
+    this.webViewRef = React.createRef();
+    this.initializeWebView();
+  }
 
-        if (data.type === 'compilationResult') {
-          if (data.success) {
-            const wasmBytes = new Uint8Array(data.wasmBytes);
-            if (validateWasmOutput(wasmBytes)) {
-              // Cache successful compilation
-              cacheCompilation(code, wasmBytes);
-              resolve({ success: true, wasmBytes });
-            } else {
-              resolve({ success: false, error: 'Invalid WASM output format' });
-            }
-          } else {
-            resolve({ success: false, error: data.error });
-          }
-        }
-      } catch (error) {
-        resolve({ success: false, error: 'Failed to parse compilation result' });
-      }
-    };
+  public static getInstance(): WebViewCompiler {
+    if (!WebViewCompiler.instance) {
+      WebViewCompiler.instance = new WebViewCompiler();
+    }
+    return WebViewCompiler.instance;
+  }
 
+  private initializeWebView() {
     const html = `
       <!DOCTYPE html>
       <html>
@@ -52,6 +46,13 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
         <body>
           <script>
             window.addEventListener('message', async (event) => {
+              if (event.data.type === 'ready') {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'ready'
+                }));
+                return;
+              }
+
               try {
                 const code = event.data.code;
 
@@ -74,96 +75,156 @@ export async function compileTypeScriptToWasm(code: string): Promise<Compilation
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'compilationResult',
                   success: true,
-                  wasmBytes: Array.from(result.buffer)
+                  wasmBytes: Array.from(result.buffer),
+                  requestId: event.data.requestId
                 }));
               } catch (error) {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'compilationResult',
                   success: false,
-                  error: error.message || 'Unknown compilation error'
+                  error: error.message || 'Unknown compilation error',
+                  requestId: event.data.requestId
                 }));
               }
             });
+
+            // Notify when ready
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'ready'
+            }));
           </script>
         </body>
       </html>
     `;
 
-    // Create a temporary container for the WebView
+    // Create a hidden WebView instance
     const container = document.createElement('div');
+    container.style.display = 'none';
     document.body.appendChild(container);
 
-    // Render WebView and send code
     ReactDOM.render(
       <WebView
-        ref={webViewRef}
+        ref={this.webViewRef}
         source={{ html }}
-        onMessage={handleMessage}
+        onMessage={this.handleWebViewMessage.bind(this)}
         javaScriptEnabled={true}
         originWhitelist={['*']}
-        injectedJavaScript={`window.postMessage({ code: ${JSON.stringify(code)} }, '*');`}
         style={{ display: 'none' }}
       />,
       container
     );
+  }
 
-    // Clean up after a delay to prevent memory leaks
-    setTimeout(() => {
-      ReactDOM.unmountComponentAtNode(container);
-      document.body.removeChild(container);
-    }, 5000);
-  });
-}
+  private handleWebViewMessage(event: any) {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
 
-async function checkCache(code: string): Promise<CompilationResult | null> {
-  return new Promise((resolve) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'SELECT wasmBytes FROM compilations WHERE codeHash = ?',
-        [hashCode(code)],
-        (_, { rows }) => {
-          if (rows.length > 0) {
-            resolve({
-              success: true,
-              wasmBytes: new Uint8Array(rows.item(0).wasmBytes)
-            });
+      if (data.type === 'ready') {
+        this.webViewReady = true;
+        this.processQueue();
+        return;
+      }
+
+      if (data.type === 'compilationResult') {
+        const request = this.queue.find(req => req.requestId === data.requestId);
+        if (request) {
+          if (data.success) {
+            const wasmBytes = new Uint8Array(data.wasmBytes);
+            if (validateWasmOutput(wasmBytes)) {
+              request.resolve({ success: true, wasmBytes });
+            } else {
+              request.resolve({ success: false, error: 'Invalid WASM output format' });
+            }
           } else {
+            request.resolve({ success: false, error: data.error });
+          }
+          this.queue = this.queue.filter(req => req.requestId !== data.requestId);
+          this.isProcessing = false;
+          this.processQueue();
+        }
+      }
+    } catch (error) {
+      console.error('Error processing WebView message:', error);
+    }
+  }
+
+  private processQueue() {
+    if (!this.webViewReady || this.isProcessing || this.queue.length === 0) {
+      return;
+    }
+
+    this.isProcessing = true;
+    const request = this.queue[0];
+
+    try {
+      this.webViewRef.current?.postMessage(JSON.stringify({
+        type: 'compile',
+        code: request.code,
+        requestId: request.requestId
+      }));
+    } catch (error) {
+      request.reject(error);
+      this.queue.shift();
+      this.isProcessing = false;
+      this.processQueue();
+    }
+  }
+
+  public async compile(code: string): Promise<CompilationResult> {
+    // Check cache first
+    const cached = await this.checkCache(code);
+    if (cached) return cached;
+
+    return new Promise((resolve, reject) => {
+      const requestId = Date.now().toString();
+      this.queue.push({ code, resolve, reject, requestId });
+      this.processQueue();
+    });
+  }
+
+  private async checkCache(code: string): Promise<CompilationResult | null> {
+    return new Promise((resolve) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'SELECT wasmBytes FROM compilations WHERE codeHash = ?',
+          [this.hashCode(code)],
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              resolve({
+                success: true,
+                wasmBytes: new Uint8Array(rows.item(0).wasmBytes)
+              });
+            } else {
+              resolve(null);
+            }
+          },
+          (_, error) => {
+            console.error('Cache check failed:', error);
             resolve(null);
           }
-        },
-        (_, error) => {
-          console.error('Cache check failed:', error);
-          resolve(null);
-        }
-      );
+        );
+      });
     });
-  });
-}
-
-function cacheCompilation(code: string, wasmBytes: Uint8Array) {
-  db.transaction(tx => {
-    tx.executeSql(
-      'INSERT OR REPLACE INTO compilations (codeHash, code, wasmBytes) VALUES (?, ?, ?)',
-      [hashCode(code), code, Array.from(wasmBytes)]
-    );
-  });
-}
-
-function hashCode(str: string): string {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32bit integer
   }
-  return hash.toString();
+
+  private hashCode(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return hash.toString();
+  }
+
+  public cleanup() {
+    // Clean up the WebView instance
+    if (this.webViewRef.current) {
+      ReactDOM.unmountComponentAtNode(this.webViewRef.current);
+    }
+    WebViewCompiler.instance = null;
+  }
 }
 
-export function validateWasmOutput(wasmBytes: Uint8Array): boolean {
-  // Check for WASM magic number (0x00 0x61 0x73 0x6d)
-  if (wasmBytes.length < 4) return false;
-  return wasmBytes[0] === 0x00 &&
-         wasmBytes[1] === 0x61 &&
-         wasmBytes[2] === 0x73 &&
-         wasmBytes[3] === 0x6d;
-}
+export const compileTypeScriptToWasm = (code: string) => WebViewCompiler.getInstance().compile(code);
+export const cleanupCompiler = () => WebViewCompiler.getInstance().cleanup();

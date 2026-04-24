@@ -1,219 +1,156 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, ActivityIndicator, Alert } from 'react-native';
-import { WebView } from 'react-native-webview';
-import { useNavigation } from '@react-navigation/native';
-import { compileTypeScriptToWasm } from '../../lib/compiler';
-import { updateProject, getProjectById } from '../../lib/database';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import CodeEditor from '../../components/CodeEditor';
+import WasmPreview from '../../components/WasmPreview';
+import ConsoleOutput from '../../components/ConsoleOutput';
+import { loadProject, saveProject } from '../../lib/storage';
 
-export default function EditorScreen({ route }) {
-  const { projectId } = route.params;
+const EditorScreen = () => {
+  const { projectId } = useLocalSearchParams();
+  const router = useRouter();
+  const [project, setProject] = useState(null);
   const [code, setCode] = useState('');
+  const [wasmBytes, setWasmBytes] = useState(null);
+  const [consoleLogs, setConsoleLogs] = useState([]);
   const [isCompiling, setIsCompiling] = useState(false);
-  const [compilationError, setCompilationError] = useState(null);
-  const webViewRef = useRef(null);
-  const navigation = useNavigation();
+  const [compilationProgress, setCompilationProgress] = useState(0);
 
   useEffect(() => {
-    loadProject();
-  }, []);
-
-  const loadProject = async () => {
-    try {
-      const project = await getProjectById(projectId);
-      if (project) {
-        setCode(project.code || '');
-      }
-    } catch (error) {
-      console.error('Failed to load project:', error);
-      Alert.alert('Error', 'Failed to load project');
+    if (projectId) {
+      loadProject(projectId).then(loadedProject => {
+        if (loadedProject) {
+          setProject(loadedProject);
+          setCode(loadedProject.code || '');
+          if (loadedProject.wasmBytes) {
+            setWasmBytes(new Uint8Array(loadedProject.wasmBytes));
+          }
+        }
+      });
     }
-  };
+  }, [projectId]);
 
   const handleCodeChange = (newCode) => {
     setCode(newCode);
-    // Auto-save every 3 seconds
-    const timeout = setTimeout(() => saveProject(newCode), 3000);
-    return () => clearTimeout(timeout);
+    // Auto-save with debounce
+    const debounceTimer = setTimeout(() => {
+      if (project) {
+        saveProject({ ...project, code: newCode });
+      }
+    }, 1000);
+
+    return () => clearTimeout(debounceTimer);
   };
 
-  const saveProject = async (codeToSave) => {
-    try {
-      await updateProject({ id: projectId, code: codeToSave });
-    } catch (error) {
-      console.error('Failed to save project:', error);
+  const handleCompile = async (result) => {
+    setIsCompiling(false);
+
+    if (result.success) {
+      setWasmBytes(result.wasmBytes);
+      if (project) {
+        await saveProject({
+          ...project,
+          wasmBytes: Array.from(result.wasmBytes),
+          updatedAt: Date.now()
+        });
+      }
+      Alert.alert('Success', 'Compilation completed successfully');
+    } else {
+      Alert.alert('Error', result.error || 'Compilation failed');
     }
   };
 
-  const compileCode = async () => {
-    if (!code.trim()) {
-      Alert.alert('Error', 'Please enter some code to compile');
+  const handleConsoleOutput = (output) => {
+    setConsoleLogs(prev => [...prev, output]);
+  };
+
+  const handleClearConsole = () => {
+    setConsoleLogs([]);
+  };
+
+  const handlePreview = () => {
+    if (!wasmBytes) {
+      Alert.alert('Error', 'No compiled WASM available. Please compile first.');
       return;
     }
-
-    setIsCompiling(true);
-    setCompilationError(null);
-
-    try {
-      const result = await compileTypeScriptToWasm(code);
-
-      if (result.success) {
-        await updateProject({
-          id: projectId,
-          code,
-          wasmBytes: result.wasmBytes
-        });
-        navigation.navigate('preview', { projectId });
-      } else {
-        setCompilationError(result.error || 'Compilation failed');
-      }
-    } catch (error) {
-      console.error('Compilation error:', error);
-      setCompilationError(error.message || 'Unknown compilation error');
-    } finally {
-      setIsCompiling(false);
-    }
+    // Navigate to preview screen with WASM bytes
+    router.push({
+      pathname: '/preview',
+      params: { projectId }
+    });
   };
-
-  const editorHtml = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs/loader.min.js"></script>
-        <style>
-          body, html { margin: 0; padding: 0; height: 100%; }
-          #container { height: 100%; }
-        </style>
-      </head>
-      <body>
-        <div id="container"></div>
-        <script>
-          require.config({ paths: { vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.34.1/min/vs' }});
-          require(['vs/editor/editor.main'], function() {
-            const editor = monaco.editor.create(document.getElementById('container'), {
-              value: ${JSON.stringify(code)},
-              language: 'typescript',
-              theme: 'vs-dark',
-              automaticLayout: true,
-              minimap: { enabled: false },
-              fontSize: 14,
-              lineNumbers: 'on',
-              roundedSelection: false,
-              scrollBeyondLastLine: false,
-              readOnly: false,
-              wordWrap: 'on'
-            });
-
-            editor.onDidChangeModelContent(() => {
-              window.ReactNativeWebView.postMessage(
-                JSON.stringify({
-                  type: 'codeChange',
-                  code: editor.getValue()
-                })
-              );
-            });
-
-            window.addEventListener('message', (event) => {
-              if (event.data.type === 'setCode') {
-                editor.setValue(event.data.code);
-              }
-            });
-          });
-        </script>
-      </body>
-    </html>
-  `;
 
   return (
     <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ html: editorHtml }}
-        onMessage={(event) => {
-          try {
-            const data = JSON.parse(event.nativeEvent.data);
-            if (data.type === 'codeChange') {
-              handleCodeChange(data.code);
-            }
-          } catch (error) {
-            console.error('Error parsing WebView message:', error);
-          }
-        }}
-        javaScriptEnabled={true}
-        style={styles.editor}
-        originWhitelist={['*']}
-      />
-
-      {compilationError && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{compilationError}</Text>
-        </View>
-      )}
+      <View style={styles.editorContainer}>
+        <CodeEditor
+          initialCode={code}
+          onCodeChange={handleCodeChange}
+          onCompile={handleCompile}
+          onProgress={setCompilationProgress}
+        />
+      </View>
 
       <View style={styles.toolbar}>
         <TouchableOpacity
-          style={[styles.button, styles.compileButton]}
-          onPress={compileCode}
+          style={[styles.button, isCompiling && styles.disabledButton]}
+          onPress={() => setIsCompiling(true)}
           disabled={isCompiling}
         >
-          {isCompiling ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Compile</Text>
-          )}
+          <Text style={styles.buttonText}>
+            {isCompiling ? `Compiling (${compilationProgress}%)...` : 'Compile'}
+          </Text>
         </TouchableOpacity>
-
         <TouchableOpacity
-          style={[styles.button, styles.previewButton]}
-          onPress={() => navigation.navigate('preview', { projectId })}
-          disabled={isCompiling}
+          style={[styles.button, !wasmBytes && styles.disabledButton]}
+          onPress={handlePreview}
+          disabled={!wasmBytes}
         >
           <Text style={styles.buttonText}>Preview</Text>
         </TouchableOpacity>
       </View>
+
+      <View style={styles.consoleContainer}>
+        <ConsoleOutput logs={consoleLogs} onClear={handleClearConsole} />
+      </View>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1e1e1e',
+    backgroundColor: '#fff',
   },
-  editor: {
+  editorContainer: {
     flex: 1,
   },
   toolbar: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     padding: 10,
-    backgroundColor: '#252526',
+    backgroundColor: '#f0f0f0',
     borderTopWidth: 1,
-    borderTopColor: '#333',
+    borderTopColor: '#ddd',
   },
   button: {
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    padding: 10,
+    backgroundColor: '#007AFF',
     borderRadius: 5,
-    marginRight: 10,
+    minWidth: 100,
     alignItems: 'center',
-    justifyContent: 'center',
   },
-  compileButton: {
-    backgroundColor: '#007acc',
-    flex: 1,
-  },
-  previewButton: {
-    backgroundColor: '#6c757d',
+  disabledButton: {
+    backgroundColor: '#cccccc',
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  errorContainer: {
-    backgroundColor: '#ff5555',
+  consoleContainer: {
+    height: 200,
     padding: 10,
   },
-  errorText: {
-    color: 'white',
-    fontSize: 14,
-  },
 });
+
+export default EditorScreen;
