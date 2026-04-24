@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
-import { Text, Button, TextInput, ActivityIndicator } from 'react-native-paper';
+import { View, StyleSheet, Alert, Platform } from 'react-native';
+import { Text, Button, TextInput, ActivityIndicator, IconButton } from 'react-native-paper';
 import { Audio } from 'expo-av';
 import { useRouter } from 'expo-router';
 import { useProjectStore } from '@/store/projectStore';
@@ -47,7 +47,7 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
       setIsRecording(true);
     } catch (err) {
       console.error('Failed to start recording', err);
-      Alert.alert('Error', 'Failed to start recording');
+      Alert.alert('Error', 'Failed to start recording. Please check microphone permissions.');
     }
   };
 
@@ -60,18 +60,21 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
       setIsRecording(false);
       setIsTranscribing(true);
 
-      // Simulate transcription with timeout
+      // In a real app, you would send the audio file to a transcription service
+      // For this prototype, we'll simulate transcription
       setTimeout(async () => {
-        const simulatedTranscription = "I want to build a fitness app where users can log workouts and track progress";
-        setTranscription(simulatedTranscription);
+        // Use the actual transcription if available, otherwise use a default
+        const finalTranscription = transcription || "I want to build a fitness app where users can log workouts and track progress";
+        setTranscription(finalTranscription);
         setIsTranscribing(false);
 
         // Create project with the transcribed text
-        await createProjectFromDescription(simulatedTranscription);
+        await createProjectFromDescription(finalTranscription);
       }, 2000);
     } catch (err) {
       console.error('Failed to stop recording', err);
       Alert.alert('Error', 'Failed to stop recording');
+      setIsTranscribing(false);
     }
   };
 
@@ -145,47 +148,55 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
           icon={isRecording ? 'stop' : 'microphone'}
           style={styles.recordButton}
           disabled={isTranscribing}
+          loading={isRecording}
         >
           {isRecording ? 'Stop Recording' : 'Start Recording'}
         </Button>
 
-        {isRecording && (
-          <Text style={styles.recordingText}>Recording...</Text>
-        )}
+        <Text variant="bodyMedium" style={styles.hintText}>
+          {isRecording ? 'Speak clearly into your microphone...' : 'Tap the microphone to start recording'}
+        </Text>
+      </View>
 
+      <View style={styles.transcriptionContainer}>
+        <Text variant="titleMedium" style={styles.sectionTitle}>
+          Transcription
+        </Text>
+        <TextInput
+          mode="outlined"
+          multiline
+          numberOfLines={4}
+          value={transcription}
+          onChangeText={setTranscription}
+          style={styles.transcriptionInput}
+          placeholder="Your spoken idea will appear here..."
+          disabled={isTranscribing}
+        />
         {isTranscribing && (
-          <View style={styles.transcribingContainer}>
-            <ActivityIndicator animating={true} />
+          <View style={styles.transcribingIndicator}>
+            <ActivityIndicator animating={true} size="small" />
             <Text style={styles.transcribingText}>Transcribing...</Text>
           </View>
         )}
       </View>
 
-      <TextInput
-        label="Or type your idea here"
-        value={transcription}
-        onChangeText={setTranscription}
-        multiline
-        numberOfLines={4}
-        style={styles.textInput}
-        disabled={isTranscribing}
-      />
-
-      <Button
-        mode="contained"
-        onPress={handleTextSubmit}
-        style={styles.submitButton}
-        disabled={isTranscribing || !transcription.trim()}
-      >
-        Create Project
-      </Button>
+      <View style={styles.actions}>
+        <Button
+          mode="contained"
+          onPress={handleTextSubmit}
+          disabled={!transcription.trim() || isTranscribing}
+          style={styles.submitButton}
+        >
+          Continue with This Description
+        </Button>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    flex: 1,
   },
   title: {
     marginBottom: 16,
@@ -193,28 +204,41 @@ const styles = StyleSheet.create({
   },
   controls: {
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 24,
   },
   recordButton: {
     marginBottom: 8,
     paddingHorizontal: 24,
+    paddingVertical: 8,
   },
-  recordingText: {
-    color: '#d32f2f',
+  hintText: {
+    color: '#666',
+    textAlign: 'center',
+  },
+  transcriptionContainer: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    marginBottom: 8,
     fontWeight: 'bold',
   },
-  transcribingContainer: {
+  transcriptionInput: {
+    backgroundColor: '#fff',
+  },
+  transcribingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 8,
   },
   transcribingText: {
     marginLeft: 8,
+    color: '#666',
   },
-  textInput: {
-    marginBottom: 16,
+  actions: {
+    marginTop: 16,
   },
   submitButton: {
-    marginTop: 8,
+    paddingVertical: 8,
   },
 });

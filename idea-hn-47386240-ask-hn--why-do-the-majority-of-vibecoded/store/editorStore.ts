@@ -1,136 +1,182 @@
 import { create } from 'zustand';
 import type { Project, Screen, Component } from '@/types/project';
-import { getProject, getScreensByProject, getComponentsByScreen, createScreen as dbCreateScreen, createComponent as dbCreateComponent } from '@/lib/db/queries';
-import { Alert } from 'react-native'; // For error feedback
+import {
+  getProject,
+  getScreensByProject,
+  getComponentsByScreen,
+  updateProject,
+  createScreen,
+  updateScreen,
+  deleteScreen,
+  createComponent,
+  updateComponent,
+  deleteComponent
+} from '@/lib/db/queries';
 
-interface EditorState {
+interface EditorStore {
   currentProject: Project | null;
-  screens: Screen[];
-  activeScreenId: string | null;
+  currentScreen: Screen | null;
   components: Component[];
+  selectedComponent: Component | null;
   loading: boolean;
   error: string | null;
-}
-
-interface EditorActions {
   loadProjectData: (projectId: string) => Promise<void>;
-  setActiveScreen: (screenId: string) => Promise<void>;
-  addScreen: (name: string) => Promise<Screen | null>;
-  // For now, just a placeholder to add a component. Actual implementation will be more complex.
-  addComponent: (screenId: string, type: string, props: object, position: object, order: number) => Promise<Component | null>;
-  // TODO: Add update/delete for screens and components
+  selectScreen: (screenId: string) => Promise<void>;
+  selectComponent: (componentId: string | null) => void;
+  updateComponentProps: (componentId: string, props: Record<string, any>) => Promise<void>;
+  addComponent: (screenId: string, component: Omit<Component, 'id'>) => Promise<Component>;
+  removeComponent: (componentId: string) => Promise<void>;
+  updateProjectName: (name: string) => Promise<void>;
 }
 
-export const useEditorStore = create<EditorState & EditorActions>((set, get) => ({
+export const useEditorStore = create<EditorStore>((set, get) => ({
   currentProject: null,
-  screens: [],
-  activeScreenId: null,
+  currentScreen: null,
   components: [],
+  selectedComponent: null,
   loading: false,
   error: null,
 
-  loadProjectData: async (projectId: string) => {
-    set({ loading: true, error: null, currentProject: null, screens: [], activeScreenId: null, components: [] });
+  loadProjectData: async (projectId) => {
+    set({ loading: true, error: null });
     try {
       const project = await getProject(projectId);
       if (!project) {
         throw new Error('Project not found');
       }
+
       const screens = await getScreensByProject(projectId);
+      const firstScreen = screens.length > 0 ? screens[0] : null;
 
-      let activeScreenId = screens.length > 0 ? screens[0].id : null;
-      let components: Component[] = [];
-
-      // If no screens exist, create a default one
-      if (screens.length === 0) {
-        const newScreen = await dbCreateScreen({
-          projectId: project.id,
-          name: 'Home Screen',
-          order: 0,
-          layout: {},
+      if (firstScreen) {
+        const components = await getComponentsByScreen(firstScreen.id);
+        set({
+          currentProject: project,
+          currentScreen: firstScreen,
+          components,
+          loading: false,
         });
-        screens.push(newScreen);
-        activeScreenId = newScreen.id;
+      } else {
+        set({
+          currentProject: project,
+          currentScreen: null,
+          components: [],
+          loading: false,
+        });
       }
-
-      if (activeScreenId) {
-        components = await getComponentsByScreen(activeScreenId);
-      }
-
-      set({
-        currentProject: project,
-        screens,
-        activeScreenId,
-        components,
-        loading: false,
-      });
     } catch (error) {
-      console.error('Failed to load project data:', error);
       set({ error: (error as Error).message, loading: false });
-      Alert.alert('Error', `Failed to load project: ${(error as Error).message}`);
+      throw error;
     }
   },
 
-  setActiveScreen: async (screenId: string) => {
-    set({ loading: true, error: null, components: [] });
+  selectScreen: async (screenId) => {
+    set({ loading: true, error: null });
     try {
+      const { currentProject } = get();
+      if (!currentProject) throw new Error('No project loaded');
+
+      const screens = await getScreensByProject(currentProject.id);
+      const selectedScreen = screens.find(s => s.id === screenId);
+
+      if (!selectedScreen) throw new Error('Screen not found');
+
       const components = await getComponentsByScreen(screenId);
-      set({ activeScreenId: screenId, components, loading: false });
+      set({
+        currentScreen: selectedScreen,
+        components,
+        selectedComponent: null,
+        loading: false,
+      });
     } catch (error) {
-      console.error('Failed to set active screen:', error);
       set({ error: (error as Error).message, loading: false });
-      Alert.alert('Error', `Failed to load screen components: ${(error as Error).message}`);
+      throw error;
     }
   },
 
-  addScreen: async (name: string) => {
-    const { currentProject, screens } = get();
-    if (!currentProject) {
-      Alert.alert('Error', 'No project selected to add a screen to.');
-      return null;
-    }
+  selectComponent: (componentId) => {
+    const { components } = get();
+    const selected = componentId ? components.find(c => c.id === componentId) : null;
+    set({ selectedComponent: selected });
+  },
 
+  updateComponentProps: async (componentId, props) => {
     set({ loading: true, error: null });
     try {
-      const newScreen = await dbCreateScreen({
-        projectId: currentProject.id,
-        name,
-        order: screens.length, // Simple ordering for now
-        layout: {},
-      });
-      set((state) => ({
-        screens: [...state.screens, newScreen],
+      const { components } = get();
+      const componentIndex = components.findIndex(c => c.id === componentId);
+
+      if (componentIndex === -1) throw new Error('Component not found');
+
+      const updatedComponent = { ...components[componentIndex], props };
+      await updateComponent(componentId, { props });
+
+      set(state => ({
+        components: [
+          ...state.components.slice(0, componentIndex),
+          updatedComponent,
+          ...state.components.slice(componentIndex + 1)
+        ],
         loading: false,
       }));
-      return newScreen;
     } catch (error) {
-      console.error('Failed to add screen:', error);
       set({ error: (error as Error).message, loading: false });
-      Alert.alert('Error', `Failed to add screen: ${(error as Error).message}`);
-      return null;
+      throw error;
     }
   },
 
-  addComponent: async (screenId: string, type: string, props: object, position: object, order: number) => {
+  addComponent: async (screenId, componentData) => {
     set({ loading: true, error: null });
     try {
-      const newComponent = await dbCreateComponent({
+      const newComponent = await createComponent({
         screenId,
-        type,
-        props,
-        position,
-        order,
+        ...componentData,
       });
-      set((state) => ({
+
+      set(state => ({
         components: [...state.components, newComponent],
+        selectedComponent: newComponent,
         loading: false,
       }));
+
       return newComponent;
     } catch (error) {
-      console.error('Failed to add component:', error);
       set({ error: (error as Error).message, loading: false });
-      Alert.alert('Error', `Failed to add component: ${(error as Error).message}`);
-      return null;
+      throw error;
+    }
+  },
+
+  removeComponent: async (componentId) => {
+    set({ loading: true, error: null });
+    try {
+      await deleteComponent(componentId);
+
+      set(state => ({
+        components: state.components.filter(c => c.id !== componentId),
+        selectedComponent: state.selectedComponent?.id === componentId ? null : state.selectedComponent,
+        loading: false,
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, loading: false });
+      throw error;
+    }
+  },
+
+  updateProjectName: async (name) => {
+    set({ loading: true, error: null });
+    try {
+      const { currentProject } = get();
+      if (!currentProject) throw new Error('No project loaded');
+
+      await updateProject(currentProject.id, { name });
+
+      set(state => ({
+        currentProject: state.currentProject ? { ...state.currentProject, name } : null,
+        loading: false,
+      }));
+    } catch (error) {
+      set({ error: (error as Error).message, loading: false });
+      throw error;
     }
   },
 }));

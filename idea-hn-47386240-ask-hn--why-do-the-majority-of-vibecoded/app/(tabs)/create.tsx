@@ -1,18 +1,43 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, Button, ActivityIndicator } from 'react-native-paper';
 import VoiceInput from '@/components/wizard/VoiceInput';
 import QuestionFlow from '@/components/wizard/QuestionFlow';
 import ProgressIndicator from '@/components/wizard/ProgressIndicator';
+import { useRouter } from 'expo-router';
+import { useProjectStore } from '@/store/projectStore';
 
 export default function CreateScreen() {
   const [currentStep, setCurrentStep] = useState(0);
   const [projectId, setProjectId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { addProject } = useProjectStore();
+  const router = useRouter();
+
   const steps = ['Describe Your Idea', 'Voice Input', 'Refine Details', 'Review'];
 
   const handleProjectCreated = (id: string) => {
     setProjectId(id);
     setCurrentStep(2);
+  };
+
+  const handleProjectSubmitted = async () => {
+    if (!projectId) return;
+
+    setIsLoading(true);
+    try {
+      // In a real app, we would save the final project state here
+      Alert.alert('Success', 'Your prototype is ready!', [
+        {
+          text: 'View Project',
+          onPress: () => router.replace(`/project/${projectId}`),
+        },
+      ]);
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save project. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -67,7 +92,10 @@ export default function CreateScreen() {
 
       {currentStep === 2 && projectId && (
         <View style={styles.stepContent}>
-          <QuestionFlow projectId={projectId} />
+          <QuestionFlow
+            projectId={projectId}
+            onComplete={() => setCurrentStep(3)}
+          />
           <View style={styles.navigationButtons}>
             <Button
               mode="outlined"
@@ -75,6 +103,34 @@ export default function CreateScreen() {
               style={styles.backButton}
             >
               Back
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {currentStep === 3 && projectId && (
+        <View style={styles.stepContent}>
+          <Text variant="titleMedium" style={styles.stepTitle}>
+            Review Your Prototype
+          </Text>
+          <Text variant="bodyMedium" style={styles.stepDescription}>
+            Your prototype is ready! You can now view it in the editor or continue refining your answers.
+          </Text>
+          <View style={styles.navigationButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => setCurrentStep(2)}
+              style={styles.backButton}
+            >
+              Back
+            </Button>
+            <Button
+              mode="contained"
+              onPress={handleProjectSubmitted}
+              style={styles.nextButton}
+              disabled={isLoading}
+            >
+              {isLoading ? <ActivityIndicator animating={true} color="#fff" /> : 'View Prototype'}
             </Button>
           </View>
         </View>
@@ -107,16 +163,24 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   stepTitle: {
     marginBottom: 8,
+    fontWeight: 'bold',
   },
   stepDescription: {
     marginBottom: 16,
     color: '#666',
+    lineHeight: 20,
   },
   nextButton: {
     marginTop: 16,
+    paddingVertical: 8,
   },
   navigationButtons: {
     flexDirection: 'row',
@@ -125,5 +189,7 @@ const styles = StyleSheet.create({
   },
   backButton: {
     flex: 1,
+    marginRight: 8,
+    paddingVertical: 8,
   },
 });

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Button, TextInput, ProgressBar, RadioButton } from 'react-native-paper';
+import { Text, Button, TextInput, ProgressBar, RadioButton, ActivityIndicator } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { generateQuestions } from '@/lib/ai/questionGenerator';
 import { useEditorStore } from '@/store/editorStore';
@@ -14,9 +14,10 @@ interface Question {
 
 interface QuestionFlowProps {
   projectId: string;
+  onComplete: () => void;
 }
 
-export default function QuestionFlow({ projectId }: QuestionFlowProps) {
+export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -66,13 +67,8 @@ export default function QuestionFlow({ projectId }: QuestionFlowProps) {
     setSubmitting(true);
     try {
       // In a real app, you would save answers to the project
-      // For this prototype, we'll just navigate to the project editor
-      Alert.alert('Success', 'Your answers have been recorded!', [
-        {
-          text: 'OK',
-          onPress: () => router.replace(`/project/${projectId}`),
-        },
-      ]);
+      // For this prototype, we'll just notify the parent component
+      onComplete();
     } catch (error) {
       console.error('Failed to submit answers:', error);
       Alert.alert('Error', 'Failed to submit answers. Please try again.');
@@ -90,8 +86,8 @@ export default function QuestionFlow({ projectId }: QuestionFlowProps) {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <Text>Generating questions...</Text>
-        <ProgressBar indeterminate style={styles.progressBar} />
+        <ActivityIndicator animating={true} size="large" />
+        <Text style={styles.loadingText}>Generating questions...</Text>
       </View>
     );
   }
@@ -182,10 +178,9 @@ export default function QuestionFlow({ projectId }: QuestionFlowProps) {
             onPress={goBack}
             style={styles.backButton}
           >
-            Back
+            Previous
           </Button>
         )}
-
         {currentQuestionIndex < questions.length - 1 && (
           <Button
             mode="contained"
@@ -196,16 +191,15 @@ export default function QuestionFlow({ projectId }: QuestionFlowProps) {
             Next
           </Button>
         )}
-
         {currentQuestionIndex === questions.length - 1 && (
           <Button
             mode="contained"
             onPress={submitAnswers}
             style={styles.submitButton}
+            disabled={!answers[currentQuestion.id] || submitting}
             loading={submitting}
-            disabled={!answers[currentQuestion.id]}
           >
-            Finish
+            {submitting ? 'Submitting...' : 'Complete'}
           </Button>
         )}
       </View>
@@ -221,8 +215,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
+    marginBottom: 8,
     textAlign: 'center',
-    marginBottom: 4,
   },
   subtitle: {
     textAlign: 'center',
@@ -230,31 +224,35 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     marginBottom: 24,
-    height: 4,
+    height: 8,
+    borderRadius: 4,
   },
   questionContainer: {
     marginBottom: 24,
   },
   questionText: {
     marginBottom: 16,
+    fontWeight: 'bold',
   },
   textInput: {
-    marginBottom: 16,
+    backgroundColor: '#fff',
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginTop: 8,
   },
   optionButton: {
     marginBottom: 8,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 16,
   },
   booleanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 16,
+    justifyContent: 'space-between',
+    marginTop: 16,
   },
   booleanButton: {
     flex: 1,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   navigationButtons: {
     flexDirection: 'row',
@@ -264,19 +262,26 @@ const styles = StyleSheet.create({
   backButton: {
     flex: 1,
     marginRight: 8,
+    paddingVertical: 8,
   },
   nextButton: {
     flex: 1,
     marginLeft: 8,
+    paddingVertical: 8,
   },
   submitButton: {
     flex: 1,
+    paddingVertical: 8,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
   },
   emptyContainer: {
     flex: 1,

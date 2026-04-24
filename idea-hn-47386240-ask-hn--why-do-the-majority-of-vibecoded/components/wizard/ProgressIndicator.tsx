@@ -1,41 +1,40 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text } from 'react-native-paper';
+import { Text, ProgressBar } from 'react-native-paper';
 
 interface ProgressIndicatorProps {
   currentStep: number;
   totalSteps: number;
-  stepNames?: string[];
+  stepNames: string[];
 }
 
 export default function ProgressIndicator({ currentStep, totalSteps, stepNames }: ProgressIndicatorProps) {
+  const progress = (currentStep + 1) / totalSteps;
+
   return (
     <View style={styles.container}>
+      <ProgressBar progress={progress} style={styles.progressBar} />
+
       <View style={styles.stepsContainer}>
-        {Array.from({ length: totalSteps }).map((_, index) => (
-          <View key={index} style={styles.stepWrapper}>
-            <View
-              style={[
-                styles.stepCircle,
-                index <= currentStep ? styles.activeStep : styles.inactiveStep,
-              ]}
-            >
-              <Text style={styles.stepNumber}>{index + 1}</Text>
-            </View>
-            {stepNames && (
+        {stepNames.map((name, index) => (
+          <View key={index} style={styles.stepItem}>
+            <View style={[
+              styles.stepCircle,
+              index <= currentStep ? styles.activeStep : styles.inactiveStep
+            ]}>
               <Text style={[
-                styles.stepLabel,
-                index <= currentStep ? styles.activeLabel : styles.inactiveLabel,
+                styles.stepNumber,
+                index <= currentStep ? styles.activeStepText : styles.inactiveStepText
               ]}>
-                {stepNames[index]}
+                {index + 1}
               </Text>
-            )}
-            {index < totalSteps - 1 && (
-              <View style={[
-                styles.stepConnector,
-                index < currentStep ? styles.activeConnector : styles.inactiveConnector,
-              ]} />
-            )}
+            </View>
+            <Text style={[
+              styles.stepName,
+              index <= currentStep ? styles.activeStepText : styles.inactiveStepText
+            ]}>
+              {name}
+            </Text>
           </View>
         ))}
       </View>
@@ -47,14 +46,18 @@ const styles = StyleSheet.create({
   container: {
     marginBottom: 24,
   },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
   stepsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
   },
-  stepWrapper: {
+  stepItem: {
     alignItems: 'center',
-    position: 'relative',
+    flex: 1,
   },
   stepCircle: {
     width: 32,
@@ -71,31 +74,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   stepNumber: {
-    color: 'white',
     fontWeight: 'bold',
   },
-  stepLabel: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  activeLabel: {
+  activeStepText: {
     color: '#6200ee',
-    fontWeight: 'bold',
   },
-  inactiveLabel: {
+  inactiveStepText: {
     color: '#9e9e9e',
   },
-  stepConnector: {
-    position: 'absolute',
-    top: 16,
-    left: 32,
-    right: -32,
-    height: 2,
-  },
-  activeConnector: {
-    backgroundColor: '#6200ee',
-  },
-  inactiveConnector: {
-    backgroundColor: '#e0e0e0',
+  stepName: {
+    fontSize: 12,
+    textAlign: 'center',
   },
 });
