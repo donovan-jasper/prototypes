@@ -1,196 +1,208 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import { Audio } from 'expo-av';
-import ChapterEditor from '@/components/ChapterEditor';
+import { detectChaptersBySilence, detectChaptersByTime } from '@/lib/audio/chapterDetector';
+import { createAudiobook } from '@/lib/db/audiobooks';
+import { createChapters } from '@/lib/db/chapters';
 import { useRouter } from 'expo-router';
 
-const ImportScreen = () => {
-  const [selectedFiles, setSelectedFiles] = useState<DocumentPicker.DocumentPickerResult[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [selectedFile, setSelectedFile] = useState<DocumentPicker.DocumentPickerResult | null>(null);
-  const [fileDuration, setFileDuration] = useState<number>(0);
+interface AudioFile {
+  uri: string;
+  name: string;
+  size: number;
+  duration: number;
+}
+
+export default function ImportScreen() {
+  const [files, setFiles] = useState<AudioFile[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
   const router = useRouter();
 
   const pickFiles = async () => {
     try {
-      setIsLoading(true);
-      setError(null);
-
       const result = await DocumentPicker.getDocumentAsync({
         type: 'audio/*',
         multiple: true,
-        copyToCacheDirectory: true,
       });
 
       if (!result.canceled && result.assets) {
-        setSelectedFiles(result.assets);
+        const audioFiles = result.assets.map(asset => ({
+          uri: asset.uri,
+          name: asset.name || 'Untitled',
+          size: asset.size || 0,
+          duration: 0, // Will be calculated
+        }));
+        setFiles(audioFiles);
       }
-    } catch (err) {
-      console.error('Error picking files:', err);
-      setError('Failed to select files. Please try again.');
-    } finally {
-      setIsLoading(false);
+    } catch (error) {
+      console.error('Error picking files:', error);
     }
   };
 
-  const getFileDuration = async (fileUri: string): Promise<number> => {
+  const processFiles = async (method: 'silence' | 'time') => {
+    if (files.length === 0) return;
+
+    setIsProcessing(true);
+    setProcessingProgress(0);
+
     try {
-      const { sound } = await Audio.Sound.createAsync(
-        { uri: fileUri },
-        { shouldPlay: false }
-      );
+      // For simplicity, we'll process one file at a time
+      const file = files[0];
+      let chapters;
 
-      const status = await sound.getStatusAsync();
-      await sound.unloadAsync();
+      if (method === 'silence') {
+        chapters = await detectChaptersBySilence(file.uri, -40, 2);
+      } else {
+        // For time-based, we need to get the duration first
+        const durationCommand = `-i "${file.uri}" -show_entries format=duration -v quiet -of csv=p=0`;
+        const durationResult = await FFprobeKit.execute(durationCommand);
+        const durationOutput = await durationResult.getOutput();
+        const duration = parseFloat(durationOutput) * 1000; // Convert to ms
 
-      return status.durationMillis || 0;
-    } catch (err) {
-      console.error('Error getting file duration:', err);
-      return 0;
-    }
-  };
-
-  const handleFileSelect = async (file: DocumentPicker.DocumentPickerResult) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      const duration = await getFileDuration(file.uri);
-      if (duration <= 0) {
-        setError('Could not determine audio duration. Please select another file.');
-        return;
+        chapters = detectChaptersByTime(duration, 4);
       }
 
-      setSelectedFile(file);
-      setFileDuration(duration);
-    } catch (err) {
-      console.error('Error handling file selection:', err);
-      setError('Failed to process the selected file. Please try again.');
+      // Create audiobook in database
+      const audiobook = await createAudiobook({
+        title: file.name.replace(/\.[^/.]+$/, ""),
+        author: 'Unknown',
+        duration: chapters[chapters.length - 1].endTime,
+        filePath: file.uri,
+        coverArt: null,
+        currentPosition: 0,
+      });
+
+      // Create chapters
+      await createChapters(audiobook.id, chapters);
+
+      // Navigate to chapter editor
+      router.push({
+        pathname: '/audiobook/[id]',
+        params: { id: audiobook.id },
+      });
+
+    } catch (error) {
+      console.error('Error processing files:', error);
+      alert('Failed to process audio file. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
-
-  const formatDuration = (milliseconds: number) => {
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const hours = Math.floor(totalSeconds / 3600);
-    const minutes = Math.floor((totalSeconds % 3600) / 60);
-    const seconds = totalSeconds % 60;
-
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
-
-  if (selectedFile) {
-    return (
-      <ChapterEditor
-        filePath={selectedFile.uri}
-        fileName={selectedFile.name || 'Unknown'}
-        duration={fileDuration}
-      />
-    );
-  }
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Import Audio Files</Text>
 
-      {error && <Text style={styles.errorText}>{error}</Text>}
-
-      {isLoading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={styles.loadingIndicator} />
+      {files.length === 0 ? (
+        <TouchableOpacity style={styles.button} onPress={pickFiles}>
+          <Text style={styles.buttonText}>Select Audio Files</Text>
+        </TouchableOpacity>
       ) : (
-        <>
-          <TouchableOpacity style={styles.importButton} onPress={pickFiles}>
-            <Text style={styles.importButtonText}>Select Audio Files</Text>
+        <View style={styles.fileListContainer}>
+          <Text style={styles.sectionTitle}>Selected Files:</Text>
+          <FlatList
+            data={files}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => (
+              <View style={styles.fileItem}>
+                <Text style={styles.fileName}>{item.name}</Text>
+                <Text style={styles.fileSize}>{(item.size / (1024 * 1024)).toFixed(2)} MB</Text>
+              </View>
+            )}
+          />
+
+          <Text style={styles.sectionTitle}>Auto-Chapter Method:</Text>
+
+          <TouchableOpacity
+            style={[styles.button, styles.methodButton]}
+            onPress={() => processFiles('silence')}
+            disabled={isProcessing}
+          >
+            <Text style={styles.buttonText}>Detect Silence</Text>
           </TouchableOpacity>
 
-          {selectedFiles.length > 0 && (
-            <>
-              <Text style={styles.sectionTitle}>Selected Files ({selectedFiles.length})</Text>
-              <FlatList
-                data={selectedFiles}
-                keyExtractor={(item, index) => index.toString()}
-                renderItem={({ item }) => (
-                  <TouchableOpacity
-                    style={styles.fileItem}
-                    onPress={() => handleFileSelect(item)}
-                  >
-                    <Text style={styles.fileName}>{item.name}</Text>
-                    {item.size && (
-                      <Text style={styles.fileSize}>
-                        {(item.size / (1024 * 1024)).toFixed(2)} MB
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-              />
-            </>
+          <TouchableOpacity
+            style={[styles.button, styles.methodButton]}
+            onPress={() => processFiles('time')}
+            disabled={isProcessing}
+          >
+            <Text style={styles.buttonText}>Equal Time Split</Text>
+          </TouchableOpacity>
+
+          {isProcessing && (
+            <View style={styles.processingContainer}>
+              <ActivityIndicator size="large" color="#007AFF" />
+              <Text style={styles.processingText}>Processing audio...</Text>
+              <Text style={styles.progressText}>{processingProgress}%</Text>
+            </View>
           )}
-        </>
+        </View>
       )}
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    padding: 20,
     backgroundColor: '#fff',
-    padding: 16,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  importButton: {
+  button: {
     backgroundColor: '#007AFF',
-    padding: 16,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  importButtonText: {
-    color: '#fff',
-    fontSize: 18,
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: '600',
+  },
+  fileListContainer: {
+    flex: 1,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   fileItem: {
-    backgroundColor: '#f5f5f5',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 8,
+    padding: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   fileName: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
   },
   fileSize: {
     fontSize: 14,
     color: '#666',
   },
-  loadingIndicator: {
-    marginTop: 24,
+  methodButton: {
+    marginTop: 10,
   },
-  errorText: {
-    color: 'red',
-    marginBottom: 16,
-    textAlign: 'center',
+  processingContainer: {
+    marginTop: 30,
+    alignItems: 'center',
+  },
+  processingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  progressText: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
   },
 });
-
-export default ImportScreen;
