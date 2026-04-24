@@ -8,8 +8,13 @@ const FeedbackForm = ({ onSubmit, submissionId, templateType, reviewerId }) => {
   const [wouldUse, setWouldUse] = useState(5);
   const [rating, setRating] = useState(5);
   const [comment, setComment] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
     try {
       const feedbackData = {
         submissionId,
@@ -19,7 +24,7 @@ const FeedbackForm = ({ onSubmit, submissionId, templateType, reviewerId }) => {
         wouldUse,
         rating,
         comment,
-        timestamp: new Date()
+        timestamp: new Date().toISOString()
       };
 
       await addDoc(collection(db, 'feedback'), feedbackData);
@@ -38,52 +43,62 @@ const FeedbackForm = ({ onSubmit, submissionId, templateType, reviewerId }) => {
     } catch (error) {
       console.error('Error submitting feedback:', error);
       Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>Clarity (1-10)</Text>
-      <Slider
-        style={styles.slider}
-        minimumValue={1}
-        maximumValue={10}
-        step={1}
-        value={clarity}
-        onValueChange={setClarity}
-        minimumTrackTintColor="#007AFF"
-        maximumTrackTintColor="#d3d3d3"
-        thumbTintColor="#007AFF"
-      />
-      <Text style={styles.value}>{clarity}</Text>
+      <Text style={styles.title}>Submit Your Feedback</Text>
 
-      <Text style={styles.label}>Would Use (1-10)</Text>
-      <Slider
-        style={styles.slider}
-        minimumValue={1}
-        maximumValue={10}
-        step={1}
-        value={wouldUse}
-        onValueChange={setWouldUse}
-        minimumTrackTintColor="#007AFF"
-        maximumTrackTintColor="#d3d3d3"
-        thumbTintColor="#007AFF"
-      />
-      <Text style={styles.value}>{wouldUse}</Text>
+      <View style={styles.sliderContainer}>
+        <Text style={styles.label}>Clarity (1-10)</Text>
+        <Slider
+          style={styles.slider}
+          minimumValue={1}
+          maximumValue={10}
+          step={1}
+          value={clarity}
+          onValueChange={setClarity}
+          minimumTrackTintColor="#007AFF"
+          maximumTrackTintColor="#d3d3d3"
+          thumbTintColor="#007AFF"
+        />
+        <Text style={styles.value}>{clarity}</Text>
+      </View>
 
-      <Text style={styles.label}>Rating (1-10)</Text>
-      <Slider
-        style={styles.slider}
-        minimumValue={1}
-        maximumValue={10}
-        step={1}
-        value={rating}
-        onValueChange={setRating}
-        minimumTrackTintColor="#007AFF"
-        maximumTrackTintColor="#d3d3d3"
-        thumbTintColor="#007AFF"
-      />
-      <Text style={styles.value}>{rating}</Text>
+      <View style={styles.sliderContainer}>
+        <Text style={styles.label}>Would Use (1-10)</Text>
+        <Slider
+          style={styles.slider}
+          minimumValue={1}
+          maximumValue={10}
+          step={1}
+          value={wouldUse}
+          onValueChange={setWouldUse}
+          minimumTrackTintColor="#007AFF"
+          maximumTrackTintColor="#d3d3d3"
+          thumbTintColor="#007AFF"
+        />
+        <Text style={styles.value}>{wouldUse}</Text>
+      </View>
+
+      <View style={styles.sliderContainer}>
+        <Text style={styles.label}>Rating (1-10)</Text>
+        <Slider
+          style={styles.slider}
+          minimumValue={1}
+          maximumValue={10}
+          step={1}
+          value={rating}
+          onValueChange={setRating}
+          minimumTrackTintColor="#007AFF"
+          maximumTrackTintColor="#d3d3d3"
+          thumbTintColor="#007AFF"
+        />
+        <Text style={styles.value}>{rating}</Text>
+      </View>
 
       <Text style={styles.label}>Additional comments (optional)</Text>
       <TextInput
@@ -93,13 +108,17 @@ const FeedbackForm = ({ onSubmit, submissionId, templateType, reviewerId }) => {
         placeholder="Enter your comments here..."
         multiline
         numberOfLines={4}
+        textAlignVertical="top"
       />
 
       <TouchableOpacity
-        style={styles.submitButton}
+        style={[styles.submitButton, isSubmitting && styles.disabledButton]}
         onPress={handleSubmit}
+        disabled={isSubmitting}
       >
-        <Text style={styles.submitButtonText}>Submit Feedback</Text>
+        <Text style={styles.submitButtonText}>
+          {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -117,10 +136,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    textAlign: 'center',
+    color: '#333',
+  },
+  sliderContainer: {
+    marginBottom: 15,
+  },
   label: {
     fontSize: 16,
     fontWeight: '600',
-    marginTop: 15,
     marginBottom: 5,
     color: '#333',
   },
@@ -143,6 +171,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     textAlignVertical: 'top',
+    minHeight: 100,
   },
   submitButton: {
     backgroundColor: '#007AFF',
@@ -150,6 +179,9 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: 'center',
     marginTop: 10,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
   },
   submitButtonText: {
     color: 'white',

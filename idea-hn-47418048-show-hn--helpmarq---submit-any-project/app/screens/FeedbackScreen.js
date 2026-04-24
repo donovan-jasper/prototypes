@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, Alert, FlatList } from 'react-native';
 import FeedbackForm from '../components/FeedbackForm';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const FeedbackScreen = ({ route }) => {
-  const { submissionId, templateType, reviewerId } = route.params;
+  const { submissionId, templateType, reviewerId, isSubmitter } = route.params;
   const [feedbackResults, setFeedbackResults] = useState(null);
   const [individualFeedback, setIndividualFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -18,13 +18,14 @@ const FeedbackScreen = ({ route }) => {
 
     const q = query(
       collection(db, 'feedback'),
-      where('submissionId', '==', submissionId)
+      where('submissionId', '==', submissionId),
+      orderBy('timestamp', 'desc')
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const feedbackData = [];
       querySnapshot.forEach((doc) => {
-        feedbackData.push(doc.data());
+        feedbackData.push({ id: doc.id, ...doc.data() });
       });
 
       if (feedbackData.length > 0) {
@@ -137,29 +138,35 @@ const FeedbackScreen = ({ route }) => {
             <Text style={styles.resultLabel}>Overall Score:</Text>
             <Text style={styles.resultValue}>{feedbackResults.score}/10</Text>
           </View>
+        </View>
+      ) : (
+        <View style={styles.noFeedbackContainer}>
+          <Text style={styles.noFeedbackText}>No feedback yet</Text>
+        </View>
+      )}
 
-          <View style={styles.divider} />
+      {isSubmitter && (
+        <View style={styles.feedbackFormContainer}>
+          <FeedbackForm
+            submissionId={submissionId}
+            templateType={templateType}
+            reviewerId={reviewerId}
+            onSubmit={handleSubmit}
+          />
+        </View>
+      )}
 
+      {individualFeedback.length > 0 && (
+        <View style={styles.individualFeedbackContainer}>
           <Text style={styles.sectionTitle}>Individual Feedback</Text>
           <FlatList
             data={individualFeedback}
             renderItem={renderFeedbackItem}
-            keyExtractor={(item, index) => index.toString()}
-            scrollEnabled={false}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.feedbackList}
           />
         </View>
-      ) : (
-        <View style={styles.noFeedbackContainer}>
-          <Text style={styles.noFeedbackText}>No feedback yet. Be the first to submit!</Text>
-        </View>
       )}
-
-      <FeedbackForm
-        onSubmit={handleSubmit}
-        submissionId={submissionId}
-        templateType={templateType}
-        reviewerId={reviewerId}
-      />
     </ScrollView>
   );
 };
@@ -168,13 +175,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    margin: 20,
-    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -186,6 +186,13 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     color: '#666',
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    margin: 20,
+    marginBottom: 10,
+    color: '#333',
   },
   resultsContainer: {
     backgroundColor: '#fff',
@@ -199,13 +206,13 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   resultsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
     marginBottom: 10,
+    color: '#333',
   },
   feedbackCount: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#666',
     marginBottom: 15,
   },
@@ -223,28 +230,50 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#eee',
-    marginVertical: 20,
+  noFeedbackContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    margin: 10,
+    alignItems: 'center',
+  },
+  noFeedbackText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  feedbackFormContainer: {
+    marginTop: 20,
+  },
+  individualFeedbackContainer: {
+    marginTop: 20,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginLeft: 20,
+    marginBottom: 10,
     color: '#333',
-    marginBottom: 15,
+  },
+  feedbackList: {
+    paddingHorizontal: 10,
   },
   feedbackItem: {
-    backgroundColor: '#f9f9f9',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     padding: 15,
-    marginBottom: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   reviewerName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
+    fontWeight: 'bold',
     marginBottom: 10,
+    color: '#333',
   },
   scoresContainer: {
     marginBottom: 10,
@@ -269,30 +298,13 @@ const styles = StyleSheet.create({
   commentLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#333',
     marginBottom: 5,
+    color: '#333',
   },
   commentText: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
     lineHeight: 20,
-  },
-  noFeedbackContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    margin: 10,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  noFeedbackText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
   },
 });
 
