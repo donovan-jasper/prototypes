@@ -18,6 +18,11 @@ export const detectChaptersByTime = (duration: number, count: number): Chapter[]
     });
   }
 
+  // Ensure the last chapter ends at the total duration
+  if (chapters.length > 0) {
+    chapters[chapters.length - 1].endTime = duration;
+  }
+
   return chapters;
 };
 
