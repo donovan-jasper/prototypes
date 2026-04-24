@@ -177,6 +177,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   nextButton: {
+    marginTop: 16,
     alignSelf: 'flex-end',
   },
   navigationButtons: {
@@ -187,5 +188,15 @@ const styles = StyleSheet.create({
   backButton: {
     flex: 1,
     marginRight: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: '#666',
   },
 });

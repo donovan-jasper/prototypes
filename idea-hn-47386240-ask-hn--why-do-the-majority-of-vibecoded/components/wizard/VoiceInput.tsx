@@ -142,53 +142,58 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
       </Text>
 
       <View style={styles.controlContainer}>
-        {!isRecording ? (
-          <IconButton
-            icon="microphone"
-            size={40}
-            onPress={startRecording}
-            disabled={isTranscribing}
-            style={styles.microphoneButton}
-          />
-        ) : (
-          <IconButton
-            icon="stop"
-            size={40}
-            onPress={stopRecording}
-            style={styles.stopButton}
-          />
-        )}
+        <TextInput
+          mode="outlined"
+          multiline
+          numberOfLines={4}
+          value={transcription}
+          onChangeText={setTranscription}
+          style={styles.textInput}
+          placeholder="Type your app idea here or use voice input..."
+          disabled={isRecording || isTranscribing}
+        />
 
-        {isRecording && (
-          <Text style={styles.recordingText}>Recording...</Text>
-        )}
+        <View style={styles.buttonContainer}>
+          {isRecording ? (
+            <Button
+              mode="contained"
+              onPress={stopRecording}
+              style={styles.recordButton}
+              icon="stop"
+            >
+              Stop Recording
+            </Button>
+          ) : (
+            <Button
+              mode="contained"
+              onPress={startRecording}
+              style={styles.recordButton}
+              icon="microphone"
+              disabled={isTranscribing}
+            >
+              Start Recording
+            </Button>
+          )}
+
+          <Button
+            mode="outlined"
+            onPress={handleTextSubmit}
+            style={styles.submitButton}
+            disabled={isRecording || isTranscribing || !transcription.trim()}
+          >
+            {isTranscribing ? (
+              <ActivityIndicator animating={true} color="#6200ee" />
+            ) : (
+              'Submit Description'
+            )}
+          </Button>
+        </View>
       </View>
-
-      <TextInput
-        mode="outlined"
-        multiline
-        numberOfLines={4}
-        value={transcription}
-        onChangeText={setTranscription}
-        style={styles.textInput}
-        placeholder="Or type your app idea description here..."
-        editable={!isRecording && !isTranscribing}
-      />
-
-      <Button
-        mode="contained"
-        onPress={handleTextSubmit}
-        disabled={isRecording || isTranscribing || !transcription.trim()}
-        loading={isTranscribing}
-        style={styles.submitButton}
-      >
-        {isTranscribing ? 'Processing...' : 'Create Prototype'}
-      </Button>
 
       {isTranscribing && (
         <View style={styles.transcribingContainer}>
-          <ActivityIndicator animating={true} size="small" />
-          <Text style={styles.transcribingText}>Transcribing your idea...</Text>
+          <ActivityIndicator animating={true} size="large" />
+          <Text style={styles.transcribingText}>Processing your idea...</Text>
         </View>
       )}
     </View>
@@ -197,47 +202,38 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
+    flex: 1,
   },
   title: {
     marginBottom: 16,
     textAlign: 'center',
   },
   controlContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 16,
-  },
-  microphoneButton: {
-    backgroundColor: '#6200ee',
-  },
-  stopButton: {
-    backgroundColor: '#ff1744',
-  },
-  recordingText: {
-    marginLeft: 8,
-    color: '#ff1744',
-    fontWeight: 'bold',
   },
   textInput: {
     marginBottom: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'white',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  recordButton: {
+    flex: 1,
+    marginRight: 8,
   },
   submitButton: {
-    marginTop: 8,
+    flex: 1,
+    marginLeft: 8,
   },
   transcribingContainer: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 16,
   },
   transcribingText: {
-    marginLeft: 8,
-    color: '#6200ee',
+    marginTop: 8,
+    color: '#666',
   },
 });

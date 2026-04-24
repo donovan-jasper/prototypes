@@ -169,39 +169,41 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
             </Button>
           </View>
         )}
-      </View>
 
-      <View style={styles.navigationButtons}>
-        {currentQuestionIndex > 0 && (
-          <Button
-            mode="outlined"
-            onPress={goBack}
-            style={styles.backButton}
-          >
-            Back
-          </Button>
-        )}
-        {currentQuestionIndex < questions.length - 1 && (
-          <Button
-            mode="contained"
-            onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
-            style={styles.nextButton}
-            disabled={!answers[currentQuestion.id]}
-          >
-            Next
-          </Button>
-        )}
-        {currentQuestionIndex === questions.length - 1 && (
-          <Button
-            mode="contained"
-            onPress={submitAnswers}
-            style={styles.nextButton}
-            disabled={!answers[currentQuestion.id] || submitting}
-            loading={submitting}
-          >
-            {submitting ? 'Submitting...' : 'Complete'}
-          </Button>
-        )}
+        <View style={styles.navigationButtons}>
+          {currentQuestionIndex > 0 && (
+            <Button
+              mode="outlined"
+              onPress={goBack}
+              style={styles.backButton}
+            >
+              Back
+            </Button>
+          )}
+          {currentQuestionIndex < questions.length - 1 ? (
+            <Button
+              mode="contained"
+              onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
+              style={styles.nextButton}
+              disabled={!answers[currentQuestion.id]}
+            >
+              Next
+            </Button>
+          ) : (
+            <Button
+              mode="contained"
+              onPress={submitAnswers}
+              style={styles.submitButton}
+              disabled={!answers[currentQuestion.id] || submitting}
+            >
+              {submitting ? (
+                <ActivityIndicator animating={true} color="#fff" />
+              ) : (
+                'Submit Answers'
+              )}
+            </Button>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
@@ -210,15 +212,11 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
   },
   header: {
     marginBottom: 16,
   },
   title: {
-    marginBottom: 4,
     textAlign: 'center',
   },
   subtitle: {
@@ -227,28 +225,36 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     marginBottom: 24,
-    height: 6,
-    borderRadius: 3,
+    height: 8,
+    borderRadius: 4,
   },
   questionContainer: {
-    marginBottom: 24,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   questionText: {
     marginBottom: 16,
   },
   textInput: {
-    backgroundColor: '#f5f5f5',
+    marginBottom: 16,
+    backgroundColor: 'white',
   },
   optionsContainer: {
-    marginTop: 8,
+    marginBottom: 16,
   },
   optionButton: {
     marginBottom: 8,
   },
   booleanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   booleanButton: {
     flex: 1,
@@ -257,7 +263,6 @@ const styles = StyleSheet.create({
   navigationButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
   },
   backButton: {
     flex: 1,
@@ -267,11 +272,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 8,
   },
+  submitButton: {
+    flex: 1,
+  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
   loadingText: {
     marginTop: 16,
@@ -281,6 +289,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
   },
 });

@@ -200,7 +200,7 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
               label: 'Proceed to Checkout',
               variant: 'primary',
             },
-            position: { x: 0, y: 400 },
+            position: { x: 0, y: 300 },
             order: 2,
           },
         ],
@@ -213,8 +213,8 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
         components: [
           ...commonComponents,
           {
-            id: 'stats',
-            type: 'stats-grid',
+            id: 'stats-overview',
+            type: 'stats-overview',
             props: {
               items: [
                 { label: 'Workouts', value: '12' },
@@ -229,9 +229,10 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
             id: 'recent-workouts',
             type: 'list',
             props: {
+              title: 'Recent Workouts',
               items: [
                 { title: 'Morning Run', subtitle: '30 min' },
-                { title: 'Weight Training', subtitle: '45 min' },
+                { title: 'Strength Training', subtitle: '45 min' },
               ],
             },
             position: { x: 0, y: 200 },
@@ -249,10 +250,10 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
             type: 'form',
             props: {
               fields: [
-                { label: 'Workout Type', type: 'select', options: ['Run', 'Walk', 'Swim', 'Cycle'] },
-                { label: 'Duration', type: 'number', unit: 'minutes' },
-                { label: 'Calories', type: 'number' },
-                { label: 'Notes', type: 'text' },
+                { label: 'Workout Type', type: 'select', options: ['Run', 'Cycle', 'Swim', 'Strength'] },
+                { label: 'Duration', type: 'text' },
+                { label: 'Distance', type: 'text' },
+                { label: 'Calories', type: 'text' },
               ],
             },
             position: { x: 0, y: 50 },
@@ -272,16 +273,17 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
       });
       break;
 
-    default: // utility or other app types
+    default:
+      // Default utility app screens
       screens.push({
         name: 'Home',
         components: [
           ...commonComponents,
           {
-            id: 'welcome',
+            id: 'welcome-message',
             type: 'text',
             props: {
-              content: 'Welcome to your app!',
+              content: 'Welcome to your new app!',
               variant: 'headline',
             },
             position: { x: 0, y: 50 },
@@ -322,7 +324,7 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
       });
   }
 
-  // Add authentication screens if needed
+  // Add authentication screens if login/signup is mentioned
   if (intent.keyFeatures.includes('login') || intent.keyFeatures.includes('signup')) {
     screens.push({
       name: 'Login',
@@ -373,6 +375,7 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
               { label: 'Name', type: 'text' },
               { label: 'Email', type: 'email' },
               { label: 'Password', type: 'password' },
+              { label: 'Confirm Password', type: 'password' },
             ],
           },
           position: { x: 0, y: 50 },
@@ -385,7 +388,7 @@ export function suggestComponents(intent: IntentResult): SuggestedScreen[] {
             label: 'Create Account',
             variant: 'primary',
           },
-          position: { x: 0, y: 300 },
+          position: { x: 0, y: 350 },
           order: 2,
         },
       ],

@@ -11,56 +11,67 @@ interface ProgressIndicatorProps {
 export default function ProgressIndicator({ currentStep, totalSteps, stepNames }: ProgressIndicatorProps) {
   return (
     <View style={styles.container}>
-      {stepNames.map((name, index) => (
-        <View key={index} style={styles.stepContainer}>
-          <View style={[
-            styles.stepCircle,
-            index <= currentStep ? styles.activeStep : styles.inactiveStep
-          ]}>
-            <Text style={[
-              styles.stepNumber,
-              index <= currentStep ? styles.activeStepText : styles.inactiveStepText
-            ]}>
-              {index + 1}
-            </Text>
+      <View style={styles.stepsContainer}>
+        {stepNames.map((step, index) => (
+          <View key={index} style={styles.stepWrapper}>
+            <View
+              style={[
+                styles.stepCircle,
+                index <= currentStep ? styles.activeStep : styles.inactiveStep,
+              ]}
+            >
+              <Text style={styles.stepNumber}>{index + 1}</Text>
+            </View>
+            {index < stepNames.length - 1 && (
+              <View
+                style={[
+                  styles.stepLine,
+                  index < currentStep ? styles.activeLine : styles.inactiveLine,
+                ]}
+              />
+            )}
           </View>
-          <Text style={[
-            styles.stepName,
-            index <= currentStep ? styles.activeStepText : styles.inactiveStepText
-          ]}>
-            {name}
+        ))}
+      </View>
+
+      <View style={styles.labelsContainer}>
+        {stepNames.map((step, index) => (
+          <Text
+            key={index}
+            style={[
+              styles.stepLabel,
+              index <= currentStep ? styles.activeLabel : styles.inactiveLabel,
+            ]}
+            numberOfLines={1}
+          >
+            {step}
           </Text>
-          {index < totalSteps - 1 && (
-            <View style={[
-              styles.connector,
-              index < currentStep ? styles.activeConnector : styles.inactiveConnector
-            ]} />
-          )}
-        </View>
-      ))}
+        ))}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    marginBottom: 24,
+  },
+  stepsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
-    paddingHorizontal: 16,
+    marginBottom: 8,
   },
-  stepContainer: {
+  stepWrapper: {
+    flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
   },
   stepCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
   },
   activeStep: {
     backgroundColor: '#6200ee',
@@ -69,29 +80,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#e0e0e0',
   },
   stepNumber: {
+    color: 'white',
     fontWeight: 'bold',
   },
-  activeStepText: {
-    color: '#6200ee',
-  },
-  inactiveStepText: {
-    color: '#9e9e9e',
-  },
-  stepName: {
-    fontSize: 12,
-    textAlign: 'center',
-  },
-  connector: {
-    position: 'absolute',
-    top: 15,
-    left: '50%',
-    right: '-50%',
+  stepLine: {
     height: 2,
+    flex: 1,
+    marginHorizontal: 4,
   },
-  activeConnector: {
+  activeLine: {
     backgroundColor: '#6200ee',
   },
-  inactiveConnector: {
+  inactiveLine: {
     backgroundColor: '#e0e0e0',
+  },
+  labelsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  stepLabel: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 12,
+  },
+  activeLabel: {
+    color: '#6200ee',
+    fontWeight: 'bold',
+  },
+  inactiveLabel: {
+    color: '#9e9e9e',
   },
 });
