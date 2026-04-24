@@ -1,84 +1,102 @@
 import { create } from 'zustand';
-import { openDatabase, saveFocusMode, getFocusModes, saveWidgetPosition, getWidgetPositions } from '../utils/database';
-import { Theme, FocusMode, Widget } from './types';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { defaultThemes } from '../constants/themes';
+import { defaultFocusModes } from '../constants/focusModes';
+
+interface Theme {
+  id: string;
+  name: string;
+  background: string;
+  text: string;
+  dark: boolean;
+}
+
+interface FocusMode {
+  id: string;
+  name: string;
+  color: string;
+  allowedApps: string[];
+}
+
+interface Widget {
+  id: string;
+  type: 'timer' | 'scratchpad' | 'habit';
+  position: number;
+}
 
 interface AppState {
   currentTheme: Theme;
+  themes: Theme[];
   currentMode: FocusMode | null;
   focusModes: FocusMode[];
   widgets: Widget[];
-  notificationsEnabled: boolean;
-  setTheme: (theme: Theme) => void;
-  activateFocusMode: (mode: FocusMode) => void;
+  setTheme: (themeId: string) => void;
+  setFocusMode: (modeId: string) => void;
   addWidget: (widget: Widget) => void;
-  updateWidgetPosition: (id: string, x: number, y: number) => void;
-  removeWidget: (id: string) => void;
-  toggleNotifications: () => void;
-  loadFocusModes: () => Promise<void>;
-  saveFocusMode: (mode: FocusMode) => Promise<void>;
-  loadWidgets: () => Promise<void>;
+  removeWidget: (widgetId: string) => void;
+  reorderWidgets: (fromIndex: number, toIndex: number) => void;
 }
 
-const useAppStore = create<AppState>((set, get) => ({
-  currentTheme: {
-    background: '#ffffff',
-    text: '#000000',
-  },
-  currentMode: null,
-  focusModes: [],
-  widgets: [],
-  notificationsEnabled: true,
+export const useAppStore = create<AppState>()(
+  persist(
+    (set, get) => ({
+      currentTheme: defaultThemes[0],
+      themes: defaultThemes,
+      currentMode: null,
+      focusModes: defaultFocusModes,
+      widgets: [],
 
-  setTheme: (theme: Theme) => set({ currentTheme: theme }),
-  
-  activateFocusMode: (mode: FocusMode) => set({ currentMode: mode }),
-  
-  addWidget: async (widget: Widget) => {
-    const db = await openDatabase();
-    await db.runAsync(
-      'INSERT INTO widgets (id, name, type, x, y) VALUES (?, ?, ?, ?, ?)',
-      [widget.id, widget.name, widget.type, widget.x, widget.y]
-    );
-    set((state) => ({ widgets: [...state.widgets, widget] }));
-  },
-  
-  updateWidgetPosition: async (id: string, x: number, y: number) => {
-    const db = await openDatabase();
-    await saveWidgetPosition(db, id, x, y);
-    set((state) => ({
-      widgets: state.widgets.map((w) =>
-        w.id === id ? { ...w, x, y } : w
-      ),
-    }));
-  },
-  
-  removeWidget: async (id: string) => {
-    const db = await openDatabase();
-    await db.runAsync('DELETE FROM widgets WHERE id = ?', [id]);
-    set((state) => ({
-      widgets: state.widgets.filter((w) => w.id !== id),
-    }));
-  },
-  
-  toggleNotifications: () => set((state) => ({ notificationsEnabled: !state.notificationsEnabled })),
-  
-  loadFocusModes: async () => {
-    const db = await openDatabase();
-    const modes = await getFocusModes(db);
-    set({ focusModes: modes });
-  },
-  
-  saveFocusMode: async (mode: FocusMode) => {
-    const db = await openDatabase();
-    await saveFocusMode(db, mode);
-    set((state) => ({ focusModes: [...state.focusModes, mode] }));
-  },
-  
-  loadWidgets: async () => {
-    const db = await openDatabase();
-    const positions = await getWidgetPositions(db);
-    set({ widgets: positions });
-  },
-}));
+      setTheme: (themeId) => {
+        const theme = get().themes.find(t => t.id === themeId);
+        if (theme) {
+          set({ currentTheme: theme });
+        }
+      },
 
-export default useAppStore;
+      setFocusMode: (modeId) => {
+        const mode = get().focusModes.find(m => m.id === modeId);
+        if (mode) {
+          set({ currentMode: mode });
+        }
+      },
+
+      addWidget: (widget) => {
+        set(state => ({
+          widgets: [...state.widgets, widget].sort((a, b) => a.position - b.position)
+        }));
+      },
+
+      removeWidget: (widgetId) => {
+        set(state => ({
+          widgets: state.widgets.filter(w => w.id !== widgetId)
+        }));
+      },
+
+      reorderWidgets: (fromIndex, toIndex) => {
+        set(state => {
+          const newWidgets = [...state.widgets];
+          const [removed] = newWidgets.splice(fromIndex, 1);
+          newWidgets.splice(toIndex, 0, removed);
+
+          // Update positions
+          return {
+            widgets: newWidgets.map((widget, index) => ({
+              ...widget,
+              position: index
+            }))
+          };
+        });
+      },
+    }),
+    {
+      name: 'focusblank-storage',
+      storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        currentTheme: state.currentTheme,
+        currentMode: state.currentMode,
+        widgets: state.widgets,
+      }),
+    }
+  )
+);

@@ -1,21 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, FlatList, TouchableOpacity, Modal, Platform } from 'react-native';
+import { View, StyleSheet, Text, FlatList, TouchableOpacity, Modal, Platform, ActivityIndicator } from 'react-native';
 import * as Application from 'expo-application';
-import * as IntentLauncher from 'expo-intent-launcher';
+import AppLauncher from './AppLauncher';
 
 interface AppInfo {
   name: string;
   packageName: string;
+  icon?: string;
+  fallbackUrl?: string;
 }
 
 interface AppDrawerProps {
   visible: boolean;
   onClose: () => void;
+  allowedApps?: string[];
 }
 
-const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
+const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose, allowedApps }) => {
   const [apps, setApps] = useState<AppInfo[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -26,83 +30,73 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
   const loadApps = async () => {
     try {
       setLoading(true);
+      setError(null);
       let installedApps: AppInfo[] = [];
 
       if (Platform.OS === 'android') {
-        // For Android, we can use expo-application to get installed apps
+        // For Android, get installed apps
         const packageManager = await Application.getAndroidPackageManager();
         const packages = await packageManager.getInstalledPackages();
 
         installedApps = packages
           .map(pkg => ({
             name: pkg.applicationInfo?.loadLabel(packageManager) || pkg.packageName,
-            packageName: pkg.packageName
+            packageName: pkg.packageName,
+            icon: pkg.applicationInfo?.loadIcon(packageManager),
           }))
           .filter(app => app.name && app.packageName)
           .sort((a, b) => a.name.localeCompare(b.name));
       } else if (Platform.OS === 'ios') {
-        // For iOS, we'll use a predefined list since getting installed apps isn't straightforward
+        // For iOS, use predefined list with URL schemes and App Store links
         installedApps = [
-          { name: 'Calendar', packageName: 'calendar' },
-          { name: 'Camera', packageName: 'camera' },
-          { name: 'Clock', packageName: 'clock' },
-          { name: 'Contacts', packageName: 'contacts' },
-          { name: 'Files', packageName: 'files' },
-          { name: 'Mail', packageName: 'mail' },
-          { name: 'Maps', packageName: 'maps' },
-          { name: 'Messages', packageName: 'messages' },
-          { name: 'Music', packageName: 'music' },
-          { name: 'Notes', packageName: 'notes' },
-          { name: 'Phone', packageName: 'phone' },
-          { name: 'Photos', packageName: 'photos' },
-          { name: 'Settings', packageName: 'settings' },
-          { name: 'Weather', packageName: 'weather' },
+          { name: 'Calendar', packageName: 'calshow', fallbackUrl: 'https://apps.apple.com/app/calendar/id338205905' },
+          { name: 'Camera', packageName: 'camera', fallbackUrl: 'https://apps.apple.com/app/camera/id344685569' },
+          { name: 'Clock', packageName: 'clock', fallbackUrl: 'https://apps.apple.com/app/clock/id304275544' },
+          { name: 'Contacts', packageName: 'contacts', fallbackUrl: 'https://apps.apple.com/app/contacts/id368677889' },
+          { name: 'Files', packageName: 'shareddocuments', fallbackUrl: 'https://apps.apple.com/app/files/id364721887' },
+          { name: 'Mail', packageName: 'message', fallbackUrl: 'https://apps.apple.com/app/mail/id1108187098' },
+          { name: 'Maps', packageName: 'maps', fallbackUrl: 'https://apps.apple.com/app/maps/id915056765' },
+          { name: 'Messages', packageName: 'sms', fallbackUrl: 'https://apps.apple.com/app/messages/id386796243' },
+          { name: 'Music', packageName: 'music', fallbackUrl: 'https://apps.apple.com/app/music/id1108187170' },
+          { name: 'Notes', packageName: 'mobilenotes', fallbackUrl: 'https://apps.apple.com/app/notes/id1108187220' },
+          { name: 'Phone', packageName: 'tel', fallbackUrl: 'https://apps.apple.com/app/phone/id364709193' },
+          { name: 'Photos', packageName: 'photos-redirect', fallbackUrl: 'https://apps.apple.com/app/photos/id364721887' },
+          { name: 'Settings', packageName: 'App-Prefs', fallbackUrl: 'https://apps.apple.com/app/settings/id1550868983' },
+          { name: 'Weather', packageName: 'weather', fallbackUrl: 'https://apps.apple.com/app/weather/id519186602' },
         ].sort((a, b) => a.name.localeCompare(b.name));
+      }
+
+      // Filter by allowed apps if specified
+      if (allowedApps && allowedApps.length > 0) {
+        installedApps = installedApps.filter(app =>
+          allowedApps.includes(app.packageName) ||
+          allowedApps.includes(app.name.toLowerCase())
+        );
       }
 
       setApps(installedApps);
     } catch (error) {
       console.error('Error loading apps:', error);
-      // Fallback to mock data if there's an error
+      setError('Failed to load apps. Please try again.');
+      // Fallback to basic apps if there's an error
       setApps([
-        { name: 'Calendar', packageName: 'calendar' },
-        { name: 'Camera', packageName: 'camera' },
-        { name: 'Clock', packageName: 'clock' },
-        { name: 'Contacts', packageName: 'contacts' },
-        { name: 'Files', packageName: 'files' },
-        { name: 'Mail', packageName: 'mail' },
-        { name: 'Maps', packageName: 'maps' },
-        { name: 'Messages', packageName: 'messages' },
-        { name: 'Music', packageName: 'music' },
-        { name: 'Notes', packageName: 'notes' },
-        { name: 'Phone', packageName: 'phone' },
-        { name: 'Photos', packageName: 'photos' },
-        { name: 'Settings', packageName: 'settings' },
-        { name: 'Weather', packageName: 'weather' },
+        { name: 'Calendar', packageName: 'calendar', fallbackUrl: 'https://apps.apple.com/app/calendar/id338205905' },
+        { name: 'Camera', packageName: 'camera', fallbackUrl: 'https://apps.apple.com/app/camera/id344685569' },
+        { name: 'Clock', packageName: 'clock', fallbackUrl: 'https://apps.apple.com/app/clock/id304275544' },
+        { name: 'Contacts', packageName: 'contacts', fallbackUrl: 'https://apps.apple.com/app/contacts/id368677889' },
+        { name: 'Files', packageName: 'files', fallbackUrl: 'https://apps.apple.com/app/files/id364721887' },
+        { name: 'Mail', packageName: 'mail', fallbackUrl: 'https://apps.apple.com/app/mail/id1108187098' },
+        { name: 'Maps', packageName: 'maps', fallbackUrl: 'https://apps.apple.com/app/maps/id915056765' },
+        { name: 'Messages', packageName: 'messages', fallbackUrl: 'https://apps.apple.com/app/messages/id386796243' },
+        { name: 'Music', packageName: 'music', fallbackUrl: 'https://apps.apple.com/app/music/id1108187170' },
+        { name: 'Notes', packageName: 'notes', fallbackUrl: 'https://apps.apple.com/app/notes/id1108187220' },
+        { name: 'Phone', packageName: 'phone', fallbackUrl: 'https://apps.apple.com/app/phone/id364709193' },
+        { name: 'Photos', packageName: 'photos', fallbackUrl: 'https://apps.apple.com/app/photos/id364721887' },
+        { name: 'Settings', packageName: 'settings', fallbackUrl: 'https://apps.apple.com/app/settings/id1550868983' },
+        { name: 'Weather', packageName: 'weather', fallbackUrl: 'https://apps.apple.com/app/weather/id519186602' },
       ].sort((a, b) => a.name.localeCompare(b.name)));
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleAppPress = async (app: AppInfo) => {
-    try {
-      if (Platform.OS === 'android') {
-        await IntentLauncher.startActivityAsync(app.packageName);
-      } else if (Platform.OS === 'ios') {
-        // For iOS, we can use the URL scheme if available
-        // This is a simplified approach - real implementation would need more work
-        const url = `${app.packageName}://`;
-        const canOpen = await Linking.canOpenURL(url);
-        if (canOpen) {
-          await Linking.openURL(url);
-        } else {
-          console.log(`No URL scheme found for ${app.name}`);
-        }
-      }
-      onClose();
-    } catch (error) {
-      console.error('Error launching app:', error);
     }
   };
 
@@ -121,27 +115,43 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
               <Text style={styles.closeText}>✕</Text>
             </TouchableOpacity>
           </View>
+
           {loading ? (
             <View style={styles.loadingContainer}>
-              <Text>Loading apps...</Text>
+              <ActivityIndicator size="large" color="#0000ff" />
+              <Text style={styles.loadingText}>Loading apps...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity onPress={loadApps} style={styles.retryButton}>
+                <Text style={styles.retryText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : apps.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No apps available</Text>
             </View>
           ) : (
             <FlatList
               data={apps}
               keyExtractor={(item) => item.packageName}
               renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.appItem}
-                  onPress={() => handleAppPress(item)}
+                <AppLauncher
+                  packageName={item.packageName}
+                  fallbackUrl={item.fallbackUrl}
                 >
-                  <Text style={styles.appName}>{item.name}</Text>
-                </TouchableOpacity>
+                  <View style={styles.appItem}>
+                    {item.icon && Platform.OS === 'android' ? (
+                      <Image source={{ uri: item.icon }} style={styles.appIcon} />
+                    ) : (
+                      <View style={styles.appIconPlaceholder} />
+                    )}
+                    <Text style={styles.appName}>{item.name}</Text>
+                  </View>
+                </AppLauncher>
               )}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Text>No apps found</Text>
-                </View>
-              }
+              contentContainerStyle={styles.listContent}
             />
           )}
         </View>
@@ -157,48 +167,97 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   drawer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: 'white',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    paddingTop: 16,
+    paddingHorizontal: 16,
     maxHeight: '80%',
-    paddingTop: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
   },
   closeButton: {
-    padding: 5,
+    padding: 8,
   },
   closeText: {
-    fontSize: 24,
-    color: '#666',
-  },
-  appItem: {
-    paddingVertical: 16,
-    paddingHorizontal: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  appName: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: 'bold',
   },
   loadingContainer: {
-    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    color: 'red',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    backgroundColor: '#f0f0f0',
+    padding: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    fontSize: 16,
+    color: '#000',
   },
   emptyContainer: {
-    padding: 20,
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  listContent: {
+    paddingBottom: 20,
+  },
+  appItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  appIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+  },
+  appIconPlaceholder: {
+    width: 24,
+    height: 24,
+    marginRight: 12,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+  },
+  appName: {
+    fontSize: 16,
   },
 });
 

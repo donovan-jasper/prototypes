@@ -1,32 +1,146 @@
-export const themes = [
+export const defaultThemes = [
   {
-    id: '1',
+    id: 'minimal',
     name: 'Minimal',
-    background: '#ffffff',
+    background: '#FFFFFF',
     text: '#000000',
+    dark: false,
   },
   {
-    id: '2',
+    id: 'warm',
     name: 'Warm',
-    background: '#fff8e1',
-    text: '#5d4037',
+    background: '#FFF8F0',
+    text: '#5D4037',
+    dark: false,
   },
   {
-    id: '3',
+    id: 'cool',
     name: 'Cool',
-    background: '#e3f2fd',
-    text: '#1565c0',
+    background: '#F0F4FF',
+    text: '#1A237E',
+    dark: false,
   },
   {
-    id: '4',
+    id: 'nature',
     name: 'Nature',
-    background: '#e8f5e9',
-    text: '#2e7d32',
+    background: '#E8F5E9',
+    text: '#1B5E20',
+    dark: false,
   },
   {
-    id: '5',
+    id: 'night',
     name: 'Night',
-    background: '#212121',
-    text: '#ffffff',
+    background: '#121212',
+    text: '#FFFFFF',
+    dark: true,
   },
+];
+
+export const premiumThemes = [
+  {
+    id: 'sunset',
+    name: 'Sunset',
+    background: '#FFE0B2',
+    text: '#BF360C',
+    dark: false,
+  },
+  {
+    id: 'ocean',
+    name: 'Ocean',
+    background: '#E1F5FE',
+    text: '#01579B',
+    dark: false,
+  },
+  // Additional premium themes would go here
+];
+
+
++++++ focusblank/constants/focusModes.ts
+export const defaultFocusModes = [
+  {
+    id: 'work',
+    name: 'Work',
+    color: '#3498DB',
+    allowedApps: [
+      'mail',
+      'calendar',
+      'notes',
+      'messages',
+      'files',
+      'browser',
+      'slack',
+      'zoom',
+      'asana',
+      'trello',
+    ],
+  },
+  {
+    id: 'study',
+    name: 'Study',
+    color: '#2ECC71',
+    allowedApps: [
+      'notes',
+      'calendar',
+      'files',
+      'browser',
+      'notion',
+      'goodnotes',
+      'anki',
+      'duolingo',
+    ],
+  },
+  {
+    id: 'relax',
+    name: 'Relax',
+    color: '#F39C12',
+    allowedApps: [
+      'music',
+      'podcasts',
+      'books',
+      'weather',
+      'calendar',
+      'notes',
+    ],
+  },
+  {
+    id: 'sleep',
+    name: 'Sleep',
+    color: '#9B59B6',
+    allowedApps: [
+      'clock',
+      'alarm',
+      'books',
+      'music',
+      'podcasts',
+      'notes',
+    ],
+  },
+];
+
+export const premiumFocusModes = [
+  {
+    id: 'meditate',
+    name: 'Meditate',
+    color: '#1ABC9C',
+    allowedApps: [
+      'calm',
+      'headspace',
+      'insighttimer',
+      'breath',
+      'notes',
+    ],
+  },
+  {
+    id: 'exercise',
+    name: 'Exercise',
+    color: '#E74C3C',
+    allowedApps: [
+      'fitness',
+      'strava',
+      'nike',
+      'myfitnesspal',
+      'notes',
+    ],
+  },
+  // Additional premium modes would go here
 ];

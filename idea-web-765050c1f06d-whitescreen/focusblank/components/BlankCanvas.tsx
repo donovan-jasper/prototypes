@@ -1,130 +1,189 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Text, Animated, Dimensions } from 'react-native';
-import { GestureHandlerRootView, PanGestureHandler, LongPressGestureHandler, State } from 'react-native-gesture-handler';
-import useAppStore from '../store/useAppStore';
-import Timer from './Timer';
-import Scratchpad from './Scratchpad';
-import HabitTracker from './HabitTracker';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Text, TouchableOpacity, Platform, StatusBar } from 'react-native';
+import { useAppStore } from '../store/useAppStore';
 import AppDrawer from './AppDrawer';
-import WidgetSelector from './WidgetSelector';
+import { format } from 'date-fns';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
-const { height } = Dimensions.get('window');
+const BlankCanvas: React.FC = () => {
+  const { currentTheme, currentMode, widgets } = useAppStore();
+  const [showAppDrawer, setShowAppDrawer] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-const BlankCanvas = () => {
-  const { currentTheme, currentMode, widgets, addWidget, updateWidgetPosition } = useAppStore();
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [selectorVisible, setSelectorVisible] = useState(false);
+  // Animation for widgets
+  const widgetOpacity = useSharedValue(0);
+  const widgetStyle = useAnimatedStyle(() => ({
+    opacity: widgetOpacity.value,
+  }));
 
-  const handleSwipeUp = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      if (event.nativeEvent.translationY < -100) {
-        setDrawerVisible(true);
-      }
-    }
+  useEffect(() => {
+    // Update time every minute
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+
+    // Animate widgets in when component mounts
+    widgetOpacity.value = withSpring(1, { damping: 10, stiffness: 100 });
+
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleLongPress = () => {
+    // Show widget menu or add widget functionality
+    console.log('Long press detected - show widget menu');
   };
 
-  const handleLongPress = (event: any) => {
-    if (event.nativeEvent.state === State.ACTIVE) {
-      setSelectorVisible(true);
-    }
-  };
-
-  const handleAddWidget = (widgetOption: any) => {
-    const newWidget = {
-      id: `${widgetOption.type}-${Date.now()}`,
-      name: widgetOption.name,
-      type: widgetOption.type,
-      x: 50,
-      y: 200,
-    };
-    addWidget(newWidget);
-  };
-
-  return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <PanGestureHandler onHandlerStateChange={handleSwipeUp}>
-        <Animated.View style={{ flex: 1 }}>
-          <LongPressGestureHandler onHandlerStateChange={handleLongPress} minDurationMs={500}>
-            <Animated.View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-              <Text style={[styles.modeText, { color: currentTheme.text }]}>
-                {currentMode?.name || 'Focus Mode'}
-              </Text>
-              
-              {widgets.map((widget) => (
-                <DraggableWidget
-                  key={widget.id}
-                  widget={widget}
-                  onPositionChange={(x, y) => updateWidgetPosition(widget.id, x, y)}
-                />
-              ))}
-            </Animated.View>
-          </LongPressGestureHandler>
-        </Animated.View>
-      </PanGestureHandler>
-
-      <AppDrawer visible={drawerVisible} onClose={() => setDrawerVisible(false)} />
-      <WidgetSelector
-        visible={selectorVisible}
-        onClose={() => setSelectorVisible(false)}
-        onSelectWidget={handleAddWidget}
-      />
-    </GestureHandlerRootView>
-  );
-};
-
-const DraggableWidget = ({ widget, onPositionChange }: any) => {
-  const translateX = useRef(new Animated.Value(widget.x)).current;
-  const translateY = useRef(new Animated.Value(widget.y)).current;
-
-  const handleGesture = Animated.event(
-    [{ nativeEvent: { translationX: translateX, translationY: translateY } }],
-    { useNativeDriver: true }
-  );
-
-  const handleStateChange = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      const newX = event.nativeEvent.translationX + widget.x;
-      const newY = event.nativeEvent.translationY + widget.y;
-      onPositionChange(newX, newY);
-      translateX.setOffset(newX);
-      translateY.setOffset(newY);
-      translateX.setValue(0);
-      translateY.setValue(0);
-    }
+  const handleSwipeUp = () => {
+    setShowAppDrawer(true);
   };
 
   return (
-    <PanGestureHandler onGestureEvent={handleGesture} onHandlerStateChange={handleStateChange}>
-      <Animated.View
-        style={[
-          styles.widgetContainer,
-          {
-            transform: [{ translateX }, { translateY }],
-          },
-        ]}
-      >
-        {widget.type === 'timer' && <Timer />}
-        {widget.type === 'scratchpad' && <Scratchpad />}
-        {widget.type === 'habittracker' && <HabitTracker />}
+    <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
+      <StatusBar barStyle={currentTheme.dark ? 'light-content' : 'dark-content'} />
+
+      {/* Time display */}
+      <View style={styles.timeContainer}>
+        <Text style={[styles.timeText, { color: currentTheme.text }]}>
+          {format(currentTime, 'h:mm')}
+        </Text>
+        <Text style={[styles.dateText, { color: currentTheme.text }]}>
+          {format(currentTime, 'EEEE, MMMM d')}
+        </Text>
+      </View>
+
+      {/* Focus mode indicator */}
+      {currentMode && (
+        <View style={[styles.modeIndicator, { backgroundColor: currentMode.color }]}>
+          <Text style={styles.modeText}>{currentMode.name}</Text>
+        </View>
+      )}
+
+      {/* Widgets area */}
+      <Animated.View style={[styles.widgetsContainer, widgetStyle]}>
+        {widgets.map((widget) => (
+          <TouchableOpacity
+            key={widget.id}
+            style={styles.widget}
+            onLongPress={handleLongPress}
+          >
+            {/* Render widget based on type */}
+            {widget.type === 'timer' && (
+              <View style={styles.timerWidget}>
+                <Text style={[styles.widgetTitle, { color: currentTheme.text }]}>Timer</Text>
+                <Text style={[styles.widgetValue, { color: currentTheme.text }]}>25:00</Text>
+              </View>
+            )}
+            {widget.type === 'scratchpad' && (
+              <View style={styles.scratchpadWidget}>
+                <Text style={[styles.widgetTitle, { color: currentTheme.text }]}>Notes</Text>
+                <Text style={[styles.widgetText, { color: currentTheme.text }]}>Quick notes...</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        ))}
       </Animated.View>
-    </PanGestureHandler>
+
+      {/* Swipe up gesture area */}
+      <TouchableOpacity
+        style={styles.swipeUpArea}
+        onPress={handleSwipeUp}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.swipeIndicator, { backgroundColor: currentTheme.text }]} />
+      </TouchableOpacity>
+
+      {/* App drawer */}
+      <AppDrawer
+        visible={showAppDrawer}
+        onClose={() => setShowAppDrawer(false)}
+        allowedApps={currentMode?.allowedApps}
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    justifyContent: 'space-between',
+    paddingTop: Platform.OS === 'ios' ? 40 : StatusBar.currentHeight,
+  },
+  timeContainer: {
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  timeText: {
+    fontSize: 48,
+    fontWeight: 'bold',
+  },
+  dateText: {
+    fontSize: 18,
+    marginTop: 4,
+  },
+  modeIndicator: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20,
+    right: 20,
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+    borderRadius: 12,
   },
   modeText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  widgetsContainer: {
+    flex: 1,
+    padding: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  widget: {
+    width: '48%',
+    marginBottom: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  timerWidget: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scratchpadWidget: {
+    padding: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 120,
+  },
+  widgetTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  widgetValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    position: 'absolute',
-    top: 40,
-    left: 20,
-    zIndex: 1,
   },
-  widgetContainer: {
-    position: 'absolute',
+  widgetText: {
+    fontSize: 14,
+  },
+  swipeUpArea: {
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  swipeIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    opacity: 0.5,
   },
 });
 
