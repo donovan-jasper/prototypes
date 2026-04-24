@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert, Clipboard, ActivityIndicator, Share, Switch } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
+import { Audio } from 'expo-av';
 import { generateCrisisPin, setCrisisPin, verifyCrisisPin, isCrisisModeEnabled, getShareableLink, disableCrisisMode } from '../services/crisisMode';
+import { addNote } from '../services/database';
+import { transcribeAudio } from '../services/whisper';
 
 const CrisisModeScreen = () => {
   const [pin, setPin] = useState('');
@@ -11,6 +14,9 @@ const CrisisModeScreen = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [shareableLink, setShareableLink] = useState('');
+  const [recording, setRecording] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingStatus, setRecordingStatus] = useState('');
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -30,6 +36,46 @@ const CrisisModeScreen = () => {
     };
     checkCrisisMode();
   }, []);
+
+  const startRecording = async () => {
+    try {
+      setIsRecording(true);
+      setRecordingStatus('Recording...');
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      setRecording(recording);
+    } catch (error) {
+      console.error('Failed to start recording:', error);
+      Alert.alert('Error', 'Failed to start recording');
+      setIsRecording(false);
+    }
+  };
+
+  const stopRecording = async () => {
+    try {
+      setRecordingStatus('Processing...');
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+
+      // Transcribe the audio
+      const transcription = await transcribeAudio(uri);
+      if (transcription) {
+        // Save to database
+        await addNote('Crisis Recording', transcription, uri);
+        Alert.alert('Success', 'Recording saved successfully');
+      } else {
+        Alert.alert('Error', 'Failed to transcribe audio');
+      }
+    } catch (error) {
+      console.error('Failed to stop recording:', error);
+      Alert.alert('Error', 'Failed to stop recording');
+    } finally {
+      setIsRecording(false);
+      setRecordingStatus('');
+    }
+  };
 
   const handleGeneratePin = async () => {
     setIsGenerating(true);
@@ -151,6 +197,28 @@ const CrisisModeScreen = () => {
         Generate a 6-digit PIN for family members to access your vault in emergencies.
       </Text>
 
+      <View style={styles.recordingContainer}>
+        <Text style={styles.sectionTitle}>Emergency Recording</Text>
+        {!isRecording ? (
+          <TouchableOpacity
+            style={styles.recordButton}
+            onPress={startRecording}
+          >
+            <Text style={styles.recordButtonText}>Start Recording</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={[styles.recordButton, styles.stopButton]}
+            onPress={stopRecording}
+          >
+            <Text style={styles.recordButtonText}>Stop Recording</Text>
+          </TouchableOpacity>
+        )}
+        {recordingStatus ? (
+          <Text style={styles.recordingStatus}>{recordingStatus}</Text>
+        ) : null}
+      </View>
+
       <View style={styles.toggleContainer}>
         <Text style={styles.toggleLabel}>Enable Crisis Mode</Text>
         <Switch
@@ -164,72 +232,73 @@ const CrisisModeScreen = () => {
       {isEnabled && (
         <View style={styles.pinContainer}>
           <Text style={styles.pinLabel}>Your Crisis PIN:</Text>
-          <View style={styles.pinDisplay}>
-            <Text style={styles.pinText}>{generatedPin || 'Not generated yet'}</Text>
+          <Text style={styles.pinText}>{generatedPin || 'Generating...'}</Text>
+
+          <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={styles.copyButton}
+              style={styles.actionButton}
               onPress={handleCopyPin}
-              disabled={!generatedPin}
             >
-              <Text style={styles.copyButtonText}>Copy PIN</Text>
+              <Text style={styles.actionButtonText}>Copy PIN</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleVerifyPin}
+              disabled={isVerifying}
+            >
+              {isVerifying ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.actionButtonText}>Verify PIN</Text>
+              )}
             </TouchableOpacity>
           </View>
 
           <Text style={styles.linkLabel}>Shareable Link:</Text>
-          <View style={styles.linkContainer}>
-            <Text style={styles.linkText} numberOfLines={1} ellipsizeMode="middle">
-              {shareableLink || 'Not generated yet'}
-            </Text>
-            <View style={styles.linkButtons}>
-              <TouchableOpacity
-                style={styles.copyButton}
-                onPress={handleCopyLink}
-                disabled={!shareableLink}
-              >
-                <Text style={styles.copyButtonText}>Copy Link</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.shareButton}
-                onPress={handleShareLink}
-                disabled={!shareableLink}
-              >
-                <Text style={styles.shareButtonText}>Share</Text>
-              </TouchableOpacity>
-            </View>
+          <Text style={styles.linkText} numberOfLines={1}>
+            {shareableLink || 'Generating...'}
+          </Text>
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleCopyLink}
+            >
+              <Text style={styles.actionButtonText}>Copy Link</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleShareLink}
+            >
+              <Text style={styles.actionButtonText}>Share Link</Text>
+            </TouchableOpacity>
           </View>
+
+          <TextInput
+            style={styles.pinInput}
+            placeholder="Enter PIN to access vault"
+            keyboardType="numeric"
+            maxLength={6}
+            value={pin}
+            onChangeText={setPin}
+            secureTextEntry
+          />
+
+          <TouchableOpacity
+            style={styles.submitButton}
+            onPress={handlePinSubmit}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.submitButtonText}>Access Vault</Text>
+            )}
+          </TouchableOpacity>
         </View>
       )}
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Enter PIN to Access Vault</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter 6-digit PIN"
-          keyboardType="numeric"
-          maxLength={6}
-          value={pin}
-          onChangeText={setPin}
-          secureTextEntry
-        />
-        <TouchableOpacity
-          style={styles.submitButton}
-          onPress={handlePinSubmit}
-          disabled={isLoading}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.submitButtonText}>Access Vault</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.backButtonText}>Back to Home</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -248,13 +317,50 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 16,
-    color: '#666',
     marginBottom: 20,
+    color: '#666',
+  },
+  recordingContainer: {
+    marginBottom: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  recordButton: {
+    backgroundColor: '#ff4757',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  stopButton: {
+    backgroundColor: '#2ed573',
+  },
+  recordButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  recordingStatus: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   toggleContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
@@ -266,11 +372,10 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   toggleLabel: {
-    fontSize: 18,
+    fontSize: 16,
     color: '#333',
   },
   pinContainer: {
-    marginBottom: 20,
     padding: 15,
     backgroundColor: '#fff',
     borderRadius: 10,
@@ -282,109 +387,61 @@ const styles = StyleSheet.create({
   },
   pinLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 5,
     color: '#333',
-  },
-  pinDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 15,
   },
   pinText: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#333',
+    marginBottom: 15,
+    color: '#2ed573',
+    textAlign: 'center',
   },
   linkLabel: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
+    marginTop: 15,
+    marginBottom: 5,
     color: '#333',
-  },
-  linkContainer: {
-    marginBottom: 15,
   },
   linkText: {
     fontSize: 14,
+    marginBottom: 15,
     color: '#666',
-    marginBottom: 10,
   },
-  linkButtons: {
+  buttonRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  inputContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
-  },
-  input: {
-    height: 50,
-    borderColor: '#ddd',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
     marginBottom: 15,
-    fontSize: 18,
   },
-  copyButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+  actionButton: {
+    backgroundColor: '#1e90ff',
+    padding: 10,
     borderRadius: 5,
+    flex: 0.48,
+    alignItems: 'center',
   },
-  copyButtonText: {
+  actionButtonText: {
     color: '#fff',
-    fontWeight: '600',
+    fontSize: 14,
   },
-  shareButton: {
-    backgroundColor: '#2196F3',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
+  pinInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
     borderRadius: 5,
-    marginLeft: 10,
-  },
-  shareButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    padding: 10,
+    marginBottom: 15,
+    fontSize: 16,
   },
   submitButton: {
-    backgroundColor: '#3F51B5',
-    paddingVertical: 15,
+    backgroundColor: '#2ed573',
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
   },
   submitButtonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    backgroundColor: '#f5f5f5',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  backButtonText: {
-    color: '#333',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
