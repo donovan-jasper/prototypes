@@ -1,57 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { getQuestions, submitQuestion } from '../../../utils/api';
-import { Question } from '../../../types';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Button, Alert } from 'react-native';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, increment } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { firebaseConfig } from '../../../firebaseConfig';
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+
+interface Question {
+  id: string;
+  title: string;
+  content: string;
+  author: string;
+  upvotes: number;
+  isAnswered: boolean;
+  createdAt: Date;
+}
 
 const CommunityScreen = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [newQuestion, setNewQuestion] = useState({
+    title: '',
+    content: '',
+    author: 'Anonymous'
+  });
 
   useEffect(() => {
-    const fetchQuestions = async () => {
-      try {
-        // First try to get from Firebase
-        const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
-        const unsubscribe = onSnapshot(q, (querySnapshot) => {
-          const questionsData: Question[] = [];
-          querySnapshot.forEach((doc) => {
-            questionsData.push({
-              id: doc.id,
-              ...doc.data(),
-              createdAt: doc.data().createdAt.toDate()
-            } as Question);
-          });
-          setQuestions(questionsData);
-          setLoading(false);
-        });
+    const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const questionsData: Question[] = [];
+      querySnapshot.forEach((doc) => {
+        questionsData.push({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt.toDate()
+        } as Question);
+      });
+      setQuestions(questionsData);
+      setLoading(false);
+    }, (err) => {
+      console.error('Error fetching questions:', err);
+      setError('Failed to load questions. Please check your connection.');
+      setLoading(false);
+    });
 
-        return () => unsubscribe();
-      } catch (err) {
-        console.error('Error fetching questions from Firebase:', err);
-        setError('Failed to load questions. Using local data.');
-
-        // Fallback to local data if Firebase fails
-        try {
-          const localQuestions = await getQuestions();
-          setQuestions(localQuestions);
-          setLoading(false);
-        } catch (localErr) {
-          console.error('Error fetching local questions:', localErr);
-          setError('Failed to load questions. Please check your connection.');
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchQuestions();
+    return () => unsubscribe();
   }, []);
 
   const handleUpvote = async (questionId: string) => {
@@ -62,34 +57,38 @@ const CommunityScreen = () => {
       });
     } catch (err) {
       console.error('Error upvoting question:', err);
-      setError('Failed to upvote. Please try again.');
+      Alert.alert('Error', 'Failed to upvote. Please try again.');
     }
   };
 
-  const seedFirebase = async () => {
+  const handleSubmitQuestion = async () => {
+    if (!newQuestion.title || !newQuestion.content) {
+      Alert.alert('Error', 'Please fill in both title and content');
+      return;
+    }
+
     try {
       setLoading(true);
-      const mockQuestions = await getQuestions();
-
-      for (const question of mockQuestions) {
-        await addDoc(collection(db, 'questions'), {
-          ...question,
-          createdAt: new Date(question.createdAt)
-        });
-      }
-
+      await addDoc(collection(db, 'questions'), {
+        ...newQuestion,
+        upvotes: 0,
+        isAnswered: false,
+        createdAt: serverTimestamp()
+      });
+      setNewQuestion({ title: '', content: '', author: 'Anonymous' });
       setLoading(false);
     } catch (err) {
-      console.error('Error seeding Firebase:', err);
-      setError('Failed to seed Firebase. Please try again.');
+      console.error('Error submitting question:', err);
+      Alert.alert('Error', 'Failed to submit question. Please try again.');
       setLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading && questions.length === 0) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color="#007AFF" />
+        <Text>Loading community questions...</Text>
       </View>
     );
   }
@@ -98,9 +97,6 @@ const CommunityScreen = () => {
     return (
       <View style={styles.centered}>
         <Text style={styles.errorText}>{error}</Text>
-        <TouchableOpacity style={styles.retryButton} onPress={seedFirebase}>
-          <Text style={styles.retryButtonText}>Retry Seeding Firebase</Text>
-        </TouchableOpacity>
       </View>
     );
   }
@@ -108,6 +104,35 @@ const CommunityScreen = () => {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Community Q&A</Text>
+
+      <View style={styles.formContainer}>
+        <Text style={styles.formTitle}>Ask a Question</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Title"
+          value={newQuestion.title}
+          onChangeText={(text) => setNewQuestion({...newQuestion, title: text})}
+        />
+        <TextInput
+          style={[styles.input, styles.multilineInput]}
+          placeholder="Content"
+          multiline
+          numberOfLines={4}
+          value={newQuestion.content}
+          onChangeText={(text) => setNewQuestion({...newQuestion, content: text})}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Your Name (optional)"
+          value={newQuestion.author}
+          onChangeText={(text) => setNewQuestion({...newQuestion, author: text || 'Anonymous'})}
+        />
+        <Button
+          title="Submit Question"
+          onPress={handleSubmitQuestion}
+          disabled={loading}
+        />
+      </View>
 
       <FlatList
         data={questions}
@@ -124,6 +149,11 @@ const CommunityScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
+          </View>
+        )}
+        ListEmptyComponent={() => (
+          <View style={styles.centered}>
+            <Text>No questions yet. Be the first to ask!</Text>
           </View>
         )}
       />
@@ -148,6 +178,36 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
+    textAlign: 'center',
+  },
+  formContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  formTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+    color: '#333',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 4,
+    padding: 10,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
   },
   questionCard: {
     backgroundColor: 'white',
@@ -191,17 +251,9 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: 'red',
-    marginBottom: 16,
+    fontSize: 16,
     textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    padding: 12,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+    marginBottom: 20,
   },
 });
 

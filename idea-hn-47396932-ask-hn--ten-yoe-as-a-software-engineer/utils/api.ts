@@ -1,53 +1,32 @@
 import { Question } from '../types';
+import { getFirestore, collection, getDocs, query, orderBy } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { firebaseConfig } from '../firebaseConfig';
 
-const mockQuestions: Question[] = [
-  {
-    id: '1',
-    title: 'How to deploy a TensorFlow model on ESP32?',
-    content: 'I need help with deploying a trained TensorFlow model to an ESP32 microcontroller. Any resources or examples would be appreciated.',
-    author: 'AI_Enthusiast',
-    upvotes: 15,
-    isAnswered: true,
-    createdAt: new Date('2023-05-15'),
-  },
-  {
-    id: '2',
-    title: 'Best Python libraries for embedded systems?',
-    content: 'What are the most useful Python libraries for working with embedded systems development?',
-    author: 'EmbeddedDev',
-    upvotes: 8,
-    isAnswered: false,
-    createdAt: new Date('2023-05-18'),
-  },
-  {
-    id: '3',
-    title: 'How to optimize memory usage in TinyML models?',
-    content: 'I\'m working on a TinyML project and need tips on optimizing memory usage for my neural network model.',
-    author: 'ML_Practitioner',
-    upvotes: 22,
-    isAnswered: true,
-    createdAt: new Date('2023-05-20'),
-  },
-];
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export const getQuestions = async (): Promise<Question[]> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  return mockQuestions;
+  try {
+    const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+    const querySnapshot = await getDocs(q);
+    const questions: Question[] = [];
+    querySnapshot.forEach((doc) => {
+      questions.push({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt.toDate()
+      } as Question);
+    });
+    return questions;
+  } catch (error) {
+    console.error('Error fetching questions from Firebase:', error);
+    throw error;
+  }
 };
 
 export const submitQuestion = async (question: Omit<Question, 'id'>): Promise<Question> => {
-  // Simulate API delay
-  await new Promise(resolve => setTimeout(resolve, 800));
-
-  // Generate a new ID
-  const newQuestion = {
-    ...question,
-    id: (mockQuestions.length + 1).toString(),
-  };
-
-  // Add to mock data
-  mockQuestions.push(newQuestion);
-
-  return newQuestion;
+  // This function is now handled directly in the component using Firebase
+  // The actual implementation is in the component file
+  throw new Error('submitQuestion should be handled in the component using Firebase');
 };
