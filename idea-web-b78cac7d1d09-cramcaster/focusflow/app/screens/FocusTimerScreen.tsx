@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, Text, Switch, Alert, Platform, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import FocusTimer from '../components/FocusTimer';
@@ -13,6 +13,7 @@ import {
   requestScreenTimePermission
 } from '../services/distractionBlocker';
 import { blockNotifications, unblockNotifications } from '../services/notificationService';
+import { calculateFocusProgress } from '../utils/focusTimer';
 
 const FocusTimerScreen: React.FC = () => {
   const [progress, setProgress] = useState(0);
@@ -20,7 +21,9 @@ const FocusTimerScreen: React.FC = () => {
   const [currentEvent, setCurrentEvent] = useState<Calendar.Event | null>(null);
   const [isDistractionBlockingEnabled, setIsDistractionBlockingEnabled] = useState(true);
   const [hasScreenTimePermission, setHasScreenTimePermission] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const duration = 60 * 25; // 25 minutes in seconds
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     registerBackgroundTask();
@@ -65,6 +68,39 @@ const FocusTimerScreen: React.FC = () => {
 
     checkBlockerStatus();
   }, []);
+
+  useEffect(() => {
+    if (isFocusActive) {
+      // Start the timer
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => {
+          const newElapsed = prev + 1;
+          const newProgress = calculateFocusProgress(newElapsed, duration);
+          setProgress(newProgress);
+
+          if (newElapsed >= duration) {
+            handleComplete();
+            return duration;
+          }
+          return newElapsed;
+        });
+      }, 1000);
+    } else {
+      // Reset timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+      setElapsedTime(0);
+      setProgress(0);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [isFocusActive]);
 
   const handleComplete = () => {
     console.log('Focus session completed!');
@@ -141,22 +177,9 @@ const FocusTimerScreen: React.FC = () => {
         <Switch
           value={isDistractionBlockingEnabled}
           onValueChange={toggleDistractionBlocking}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={isDistractionBlockingEnabled ? '#f5dd4b' : '#f4f3f4'}
+          disabled={!isFocusActive}
         />
       </View>
-
-      {isDistractionBlockingEnabled && (
-        <View style={styles.blockingStatus}>
-          <Ionicons
-            name="shield-checkmark"
-            size={24}
-            color="#4CAF50"
-            style={styles.blockingIcon}
-          />
-          <Text style={styles.blockingText}>Distraction blocking active</Text>
-        </View>
-      )}
     </View>
   );
 };
@@ -172,11 +195,7 @@ const styles = StyleSheet.create({
     padding: 15,
     backgroundColor: '#fff',
     borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    alignItems: 'center',
   },
   eventTitle: {
     fontSize: 18,
@@ -191,28 +210,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginVertical: 20,
-    paddingHorizontal: 10,
+    marginTop: 20,
+    padding: 15,
+    backgroundColor: '#fff',
+    borderRadius: 10,
   },
   settingLabel: {
     fontSize: 16,
-    color: '#333',
-  },
-  blockingStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#e8f5e9',
-    borderRadius: 8,
-  },
-  blockingIcon: {
-    marginRight: 8,
-  },
-  blockingText: {
-    color: '#4CAF50',
-    fontWeight: '500',
   },
 });
 
