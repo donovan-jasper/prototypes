@@ -1,12 +1,12 @@
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
 import HomeScreen from '../app/(tabs)/home/index';
-import * as healthService from '../lib/healthService';
-import * as calendarService from '../lib/calendarService';
+import { calendarService } from '../lib/api/calendarService';
+import { healthService } from '../lib/api/healthService';
 
 // Mock the services
-jest.mock('../lib/healthService');
-jest.mock('../lib/calendarService');
+jest.mock('../lib/api/calendarService');
+jest.mock('../lib/api/healthService');
 
 describe('HomeScreen', () => {
   beforeEach(() => {
@@ -16,66 +16,52 @@ describe('HomeScreen', () => {
 
   it('renders loading state initially', () => {
     const { getByText } = render(<HomeScreen />);
-    expect(getByText('Loading your data...')).toBeTruthy();
+    expect(getByText('Loading your habits and health data...')).toBeTruthy();
   });
 
-  it('displays error state when initialization fails', async () => {
-    (healthService.initializeHealthKit as jest.Mock).mockRejectedValue(new Error('Initialization failed'));
+  it('displays error state when data fetch fails', async () => {
+    // Mock the failed fetch
+    (calendarService.getEvents as jest.Mock).mockRejectedValue(new Error('Failed to fetch'));
+    (healthService.getHealthData as jest.Mock).mockRejectedValue(new Error('Failed to fetch'));
 
     const { getByText } = render(<HomeScreen />);
 
     await waitFor(() => {
-      expect(getByText('Failed to initialize services. Please check permissions.')).toBeTruthy();
+      expect(getByText('Failed to load data. Please check your connections and try again.')).toBeTruthy();
     });
   });
 
-  it('displays health data and habits after successful sync', async () => {
-    const mockHealthData = { steps: 5000, sleep: 7, workouts: 3 };
-    const mockEvents = [{ title: 'Morning run', start: new Date() }];
-    const mockHabits = ['Exercise'];
+  it('displays health metrics when data is loaded', async () => {
+    // Mock successful fetch
+    (calendarService.getEvents as jest.Mock).mockResolvedValue([]);
+    (healthService.getHealthData as jest.Mock).mockResolvedValue({
+      steps: 5000,
+      sleep: 7.5,
+      workouts: 3
+    });
 
-    (healthService.initializeHealthKit as jest.Mock).mockResolvedValue(undefined);
-    (healthService.initializeGoogleFit as jest.Mock).mockResolvedValue(undefined);
-    (healthService.fetchHealthData as jest.Mock).mockResolvedValue(mockHealthData);
-    (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockEvents);
-    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(mockHabits);
-
-    const { getByText, getByTestId } = render(<HomeScreen />);
+    const { getByText } = render(<HomeScreen />);
 
     await waitFor(() => {
-      expect(getByText('5000')).toBeTruthy();
+      expect(getByText('5,000')).toBeTruthy();
       expect(getByText('7')).toBeTruthy();
       expect(getByText('3')).toBeTruthy();
-      expect(getByText('Exercise')).toBeTruthy();
     });
   });
 
-  it('shows syncing state when sync button is pressed', async () => {
-    const mockHealthData = { steps: 5000, sleep: 7, workouts: 3 };
-    const mockEvents = [{ title: 'Morning run', start: new Date() }];
-    const mockHabits = ['Exercise'];
-
-    (healthService.initializeHealthKit as jest.Mock).mockResolvedValue(undefined);
-    (healthService.initializeGoogleFit as jest.Mock).mockResolvedValue(undefined);
-    (healthService.fetchHealthData as jest.Mock).mockResolvedValue(mockHealthData);
-    (calendarService.fetchCalendarEvents as jest.Mock).mockResolvedValue(mockEvents);
-    (calendarService.identifyHabitsFromEvents as jest.Mock).mockReturnValue(mockHabits);
-
-    const { getByText, getByTestId } = render(<HomeScreen />);
-
-    // Wait for initial load to complete
-    await waitFor(() => {
-      expect(getByText('5000')).toBeTruthy();
+  it('displays empty state when no habits are detected', async () => {
+    // Mock successful fetch with no habits
+    (calendarService.getEvents as jest.Mock).mockResolvedValue([]);
+    (healthService.getHealthData as jest.Mock).mockResolvedValue({
+      steps: 0,
+      sleep: 0,
+      workouts: 0
     });
 
-    // Click sync button
-    const syncButton = getByText('Sync Now');
-    fireEvent.press(syncButton);
+    const { getByText } = render(<HomeScreen />);
 
-    // Verify syncing state is shown
     await waitFor(() => {
-      expect(healthService.fetchHealthData).toHaveBeenCalled();
-      expect(calendarService.fetchCalendarEvents).toHaveBeenCalled();
+      expect(getByText('No habits detected yet.')).toBeTruthy();
     });
   });
 });
