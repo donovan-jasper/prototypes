@@ -1,123 +1,131 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { useHistory } from 'react-router-dom';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Image, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 
 const AddPlant = () => {
-  const history = useHistory();
-  const [plantData, setPlantData] = useState({
-    name: '',
-    scientificName: '',
-    description: '',
-    wateringFrequency: '',
-    lightRequirements: '',
-    careInstructions: '',
-    image: null
-  });
-
-  const handleInputChange = (name, value) => {
-    setPlantData(prev => ({ ...prev, [name]: value }));
-  };
+  const [name, setName] = useState('');
+  const [scientificName, setScientificName] = useState('');
+  const [acquiredDate, setAcquiredDate] = useState('');
+  const [lightRequirements, setLightRequirements] = useState('');
+  const [wateringFrequency, setWateringFrequency] = useState('');
+  const [photo, setPhoto] = useState(null);
+  const navigation = useNavigation();
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      let result = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (permissionResult.granted === false) {
-      alert('Permission to access camera roll is required!');
-      return;
-    }
+      if (result.granted === false) {
+        Alert.alert('Permission required', 'Please grant camera roll permissions to select a photo');
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 1,
+      });
 
-    if (!result.canceled) {
-      handleInputChange('image', result.assets[0].uri);
+      if (!result.canceled) {
+        setPhoto(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
   const handleSubmit = () => {
-    // In a real app, you would save the plant data to your backend here
-    console.log('Plant data to be saved:', plantData);
-    alert('Plant added successfully!');
-    history.push('/my-plants');
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter a plant name');
+      return;
+    }
+
+    // In a real app, this would save the plant to your database
+    console.log('Plant added:', {
+      name,
+      scientificName,
+      acquiredDate,
+      lightRequirements,
+      wateringFrequency,
+      photo
+    });
+
+    // Navigate back to MyPlants after adding
+    navigation.navigate('MyPlants');
   };
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Add New Plant</Text>
-      </View>
+      <Text style={styles.title}>Add New Plant</Text>
 
-      <View style={styles.form}>
-        <Text style={styles.label}>Plant Name</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Common Name*</Text>
         <TextInput
           style={styles.input}
-          value={plantData.name}
-          onChangeText={(text) => handleInputChange('name', text)}
+          value={name}
+          onChangeText={setName}
           placeholder="e.g. Monstera Deliciosa"
         />
+      </View>
 
+      <View style={styles.formGroup}>
         <Text style={styles.label}>Scientific Name</Text>
         <TextInput
           style={styles.input}
-          value={plantData.scientificName}
-          onChangeText={(text) => handleInputChange('scientificName', text)}
-          placeholder="e.g. Monstera adansonii"
+          value={scientificName}
+          onChangeText={setScientificName}
+          placeholder="e.g. Monstera deliciosa"
         />
+      </View>
 
-        <Text style={styles.label}>Description</Text>
-        <TextInput
-          style={[styles.input, styles.multilineInput]}
-          value={plantData.description}
-          onChangeText={(text) => handleInputChange('description', text)}
-          placeholder="Describe your plant..."
-          multiline
-          numberOfLines={4}
-        />
-
-        <Text style={styles.label}>Watering Frequency</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Acquired Date</Text>
         <TextInput
           style={styles.input}
-          value={plantData.wateringFrequency}
-          onChangeText={(text) => handleInputChange('wateringFrequency', text)}
-          placeholder="e.g. every 7-10 days"
+          value={acquiredDate}
+          onChangeText={setAcquiredDate}
+          placeholder="YYYY-MM-DD"
         />
+      </View>
 
+      <View style={styles.formGroup}>
         <Text style={styles.label}>Light Requirements</Text>
         <TextInput
           style={styles.input}
-          value={plantData.lightRequirements}
-          onChangeText={(text) => handleInputChange('lightRequirements', text)}
+          value={lightRequirements}
+          onChangeText={setLightRequirements}
           placeholder="e.g. Bright, indirect light"
         />
+      </View>
 
-        <Text style={styles.label}>Care Instructions</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Watering Frequency</Text>
         <TextInput
-          style={[styles.input, styles.multilineInput]}
-          value={plantData.careInstructions}
-          onChangeText={(text) => handleInputChange('careInstructions', text)}
-          placeholder="Add specific care instructions..."
-          multiline
-          numberOfLines={4}
+          style={styles.input}
+          value={wateringFrequency}
+          onChangeText={setWateringFrequency}
+          placeholder="e.g. Every 7-10 days"
         />
+      </View>
 
-        <Text style={styles.label}>Plant Photo</Text>
-        <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
-          {plantData.image ? (
-            <Image source={{ uri: plantData.image }} style={styles.previewImage} />
-          ) : (
-            <Text style={styles.imagePickerText}>Tap to select an image</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Add Plant</Text>
+      <View style={styles.formGroup}>
+        <Text style={styles.label}>Photo</Text>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.previewImage} />
+        ) : (
+          <Text style={styles.photoPlaceholder}>No photo selected</Text>
+        )}
+        <TouchableOpacity style={styles.photoButton} onPress={pickImage}>
+          <Text style={styles.photoButtonText}>Select Photo</Text>
         </TouchableOpacity>
       </View>
+
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.submitButtonText}>Add Plant</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 };
@@ -125,69 +133,63 @@ const AddPlant = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
     padding: 16,
-    backgroundColor: '#2ecc71',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
+    marginBottom: 24,
+    textAlign: 'center',
   },
-  form: {
-    padding: 16,
+  formGroup: {
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#2c3e50',
     marginBottom: 8,
-    marginTop: 16,
+    fontWeight: '500',
   },
   input: {
     backgroundColor: 'white',
     padding: 12,
     borderRadius: 8,
-    fontSize: 16,
     borderWidth: 1,
     borderColor: '#ddd',
   },
-  multilineInput: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  imagePicker: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    height: 150,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  imagePickerText: {
-    color: '#7f8c8d',
-    fontSize: 16,
+  photoPlaceholder: {
+    color: '#666',
+    marginBottom: 8,
   },
   previewImage: {
     width: '100%',
-    height: '100%',
+    height: 200,
+    resizeMode: 'cover',
     borderRadius: 8,
+    marginBottom: 8,
+  },
+  photoButton: {
+    backgroundColor: '#4CAF50',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  photoButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   submitButton: {
-    backgroundColor: '#2ecc71',
+    backgroundColor: '#4CAF50',
     padding: 16,
     borderRadius: 8,
-    marginTop: 24,
     alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 32,
   },
   submitButtonText: {
     color: 'white',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
