@@ -25,13 +25,17 @@ export const traceMoney = (
 
   for (const tx of sortedTransactions) {
     runningBalance += tx.amount;
+    // Apply transaction fee if this is a withdrawal
+    if (tx.type === 'withdrawal' && tx.fee) {
+      runningBalance -= tx.fee;
+    }
     timeline.push({
       ...tx,
       runningBalance
     });
   }
 
-  // Apply transaction fee if specified
+  // Apply overall fee if specified
   if (fee > 0) {
     runningBalance -= fee;
   }
