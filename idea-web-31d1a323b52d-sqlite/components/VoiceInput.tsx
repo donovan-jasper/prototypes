@@ -1,213 +1,113 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
-import { Button, TextInput, ActivityIndicator, Text } from 'react-native-paper';
-import { startListening, stopListening, VoiceRecognitionError } from '../lib/voice';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Text, useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Speech from 'expo-speech';
+import * as Haptics from 'expo-haptics';
 
 interface VoiceInputProps {
-  onTranscription: (text: string) => void;
+  onResult: (text: string) => void;
+  placeholder?: string;
 }
 
-type ListeningState = 'idle' | 'listening' | 'processing';
-
-export default function VoiceInput({ onTranscription }: VoiceInputProps) {
-  const [state, setState] = useState<ListeningState>('idle');
-  const [transcription, setTranscription] = useState('');
+const VoiceInput: React.FC<VoiceInputProps> = ({ onResult, placeholder = 'Tap to speak...' }) => {
+  const theme = useTheme();
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [pulseAnim] = useState(new Animated.Value(1));
 
-  React.useEffect(() => {
-    if (state === 'listening') {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.3,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 1,
-            duration: 800,
-            useNativeDriver: true,
-          }),
-        ])
-      ).start();
-    } else {
-      pulseAnim.setValue(1);
-    }
-  }, [state]);
-
-  const handleVoiceInput = async () => {
-    setError(null);
-    setState('listening');
-    
+  const startListening = async () => {
     try {
-      const text = await startListening();
-      setState('processing');
-      
-      // Small delay to show processing state
-      setTimeout(() => {
-        setTranscription(text);
-        onTranscription(text);
-        setState('idle');
-      }, 300);
+      setError(null);
+      setIsListening(true);
+      setTranscript('');
+
+      // Trigger haptic feedback
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      // Start speech recognition
+      Speech.recognizeAsync({
+        language: 'en-US',
+        prompt: 'Speak now...',
+        onResult: (result) => {
+          if (result.isFinal) {
+            setTranscript(result.text);
+            onResult(result.text);
+            setIsListening(false);
+          }
+        },
+        onError: (error) => {
+          setError(error.message);
+          setIsListening(false);
+        },
+      });
     } catch (err) {
-      const error = err as VoiceRecognitionError;
-      setState('idle');
-      
-      let errorMessage = 'Failed to recognize speech';
-      if (error.code === 'PERMISSION_DENIED') {
-        errorMessage = 'Microphone permission denied. Please enable it in settings.';
-      } else if (error.code === 'NOT_SUPPORTED' || error.code === 'NOT_AVAILABLE') {
-        errorMessage = 'Speech recognition not supported on this device.';
-      } else if (error.code === 'NO_SPEECH') {
-        errorMessage = 'No speech detected. Please try again.';
-      } else if (error.code === 'NETWORK') {
-        errorMessage = 'Network error. Check your connection.';
-      } else if (error.code === 'AUDIO') {
-        errorMessage = 'Audio recording error. Check microphone access.';
-      }
-      
-      setError(errorMessage);
-      console.error('Voice recognition error:', error);
+      setError(err instanceof Error ? err.message : 'Failed to start voice input');
+      setIsListening(false);
     }
-  };
-
-  const handleStop = async () => {
-    await stopListening();
-    setState('idle');
-  };
-
-  const getButtonLabel = () => {
-    switch (state) {
-      case 'listening':
-        return 'Tap to Stop';
-      case 'processing':
-        return 'Processing...';
-      default:
-        return 'Start Recording';
-    }
-  };
-
-  const getButtonIcon = () => {
-    if (state === 'listening') {
-      return 'stop';
-    } else if (state === 'processing') {
-      return 'sync';
-    }
-    return 'microphone';
   };
 
   return (
     <View style={styles.container}>
-      <View style={styles.buttonContainer}>
-        <Button
-          mode="contained"
-          onPress={state === 'listening' ? handleStop : handleVoiceInput}
-          disabled={state === 'processing'}
-          style={[
-            styles.button,
-            state === 'listening' && styles.listeningButton,
-            state === 'processing' && styles.processingButton
-          ]}
-          icon={getButtonIcon()}
-          contentStyle={styles.buttonContent}
-        >
-          {state === 'processing' ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            getButtonLabel()
-          )}
-        </Button>
-        
-        {state === 'listening' && (
-          <View style={styles.indicator}>
-            <Animated.View 
-              style={[
-                styles.pulse,
-                { transform: [{ scale: pulseAnim }] }
-              ]} 
-            />
-            <Text style={styles.indicatorText}>Listening... Speak now</Text>
-          </View>
+      <TouchableOpacity
+        style={[
+          styles.inputContainer,
+          { backgroundColor: theme.colors.surfaceVariant },
+          isListening && styles.listeningContainer
+        ]}
+        onPress={startListening}
+        disabled={isListening}
+      >
+        {isListening ? (
+          <ActivityIndicator size="small" color={theme.colors.primary} />
+        ) : (
+          <MaterialCommunityIcons
+            name="microphone"
+            size={24}
+            color={theme.colors.primary}
+          />
         )}
-        
-        {state === 'processing' && (
-          <View style={styles.indicator}>
-            <Text style={styles.indicatorText}>Converting speech to text...</Text>
-          </View>
-        )}
-      </View>
+        <Text style={[
+          styles.placeholder,
+          { color: theme.colors.onSurfaceVariant }
+        ]}>
+          {transcript || placeholder}
+        </Text>
+      </TouchableOpacity>
 
       {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-        </View>
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>
+          {error}
+        </Text>
       )}
-
-      <TextInput
-        label="Transcription"
-        value={transcription}
-        onChangeText={(text) => {
-          setTranscription(text);
-          onTranscription(text);
-        }}
-        style={styles.input}
-        multiline
-        numberOfLines={3}
-        mode="outlined"
-      />
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginVertical: 8,
   },
-  buttonContainer: {
-    marginBottom: 16,
+  inputContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-  },
-  button: {
-    width: '100%',
-  },
-  buttonContent: {
-    paddingVertical: 8,
-  },
-  listeningButton: {
-    backgroundColor: '#e74c3c',
-  },
-  processingButton: {
-    backgroundColor: '#95a5a6',
-  },
-  indicator: {
-    marginTop: 16,
-    alignItems: 'center',
-  },
-  pulse: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#e74c3c',
-    marginBottom: 8,
-  },
-  indicatorText: {
-    fontSize: 14,
-    color: '#7f8c8d',
-    fontStyle: 'italic',
-  },
-  errorContainer: {
-    backgroundColor: '#ffe6e6',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  listeningContainer: {
+    borderColor: '#4CAF50',
+    borderWidth: 1,
+  },
+  placeholder: {
+    marginLeft: 8,
+    flex: 1,
   },
   errorText: {
-    color: '#e74c3c',
-    fontSize: 14,
+    marginTop: 4,
     textAlign: 'center',
   },
-  input: {
-    marginBottom: 16,
-  },
 });
+
+export default VoiceInput;

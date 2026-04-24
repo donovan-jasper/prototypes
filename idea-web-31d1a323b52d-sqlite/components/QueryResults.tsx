@@ -1,38 +1,82 @@
 import React from 'react';
-import { View, FlatList, StyleSheet } from 'react-native';
-import { Card, Title, Paragraph } from 'react-native-paper';
+import { View, StyleSheet, FlatList } from 'react-native';
+import { Card, Text, useTheme } from 'react-native-paper';
 
-export default function QueryResults({ results }) {
-  return (
-    <View style={styles.container}>
-      <FlatList
-        data={results}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <Card.Content>
-              {Object.entries(item).map(([key, value]) => (
-                <View key={key} style={styles.row}>
-                  <Title>{key}</Title>
-                  <Paragraph>{value}</Paragraph>
-                </View>
-              ))}
-            </Card.Content>
-          </Card>
-        )}
-      />
-    </View>
-  );
+interface QueryResultsProps {
+  data: any[];
 }
 
+const QueryResults: React.FC<QueryResultsProps> = ({ data }) => {
+  const theme = useTheme();
+
+  if (!data || data.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text>No results found</Text>
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: { item: any }) => {
+    // Get all keys except 'id' if it exists
+    const keys = Object.keys(item).filter(key => key !== 'id');
+
+    return (
+      <Card style={styles.card}>
+        <Card.Content>
+          {keys.map((key) => (
+            <View key={key} style={styles.row}>
+              <Text variant="labelMedium" style={styles.label}>
+                {key.replace(/_/g, ' ')}:
+              </Text>
+              <Text variant="bodyMedium" style={styles.value}>
+                {item[key]}
+              </Text>
+            </View>
+          ))}
+        </Card.Content>
+      </Card>
+    );
+  };
+
+  return (
+    <FlatList
+      data={data}
+      renderItem={renderItem}
+      keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+      contentContainerStyle={styles.list}
+      ItemSeparatorComponent={() => <View style={styles.separator} />}
+    />
+  );
+};
+
 const styles = StyleSheet.create({
-  container: {
+  emptyContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  list: {
+    paddingBottom: 16,
   },
   card: {
-    marginBottom: 16,
-  },
-  row: {
     marginBottom: 8,
   },
+  row: {
+    flexDirection: 'row',
+    marginBottom: 4,
+  },
+  label: {
+    fontWeight: 'bold',
+    marginRight: 8,
+    textTransform: 'capitalize',
+  },
+  value: {
+    flex: 1,
+  },
+  separator: {
+    height: 8,
+  },
 });
+
+export default QueryResults;
