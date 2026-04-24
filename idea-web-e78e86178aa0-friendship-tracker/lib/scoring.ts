@@ -45,22 +45,18 @@ export interface StreakState {
 }
 
 export function calculateStreak(
-  currentStreak: StreakState,
   lastInteractionDate: string | null,
-  freezeUsed: boolean = false,
-  freezeAvailable: boolean = true
-): StreakState {
+  currentStreakDays: number,
+  freezeStatus: { used: boolean; available: boolean }
+): { updatedStreakDays: number; freezeUsed: boolean } {
   const now = new Date();
   const lastInteraction = lastInteractionDate ? new Date(lastInteractionDate) : null;
 
   // If no previous interaction, start fresh streak
   if (!lastInteraction) {
     return {
-      currentDays: 0,
-      longestDays: currentStreak.longestDays,
-      lastInteraction: null,
-      freezeUsed: false,
-      freezeAvailable: freezeAvailable
+      updatedStreakDays: 0,
+      freezeUsed: false
     };
   }
 
@@ -68,47 +64,33 @@ export function calculateStreak(
 
   // If interaction was today, increment streak
   if (daysSince === 0) {
-    const newCurrent = currentStreak.currentDays + 1;
     return {
-      currentDays: newCurrent,
-      longestDays: Math.max(currentStreak.longestDays, newCurrent),
-      lastInteraction: lastInteractionDate,
-      freezeUsed: false,
-      freezeAvailable: freezeAvailable
+      updatedStreakDays: currentStreakDays + 1,
+      freezeUsed: false
     };
   }
 
   // If interaction was yesterday, continue streak
   if (daysSince === 1) {
-    const newCurrent = currentStreak.currentDays + 1;
     return {
-      currentDays: newCurrent,
-      longestDays: Math.max(currentStreak.longestDays, newCurrent),
-      lastInteraction: lastInteractionDate,
-      freezeUsed: false,
-      freezeAvailable: freezeAvailable
+      updatedStreakDays: currentStreakDays + 1,
+      freezeUsed: false
     };
   }
 
   // If streak was broken (more than 1 day since last interaction)
   // Check if freeze is available and not used yet
-  if (freezeAvailable && !freezeUsed && currentStreak.currentDays > 0) {
+  if (freezeStatus.available && !freezeStatus.used && currentStreakDays > 0) {
     return {
-      currentDays: currentStreak.currentDays,
-      longestDays: currentStreak.longestDays,
-      lastInteraction: lastInteractionDate,
-      freezeUsed: false,
-      freezeAvailable: true
+      updatedStreakDays: currentStreakDays,
+      freezeUsed: true
     };
   }
 
   // If freeze is used or not available, reset streak
   return {
-    currentDays: 0,
-    longestDays: currentStreak.longestDays,
-    lastInteraction: lastInteractionDate,
-    freezeUsed: false,
-    freezeAvailable: freezeAvailable
+    updatedStreakDays: 0,
+    freezeUsed: false
   };
 }
 

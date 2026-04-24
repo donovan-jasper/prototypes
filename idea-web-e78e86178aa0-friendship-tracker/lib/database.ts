@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { calculateStreak } from './scoring';
 
 export interface Friend {
   id: number;
@@ -159,35 +160,58 @@ export async function logInteraction(
 ): Promise<number> {
   if (!db) throw new Error('Database not initialized');
 
+  // Get current streak information
+  const currentStreak = await db.getFirstAsync<Streak>(
+    'SELECT * FROM streaks WHERE friendId = ?',
+    [friendId]
+  );
+
+  if (!currentStreak) {
+    throw new Error('No streak record found for this friend');
+  }
+
+  // Calculate new streak state
+  const { updatedStreakDays, freezeUsed } = calculateStreak(
+    currentStreak.lastInteraction,
+    currentStreak.currentDays,
+    {
+      used: currentStreak.freezeUsed === 1,
+      available: true // Assuming freeze is always available unless used
+    }
+  );
+
+  // Insert the interaction
   const result = await db.runAsync(
     'INSERT INTO interactions (friendId, type, date, notes, photoUri) VALUES (?, ?, ?, ?, ?)',
     [friendId, type, date, notes || null, photoUri || null]
   );
 
+  // Update friend's last contact date and connection score
+  const connectionScore = calculateConnectionScore(date);
   await db.runAsync(
-    'UPDATE friends SET lastContact = ? WHERE id = ?',
-    [date, friendId]
+    'UPDATE friends SET lastContact = ?, connectionScore = ? WHERE id = ?',
+    [date, connectionScore, friendId]
   );
 
-  // Update streak
-  const streak = await getStreak(friendId);
-  if (streak) {
-    const { calculateStreak } = await import('./scoring');
-    const { currentDays, freezeUsed } = calculateStreak(
-      streak.lastInteraction,
-      streak.currentDays,
-      streak.freezeUsed
-    );
-
-    const longestDays = Math.max(streak.longestDays, currentDays);
-
-    await db.runAsync(
-      'UPDATE streaks SET currentDays = ?, longestDays = ?, lastInteraction = ?, freezeUsed = ? WHERE friendId = ?',
-      [currentDays, longestDays, date, freezeUsed ? 1 : 0, friendId]
-    );
-  }
+  // Update streak information
+  const longestDays = Math.max(currentStreak.longestDays, updatedStreakDays);
+  await db.runAsync(
+    'UPDATE streaks SET currentDays = ?, longestDays = ?, lastInteraction = ?, freezeUsed = ? WHERE friendId = ?',
+    [updatedStreakDays, longestDays, date, freezeUsed ? 1 : 0, friendId]
+  );
 
   return result.lastInsertRowId;
+}
+
+export async function getStreak(friendId: number): Promise<Streak | null> {
+  if (!db) throw new Error('Database not initialized');
+
+  const streak = await db.getFirstAsync<Streak>(
+    'SELECT * FROM streaks WHERE friendId = ?',
+    [friendId]
+  );
+
+  return streak || null;
 }
 
 export async function getInteractionsForFriend(friendId: number): Promise<Interaction[]> {
@@ -201,55 +225,66 @@ export async function getInteractionsForFriend(friendId: number): Promise<Intera
   return interactions;
 }
 
-export async function getStreak(friendId: number): Promise<Streak | null> {
+export async function getAllChallenges(): Promise<Challenge[]> {
   if (!db) throw new Error('Database not initialized');
 
-  const streak = await db.getFirstAsync<Streak>(
-    'SELECT * FROM streaks WHERE friendId = ?',
-    [friendId]
+  const challenges = await db.getAllAsync<Challenge>(
+    'SELECT * FROM challenges ORDER BY createdAt DESC'
   );
 
-  if (streak) {
-    // Check if streak should be broken
-    if (streak.lastInteraction) {
-      const { calculateStreak } = await import('./scoring');
-      const { currentDays, freezeUsed } = calculateStreak(
-        streak.lastInteraction,
-        streak.currentDays,
-        streak.freezeUsed
-      );
-
-      if (currentDays !== streak.currentDays || freezeUsed !== streak.freezeUsed) {
-        await db.runAsync(
-          'UPDATE streaks SET currentDays = ?, freezeUsed = ? WHERE friendId = ?',
-          [currentDays, freezeUsed ? 1 : 0, friendId]
-        );
-        streak.currentDays = currentDays;
-        streak.freezeUsed = freezeUsed;
-      }
-    }
-  }
-
-  return streak || null;
+  return challenges;
 }
 
-export async function freezeStreak(friendId: number): Promise<void> {
+export async function addChallenge(
+  title: string,
+  description: string,
+  type: Challenge['type'],
+  targetCount: number
+): Promise<number> {
   if (!db) throw new Error('Database not initialized');
 
-  const streak = await getStreak(friendId);
-  if (!streak) return;
+  const result = await db.runAsync(
+    'INSERT INTO challenges (title, description, type, targetCount) VALUES (?, ?, ?, ?)',
+    [title, description, type, targetCount]
+  );
 
-  if (!streak.freezeUsed) {
-    await db.runAsync(
-      'UPDATE streaks SET freezeUsed = 1 WHERE friendId = ?',
-      [friendId]
-    );
-  }
+  return result.lastInsertRowId;
 }
 
-export async function getAllStreaks(): Promise<Streak[]> {
+export async function updateChallengeProgress(id: number, progress: number): Promise<void> {
   if (!db) throw new Error('Database not initialized');
 
-  const streaks = await db.getAllAsync<Streak>('SELECT * FROM streaks');
-  return streaks;
+  await db.runAsync(
+    'UPDATE challenges SET progress = ? WHERE id = ?',
+    [progress, id]
+  );
+}
+
+export async function completeChallenge(id: number): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
+  await db.runAsync(
+    'UPDATE challenges SET completed = 1 WHERE id = ?',
+    [id]
+  );
+}
+
+export async function getUserSetting(key: string): Promise<string | null> {
+  if (!db) throw new Error('Database not initialized');
+
+  const result = await db.getFirstAsync<{ value: string }>(
+    'SELECT value FROM user_settings WHERE key = ?',
+    [key]
+  );
+
+  return result?.value || null;
+}
+
+export async function setUserSetting(key: string, value: string): Promise<void> {
+  if (!db) throw new Error('Database not initialized');
+
+  await db.runAsync(
+    'INSERT OR REPLACE INTO user_settings (key, value) VALUES (?, ?)',
+    [key, value]
+  );
 }
