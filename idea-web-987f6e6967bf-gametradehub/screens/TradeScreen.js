@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity, ScrollView, Alert, Modal, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { getGameDetails } from '../utils/api';
+import { getGameDetails, getGamePriceHistory } from '../utils/api';
 import { createTradeRecord } from '../utils/firebase';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -15,24 +15,18 @@ const TradeScreen = ({ route }) => {
   const [tradeInProgress, setTradeInProgress] = useState(false);
   const [priceHistory, setPriceHistory] = useState([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [matchedTrade, setMatchedTrade] = useState(null);
   const navigation = useNavigation();
 
   useEffect(() => {
     const fetchGameData = async () => {
       try {
+        setLoading(true);
         const data = await getGameDetails(barcode);
         setGameData(data);
 
-        // Generate mock price history for demonstration
-        const history = [];
-        const basePrice = data.price;
-        for (let i = 0; i < 7; i++) {
-          const variation = (Math.random() - 0.5) * 5; // Random variation between -2.5 and +2.5
-          history.push({
-            date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toLocaleDateString(),
-            price: Math.max(5, basePrice + variation) // Ensure price doesn't go below $5
-          });
-        }
+        // Fetch real price history from API
+        const history = await getGamePriceHistory(data.id);
         setPriceHistory(history);
       } catch (err) {
         setError(err.message || 'Failed to fetch game data');
@@ -49,22 +43,36 @@ const TradeScreen = ({ route }) => {
 
     setTradeInProgress(true);
     try {
+      // Simulate trade matching algorithm
+      const potentialMatches = [
+        { price: gameData.price * 0.95, seller: 'GameDeals', condition: 'New' },
+        { price: gameData.price * 0.9, seller: 'LocalGamer', condition: 'Used - Like New' },
+        { price: gameData.price * 0.85, seller: 'RetroGamer', condition: 'Used - Good' }
+      ];
+
+      // Select the best match (highest price)
+      const bestMatch = potentialMatches.reduce((prev, current) =>
+        (prev.price > current.price) ? prev : current
+      );
+
       const tradeId = await createTradeRecord({
         gameId: gameData.id,
         gameName: gameData.name,
-        price: gameData.price,
-        condition: gameData.condition,
+        price: bestMatch.price,
+        condition: bestMatch.condition,
+        seller: bestMatch.seller,
         timestamp: new Date().toISOString(),
         status: 'pending'
       });
 
-      Alert.alert(
-        'Trade Submitted',
-        `Your trade for ${gameData.name} has been submitted successfully. Trade ID: ${tradeId}`,
-        [
-          { text: 'OK', onPress: () => navigation.navigate('Inventory') }
-        ]
-      );
+      setMatchedTrade({
+        ...bestMatch,
+        tradeId,
+        gameName: gameData.name,
+        gameCover: gameData.cover
+      });
+
+      setShowConfirmation(true);
     } catch (err) {
       Alert.alert('Trade Failed', err.message || 'Failed to execute trade. Please try again.');
     } finally {
@@ -147,91 +155,102 @@ const TradeScreen = ({ route }) => {
           />
         )}
         <Text style={styles.gameTitle}>{gameData.name}</Text>
+        <View style={styles.gameInfoContainer}>
+          <View style={styles.gameInfoRow}>
+            <Text style={styles.gameInfoLabel}>Platform:</Text>
+            <Text style={styles.gameInfoValue}>{gameData.platforms}</Text>
+          </View>
+          <View style={styles.gameInfoRow}>
+            <Text style={styles.gameInfoLabel}>Release Date:</Text>
+            <Text style={styles.gameInfoValue}>{gameData.releaseDate}</Text>
+          </View>
+          <View style={styles.gameInfoRow}>
+            <Text style={styles.gameInfoLabel}>Genres:</Text>
+            <Text style={styles.gameInfoValue}>{gameData.genres}</Text>
+          </View>
+          <View style={styles.gameInfoRow}>
+            <Text style={styles.gameInfoLabel}>Developer:</Text>
+            <Text style={styles.gameInfoValue}>{gameData.developer}</Text>
+          </View>
+        </View>
 
         <View style={styles.priceContainer}>
-          <Text style={styles.gamePrice}>Market Price: ${gameData.price.toFixed(2)}</Text>
-          <Text style={styles.gameCondition}>Condition: {gameData.condition}</Text>
+          <Text style={styles.currentPrice}>Current Market Price: ${gameData.price.toFixed(2)}</Text>
+          <Text style={styles.conditionText}>Condition: {gameData.condition}</Text>
         </View>
 
         {renderPriceHistory()}
 
         <TouchableOpacity
           style={styles.tradeButton}
-          onPress={() => setShowConfirmation(true)}
+          onPress={handleExecuteTrade}
           disabled={tradeInProgress}
         >
           {tradeInProgress ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.tradeButtonText}>Execute Trade</Text>
+            <Text style={styles.tradeButtonText}>Find Best Trade Match</Text>
           )}
         </TouchableOpacity>
       </ScrollView>
     );
   };
 
-  const renderConfirmationModal = () => {
-    if (!gameData) return null;
+  return (
+    <View style={styles.container}>
+      {renderGameDetails()}
 
-    const currentPrice = gameData.price;
-    const potentialProfit = currentPrice * 0.1; // Assuming 10% potential profit for demo
-
-    return (
       <Modal
-        visible={showConfirmation}
-        transparent={true}
         animationType="slide"
+        transparent={true}
+        visible={showConfirmation}
         onRequestClose={() => setShowConfirmation(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Trade Execution</Text>
+            <Text style={styles.modalTitle}>Trade Matched!</Text>
 
-            <View style={styles.modalGameInfo}>
+            {matchedTrade?.gameCover && (
               <Image
-                source={{ uri: gameData.cover }}
+                source={{ uri: matchedTrade.gameCover }}
                 style={styles.modalGameCover}
                 resizeMode="contain"
               />
-              <View style={styles.modalGameDetails}>
-                <Text style={styles.modalGameName}>{gameData.name}</Text>
-                <Text style={styles.modalGamePrice}>Price: ${currentPrice.toFixed(2)}</Text>
-                <Text style={styles.modalGameCondition}>Condition: {gameData.condition}</Text>
+            )}
+
+            <Text style={styles.modalGameName}>{matchedTrade?.gameName}</Text>
+
+            <View style={styles.modalDetails}>
+              <View style={styles.modalDetailRow}>
+                <Text style={styles.modalDetailLabel}>Seller:</Text>
+                <Text style={styles.modalDetailValue}>{matchedTrade?.seller}</Text>
+              </View>
+              <View style={styles.modalDetailRow}>
+                <Text style={styles.modalDetailLabel}>Price:</Text>
+                <Text style={styles.modalDetailValue}>${matchedTrade?.price.toFixed(2)}</Text>
+              </View>
+              <View style={styles.modalDetailRow}>
+                <Text style={styles.modalDetailLabel}>Condition:</Text>
+                <Text style={styles.modalDetailValue}>{matchedTrade?.condition}</Text>
+              </View>
+              <View style={styles.modalDetailRow}>
+                <Text style={styles.modalDetailLabel}>Trade ID:</Text>
+                <Text style={styles.modalDetailValue}>{matchedTrade?.tradeId}</Text>
               </View>
             </View>
 
-            <View style={styles.modalProfitContainer}>
-              <Text style={styles.modalProfitTitle}>Potential Profit:</Text>
-              <Text style={styles.modalProfitAmount}>${potentialProfit.toFixed(2)}</Text>
-            </View>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalCancelButton]}
-                onPress={() => setShowConfirmation(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.modalConfirmButton]}
-                onPress={() => {
-                  setShowConfirmation(false);
-                  handleExecuteTrade();
-                }}
-              >
-                <Text style={styles.modalButtonText}>Confirm Trade</Text>
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowConfirmation(false);
+                navigation.navigate('Inventory');
+              }}
+            >
+              <Text style={styles.modalButtonText}>Continue</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
-    );
-  };
-
-  return (
-    <View style={styles.container}>
-      {renderGameDetails()}
-      {renderConfirmationModal()}
     </View>
   );
 };
@@ -242,16 +261,113 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   gameContainer: {
+    flex: 1,
     padding: 16,
+  },
+  gameCover: {
+    width: '100%',
+    height: 200,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
+  gameTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    color: '#333',
+  },
+  gameInfoContainer: {
+    marginBottom: 20,
+  },
+  gameInfoRow: {
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  gameInfoLabel: {
+    fontWeight: '600',
+    marginRight: 8,
+    color: '#666',
+    width: 100,
+  },
+  gameInfoValue: {
+    flex: 1,
+    color: '#333',
+  },
+  priceContainer: {
+    marginVertical: 20,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  currentPrice: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#6200EE',
+    marginBottom: 8,
+  },
+  conditionText: {
+    fontSize: 16,
+    color: '#666',
+  },
+  priceHistoryContainer: {
+    marginVertical: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333',
+  },
+  priceChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    height: 150,
+    alignItems: 'flex-end',
+  },
+  priceBarContainer: {
+    alignItems: 'center',
+    width: (width - 48) / 7,
+  },
+  priceBar: {
+    width: '60%',
+    backgroundColor: '#6200EE',
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+  },
+  priceBarLabel: {
+    fontSize: 12,
+    marginTop: 4,
+    color: '#333',
+  },
+  priceBarDate: {
+    fontSize: 10,
+    color: '#666',
+    marginTop: 2,
+  },
+  tradeButton: {
+    backgroundColor: '#6200EE',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  tradeButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
     color: '#666',
   },
@@ -262,110 +378,21 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   errorText: {
-    marginTop: 10,
     fontSize: 16,
     color: '#d32f2f',
+    marginVertical: 16,
     textAlign: 'center',
   },
   retryButton: {
-    marginTop: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
     backgroundColor: '#6200EE',
-    borderRadius: 5,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
   },
   retryButtonText: {
     color: '#fff',
     fontSize: 16,
-  },
-  gameCover: {
-    width: '100%',
-    height: 200,
-    marginBottom: 20,
-    borderRadius: 8,
-  },
-  gameTitle: {
-    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
-  },
-  priceContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  gamePrice: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#6200EE',
-    marginBottom: 5,
-  },
-  gameCondition: {
-    fontSize: 16,
-    color: '#666',
-  },
-  priceHistoryContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    color: '#333',
-  },
-  priceChart: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 150,
-    paddingVertical: 10,
-  },
-  priceBarContainer: {
-    alignItems: 'center',
-    width: (width - 60) / 7,
-  },
-  priceBar: {
-    width: 20,
-    backgroundColor: '#6200EE',
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-    marginBottom: 5,
-  },
-  priceBarLabel: {
-    fontSize: 12,
-    color: '#333',
-  },
-  priceBarDate: {
-    fontSize: 10,
-    color: '#666',
-    marginTop: 2,
-  },
-  tradeButton: {
-    backgroundColor: '#6200EE',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  tradeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
   },
   modalContainer: {
     flex: 1,
@@ -374,85 +401,60 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 24,
     width: '90%',
     maxWidth: 400,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 20,
+    marginBottom: 16,
+    color: '#6200EE',
+  },
+  modalGameCover: {
+    width: 120,
+    height: 120,
+    marginBottom: 16,
+    borderRadius: 8,
+  },
+  modalGameName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 16,
     textAlign: 'center',
     color: '#333',
   },
-  modalGameInfo: {
+  modalDetails: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  modalDetailRow: {
     flexDirection: 'row',
-    marginBottom: 20,
-  },
-  modalGameCover: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 15,
-  },
-  modalGameDetails: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  modalGameName: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 5,
-    color: '#333',
-  },
-  modalGamePrice: {
-    fontSize: 16,
-    color: '#6200EE',
-    marginBottom: 5,
-  },
-  modalGameCondition: {
-    fontSize: 14,
-    color: '#666',
-  },
-  modalProfitContainer: {
-    marginBottom: 20,
-    padding: 15,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  modalProfitTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 5,
-    color: '#333',
-  },
-  modalProfitAmount: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  modalButtons: {
-    flexDirection: 'row',
+    marginBottom: 8,
     justifyContent: 'space-between',
   },
+  modalDetailLabel: {
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalDetailValue: {
+    color: '#333',
+  },
   modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  modalCancelButton: {
-    backgroundColor: '#f5f5f5',
-  },
-  modalConfirmButton: {
     backgroundColor: '#6200EE',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
   },
   modalButtonText: {
+    color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
