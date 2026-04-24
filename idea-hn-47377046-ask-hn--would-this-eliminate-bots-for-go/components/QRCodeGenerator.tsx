@@ -66,6 +66,17 @@ export default function QRCodeGenerator({ token, expiryTime, onClose }: Props) {
 
   const isExpired = Date.now() > expiryTime;
 
+  if (!token) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>No verification token available</Text>
+        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+          <Text style={styles.closeText}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -202,7 +213,7 @@ const styles = StyleSheet.create({
   expiryTime: {
     fontSize: 24,
     fontWeight: '600',
-    color: '#007AFF',
+    color: '#1C1C1E',
     marginBottom: 4,
   },
   expiryDate: {
@@ -219,8 +230,8 @@ const styles = StyleSheet.create({
   },
   tokenText: {
     fontSize: 14,
-    fontFamily: 'monospace',
     color: '#1C1C1E',
+    fontFamily: 'monospace',
     backgroundColor: '#F2F2F7',
     padding: 12,
     borderRadius: 8,
@@ -232,26 +243,26 @@ const styles = StyleSheet.create({
   actionButton: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 8,
+    backgroundColor: '#007AFF',
     alignItems: 'center',
-    backgroundColor: '#F2F2F7',
     marginHorizontal: 4,
   },
   shareButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#34C759',
   },
   actionText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
-    color: '#1C1C1E',
   },
   shareText: {
     color: '#fff',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  errorText: {
+    fontSize: 18,
+    color: '#FF3B30',
+    textAlign: 'center',
+    marginBottom: 20,
   },
 });

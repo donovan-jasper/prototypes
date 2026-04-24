@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Modal } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, ActivityIndicator, Modal, View } from 'react-native';
 import QRCodeGenerator from './QRCodeGenerator';
 
 interface Props {
@@ -8,7 +8,7 @@ interface Props {
 
 export default function VerificationButton({ onVerify }: Props) {
   const [loading, setLoading] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
   const [verificationData, setVerificationData] = useState<{
     token: string;
     expiryTime: number;
@@ -17,12 +17,17 @@ export default function VerificationButton({ onVerify }: Props) {
   const handlePress = async () => {
     setLoading(true);
     try {
-      const result = await onVerify();
-      setVerificationData(result);
-      setShowQRModal(true);
+      const data = await onVerify();
+      setVerificationData(data);
+      setShowQRCode(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCloseQRCode = () => {
+    setShowQRCode(false);
+    setVerificationData(null);
   };
 
   return (
@@ -40,30 +45,20 @@ export default function VerificationButton({ onVerify }: Props) {
       </TouchableOpacity>
 
       <Modal
-        visible={showQRModal}
-        transparent
+        visible={showQRCode}
+        transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowQRModal(false)}
+        onRequestClose={handleCloseQRCode}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowQRModal(false)}
-        >
-          <TouchableOpacity
-            activeOpacity={1}
-            onPress={() => {}}
-            style={styles.modalContent}
-          >
-            {verificationData && (
-              <QRCodeGenerator
-                token={verificationData.token}
-                expiryTime={verificationData.expiryTime}
-                onClose={() => setShowQRModal(false)}
-              />
-            )}
-          </TouchableOpacity>
-        </TouchableOpacity>
+        <View style={styles.modalContainer}>
+          {verificationData && (
+            <QRCodeGenerator
+              token={verificationData.token}
+              expiryTime={verificationData.expiryTime}
+              onClose={handleCloseQRCode}
+            />
+          )}
+        </View>
       </Modal>
     </>
   );
@@ -85,14 +80,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
   },
-  modalOverlay: {
+  modalContainer: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    width: '100%',
     alignItems: 'center',
   },
 });
