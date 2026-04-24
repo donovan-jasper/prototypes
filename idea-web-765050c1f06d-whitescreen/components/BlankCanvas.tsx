@@ -31,39 +31,15 @@ const BlankCanvas: React.FC = () => {
   const widgetScale = useSharedValue(0.9);
 
   // Animated styles
-  const drawerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: drawerTranslateY.value }],
-  }));
-
   const widgetContainerStyle = useAnimatedStyle(() => ({
     opacity: widgetOpacity.value,
     transform: [{ scale: widgetScale.value }],
   }));
 
   // Gesture handlers
-  const gestureHandler = useAnimatedGestureHandler({
-    onStart: (_, ctx) => {
-      ctx.startY = drawerTranslateY.value;
-    },
-    onActive: (event, ctx) => {
-      if (event.translationY > 0) {
-        drawerTranslateY.value = ctx.startY + event.translationY;
-      }
-    },
-    onEnd: (event) => {
-      if (event.translationY > 100) {
-        drawerTranslateY.value = withSpring(height, { damping: 20 });
-        runOnJS(setShowAppDrawer)(false);
-      } else {
-        drawerTranslateY.value = withSpring(0, { damping: 20 });
-      }
-    },
-  });
-
   const swipeUpHandler = useAnimatedGestureHandler({
     onEnd: (event) => {
       if (event.translationY < -50) {
-        drawerTranslateY.value = withSpring(0, { damping: 20 });
         runOnJS(setShowAppDrawer)(true);
       }
     },
@@ -95,11 +71,6 @@ const BlankCanvas: React.FC = () => {
   const handleLongPress = (widgetId: string) => {
     setSelectedWidgetId(widgetId);
     setShowWidgetMenu(true);
-  };
-
-  const handleSwipeUp = () => {
-    setShowAppDrawer(true);
-    drawerTranslateY.value = withSpring(0, { damping: 20 });
   };
 
   const handleAddWidget = (widgetType: 'timer' | 'scratchpad' | 'habitTracker') => {
@@ -147,26 +118,20 @@ const BlankCanvas: React.FC = () => {
       </PanGestureHandler>
 
       {/* App Drawer */}
-      <PanGestureHandler onGestureEvent={gestureHandler}>
-        <Animated.View style={[styles.drawerContainer, drawerStyle]}>
-          <AppDrawer
-            visible={showAppDrawer}
-            onClose={() => {
-              setShowAppDrawer(false);
-              drawerTranslateY.value = withSpring(height, { damping: 20 });
-            }}
-            allowedApps={currentMode?.allowedApps}
-          />
-        </Animated.View>
-      </PanGestureHandler>
+      <AppDrawer
+        visible={showAppDrawer}
+        onClose={() => setShowAppDrawer(false)}
+      />
 
       {/* Widget Menu */}
-      <WidgetMenu
-        visible={showWidgetMenu}
-        onClose={() => setShowWidgetMenu(false)}
-        onAddWidget={handleAddWidget}
-        onRemoveWidget={handleRemoveWidget}
-      />
+      {showWidgetMenu && selectedWidgetId && (
+        <WidgetMenu
+          widgetId={selectedWidgetId}
+          onAddWidget={handleAddWidget}
+          onRemoveWidget={handleRemoveWidget}
+          onClose={() => setShowWidgetMenu(false)}
+        />
+      )}
     </View>
   );
 };
@@ -174,6 +139,7 @@ const BlankCanvas: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   timeContainer: {
     position: 'absolute',
@@ -187,16 +153,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   dateText: {
-    fontSize: 18,
-    marginTop: 4,
+    fontSize: 16,
+    marginTop: 5,
   },
   modeIndicator: {
     position: 'absolute',
-    top: 20,
+    top: 120,
     right: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
   },
   modeText: {
     color: 'white',
@@ -206,13 +172,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: 'center',
-  },
-  drawerContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: height * 0.8,
   },
 });
 

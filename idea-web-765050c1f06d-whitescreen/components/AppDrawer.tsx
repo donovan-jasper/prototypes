@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 
 const { height } = Dimensions.get('window');
 
@@ -11,6 +12,23 @@ interface AppDrawerProps {
 
 const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
   const { currentTheme, currentMode } = useAppStore();
+
+  // Animation value
+  const drawerTranslateY = useSharedValue(height);
+
+  // Animated style
+  const drawerStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: drawerTranslateY.value }],
+  }));
+
+  // Update animation when visibility changes
+  React.useEffect(() => {
+    if (visible) {
+      drawerTranslateY.value = withSpring(0, { damping: 20 });
+    } else {
+      drawerTranslateY.value = withSpring(height, { damping: 20 });
+    }
+  }, [visible]);
 
   // Mock app data - in a real app this would come from the device's installed apps
   const apps = [
@@ -29,10 +47,8 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
     ? apps.filter(app => currentMode.allowedApps.includes(app.id))
     : apps;
 
-  if (!visible) return null;
-
   return (
-    <View style={[styles.container, { backgroundColor: currentTheme.drawerBackground }]}>
+    <Animated.View style={[styles.container, drawerStyle, { backgroundColor: currentTheme.drawerBackground }]}>
       <View style={styles.handle} />
 
       <FlatList
@@ -49,16 +65,21 @@ const AppDrawer: React.FC<AppDrawerProps> = ({ visible, onClose }) => {
       <TouchableOpacity style={styles.closeButton} onPress={onClose}>
         <Text style={[styles.closeButtonText, { color: currentTheme.text }]}>Close</Text>
       </TouchableOpacity>
-    </View>
+    </Animated.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     height: height * 0.8,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 10,
+    zIndex: 100,
   },
   handle: {
     width: 40,
