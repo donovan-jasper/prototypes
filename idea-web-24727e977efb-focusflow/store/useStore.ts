@@ -25,6 +25,7 @@ interface StoreState {
   setActiveRoom: (room: Room) => void;
   clearActiveRoom: () => void;
   updateRoomParticipants: (participants: string[]) => void;
+  updateRoomStatus: (status: RoomStatus) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -38,6 +39,16 @@ export const useStore = create<StoreState>((set) => ({
     set((state) => ({
       activeRoom: state.activeRoom
         ? { ...state.activeRoom, participants }
+        : null,
+    })),
+  updateRoomStatus: (status) =>
+    set((state) => ({
+      activeRoom: state.activeRoom
+        ? {
+            ...state.activeRoom,
+            participants: status.participants,
+            duration: status.duration,
+          }
         : null,
     })),
 }));

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { useStore } from '../../store/useStore';
-import { createRoom, joinRoom, getRoomStatus } from '../../lib/room-manager';
+import { createRoom, joinRoom, getRoomStatus, pollRoomUpdates } from '../../lib/room-manager';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
 
@@ -12,6 +12,7 @@ export default function TogetherScreen() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const db = useSQLiteContext();
+  const { setActiveRoom } = useStore();
 
   const createNewRoom = async () => {
     if (!username) {
@@ -22,6 +23,13 @@ export default function TogetherScreen() {
     setLoading(true);
     try {
       const room = await createRoom(username, 50); // Default 50 min duration
+      setActiveRoom({
+        code: room.code,
+        creator: room.creator,
+        duration: room.duration,
+        participants: [username],
+        createdAt: room.createdAt
+      });
       router.push(`/room/${room.code}`);
     } catch (error) {
       console.error('Error creating room:', error);
@@ -39,7 +47,14 @@ export default function TogetherScreen() {
 
     setLoading(true);
     try {
-      await joinRoom(roomCode, username);
+      const status = await joinRoom(roomCode, username);
+      setActiveRoom({
+        code: status.code,
+        creator: status.creator || '',
+        duration: status.duration,
+        participants: status.participants,
+        createdAt: status.createdAt
+      });
       router.push(`/room/${roomCode}`);
     } catch (error) {
       console.error('Error joining room:', error);
@@ -186,6 +201,5 @@ const styles = StyleSheet.create({
   noRoomsText: {
     color: '#666',
     textAlign: 'center',
-    marginTop: 10,
   },
 });

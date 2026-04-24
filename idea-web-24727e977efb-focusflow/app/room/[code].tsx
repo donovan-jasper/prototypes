@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { getRoomStatus, leaveRoom } from '../../lib/room-manager';
+import { getRoomStatus, leaveRoom, pollRoomUpdates } from '../../lib/room-manager';
 import { useStore } from '../../store/useStore';
 import * as Notifications from 'expo-notifications';
 
@@ -12,7 +12,7 @@ export default function RoomScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const router = useRouter();
-  const { activeSession } = useStore();
+  const { activeRoom, updateRoomStatus } = useStore();
   const intervalRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -22,6 +22,7 @@ export default function RoomScreen() {
         const status = await getRoomStatus(code);
         setRoomStatus(status);
         setTimeLeft(status.duration * 60); // Convert to seconds
+        updateRoomStatus(status);
         setLoading(false);
         setError(null);
       } catch (error) {
@@ -34,7 +35,10 @@ export default function RoomScreen() {
     fetchRoomStatus();
 
     // Set up polling every 5 seconds
-    intervalRef.current = setInterval(fetchRoomStatus, 5000);
+    const stopPolling = pollRoomUpdates(code, (status) => {
+      setRoomStatus(status);
+      updateRoomStatus(status);
+    });
 
     // Set up timer countdown
     timerRef.current = setInterval(() => {
@@ -48,7 +52,7 @@ export default function RoomScreen() {
     }, 1000);
 
     return () => {
-      clearInterval(intervalRef.current);
+      stopPolling();
       clearInterval(timerRef.current);
     };
   }, [code]);

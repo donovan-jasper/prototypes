@@ -203,3 +203,18 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
     throw error;
   }
 };
+
+// Poll for room updates
+export const pollRoomUpdates = async (code: string, callback: (status: RoomStatus) => void) => {
+  const interval = setInterval(async () => {
+    try {
+      const status = await getRoomStatus(code);
+      callback(status);
+    } catch (error) {
+      console.error('Error polling room updates:', error);
+      clearInterval(interval);
+    }
+  }, 5000);
+
+  return () => clearInterval(interval);
+};
