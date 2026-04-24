@@ -8,128 +8,133 @@ interface Question {
 }
 
 export async function generateQuestions(project: Project): Promise<Question[]> {
+  // In a real implementation, this would call the OpenAI API
+  // For this prototype, we'll use a rule-based approach
+
   const questions: Question[] = [];
 
   // Common questions for all projects
   questions.push({
-    id: 'target_audience',
-    text: 'Who is your target audience?',
-    type: 'text',
+    id: 'q1',
+    text: 'What is the primary value proposition of your app?',
+    type: 'text'
   });
 
   questions.push({
-    id: 'main_feature',
-    text: 'What is the main feature or value proposition of your app?',
-    type: 'text',
+    id: 'q2',
+    text: 'How will users discover your app?',
+    type: 'multiple-choice',
+    options: [
+      'Organic search (SEO)',
+      'Paid advertising',
+      'Social media marketing',
+      'Referrals from existing users',
+      'Other'
+    ]
   });
 
   // App type specific questions
   switch (project.appType) {
     case 'social':
       questions.push({
-        id: 'content_type',
-        text: 'What type of content will users share on your app?',
-        type: 'multiple-choice',
-        options: ['Text posts', 'Photos', 'Videos', 'Live streams', 'All of the above'],
+        id: 'q3',
+        text: 'What types of content will users create and share?',
+        type: 'text'
       });
-
       questions.push({
-        id: 'moderation',
-        text: 'Do you need content moderation features?',
-        type: 'boolean',
-      });
-
-      questions.push({
-        id: 'notifications',
-        text: 'How will users receive notifications about new activity?',
-        type: 'multiple-choice',
-        options: ['Push notifications', 'Email', 'In-app notifications', 'All of the above'],
+        id: 'q4',
+        text: 'Should users be able to follow or connect with each other?',
+        type: 'boolean'
       });
       break;
 
     case 'ecommerce':
       questions.push({
-        id: 'payment_methods',
-        text: 'Which payment methods will you support?',
+        id: 'q3',
+        text: 'What is your pricing strategy?',
         type: 'multiple-choice',
-        options: ['Credit card', 'PayPal', 'Apple Pay', 'Google Pay', 'Cryptocurrency'],
+        options: [
+          'Fixed price per item',
+          'Subscription model',
+          'Tiered pricing',
+          'Negotiated pricing',
+          'Other'
+        ]
       });
-
       questions.push({
-        id: 'shipping_options',
-        text: 'Will you offer shipping options?',
-        type: 'boolean',
-      });
-
-      questions.push({
-        id: 'inventory_management',
-        text: 'Do you need inventory management features?',
-        type: 'boolean',
+        id: 'q4',
+        text: 'Will you offer shipping or in-person pickup?',
+        type: 'boolean'
       });
       break;
 
     case 'fitness':
       questions.push({
-        id: 'workout_types',
-        text: 'What types of workouts will users track?',
-        type: 'multiple-choice',
-        options: ['Cardio', 'Strength training', 'Flexibility', 'Mindfulness', 'All of the above'],
+        id: 'q3',
+        text: 'What types of workouts will you support?',
+        type: 'text'
       });
-
       questions.push({
-        id: 'progress_tracking',
-        text: 'What metrics will you track for user progress?',
-        type: 'text',
-      });
-
-      questions.push({
-        id: 'social_features',
-        text: 'Will users be able to share their progress with others?',
-        type: 'boolean',
+        id: 'q4',
+        text: 'Should users be able to track their progress over time?',
+        type: 'boolean'
       });
       break;
 
     default:
-      // Default questions for utility apps
       questions.push({
-        id: 'primary_use_case',
-        text: 'What is the primary use case for your app?',
-        type: 'text',
+        id: 'q3',
+        text: 'What is the core functionality of your app?',
+        type: 'text'
       });
-
       questions.push({
-        id: 'user_roles',
-        text: 'Will there be different user roles or permissions?',
-        type: 'boolean',
+        id: 'q4',
+        text: 'Do you need user accounts for this app?',
+        type: 'boolean'
       });
   }
 
   // Monetization questions
-  questions.push({
-    id: 'monetization',
-    text: 'How do you plan to monetize your app?',
-    type: 'multiple-choice',
-    options: [
-      'Freemium model (free with premium features)',
-      'Subscription (monthly/yearly fee)',
-      'One-time purchase',
-      'Ad-supported',
-      'Not sure yet',
-    ],
-  });
+  if (project.appType !== 'ecommerce') {
+    questions.push({
+      id: 'q5',
+      text: 'How do you plan to monetize this app?',
+      type: 'multiple-choice',
+      options: [
+        'Freemium model (free with premium features)',
+        'Subscription service',
+        'Ad-supported',
+        'One-time purchase',
+        'Not sure yet'
+      ]
+    });
+  }
 
   // Technical questions
   questions.push({
-    id: 'authentication',
-    text: 'What authentication methods will you support?',
+    id: 'q6',
+    text: 'What platforms should this app support?',
     type: 'multiple-choice',
-    options: ['Email/password', 'Social login (Google, Facebook, etc.)', 'Phone number', 'All of the above'],
+    options: [
+      'iOS only',
+      'Android only',
+      'Both iOS and Android',
+      'Web browser',
+      'All of the above'
+    ]
+  });
+
+  // Edge case questions
+  questions.push({
+    id: 'q7',
+    text: 'What should happen if the user loses internet connection?',
+    type: 'text'
   });
 
   questions.push({
-    id: 'offline_support',
-    text: 'Will your app need to work offline?',
-    type: 'boolean',
+    id: 'q8',
+    text: 'How will you handle user authentication and security?',
+    type: 'text'
   });
 
   return questions;

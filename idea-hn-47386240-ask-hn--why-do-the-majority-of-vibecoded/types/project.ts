@@ -1,8 +1,8 @@
 export interface Project {
   id: string;
   name: string;
-  description: string;
-  appType: string;
+  description?: string;
+  appType?: string;
   createdAt: number;
   updatedAt: number;
 }
@@ -12,14 +12,17 @@ export interface Screen {
   projectId: string;
   name: string;
   order: number;
-  layout: object; // Changed from string to object
+  layout: Record<string, any>;
 }
 
 export interface Component {
   id: string;
   screenId: string;
   type: string;
-  props: object; // Changed from string to object
-  position: object; // Changed from string to object
+  props: Record<string, any>;
+  position: {
+    x: number;
+    y: number;
+  };
   order: number;
 }

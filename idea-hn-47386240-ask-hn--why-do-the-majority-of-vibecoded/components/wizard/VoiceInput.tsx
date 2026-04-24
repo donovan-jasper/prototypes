@@ -160,6 +160,7 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
               onPress={stopRecording}
               style={styles.recordButton}
               icon="stop"
+              loading={isRecording}
             >
               Stop Recording
             </Button>
@@ -179,20 +180,17 @@ export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
             mode="outlined"
             onPress={handleTextSubmit}
             style={styles.submitButton}
-            disabled={isRecording || isTranscribing || !transcription.trim()}
+            disabled={!transcription.trim() || isRecording || isTranscribing}
+            loading={isTranscribing}
           >
-            {isTranscribing ? (
-              <ActivityIndicator animating={true} color="#6200ee" />
-            ) : (
-              'Submit Description'
-            )}
+            Submit
           </Button>
         </View>
       </View>
 
       {isTranscribing && (
         <View style={styles.transcribingContainer}>
-          <ActivityIndicator animating={true} size="large" />
+          <ActivityIndicator animating={true} size="small" />
           <Text style={styles.transcribingText}>Processing your idea...</Text>
         </View>
       )}
@@ -218,7 +216,6 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
   },
   recordButton: {
     flex: 1,
@@ -229,11 +226,13 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   transcribingContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 16,
   },
   transcribingText: {
-    marginTop: 8,
+    marginLeft: 8,
     color: '#666',
   },
 });

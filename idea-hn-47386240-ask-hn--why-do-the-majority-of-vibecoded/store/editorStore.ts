@@ -6,11 +6,7 @@ import {
   getComponentsByScreen,
   updateProject,
   createScreen,
-  updateScreen,
-  deleteScreen,
-  createComponent,
-  updateComponent,
-  deleteComponent
+  createComponent
 } from '@/lib/db/queries';
 
 interface EditorStore {
@@ -21,12 +17,11 @@ interface EditorStore {
   loading: boolean;
   error: string | null;
   loadProjectData: (projectId: string) => Promise<void>;
-  selectScreen: (screenId: string) => Promise<void>;
+  setCurrentScreen: (screenId: string) => void;
   selectComponent: (componentId: string | null) => void;
-  updateComponentProps: (componentId: string, props: Record<string, any>) => Promise<void>;
-  addComponent: (screenId: string, component: Omit<Component, 'id'>) => Promise<Component>;
+  updateComponent: (componentId: string, updates: Partial<Component>) => Promise<void>;
+  addComponent: (component: Omit<Component, 'id'>) => Promise<Component>;
   removeComponent: (componentId: string) => Promise<void>;
-  updateProjectName: (name: string) => Promise<void>;
 }
 
 export const useEditorStore = create<EditorStore>((set, get) => ({
@@ -40,53 +35,64 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   loadProjectData: async (projectId) => {
     set({ loading: true, error: null });
     try {
+      // Load project
       const project = await getProject(projectId);
       if (!project) {
         throw new Error('Project not found');
       }
 
+      // Load screens
       const screens = await getScreensByProject(projectId);
-      const firstScreen = screens.length > 0 ? screens[0] : null;
-
-      if (firstScreen) {
-        const components = await getComponentsByScreen(firstScreen.id);
-        set({
-          currentProject: project,
-          currentScreen: firstScreen,
-          components,
-          loading: false,
+      if (screens.length === 0) {
+        // Create a default screen if none exist
+        const defaultScreen = await createScreen({
+          projectId,
+          name: 'Main Screen',
+          order: 0,
+          layout: {}
         });
-      } else {
-        set({
-          currentProject: project,
-          currentScreen: null,
-          components: [],
-          loading: false,
-        });
+        screens.push(defaultScreen);
       }
+
+      // Set current screen to first one
+      const currentScreen = screens[0];
+
+      // Load components for current screen
+      const components = await getComponentsByScreen(currentScreen.id);
+
+      set({
+        currentProject: project,
+        currentScreen,
+        components,
+        loading: false
+      });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
       throw error;
     }
   },
 
-  selectScreen: async (screenId) => {
+  setCurrentScreen: async (screenId) => {
+    if (!get().currentProject) return;
+
     set({ loading: true, error: null });
     try {
-      const { currentProject } = get();
-      if (!currentProject) throw new Error('No project loaded');
+      // Find the screen in the project's screens
+      const screens = await getScreensByProject(get().currentProject.id);
+      const screen = screens.find(s => s.id === screenId);
 
-      const screens = await getScreensByProject(currentProject.id);
-      const selectedScreen = screens.find(s => s.id === screenId);
+      if (!screen) {
+        throw new Error('Screen not found');
+      }
 
-      if (!selectedScreen) throw new Error('Screen not found');
+      // Load components for the new screen
+      const components = await getComponentsByScreen(screen.id);
 
-      const components = await getComponentsByScreen(screenId);
       set({
-        currentScreen: selectedScreen,
+        currentScreen: screen,
         components,
         selectedComponent: null,
-        loading: false,
+        loading: false
       });
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
@@ -95,48 +101,54 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   },
 
   selectComponent: (componentId) => {
-    const { components } = get();
-    const selected = componentId ? components.find(c => c.id === componentId) : null;
-    set({ selectedComponent: selected });
+    if (!componentId) {
+      set({ selectedComponent: null });
+      return;
+    }
+
+    const component = get().components.find(c => c.id === componentId);
+    if (component) {
+      set({ selectedComponent: component });
+    }
   },
 
-  updateComponentProps: async (componentId, props) => {
+  updateComponent: async (componentId, updates) => {
     set({ loading: true, error: null });
     try {
-      const { components } = get();
-      const componentIndex = components.findIndex(c => c.id === componentId);
-
-      if (componentIndex === -1) throw new Error('Component not found');
-
-      const updatedComponent = { ...components[componentIndex], props };
-      await updateComponent(componentId, { props });
-
+      // Update component in state
       set(state => ({
-        components: [
-          ...state.components.slice(0, componentIndex),
-          updatedComponent,
-          ...state.components.slice(componentIndex + 1)
-        ],
-        loading: false,
+        components: state.components.map(comp =>
+          comp.id === componentId ? { ...comp, ...updates } : comp
+        ),
+        selectedComponent: state.selectedComponent?.id === componentId
+          ? { ...state.selectedComponent, ...updates }
+          : state.selectedComponent,
+        loading: false
       }));
+
+      // In a real app, you would also update the database here
+      // await updateComponentInDb(componentId, updates);
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
       throw error;
     }
   },
 
-  addComponent: async (screenId, componentData) => {
+  addComponent: async (componentData) => {
+    if (!get().currentScreen) return Promise.reject('No screen selected');
+
     set({ loading: true, error: null });
     try {
+      // Create component in database
       const newComponent = await createComponent({
-        screenId,
         ...componentData,
+        screenId: get().currentScreen.id
       });
 
+      // Add to state
       set(state => ({
         components: [...state.components, newComponent],
-        selectedComponent: newComponent,
-        loading: false,
+        loading: false
       }));
 
       return newComponent;
@@ -149,31 +161,17 @@ export const useEditorStore = create<EditorStore>((set, get) => ({
   removeComponent: async (componentId) => {
     set({ loading: true, error: null });
     try {
-      await deleteComponent(componentId);
-
+      // Remove from state
       set(state => ({
-        components: state.components.filter(c => c.id !== componentId),
-        selectedComponent: state.selectedComponent?.id === componentId ? null : state.selectedComponent,
-        loading: false,
+        components: state.components.filter(comp => comp.id !== componentId),
+        selectedComponent: state.selectedComponent?.id === componentId
+          ? null
+          : state.selectedComponent,
+        loading: false
       }));
-    } catch (error) {
-      set({ error: (error as Error).message, loading: false });
-      throw error;
-    }
-  },
 
-  updateProjectName: async (name) => {
-    set({ loading: true, error: null });
-    try {
-      const { currentProject } = get();
-      if (!currentProject) throw new Error('No project loaded');
-
-      await updateProject(currentProject.id, { name });
-
-      set(state => ({
-        currentProject: state.currentProject ? { ...state.currentProject, name } : null,
-        loading: false,
-      }));
+      // In a real app, you would also delete from database
+      // await deleteComponentFromDb(componentId);
     } catch (error) {
       set({ error: (error as Error).message, loading: false });
       throw error;

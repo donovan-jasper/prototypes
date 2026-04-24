@@ -189,14 +189,4 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#666',
-  },
 });

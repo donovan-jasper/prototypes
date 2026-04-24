@@ -169,41 +169,39 @@ export default function QuestionFlow({ projectId, onComplete }: QuestionFlowProp
             </Button>
           </View>
         )}
+      </View>
 
-        <View style={styles.navigationButtons}>
-          {currentQuestionIndex > 0 && (
-            <Button
-              mode="outlined"
-              onPress={goBack}
-              style={styles.backButton}
-            >
-              Back
-            </Button>
-          )}
-          {currentQuestionIndex < questions.length - 1 ? (
-            <Button
-              mode="contained"
-              onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
-              style={styles.nextButton}
-              disabled={!answers[currentQuestion.id]}
-            >
-              Next
-            </Button>
-          ) : (
-            <Button
-              mode="contained"
-              onPress={submitAnswers}
-              style={styles.submitButton}
-              disabled={!answers[currentQuestion.id] || submitting}
-            >
-              {submitting ? (
-                <ActivityIndicator animating={true} color="#fff" />
-              ) : (
-                'Submit Answers'
-              )}
-            </Button>
-          )}
-        </View>
+      <View style={styles.navigationButtons}>
+        {currentQuestionIndex > 0 && (
+          <Button
+            mode="outlined"
+            onPress={goBack}
+            style={styles.backButton}
+          >
+            Back
+          </Button>
+        )}
+        {currentQuestionIndex < questions.length - 1 && (
+          <Button
+            mode="contained"
+            onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
+            style={styles.nextButton}
+            disabled={!answers[currentQuestion.id]}
+          >
+            Next
+          </Button>
+        )}
+        {currentQuestionIndex === questions.length - 1 && (
+          <Button
+            mode="contained"
+            onPress={submitAnswers}
+            style={styles.submitButton}
+            disabled={!answers[currentQuestion.id] || submitting}
+            loading={submitting}
+          >
+            Submit Answers
+          </Button>
+        )}
       </View>
     </ScrollView>
   );
@@ -229,24 +227,16 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   questionContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    marginBottom: 24,
   },
   questionText: {
     marginBottom: 16,
   },
   textInput: {
-    marginBottom: 16,
     backgroundColor: 'white',
   },
   optionsContainer: {
-    marginBottom: 16,
+    marginTop: 16,
   },
   optionButton: {
     marginBottom: 8,
@@ -254,7 +244,7 @@ const styles = StyleSheet.create({
   booleanContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginTop: 16,
   },
   booleanButton: {
     flex: 1,
@@ -263,6 +253,7 @@ const styles = StyleSheet.create({
   navigationButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 16,
   },
   backButton: {
     flex: 1,
@@ -279,7 +270,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   loadingText: {
     marginTop: 16,
@@ -289,6 +280,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
 });
