@@ -129,28 +129,91 @@ export const scanAPK = async (fileUri: string): Promise<ComplianceIssue[]> => {
           description: `The APK is missing the required icon file: ${icon}`,
           severity: 'warning',
           fix: 'Add the missing icon to your mipmap resources',
-          documentationUrl: 'https://developer.android.com/guide/practices/ui_guidelines/icon_design_adaptive'
+          documentationUrl: 'https://developer.android.com/guide/practices/ui_guidelines/icon_design_launcher'
         });
       }
     });
 
-    // Apply additional rules from database
-    for (const rule of rules) {
-      if (rule.checkType === 'file_exists') {
-        const filePath = rule.path;
-        if (!zip.file(filePath)) {
+    // Check for required permissions
+    if (manifest.usesPermission) {
+      const requiredPermissions = [
+        'android.permission.INTERNET',
+        'android.permission.ACCESS_NETWORK_STATE'
+      ];
+
+      requiredPermissions.forEach(permission => {
+        const hasPermission = manifest.usesPermission.some((p: any) =>
+          p.$.name === permission
+        );
+
+        if (!hasPermission) {
           issues.push({
             id: `issue-${Date.now()}`,
-            ruleId: rule.id,
-            title: rule.title,
-            description: rule.description,
-            severity: rule.severity,
-            fix: rule.fix,
-            documentationUrl: rule.documentationUrl
+            ruleId: `android_missing_permission_${permission.split('.').pop()}`,
+            title: `Missing Permission: ${permission}`,
+            description: `The APK is missing the required permission: ${permission}`,
+            severity: 'warning',
+            fix: 'Add the missing permission to your AndroidManifest.xml',
+            documentationUrl: 'https://developer.android.com/guide/topics/permissions/overview'
           });
         }
+      });
+    }
+
+    // Check for required features
+    if (manifest.usesFeature) {
+      const requiredFeatures = [
+        'android.hardware.screen.portrait',
+        'android.hardware.screen.landscape'
+      ];
+
+      requiredFeatures.forEach(feature => {
+        const hasFeature = manifest.usesFeature.some((f: any) =>
+          f.$.name === feature && f.$['android:required'] === 'true'
+        );
+
+        if (!hasFeature) {
+          issues.push({
+            id: `issue-${Date.now()}`,
+            ruleId: `android_missing_feature_${feature.split('.').pop()}`,
+            title: `Missing Feature: ${feature}`,
+            description: `The APK is missing the required feature: ${feature}`,
+            severity: 'warning',
+            fix: 'Add the missing feature to your AndroidManifest.xml',
+            documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-feature-element'
+          });
+        }
+      });
+    }
+
+    // Check for required SDK version
+    if (manifest.usesSdk) {
+      const minSdk = manifest.usesSdk[0].$['android:minSdkVersion'];
+      const targetSdk = manifest.usesSdk[0].$['android:targetSdkVersion'];
+
+      if (!minSdk) {
+        issues.push({
+          id: `issue-${Date.now()}`,
+          ruleId: 'android_missing_min_sdk',
+          title: 'Missing Minimum SDK Version',
+          description: 'The AndroidManifest.xml is missing the required android:minSdkVersion attribute',
+          severity: 'critical',
+          fix: 'Add the android:minSdkVersion attribute to your AndroidManifest.xml',
+          documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-sdk-element'
+        });
       }
-      // Add more rule types as needed
+
+      if (!targetSdk) {
+        issues.push({
+          id: `issue-${Date.now()}`,
+          ruleId: 'android_missing_target_sdk',
+          title: 'Missing Target SDK Version',
+          description: 'The AndroidManifest.xml is missing the required android:targetSdkVersion attribute',
+          severity: 'warning',
+          fix: 'Add the android:targetSdkVersion attribute to your AndroidManifest.xml',
+          documentationUrl: 'https://developer.android.com/guide/topics/manifest/uses-sdk-element'
+        });
+      }
     }
 
     return issues;
@@ -163,7 +226,7 @@ export const scanAPK = async (fileUri: string): Promise<ComplianceIssue[]> => {
       description: 'An error occurred while scanning the APK file',
       severity: 'critical',
       fix: 'Try scanning a different APK file or contact support',
-      documentationUrl: 'https://support.submitguard.com'
+      documentationUrl: 'https://developer.android.com/studio/publish/preparing'
     }];
   }
 };

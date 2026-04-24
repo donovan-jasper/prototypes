@@ -135,25 +135,49 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
           });
         }
       });
-    }
 
-    // Apply additional rules from database
-    for (const rule of rules) {
-      if (rule.checkType === 'file_exists') {
-        const filePath = rule.path;
-        if (!appDir.file(filePath)) {
+      // Check for required device capabilities
+      if (infoPlist.UIRequiredDeviceCapabilities) {
+        const requiredCapabilities = infoPlist.UIRequiredDeviceCapabilities;
+        if (!Array.isArray(requiredCapabilities) || requiredCapabilities.length === 0) {
           issues.push({
             id: `issue-${Date.now()}`,
-            ruleId: rule.id,
-            title: rule.title,
-            description: rule.description,
-            severity: rule.severity,
-            fix: rule.fix,
-            documentationUrl: rule.documentationUrl
+            ruleId: 'ios_empty_device_capabilities',
+            title: 'Empty Device Capabilities',
+            description: 'The UIRequiredDeviceCapabilities array is empty',
+            severity: 'warning',
+            fix: 'Specify required device capabilities or remove the key',
+            documentationUrl: 'https://developer.apple.com/documentation/bundleresources/information_property_list/uirequireddevicecapabilities'
           });
         }
       }
-      // Add more rule types as needed
+
+      // Check for age rating
+      if (!infoPlist.ITSAppUsesNonExemptEncryption) {
+        issues.push({
+          id: `issue-${Date.now()}`,
+          ruleId: 'ios_missing_encryption_flag',
+          title: 'Missing Encryption Flag',
+          description: 'The ITSAppUsesNonExemptEncryption flag is missing',
+          severity: 'info',
+          fix: 'Add the ITSAppUsesNonExemptEncryption key to your Info.plist',
+          documentationUrl: 'https://developer.apple.com/documentation/security/preparing_your_app_for_the_app_store'
+        });
+      }
+    }
+
+    // Check for required screenshots
+    const screenshotDir = appDir.folder('AppPreview.appiconset');
+    if (!screenshotDir) {
+      issues.push({
+        id: `issue-${Date.now()}`,
+        ruleId: 'ios_missing_screenshots',
+        title: 'Missing App Preview Screenshots',
+        description: 'The app bundle is missing the AppPreview.appiconset directory',
+        severity: 'warning',
+        fix: 'Add app preview screenshots to your project',
+        documentationUrl: 'https://developer.apple.com/app-store/app-previews/'
+      });
     }
 
     return issues;
@@ -166,7 +190,7 @@ export const scanIPA = async (fileUri: string): Promise<ComplianceIssue[]> => {
       description: 'An error occurred while scanning the IPA file',
       severity: 'critical',
       fix: 'Try scanning a different IPA file or contact support',
-      documentationUrl: 'https://support.submitguard.com'
+      documentationUrl: 'https://developer.apple.com/documentation/xcode/creating-an-archive-of-your-app'
     }];
   }
 };
