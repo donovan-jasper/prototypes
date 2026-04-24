@@ -31,3 +31,8 @@ export interface FollowUpOptions {
   daysOverdue: number;
   submittedAt: Date;
 }
+
+export interface ParsedField<T> {
+  value: T;
+  confidence: number;
+}

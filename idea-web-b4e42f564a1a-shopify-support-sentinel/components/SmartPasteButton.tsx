@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
-import { TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
+import React from 'react';
+import { TouchableOpacity, Text, StyleSheet, Alert, Clipboard } from 'react-native';
 import { parseTicketFromText } from '../lib/ticketParser';
 import { ParsedTicket } from '../lib/types';
 
@@ -9,38 +8,30 @@ interface SmartPasteButtonProps {
 }
 
 export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
-  const [isLoading, setIsLoading] = useState(false);
-
-  const handlePress = async () => {
-    setIsLoading(true);
+  const handlePaste = async () => {
     try {
-      const clipboardText = await Clipboard.getStringAsync();
-
-      if (!clipboardText.trim()) {
-        Alert.alert('Clipboard is empty', 'Please copy some text first');
+      const clipboardContent = await Clipboard.getString();
+      if (!clipboardContent) {
+        Alert.alert('Clipboard empty', 'No text found in clipboard');
         return;
       }
 
-      const parsed = parseTicketFromText(clipboardText);
+      const parsed = parseTicketFromText(clipboardContent);
+      if (!parsed.company && !parsed.ticketId && !parsed.submittedAt) {
+        Alert.alert('No data found', 'Could not extract ticket information from the clipboard content');
+        return;
+      }
+
       onParsed(parsed);
+      Alert.alert('Success', 'Ticket information extracted from clipboard');
     } catch (error) {
-      Alert.alert('Error', 'Failed to parse clipboard content');
-    } finally {
-      setIsLoading(false);
+      Alert.alert('Error', 'Failed to read clipboard');
     }
   };
 
   return (
-    <TouchableOpacity
-      style={styles.button}
-      onPress={handlePress}
-      disabled={isLoading}
-    >
-      {isLoading ? (
-        <ActivityIndicator color="#fff" />
-      ) : (
-        <Text style={styles.buttonText}>Smart Paste</Text>
-      )}
+    <TouchableOpacity style={styles.button} onPress={handlePaste}>
+      <Text style={styles.buttonText}>Smart Paste</Text>
     </TouchableOpacity>
   );
 }
@@ -48,11 +39,9 @@ export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: '#4CAF50',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    justifyContent: 'center',
     marginTop: 16,
   },
   buttonText: {
