@@ -62,7 +62,7 @@ export const useDatabase = () => {
     });
   };
 
-  const executeQuery = async (sql: string): Promise<any[]> => {
+  const queryDatabase = async (table: string, sql: string): Promise<any[]> => {
     return new Promise((resolve, reject) => {
       db.transaction(
         tx => {
@@ -190,9 +190,11 @@ export const useDatabase = () => {
   return {
     createDatabase,
     insertRow,
-    executeQuery,
+    queryDatabase,
     getDatabaseSchema,
     deleteDatabase,
     listDatabases
   };
 };
+
+export { createDatabase, insertRow, queryDatabase, getDatabaseSchema, deleteDatabase, listDatabases };

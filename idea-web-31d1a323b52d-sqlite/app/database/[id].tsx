@@ -1,27 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { View, FlatList, StyleSheet, ScrollView } from 'react-native';
-import { FAB, ActivityIndicator, Card, Title, Paragraph, Portal, Modal, Button, TextInput } from 'react-native-paper';
+import { View, FlatList, StyleSheet, ScrollView, TextInput as RNTextInput } from 'react-native';
+import { FAB, ActivityIndicator, Card, Title, Paragraph, Portal, Modal, Button, TextInput, Searchbar, useTheme } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import VoiceInput from '../../components/VoiceInput';
-import { queryDatabase, insertRow } from '../../lib/database';
+import QueryResults from '../../components/QueryResults';
+import { queryDatabase, insertRow, getDatabaseSchema } from '../../lib/database';
 import { useStore } from '../../lib/store';
+import { parseVoiceCommand, generateSQL } from '../../lib/ai';
 
 export default function DatabaseScreen() {
   const { id } = useLocalSearchParams();
   const { databases } = useStore();
-  const [rows, setRows] = useState([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
   const [transcription, setTranscription] = useState('');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+  const [schema, setSchema] = useState<Record<string, any>[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const router = useRouter();
+  const theme = useTheme();
   const database = databases.find((db) => db.name === id);
 
   const fetchRows = async () => {
     setLoading(true);
     try {
-      const data = await queryDatabase(id as string, 'SELECT * FROM ' + id);
+      const data = await queryDatabase(id as string, `SELECT * FROM ${id}`);
       setRows(data);
     } catch (error) {
       console.error('Error fetching rows:', error);
@@ -30,8 +37,20 @@ export default function DatabaseScreen() {
     }
   };
 
+  const fetchSchema = async () => {
+    try {
+      const schemas = await getDatabaseSchema();
+      if (schemas[id as string]) {
+        setSchema(schemas[id as string]);
+      }
+    } catch (error) {
+      console.error('Error fetching schema:', error);
+    }
+  };
+
   useEffect(() => {
     fetchRows();
+    fetchSchema();
   }, [id]);
 
   const handleVoiceInput = (text: string) => {
@@ -40,23 +59,16 @@ export default function DatabaseScreen() {
   };
 
   const parseVoiceInput = (text: string) => {
-    // Parse voice input like "Add product: Laptop, quantity 5"
-    const addRegex = /add\s+(.+?):\s*(.+)/i;
-    const match = text.match(addRegex);
-    
-    if (match) {
-      const pairs = match[2].split(',').map(pair => pair.trim());
-      const parsed: Record<string, string> = {};
-      
-      pairs.forEach(pair => {
-        const [key, ...valueParts] = pair.split(/\s+/);
-        const value = valueParts.join(' ');
-        if (key && value) {
-          parsed[key.toLowerCase().replace(/[^a-z0-9_]/g, '_')] = value;
+    const parsed = parseVoiceCommand(text);
+
+    if (parsed.action === 'insert' && parsed.fields) {
+      const newFormData: Record<string, string> = {};
+      parsed.fields.forEach(field => {
+        if (field.name && field.value) {
+          newFormData[field.name] = field.value.toString();
         }
       });
-      
-      setFormData(parsed);
+      setFormData(newFormData);
     }
   };
 
@@ -83,11 +95,34 @@ export default function DatabaseScreen() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const getFields = () => {
-    if (rows.length > 0) {
-      return Object.keys(rows[0]).filter(key => key !== 'id');
+  const handleSearch = async (query: string) => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
-    return database?.fields?.map(f => f.name) || [];
+
+    setIsSearching(true);
+    try {
+      const parsed = parseVoiceCommand(query);
+      if (parsed.action === 'query') {
+        const sql = generateSQL(parsed);
+        const results = await queryDatabase(id as string, sql);
+        setSearchResults(results);
+      } else {
+        // Fallback to simple text search
+        const results = rows.filter(row =>
+          Object.values(row).some(value =>
+            String(value).toLowerCase().includes(query.toLowerCase())
+          )
+        );
+        setSearchResults(results);
+      }
+    } catch (error) {
+      console.error('Error searching:', error);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   if (loading) {
@@ -100,32 +135,66 @@ export default function DatabaseScreen() {
 
   return (
     <View style={styles.container}>
-      <FlatList
-        data={rows}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => (
-          <Card style={styles.card}>
-            <Card.Content>
-              {Object.entries(item).map(([key, value]) => (
-                <View key={key} style={styles.row}>
-                  <Title style={styles.fieldName}>{key}</Title>
-                  <Paragraph style={styles.fieldValue}>{String(value)}</Paragraph>
-                </View>
-              ))}
-            </Card.Content>
-          </Card>
-        )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Paragraph>No rows yet. Tap the + button to add data.</Paragraph>
-          </View>
-        }
+      {/* Schema Header */}
+      <View style={[styles.schemaHeader, { backgroundColor: theme.colors.surfaceVariant }]}>
+        <Title style={styles.schemaTitle}>Table Schema</Title>
+        <View style={styles.schemaFields}>
+          {schema.map((field, index) => (
+            <View key={index} style={styles.schemaField}>
+              <Paragraph style={styles.fieldName}>{field.name}</Paragraph>
+              <Paragraph style={styles.fieldType}>{field.type}</Paragraph>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* Search Bar */}
+      <Searchbar
+        placeholder="Search or ask a question..."
+        onChangeText={setSearchQuery}
+        value={searchQuery}
+        onSubmitEditing={() => handleSearch(searchQuery)}
+        style={styles.searchBar}
       />
-      
+
+      {/* Results Display */}
+      {searchQuery ? (
+        isSearching ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" />
+          </View>
+        ) : (
+          <QueryResults data={searchResults} />
+        )
+      ) : (
+        <FlatList
+          data={rows}
+          keyExtractor={(item, index) => item.id?.toString() || index.toString()}
+          renderItem={({ item }) => (
+            <Card style={styles.card}>
+              <Card.Content>
+                {Object.entries(item).map(([key, value]) => (
+                  <View key={key} style={styles.row}>
+                    <Title style={styles.fieldName}>{key}</Title>
+                    <Paragraph style={styles.fieldValue}>{String(value)}</Paragraph>
+                  </View>
+                ))}
+              </Card.Content>
+            </Card>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Paragraph>No rows yet. Tap the + button to add data.</Paragraph>
+            </View>
+          }
+        />
+      )}
+
       <FAB
         style={styles.fab}
         icon="plus"
         onPress={() => setModalVisible(true)}
+        label="Add Record"
       />
 
       <Portal>
@@ -135,24 +204,28 @@ export default function DatabaseScreen() {
           contentContainerStyle={styles.modalContainer}
         >
           <ScrollView>
-            <Title style={styles.modalTitle}>Add New Row</Title>
-            
-            <VoiceInput onTranscription={handleVoiceInput} />
-            
+            <Title style={styles.modalTitle}>Add New Record</Title>
+
+            <VoiceInput
+              onResult={handleVoiceInput}
+              placeholder="Say 'Add product: Laptop, quantity 5'"
+            />
+
             {transcription ? (
               <Paragraph style={styles.transcriptionHint}>
                 Parsed: {JSON.stringify(formData, null, 2)}
               </Paragraph>
             ) : null}
 
-            {getFields().map(field => (
+            {schema.map((field, index) => (
               <TextInput
-                key={field}
-                label={field}
-                value={formData[field] || ''}
-                onChangeText={(text) => updateFormField(field, text)}
+                key={index}
+                label={field.name}
+                value={formData[field.name] || ''}
+                onChangeText={(text) => updateFormField(field.name, text)}
                 style={styles.input}
                 mode="outlined"
+                keyboardType={field.type === 'INTEGER' || field.type === 'REAL' ? 'numeric' : 'default'}
               />
             ))}
 
@@ -164,17 +237,16 @@ export default function DatabaseScreen() {
                   setTranscription('');
                   setFormData({});
                 }}
-                style={styles.cancelButton}
               >
                 Cancel
               </Button>
               <Button
                 mode="contained"
                 onPress={handleAddRow}
-                disabled={saving || Object.keys(formData).length === 0}
-                style={styles.saveButton}
+                loading={saving}
+                disabled={Object.keys(formData).length === 0}
               >
-                {saving ? <ActivityIndicator color="#fff" size="small" /> : 'Add Row'}
+                Save
               </Button>
             </View>
           </ScrollView>
@@ -188,32 +260,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 16,
-    backgroundColor: '#f5f5f5',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  card: {
+  schemaHeader: {
+    padding: 16,
+    borderRadius: 8,
     marginBottom: 16,
-    elevation: 2,
   },
-  row: {
-    marginBottom: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+  schemaTitle: {
+    marginBottom: 8,
+  },
+  schemaFields: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  schemaField: {
+    marginRight: 16,
+    marginBottom: 8,
   },
   fieldName: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  fieldType: {
+    fontSize: 12,
     color: '#666',
-    marginBottom: 4,
+  },
+  searchBar: {
+    marginBottom: 16,
+  },
+  card: {
+    marginBottom: 16,
+  },
+  row: {
+    marginBottom: 8,
   },
   fieldValue: {
-    fontSize: 16,
-    color: '#000',
+    marginTop: 4,
   },
   emptyContainer: {
     flex: 1,
@@ -236,28 +322,20 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     marginBottom: 16,
-    fontSize: 20,
-  },
-  transcriptionHint: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 16,
-    fontFamily: 'monospace',
   },
   input: {
-    marginBottom: 12,
+    marginBottom: 16,
   },
   buttonRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     marginTop: 16,
+    gap: 8,
   },
-  cancelButton: {
-    flex: 1,
-    marginRight: 8,
-  },
-  saveButton: {
-    flex: 1,
-    marginLeft: 8,
+  transcriptionHint: {
+    marginVertical: 8,
+    padding: 8,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 4,
   },
 });

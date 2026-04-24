@@ -105,7 +105,7 @@ export const generateSQL = (parsed: ParsedCommand, schema?: Record<string, Datab
 
   if (parsed.action === 'insert' && parsed.tableName && parsed.fields) {
     const columns = parsed.fields.map(field => field.name).join(', ');
-    const values = parsed.fields.map(field => `'${field.value?.replace(/'/g, "''")}'`).join(', ');
+    const values = parsed.fields.map(field => `'${field.value?.toString().replace(/'/g, "''")}'`).join(', ');
     return `INSERT INTO ${parsed.tableName} (${columns}) VALUES (${values})`;
   }
 

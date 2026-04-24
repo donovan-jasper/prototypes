@@ -4,9 +4,10 @@ import { Card, Text, useTheme } from 'react-native-paper';
 
 interface QueryResultsProps {
   data: any[];
+  highlightFields?: string[];
 }
 
-const QueryResults: React.FC<QueryResultsProps> = ({ data }) => {
+const QueryResults: React.FC<QueryResultsProps> = ({ data, highlightFields = [] }) => {
   const theme = useTheme();
 
   if (!data || data.length === 0) {
@@ -26,10 +27,16 @@ const QueryResults: React.FC<QueryResultsProps> = ({ data }) => {
         <Card.Content>
           {keys.map((key) => (
             <View key={key} style={styles.row}>
-              <Text variant="labelMedium" style={styles.label}>
+              <Text variant="labelMedium" style={[
+                styles.label,
+                highlightFields.includes(key) && styles.highlightedLabel
+              ]}>
                 {key.replace(/_/g, ' ')}:
               </Text>
-              <Text variant="bodyMedium" style={styles.value}>
+              <Text variant="bodyMedium" style={[
+                styles.value,
+                highlightFields.includes(key) && styles.highlightedValue
+              ]}>
                 {item[key]}
               </Text>
             </View>
@@ -55,6 +62,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 32,
   },
   list: {
     paddingBottom: 16,
@@ -73,6 +81,12 @@ const styles = StyleSheet.create({
   },
   value: {
     flex: 1,
+  },
+  highlightedLabel: {
+    color: '#4CAF50',
+  },
+  highlightedValue: {
+    fontWeight: 'bold',
   },
   separator: {
     height: 8,
