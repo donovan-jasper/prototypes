@@ -8,7 +8,11 @@ import { parseIntent } from '@/lib/ai/intentParser';
 import { suggestComponents } from '@/lib/ai/componentSuggester';
 import { createScreen as dbCreateScreen, createComponent as dbCreateComponent } from '@/lib/db/queries';
 
-export default function VoiceInput() {
+interface VoiceInputProps {
+  onProjectCreated: (projectId: string) => void;
+}
+
+export default function VoiceInput({ onProjectCreated }: VoiceInputProps) {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [transcription, setTranscription] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -56,15 +60,13 @@ export default function VoiceInput() {
       setIsRecording(false);
       setIsTranscribing(true);
 
-      // Here you would typically send the audio to a transcription service
-      // For this prototype, we'll simulate it with a timeout
+      // Simulate transcription with timeout
       setTimeout(async () => {
-        // Simulate transcription result
         const simulatedTranscription = "I want to build a fitness app where users can log workouts and track progress";
         setTranscription(simulatedTranscription);
         setIsTranscribing(false);
 
-        // Automatically create project with the transcribed text
+        // Create project with the transcribed text
         await createProjectFromDescription(simulatedTranscription);
       }, 2000);
     } catch (err) {
@@ -75,19 +77,19 @@ export default function VoiceInput() {
 
   const createProjectFromDescription = async (description: string) => {
     try {
-      // 1. Call parseIntent
+      // Parse intent from description
       const intentResult = await parseIntent(description.trim());
       console.log('Parsed Intent:', intentResult);
 
-      // 2. Use results from parseIntent to call suggestComponents
+      // Suggest components based on intent
       const suggestedScreens = suggestComponents(intentResult);
       console.log('Suggested Screens & Components:', suggestedScreens);
 
-      // 3. Orchestrate the creation of the new project
+      // Create new project
       const newProject = await addProject({
         name: `Project from "${description.substring(0, 20)}..."`,
         description: description.trim(),
-        appType: intentResult.appType, // Use AI-determined app type
+        appType: intentResult.appType,
       });
 
       // Create screens and components for the new project
@@ -97,7 +99,7 @@ export default function VoiceInput() {
           projectId: newProject.id,
           name: suggestedScreen.name,
           order: i,
-          layout: {}, // Layout can be empty for now, or filled with AI suggestions later
+          layout: {},
         });
 
         for (let j = 0; j < suggestedScreen.components.length; j++) {
@@ -112,12 +114,22 @@ export default function VoiceInput() {
         }
       }
 
-      // 4. Navigate to the new project
-      router.replace(`/project/${newProject.id}`);
+      // Notify parent component that project was created
+      onProjectCreated(newProject.id);
     } catch (error) {
       console.error('Project creation failed:', error);
       Alert.alert('Error', `Failed to create project: ${(error as Error).message}`);
     }
+  };
+
+  const handleTextSubmit = async () => {
+    if (!transcription.trim()) {
+      Alert.alert('Error', 'Please enter your app idea description');
+      return;
+    }
+
+    setIsTranscribing(true);
+    await createProjectFromDescription(transcription);
   };
 
   return (
@@ -138,36 +150,32 @@ export default function VoiceInput() {
         </Button>
 
         {isRecording && (
-          <Text style={styles.recordingIndicator}>
-            Recording... {Math.floor(recording?.getStatusAsync().durationMillis / 1000)}s
-          </Text>
+          <Text style={styles.recordingText}>Recording...</Text>
         )}
 
         {isTranscribing && (
           <View style={styles.transcribingContainer}>
-            <ActivityIndicator size="small" color="#6200ee" />
+            <ActivityIndicator animating={true} />
             <Text style={styles.transcribingText}>Transcribing...</Text>
           </View>
         )}
       </View>
 
       <TextInput
-        label="Your Description"
+        label="Or type your idea here"
         value={transcription}
         onChangeText={setTranscription}
-        mode="outlined"
         multiline
-        numberOfLines={6}
-        style={styles.textArea}
-        placeholder="Describe your app idea in detail. What problem does it solve? Who is it for? What are the key features?"
-        disabled={isRecording || isTranscribing}
+        numberOfLines={4}
+        style={styles.textInput}
+        disabled={isTranscribing}
       />
 
       <Button
         mode="contained"
-        onPress={() => createProjectFromDescription(transcription)}
-        style={styles.createButton}
-        disabled={!transcription.trim() || isRecording || isTranscribing}
+        onPress={handleTextSubmit}
+        style={styles.submitButton}
+        disabled={isTranscribing || !transcription.trim()}
       >
         Create Project
       </Button>
@@ -178,9 +186,6 @@ export default function VoiceInput() {
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-    marginBottom: 16,
   },
   title: {
     marginBottom: 16,
@@ -192,9 +197,10 @@ const styles = StyleSheet.create({
   },
   recordButton: {
     marginBottom: 8,
+    paddingHorizontal: 24,
   },
-  recordingIndicator: {
-    color: '#6200ee',
+  recordingText: {
+    color: '#d32f2f',
     fontWeight: 'bold',
   },
   transcribingContainer: {
@@ -204,12 +210,11 @@ const styles = StyleSheet.create({
   },
   transcribingText: {
     marginLeft: 8,
-    color: '#6200ee',
   },
-  textArea: {
+  textInput: {
     marginBottom: 16,
   },
-  createButton: {
+  submitButton: {
     marginTop: 8,
   },
 });

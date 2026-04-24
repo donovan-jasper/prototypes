@@ -2,11 +2,18 @@ import React, { useState } from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import VoiceInput from '@/components/wizard/VoiceInput';
+import QuestionFlow from '@/components/wizard/QuestionFlow';
 import ProgressIndicator from '@/components/wizard/ProgressIndicator';
 
 export default function CreateScreen() {
   const [currentStep, setCurrentStep] = useState(0);
-  const steps = ['Describe Your Idea', 'Voice Input', 'Review'];
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const steps = ['Describe Your Idea', 'Voice Input', 'Refine Details', 'Review'];
+
+  const handleProjectCreated = (id: string) => {
+    setProjectId(id);
+    setCurrentStep(2);
+  };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -45,11 +52,26 @@ export default function CreateScreen() {
 
       {currentStep === 1 && (
         <View style={styles.stepContent}>
-          <VoiceInput />
+          <VoiceInput onProjectCreated={handleProjectCreated} />
           <View style={styles.navigationButtons}>
             <Button
               mode="outlined"
               onPress={() => setCurrentStep(0)}
+              style={styles.backButton}
+            >
+              Back
+            </Button>
+          </View>
+        </View>
+      )}
+
+      {currentStep === 2 && projectId && (
+        <View style={styles.stepContent}>
+          <QuestionFlow projectId={projectId} />
+          <View style={styles.navigationButtons}>
+            <Button
+              mode="outlined"
+              onPress={() => setCurrentStep(1)}
               style={styles.backButton}
             >
               Back

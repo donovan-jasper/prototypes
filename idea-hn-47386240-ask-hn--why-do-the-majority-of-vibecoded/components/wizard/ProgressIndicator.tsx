@@ -5,43 +5,39 @@ import { Text } from 'react-native-paper';
 interface ProgressIndicatorProps {
   currentStep: number;
   totalSteps: number;
-  stepNames: string[];
+  stepNames?: string[];
 }
 
 export default function ProgressIndicator({ currentStep, totalSteps, stepNames }: ProgressIndicatorProps) {
   return (
     <View style={styles.container}>
       <View style={styles.stepsContainer}>
-        {stepNames.map((stepName, index) => {
-          const isActive = index === currentStep;
-          const isCompleted = index < currentStep;
-
-          return (
-            <View key={index} style={styles.stepContainer}>
-              <View style={[
+        {Array.from({ length: totalSteps }).map((_, index) => (
+          <View key={index} style={styles.stepWrapper}>
+            <View
+              style={[
                 styles.stepCircle,
-                isActive && styles.activeStep,
-                isCompleted && styles.completedStep
-              ]}>
-                {isCompleted ? (
-                  <Text style={styles.stepText}>✓</Text>
-                ) : (
-                  <Text style={styles.stepText}>{index + 1}</Text>
-                )}
-              </View>
+                index <= currentStep ? styles.activeStep : styles.inactiveStep,
+              ]}
+            >
+              <Text style={styles.stepNumber}>{index + 1}</Text>
+            </View>
+            {stepNames && (
               <Text style={[
                 styles.stepLabel,
-                isActive && styles.activeLabel
+                index <= currentStep ? styles.activeLabel : styles.inactiveLabel,
               ]}>
-                {stepName}
+                {stepNames[index]}
               </Text>
-            </View>
-          );
-        })}
-      </View>
-
-      <View style={styles.progressBarContainer}>
-        <View style={[styles.progressBar, { width: `${(currentStep / (totalSteps - 1)) * 100}%` }]} />
+            )}
+            {index < totalSteps - 1 && (
+              <View style={[
+                styles.stepConnector,
+                index < currentStep ? styles.activeConnector : styles.inactiveConnector,
+              ]} />
+            )}
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -53,18 +49,17 @@ const styles = StyleSheet.create({
   },
   stepsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  stepContainer: {
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'center',
+  },
+  stepWrapper: {
+    alignItems: 'center',
+    position: 'relative',
   },
   stepCircle: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#e0e0e0',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 4,
@@ -72,30 +67,35 @@ const styles = StyleSheet.create({
   activeStep: {
     backgroundColor: '#6200ee',
   },
-  completedStep: {
-    backgroundColor: '#4caf50',
+  inactiveStep: {
+    backgroundColor: '#e0e0e0',
   },
-  stepText: {
-    color: '#fff',
+  stepNumber: {
+    color: 'white',
     fontWeight: 'bold',
   },
   stepLabel: {
     fontSize: 12,
-    color: '#666',
     textAlign: 'center',
   },
   activeLabel: {
     color: '#6200ee',
     fontWeight: 'bold',
   },
-  progressBarContainer: {
-    height: 4,
-    backgroundColor: '#e0e0e0',
-    borderRadius: 2,
-    overflow: 'hidden',
+  inactiveLabel: {
+    color: '#9e9e9e',
   },
-  progressBar: {
-    height: '100%',
+  stepConnector: {
+    position: 'absolute',
+    top: 16,
+    left: 32,
+    right: -32,
+    height: 2,
+  },
+  activeConnector: {
     backgroundColor: '#6200ee',
+  },
+  inactiveConnector: {
+    backgroundColor: '#e0e0e0',
   },
 });

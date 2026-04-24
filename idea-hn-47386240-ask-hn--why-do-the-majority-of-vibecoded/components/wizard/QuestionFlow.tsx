@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, Button, TextInput, ProgressBar } from 'react-native-paper';
+import { Text, Button, TextInput, ProgressBar, RadioButton } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { generateQuestions } from '@/lib/ai/questionGenerator';
 import { useEditorStore } from '@/store/editorStore';
@@ -12,7 +12,11 @@ interface Question {
   options?: string[];
 }
 
-export default function QuestionFlow({ projectId }: { projectId: string }) {
+interface QuestionFlowProps {
+  projectId: string;
+}
+
+export default function QuestionFlow({ projectId }: QuestionFlowProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -61,7 +65,7 @@ export default function QuestionFlow({ projectId }: { projectId: string }) {
   const submitAnswers = async () => {
     setSubmitting(true);
     try {
-      // Here you would typically send answers to the backend to update the project
+      // In a real app, you would save answers to the project
       // For this prototype, we'll just navigate to the project editor
       Alert.alert('Success', 'Your answers have been recorded!', [
         {
@@ -171,34 +175,35 @@ export default function QuestionFlow({ projectId }: { projectId: string }) {
         )}
       </View>
 
-      <View style={styles.navigationContainer}>
+      <View style={styles.navigationButtons}>
         {currentQuestionIndex > 0 && (
           <Button
             mode="outlined"
             onPress={goBack}
-            style={styles.navButton}
-            disabled={submitting}
+            style={styles.backButton}
           >
             Back
           </Button>
         )}
 
-        {currentQuestionIndex < questions.length - 1 ? (
+        {currentQuestionIndex < questions.length - 1 && (
           <Button
             mode="contained"
             onPress={() => setCurrentQuestionIndex(prev => prev + 1)}
-            style={styles.navButton}
-            disabled={!answers[currentQuestion.id] || submitting}
+            style={styles.nextButton}
+            disabled={!answers[currentQuestion.id]}
           >
             Next
           </Button>
-        ) : (
+        )}
+
+        {currentQuestionIndex === questions.length - 1 && (
           <Button
             mode="contained"
             onPress={submitAnswers}
-            style={styles.navButton}
-            disabled={!answers[currentQuestion.id] || submitting}
+            style={styles.submitButton}
             loading={submitting}
+            disabled={!answers[currentQuestion.id]}
           >
             Finish
           </Button>
@@ -211,27 +216,13 @@ export default function QuestionFlow({ projectId }: { projectId: string }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: '#fff',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
   },
   header: {
     marginBottom: 16,
   },
   title: {
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 4,
   },
   subtitle: {
     textAlign: 'center',
@@ -239,8 +230,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     marginBottom: 24,
-    height: 8,
-    borderRadius: 4,
+    height: 4,
   },
   questionContainer: {
     marginBottom: 24,
@@ -259,20 +249,39 @@ const styles = StyleSheet.create({
   },
   booleanContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginBottom: 16,
   },
   booleanButton: {
     flex: 1,
-    marginHorizontal: 4,
+    marginHorizontal: 8,
   },
-  navigationContainer: {
+  navigationButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 24,
+    marginTop: 16,
   },
-  navButton: {
+  backButton: {
     flex: 1,
-    marginHorizontal: 4,
+    marginRight: 8,
+  },
+  nextButton: {
+    flex: 1,
+    marginLeft: 8,
+  },
+  submitButton: {
+    flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
 });
