@@ -2,6 +2,7 @@ import * as BackgroundFetch from 'expo-background-fetch';
 import * as TaskManager from 'expo-task-manager';
 import { getCalendarEvents, isEventInProgress } from './calendarService';
 import { blockNotifications, unblockNotifications } from './notificationService';
+import { registerDistractionBlocker, unregisterDistractionBlocker } from './distractionBlocker';
 
 const BACKGROUND_TASK_NAME = 'focusflow-background-task';
 
@@ -13,8 +14,10 @@ TaskManager.defineTask(BACKGROUND_TASK_NAME, async () => {
 
     if (isDuringEvent) {
       await blockNotifications();
+      await registerDistractionBlocker();
     } else {
       await unblockNotifications();
+      await unregisterDistractionBlocker();
     }
 
     return BackgroundFetch.BackgroundFetchResult.NewData;
