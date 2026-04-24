@@ -183,27 +183,32 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
                     color={isPlaying ? "#4CAF50" : "#2196F3"}
                   />
                 </TouchableOpacity>
+
+                <View style={styles.swipeIndicators}>
+                  <View style={[styles.indicator, styles.leftIndicator]}>
+                    <Ionicons name="arrow-back" size={24} color="#FF9800" />
+                    <Text style={styles.indicatorText}>Learning</Text>
+                  </View>
+
+                  <View style={[styles.indicator, styles.downIndicator]}>
+                    <Ionicons name="arrow-down" size={24} color="#F44336" />
+                    <Text style={styles.indicatorText}>Forgot</Text>
+                  </View>
+
+                  <View style={[styles.indicator, styles.rightIndicator]}>
+                    <Ionicons name="arrow-forward" size={24} color="#4CAF50" />
+                    <Text style={styles.indicatorText}>Know it</Text>
+                  </View>
+                </View>
               </>
             ) : (
               <TouchableOpacity
-                style={styles.showTranslationButton}
+                style={styles.revealButton}
                 onPress={() => setShowTranslation(true)}
               >
-                <Text style={styles.showTranslationText}>Show Translation</Text>
+                <Text style={styles.revealButtonText}>Show Translation</Text>
               </TouchableOpacity>
             )}
-          </View>
-
-          <View style={styles.swipeIndicators}>
-            <View style={[styles.indicator, styles.leftIndicator]}>
-              <Ionicons name="thumbs-down" size={24} color="#FF5252" />
-            </View>
-            <View style={[styles.indicator, styles.rightIndicator]}>
-              <Ionicons name="thumbs-up" size={24} color="#4CAF50" />
-            </View>
-            <View style={[styles.indicator, styles.downIndicator]}>
-              <Ionicons name="help" size={24} color="#FFC107" />
-            </View>
           </View>
         </Animated.View>
       </PanGestureHandler>
@@ -221,17 +226,19 @@ const styles = StyleSheet.create({
     width: width * 0.9,
     height: height * 0.7,
     backgroundColor: 'white',
-    borderRadius: 10,
+    borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
     padding: 20,
-    position: 'absolute',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardContent: {
     flex: 1,
+    width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -243,37 +250,38 @@ const styles = StyleSheet.create({
   wordText: {
     fontSize: 32,
     fontWeight: 'bold',
+    color: '#1E40AF',
     marginBottom: 10,
-    color: '#333',
   },
   translationText: {
     fontSize: 24,
-    color: '#666',
-    marginBottom: 20,
+    color: '#4B5563',
+    marginBottom: 15,
   },
   exampleText: {
     fontSize: 18,
-    color: '#888',
+    color: '#6B7280',
     textAlign: 'center',
     marginBottom: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   audioButton: {
-    padding: 10,
-    borderRadius: 50,
-    backgroundColor: '#E3F2FD',
     marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#EFF6FF',
+    borderRadius: 50,
   },
-  showTranslationButton: {
-    padding: 15,
-    backgroundColor: '#2196F3',
-    borderRadius: 5,
+  revealButton: {
     marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    backgroundColor: '#1E40AF',
+    borderRadius: 8,
   },
-  showTranslationText: {
+  revealButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
   swipeIndicators: {
     position: 'absolute',
@@ -281,24 +289,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    justifyContent: 'space-around',
+    alignItems: 'center',
   },
   indicator: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
     alignItems: 'center',
   },
   leftIndicator: {
-    backgroundColor: 'rgba(255, 82, 82, 0.2)',
-  },
-  rightIndicator: {
-    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+    transform: [{ rotate: '180deg' }],
   },
   downIndicator: {
-    backgroundColor: 'rgba(255, 193, 7, 0.2)',
+    transform: [{ rotate: '90deg' }],
+  },
+  rightIndicator: {
+    transform: [{ rotate: '0deg' }],
+  },
+  indicatorText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 5,
   },
 });

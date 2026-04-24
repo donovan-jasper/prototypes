@@ -150,20 +150,22 @@ export const useStore = create<StoreState>()(
           if (diffDays === 1) {
             // Consecutive day
             set({ streak: streak + 1, lastPracticed: today.getTime() });
-          } else if (diffDays > 1) {
+          } else {
             // Broken streak
             set({ streak: 1, lastPracticed: today.getTime() });
           }
         } else {
-          // First practice
+          // First time practicing
           set({ streak: 1, lastPracticed: today.getTime() });
         }
       },
 
       updateSettings: async (newSettings) => {
         try {
-          await updateSettings(newSettings);
-          set({ settings: { ...get().settings, ...newSettings } });
+          const currentSettings = get().settings;
+          const updatedSettings = { ...currentSettings, ...newSettings };
+          await updateSettings(updatedSettings);
+          set({ settings: updatedSettings });
         } catch (error) {
           console.error('Error updating settings:', error);
         }
