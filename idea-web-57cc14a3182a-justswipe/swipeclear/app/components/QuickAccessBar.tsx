@@ -1,14 +1,17 @@
 import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-const QuickAccessBar = ({ items, onItemPress }) => {
+const QuickAccessBar = ({ items, onPress }) => {
   return (
     <View style={styles.container}>
       {items.map((item, index) => (
-        <TouchableOpacity key={index} style={styles.item} onPress={() => onItemPress(item)}>
-          {item.icon && <Ionicons name={item.icon} size={24} color="#4285f4" />}
-          <Text style={styles.itemText}>{item.name}</Text>
+        <TouchableOpacity
+          key={index}
+          style={styles.button}
+          onPress={() => onPress(item)}
+        >
+          <Ionicons name={item.icon} size={24} color="#6C757D" />
         </TouchableOpacity>
       ))}
     </View>
@@ -17,23 +20,19 @@ const QuickAccessBar = ({ items, onItemPress }) => {
 
 const styles = StyleSheet.create({
   container: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: 'white',
+    paddingVertical: 16,
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#E9ECEF',
   },
-  item: {
-    alignItems: 'center',
+  button: {
     padding: 8,
-  },
-  itemText: {
-    marginTop: 4,
-    fontSize: 12,
-    color: '#4285f4',
-    fontWeight: '500',
   },
 });
 

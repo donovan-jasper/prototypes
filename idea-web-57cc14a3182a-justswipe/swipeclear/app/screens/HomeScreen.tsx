@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, FlatList } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, Alert, FlatList, SafeAreaView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
 import SwipeAction from '../components/SwipeAction';
@@ -172,23 +172,37 @@ const HomeScreen = () => {
     const fadeAnim = animatingItems[item.id] || new Animated.Value(1);
 
     return (
-      <Animated.View style={[styles.itemContainer, { opacity: fadeAnim }]}>
+      <Animated.View style={{ opacity: fadeAnim }}>
         <SwipeAction
           item={item}
-          onSwipeLeft={handleSwipeLeft}
-          onSwipeRight={handleSwipeRight}
-          onSwipeUp={handleSwipeUp}
-          onSwipeDown={handleSwipeDown}
+          onSwipeLeft={() => handleSwipeLeft(item)}
+          onSwipeRight={() => handleSwipeRight(item)}
+          onSwipeUp={() => handleSwipeUp(item)}
+          onSwipeDown={() => handleSwipeDown(item)}
         >
-          <View style={styles.itemContent}>
+          <View style={styles.itemContainer}>
             <View style={styles.itemHeader}>
-              <Text style={[styles.appName, item.pinned && styles.pinnedApp]}>{item.app}</Text>
-              {item.pinned && <Ionicons name="pin" size={16} color="#FF6B6B" />}
-              {item.muted && <Ionicons name="volume-mute" size={16} color="#6C757D" style={styles.mutedIcon} />}
+              <Text style={[styles.itemApp, { color: item.pinned ? '#FF6B6B' : '#6C757D' }]}>
+                {item.app}
+              </Text>
+              <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
             </View>
             <Text style={styles.itemTitle}>{item.title}</Text>
             <Text style={styles.itemBody}>{item.body}</Text>
-            <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
+            <View style={styles.itemStatus}>
+              {item.pinned && (
+                <View style={styles.statusBadge}>
+                  <Ionicons name="pin" size={12} color="#FF6B6B" />
+                  <Text style={styles.statusText}>Pinned</Text>
+                </View>
+              )}
+              {item.muted && (
+                <View style={styles.statusBadge}>
+                  <Ionicons name="volume-mute" size={12} color="#6C757D" />
+                  <Text style={styles.statusText}>Muted</Text>
+                </View>
+              )}
+            </View>
           </View>
         </SwipeAction>
       </Animated.View>
@@ -196,12 +210,16 @@ const HomeScreen = () => {
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>SwipeClear</Text>
-        <Text style={styles.subtitle}>
-          {showArchived ? 'Archived Notifications' : 'Recent Notifications'}
-        </Text>
+        <TouchableOpacity onPress={() => setShowArchived(!showArchived)}>
+          <Ionicons
+            name={showArchived ? 'archive' : 'archive-outline'}
+            size={24}
+            color="#6C757D"
+          />
+        </TouchableOpacity>
       </View>
 
       <FlatList
@@ -210,7 +228,7 @@ const HomeScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
+          <View style={styles.emptyState}>
             <Ionicons name="notifications-off-outline" size={48} color="#6C757D" />
             <Text style={styles.emptyText}>
               {showArchived ? 'No archived notifications' : 'No new notifications'}
@@ -223,7 +241,7 @@ const HomeScreen = () => {
         items={quickAccessItems}
         onPress={handleQuickAccessPress}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -233,9 +251,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8F9FA',
   },
   header: {
-    padding: 20,
-    paddingTop: 40,
-    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#E9ECEF',
   },
@@ -244,49 +263,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
   },
-  subtitle: {
-    fontSize: 16,
-    color: '#6C757D',
-    marginTop: 4,
-  },
   listContent: {
     paddingBottom: 80,
   },
   itemContainer: {
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
     marginHorizontal: 16,
     marginVertical: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-    backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
-  itemContent: {
-    padding: 16,
-  },
   itemHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
-  appName: {
-    fontSize: 14,
+  itemApp: {
+    fontSize: 12,
     fontWeight: '600',
-    color: '#495057',
-    marginRight: 8,
   },
-  pinnedApp: {
-    color: '#FF6B6B',
-  },
-  mutedIcon: {
-    marginLeft: 'auto',
+  itemTime: {
+    fontSize: 12,
+    color: '#6C757D',
   },
   itemTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#212529',
     marginBottom: 4,
   },
@@ -295,15 +302,28 @@ const styles = StyleSheet.create({
     color: '#495057',
     marginBottom: 8,
   },
-  itemTime: {
-    fontSize: 12,
-    color: '#6C757D',
+  itemStatus: {
+    flexDirection: 'row',
+    gap: 8,
   },
-  emptyContainer: {
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E9ECEF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    color: '#495057',
+    marginLeft: 4,
+  },
+  emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 32,
   },
   emptyText: {
     fontSize: 16,
