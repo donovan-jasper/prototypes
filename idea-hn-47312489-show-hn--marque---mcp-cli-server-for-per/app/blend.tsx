@@ -24,6 +24,7 @@ const BlendScreen = () => {
         setBlendedSystem(blended);
         setIsBlending(false);
       }, 300); // Small delay to show loading state
+      return () => clearTimeout(timer);
     } else {
       setBlendedSystem(null);
     }
