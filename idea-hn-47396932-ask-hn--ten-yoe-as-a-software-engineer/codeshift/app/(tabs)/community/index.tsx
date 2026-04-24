@@ -1,25 +1,45 @@
-import React, { useState } from 'react';
-import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
 import { FAB } from 'react-native-paper';
+import { db } from '../../../utils/api';
+import { collection, addDoc, query, orderBy, onSnapshot } from 'firebase/firestore';
 
 const CommunityScreen = () => {
-  const [questions, setQuestions] = useState([
-    { id: '1', question: 'How to deploy a TensorFlow model on ESP32?', answer: 'You need to use TensorFlow Lite for Microcontrollers...' },
-    { id: '2', question: 'Best Python libraries for embedded systems?', answer: 'Consider CircuitPython and MicroPython...' },
-  ]);
-
+  const [questions, setQuestions] = useState([]);
   const [newQuestion, setNewQuestion] = useState('');
   const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  const handleAddQuestion = () => {
+  useEffect(() => {
+    const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const questionsData = [];
+      querySnapshot.forEach((doc) => {
+        questionsData.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      setQuestions(questionsData);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  const handleAddQuestion = async () => {
     if (newQuestion.trim()) {
-      setQuestions([...questions, {
-        id: Date.now().toString(),
-        question: newQuestion,
-        answer: 'This question is awaiting an answer...'
-      }]);
-      setNewQuestion('');
-      setShowForm(false);
+      try {
+        await addDoc(collection(db, 'questions'), {
+          question: newQuestion,
+          answer: 'This question is awaiting an answer...',
+          createdAt: new Date()
+        });
+        setNewQuestion('');
+        setShowForm(false);
+      } catch (error) {
+        console.error('Error adding question: ', error);
+      }
     }
   };
 
@@ -30,6 +50,14 @@ const CommunityScreen = () => {
     </View>
   );
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6200ee" />
+      </View>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Community Q&A</Text>
@@ -39,6 +67,11 @@ const CommunityScreen = () => {
         renderItem={renderItem}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No questions yet. Be the first to ask!</Text>
+          </View>
+        }
       />
 
       {showForm && (
@@ -157,6 +190,22 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#6200ee',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
