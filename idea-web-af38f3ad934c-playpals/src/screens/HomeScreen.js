@@ -1,14 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native';
 import * as Location from 'expo-location';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateMockEvents } from '../utils/mockEventGenerator';
 
+const ACTIVITY_TYPES = [
+  { name: 'Basketball', emoji: '🏀' },
+  { name: 'Yoga', emoji: '🧘' },
+  { name: 'Frisbee', emoji: '🥏' },
+  { name: 'Soccer', emoji: '⚽' },
+  { name: 'Tennis', emoji: '🎾' },
+  { name: 'Running', emoji: '🏃' },
+  { name: 'Volleyball', emoji: '🏐' },
+  { name: 'Cycling', emoji: '🚴' },
+  { name: 'Hiking', emoji: '🥾' },
+  { name: 'Pickleball', emoji: '🏓' },
+];
+
 const HomeScreen = ({ navigation }) => {
   const [location, setLocation] = useState(null);
   const [events, setEvents] = useState([]);
+  const [filteredEvents, setFilteredEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [distanceFilter, setDistanceFilter] = useState(10);
+  const [selectedActivity, setSelectedActivity] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -41,13 +57,17 @@ const HomeScreen = ({ navigation }) => {
     return unsubscribe;
   }, [navigation, location]);
 
+  useEffect(() => {
+    applyFilters();
+  }, [events, distanceFilter, selectedActivity]);
+
   const loadEvents = async (userLat, userLon) => {
     const mockEvents = generateMockEvents(userLat, userLon);
-    
+
     try {
       const storedEvents = await AsyncStorage.getItem('userEvents');
       const userEvents = storedEvents ? JSON.parse(storedEvents) : [];
-      
+
       const userEventsWithDistance = userEvents.map(event => {
         const distance = calculateDistance(
           userLat,
@@ -57,15 +77,27 @@ const HomeScreen = ({ navigation }) => {
         );
         return { ...event, distance };
       });
-      
+
       const allEvents = [...userEventsWithDistance, ...mockEvents];
       allEvents.sort((a, b) => a.distance - b.distance);
-      
+
       setEvents(allEvents);
     } catch (error) {
       console.error('Error loading user events:', error);
       setEvents(mockEvents);
     }
+  };
+
+  const applyFilters = () => {
+    let filtered = [...events];
+
+    if (selectedActivity) {
+      filtered = filtered.filter(event => event.title === selectedActivity);
+    }
+
+    filtered = filtered.filter(event => event.distance <= distanceFilter);
+
+    setFilteredEvents(filtered);
   };
 
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
@@ -144,27 +176,50 @@ const HomeScreen = ({ navigation }) => {
           </Text>
         </TouchableOpacity>
       </View>
-      {events.length === 0 ? (
+
+      <View style={styles.filtersContainer}>
+        <Text style={styles.filterLabel}>Activity Type:</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activityScroll}>
+          {ACTIVITY_TYPES.map((activity) => (
+            <TouchableOpacity
+              key={activity.name}
+              style={[
+                styles.activityButton,
+                selectedActivity === activity.name && styles.selectedActivityButton
+              ]}
+              onPress={() => setSelectedActivity(selectedActivity === activity.name ? null : activity.name)}
+            >
+              <Text style={styles.activityButtonText}>{activity.emoji} {activity.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.distanceFilter}>
+          <Text style={styles.filterLabel}>Max Distance: {distanceFilter} miles</Text>
+          <TextInput
+            style={styles.distanceInput}
+            keyboardType="numeric"
+            value={distanceFilter.toString()}
+            onChangeText={(text) => setDistanceFilter(text ? parseFloat(text) : 0)}
+          />
+        </View>
+      </View>
+
+      {filteredEvents.length === 0 ? (
         <View style={styles.centerContainer}>
           <Text style={styles.emptyText}>No activities found nearby</Text>
           <Text style={styles.emptySubtext}>Check back soon!</Text>
         </View>
       ) : (
         <FlatList
-          data={events}
+          data={filteredEvents}
           renderItem={renderItem}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
           refreshing={refreshing}
           onRefresh={handleRefresh}
         />
       )}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => navigation.navigate('CreateEvent')}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
     </View>
   );
 };
@@ -172,7 +227,7 @@ const HomeScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#f5f5f5',
   },
   centerContainer: {
     flex: 1,
@@ -184,56 +239,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    paddingBottom: 10,
-    backgroundColor: '#FFFFFF',
+    padding: 15,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    borderBottomColor: '#e0e0e0',
   },
   header: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#333',
   },
   refreshButton: {
+    padding: 8,
     backgroundColor: '#007AFF',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     borderRadius: 20,
   },
   refreshButtonText: {
-    color: '#FFFFFF',
+    color: 'white',
     fontSize: 14,
-    fontWeight: '600',
   },
-  loadingText: {
-    marginTop: 12,
+  filtersContainer: {
+    padding: 15,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  filterLabel: {
     fontSize: 16,
-    color: '#666',
+    fontWeight: '600',
+    marginBottom: 10,
+    color: '#333',
   },
-  listContent: {
-    padding: 16,
-    paddingBottom: 80,
+  activityScroll: {
+    marginBottom: 15,
+  },
+  activityButton: {
+    padding: 8,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 20,
+    marginRight: 10,
+  },
+  selectedActivityButton: {
+    backgroundColor: '#007AFF',
+  },
+  activityButtonText: {
+    color: '#333',
+  },
+  distanceFilter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  distanceInput: {
+    width: 60,
+    height: 40,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    textAlign: 'center',
+  },
+  listContainer: {
+    padding: 15,
   },
   eventItem: {
-    backgroundColor: '#FFFFFF',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 2,
   },
   eventHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   eventEmoji: {
-    fontSize: 32,
-    marginRight: 12,
+    fontSize: 24,
+    marginRight: 10,
   },
   eventInfo: {
     flex: 1,
@@ -242,23 +329,21 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
   eventLocation: {
     fontSize: 14,
     color: '#666',
+    marginTop: 2,
   },
   eventDistance: {
     fontSize: 14,
-    fontWeight: '600',
     color: '#007AFF',
+    fontWeight: 'bold',
   },
   eventDetails: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
+    marginTop: 5,
   },
   eventTime: {
     fontSize: 14,
@@ -269,48 +354,33 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   userBadge: {
-    marginTop: 8,
-    alignSelf: 'flex-start',
-    backgroundColor: '#E3F2FD',
-    paddingHorizontal: 12,
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    backgroundColor: '#007AFF',
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 10,
   },
   userBadgeText: {
+    color: 'white',
     fontSize: 12,
-    color: '#007AFF',
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
   },
   emptyText: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 5,
   },
   emptySubtext: {
     fontSize: 14,
     color: '#666',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabText: {
-    fontSize: 32,
-    color: '#FFFFFF',
-    fontWeight: '300',
   },
 });
 
