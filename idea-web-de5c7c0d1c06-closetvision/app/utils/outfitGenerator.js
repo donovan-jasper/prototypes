@@ -46,21 +46,67 @@ export function generateOutfit(wardrobe, occasion) {
   const outfits = [];
 
   for (let i = 0; i < 3; i++) {
+    // Get random items from each category
     const topType = shuffleArray(rules.top)[0];
     const bottomType = shuffleArray(rules.bottom)[0];
     const accessoryType = shuffleArray(rules.accessory)[0];
 
+    // Find actual items or use generic if none available
     const top = shuffleArray(wardrobe[topType] || [])[0] || `Generic ${topType}`;
     const bottom = shuffleArray(wardrobe[bottomType] || [])[0] || `Generic ${bottomType}`;
     const accessory = shuffleArray(wardrobe[accessoryType] || [])[0] || `Generic ${accessoryType}`;
 
-    outfits.push({
-      top,
-      bottom,
-      accessory,
-      occasion
-    });
+    // Ensure we have all three components
+    if (top && bottom && accessory) {
+      outfits.push({
+        top,
+        bottom,
+        accessory,
+        occasion
+      });
+    }
+  }
+
+  // If we couldn't create 3 outfits, try to create more with different combinations
+  if (outfits.length < 3) {
+    const additionalOutfits = generateAdditionalOutfits(wardrobe, rules, 3 - outfits.length);
+    outfits.push(...additionalOutfits);
   }
 
   return outfits;
+}
+
+function generateAdditionalOutfits(wardrobe, rules, needed) {
+  const additionalOutfits = [];
+  const usedCombinations = new Set();
+
+  for (let i = 0; i < needed; i++) {
+    // Try different combinations until we find a valid one
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const topType = shuffleArray(rules.top)[0];
+      const bottomType = shuffleArray(rules.bottom)[0];
+      const accessoryType = shuffleArray(rules.accessory)[0];
+
+      const combinationKey = `${topType}-${bottomType}-${accessoryType}`;
+
+      if (!usedCombinations.has(combinationKey)) {
+        const top = shuffleArray(wardrobe[topType] || [])[0] || `Generic ${topType}`;
+        const bottom = shuffleArray(wardrobe[bottomType] || [])[0] || `Generic ${bottomType}`;
+        const accessory = shuffleArray(wardrobe[accessoryType] || [])[0] || `Generic ${accessoryType}`;
+
+        if (top && bottom && accessory) {
+          additionalOutfits.push({
+            top,
+            bottom,
+            accessory,
+            occasion: 'custom'
+          });
+          usedCombinations.add(combinationKey);
+          break;
+        }
+      }
+    }
+  }
+
+  return additionalOutfits;
 }
