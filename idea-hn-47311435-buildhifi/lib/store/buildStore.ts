@@ -7,6 +7,7 @@ interface BuildStore {
   addComponent: (component: Component) => void;
   removeComponent: (componentId: number) => void;
   updateComponentPosition: (componentId: number, x: number, y: number) => void;
+  clearCurrentBuild: () => void;
 }
 
 const useBuildStore = create<BuildStore>((set) => ({
@@ -14,10 +15,23 @@ const useBuildStore = create<BuildStore>((set) => ({
   setCurrentBuild: (build) => set({ currentBuild: build }),
   addComponent: (component) => set((state) => {
     if (!state.currentBuild) return state;
+
+    // Determine position based on component type
+    let position = { x: 0, y: 0 };
+    if (component.type === 'turntable' || component.type === 'streamer') {
+      position = { x: 100, y: 100 };
+    } else if (component.type === 'preamp') {
+      position = { x: 300, y: 100 };
+    } else if (component.type === 'amplifier') {
+      position = { x: 500, y: 100 };
+    } else if (component.type === 'speaker') {
+      position = { x: 700, y: 100 };
+    }
+
     return {
       currentBuild: {
         ...state.currentBuild,
-        components: [...state.currentBuild.components, component],
+        components: [...state.currentBuild.components, { ...component, position }],
       },
     };
   }),
@@ -45,6 +59,7 @@ const useBuildStore = create<BuildStore>((set) => ({
       },
     };
   }),
+  clearCurrentBuild: () => set({ currentBuild: null }),
 }));
 
 export default useBuildStore;
