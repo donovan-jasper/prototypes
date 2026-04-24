@@ -28,7 +28,7 @@ export const getGameDetails = async (barcode) => {
 
     // Then get detailed game info
     const gameResponse = await api.post('/games', {
-      fields: 'name,cover,summary,platforms,release_dates',
+      fields: 'name,cover,summary,platforms,release_dates,genres,involved_companies.company.name',
       where: `id = ${gameId}`
     });
 
@@ -39,7 +39,6 @@ export const getGameDetails = async (barcode) => {
     const gameData = gameResponse.data[0];
 
     // Get market price (mock implementation - replace with real pricing API)
-    // Note: IGDB doesn't provide pricing data, so we'll use a mock price
     const mockPrice = Math.floor(Math.random() * 50) + 10; // Random price between $10-$60
     const conditions = ['New', 'Used - Like New', 'Used - Good', 'Used - Fair'];
     const randomCondition = conditions[Math.floor(Math.random() * conditions.length)];
@@ -52,7 +51,9 @@ export const getGameDetails = async (barcode) => {
       platforms: gameData.platforms?.map(p => p.name).join(', ') || 'Unknown',
       releaseDate: gameData.release_dates?.[0]?.human || 'Unknown',
       price: mockPrice,
-      condition: randomCondition
+      condition: randomCondition,
+      genres: gameData.genres?.map(g => g.name).join(', ') || 'Unknown',
+      developer: gameData.involved_companies?.find(ic => ic.developer)?.company?.name || 'Unknown'
     };
   } catch (error) {
     console.error('API Error:', error);
