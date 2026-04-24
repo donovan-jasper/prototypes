@@ -1,5 +1,6 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, Alert, Clipboard } from 'react-native';
+import { TouchableOpacity, Text, StyleSheet, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { parseTicketFromText } from '../lib/ticketParser';
 import { ParsedTicket } from '../lib/types';
 
@@ -10,22 +11,22 @@ interface SmartPasteButtonProps {
 export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
   const handlePaste = async () => {
     try {
-      const clipboardContent = await Clipboard.getString();
-      if (!clipboardContent) {
+      const text = await Clipboard.getStringAsync();
+      if (!text) {
         Alert.alert('Clipboard empty', 'No text found in clipboard');
         return;
       }
 
-      const parsed = parseTicketFromText(clipboardContent);
-      if (!parsed.company && !parsed.ticketId && !parsed.submittedAt) {
-        Alert.alert('No data found', 'Could not extract ticket information from the clipboard content');
+      const parsed = parseTicketFromText(text);
+      if (!parsed.company?.value && !parsed.ticketId?.value && !parsed.submittedAt?.value) {
+        Alert.alert('No ticket info found', 'Could not extract ticket information from the pasted text');
         return;
       }
 
       onParsed(parsed);
-      Alert.alert('Success', 'Ticket information extracted from clipboard');
+      Alert.alert('Success', 'Ticket information extracted successfully');
     } catch (error) {
-      Alert.alert('Error', 'Failed to read clipboard');
+      Alert.alert('Error', 'Failed to parse clipboard content');
     }
   };
 
@@ -39,10 +40,10 @@ export default function SmartPasteButton({ onParsed }: SmartPasteButtonProps) {
 const styles = StyleSheet.create({
   button: {
     backgroundColor: '#4CAF50',
-    padding: 12,
+    padding: 15,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 20,
   },
   buttonText: {
     color: 'white',

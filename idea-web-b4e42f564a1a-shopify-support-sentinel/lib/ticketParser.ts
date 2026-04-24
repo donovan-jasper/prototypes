@@ -169,94 +169,78 @@ export function parseTicketFromText(text: string): ParsedTicket {
               now.setFullYear(now.getFullYear() - value);
             }
             date = now;
-          }
-        }
-        // Handle today/yesterday
-        else if (match[1]) {
-          const todayMatch = match[1].toLowerCase();
-          const now = new Date();
+          } else if (match[1] && match[2] && match[3]) {
+            // Handle absolute dates
+            const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
+                              'july', 'august', 'september', 'october', 'november', 'december'];
 
-          if (todayMatch === 'today') {
-            date = now;
-          } else if (todayMatch === 'yesterday') {
+            // Check if first group is month name
+            if (monthNames.includes(match[1].toLowerCase())) {
+              const month = monthNames.indexOf(match[1].toLowerCase());
+              const day = parseInt(match[2]);
+              const year = parseInt(match[3]);
+
+              date = new Date(year, month, day);
+
+              // Handle time if present
+              if (match[5] && match[6]) {
+                let hours = parseInt(match[5]);
+                const minutes = parseInt(match[6]);
+                const period = match[7]?.toLowerCase();
+
+                if (period === 'pm' && hours < 12) {
+                  hours += 12;
+                } else if (period === 'am' && hours === 12) {
+                  hours = 0;
+                }
+
+                date.setHours(hours, minutes);
+              }
+            } else {
+              // Numeric date format (MM/DD/YYYY or DD/MM/YYYY)
+              const day = parseInt(match[1]);
+              const month = parseInt(match[2]) - 1; // months are 0-indexed
+              const year = parseInt(match[3]) > 1000 ? parseInt(match[3]) : parseInt(match[3]) + 2000;
+
+              date = new Date(year, month, day);
+
+              // Handle time if present
+              if (match[5] && match[6]) {
+                let hours = parseInt(match[5]);
+                const minutes = parseInt(match[6]);
+                const period = match[7]?.toLowerCase();
+
+                if (period === 'pm' && hours < 12) {
+                  hours += 12;
+                } else if (period === 'am' && hours === 12) {
+                  hours = 0;
+                }
+
+                date.setHours(hours, minutes);
+              }
+            }
+          } else if (match[1] && match[1].toLowerCase() === 'today') {
+            date = new Date();
+          } else if (match[1] && match[1].toLowerCase() === 'yesterday') {
+            const now = new Date();
             now.setDate(now.getDate() - 1);
             date = now;
-          } else if (todayMatch === 'tomorrow') {
+          } else if (match[1] && match[1].toLowerCase() === 'tomorrow') {
+            const now = new Date();
             now.setDate(now.getDate() + 1);
             date = now;
           }
-        }
-        // Handle standard date formats
-        else {
-          let day, month, year, hours = 0, minutes = 0;
 
-          // Numeric date (MM/DD/YYYY or DD/MM/YYYY)
-          if (match[1] && match[1].match(/^\d+$/)) {
-            day = parseInt(match[1]);
-            month = parseInt(match[2]) - 1;
-            year = parseInt(match[3]) > 1000 ? parseInt(match[3]) : 2000 + parseInt(match[3]);
-
-            // Check if month is likely to be day (US vs international format)
-            if (month > 11 && day <= 12) {
-              // Likely US format (MM/DD/YYYY)
-              [day, month] = [month, day - 1];
-            }
+          if (date) {
+            result.submittedAt = {
+              value: date,
+              confidence: 0.8
+            };
+            break;
           }
-          // Month name format
-          else if (match[1] && match[1].match(/^[a-z]+$/i)) {
-            month = new Date(Date.parse(match[1] + " 1, 2023")).getMonth();
-            day = parseInt(match[2]);
-            year = parseInt(match[3]);
-          }
-
-          // Handle time if present
-          if (match[5] && match[6]) {
-            hours = parseInt(match[5]);
-            minutes = parseInt(match[6]);
-
-            if (match[7] && match[7].toLowerCase() === 'pm' && hours < 12) {
-              hours += 12;
-            } else if (match[7] && match[7].toLowerCase() === 'am' && hours === 12) {
-              hours = 0;
-            }
-          }
-
-          date = new Date(year, month, day, hours, minutes);
-        }
-
-        if (date && !isNaN(date.getTime())) {
-          result.submittedAt = {
-            value: date,
-            confidence: 0.8
-          };
-          break;
         }
       } catch (e) {
-        continue;
-      }
-    }
-  }
-
-  // If no date found, try to find the most recent date in the text
-  if (!result.submittedAt) {
-    const potentialDates = text.match(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g);
-    if (potentialDates && potentialDates.length > 0) {
-      // Try to parse the most recent date
-      const sortedDates = potentialDates.sort((a, b) => {
-        const dateA = new Date(a);
-        const dateB = new Date(b);
-        return dateB.getTime() - dateA.getTime();
-      });
-
-      for (const dateStr of sortedDates) {
-        const date = new Date(dateStr);
-        if (!isNaN(date.getTime())) {
-          result.submittedAt = {
-            value: date,
-            confidence: 0.6
-          };
-          break;
-        }
+        console.log('Date parsing error:', e);
       }
     }
   }
