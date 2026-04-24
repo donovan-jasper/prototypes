@@ -212,12 +212,12 @@ const styles = StyleSheet.create({
   },
   feedback: {
     marginTop: 20,
-    textAlign: 'center',
-    fontSize: 16,
-    color: '#333',
-    padding: 10,
+    padding: 15,
     backgroundColor: '#e8f5e9',
     borderRadius: 8,
+    textAlign: 'center',
+    fontSize: 16,
+    color: '#2e7d32',
   },
 });
 
