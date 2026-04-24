@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator, Image } from 'react-native';
 import { generateOutfit } from '../utils/outfitGenerator';
 import { getWardrobeItems } from '../services/wardrobeService';
 
@@ -8,12 +8,13 @@ const OutfitGeneratorScreen = () => {
   const [selectedOccasion, setSelectedOccasion] = useState('work');
   const [wardrobe, setWardrobe] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const occasions = [
-    { id: 'work', title: 'Work' },
-    { id: 'casual', title: 'Casual' },
-    { id: 'formal', title: 'Formal' },
-    { id: 'athleisure', title: 'Athleisure' }
+    { id: 'work', title: 'Work', icon: require('../../assets/icons/work.png') },
+    { id: 'casual', title: 'Casual', icon: require('../../assets/icons/casual.png') },
+    { id: 'formal', title: 'Formal', icon: require('../../assets/icons/formal.png') },
+    { id: 'athleisure', title: 'Athleisure', icon: require('../../assets/icons/athleisure.png') }
   ];
 
   useEffect(() => {
@@ -22,8 +23,10 @@ const OutfitGeneratorScreen = () => {
         const items = await getWardrobeItems();
         const categorizedWardrobe = categorizeWardrobe(items);
         setWardrobe(categorizedWardrobe);
+        setError(null);
       } catch (error) {
         console.error('Error loading wardrobe:', error);
+        setError('Failed to load wardrobe. Please try again.');
       } finally {
         setIsLoading(false);
       }
@@ -53,7 +56,8 @@ const OutfitGeneratorScreen = () => {
       boots: [],
       sandals: [],
       dresses: [],
-      skirts: []
+      skirts: [],
+      ties: []
     };
 
     items.forEach(item => {
@@ -66,18 +70,37 @@ const OutfitGeneratorScreen = () => {
   };
 
   const handleGenerateOutfits = () => {
-    if (!wardrobe) return;
+    if (!wardrobe) {
+      setError('Wardrobe not loaded. Please try again.');
+      return;
+    }
 
     const generatedOutfits = generateOutfit(wardrobe, selectedOccasion);
-    setOutfits(generatedOutfits);
+    if (generatedOutfits.length === 0) {
+      setError('Could not generate outfits. Please add more items to your wardrobe.');
+    } else {
+      setOutfits(generatedOutfits);
+      setError(null);
+    }
   };
 
   const renderOutfit = ({ item }) => (
     <View style={styles.outfitCard}>
       <Text style={styles.outfitTitle}>Outfit for {item.occasion}</Text>
-      <Text style={styles.outfitItem}>Top: {item.top}</Text>
-      <Text style={styles.outfitItem}>Bottom: {item.bottom}</Text>
-      <Text style={styles.outfitItem}>Accessory: {item.accessory}</Text>
+      <View style={styles.outfitItemsContainer}>
+        <View style={styles.outfitItem}>
+          <Text style={styles.itemLabel}>Top:</Text>
+          <Text style={styles.itemName}>{item.top}</Text>
+        </View>
+        <View style={styles.outfitItem}>
+          <Text style={styles.itemLabel}>Bottom:</Text>
+          <Text style={styles.itemName}>{item.bottom}</Text>
+        </View>
+        <View style={styles.outfitItem}>
+          <Text style={styles.itemLabel}>Accessory:</Text>
+          <Text style={styles.itemName}>{item.accessory}</Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -104,6 +127,7 @@ const OutfitGeneratorScreen = () => {
             ]}
             onPress={() => setSelectedOccasion(occasion.id)}
           >
+            <Image source={occasion.icon} style={styles.occasionIcon} />
             <Text style={[
               styles.occasionText,
               selectedOccasion === occasion.id && styles.selectedOccasionText
@@ -115,15 +139,21 @@ const OutfitGeneratorScreen = () => {
       <TouchableOpacity
         style={styles.generateButton}
         onPress={handleGenerateOutfits}
-        disabled={!wardrobe || wardrobe.shirts.length === 0}
+        disabled={!wardrobe || Object.values(wardrobe).every(arr => arr.length === 0)}
       >
         <Text style={styles.generateButtonText}>Generate Outfits</Text>
       </TouchableOpacity>
 
-      {outfits.length === 0 && wardrobe && (
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+
+      {outfits.length === 0 && wardrobe && !error && (
         <View style={styles.emptyState}>
           <Text style={styles.emptyStateText}>
-            {wardrobe.shirts.length === 0
+            {Object.values(wardrobe).every(arr => arr.length === 0)
               ? 'Please add some items to your wardrobe first'
               : 'Select an occasion and tap "Generate Outfits"'}
           </Text>
@@ -161,14 +191,21 @@ const styles = StyleSheet.create({
   },
   occasionButton: {
     padding: 10,
-    borderRadius: 5,
+    borderRadius: 10,
     backgroundColor: '#e0e0e0',
     marginBottom: 10,
     width: '48%',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 100,
   },
   selectedOccasion: {
     backgroundColor: '#6200ee',
+  },
+  occasionIcon: {
+    width: 30,
+    height: 30,
+    marginBottom: 5,
   },
   occasionText: {
     color: '#333',
@@ -180,7 +217,7 @@ const styles = StyleSheet.create({
   generateButton: {
     backgroundColor: '#6200ee',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 10,
     alignItems: 'center',
     marginBottom: 20,
   },
@@ -189,14 +226,38 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 16,
   },
+  generateButtonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 15,
+    borderRadius: 5,
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#c62828',
+    textAlign: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    color: '#666',
+    textAlign: 'center',
+    fontSize: 16,
+  },
   outfitsList: {
     paddingBottom: 20,
   },
   outfitCard: {
     backgroundColor: 'white',
+    borderRadius: 10,
     padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -207,12 +268,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    color: '#333',
+    color: '#6200ee',
+  },
+  outfitItemsContainer: {
+    marginTop: 10,
   },
   outfitItem: {
-    fontSize: 16,
-    marginBottom: 5,
+    flexDirection: 'row',
+    marginBottom: 8,
+  },
+  itemLabel: {
+    fontWeight: '600',
+    marginRight: 5,
     color: '#555',
+  },
+  itemName: {
+    color: '#333',
   },
   loadingContainer: {
     flex: 1,
@@ -222,19 +293,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    fontSize: 16,
     color: '#666',
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
   },
 });
 
