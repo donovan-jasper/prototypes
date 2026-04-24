@@ -15,6 +15,13 @@ export interface WordProgress {
   incorrectCount?: number;
 }
 
+export interface Settings {
+  notificationsEnabled: boolean;
+  notificationTime?: number;
+  dailyGoal: number;
+  currentLanguage: string;
+}
+
 export const initDatabase = async () => {
   return new Promise((resolve, reject) => {
     db.transaction(
@@ -38,9 +45,9 @@ export const initDatabase = async () => {
             wordId INTEGER NOT NULL,
             lastReviewed INTEGER,
             nextReview INTEGER,
-            difficulty REAL,
-            stability REAL,
-            retrievability REAL,
+            difficulty REAL DEFAULT 2.5,
+            stability REAL DEFAULT 1,
+            retrievability REAL DEFAULT 0.5,
             correctCount INTEGER DEFAULT 0,
             incorrectCount INTEGER DEFAULT 0,
             FOREIGN KEY (wordId) REFERENCES words (id)
@@ -55,6 +62,20 @@ export const initDatabase = async () => {
             dailyGoal INTEGER DEFAULT 10,
             currentLanguage TEXT DEFAULT 'spanish'
           );`
+        );
+
+        // Initialize settings if empty
+        tx.executeSql(
+          'SELECT * FROM settings',
+          [],
+          (_, { rows }) => {
+            if (rows.length === 0) {
+              tx.executeSql(
+                'INSERT INTO settings (notificationsEnabled, dailyGoal, currentLanguage) VALUES (?, ?, ?)',
+                [1, 10, 'spanish']
+              );
+            }
+          }
         );
       },
       (error) => reject(error),
@@ -97,21 +118,51 @@ export const updateProgress = async (wordId: number, progress: WordProgress) => 
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
+        // Check if progress record exists
         tx.executeSql(
-          `UPDATE user_progress
-           SET lastReviewed = ?, nextReview = ?, difficulty = ?, stability = ?, retrievability = ?, correctCount = ?, incorrectCount = ?
-           WHERE wordId = ?`,
-          [
-            progress.lastReviewed,
-            progress.nextReview,
-            progress.difficulty,
-            progress.stability,
-            progress.retrievability,
-            progress.correctCount,
-            progress.incorrectCount,
-            wordId
-          ],
-          (_, result) => resolve(result.rowsAffected),
+          'SELECT * FROM user_progress WHERE wordId = ?',
+          [wordId],
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              // Update existing record
+              tx.executeSql(
+                `UPDATE user_progress
+                 SET lastReviewed = ?, nextReview = ?, difficulty = ?, stability = ?, retrievability = ?, correctCount = ?, incorrectCount = ?
+                 WHERE wordId = ?`,
+                [
+                  progress.lastReviewed,
+                  progress.nextReview,
+                  progress.difficulty,
+                  progress.stability,
+                  progress.retrievability,
+                  progress.correctCount,
+                  progress.incorrectCount,
+                  wordId
+                ],
+                (_, result) => resolve(result.rowsAffected),
+                (_, error) => reject(error)
+              );
+            } else {
+              // Insert new record
+              tx.executeSql(
+                `INSERT INTO user_progress
+                 (wordId, lastReviewed, nextReview, difficulty, stability, retrievability, correctCount, incorrectCount)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                  wordId,
+                  progress.lastReviewed,
+                  progress.nextReview,
+                  progress.difficulty,
+                  progress.stability,
+                  progress.retrievability,
+                  progress.correctCount || 0,
+                  progress.incorrectCount || 0
+                ],
+                (_, result) => resolve(result.insertId),
+                (_, error) => reject(error)
+              );
+            }
+          },
           (_, error) => reject(error)
         );
       }
@@ -119,68 +170,30 @@ export const updateProgress = async (wordId: number, progress: WordProgress) => 
   });
 };
 
-export const getDueWords = async (limit: number = 10) => {
+export const getDueWords = async (limit: number): Promise<WordProgress[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
-        tx.executeSql(
-          `SELECT w.*, up.lastReviewed, up.nextReview, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
-           FROM words w
-           LEFT JOIN user_progress up ON w.id = up.wordId
-           WHERE up.wordId IS NULL OR up.nextReview IS NULL OR up.nextReview <= ?
-           ORDER BY 
-             CASE WHEN up.wordId IS NULL THEN 0 ELSE 1 END,
-             CASE WHEN up.nextReview IS NULL THEN 0 ELSE 1 END,
-             w.frequency ASC
-           LIMIT ?`,
-          [Date.now(), limit],
-          (_, { rows }) => resolve(rows._array),
-          (_, error) => reject(error)
-        );
-      }
-    );
-  });
-};
-
-export const getTotalWordsLearned = async () => {
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
-        tx.executeSql(
-          'SELECT COUNT(*) as count FROM user_progress WHERE correctCount > 0',
-          [],
-          (_, { rows }) => resolve(rows._array[0].count),
-          (_, error) => reject(error)
-        );
-      }
-    );
-  });
-};
-
-export const getWordsByDifficulty = async (difficulty: 'beginner' | 'intermediate' | 'advanced') => {
-  let condition = '';
-  switch (difficulty) {
-    case 'beginner':
-      condition = 'correctCount < 3';
-      break;
-    case 'intermediate':
-      condition = 'correctCount >= 3 AND correctCount < 7';
-      break;
-    case 'advanced':
-      condition = 'correctCount >= 7';
-      break;
-  }
-
-  return new Promise((resolve, reject) => {
-    db.transaction(
-      (tx) => {
+        const now = Date.now();
         tx.executeSql(
           `SELECT w.*, up.*
            FROM words w
-           JOIN user_progress up ON w.id = up.wordId
-           WHERE ${condition}`,
-          [],
-          (_, { rows }) => resolve(rows._array),
+           LEFT JOIN user_progress up ON w.id = up.wordId
+           WHERE up.nextReview <= ? OR up.nextReview IS NULL
+           ORDER BY up.nextReview ASC, w.frequency DESC
+           LIMIT ?`,
+          [now, limit],
+          (_, { rows }) => {
+            const words = rows._array.map(word => ({
+              ...word,
+              difficulty: word.difficulty || 2.5,
+              stability: word.stability || 1,
+              retrievability: word.retrievability || 0,
+              correctCount: word.correctCount || 0,
+              incorrectCount: word.incorrectCount || 0,
+            }));
+            resolve(words);
+          },
           (_, error) => reject(error)
         );
       }
@@ -188,14 +201,30 @@ export const getWordsByDifficulty = async (difficulty: 'beginner' | 'intermediat
   });
 };
 
-export const getSettings = async () => {
+export const getSettings = async (): Promise<Settings> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
           'SELECT * FROM settings LIMIT 1',
           [],
-          (_, { rows }) => resolve(rows._array[0] || {}),
+          (_, { rows }) => {
+            if (rows.length > 0) {
+              const settings = rows._array[0];
+              resolve({
+                notificationsEnabled: settings.notificationsEnabled === 1,
+                notificationTime: settings.notificationTime,
+                dailyGoal: settings.dailyGoal,
+                currentLanguage: settings.currentLanguage,
+              });
+            } else {
+              resolve({
+                notificationsEnabled: true,
+                dailyGoal: 10,
+                currentLanguage: 'spanish',
+              });
+            }
+          },
           (_, error) => reject(error)
         );
       }
@@ -203,15 +232,14 @@ export const getSettings = async () => {
   });
 };
 
-export const updateSettings = async (settings: any) => {
+export const updateSettings = async (settings: Settings) => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          `INSERT OR REPLACE INTO settings (id, notificationsEnabled, notificationTime, dailyGoal, currentLanguage)
-           VALUES ((SELECT id FROM settings LIMIT 1), ?, ?, ?, ?)`,
+          'UPDATE settings SET notificationsEnabled = ?, notificationTime = ?, dailyGoal = ?, currentLanguage = ? WHERE id = 1',
           [
-            settings.notificationsEnabled,
+            settings.notificationsEnabled ? 1 : 0,
             settings.notificationTime,
             settings.dailyGoal,
             settings.currentLanguage
@@ -224,14 +252,14 @@ export const updateSettings = async (settings: any) => {
   });
 };
 
-export const isDatabaseEmpty = async (): Promise<boolean> => {
+export const getTotalWordsLearned = async (): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT COUNT(*) as count FROM words',
+          'SELECT COUNT(*) as count FROM user_progress WHERE correctCount > 0',
           [],
-          (_, { rows }) => resolve(rows._array[0].count === 0),
+          (_, { rows }) => resolve(rows._array[0].count),
           (_, error) => reject(error)
         );
       }

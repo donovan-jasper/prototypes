@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getDueWords, getSettings, updateSettings } from '../lib/database';
+import { getDueWords, getSettings, updateSettings, getTotalWordsLearned } from '../lib/database';
+import { calculateNextReview, updateCardState } from '../lib/fsrs';
 
 interface Word {
   id: number;
@@ -10,6 +11,11 @@ interface Word {
   example: string;
   audioUrl: string;
   imageUrl?: string;
+  difficulty?: number;
+  stability?: number;
+  retrievability?: number;
+  correctCount?: number;
+  incorrectCount?: number;
 }
 
 interface Settings {
@@ -28,9 +34,10 @@ interface StoreState {
   totalWordsLearned: number;
   settings: Settings;
   loadDailyQueue: () => Promise<void>;
-  markWordReviewed: (wordId: number, direction: 'correct' | 'learning' | 'forgot') => void;
+  markWordReviewed: (wordId: number, direction: 'correct' | 'learning' | 'forgot') => Promise<void>;
   incrementStreak: () => void;
-  updateSettings: (newSettings: Partial<Settings>) => void;
+  updateSettings: (newSettings: Partial<Settings>) => Promise<void>;
+  loadTotalWordsLearned: () => Promise<void>;
 }
 
 export const useStore = create<StoreState>()(
@@ -50,27 +57,64 @@ export const useStore = create<StoreState>()(
 
       loadDailyQueue: async () => {
         const { settings } = get();
-        const newWords = await getDueWords(settings.dailyGoal);
-        const reviewWords = await getDueWords(10);
+        try {
+          const newWords = await getDueWords(settings.dailyGoal);
+          const reviewWords = await getDueWords(10);
 
-        set({
-          dailyQueue: [...newWords, ...reviewWords],
-          currentWord: null,
-        });
+          // Combine and shuffle the queue
+          const combinedQueue = [...newWords, ...reviewWords];
+          const shuffledQueue = combinedQueue.sort(() => Math.random() - 0.5);
+
+          set({
+            dailyQueue: shuffledQueue,
+            currentWord: shuffledQueue.length > 0 ? shuffledQueue[0] : null,
+          });
+        } catch (error) {
+          console.error('Error loading daily queue:', error);
+        }
       },
 
-      markWordReviewed: (wordId, direction) => {
+      markWordReviewed: async (wordId, direction) => {
         const { dailyQueue, totalWordsLearned } = get();
         const wordIndex = dailyQueue.findIndex(word => word.id === wordId);
 
         if (wordIndex !== -1) {
-          const updatedQueue = [...dailyQueue];
-          updatedQueue.splice(wordIndex, 1);
+          const currentWord = dailyQueue[wordIndex];
+          const rating = direction === 'correct' ? 'easy' :
+                       direction === 'learning' ? 'good' : 'forgot';
 
-          set({
-            dailyQueue: updatedQueue,
-            totalWordsLearned: direction === 'correct' ? totalWordsLearned + 1 : totalWordsLearned,
-          });
+          const cardState = {
+            difficulty: currentWord.difficulty || 2.5,
+            stability: currentWord.stability || 1,
+            retrievability: currentWord.retrievability || 0,
+          };
+
+          const updatedCard = updateCardState(cardState, rating);
+          const nextReview = calculateNextReview(updatedCard, rating);
+
+          try {
+            await updateProgress(currentWord.id, {
+              wordId: currentWord.id,
+              lastReviewed: Date.now(),
+              nextReview: nextReview.date.getTime(),
+              difficulty: updatedCard.difficulty,
+              stability: updatedCard.stability,
+              retrievability: updatedCard.retrievability,
+              correctCount: direction === 'correct' ? (currentWord.correctCount || 0) + 1 : (currentWord.correctCount || 0),
+              incorrectCount: direction === 'forgot' ? (currentWord.incorrectCount || 0) + 1 : (currentWord.incorrectCount || 0),
+            });
+
+            const updatedQueue = [...dailyQueue];
+            updatedQueue.splice(wordIndex, 1);
+
+            set({
+              dailyQueue: updatedQueue,
+              currentWord: updatedQueue.length > 0 ? updatedQueue[0] : null,
+              totalWordsLearned: direction === 'correct' ? totalWordsLearned + 1 : totalWordsLearned,
+            });
+          } catch (error) {
+            console.error('Error updating word progress:', error);
+          }
         }
       },
 
@@ -108,7 +152,20 @@ export const useStore = create<StoreState>()(
         const { settings } = get();
         const updatedSettings = { ...settings, ...newSettings };
         set({ settings: updatedSettings });
-        await updateSettings(updatedSettings);
+        try {
+          await updateSettings(updatedSettings);
+        } catch (error) {
+          console.error('Error updating settings:', error);
+        }
+      },
+
+      loadTotalWordsLearned: async () => {
+        try {
+          const count = await getTotalWordsLearned();
+          set({ totalWordsLearned: count });
+        } catch (error) {
+          console.error('Error loading total words learned:', error);
+        }
       },
     }),
     {
@@ -126,8 +183,16 @@ export const useStore = create<StoreState>()(
 
 // Initialize settings from database
 (async () => {
-  const dbSettings = await getSettings();
-  if (Object.keys(dbSettings).length > 0) {
-    useStore.setState({ settings: dbSettings });
+  try {
+    const dbSettings = await getSettings();
+    if (Object.keys(dbSettings).length > 0) {
+      useStore.setState({ settings: dbSettings });
+    }
+
+    // Load initial data
+    await useStore.getState().loadDailyQueue();
+    await useStore.getState().loadTotalWordsLearned();
+  } catch (error) {
+    console.error('Error initializing store:', error);
   }
 })();

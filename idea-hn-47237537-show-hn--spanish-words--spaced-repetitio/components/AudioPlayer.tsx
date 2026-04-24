@@ -23,6 +23,11 @@ export default function AudioPlayer({ audioUrl }: AudioPlayerProps) {
   const playSound = async () => {
     setIsLoading(true);
     try {
+      // Unload previous sound if exists
+      if (sound) {
+        await sound.unloadAsync();
+      }
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: audioUrl },
         { shouldPlay: true }

@@ -1,3 +1,5 @@
+import { WordProgress } from './database';
+
 interface CardState {
   difficulty: number;
   stability: number;
@@ -10,11 +12,13 @@ interface NextReview {
 }
 
 export const calculateNextReview = (card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): NextReview => {
-  // Simplified FSRS algorithm implementation
-  // In a real app, you would use the full FSRS-4.5 algorithm
+  // FSRS-4.5 algorithm implementation
+  // This is a simplified version for demonstration
+  // In production, you would use the full algorithm with more parameters
 
   let intervalDays = 1; // Default to 1 day
 
+  // Adjust interval based on rating
   switch (rating) {
     case 'forgot':
       intervalDays = 1;
@@ -30,6 +34,9 @@ export const calculateNextReview = (card: CardState, rating: 'forgot' | 'hard' |
       break;
   }
 
+  // Add some randomness to prevent perfect spacing
+  intervalDays = Math.floor(intervalDays * (0.9 + Math.random() * 0.2));
+
   const nextReviewDate = new Date();
   nextReviewDate.setDate(nextReviewDate.getDate() + intervalDays);
 
@@ -40,9 +47,7 @@ export const calculateNextReview = (card: CardState, rating: 'forgot' | 'hard' |
 };
 
 export const updateCardState = (card: CardState, rating: 'forgot' | 'hard' | 'good' | 'easy'): CardState => {
-  // Simplified state update logic
-  // In a real app, you would use the full FSRS-4.5 algorithm
-
+  // Update card state based on rating
   let newDifficulty = card.difficulty;
   let newStability = card.stability;
   let newRetrievability = card.retrievability;
@@ -75,4 +80,35 @@ export const updateCardState = (card: CardState, rating: 'forgot' | 'hard' | 'go
     stability: newStability,
     retrievability: newRetrievability,
   };
+};
+
+export const getDueWords = async (limit: number): Promise<WordProgress[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(
+      (tx) => {
+        const now = Date.now();
+        tx.executeSql(
+          `SELECT w.*, up.*
+           FROM words w
+           LEFT JOIN user_progress up ON w.id = up.wordId
+           WHERE up.nextReview <= ? OR up.nextReview IS NULL
+           ORDER BY up.nextReview ASC, w.frequency DESC
+           LIMIT ?`,
+          [now, limit],
+          (_, { rows }) => {
+            const words = rows._array.map(word => ({
+              ...word,
+              difficulty: word.difficulty || 2.5,
+              stability: word.stability || 1,
+              retrievability: word.retrievability || 0,
+              correctCount: word.correctCount || 0,
+              incorrectCount: word.incorrectCount || 0,
+            }));
+            resolve(words);
+          },
+          (_, error) => reject(error)
+        );
+      }
+    );
+  });
 };

@@ -7,62 +7,37 @@ import { getDueWords, updateProgress } from '../../lib/database';
 import { calculateNextReview, updateCardState } from '../../lib/fsrs';
 
 export default function DailyPractice() {
-  const { incrementStreak } = useStore();
-  const [dailyQueue, setDailyQueue] = useState([]);
-  const [currentWordIndex, setCurrentWordIndex] = useState(0);
+  const { incrementStreak, markWordReviewed, dailyQueue, currentWord, loadDailyQueue } = useStore();
   const [isLoading, setIsLoading] = useState(true);
   const [completedCount, setCompletedCount] = useState(0);
 
   useEffect(() => {
-    loadDailyQueue();
-  }, []);
-
-  const loadDailyQueue = async () => {
-    setIsLoading(true);
-    try {
-      const newWords = await getDueWords(5);
-      const reviewWords = await getDueWords(10);
-      const combined = [...newWords, ...reviewWords];
-      setDailyQueue(combined);
-    } catch (error) {
-      console.error('Error loading daily queue:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSwipe = async (direction: 'correct' | 'learning' | 'forgot') => {
-    const currentWord = dailyQueue[currentWordIndex];
-    const rating = direction === 'correct' ? 'easy' :
-                  direction === 'learning' ? 'good' : 'forgot';
-
-    const cardState = {
-      difficulty: currentWord.difficulty || 2.5,
-      stability: currentWord.stability || 1,
-      retrievability: currentWord.retrievability || 0,
+    const initialize = async () => {
+      setIsLoading(true);
+      try {
+        await loadDailyQueue();
+      } catch (error) {
+        console.error('Error loading daily queue:', error);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    const updatedCard = updateCardState(cardState, rating);
-    const nextReview = calculateNextReview(updatedCard, rating);
+    initialize();
+  }, []);
 
-    await updateProgress(currentWord.id, {
-      wordId: currentWord.id,
-      lastReviewed: Date.now(),
-      nextReview: nextReview.date.getTime(),
-      difficulty: updatedCard.difficulty,
-      stability: updatedCard.stability,
-      retrievability: updatedCard.retrievability,
-      correctCount: direction === 'correct' ? (currentWord.correctCount || 0) + 1 : (currentWord.correctCount || 0),
-      incorrectCount: direction === 'forgot' ? (currentWord.incorrectCount || 0) + 1 : (currentWord.incorrectCount || 0),
-    });
+  const handleSwipe = async (direction: 'correct' | 'learning' | 'forgot') => {
+    if (!currentWord) return;
 
-    const newCompletedCount = completedCount + 1;
-    setCompletedCount(newCompletedCount);
+    try {
+      await markWordReviewed(currentWord.id, direction);
+      setCompletedCount(prev => prev + 1);
 
-    if (currentWordIndex < dailyQueue.length - 1) {
-      setCurrentWordIndex(currentWordIndex + 1);
-    } else {
-      incrementStreak();
+      if (dailyQueue.length === 0) {
+        incrementStreak();
+      }
+    } catch (error) {
+      console.error('Error handling swipe:', error);
     }
   };
 
@@ -75,7 +50,7 @@ export default function DailyPractice() {
     );
   }
 
-  if (dailyQueue.length === 0) {
+  if (dailyQueue.length === 0 && completedCount === 0) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.emptyTitle}>All caught up!</Text>
@@ -85,7 +60,7 @@ export default function DailyPractice() {
     );
   }
 
-  if (completedCount >= dailyQueue.length) {
+  if (dailyQueue.length === 0 && completedCount > 0) {
     return (
       <View style={styles.centerContainer}>
         <Text style={styles.completeTitle}>Great work!</Text>
@@ -100,13 +75,15 @@ export default function DailyPractice() {
       <View style={styles.header}>
         <StreakCounter />
         <Text style={styles.progressText}>
-          {completedCount + 1} / {dailyQueue.length}
+          {completedCount + 1} / {completedCount + dailyQueue.length}
         </Text>
       </View>
-      <WordCard
-        word={dailyQueue[currentWordIndex]}
-        onSwipe={handleSwipe}
-      />
+      {currentWord && (
+        <WordCard
+          word={currentWord}
+          onSwipe={handleSwipe}
+        />
+      )}
     </View>
   );
 }

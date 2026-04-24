@@ -2,6 +2,9 @@ import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated, PanResponder, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AudioPlayer from './AudioPlayer';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { calculateNextReview, updateCardState } from '../lib/fsrs';
+import { updateProgress } from '../lib/database';
 
 interface Word {
   id: number;
@@ -10,6 +13,9 @@ interface Word {
   example: string;
   audioUrl: string;
   imageUrl?: string;
+  difficulty?: number;
+  stability?: number;
+  retrievability?: number;
 }
 
 interface WordCardProps {
@@ -20,6 +26,36 @@ interface WordCardProps {
 export default function WordCard({ word, onSwipe }: WordCardProps) {
   const [showTranslation, setShowTranslation] = useState(false);
   const pan = useRef(new Animated.ValueXY()).current;
+
+  const handleSwipe = async (direction: 'correct' | 'learning' | 'forgot') => {
+    // Calculate FSRS parameters
+    const rating = direction === 'correct' ? 'easy' :
+                  direction === 'learning' ? 'good' : 'forgot';
+
+    const cardState = {
+      difficulty: word.difficulty || 2.5,
+      stability: word.stability || 1,
+      retrievability: word.retrievability || 0.5
+    };
+
+    const updatedState = updateCardState(cardState, rating);
+    const nextReview = calculateNextReview(updatedState, rating);
+
+    // Update database
+    await updateProgress(word.id, {
+      wordId: word.id,
+      lastReviewed: Date.now(),
+      nextReview: nextReview.date.getTime(),
+      difficulty: updatedState.difficulty,
+      stability: updatedState.stability,
+      retrievability: updatedState.retrievability,
+      correctCount: direction === 'correct' ? (word.correctCount || 0) + 1 : word.correctCount,
+      incorrectCount: direction === 'forgot' ? (word.incorrectCount || 0) + 1 : word.incorrectCount
+    });
+
+    // Notify parent component
+    onSwipe(direction);
+  };
 
   const panResponder = PanResponder.create({
     onStartShouldSetPanResponder: () => true,
@@ -33,7 +69,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
           toValue: { x: 500, y: 0 },
           useNativeDriver: false,
         }).start(() => {
-          onSwipe('correct');
+          handleSwipe('correct');
           pan.setValue({ x: 0, y: 0 });
         });
       } else if (gesture.dx < -120) {
@@ -41,7 +77,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
           toValue: { x: -500, y: 0 },
           useNativeDriver: false,
         }).start(() => {
-          onSwipe('learning');
+          handleSwipe('learning');
           pan.setValue({ x: 0, y: 0 });
         });
       } else if (gesture.dy > 120) {
@@ -49,7 +85,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
           toValue: { x: 0, y: 500 },
           useNativeDriver: false,
         }).start(() => {
-          onSwipe('forgot');
+          handleSwipe('forgot');
           pan.setValue({ x: 0, y: 0 });
         });
       } else {
@@ -75,7 +111,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <Animated.View
         style={[styles.card, animatedStyle]}
         {...panResponder.panHandlers}
@@ -119,7 +155,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
           </View>
         </View>
       </Animated.View>
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
