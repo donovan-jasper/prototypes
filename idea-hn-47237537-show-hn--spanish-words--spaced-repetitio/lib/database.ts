@@ -170,7 +170,7 @@ export const updateProgress = async (wordId: number, progress: WordProgress) => 
   });
 };
 
-export const getDueWords = async (limit: number, newWordsOnly: boolean) => {
+export const getDueWords = async (limit: number, newWordsOnly: boolean = false) => {
   return new Promise<Word[]>((resolve, reject) => {
     db.transaction(
       (tx) => {
@@ -212,7 +212,9 @@ export const getTotalWordsLearned = async () => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'SELECT COUNT(*) as count FROM user_progress WHERE correctCount > 0',
+          `SELECT COUNT(*) as count
+           FROM user_progress
+           WHERE correctCount > 0`,
           [],
           (_, { rows }) => resolve(rows._array[0].count),
           (_, error) => reject(error)
@@ -252,17 +254,22 @@ export const getSettings = async () => {
   });
 };
 
-export const updateSettings = async (settings: Settings) => {
+export const updateSettings = async (newSettings: Partial<Settings>) => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          'UPDATE settings SET notificationsEnabled = ?, notificationTime = ?, dailyGoal = ?, currentLanguage = ? WHERE id = 1',
+          `UPDATE settings
+           SET notificationsEnabled = ?,
+               notificationTime = ?,
+               dailyGoal = ?,
+               currentLanguage = ?
+           WHERE id = 1`,
           [
-            settings.notificationsEnabled ? 1 : 0,
-            settings.notificationTime,
-            settings.dailyGoal,
-            settings.currentLanguage
+            newSettings.notificationsEnabled !== undefined ? (newSettings.notificationsEnabled ? 1 : 0) : 1,
+            newSettings.notificationTime || null,
+            newSettings.dailyGoal || 10,
+            newSettings.currentLanguage || 'spanish'
           ],
           (_, result) => resolve(result.rowsAffected),
           (_, error) => reject(error)

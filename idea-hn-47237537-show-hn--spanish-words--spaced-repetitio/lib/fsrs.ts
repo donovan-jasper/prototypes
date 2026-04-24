@@ -13,24 +13,24 @@ export function calculateNextReview(card: CardState, rating: 'forgot' | 'hard' |
   const now = new Date();
   let intervalDays = 1;
 
-  // Adjust interval based on rating and current stability
+  // Adjust interval based on rating
   switch (rating) {
     case 'forgot':
       intervalDays = 1;
       break;
     case 'hard':
-      intervalDays = Math.max(1, Math.floor(card.stability * 0.5));
+      intervalDays = Math.max(1, Math.round(card.stability * 0.5));
       break;
     case 'good':
-      intervalDays = Math.max(1, Math.floor(card.stability * 0.8));
+      intervalDays = Math.round(card.stability * 0.8);
       break;
     case 'easy':
-      intervalDays = Math.max(1, Math.floor(card.stability * 1.2));
+      intervalDays = Math.round(card.stability * 1.5);
       break;
   }
 
-  // Add some randomness to prevent overfitting
-  intervalDays = Math.floor(intervalDays * (0.9 + Math.random() * 0.2));
+  // Ensure minimum interval of 1 day
+  intervalDays = Math.max(1, intervalDays);
 
   const nextReviewDate = new Date(now);
   nextReviewDate.setDate(now.getDate() + intervalDays);
@@ -47,38 +47,25 @@ export function updateCardState(card: CardState, rating: 'forgot' | 'hard' | 'go
   // Update difficulty based on rating
   switch (rating) {
     case 'forgot':
-      newCard.difficulty = Math.max(1, newCard.difficulty - 0.2);
-      newCard.stability = Math.max(1, newCard.stability * 0.5);
+      newCard.difficulty = Math.min(10, newCard.difficulty + 1);
+      newCard.stability = Math.max(0.1, newCard.stability * 0.5);
       break;
     case 'hard':
-      newCard.difficulty = Math.max(1, newCard.difficulty - 0.15);
-      newCard.stability = Math.max(1, newCard.stability * 0.8);
+      newCard.difficulty = Math.min(10, newCard.difficulty + 0.5);
+      newCard.stability = Math.max(0.1, newCard.stability * 0.8);
       break;
     case 'good':
-      newCard.difficulty = Math.min(10, newCard.difficulty + 0.1);
-      newCard.stability = Math.max(1, newCard.stability * 1.1);
+      newCard.difficulty = Math.max(1, newCard.difficulty - 0.2);
+      newCard.stability = Math.max(0.1, newCard.stability * 1.2);
       break;
     case 'easy':
-      newCard.difficulty = Math.min(10, newCard.difficulty + 0.2);
-      newCard.stability = Math.max(1, newCard.stability * 1.2);
+      newCard.difficulty = Math.max(1, newCard.difficulty - 0.5);
+      newCard.stability = Math.max(0.1, newCard.stability * 1.5);
       break;
   }
 
-  // Update retrievability based on rating
-  switch (rating) {
-    case 'forgot':
-      newCard.retrievability = 0;
-      break;
-    case 'hard':
-      newCard.retrievability = 0.5;
-      break;
-    case 'good':
-      newCard.retrievability = 0.8;
-      break;
-    case 'easy':
-      newCard.retrievability = 1;
-      break;
-  }
+  // Ensure stability is within reasonable bounds
+  newCard.stability = Math.max(0.1, Math.min(365, newCard.stability));
 
   return newCard;
 }

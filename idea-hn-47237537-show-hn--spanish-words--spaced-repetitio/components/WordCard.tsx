@@ -1,10 +1,12 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Animated, Image, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Animated, Image, TouchableOpacity, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
 import { useStore } from '../store/useStore';
+
+const { width, height } = Dimensions.get('window');
 
 interface Word {
   id: number;
@@ -98,7 +100,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
 
     if (translationX > 120) {
       Animated.spring(pan, {
-        toValue: { x: 500, y: 0 },
+        toValue: { x: width * 1.5, y: 0 },
         useNativeDriver: false,
         speed: 20,
         bounciness: 0,
@@ -108,7 +110,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
       });
     } else if (translationX < -120) {
       Animated.spring(pan, {
-        toValue: { x: -500, y: 0 },
+        toValue: { x: -width * 1.5, y: 0 },
         useNativeDriver: false,
         speed: 20,
         bounciness: 0,
@@ -118,7 +120,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
       });
     } else if (translationY > 120) {
       Animated.spring(pan, {
-        toValue: { x: 0, y: 500 },
+        toValue: { x: 0, y: height * 1.5 },
         useNativeDriver: false,
         speed: 20,
         bounciness: 0,
@@ -184,28 +186,23 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
               </>
             ) : (
               <TouchableOpacity
-                style={styles.revealButton}
+                style={styles.showTranslationButton}
                 onPress={() => setShowTranslation(true)}
               >
-                <Text style={styles.revealButtonText}>Show Translation</Text>
+                <Text style={styles.showTranslationText}>Show Translation</Text>
               </TouchableOpacity>
             )}
           </View>
 
           <View style={styles.swipeIndicators}>
-            <View style={styles.swipeIndicatorContainer}>
-              <Ionicons name="arrow-back" size={24} color="#FF9800" />
-              <Text style={styles.swipeIndicatorText}>Learning</Text>
+            <View style={[styles.indicator, styles.leftIndicator]}>
+              <Ionicons name="thumbs-down" size={24} color="#FF5252" />
             </View>
-
-            <View style={styles.swipeIndicatorContainer}>
-              <Ionicons name="arrow-down" size={24} color="#F44336" />
-              <Text style={styles.swipeIndicatorText}>Forgot</Text>
+            <View style={[styles.indicator, styles.rightIndicator]}>
+              <Ionicons name="thumbs-up" size={24} color="#4CAF50" />
             </View>
-
-            <View style={styles.swipeIndicatorContainer}>
-              <Ionicons name="arrow-forward" size={24} color="#4CAF50" />
-              <Text style={styles.swipeIndicatorText}>Know it</Text>
+            <View style={[styles.indicator, styles.downIndicator]}>
+              <Ionicons name="help" size={24} color="#FFC107" />
             </View>
           </View>
         </Animated.View>
@@ -221,18 +218,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    width: '90%',
-    maxWidth: 400,
-    height: '70%',
+    width: width * 0.9,
+    height: height * 0.7,
     backgroundColor: 'white',
-    borderRadius: 15,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
     padding: 20,
-    justifyContent: 'space-between',
+    position: 'absolute',
   },
   cardContent: {
     flex: 1,
@@ -247,54 +243,62 @@ const styles = StyleSheet.create({
   wordText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1E40AF',
     marginBottom: 10,
-    textAlign: 'center',
+    color: '#333',
   },
   translationText: {
     fontSize: 24,
-    color: '#4B5563',
-    marginBottom: 15,
-    textAlign: 'center',
+    color: '#666',
+    marginBottom: 20,
   },
   exampleText: {
-    fontSize: 16,
-    color: '#6B7280',
-    marginBottom: 20,
+    fontSize: 18,
+    color: '#888',
     textAlign: 'center',
-    fontStyle: 'italic',
+    marginBottom: 20,
+    paddingHorizontal: 20,
   },
   audioButton: {
     padding: 10,
     borderRadius: 50,
-    backgroundColor: '#E0F2FE',
+    backgroundColor: '#E3F2FD',
     marginBottom: 20,
   },
-  revealButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    backgroundColor: '#1E40AF',
-    borderRadius: 8,
+  showTranslationButton: {
+    padding: 15,
+    backgroundColor: '#2196F3',
+    borderRadius: 5,
     marginTop: 20,
   },
-  revealButtonText: {
+  showTranslationText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   swipeIndicators: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    marginTop: 20,
+    paddingHorizontal: 20,
   },
-  swipeIndicatorContainer: {
+  indicator: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  swipeIndicatorText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginTop: 5,
+  leftIndicator: {
+    backgroundColor: 'rgba(255, 82, 82, 0.2)',
+  },
+  rightIndicator: {
+    backgroundColor: 'rgba(76, 175, 80, 0.2)',
+  },
+  downIndicator: {
+    backgroundColor: 'rgba(255, 193, 7, 0.2)',
   },
 });
