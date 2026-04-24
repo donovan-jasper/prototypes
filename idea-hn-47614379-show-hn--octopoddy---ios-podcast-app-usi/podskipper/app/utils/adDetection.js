@@ -8,8 +8,28 @@ const SILENCE_THRESHOLD = 0.01; // Volume threshold for silence detection
 const MIN_SILENCE_DURATION = 1000; // Minimum silence duration in ms
 const MIN_AD_DURATION = 5000; // Minimum ad duration in ms
 
+// Initialize database tables
+const initializeDatabase = () => {
+  db.transaction(tx => {
+    tx.executeSql(
+      'CREATE TABLE IF NOT EXISTS ad_segments (id INTEGER PRIMARY KEY AUTOINCREMENT, episode_id TEXT, start INTEGER, end INTEGER);'
+    );
+  });
+};
+
+// Analyze audio buffer for volume
+const analyzeAudioBuffer = (buffer) => {
+  let sum = 0;
+  for (let i = 0; i < buffer.length; i++) {
+    sum += Math.abs(buffer[i]);
+  }
+  return sum / buffer.length;
+};
+
 export const detectAd = async (episode) => {
   try {
+    initializeDatabase();
+
     // Load audio file
     const soundObject = new Audio.Sound();
     await soundObject.loadAsync({ uri: episode.audioUrl });
@@ -24,12 +44,35 @@ export const detectAd = async (episode) => {
     let silentSegments = [];
     let currentSilenceStart = null;
 
+    // Create audio context for analysis
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioContext.createBufferSource();
+
+    // Load audio data
+    const response = await fetch(episode.audioUrl);
+    const arrayBuffer = await response.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+    source.buffer = audioBuffer;
+
+    // Create analyzer node
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 2048;
+    source.connect(analyser);
+
+    // Process audio in chunks
     for (let i = 0; i < totalSamples; i++) {
       const position = i * analysisInterval;
-      await soundObject.setPositionAsync(position);
+      const startTime = position / 1000;
+      const endTime = (position + analysisInterval) / 1000;
 
-      // Get current volume (simplified - in real app would use proper audio analysis)
-      const volume = Math.random() * 0.1; // Mock volume value
+      // Get audio data for this chunk
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteTimeDomainData(dataArray);
+
+      // Calculate volume
+      const volume = analyzeAudioBuffer(dataArray);
 
       if (volume < SILENCE_THRESHOLD) {
         if (!currentSilenceStart) {
