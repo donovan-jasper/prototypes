@@ -1,12 +1,13 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme } from 'react-native-paper';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from 'react-native-reanimated';
+import { useTheme } from 'react-native-paper';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 interface NodeProps {
   node: {
@@ -19,17 +20,14 @@ interface NodeProps {
     inputType?: 'text' | 'image' | 'audio' | 'number';
   };
   isSelected: boolean;
-  onSelect: () => void;
-  onDragEnd: (x: number, y: number) => void;
-  onOutputPress: () => void;
-  onInputPress: () => void;
+  onSelect: (nodeId: string) => void;
+  onDragEnd: (nodeId: string, x: number, y: number) => void;
+  onOutputPress: (nodeId: string) => void;
+  onInputPress: (nodeId: string) => void;
   isConnectingFrom: boolean;
 }
 
-const NODE_WIDTH = 150;
-const NODE_HEIGHT = 100;
-
-export default function Node({
+const Node = ({
   node,
   isSelected,
   onSelect,
@@ -37,20 +35,23 @@ export default function Node({
   onOutputPress,
   onInputPress,
   isConnectingFrom,
-}: NodeProps) {
+}: NodeProps) => {
   const theme = useTheme();
   const translateX = useSharedValue(node.x);
   const translateY = useSharedValue(node.y);
+  const isDragging = useSharedValue(false);
 
   const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
-      translateX.value = node.x + e.translationX;
-      translateY.value = node.y + e.translationY;
+    .onStart(() => {
+      isDragging.value = true;
     })
-    .onEnd((e) => {
-      const newX = node.x + e.translationX;
-      const newY = node.y + e.translationY;
-      onDragEnd(newX, newY);
+    .onUpdate((e) => {
+      translateX.value = e.translationX + node.x;
+      translateY.value = e.translationY + node.y;
+    })
+    .onEnd(() => {
+      isDragging.value = false;
+      onDragEnd(node.id, translateX.value, translateY.value);
     });
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -73,17 +74,24 @@ export default function Node({
     }
   };
 
-  const getNodeIcon = () => {
+  const getIconName = () => {
     switch (node.type) {
       case 'trigger':
-        return '⚡';
+        return 'lightning-bolt';
       case 'ai':
-        return '🤖';
+        return 'robot';
       case 'action':
-        return '🔄';
+        return 'cog';
       default:
-        return '❓';
+        return 'help-circle';
     }
+  };
+
+  const getPortColor = (type: 'input' | 'output') => {
+    if (type === 'output' && isConnectingFrom) {
+      return theme.colors.primary;
+    }
+    return theme.colors.onSurfaceVariant;
   };
 
   return (
@@ -91,7 +99,7 @@ export default function Node({
       <Animated.View style={[styles.nodeContainer, animatedStyle]}>
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={onSelect}
+          onPress={() => onSelect(node.id)}
           style={[
             styles.node,
             {
@@ -101,42 +109,30 @@ export default function Node({
             },
           ]}
         >
-          <View style={styles.nodeHeader}>
-            <Text style={[
-              styles.nodeIcon,
-              { color: theme.colors.onSurface }
-            ]}>
-              {getNodeIcon()}
-            </Text>
-            <Text
-              style={[
-                styles.nodeLabel,
-                { color: theme.colors.onSurface }
-              ]}
-              numberOfLines={1}
-            >
+          <View style={styles.header}>
+            <MaterialCommunityIcons
+              name={getIconName()}
+              size={18}
+              color={theme.colors.onSurfaceVariant}
+            />
+            <Text style={[styles.label, { color: theme.colors.onSurface }]}>
               {node.label}
             </Text>
           </View>
 
-          <View style={styles.nodePorts}>
+          <View style={styles.portsContainer}>
             {node.inputType && (
               <TouchableOpacity
-                style={[
-                  styles.port,
-                  styles.inputPort,
-                  isConnectingFrom && styles.disabledPort
-                ]}
-                onPress={onInputPress}
-                disabled={isConnectingFrom}
+                style={styles.port}
+                onPress={() => onInputPress(node.id)}
               >
                 <View style={[
-                  styles.portIndicator,
-                  { backgroundColor: theme.colors.primary }
+                  styles.portCircle,
+                  { backgroundColor: getPortColor('input') }
                 ]} />
                 <Text style={[
                   styles.portLabel,
-                  { color: theme.colors.onSurface }
+                  { color: theme.colors.onSurfaceVariant }
                 ]}>
                   {node.inputType}
                 </Text>
@@ -145,23 +141,19 @@ export default function Node({
 
             {node.outputType && (
               <TouchableOpacity
-                style={[
-                  styles.port,
-                  styles.outputPort,
-                  isConnectingFrom && styles.activePort
-                ]}
-                onPress={onOutputPress}
+                style={styles.port}
+                onPress={() => onOutputPress(node.id)}
               >
-                <View style={[
-                  styles.portIndicator,
-                  { backgroundColor: theme.colors.primary }
-                ]} />
                 <Text style={[
                   styles.portLabel,
-                  { color: theme.colors.onSurface }
+                  { color: theme.colors.onSurfaceVariant }
                 ]}>
                   {node.outputType}
                 </Text>
+                <View style={[
+                  styles.portCircle,
+                  { backgroundColor: getPortColor('output') }
+                ]} />
               </TouchableOpacity>
             )}
           </View>
@@ -169,13 +161,13 @@ export default function Node({
       </Animated.View>
     </GestureDetector>
   );
-}
+};
 
 const styles = StyleSheet.create({
   nodeContainer: {
     position: 'absolute',
-    width: NODE_WIDTH,
-    height: NODE_HEIGHT,
+    width: 150,
+    height: 100,
   },
   node: {
     width: '100%',
@@ -187,22 +179,18 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
-    shadowRadius: 1,
+    shadowRadius: 1.41,
   },
-  nodeHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  nodeIcon: {
-    fontSize: 18,
-  },
-  nodeLabel: {
+  label: {
     fontSize: 14,
     fontWeight: '500',
-    flex: 1,
   },
-  nodePorts: {
+  portsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -211,28 +199,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    padding: 4,
-    borderRadius: 4,
   },
-  inputPort: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  outputPort: {
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  activePort: {
-    backgroundColor: 'rgba(0, 122, 255, 0.1)',
-  },
-  disabledPort: {
-    opacity: 0.5,
-  },
-  portIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  portCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   portLabel: {
     fontSize: 10,
     fontWeight: '400',
   },
 });
+
+export default Node;

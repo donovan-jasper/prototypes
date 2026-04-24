@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { getAllWorkflows, saveWorkflow, getWorkflowById, createWorkflow } from '../lib/storage/workflows';
-import { Workflow } from '../lib/storage/workflows';
+import { persist } from 'zustand/middleware';
+import { getAllWorkflows, saveWorkflow, deleteWorkflow } from '../lib/storage/workflows';
+import { saveVersion } from '../lib/storage/versions';
 
 interface NodeData {
   id: string;
@@ -18,6 +19,16 @@ interface Connection {
   to: string;
 }
 
+interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+  nodes: NodeData[];
+  connections: Connection[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 interface WorkflowState {
   workflows: Workflow[];
   currentWorkflow: Workflow | null;
@@ -26,195 +37,250 @@ interface WorkflowState {
   error: string | null;
 
   loadWorkflows: () => Promise<void>;
-  loadWorkflow: (id: string) => Promise<void>;
-  createNewWorkflow: (name: string, description: string) => Promise<void>;
+  createWorkflow: (name: string) => Promise<void>;
+  selectWorkflow: (workflowId: string) => void;
   updateWorkflow: (workflow: Workflow) => Promise<void>;
-  selectNode: (nodeId: string | null) => void;
+  deleteWorkflow: (workflowId: string) => Promise<void>;
   addNode: (node: NodeData) => void;
   updateNode: (nodeId: string, updates: Partial<NodeData>) => void;
   deleteNode: (nodeId: string) => void;
+  moveNode: (nodeId: string, x: number, y: number) => void;
   addConnection: (from: string, to: string) => void;
   deleteConnection: (from: string, to: string) => void;
+  selectNode: (nodeId: string | null) => void;
 }
 
-export const useWorkflowStore = create<WorkflowState>((set, get) => ({
-  workflows: [],
-  currentWorkflow: null,
-  selectedNodeId: null,
-  isLoading: false,
-  error: null,
+export const useWorkflowStore = create<WorkflowState>()(
+  persist(
+    (set, get) => ({
+      workflows: [],
+      currentWorkflow: null,
+      selectedNodeId: null,
+      isLoading: false,
+      error: null,
 
-  loadWorkflows: async () => {
-    try {
-      set({ isLoading: true, error: null });
-      const workflows = await getAllWorkflows();
-      set({ workflows, isLoading: false });
-    } catch (error) {
-      set({ error: 'Failed to load workflows', isLoading: false });
+      loadWorkflows: async () => {
+        set({ isLoading: true, error: null });
+        try {
+          const workflows = await getAllWorkflows();
+          set({ workflows, isLoading: false });
+        } catch (error) {
+          set({ error: 'Failed to load workflows', isLoading: false });
+        }
+      },
+
+      createWorkflow: async (name: string) => {
+        const newWorkflow: Workflow = {
+          id: Date.now().toString(),
+          name,
+          description: '',
+          nodes: [],
+          connections: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+
+        try {
+          await saveWorkflow(newWorkflow);
+          set((state) => ({
+            workflows: [...state.workflows, newWorkflow],
+            currentWorkflow: newWorkflow,
+          }));
+        } catch (error) {
+          set({ error: 'Failed to create workflow' });
+        }
+      },
+
+      selectWorkflow: (workflowId: string) => {
+        const workflow = get().workflows.find(w => w.id === workflowId);
+        if (workflow) {
+          set({ currentWorkflow: workflow, selectedNodeId: null });
+        }
+      },
+
+      updateWorkflow: async (workflow: Workflow) => {
+        try {
+          const updatedWorkflow = {
+            ...workflow,
+            updatedAt: new Date(),
+          };
+
+          await saveWorkflow(updatedWorkflow);
+          await saveVersion(updatedWorkflow.id, updatedWorkflow);
+
+          set((state) => ({
+            workflows: state.workflows.map(w =>
+              w.id === updatedWorkflow.id ? updatedWorkflow : w
+            ),
+            currentWorkflow: updatedWorkflow,
+          }));
+        } catch (error) {
+          set({ error: 'Failed to update workflow' });
+        }
+      },
+
+      deleteWorkflow: async (workflowId: string) => {
+        try {
+          await deleteWorkflow(workflowId);
+          set((state) => ({
+            workflows: state.workflows.filter(w => w.id !== workflowId),
+            currentWorkflow: state.currentWorkflow?.id === workflowId
+              ? null
+              : state.currentWorkflow,
+          }));
+        } catch (error) {
+          set({ error: 'Failed to delete workflow' });
+        }
+      },
+
+      addNode: (node: NodeData) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            nodes: [...state.currentWorkflow.nodes, node],
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+            selectedNodeId: node.id,
+          };
+        });
+      },
+
+      updateNode: (nodeId: string, updates: Partial<NodeData>) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          const updatedNodes = state.currentWorkflow.nodes.map(node =>
+            node.id === nodeId ? { ...node, ...updates } : node
+          );
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            nodes: updatedNodes,
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+          };
+        });
+      },
+
+      deleteNode: (nodeId: string) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          // Remove the node and any connections involving it
+          const updatedNodes = state.currentWorkflow.nodes.filter(
+            node => node.id !== nodeId
+          );
+
+          const updatedConnections = state.currentWorkflow.connections.filter(
+            conn => conn.from !== nodeId && conn.to !== nodeId
+          );
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            nodes: updatedNodes,
+            connections: updatedConnections,
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+            selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
+          };
+        });
+      },
+
+      moveNode: (nodeId: string, x: number, y: number) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          const updatedNodes = state.currentWorkflow.nodes.map(node =>
+            node.id === nodeId ? { ...node, x, y } : node
+          );
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            nodes: updatedNodes,
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+          };
+        });
+      },
+
+      addConnection: (from: string, to: string) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          // Check if connection already exists
+          const exists = state.currentWorkflow.connections.some(
+            conn => conn.from === from && conn.to === to
+          );
+
+          if (exists) return state;
+
+          const updatedConnections = [
+            ...state.currentWorkflow.connections,
+            { from, to },
+          ];
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            connections: updatedConnections,
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+          };
+        });
+      },
+
+      deleteConnection: (from: string, to: string) => {
+        set((state) => {
+          if (!state.currentWorkflow) return state;
+
+          const updatedConnections = state.currentWorkflow.connections.filter(
+            conn => !(conn.from === from && conn.to === to)
+          );
+
+          const updatedWorkflow = {
+            ...state.currentWorkflow,
+            connections: updatedConnections,
+          };
+
+          get().updateWorkflow(updatedWorkflow);
+
+          return {
+            currentWorkflow: updatedWorkflow,
+          };
+        });
+      },
+
+      selectNode: (nodeId: string | null) => {
+        set({ selectedNodeId: nodeId });
+      },
+    }),
+    {
+      name: 'workflow-storage',
+      partialize: (state) => ({
+        workflows: state.workflows,
+        currentWorkflow: state.currentWorkflow,
+      }),
     }
-  },
-
-  loadWorkflow: async (id: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      const workflow = await getWorkflowById(id);
-      if (workflow) {
-        set({ currentWorkflow: workflow, isLoading: false });
-      } else {
-        set({ error: 'Workflow not found', isLoading: false });
-      }
-    } catch (error) {
-      set({ error: 'Failed to load workflow', isLoading: false });
-    }
-  },
-
-  createNewWorkflow: async (name: string, description: string) => {
-    try {
-      set({ isLoading: true, error: null });
-      const newWorkflow = await createWorkflow(name, description);
-      set((state) => ({
-        workflows: [newWorkflow, ...state.workflows],
-        currentWorkflow: newWorkflow,
-        isLoading: false,
-      }));
-    } catch (error) {
-      set({ error: 'Failed to create workflow', isLoading: false });
-    }
-  },
-
-  updateWorkflow: async (workflow: Workflow) => {
-    try {
-      set({ isLoading: true, error: null });
-      await saveWorkflow(workflow);
-      set((state) => ({
-        currentWorkflow: workflow,
-        workflows: state.workflows.map(w =>
-          w.id === workflow.id ? workflow : w
-        ),
-        isLoading: false,
-      }));
-    } catch (error) {
-      set({ error: 'Failed to save workflow', isLoading: false });
-    }
-  },
-
-  selectNode: (nodeId: string | null) => {
-    set({ selectedNodeId: nodeId });
-  },
-
-  addNode: (node: NodeData) => {
-    set((state) => {
-      if (!state.currentWorkflow) return state;
-
-      const newWorkflow = {
-        ...state.currentWorkflow,
-        nodes: [...state.currentWorkflow.nodes, node],
-      };
-
-      // Auto-save after adding node
-      get().updateWorkflow(newWorkflow);
-
-      return {
-        currentWorkflow: newWorkflow,
-        selectedNodeId: node.id,
-      };
-    });
-  },
-
-  updateNode: (nodeId: string, updates: Partial<NodeData>) => {
-    set((state) => {
-      if (!state.currentWorkflow) return state;
-
-      const newNodes = state.currentWorkflow.nodes.map(node =>
-        node.id === nodeId ? { ...node, ...updates } : node
-      );
-
-      const newWorkflow = {
-        ...state.currentWorkflow,
-        nodes: newNodes,
-      };
-
-      // Auto-save after updating node
-      get().updateWorkflow(newWorkflow);
-
-      return {
-        currentWorkflow: newWorkflow,
-      };
-    });
-  },
-
-  deleteNode: (nodeId: string) => {
-    set((state) => {
-      if (!state.currentWorkflow) return state;
-
-      // Remove node and any connections involving it
-      const newNodes = state.currentWorkflow.nodes.filter(node => node.id !== nodeId);
-      const newConnections = state.currentWorkflow.connections.filter(
-        conn => conn.from !== nodeId && conn.to !== nodeId
-      );
-
-      const newWorkflow = {
-        ...state.currentWorkflow,
-        nodes: newNodes,
-        connections: newConnections,
-      };
-
-      // Auto-save after deleting node
-      get().updateWorkflow(newWorkflow);
-
-      return {
-        currentWorkflow: newWorkflow,
-        selectedNodeId: state.selectedNodeId === nodeId ? null : state.selectedNodeId,
-      };
-    });
-  },
-
-  addConnection: (from: string, to: string) => {
-    set((state) => {
-      if (!state.currentWorkflow) return state;
-
-      // Check if connection already exists
-      const exists = state.currentWorkflow.connections.some(
-        conn => conn.from === from && conn.to === to
-      );
-
-      if (exists) return state;
-
-      const newConnections = [...state.currentWorkflow.connections, { from, to }];
-
-      const newWorkflow = {
-        ...state.currentWorkflow,
-        connections: newConnections,
-      };
-
-      // Auto-save after adding connection
-      get().updateWorkflow(newWorkflow);
-
-      return {
-        currentWorkflow: newWorkflow,
-      };
-    });
-  },
-
-  deleteConnection: (from: string, to: string) => {
-    set((state) => {
-      if (!state.currentWorkflow) return state;
-
-      const newConnections = state.currentWorkflow.connections.filter(
-        conn => !(conn.from === from && conn.to === to)
-      );
-
-      const newWorkflow = {
-        ...state.currentWorkflow,
-        connections: newConnections,
-      };
-
-      // Auto-save after deleting connection
-      get().updateWorkflow(newWorkflow);
-
-      return {
-        currentWorkflow: newWorkflow,
-      };
-    });
-  },
-}));
+  )
+);

@@ -1,10 +1,11 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  runOnJS,
 } from 'react-native-reanimated';
 import Svg, { Line, Circle } from 'react-native-svg';
 import Node from './Node';
@@ -88,16 +89,16 @@ export default function Canvas({
     ],
   }));
 
-  const handleNodeDragEnd = (nodeId: string, x: number, y: number) => {
+  const handleNodeDragEnd = useCallback((nodeId: string, x: number, y: number) => {
     onNodeMove(nodeId, x, y);
-  };
+  }, [onNodeMove]);
 
-  const handleOutputPress = (nodeId: string) => {
+  const handleOutputPress = useCallback((nodeId: string) => {
     setConnectingFrom(nodeId);
     setConnectionValidation(null);
-  };
+  }, []);
 
-  const handleInputPress = (nodeId: string) => {
+  const handleInputPress = useCallback((nodeId: string) => {
     if (connectingFrom && connectingFrom !== nodeId) {
       const fromNode = nodes.find(n => n.id === connectingFrom);
       const toNode = nodes.find(n => n.id === nodeId);
@@ -129,16 +130,33 @@ export default function Canvas({
           });
         }
       }
-
-      setConnectingFrom(null);
-      setTimeout(() => setConnectionValidation(null), 3000);
     }
-  };
+    setConnectingFrom(null);
+    setTimeout(() => setConnectionValidation(null), 3000);
+  }, [connectingFrom, nodes, onConnectionCreate]);
 
-  const getNodePosition = (nodeId: string) => {
+  const getNodePosition = useCallback((nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
     return node ? { x: node.x, y: node.y } : { x: 0, y: 0 };
-  };
+  }, [nodes]);
+
+  const getConnectionPoints = useCallback((fromId: string, toId: string) => {
+    const fromNode = nodes.find(n => n.id === fromId);
+    const toNode = nodes.find(n => n.id === toId);
+
+    if (!fromNode || !toNode) return { start: { x: 0, y: 0 }, end: { x: 0, y: 0 } };
+
+    // Calculate connection points based on actual node positions
+    const startX = fromNode.x + 75; // Center of output port
+    const startY = fromNode.y + 50; // Bottom of node
+    const endX = toNode.x + 75;     // Center of input port
+    const endY = toNode.y;          // Top of node
+
+    return {
+      start: { x: startX, y: startY },
+      end: { x: endX, y: endY }
+    };
+  }, [nodes]);
 
   return (
     <View style={styles.container}>
@@ -150,8 +168,7 @@ export default function Canvas({
             height={SCREEN_HEIGHT * 3}
           >
             {connections.map((conn, index) => {
-              const fromPos = getNodePosition(conn.from);
-              const toPos = getNodePosition(conn.to);
+              const { start, end } = getConnectionPoints(conn.from, conn.to);
               const fromNode = nodes.find(n => n.id === conn.from);
               const toNode = nodes.find(n => n.id === conn.to);
               const isValid = fromNode?.outputType === toNode?.inputType;
@@ -159,13 +176,12 @@ export default function Canvas({
               return (
                 <Line
                   key={`${conn.from}-${conn.to}-${index}`}
-                  x1={fromPos.x + 75}
-                  y1={fromPos.y + 50}
-                  x2={toPos.x + 75}
-                  y2={toPos.y + 50}
+                  x1={start.x}
+                  y1={start.y}
+                  x2={end.x}
+                  y2={end.y}
                   stroke={isValid ? theme.colors.primary : theme.colors.error}
-                  strokeWidth="2"
-                  strokeDasharray={isValid ? undefined : '5,5'}
+                  strokeWidth={2}
                 />
               );
             })}
@@ -174,10 +190,10 @@ export default function Canvas({
               <Line
                 x1={getNodePosition(connectingFrom).x + 75}
                 y1={getNodePosition(connectingFrom).y + 50}
-                x2={getNodePosition(connectingFrom).x + 75 + 50}
-                y2={getNodePosition(connectingFrom).y + 50 + 50}
+                x2={getNodePosition(connectingFrom).x + 75}
+                y2={getNodePosition(connectingFrom).y + 100}
                 stroke={theme.colors.primary}
-                strokeWidth="2"
+                strokeWidth={2}
                 strokeDasharray="5,5"
               />
             )}
@@ -187,11 +203,11 @@ export default function Canvas({
             <Node
               key={node.id}
               node={node}
-              isSelected={node.id === selectedNodeId}
-              onSelect={() => onNodeSelect(node.id)}
-              onDragEnd={(x, y) => handleNodeDragEnd(node.id, x, y)}
-              onOutputPress={() => handleOutputPress(node.id)}
-              onInputPress={() => handleInputPress(node.id)}
+              isSelected={selectedNodeId === node.id}
+              onSelect={onNodeSelect}
+              onDragEnd={handleNodeDragEnd}
+              onOutputPress={handleOutputPress}
+              onInputPress={handleInputPress}
               isConnectingFrom={connectingFrom === node.id}
             />
           ))}
@@ -200,7 +216,7 @@ export default function Canvas({
 
       {connectionValidation && (
         <View style={[
-          styles.validationFeedback,
+          styles.validationMessage,
           {
             backgroundColor: connectionValidation.valid
               ? theme.colors.primaryContainer
@@ -234,7 +250,7 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT * 3,
     backgroundColor: '#f5f5f5',
   },
-  validationFeedback: {
+  validationMessage: {
     position: 'absolute',
     bottom: 20,
     left: 20,
