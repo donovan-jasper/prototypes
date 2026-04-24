@@ -91,6 +91,18 @@ export function calculateStreak(
   }
 
   // If streak was broken (more than 1 day since last interaction)
+  // Check if freeze is available and not used yet
+  if (freezeAvailable && !freezeUsed && currentStreak.currentDays > 0) {
+    return {
+      currentDays: currentStreak.currentDays,
+      longestDays: currentStreak.longestDays,
+      lastInteraction: lastInteractionDate,
+      freezeUsed: false,
+      freezeAvailable: true
+    };
+  }
+
+  // If freeze is used or not available, reset streak
   return {
     currentDays: 0,
     longestDays: currentStreak.longestDays,
