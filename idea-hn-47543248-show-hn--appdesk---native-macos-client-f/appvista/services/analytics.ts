@@ -3,6 +3,18 @@ import { getAppStoreData } from './api';
 
 const db = openDatabase('appvista.db');
 
+// Initialize database schema
+const initializeDatabase = () => {
+  db.transaction(tx => {
+    tx.executeSql(
+      'CREATE TABLE IF NOT EXISTS analytics (appId TEXT PRIMARY KEY, data TEXT, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP);'
+    );
+  });
+};
+
+// Call initialization when module is loaded
+initializeDatabase();
+
 export const fetchAnalytics = async (appId: string) => {
   // Check cache first
   const cachedData = await getCachedAnalytics(appId);
@@ -27,7 +39,12 @@ const getCachedAnalytics = (appId: string): Promise<any> => {
         [appId],
         (_, { rows }) => {
           if (rows.length > 0) {
-            resolve(rows.item(0));
+            const item = rows.item(0);
+            try {
+              resolve(JSON.parse(item.data));
+            } catch (e) {
+              resolve(null);
+            }
           } else {
             resolve(null);
           }
