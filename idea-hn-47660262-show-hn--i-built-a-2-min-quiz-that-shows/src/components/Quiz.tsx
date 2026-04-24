@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { saveDecision, initDatabase } from '../utils/storage';
 import { calculateBetaDistribution } from '../utils/betaDistribution';
 
@@ -13,6 +13,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
   const [estimatedValue, setEstimatedValue] = useState('');
   const [feedback, setFeedback] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const initializeDB = async () => {
@@ -29,7 +30,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
   }, []);
 
   const handleSubmit = async () => {
-    if (isLoading) return;
+    if (isLoading || isSubmitting) return;
 
     if (!description || !actualValue || !estimatedValue) {
       setFeedback('Please fill all fields');
@@ -43,6 +44,9 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
       setFeedback('Please enter valid numbers');
       return;
     }
+
+    setIsSubmitting(true);
+    setFeedback('');
 
     try {
       const difference = Math.abs(actual - estimated);
@@ -63,10 +67,17 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
       const betaResult = calculateBetaDistribution(successes, failures);
       setFeedback(`Your calibration score: ${betaResult.mean.toFixed(2)} (${betaResult.confidenceInterval[0].toFixed(2)}-${betaResult.confidenceInterval[1].toFixed(2)})`);
 
+      // Reset form
+      setDescription('');
+      setActualValue('');
+      setEstimatedValue('');
+
       setTimeout(() => {
+        setIsSubmitting(false);
         onComplete();
       }, 2000);
     } catch (error) {
+      setIsSubmitting(false);
       Alert.alert('Error', 'Failed to save decision');
     }
   };
@@ -74,6 +85,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
   if (isLoading) {
     return (
       <View style={styles.container}>
+        <ActivityIndicator size="large" color="#4CAF50" />
         <Text style={styles.title}>Loading...</Text>
       </View>
     );
@@ -89,6 +101,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         value={description}
         onChangeText={setDescription}
         placeholderTextColor="#999"
+        editable={!isSubmitting}
       />
 
       <TextInput
@@ -98,6 +111,7 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         value={actualValue}
         onChangeText={setActualValue}
         placeholderTextColor="#999"
+        editable={!isSubmitting}
       />
 
       <TextInput
@@ -107,14 +121,22 @@ const Quiz: React.FC<QuizProps> = ({ onComplete }) => {
         value={estimatedValue}
         onChangeText={setEstimatedValue}
         placeholderTextColor="#999"
+        editable={!isSubmitting}
       />
 
       <TouchableOpacity
-        style={[styles.button, (!description || !actualValue || !estimatedValue) && styles.disabledButton]}
+        style={[
+          styles.button,
+          (!description || !actualValue || !estimatedValue || isSubmitting) && styles.disabledButton
+        ]}
         onPress={handleSubmit}
-        disabled={!description || !actualValue || !estimatedValue}
+        disabled={!description || !actualValue || !estimatedValue || isSubmitting}
       >
-        <Text style={styles.buttonText}>Submit</Text>
+        {isSubmitting ? (
+          <ActivityIndicator color="white" />
+        ) : (
+          <Text style={styles.buttonText}>Submit</Text>
+        )}
       </TouchableOpacity>
 
       {feedback ? <Text style={styles.feedback}>{feedback}</Text> : null}
@@ -151,6 +173,8 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     alignItems: 'center',
     marginTop: 10,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   disabledButton: {
     backgroundColor: '#cccccc',
