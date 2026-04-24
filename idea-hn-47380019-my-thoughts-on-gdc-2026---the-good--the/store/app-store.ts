@@ -1,96 +1,69 @@
 import { create } from 'zustand';
-import { Generation, User } from '../types';
-import { getGenerations, saveGeneration, updateUserProfile, getUserProfile } from '../lib/database';
-import { calculateEthicalScore } from '../lib/ethical-score';
+import { User, Generation } from '../types';
+import { getUserProfile, updateUserProfile, getGenerations } from '../lib/database';
 
 interface AppState {
-  generations: Generation[];
   user: User;
-  ethicalScore: number;
+  generations: Generation[];
   isGenerating: boolean;
-  selectedPlatform: string | null;
-  loadGenerations: () => Promise<void>;
-  addGeneration: (generation: Omit<Generation, 'id'>) => Promise<void>;
-  setUser: (user: Partial<User>) => void;
+  loadData: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => Promise<void>;
+  addGeneration: (generation: Generation) => void;
   setIsGenerating: (isGenerating: boolean) => void;
-  setSelectedPlatform: (platform: string | null) => void;
 }
 
-export const useAppStore = create<AppState>((set, get) => ({
-  generations: [],
+export const useStore = create<AppState>((set, get) => ({
   user: {
     premiumStatus: false,
     generationCount: 0,
-    totalScore: 0
+    totalScore: 0,
+    balance: 0,
   },
-  ethicalScore: 0,
+  generations: [],
   isGenerating: false,
-  selectedPlatform: null,
-  
-  loadGenerations: async () => {
+
+  loadData: async () => {
     try {
-      const generations = await getGenerations();
-      set({ generations });
-      
-      // Update ethical score based on loaded generations
-      const ethicalScore = calculateEthicalScore(generations);
-      set({ ethicalScore });
-      
-      // Update user profile from DB
       const userProfile = await getUserProfile();
-      if (userProfile) {
-        set({ 
-          user: {
-            premiumStatus: !!userProfile.premiumStatus,
-            generationCount: userProfile.generationCount,
-            totalScore: userProfile.totalScore
-          }
-        });
-      }
+      const generations = await getGenerations();
+
+      set({
+        user: {
+          premiumStatus: userProfile?.premiumStatus || false,
+          generationCount: userProfile?.generationCount || 0,
+          totalScore: userProfile?.totalScore || 0,
+          balance: userProfile?.balance || 0,
+        },
+        generations,
+      });
     } catch (error) {
-      console.error('Error loading generations:', error);
+      console.error('Error loading data:', error);
     }
   },
-  
-  addGeneration: async (generation) => {
+
+  updateUser: async (updates) => {
     try {
-      const id = await saveGeneration(generation);
-      const newGeneration = { ...generation, id } as Generation;
-      
-      // Update local state
-      const currentGenerations = get().generations;
-      set({ 
-        generations: [newGeneration, ...currentGenerations],
-        ethicalScore: calculateEthicalScore([newGeneration, ...currentGenerations])
-      });
-      
-      // Update user profile
       const currentUser = get().user;
-      const newGenerationCount = currentUser.generationCount + 1;
-      set({ 
-        user: { 
-          ...currentUser, 
-          generationCount: newGenerationCount 
-        } 
-      });
-      
-      await updateUserProfile({ generationCount: newGenerationCount });
+      const updatedUser = { ...currentUser, ...updates };
+
+      await updateUserProfile(updatedUser);
+      set({ user: updatedUser });
     } catch (error) {
-      console.error('Error adding generation:', error);
+      console.error('Error updating user:', error);
     }
   },
-  
-  setUser: (userUpdate) => {
-    const currentUser = get().user;
-    const newUser = { ...currentUser, ...userUpdate };
-    set({ user: newUser });
+
+  addGeneration: (generation) => {
+    set(state => ({
+      generations: [generation, ...state.generations],
+      user: {
+        ...state.user,
+        generationCount: state.user.generationCount + 1,
+      }
+    }));
   },
-  
+
   setIsGenerating: (isGenerating) => {
     set({ isGenerating });
   },
-  
-  setSelectedPlatform: (platform) => {
-    set({ selectedPlatform: platform });
-  }
 }));
