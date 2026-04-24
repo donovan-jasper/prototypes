@@ -15,41 +15,43 @@ const ACTIVITY_TYPES = [
 
 const generateMockEvents = (userLat, userLon) => {
   const events = [];
+  const now = new Date();
+  const currentHour = now.getHours();
 
-  for (let i = 0; i < 20; i++) {
-    const activity = faker.helpers.arrayElement(ACTIVITY_TYPES);
-    const distance = faker.datatype.float({ min: 0.1, max: 15, precision: 0.1 });
-    const bearing = faker.datatype.float({ min: 0, max: 360 });
+  // Generate 5-15 events
+  const eventCount = Math.floor(Math.random() * 11) + 5;
 
-    // Convert distance and bearing to coordinates
-    const R = 3958.8; // Earth radius in miles
-    const lat2 = userLat + (distance / R) * (180 / Math.PI) * Math.cos(bearing * (Math.PI / 180));
-    const lon2 = userLon + (distance / R) * (180 / Math.PI) / Math.cos(userLat * (Math.PI / 180)) * Math.sin(bearing * (Math.PI / 180));
+  for (let i = 0; i < eventCount; i++) {
+    const activity = ACTIVITY_TYPES[Math.floor(Math.random() * ACTIVITY_TYPES.length)];
 
-    // Generate random time (next 24 hours)
-    const now = new Date();
-    const randomMinutes = faker.datatype.number({ min: 0, max: 1440 });
-    const eventTime = new Date(now.getTime() + randomMinutes * 60000);
+    // Generate coordinates within 10 miles of user location
+    const latOffset = (Math.random() - 0.5) * 0.15; // ~10 miles in degrees
+    const lonOffset = (Math.random() - 0.5) * 0.15;
 
-    const hours = eventTime.getHours();
-    const minutes = eventTime.getMinutes();
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    const displayHours = hours % 12 || 12;
-    const displayMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    const eventLat = userLat + latOffset;
+    const eventLon = userLon + lonOffset;
+
+    // Generate time (within next 2 hours)
+    const eventHour = (currentHour + Math.floor(Math.random() * 3)) % 24;
+    const eventMinute = Math.floor(Math.random() * 60);
+    const eventTime = `${eventHour.toString().padStart(2, '0')}:${eventMinute.toString().padStart(2, '0')}`;
+
+    // Generate participants
+    const maxCapacity = Math.floor(Math.random() * 10) + 5;
+    const currentParticipants = Math.floor(Math.random() * maxCapacity);
 
     events.push({
-      id: `mock-${i}`,
+      id: faker.datatype.uuid(),
       title: activity.name,
       emoji: activity.emoji,
       location: faker.address.streetAddress(),
-      latitude: lat2,
-      longitude: lon2,
-      distance: parseFloat(distance.toFixed(1)),
-      time: `${displayHours}:${displayMinutes} ${ampm}`,
-      currentParticipants: faker.datatype.number({ min: 1, max: 15 }),
-      maxCapacity: faker.datatype.number({ min: 8, max: 20 }),
-      description: faker.lorem.sentence(),
-      createdBy: 'community',
+      latitude: eventLat,
+      longitude: eventLon,
+      time: eventTime,
+      currentParticipants,
+      maxCapacity,
+      createdBy: Math.random() > 0.7 ? 'user' : 'other',
+      distance: 0, // Will be calculated in HomeScreen
     });
   }
 
