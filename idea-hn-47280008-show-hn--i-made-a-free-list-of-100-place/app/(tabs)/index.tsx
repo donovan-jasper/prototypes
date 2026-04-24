@@ -185,17 +185,20 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     height: 40,
     paddingHorizontal: 16,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FFF',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
   filterButtonText: {
-    color: '#FFF',
     fontSize: 14,
+    color: '#007AFF',
     fontWeight: '600',
   },
   listContent: {
+    paddingHorizontal: 16,
     paddingBottom: 20,
   },
   emptyContainer: {

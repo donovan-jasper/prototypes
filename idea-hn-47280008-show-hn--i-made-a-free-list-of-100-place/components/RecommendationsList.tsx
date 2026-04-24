@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
-import { getPriorityRecommendations } from '@/lib/directories';
 import DirectoryCard from './DirectoryCard';
+import { getPriorityRecommendations } from '@/lib/directories';
 import { Directory } from '@/lib/database';
 
 interface RecommendationsListProps {
@@ -15,17 +15,17 @@ export default function RecommendationsList({ category }: RecommendationsListPro
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const loadRecommendations = async () => {
+    async function loadRecommendations() {
       try {
         setLoading(true);
-        const recs = await getPriorityRecommendations(category);
-        setRecommendations(recs);
+        const topDirectories = await getPriorityRecommendations(category, 10);
+        setRecommendations(topDirectories);
       } catch (error) {
-        console.error('Error loading recommendations:', error);
+        console.error('Failed to load recommendations:', error);
       } finally {
         setLoading(false);
       }
-    };
+    }
 
     loadRecommendations();
   }, [category]);
@@ -34,7 +34,7 @@ export default function RecommendationsList({ category }: RecommendationsListPro
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="small" color="#007AFF" />
-        <Text style={styles.loadingText}>Finding best matches...</Text>
+        <Text style={styles.loadingText}>Loading recommendations...</Text>
       </View>
     );
   }
@@ -46,7 +46,7 @@ export default function RecommendationsList({ category }: RecommendationsListPro
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Start Here</Text>
-      <Text style={styles.subtitle}>Top directories for {category}</Text>
+      <Text style={styles.subtitle}>Top recommendations for {category}</Text>
 
       <FlatList
         data={recommendations}
@@ -58,6 +58,7 @@ export default function RecommendationsList({ category }: RecommendationsListPro
             <DirectoryCard
               directory={item}
               onPress={() => router.push(`/directory/${item.id}`)}
+              compact
             />
           </View>
         )}
@@ -86,8 +87,7 @@ const styles = StyleSheet.create({
   loadingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    padding: 16,
   },
   loadingText: {
     marginLeft: 8,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cardContainer: {
-    width: 280,
     marginRight: 12,
+    width: 220,
   },
 });
