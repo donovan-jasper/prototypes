@@ -1,45 +1,57 @@
 import { create } from 'zustand';
 
 interface SessionState {
-  sessionId: string | null;
   taskName: string;
   coachId: string;
   isActive: boolean;
+  isPaused: boolean;
   elapsedSeconds: number;
-  startSession: (sessionId: string, taskName: string, coachId: string) => void;
+  startSession: (taskName: string, coachId: string) => void;
   stopSession: () => void;
-  tick: () => void;
+  togglePause: () => void;
   reset: () => void;
+  tick: () => void;
 }
 
 export const useSessionStore = create<SessionState>((set) => ({
-  sessionId: null,
   taskName: '',
   coachId: '',
   isActive: false,
+  isPaused: false,
   elapsedSeconds: 0,
-  startSession: (sessionId, taskName, coachId) =>
+
+  startSession: (taskName, coachId) =>
     set({
-      sessionId,
       taskName,
       coachId,
       isActive: true,
+      isPaused: false,
       elapsedSeconds: 0,
     }),
+
   stopSession: () =>
     set({
       isActive: false,
+      isPaused: false,
     }),
-  tick: () =>
+
+  togglePause: () =>
     set((state) => ({
-      elapsedSeconds: state.elapsedSeconds + 1,
+      isPaused: !state.isPaused,
     })),
+
   reset: () =>
     set({
-      sessionId: null,
       taskName: '',
       coachId: '',
       isActive: false,
+      isPaused: false,
       elapsedSeconds: 0,
+    }),
+
+  tick: () =>
+    set((state) => {
+      if (!state.isActive || state.isPaused) return state;
+      return { elapsedSeconds: state.elapsedSeconds + 1 };
     }),
 }));
