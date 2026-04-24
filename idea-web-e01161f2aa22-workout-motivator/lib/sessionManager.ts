@@ -1,71 +1,82 @@
 import { useSessionStore } from './store';
-import { generatePrompt, selectPromptByIntensity, getRandomInterval } from './prompts';
 import { speakPrompt, stopSpeaking } from './audio';
-import { CoachId } from '../constants/Prompts';
+import { generatePrompt } from './prompts';
+import { registerBackgroundAudioTask, cleanupBackgroundAudio } from './backgroundAudio';
 
-export class SessionManager {
-  private timer: NodeJS.Timeout | null = null;
-  private lastPromptTime: number = 0;
-  private nextPromptTime: number = 0;
-  private pauseStartTime: number = 0;
+let timerInterval: NodeJS.Timeout | null = null;
+let promptInterval: NodeJS.Timeout | null = null;
+let lastPromptTime = 0;
+let sessionStartTime = 0;
 
-  constructor() {
-    this.setupTimer();
-  }
+export const sessionManager = {
+  initialize: async () => {
+    await registerBackgroundAudioTask();
+  },
 
-  private setupTimer() {
-    this.timer = setInterval(() => {
-      const { isActive, isPaused, elapsedSeconds } = useSessionStore.getState();
+  startSession: (taskName: string, coachId: string) => {
+    const { startSession } = useSessionStore.getState();
+    startSession(taskName, coachId);
+    sessionStartTime = Date.now();
 
-      if (!isActive || isPaused) return;
-
-      if (elapsedSeconds >= this.nextPromptTime) {
-        this.triggerPrompt();
-      }
+    // Start timer
+    timerInterval = setInterval(() => {
+      const { tick } = useSessionStore.getState();
+      tick();
     }, 1000);
-  }
 
-  private triggerPrompt() {
-    const { coachId, elapsedSeconds } = useSessionStore.getState();
+    // Schedule prompts
+    scheduleNextPrompt();
+  },
 
-    if (!coachId) return;
-
-    const secondsSinceLastPrompt = elapsedSeconds - this.lastPromptTime;
-    const prompt = selectPromptByIntensity(coachId as CoachId, secondsSinceLastPrompt);
-
-    this.lastPromptTime = elapsedSeconds;
-    this.nextPromptTime = elapsedSeconds + getRandomInterval();
-
-    speakPrompt(prompt, coachId);
-  }
-
-  public handlePause() {
-    const { isPaused } = useSessionStore.getState();
-
-    if (!isPaused) {
-      this.pauseStartTime = Date.now();
-    } else {
-      const pauseDuration = (Date.now() - this.pauseStartTime) / 1000;
-      // Adjust next prompt time based on pause duration
-      this.nextPromptTime = Math.max(
-        this.nextPromptTime - Math.floor(pauseDuration),
-        this.lastPromptTime + 60 // Minimum 1 minute between prompts
-      );
+  handlePause: () => {
+    if (promptInterval) {
+      clearTimeout(promptInterval);
+      promptInterval = null;
     }
-  }
+  },
 
-  public reset() {
-    this.lastPromptTime = 0;
-    this.nextPromptTime = getRandomInterval();
-    this.pauseStartTime = 0;
-  }
-
-  public cleanup() {
-    if (this.timer) {
-      clearInterval(this.timer);
+  cleanup: () => {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
     }
+
+    if (promptInterval) {
+      clearTimeout(promptInterval);
+      promptInterval = null;
+    }
+
     stopSpeaking();
-  }
-}
+    cleanupBackgroundAudio();
+  },
 
-export const sessionManager = new SessionManager();
+  reset: () => {
+    sessionManager.cleanup();
+    lastPromptTime = 0;
+    sessionStartTime = 0;
+  }
+};
+
+function scheduleNextPrompt() {
+  const { taskName, coachId, elapsedSeconds, isPaused } = useSessionStore.getState();
+
+  if (isPaused) return;
+
+  // Calculate time since last prompt
+  const timeSinceLastPrompt = elapsedSeconds - lastPromptTime;
+
+  // Determine next prompt interval (2-5 minutes)
+  const nextInterval = Math.floor(Math.random() * 180) + 120; // 2-5 minutes in seconds
+
+  promptInterval = setTimeout(async () => {
+    try {
+      const prompt = generatePrompt(coachId, taskName);
+      await speakPrompt(prompt, coachId);
+      lastPromptTime = elapsedSeconds;
+    } catch (error) {
+      console.error('Error playing prompt:', error);
+    } finally {
+      scheduleNextPrompt();
+    }
+  }, nextInterval * 1000);
+}

@@ -1,43 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSessionStore } from '../lib/store';
 
-export default function SessionTimer() {
-  const { elapsedSeconds, isPaused } = useSessionStore();
-  const [displayTime, setDisplayTime] = useState('00:00:00');
+const SessionTimer = () => {
+  const { elapsedSeconds } = useSessionStore();
 
-  useEffect(() => {
-    const hours = Math.floor(elapsedSeconds / 3600);
-    const minutes = Math.floor((elapsedSeconds % 3600) / 60);
-    const seconds = elapsedSeconds % 60;
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
 
-    setDisplayTime(
-      `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
-    );
-  }, [elapsedSeconds]);
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.timerText}>{displayTime}</Text>
-      {isPaused && <Text style={styles.pausedText}>PAUSED</Text>}
+      <Text style={styles.label}>Session Time</Text>
+      <Text style={styles.time}>{formatTime(elapsedSeconds)}</Text>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     marginVertical: 20,
   },
-  timerText: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: '#2196f3',
-  },
-  pausedText: {
+  label: {
     fontSize: 16,
-    color: '#f44336',
+    color: '#666',
+    marginBottom: 5,
+  },
+  time: {
+    fontSize: 36,
     fontWeight: 'bold',
-    marginTop: 5,
+    color: '#333',
   },
 });
+
+export default SessionTimer;
