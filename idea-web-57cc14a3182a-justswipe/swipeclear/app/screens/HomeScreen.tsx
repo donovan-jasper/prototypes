@@ -172,7 +172,7 @@ const HomeScreen = () => {
     const fadeAnim = animatingItems[item.id] || new Animated.Value(1);
 
     return (
-      <Animated.View style={[styles.itemContainer, { opacity: fadeAnim }]}>
+      <Animated.View style={{ opacity: fadeAnim }}>
         <SwipeAction
           item={item}
           onSwipeLeft={handleSwipeLeft}
@@ -180,20 +180,18 @@ const HomeScreen = () => {
           onSwipeUp={handleSwipeUp}
           onSwipeDown={handleSwipeDown}
         >
-          <View style={styles.itemContent}>
+          <View style={styles.itemContainer}>
             <View style={styles.itemHeader}>
-              <Text style={[styles.itemTitle, item.pinned && styles.pinnedItem]}>
-                {item.title}
-              </Text>
-              {item.pinned && (
-                <Ionicons name="pin" size={16} color="#FF9500" style={styles.pinIcon} />
-              )}
+              <Text style={[styles.appName, item.pinned && styles.pinned]}>{item.app}</Text>
+              <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
             </View>
-            <Text style={styles.itemBody}>{item.body}</Text>
-            <View style={styles.itemFooter}>
-              <Text style={styles.itemApp}>{item.app}</Text>
-              <Text style={styles.itemTime}>{formatTimestamp(item.timestamp)}</Text>
-            </View>
+            <Text style={styles.title}>{item.title}</Text>
+            <Text style={styles.body}>{item.body}</Text>
+            {item.muted && (
+              <View style={styles.mutedBadge}>
+                <Text style={styles.mutedText}>Muted</Text>
+              </View>
+            )}
           </View>
         </SwipeAction>
       </Animated.View>
@@ -203,12 +201,12 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>SwipeClear</Text>
+        <Text style={styles.headerTitle}>SwipeClear</Text>
         <TouchableOpacity onPress={() => setShowArchived(!showArchived)}>
           <Ionicons
             name={showArchived ? 'archive' : 'archive-outline'}
             size={24}
-            color="#333"
+            color="#666"
           />
         </TouchableOpacity>
       </View>
@@ -219,8 +217,7 @@ const HomeScreen = () => {
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Ionicons name="notifications-off-outline" size={48} color="#999" />
+          <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>
               {showArchived ? 'No archived items' : 'No new notifications'}
             </Text>
@@ -239,7 +236,7 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#f5f5f5',
   },
   header: {
     flexDirection: 'row',
@@ -247,9 +244,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#e0e0e0',
   },
-  title: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
@@ -258,64 +255,67 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   itemContainer: {
-    marginHorizontal: 16,
-    marginVertical: 8,
-    borderRadius: 8,
     backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginHorizontal: 12,
+    marginVertical: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
   },
-  itemContent: {
-    padding: 16,
-  },
   itemHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 4,
   },
-  itemTitle: {
-    fontSize: 16,
+  appName: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#666',
+  },
+  pinned: {
+    color: '#ff6b6b',
+  },
+  timestamp: {
+    fontSize: 12,
+    color: '#999',
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: 'bold',
     color: '#333',
-    flex: 1,
+    marginBottom: 4,
   },
-  pinnedItem: {
-    color: '#FF9500',
-  },
-  pinIcon: {
-    marginLeft: 8,
-  },
-  itemBody: {
+  body: {
     fontSize: 14,
     color: '#666',
-    marginBottom: 8,
   },
-  itemFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  mutedBadge: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: '#ffcccc',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
   },
-  itemApp: {
+  mutedText: {
     fontSize: 12,
-    color: '#999',
+    color: '#ff6b6b',
+    fontWeight: '500',
   },
-  itemTime: {
-    fontSize: 12,
-    color: '#999',
-  },
-  emptyState: {
+  emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 32,
+    padding: 20,
   },
   emptyText: {
     fontSize: 16,
     color: '#999',
-    marginTop: 16,
     textAlign: 'center',
   },
 });

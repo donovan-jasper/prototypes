@@ -1,128 +1,140 @@
 import React, { useRef } from 'react';
 import { View, StyleSheet, Animated, PanResponder, Text } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 
 const SwipeAction = ({ children, item, onSwipeLeft, onSwipeRight, onSwipeUp, onSwipeDown }) => {
   const pan = useRef(new Animated.ValueXY()).current;
   const opacity = useRef(new Animated.Value(1)).current;
-  const [actionText, setActionText] = React.useState('');
-  const [actionColor, setActionColor] = React.useState('#333');
+  const scale = useRef(new Animated.Value(1)).current;
 
-  const panResponder = PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (e, gestureState) => {
-      const { dx, dy } = gestureState;
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onPanResponderMove: (e, gestureState) => {
+        pan.setValue({ x: gestureState.dx, y: gestureState.dy });
 
-      // Determine which direction has the most movement
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(dy);
+        // Show action indicators based on swipe direction
+        const absX = Math.abs(gestureState.dx);
+        const absY = Math.abs(gestureState.dy);
 
-      if (absDx > absDy) {
-        // Horizontal swipe
-        pan.setValue({ x: dx, y: 0 });
-        if (dx > 0) {
-          setActionText('Archive');
-          setActionColor('#4CAF50');
-        } else {
-          setActionText('Mute');
-          setActionColor('#FF9800');
+        if (absX > absY && absX > 50) {
+          // Horizontal swipe
+          if (gestureState.dx > 0) {
+            // Right swipe
+            opacity.setValue(1 - (gestureState.dx / 200));
+          } else {
+            // Left swipe
+            opacity.setValue(1 + (gestureState.dx / 200));
+          }
+        } else if (absY > absX && absY > 50) {
+          // Vertical swipe
+          if (gestureState.dy > 0) {
+            // Down swipe
+            scale.setValue(1 - (gestureState.dy / 300));
+          } else {
+            // Up swipe
+            scale.setValue(1 + (gestureState.dy / 300));
+          }
         }
-      } else {
-        // Vertical swipe
-        pan.setValue({ x: 0, y: dy });
-        if (dy > 0) {
-          setActionText('Delete');
-          setActionColor('#F44336');
-        } else {
-          setActionText('Pin');
-          setActionColor('#2196F3');
-        }
-      }
+      },
+      onPanResponderRelease: (e, gestureState) => {
+        const absX = Math.abs(gestureState.dx);
+        const absY = Math.abs(gestureState.dy);
 
-      // Calculate opacity based on swipe distance
-      const opacityValue = 1 - Math.min(Math.max(Math.abs(dx) / 100, Math.abs(dy) / 100), 0.5);
-      opacity.setValue(opacityValue);
-    },
-    onPanResponderRelease: (e, gestureState) => {
-      const { dx, dy } = gestureState;
-      const absDx = Math.abs(dx);
-      const absDy = Math.abs(dy);
-
-      if (absDx > 100 || absDy > 100) {
-        // Trigger action based on direction
-        if (absDx > absDy) {
-          if (dx > 0) {
+        if (absX > absY && absX > 100) {
+          // Horizontal swipe
+          if (gestureState.dx > 0) {
+            // Right swipe
             onSwipeRight(item);
           } else {
+            // Left swipe
             onSwipeLeft(item);
           }
-        } else {
-          if (dy > 0) {
+        } else if (absY > absX && absY > 100) {
+          // Vertical swipe
+          if (gestureState.dy > 0) {
+            // Down swipe
             onSwipeDown(item);
           } else {
+            // Up swipe
             onSwipeUp(item);
           }
+        } else {
+          // Reset position
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+          }).start();
+
+          Animated.spring(opacity, {
+            toValue: 1,
+            useNativeDriver: true,
+          }).start();
+
+          Animated.spring(scale, {
+            toValue: 1,
+            useNativeDriver: true,
+          }).start();
         }
+      },
+    })
+  ).current;
 
-        // Animate back to original position
-        Animated.spring(pan, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-        }).start();
+  const getActionIndicator = () => {
+    const { dx, dy } = pan.getTranslate();
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
 
-        Animated.spring(opacity, {
-          toValue: 1,
-          useNativeDriver: false,
-        }).start();
+    if (absX > absY && absX > 50) {
+      if (dx > 0) {
+        return (
+          <View style={[styles.actionIndicator, styles.rightIndicator]}>
+            <Text style={styles.actionText}>Mute</Text>
+          </View>
+        );
       } else {
-        // Reset position if swipe wasn't far enough
-        Animated.spring(pan, {
-          toValue: { x: 0, y: 0 },
-          useNativeDriver: false,
-        }).start();
-
-        Animated.spring(opacity, {
-          toValue: 1,
-          useNativeDriver: false,
-        }).start();
+        return (
+          <View style={[styles.actionIndicator, styles.leftIndicator]}>
+            <Text style={styles.actionText}>Archive</Text>
+          </View>
+        );
       }
-
-      setActionText('');
-    },
-  });
-
-  const rotate = pan.x.interpolate({
-    inputRange: [-200, 0, 200],
-    outputRange: ['-10deg', '0deg', '10deg'],
-  });
+    } else if (absY > absX && absY > 50) {
+      if (dy > 0) {
+        return (
+          <View style={[styles.actionIndicator, styles.downIndicator]}>
+            <Text style={styles.actionText}>Delete</Text>
+          </View>
+        );
+      } else {
+        return (
+          <View style={[styles.actionIndicator, styles.upIndicator]}>
+            <Text style={styles.actionText}>Pin</Text>
+          </View>
+        );
+      }
+    }
+    return null;
+  };
 
   return (
     <View style={styles.container}>
       <Animated.View
         style={[
-          styles.actionIndicator,
+          styles.actionContainer,
           {
-            opacity: actionText ? 1 : 0,
-            backgroundColor: actionColor,
-          },
-        ]}
-      >
-        <Text style={styles.actionText}>{actionText}</Text>
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.swipeable,
-          {
-            transform: [{ translateX: pan.x }, { translateY: pan.y }, { rotate }],
-            opacity,
+            transform: [
+              { translateX: pan.x },
+              { translateY: pan.y },
+              { scale: scale },
+            ],
+            opacity: opacity,
           },
         ]}
         {...panResponder.panHandlers}
       >
         {children}
       </Animated.View>
+      {getActionIndicator()}
     </View>
   );
 };
@@ -131,29 +143,43 @@ const styles = StyleSheet.create({
   container: {
     position: 'relative',
   },
-  swipeable: {
-    backgroundColor: 'white',
-    borderRadius: 8,
-    overflow: 'hidden',
+  actionContainer: {
+    position: 'relative',
+    zIndex: 1,
   },
   actionIndicator: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1,
-    borderRadius: 8,
+    padding: 8,
+    borderRadius: 4,
+    zIndex: 0,
+  },
+  leftIndicator: {
+    left: 10,
+    top: '50%',
+    marginTop: -15,
+    backgroundColor: 'rgba(76, 175, 80, 0.8)',
+  },
+  rightIndicator: {
+    right: 10,
+    top: '50%',
+    marginTop: -15,
+    backgroundColor: 'rgba(255, 152, 0, 0.8)',
+  },
+  upIndicator: {
+    top: 10,
+    left: '50%',
+    marginLeft: -30,
+    backgroundColor: 'rgba(33, 150, 243, 0.8)',
+  },
+  downIndicator: {
+    bottom: 10,
+    left: '50%',
+    marginLeft: -30,
+    backgroundColor: 'rgba(244, 67, 54, 0.8)',
   },
   actionText: {
     color: 'white',
-    fontSize: 18,
     fontWeight: 'bold',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
   },
 });
 
