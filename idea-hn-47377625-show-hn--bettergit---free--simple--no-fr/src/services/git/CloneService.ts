@@ -57,6 +57,19 @@ export class CloneService {
       });
 
     } catch (error) {
+      // Handle specific error cases
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          throw new Error('Network timeout while cloning repository. Please check your connection and try again.');
+        } else if (error.message.includes('authentication') || error.message.includes('401')) {
+          throw new Error('Authentication failed. Please check your credentials and try again.');
+        } else if (error.message.includes('access') || error.message.includes('403')) {
+          throw new Error('You do not have permission to access this repository.');
+        } else if (error.message.includes('not found') || error.message.includes('404')) {
+          throw new Error('Repository not found. Please verify the URL and try again.');
+        }
+      }
+
       // Clean up if clone failed
       try {
         await FileSystemService.deleteDirectory(repoPath);
@@ -64,8 +77,8 @@ export class CloneService {
         console.error('Failed to clean up after clone failure:', cleanupError);
       }
 
-      // Re-throw the original error
-      throw error;
+      // Re-throw the original error with user-friendly message
+      throw new Error('Failed to clone repository. Please try again later.');
     }
   }
 
@@ -79,7 +92,12 @@ export class CloneService {
       await DatabaseService.deleteRepository(repoId);
     } catch (error) {
       console.error('Error deleting repository:', error);
-      throw error;
+      if (error instanceof Error) {
+        if (error.message.includes('permission')) {
+          throw new Error('Permission denied. Unable to delete repository.');
+        }
+      }
+      throw new Error('Failed to delete repository. Please try again.');
     }
   }
 
@@ -103,7 +121,14 @@ export class CloneService {
       return await GitProviderService.getRepositoryInfo(url, authToken ? { provider, token: authToken } : undefined);
     } catch (error) {
       console.error('Error fetching repository info:', error);
-      throw error;
+      if (error instanceof Error) {
+        if (error.message.includes('timeout')) {
+          throw new Error('Network timeout while fetching repository information.');
+        } else if (error.message.includes('authentication') || error.message.includes('401')) {
+          throw new Error('Authentication failed. Please check your credentials.');
+        }
+      }
+      throw new Error('Failed to fetch repository information. Please try again.');
     }
   }
 
@@ -124,7 +149,46 @@ export class CloneService {
       await FileSystemService.deleteDirectory(repoPath);
     } catch (error) {
       console.error('Error canceling clone:', error);
-      throw error;
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          throw new Error('Clone operation not found or already completed.');
+        }
+      }
+      throw new Error('Failed to cancel clone operation. Please try again.');
     }
+  }
+
+  static async retryClone(options: CloneOptions, retryCount: number = 3): Promise<void> {
+    let lastError: Error | null = null;
+
+    for (let i = 0; i < retryCount; i++) {
+      try {
+        await this.cloneRepository(options);
+        return; // Success
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+        console.error(`Clone attempt ${i + 1} failed:`, error);
+
+        // Don't wait on the last attempt
+        if (i < retryCount - 1) {
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = Math.pow(2, i) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+
+    // If we get here, all retries failed
+    if (lastError) {
+      if (lastError.message.includes('timeout')) {
+        throw new Error('Network timeout after multiple attempts. Please check your connection and try again later.');
+      } else if (lastError.message.includes('authentication')) {
+        throw new Error('Authentication failed after multiple attempts. Please verify your credentials.');
+      } else if (lastError.message.includes('access')) {
+        throw new Error('Access denied after multiple attempts. Please check your permissions.');
+      }
+    }
+
+    throw new Error('Failed to clone repository after multiple attempts. Please try again later.');
   }
 }
