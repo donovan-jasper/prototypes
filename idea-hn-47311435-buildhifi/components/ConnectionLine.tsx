@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import Svg, { Path, G, Circle } from 'react-native-svg';
+import Svg, { Path, G, Circle, Text as SvgText } from 'react-native-svg';
 import { Component } from '@/lib/types';
 
 interface ConnectionLineProps {
@@ -29,23 +29,6 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
   const toX = to.position?.x || 0;
   const toY = to.position?.y || 0;
 
-  // Calculate control points for a smooth curve
-  const midX = (fromX + toX) / 2;
-  const controlY = Math.abs(toY - fromY) / 2;
-
-  // Calculate arrowhead points
-  const angle = Math.atan2(toY - fromY, toX - fromX);
-  const arrowLength = 15;
-  const arrowWidth = 8;
-
-  const arrowX = toX - arrowLength * Math.cos(angle);
-  const arrowY = toY - arrowLength * Math.sin(angle);
-
-  const arrowLeftX = arrowX - arrowWidth * Math.sin(angle);
-  const arrowLeftY = arrowY + arrowWidth * Math.cos(angle);
-  const arrowRightX = arrowX + arrowWidth * Math.sin(angle);
-  const arrowRightY = arrowY - arrowWidth * Math.cos(angle);
-
   // Calculate connection points (bottom center of each component)
   const fromConnectionX = fromX + 75;
   const fromConnectionY = fromY + 200;
@@ -57,6 +40,23 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
   const control1Y = fromConnectionY;
   const control2X = toConnectionX - (toConnectionX - fromConnectionX) * 0.3;
   const control2Y = toConnectionY;
+
+  // Calculate arrowhead points
+  const angle = Math.atan2(toConnectionY - fromConnectionY, toConnectionX - fromConnectionX);
+  const arrowLength = 15;
+  const arrowWidth = 8;
+
+  const arrowX = toConnectionX - arrowLength * Math.cos(angle);
+  const arrowY = toConnectionY - arrowLength * Math.sin(angle);
+
+  const arrowLeftX = arrowX - arrowWidth * Math.sin(angle);
+  const arrowLeftY = arrowY + arrowWidth * Math.cos(angle);
+  const arrowRightX = arrowX + arrowWidth * Math.sin(angle);
+  const arrowRightY = arrowY - arrowWidth * Math.cos(angle);
+
+  // Calculate midpoint for status text
+  const midX = (fromConnectionX + toConnectionX) / 2;
+  const midY = (fromConnectionY + toConnectionY) / 2 - 20;
 
   return (
     <View style={styles.container}>
@@ -93,6 +93,19 @@ const ConnectionLine: React.FC<ConnectionLineProps> = ({ from, to, status }) => 
             fill={getColor()}
           />
         </G>
+
+        {/* Status text */}
+        {status !== 'compatible' && (
+          <SvgText
+            x={midX}
+            y={midY}
+            fill={getColor()}
+            fontSize="12"
+            textAnchor="middle"
+          >
+            {status === 'warning' ? '⚠️' : '❌'}
+          </SvgText>
+        )}
       </Svg>
     </View>
   );

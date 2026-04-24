@@ -138,26 +138,41 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
   };
 
   const renderConnectionLines = () => {
-    if (!currentBuild?.components || currentBuild.components.length < 2) return null;
+    if (!currentBuild?.components.length) return null;
 
-    return currentBuild.components.map((component, index) => {
-      if (index === currentBuild.components.length - 1) return null;
+    const components = [...currentBuild.components];
+    // Sort components by their position to ensure proper connection order
+    components.sort((a, b) => {
+      const aPos = componentPositions[a.id] || { x: 0, y: 0 };
+      const bPos = componentPositions[b.id] || { x: 0, y: 0 };
+      return aPos.x - bPos.x;
+    });
 
-      const nextComponent = currentBuild.components[index + 1];
-      const fromPosition = componentPositions[component.id] || { x: 0, y: 0 };
-      const toPosition = componentPositions[nextComponent.id] || { x: 0, y: 0 };
+    return components.map((component, index) => {
+      if (index === components.length - 1) return null;
+
+      const nextComponent = components[index + 1];
+      const fromPos = componentPositions[component.id] || { x: 0, y: 0 };
+      const toPos = componentPositions[nextComponent.id] || { x: 0, y: 0 };
 
       // Determine connection status
-      const connectionStatus = validation.issues.find(
+      let status: 'compatible' | 'warning' | 'incompatible' = 'compatible';
+
+      // Check validation issues for this connection
+      const issue = validation.issues.find(
         issue => issue.fromId === component.id && issue.toId === nextComponent.id
-      )?.status || 'compatible';
+      );
+
+      if (issue) {
+        status = issue.type;
+      }
 
       return (
         <ConnectionLine
           key={`connection-${component.id}-${nextComponent.id}`}
-          from={{ ...component, position: fromPosition }}
-          to={{ ...nextComponent, position: toPosition }}
-          status={connectionStatus}
+          from={{ ...component, position: fromPos }}
+          to={{ ...nextComponent, position: toPos }}
+          status={status}
         />
       );
     });
@@ -187,7 +202,7 @@ const BuildCanvas: React.FC<BuildCanvasProps> = ({ build }) => {
       )}
 
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
         horizontal
         showsHorizontalScrollIndicator={false}
       >
@@ -204,13 +219,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContainer: {
+  scrollContent: {
     flexGrow: 1,
     paddingVertical: 20,
   },
   canvas: {
-    width: SCREEN_WIDTH * 2,
-    height: SCREEN_HEIGHT * 0.7,
+    width: SCREEN_WIDTH * 2, // Wider than screen to allow horizontal scrolling
+    height: SCREEN_HEIGHT * 0.8,
     position: 'relative',
   },
   componentContainer: {
@@ -218,6 +233,11 @@ const styles = StyleSheet.create({
     height: 200,
     borderRadius: 8,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });
 
