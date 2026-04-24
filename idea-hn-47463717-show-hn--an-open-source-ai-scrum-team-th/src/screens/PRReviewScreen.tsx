@@ -1,29 +1,28 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Text, Alert } from 'react-native';
 import { useRoute } from '@react-navigation/native';
 import PRReview from '../components/PRReview';
+import useGitHubPRs from '../hooks/useGitHubPRs';
+
+interface PR {
+  id: number;
+  title: string;
+  // Add other PR properties as needed
+}
 
 const PRReviewScreen: React.FC = () => {
-  const [loading, setLoading] = React.useState<boolean>(false);
   const route = useRoute();
-  const { pr } = route.params as { pr: any };
+  const { pr } = route.params as { pr: PR };
+  const { loading, approvePR, rejectPR } = useGitHubPRs();
 
-  const handleApprove = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      alert('PR Approved!');
-    }, 1000);
+  const handleApprove = async () => {
+    const result = await approvePR(pr.id);
+    Alert.alert('Success', result.message);
   };
 
-  const handleReject = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setLoading(false);
-      alert('PR Rejected!');
-    }, 1000);
+  const handleReject = async () => {
+    const result = await rejectPR(pr.id);
+    Alert.alert('Success', result.message);
   };
 
   if (loading) {
