@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert, Switch } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Modal, Alert, Switch, KeyboardAvoidingView, Platform } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { useCourseStore } from '../../store/courseStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,12 +25,16 @@ export default function CourseEditorScreen() {
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [price, setPrice] = useState('');
   const [isPublished, setIsPublished] = useState(false);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
 
   useEffect(() => {
     loadCourses().then(() => {
       const foundCourse = courses.find((c) => c.id === id);
       if (foundCourse) {
         setCourse(foundCourse);
+        setTitle(foundCourse.title);
+        setDescription(foundCourse.description || '');
         setPrice(foundCourse.price?.toString() || '');
         setIsPublished(foundCourse.published || false);
       }
@@ -73,21 +77,7 @@ export default function CourseEditorScreen() {
   };
 
   const handleLessonPress = (lessonId: string) => {
-    setEditingLessonId(lessonId);
-  };
-
-  const handleSaveLesson = () => {
-    if (editingLessonId) {
-      const lesson = course.lessons.find(l => l.id === editingLessonId);
-      if (lesson) {
-        updateLesson(course.id, editingLessonId, {
-          title: lesson.title,
-          content: lesson.content
-        }).then(() => {
-          setEditingLessonId(null);
-        });
-      }
-    }
+    router.push(`/course/lesson/${lessonId}`);
   };
 
   const handleDeleteLesson = (lessonId: string) => {
@@ -136,11 +126,26 @@ export default function CourseEditorScreen() {
   };
 
   const handleSaveChanges = () => {
-    Alert.alert(
-      'Changes Saved',
-      'Your course has been successfully updated.',
-      [{ text: 'OK' }]
-    );
+    updateCourse(course.id, {
+      title,
+      description,
+      price: parseFloat(price) || 0,
+      published: isPublished
+    }).then(() => {
+      Alert.alert(
+        'Changes Saved',
+        'Your course has been successfully updated.',
+        [{ text: 'OK' }]
+      );
+    });
+  };
+
+  const handleTitleChange = (text: string) => {
+    setTitle(text);
+  };
+
+  const handleDescriptionChange = (text: string) => {
+    setDescription(text);
   };
 
   const renderLessonItem = ({ item, drag, isActive }: RenderItemParams<Lesson>) => {
@@ -152,46 +157,47 @@ export default function CourseEditorScreen() {
         activeOpacity={0.7}
         delayLongPress={200}
       >
-        <View style={styles.lessonNumber}>
-          <Text style={styles.lessonNumberText}>{item.order + 1}</Text>
+        <View style={styles.lessonContent}>
+          <Text style={styles.lessonTitle}>{item.title}</Text>
+          <Text style={styles.lessonPreview} numberOfLines={2}>
+            {item.content || 'No content yet'}
+          </Text>
         </View>
-        <Text style={styles.lessonTitle}>{item.title}</Text>
-        <Ionicons name="reorder-three-outline" size={24} color="#C7C7CC" />
+        <View style={styles.lessonActions}>
+          <TouchableOpacity
+            onPress={() => handleDeleteLesson(item.id)}
+            style={styles.deleteButton}
+          >
+            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+          </TouchableOpacity>
+          <Ionicons name="reorder-two-outline" size={24} color="#C7C7CC" />
+        </View>
       </TouchableOpacity>
     );
   };
 
-  const currentLesson = editingLessonId ? course.lessons.find(l => l.id === editingLessonId) : null;
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
           <TextInput
             style={styles.titleInput}
-            value={course.title}
-            onChangeText={(text) => updateCourse(course.id, { title: text })}
+            value={title}
+            onChangeText={handleTitleChange}
             placeholder="Course Title"
             placeholderTextColor="#8E8E93"
           />
           <TextInput
             style={styles.descriptionInput}
-            value={course.description}
-            onChangeText={(text) => updateCourse(course.id, { description: text })}
+            value={description}
+            onChangeText={handleDescriptionChange}
             placeholder="Course Description"
             placeholderTextColor="#8E8E93"
             multiline
           />
-          <View style={styles.metaRow}>
-            <View style={styles.metaItem}>
-              <Ionicons name="book-outline" size={16} color="#8E8E93" />
-              <Text style={styles.metaText}>{course.lessons.length} lessons</Text>
-            </View>
-            <View style={styles.metaItem}>
-              <Ionicons name="pricetag-outline" size={16} color="#8E8E93" />
-              <Text style={styles.metaText}>${price || '0'}</Text>
-            </View>
-          </View>
         </View>
 
         <View style={styles.section}>
@@ -200,38 +206,49 @@ export default function CourseEditorScreen() {
             <TouchableOpacity
               style={styles.addButton}
               onPress={() => setIsModalVisible(true)}
-              activeOpacity={0.7}
             >
-              <Ionicons name="add" size={20} color="#FFFFFF" />
+              <Ionicons name="add-circle-outline" size={24} color="#007AFF" />
               <Text style={styles.addButtonText}>Add Lesson</Text>
             </TouchableOpacity>
           </View>
 
-          <DraggableFlatList
-            data={course.lessons}
-            renderItem={renderLessonItem}
-            keyExtractor={(item) => item.id}
-            onDragEnd={({ data }) => handleReorderLessons(data)}
-            activationDistance={20}
-          />
+          {course.lessons.length > 0 ? (
+            <DraggableFlatList
+              data={course.lessons}
+              renderItem={renderLessonItem}
+              keyExtractor={(item) => item.id}
+              onDragEnd={({ data }) => handleReorderLessons(data)}
+              activationDistance={20}
+            />
+          ) : (
+            <View style={styles.emptyState}>
+              <Ionicons name="book-outline" size={48} color="#C7C7CC" />
+              <Text style={styles.emptyStateText}>No lessons yet</Text>
+              <Text style={styles.emptyStateSubtext}>Add your first lesson to get started</Text>
+            </View>
+          )}
         </View>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Pricing & Publishing</Text>
+            <Text style={styles.sectionTitle}>Pricing</Text>
           </View>
           <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Price ($)</Text>
+            <Text style={styles.priceLabel}>$</Text>
             <TextInput
               style={styles.priceInput}
               value={price}
               onChangeText={handlePriceChange}
-              keyboardType="numeric"
               placeholder="0"
+              placeholderTextColor="#8E8E93"
+              keyboardType="numeric"
             />
           </View>
-          <View style={styles.publishContainer}>
-            <Text style={styles.publishLabel}>Publish Course</Text>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Publish</Text>
             <Switch
               value={isPublished}
               onValueChange={handlePublishToggle}
@@ -239,6 +256,9 @@ export default function CourseEditorScreen() {
               thumbColor={isPublished ? '#FFFFFF' : '#FFFFFF'}
             />
           </View>
+          <Text style={styles.publishStatus}>
+            {isPublished ? 'Your course is published and visible to students' : 'Your course is not published'}
+          </Text>
         </View>
 
         <TouchableOpacity
@@ -265,21 +285,25 @@ export default function CourseEditorScreen() {
               <Ionicons name="close" size={24} color="#8E8E93" />
             </TouchableOpacity>
           </View>
+
           <View style={styles.modalContent}>
             <TextInput
               style={styles.modalInput}
-              placeholder="Lesson Title"
               value={newLessonTitle}
               onChangeText={setNewLessonTitle}
-              autoFocus
+              placeholder="Lesson Title"
+              placeholderTextColor="#8E8E93"
             />
+
             <TextInput
               style={[styles.modalInput, styles.modalTextArea]}
-              placeholder="Lesson Content (Markdown)"
               value={newLessonContent}
               onChangeText={setNewLessonContent}
+              placeholder="Lesson Content (Markdown supported)"
+              placeholderTextColor="#8E8E93"
               multiline
             />
+
             <TouchableOpacity
               style={styles.modalButton}
               onPress={handleAddLesson}
@@ -290,153 +314,38 @@ export default function CourseEditorScreen() {
           </View>
         </View>
       </Modal>
-
-      {currentLesson && (
-        <Modal
-          visible={!!editingLessonId}
-          animationType="slide"
-          onRequestClose={() => setEditingLessonId(null)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Lesson</Text>
-              <TouchableOpacity
-                onPress={() => setEditingLessonId(null)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color="#8E8E93" />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.modalContent}>
-              <TextInput
-                style={styles.modalInput}
-                value={currentLesson.title}
-                onChangeText={(text) => {
-                  const updatedLesson = { ...currentLesson, title: text };
-                  updateLesson(course.id, currentLesson.id, updatedLesson);
-                }}
-              />
-              <TextInput
-                style={[styles.modalInput, styles.modalTextArea]}
-                value={currentLesson.content}
-                onChangeText={(text) => {
-                  const updatedLesson = { ...currentLesson, content: text };
-                  updateLesson(course.id, currentLesson.id, updatedLesson);
-                }}
-                multiline
-              />
-              <View style={styles.previewToggle}>
-                <Text style={styles.previewLabel}>Preview</Text>
-                <Switch
-                  value={isPreviewVisible}
-                  onValueChange={setIsPreviewVisible}
-                />
-              </View>
-              {isPreviewVisible && (
-                <View style={styles.previewContainer}>
-                  <Markdown style={markdownStyles}>
-                    {currentLesson.content || 'Preview will appear here'}
-                  </Markdown>
-                </View>
-              )}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.deleteButton]}
-                  onPress={() => handleDeleteLesson(currentLesson.id)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.modalButtonText}>Delete</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.modalButton}
-                  onPress={handleSaveLesson}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.modalButtonText}>Save</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-    </View>
+    </KeyboardAvoidingView>
   );
 }
-
-const markdownStyles = {
-  heading1: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  heading2: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  heading3: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  text: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 8,
-  },
-  code: {
-    fontFamily: 'monospace',
-    backgroundColor: '#F5F5F5',
-    padding: 4,
-    borderRadius: 4,
-  },
-  list: {
-    marginLeft: 20,
-  },
-  listItem: {
-    marginBottom: 4,
-  },
-};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F2F2F7',
   },
-  content: {
+  scrollContainer: {
     padding: 16,
+    paddingBottom: 32,
   },
   header: {
     marginBottom: 24,
   },
   titleInput: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 8,
     color: '#1C1C1E',
+    marginBottom: 8,
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
   },
   descriptionInput: {
     fontSize: 16,
     color: '#8E8E93',
-    marginBottom: 16,
-    minHeight: 60,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    marginLeft: 4,
-    color: '#8E8E93',
-    fontSize: 14,
+    padding: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    minHeight: 80,
   },
   section: {
     backgroundColor: '#FFFFFF',
@@ -458,82 +367,87 @@ const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
   },
   addButtonText: {
-    color: '#FFFFFF',
+    color: '#007AFF',
+    fontSize: 16,
     marginLeft: 4,
-    fontSize: 14,
   },
   lessonCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
+    padding: 16,
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   activeLessonCard: {
-    opacity: 0.7,
-    backgroundColor: '#F2F2F7',
+    opacity: 0.8,
+    backgroundColor: '#E5E5EA',
   },
-  lessonNumber: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  lessonNumberText: {
-    color: '#FFFFFF',
-    fontWeight: 'bold',
+  lessonContent: {
+    flex: 1,
   },
   lessonTitle: {
-    flex: 1,
     fontSize: 16,
+    fontWeight: '500',
     color: '#1C1C1E',
+    marginBottom: 4,
+  },
+  lessonPreview: {
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  lessonActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  deleteButton: {
+    marginRight: 8,
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1C1C1E',
+    marginTop: 16,
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#8E8E93',
+    marginTop: 4,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
   priceLabel: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#1C1C1E',
-    marginRight: 16,
+    marginRight: 8,
   },
   priceInput: {
-    flex: 1,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 8,
-    padding: 12,
-  },
-  publishContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  publishLabel: {
-    fontSize: 16,
+    fontSize: 24,
     color: '#1C1C1E',
+    flex: 1,
+    padding: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5EA',
+  },
+  publishStatus: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   saveButton: {
-    backgroundColor: '#34C759',
+    backgroundColor: '#007AFF',
+    borderRadius: 8,
     padding: 16,
-    borderRadius: 12,
     alignItems: 'center',
-    marginBottom: 32,
+    marginTop: 16,
   },
   saveButtonText: {
     color: '#FFFFFF',
@@ -561,56 +475,30 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   modalContent: {
-    flex: 1,
     padding: 16,
   },
   modalInput: {
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
+    backgroundColor: '#F2F2F7',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
+    fontSize: 16,
   },
   modalTextArea: {
-    minHeight: 200,
+    minHeight: 120,
     textAlignVertical: 'top',
   },
   modalButton: {
     backgroundColor: '#007AFF',
-    padding: 16,
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 16,
+    marginTop: 16,
   },
   modalButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  deleteButton: {
-    backgroundColor: '#FF3B30',
-  },
-  previewToggle: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  previewLabel: {
-    fontSize: 16,
-    color: '#1C1C1E',
-  },
-  previewContainer: {
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 16,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
   },
   errorState: {
     flex: 1,
@@ -624,13 +512,12 @@ const styles = StyleSheet.create({
     color: '#1C1C1E',
     marginTop: 16,
     marginBottom: 24,
-    textAlign: 'center',
   },
   backButton: {
     backgroundColor: '#007AFF',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
     borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
   backButtonText: {
     color: '#FFFFFF',
