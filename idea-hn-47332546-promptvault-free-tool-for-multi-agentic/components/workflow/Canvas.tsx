@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { View, StyleSheet, Dimensions, Text } from 'react-native';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import Animated, {
@@ -7,13 +7,14 @@ import Animated, {
   withSpring,
   runOnJS,
 } from 'react-native-reanimated';
-import Svg, { Line, Circle } from 'react-native-svg';
+import Svg, { Line, Circle, Path } from 'react-native-svg';
 import Node from './Node';
 import { useTheme } from 'react-native-paper';
 import Toast from 'react-native-toast-message';
 import { useWorkflowStore } from '../../store/workflowStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const GRID_SIZE = 20;
 
 interface NodeData {
   id: string;
@@ -57,12 +58,18 @@ export default function Canvas({
     valid: boolean;
     message: string;
   } | null>(null);
+  const [tempConnection, setTempConnection] = useState<{
+    from: string;
+    toX: number;
+    toY: number;
+  } | null>(null);
 
   const {
     moveNode,
     addConnection,
     validateConnection,
-    currentWorkflow
+    currentWorkflow,
+    checkForCircularReference
   } = useWorkflowStore();
 
   const pinchGesture = Gesture.Pinch()
@@ -93,9 +100,15 @@ export default function Canvas({
     ],
   }));
 
+  const snapToGrid = (value: number) => {
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+  };
+
   const handleNodeDragEnd = useCallback((nodeId: string, x: number, y: number) => {
     if (currentWorkflow) {
-      moveNode(nodeId, x, y);
+      const snappedX = snapToGrid(x);
+      const snappedY = snapToGrid(y);
+      moveNode(nodeId, snappedX, snappedY);
     }
   }, [moveNode, currentWorkflow]);
 
@@ -110,7 +123,10 @@ export default function Canvas({
       const toNode = nodes.find(n => n.id === nodeId);
 
       if (fromNode && toNode) {
-        if (validateConnection(fromNode, toNode)) {
+        const isValidType = validateConnection(fromNode, toNode);
+        const isCircular = checkForCircularReference(connectingFrom, nodeId);
+
+        if (isValidType && !isCircular) {
           addConnection(connectingFrom, nodeId);
           setConnectionValidation({
             valid: true,
@@ -123,7 +139,13 @@ export default function Canvas({
             visibilityTime: 2000,
           });
         } else {
-          const message = `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`;
+          let message = '';
+          if (!isValidType) {
+            message = `Cannot connect ${fromNode.outputType} output to ${toNode.inputType} input`;
+          } else if (isCircular) {
+            message = 'Circular reference detected - this connection would create a loop';
+          }
+
           setConnectionValidation({
             valid: false,
             message
@@ -138,8 +160,14 @@ export default function Canvas({
       }
     }
     setConnectingFrom(null);
+    setTempConnection(null);
     setTimeout(() => setConnectionValidation(null), 3000);
-  }, [connectingFrom, nodes, addConnection, validateConnection, currentWorkflow]);
+  }, [connectingFrom, nodes, addConnection, validateConnection, checkForCircularReference, currentWorkflow]);
+
+  const handleCanvasPress = useCallback(() => {
+    setConnectingFrom(null);
+    setTempConnection(null);
+  }, []);
 
   const getNodePosition = useCallback((nodeId: string) => {
     const node = nodes.find((n) => n.id === nodeId);
@@ -164,129 +192,137 @@ export default function Canvas({
     };
   }, [nodes]);
 
-  const renderNodes = useCallback(() => {
-    return nodes.map((node) => (
-      <Node
-        key={node.id}
-        node={node}
-        isSelected={selectedNodeId === node.id}
-        onSelect={() => onNodeSelect(node.id)}
-        onDragEnd={(x, y) => handleNodeDragEnd(node.id, x, y)}
-        onOutputPress={() => handleOutputPress(node.id)}
-        onInputPress={() => handleInputPress(node.id)}
-        isConnectingFrom={connectingFrom === node.id}
-      />
-    ));
-  }, [
-    nodes,
-    selectedNodeId,
-    onNodeSelect,
-    handleNodeDragEnd,
-    handleOutputPress,
-    handleInputPress,
-    connectingFrom
-  ]);
+  const renderGrid = () => {
+    const gridLines = [];
+    const gridSize = GRID_SIZE;
+    const width = SCREEN_WIDTH * 2;
+    const height = SCREEN_HEIGHT * 2;
 
-  const renderConnections = useCallback(() => {
-    return connections.map((connection, index) => {
+    for (let x = 0; x <= width; x += gridSize) {
+      gridLines.push(
+        <Line
+          key={`v-${x}`}
+          x1={x}
+          y1={0}
+          x2={x}
+          y2={height}
+          stroke={theme.colors.surfaceVariant}
+          strokeWidth={0.5}
+          strokeOpacity={0.3}
+        />
+      );
+    }
+
+    for (let y = 0; y <= height; y += gridSize) {
+      gridLines.push(
+        <Line
+          key={`h-${y}`}
+          x1={0}
+          y1={y}
+          x2={width}
+          y2={y}
+          stroke={theme.colors.surfaceVariant}
+          strokeWidth={0.5}
+          strokeOpacity={0.3}
+        />
+      );
+    }
+
+    return gridLines;
+  };
+
+  const renderConnections = () => {
+    return connections.map((connection) => {
       const { start, end } = getConnectionPoints(connection.from, connection.to);
 
+      // Create a curved path for the connection
+      const controlX = (start.x + end.x) / 2;
+      const controlY = start.y + (end.y - start.y) / 2;
+
       return (
-        <Line
-          key={`${connection.from}-${connection.to}-${index}`}
-          x1={start.x}
-          y1={start.y}
-          x2={end.x}
-          y2={end.y}
+        <Path
+          key={`${connection.from}-${connection.to}`}
+          d={`M${start.x},${start.y} Q${controlX},${controlY} ${end.x},${end.y}`}
           stroke={theme.colors.primary}
-          strokeWidth="2"
+          strokeWidth={2}
+          fill="none"
         />
       );
     });
-  }, [connections, getConnectionPoints, theme.colors.primary]);
+  };
 
-  const renderConnectionPreview = useCallback(() => {
-    if (!connectingFrom) return null;
+  const renderTempConnection = () => {
+    if (!tempConnection) return null;
 
-    const fromNode = nodes.find(n => n.id === connectingFrom);
+    const fromNode = nodes.find(n => n.id === tempConnection.from);
     if (!fromNode) return null;
 
-    // Get the current touch position (this would need to be tracked separately)
-    // For now, we'll just show a line from the output port to the center
     const startX = fromNode.x + 75;
     const startY = fromNode.y + 50;
 
+    // Create a curved path for the temporary connection
+    const controlX = (startX + tempConnection.toX) / 2;
+    const controlY = startY + (tempConnection.toY - startY) / 2;
+
     return (
-      <Line
-        x1={startX}
-        y1={startY}
-        x2={SCREEN_WIDTH / 2}
-        y2={SCREEN_HEIGHT / 2}
-        stroke={connectionValidation?.valid ? theme.colors.primary : theme.colors.error}
-        strokeWidth="2"
+      <Path
+        d={`M${startX},${startY} Q${controlX},${controlY} ${tempConnection.toX},${tempConnection.toY}`}
+        stroke={connectionValidation?.valid ? theme.colors.success : connectionValidation?.valid === false ? theme.colors.error : theme.colors.primary}
+        strokeWidth={2}
         strokeDasharray="5,5"
+        fill="none"
       />
     );
-  }, [connectingFrom, nodes, connectionValidation, theme.colors]);
+  };
+
+  const handleNodeDrag = useCallback((nodeId: string, x: number, y: number) => {
+    if (connectingFrom === nodeId) {
+      setTempConnection({
+        from: nodeId,
+        toX: x,
+        toY: y
+      });
+    }
+  }, [connectingFrom]);
 
   return (
-    <View style={styles.container}>
-      <GestureDetector gesture={composed}>
-        <Animated.View style={[styles.canvas, animatedStyle]}>
+    <GestureDetector gesture={composed}>
+      <Animated.View style={[styles.container, animatedStyle]}>
+        <View style={styles.canvas} onTouchEnd={handleCanvasPress}>
           <Svg style={StyleSheet.absoluteFill}>
+            {renderGrid()}
             {renderConnections()}
-            {renderConnectionPreview()}
+            {renderTempConnection()}
           </Svg>
-          {renderNodes()}
-        </Animated.View>
-      </GestureDetector>
 
-      {connectionValidation && (
-        <View style={[
-          styles.validationMessage,
-          {
-            backgroundColor: connectionValidation.valid
-              ? theme.colors.primaryContainer
-              : theme.colors.errorContainer
-          }
-        ]}>
-          <Text style={[
-            styles.validationText,
-            {
-              color: connectionValidation.valid
-                ? theme.colors.onPrimaryContainer
-                : theme.colors.onErrorContainer
-            }
-          ]}>
-            {connectionValidation.message}
-          </Text>
+          {nodes.map((node) => (
+            <Node
+              key={node.id}
+              node={node}
+              isSelected={selectedNodeId === node.id}
+              onSelect={onNodeSelect}
+              onDragEnd={handleNodeDragEnd}
+              onOutputPress={handleOutputPress}
+              onInputPress={handleInputPress}
+              onDrag={handleNodeDrag}
+            />
+          ))}
         </View>
-      )}
-    </View>
+      </Animated.View>
+    </GestureDetector>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    width: SCREEN_WIDTH,
+    height: SCREEN_HEIGHT,
   },
   canvas: {
     flex: 1,
     width: SCREEN_WIDTH * 2,
     height: SCREEN_HEIGHT * 2,
-  },
-  validationMessage: {
-    position: 'absolute',
-    bottom: 20,
-    left: 20,
-    right: 20,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  validationText: {
-    fontSize: 14,
-    fontWeight: '500',
+    backgroundColor: 'transparent',
   },
 });

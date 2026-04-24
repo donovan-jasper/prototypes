@@ -49,6 +49,7 @@ interface WorkflowState {
   deleteConnection: (from: string, to: string) => void;
   selectNode: (nodeId: string | null) => void;
   validateConnection: (fromNode: NodeData, toNode: NodeData) => boolean;
+  checkForCircularReference: (fromNodeId: string, toNodeId: string) => boolean;
 }
 
 export const useWorkflowStore = create<WorkflowState>()(
@@ -177,7 +178,10 @@ export const useWorkflowStore = create<WorkflowState>()(
         set((state) => {
           if (!state.currentWorkflow) return state;
 
+          // Remove the node
           const updatedNodes = state.currentWorkflow.nodes.filter(node => node.id !== nodeId);
+
+          // Remove any connections involving this node
           const updatedConnections = state.currentWorkflow.connections.filter(
             conn => conn.from !== nodeId && conn.to !== nodeId
           );
@@ -229,7 +233,10 @@ export const useWorkflowStore = create<WorkflowState>()(
 
           if (connectionExists) return state;
 
-          const updatedConnections = [...state.currentWorkflow.connections, { from, to }];
+          const updatedConnections = [
+            ...state.currentWorkflow.connections,
+            { from, to }
+          ];
 
           const updatedWorkflow = {
             ...state.currentWorkflow,
@@ -274,9 +281,49 @@ export const useWorkflowStore = create<WorkflowState>()(
         if (fromNode.outputType && toNode.inputType) {
           return fromNode.outputType === toNode.inputType;
         }
+        return true; // If no type specified, allow connection
+      },
 
-        // If no type specified, allow connection
-        return true;
+      checkForCircularReference: (fromNodeId: string, toNodeId: string) => {
+        const state = get();
+        if (!state.currentWorkflow) return false;
+
+        // Create a map of node connections
+        const connectionMap: Record<string, string[]> = {};
+
+        // Initialize the map with all nodes
+        state.currentWorkflow.nodes.forEach(node => {
+          connectionMap[node.id] = [];
+        });
+
+        // Populate the map with connections
+        state.currentWorkflow.connections.forEach(conn => {
+          if (!connectionMap[conn.from]) {
+            connectionMap[conn.from] = [];
+          }
+          connectionMap[conn.from].push(conn.to);
+        });
+
+        // Check for circular reference using DFS
+        const visited = new Set<string>();
+        const stack: string[] = [toNodeId];
+
+        while (stack.length > 0) {
+          const currentNode = stack.pop()!;
+
+          if (currentNode === fromNodeId) {
+            return true; // Circular reference found
+          }
+
+          if (!visited.has(currentNode)) {
+            visited.add(currentNode);
+            if (connectionMap[currentNode]) {
+              stack.push(...connectionMap[currentNode]);
+            }
+          }
+        }
+
+        return false;
       },
     }),
     {
