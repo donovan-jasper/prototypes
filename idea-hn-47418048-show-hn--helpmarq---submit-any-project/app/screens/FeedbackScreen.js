@@ -140,20 +140,7 @@ const FeedbackScreen = ({ route }) => {
           </View>
         </View>
       ) : (
-        <View style={styles.noFeedbackContainer}>
-          <Text style={styles.noFeedbackText}>No feedback yet</Text>
-        </View>
-      )}
-
-      {isSubmitter && (
-        <View style={styles.feedbackFormContainer}>
-          <FeedbackForm
-            submissionId={submissionId}
-            templateType={templateType}
-            reviewerId={reviewerId}
-            onSubmit={handleSubmit}
-          />
-        </View>
+        <Text style={styles.noFeedbackText}>No feedback yet. Be the first to submit!</Text>
       )}
 
       {individualFeedback.length > 0 && (
@@ -163,9 +150,18 @@ const FeedbackScreen = ({ route }) => {
             data={individualFeedback}
             renderItem={renderFeedbackItem}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.feedbackList}
+            scrollEnabled={false}
           />
         </View>
+      )}
+
+      {!isSubmitter && (
+        <FeedbackForm
+          onSubmit={handleSubmit}
+          submissionId={submissionId}
+          templateType={templateType}
+          reviewerId={reviewerId}
+        />
       )}
     </ScrollView>
   );
@@ -175,6 +171,14 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    padding: 15,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
+    color: '#333',
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -187,18 +191,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    margin: 20,
-    marginBottom: 10,
-    color: '#333',
-  },
   resultsContainer: {
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 20,
-    margin: 10,
+    marginBottom: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -212,7 +209,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   feedbackCount: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
     marginBottom: 15,
   },
@@ -223,6 +220,7 @@ const styles = StyleSheet.create({
   },
   resultLabel: {
     fontSize: 16,
+    fontWeight: '600',
     color: '#333',
   },
   resultValue: {
@@ -230,39 +228,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#007AFF',
   },
-  noFeedbackContainer: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
-    margin: 10,
-    alignItems: 'center',
-  },
   noFeedbackText: {
     fontSize: 16,
     color: '#666',
-  },
-  feedbackFormContainer: {
-    marginTop: 20,
+    textAlign: 'center',
+    marginVertical: 20,
   },
   individualFeedbackContainer: {
     marginTop: 20,
-    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 20,
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
-  },
-  feedbackList: {
-    paddingHorizontal: 10,
   },
   feedbackItem: {
     backgroundColor: '#fff',
     borderRadius: 10,
     padding: 15,
-    marginBottom: 10,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -303,7 +288,7 @@ const styles = StyleSheet.create({
   },
   commentText: {
     fontSize: 14,
-    color: '#333',
+    color: '#444',
     lineHeight: 20,
   },
 });
