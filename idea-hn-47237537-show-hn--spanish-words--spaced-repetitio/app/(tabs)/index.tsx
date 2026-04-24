@@ -5,9 +5,17 @@ import WordCard from '../../components/WordCard';
 import StreakCounter from '../../components/StreakCounter';
 import { getDueWords, updateProgress } from '../../lib/database';
 import { calculateNextReview, updateCardState } from '../../lib/fsrs';
+import * as Haptics from 'expo-haptics';
 
 export default function DailyPractice() {
-  const { incrementStreak, markWordReviewed, dailyQueue, currentWord, loadDailyQueue } = useStore();
+  const {
+    incrementStreak,
+    markWordReviewed,
+    dailyQueue,
+    currentWord,
+    loadDailyQueue,
+    loadTotalWordsLearned
+  } = useStore();
   const [isLoading, setIsLoading] = useState(true);
   const [completedCount, setCompletedCount] = useState(0);
 
@@ -16,6 +24,7 @@ export default function DailyPractice() {
       setIsLoading(true);
       try {
         await loadDailyQueue();
+        await loadTotalWordsLearned();
       } catch (error) {
         console.error('Error loading daily queue:', error);
       } finally {
@@ -32,6 +41,13 @@ export default function DailyPractice() {
     try {
       await markWordReviewed(currentWord.id, direction);
       setCompletedCount(prev => prev + 1);
+
+      // Play haptic feedback
+      await Haptics.notificationAsync(
+        direction === 'correct' ? Haptics.NotificationFeedbackType.Success :
+        direction === 'learning' ? Haptics.NotificationFeedbackType.Warning :
+        Haptics.NotificationFeedbackType.Error
+      );
 
       if (dailyQueue.length === 0) {
         incrementStreak();

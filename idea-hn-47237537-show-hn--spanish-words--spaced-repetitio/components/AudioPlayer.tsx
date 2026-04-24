@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Audio } from 'expo-av';
+import * as Haptics from 'expo-haptics';
 
 interface AudioPlayerProps {
   audioUrl: string;
@@ -34,6 +35,9 @@ export default function AudioPlayer({ audioUrl }: AudioPlayerProps) {
       );
       setSound(newSound);
       setIsPlaying(true);
+
+      // Play haptic feedback
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
       newSound.setOnPlaybackStatusUpdate((status) => {
         if (status.didJustFinish) {

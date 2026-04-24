@@ -58,8 +58,8 @@ export const useStore = create<StoreState>()(
       loadDailyQueue: async () => {
         const { settings } = get();
         try {
-          const newWords = await getDueWords(settings.dailyGoal);
-          const reviewWords = await getDueWords(10);
+          const newWords = await getDueWords(settings.dailyGoal, true);
+          const reviewWords = await getDueWords(10, false);
 
           // Combine and shuffle the queue
           const combinedQueue = [...newWords, ...reviewWords];
@@ -149,11 +149,9 @@ export const useStore = create<StoreState>()(
       },
 
       updateSettings: async (newSettings) => {
-        const { settings } = get();
-        const updatedSettings = { ...settings, ...newSettings };
-        set({ settings: updatedSettings });
         try {
-          await updateSettings(updatedSettings);
+          await updateSettings(newSettings);
+          set({ settings: { ...get().settings, ...newSettings } });
         } catch (error) {
           console.error('Error updating settings:', error);
         }
@@ -180,19 +178,3 @@ export const useStore = create<StoreState>()(
     }
   )
 );
-
-// Initialize settings from database
-(async () => {
-  try {
-    const dbSettings = await getSettings();
-    if (Object.keys(dbSettings).length > 0) {
-      useStore.setState({ settings: dbSettings });
-    }
-
-    // Load initial data
-    await useStore.getState().loadDailyQueue();
-    await useStore.getState().loadTotalWordsLearned();
-  } catch (error) {
-    console.error('Error initializing store:', error);
-  }
-})();
