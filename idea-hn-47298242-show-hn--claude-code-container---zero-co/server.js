@@ -194,118 +194,82 @@ app.post('/api/run/:sessionId', async (req, res) => {
     return res.status(404).json({ error: 'Session not found' });
   }
 
-  const { code, language } = req.body;
-  session.code = code;
-
-  let tempDir = null;
-  let container = null;
-  let timeoutId = null;
+  const { code, language } = session;
+  let container;
 
   try {
     // Validate code
     validateCode(code);
 
     // Write code to temporary file
-    const { tempDir: dir, filepath, filename } = await writeCodeToTempFile(code, language);
-    tempDir = dir;
+    const { tempDir, filepath, filename } = await writeCodeToTempFile(code, language);
 
-    // Create container with strict security settings
+    // Create Docker container
+    const image = getDockerImage(language);
+    const command = getCodeExecutionCommand(filename, language);
+
     container = await docker.createContainer({
-      Image: getDockerImage(language),
-      Cmd: getCodeExecutionCommand(filename, language),
+      Image: image,
+      Cmd: command,
       HostConfig: {
-        Memory: 128 * 1024 * 1024, // 128MB memory limit
-        CpuQuota: 50000, // 0.5 CPU
-        CpuPeriod: 100000,
-        PidsLimit: 50, // Max 50 processes
-        DeviceWriteBps: [{ Path: '/dev/sda', Rate: 1048576 }], // 1MB/s write limit
-        NetworkMode: 'none', // No network access
-        AutoRemove: true,
-        ReadonlyRootfs: true,
-        SecurityOpt: ['no-new-privileges'],
-        CapDrop: ['ALL'],
         Binds: [`${tempDir}:/workspace`],
+        AutoRemove: true,
+        Memory: 256 * 1024 * 1024, // 256MB memory limit
+        CPUShares: 512, // Limit CPU usage
+        NetworkMode: 'none' // No network access
       },
-      WorkingDir: '/workspace',
+      WorkingDir: '/workspace'
     });
 
     // Start container
     await container.start();
 
-    // Set timeout for execution
-    timeoutId = setTimeout(async () => {
-      try {
-        await container.stop();
-        io.to(sessionId).emit('output', {
-          output: 'Execution timed out (30 seconds)',
-          language,
-          timestamp: new Date().toISOString(),
-        });
-      } catch (err) {
-        console.error('Error stopping container:', err);
-      }
-    }, EXECUTION_TIMEOUT);
+    // Stream output to client via WebSocket
+    const socket = io.sockets.sockets.get(sessionId);
+    if (socket) {
+      const stream = await container.logs({
+        follow: true,
+        stdout: true,
+        stderr: true
+      });
 
-    // Wait for container to finish
-    const result = await container.wait();
+      stream.on('data', (chunk) => {
+        const output = chunk.toString('utf8');
+        socket.emit('output', output);
+      });
 
-    // Clear timeout if container finished
-    clearTimeout(timeoutId);
+      stream.on('end', () => {
+        socket.emit('execution-complete');
+      });
+    }
 
-    // Get container logs
-    const logs = await container.logs({
-      stdout: true,
-      stderr: true,
-      timestamps: false,
-    });
-
-    // Convert logs to string
-    let output = logs.toString('utf8');
+    // Wait for container to finish with timeout
+    await Promise.race([
+      container.wait(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Execution timeout')), EXECUTION_TIMEOUT))
+    ]);
 
     // Clean up
-    await container.remove();
+    await container.stop();
     await fs.rm(tempDir, { recursive: true, force: true });
-
-    // Emit output via WebSocket
-    io.to(sessionId).emit('output', {
-      output,
-      language,
-      timestamp: new Date().toISOString(),
-    });
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Execution error:', error);
-
-    // Clean up resources if they exist
-    if (timeoutId) clearTimeout(timeoutId);
+    // Clean up if container exists
     if (container) {
       try {
         await container.stop();
-        await container.remove();
-      } catch (err) {
-        console.error('Error cleaning up container:', err);
-      }
-    }
-    if (tempDir) {
-      try {
-        await fs.rm(tempDir, { recursive: true, force: true });
-      } catch (err) {
-        console.error('Error cleaning up temp directory:', err);
+      } catch (stopError) {
+        console.error('Error stopping container:', stopError);
       }
     }
 
-    // Emit error via WebSocket
-    io.to(sessionId).emit('error', {
-      error: error.message || 'Execution failed',
-      timestamp: new Date().toISOString(),
-    });
-
+    console.error('Execution error:', error);
     res.status(500).json({ error: error.message || 'Execution failed' });
   }
 });
 
-// WebSocket connection handling
+// WebSocket connection handler
 io.on('connection', (socket) => {
   console.log('Client connected');
 
