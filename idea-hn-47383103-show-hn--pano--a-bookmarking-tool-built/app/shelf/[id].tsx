@@ -1,22 +1,25 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, FlatList, RefreshControl } from 'react-native';
-import { FAB, Text, useTheme, Portal, Dialog, Button, TextInput } from 'react-native-paper';
+import React, { useState, useCallback } from 'react';
+import { View, StyleSheet, FlatList, RefreshControl, Share, Alert } from 'react-native';
+import { FAB, Text, useTheme, Portal, Dialog, Button, TextInput, IconButton } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useItems } from '../../hooks/useItems';
 import { useShelves } from '../../hooks/useShelves';
 import { ItemCard } from '../../components/ItemCard';
 import { useUserStore } from '../../lib/store/user';
+import { generateShareLink } from '../../lib/utils/share';
+import { usePremium } from '../../hooks/usePremium';
 
 export default function ShelfDetailScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const shelfId = parseInt(id, 10);
-  
+
   const { shelves } = useShelves();
   const { items, loading, createItem, removeItem, refresh } = useItems(shelfId);
   const { isPremium } = useUserStore();
-  
+  const { checkItemLimit } = usePremium();
+
   const [addDialogVisible, setAddDialogVisible] = useState(false);
   const [paywallVisible, setPaywallVisible] = useState(false);
   const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
@@ -26,17 +29,16 @@ export default function ShelfDetailScreen() {
 
   const shelf = shelves.find(s => s.id === shelfId);
 
-  const handleAddItem = () => {
+  const handleAddItem = useCallback(() => {
     setUrl('');
     setAddDialogVisible(true);
-  };
+  }, []);
 
-  const extractMetadata = async (itemUrl: string) => {
-    // Simple metadata extraction - in production, this would call an API
+  const extractMetadata = useCallback(async (itemUrl: string) => {
     try {
       const urlObj = new URL(itemUrl);
       const domain = urlObj.hostname.replace('www.', '');
-      
+
       return {
         title: domain,
         description: itemUrl,
@@ -51,10 +53,17 @@ export default function ShelfDetailScreen() {
         favicon_url: undefined,
       };
     }
-  };
+  }, []);
 
-  const handleSaveItem = async () => {
+  const handleSaveItem = useCallback(async () => {
     if (!url.trim()) return;
+
+    const canAdd = await checkItemLimit(shelfId);
+    if (!canAdd) {
+      setAddDialogVisible(false);
+      setPaywallVisible(true);
+      return;
+    }
 
     setSaving(true);
     try {
@@ -63,29 +72,40 @@ export default function ShelfDetailScreen() {
       setUrl('');
       setAddDialogVisible(false);
     } catch (err) {
-      if (err instanceof Error && err.message === 'FREE_TIER_LIMIT') {
-        setAddDialogVisible(false);
-        setPaywallVisible(true);
-      }
+      Alert.alert('Error', 'Failed to save item. Please try again.');
     } finally {
       setSaving(false);
     }
-  };
+  }, [url, shelfId, createItem, extractMetadata, checkItemLimit]);
 
-  const handleDeleteItem = (itemId: number) => {
+  const handleDeleteItem = useCallback((itemId: number) => {
     setItemToDelete(itemId);
     setDeleteDialogVisible(true);
-  };
+  }, []);
 
-  const confirmDelete = async () => {
+  const confirmDelete = useCallback(async () => {
     if (itemToDelete !== null) {
       await removeItem(itemToDelete);
       setItemToDelete(null);
       setDeleteDialogVisible(false);
     }
-  };
+  }, [itemToDelete, removeItem]);
 
-  const renderEmpty = () => (
+  const handleShareShelf = useCallback(async () => {
+    if (!shelf) return;
+
+    try {
+      const shareLink = generateShareLink(shelf.id);
+      await Share.share({
+        message: `Check out my shelf "${shelf.name}" on ShelfLife: ${shareLink}`,
+        url: shareLink,
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share shelf');
+    }
+  }, [shelf]);
+
+  const renderEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
       <Text variant="displaySmall" style={{ marginBottom: 16 }}>🔗</Text>
       <Text variant="headlineSmall" style={{ marginBottom: 8, textAlign: 'center' }}>
@@ -95,13 +115,21 @@ export default function ShelfDetailScreen() {
         Add your first link to this shelf
       </Text>
     </View>
-  );
+  ), [theme.colors.onSurfaceVariant]);
 
-  const renderHeader = () => (
+  const renderHeader = useCallback(() => (
     <View style={styles.header}>
-      <Text variant="headlineMedium" style={styles.shelfName}>
-        {shelf?.name || 'Shelf'}
-      </Text>
+      <View style={styles.headerTop}>
+        <Text variant="headlineMedium" style={styles.shelfName}>
+          {shelf?.name || 'Shelf'}
+        </Text>
+        <IconButton
+          icon="share-variant"
+          size={24}
+          onPress={handleShareShelf}
+          style={styles.shareButton}
+        />
+      </View>
       {shelf?.description && (
         <Text variant="bodyMedium" style={[styles.shelfDescription, { color: theme.colors.onSurfaceVariant }]}>
           {shelf.description}
@@ -111,7 +139,7 @@ export default function ShelfDetailScreen() {
         {items.length} {items.length === 1 ? 'item' : 'items'}
       </Text>
     </View>
-  );
+  ), [shelf, items.length, theme.colors.onSurfaceVariant, theme.colors.primary, handleShareShelf]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -153,32 +181,17 @@ export default function ShelfDetailScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
+              style={styles.urlInput}
             />
           </Dialog.Content>
           <Dialog.Actions>
-            <Button onPress={() => setAddDialogVisible(false)} disabled={saving}>
-              Cancel
-            </Button>
-            <Button onPress={handleSaveItem} disabled={!url.trim() || saving} loading={saving}>
-              Add
-            </Button>
-          </Dialog.Actions>
-        </Dialog>
-
-        <Dialog visible={paywallVisible} onDismiss={() => setPaywallVisible(false)}>
-          <Dialog.Title>Upgrade to Premium</Dialog.Title>
-          <Dialog.Content>
-            <Text variant="bodyMedium">
-              You've reached the free tier limit of 50 items per shelf. Upgrade to Premium for unlimited items!
-            </Text>
-          </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setPaywallVisible(false)}>Cancel</Button>
-            <Button onPress={() => {
-              setPaywallVisible(false);
-              router.push('/paywall');
-            }}>
-              Upgrade
+            <Button onPress={() => setAddDialogVisible(false)}>Cancel</Button>
+            <Button
+              onPress={handleSaveItem}
+              loading={saving}
+              disabled={!url.trim()}
+            >
+              Save
             </Button>
           </Dialog.Actions>
         </Dialog>
@@ -186,15 +199,26 @@ export default function ShelfDetailScreen() {
         <Dialog visible={deleteDialogVisible} onDismiss={() => setDeleteDialogVisible(false)}>
           <Dialog.Title>Delete Item</Dialog.Title>
           <Dialog.Content>
-            <Text variant="bodyMedium">
-              Are you sure you want to delete this item?
-            </Text>
+            <Text>Are you sure you want to delete this item?</Text>
           </Dialog.Content>
           <Dialog.Actions>
             <Button onPress={() => setDeleteDialogVisible(false)}>Cancel</Button>
-            <Button onPress={confirmDelete} textColor={theme.colors.error}>
-              Delete
-            </Button>
+            <Button onPress={confirmDelete}>Delete</Button>
+          </Dialog.Actions>
+        </Dialog>
+
+        <Dialog visible={paywallVisible} onDismiss={() => setPaywallVisible(false)}>
+          <Dialog.Title>Premium Feature</Dialog.Title>
+          <Dialog.Content>
+            <Text>You've reached the free tier limit of 50 items per shelf.</Text>
+            <Text style={{ marginTop: 8 }}>Upgrade to add more items.</Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setPaywallVisible(false)}>Later</Button>
+            <Button onPress={() => {
+              setPaywallVisible(false);
+              router.push('/paywall');
+            }}>Upgrade</Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -210,8 +234,17 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 8,
   },
+  headerTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   shelfName: {
-    marginBottom: 4,
+    fontWeight: 'bold',
+    flex: 1,
+  },
+  shareButton: {
+    margin: 0,
   },
   shelfDescription: {
     marginTop: 4,
@@ -221,17 +254,21 @@ const styles = StyleSheet.create({
   },
   emptyList: {
     flex: 1,
-  },
-  emptyContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
+  },
+  emptyContainer: {
+    alignItems: 'center',
     padding: 32,
-    minHeight: 400,
   },
   fab: {
     position: 'absolute',
-    right: 16,
-    bottom: 16,
+    margin: 16,
+    right: 0,
+    bottom: 0,
+  },
+  urlInput: {
+    marginTop: 8,
   },
 });
