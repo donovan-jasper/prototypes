@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal, Alert } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Modal, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { getFirestore, collection, addDoc, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, onSnapshot } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 interface Group {
@@ -15,6 +15,7 @@ interface Group {
 
 const Hive: React.FC = () => {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroup, setNewGroup] = useState({
@@ -28,22 +29,17 @@ const Hive: React.FC = () => {
   const auth = getAuth();
 
   useEffect(() => {
-    fetchGroups();
-  }, []);
-
-  const fetchGroups = async () => {
-    try {
-      const q = query(collection(db, 'groups'));
-      const querySnapshot = await getDocs(q);
+    const unsubscribe = onSnapshot(collection(db, 'groups'), (snapshot) => {
       const groupsData: Group[] = [];
-      querySnapshot.forEach((doc) => {
+      snapshot.forEach((doc) => {
         groupsData.push({ id: doc.id, ...doc.data() } as Group);
       });
       setGroups(groupsData);
-    } catch (error) {
-      console.error('Error fetching groups:', error);
-    }
-  };
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const handleCreateGroup = async () => {
     if (!newGroup.name.trim()) {
@@ -67,7 +63,6 @@ const Hive: React.FC = () => {
       await addDoc(collection(db, 'groups'), groupData);
       setShowCreateModal(false);
       setNewGroup({ name: '', description: '', privacy: 'public' });
-      fetchGroups();
     } catch (error) {
       console.error('Error creating group:', error);
       Alert.alert('Error', 'Failed to create group');
@@ -96,7 +91,6 @@ const Hive: React.FC = () => {
         });
         Alert.alert('Success', `You joined ${group.name}`);
       }
-      fetchGroups();
     } catch (error) {
       console.error('Error joining/leaving group:', error);
       Alert.alert('Error', 'Failed to update group membership');
@@ -107,6 +101,29 @@ const Hive: React.FC = () => {
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     group.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6200EE" />
+        <Text style={styles.loadingText}>Loading groups...</Text>
+      </View>
+    );
+  }
+
+  if (groups.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>No groups found. Create one to get started!</Text>
+        <TouchableOpacity
+          style={styles.createButton}
+          onPress={() => setShowCreateModal(true)}
+        >
+          <Text style={styles.createButtonText}>Create New Group</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -161,11 +178,11 @@ const Hive: React.FC = () => {
         )}
       />
 
-      {/* Create Group Modal */}
       <Modal
         visible={showCreateModal}
         animationType="slide"
         transparent={true}
+        onRequestClose={() => setShowCreateModal(false)}
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
@@ -217,7 +234,7 @@ const Hive: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.createButtonModal]}
+                style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateGroup}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -227,32 +244,44 @@ const Hive: React.FC = () => {
         </View>
       </Modal>
 
-      {/* Group Detail Modal */}
       {selectedGroup && (
         <Modal
           visible={!!selectedGroup}
           animationType="slide"
           transparent={true}
+          onRequestClose={() => setSelectedGroup(null)}
         >
           <View style={styles.modalContainer}>
             <View style={styles.modalContent}>
               <Text style={styles.modalTitle}>{selectedGroup.name}</Text>
-              <Text style={styles.groupDetailDescription}>{selectedGroup.description}</Text>
-
-              <Text style={styles.sectionTitle}>Members ({selectedGroup.members.length})</Text>
-              <Text style={styles.memberList}>
-                {selectedGroup.members.length > 0 ? selectedGroup.members.join(', ') : 'No members yet'}
+              <Text style={styles.groupPrivacy}>
+                {selectedGroup.privacy === 'public' ? 'Public Group' : 'Private Group'}
               </Text>
+              <Text style={styles.groupDescription}>{selectedGroup.description}</Text>
+              <Text style={styles.memberCount}>{selectedGroup.members.length} members</Text>
 
-              <Text style={styles.sectionTitle}>Recent Activity</Text>
-              <Text style={styles.activityText}>No recent activity</Text>
-
-              <TouchableOpacity
-                style={styles.closeButton}
-                onPress={() => setSelectedGroup(null)}
-              >
-                <Text style={styles.closeButtonText}>Close</Text>
-              </TouchableOpacity>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.cancelButton]}
+                  onPress={() => setSelectedGroup(null)}
+                >
+                  <Text style={styles.modalButtonText}>Close</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    selectedGroup.members.includes(auth.currentUser?.uid || '') ? styles.leaveButton : styles.joinButton
+                  ]}
+                  onPress={() => {
+                    handleJoinLeaveGroup(selectedGroup);
+                    setSelectedGroup(null);
+                  }}
+                >
+                  <Text style={styles.modalButtonText}>
+                    {selectedGroup.members.includes(auth.currentUser?.uid || '') ? 'Leave' : 'Join'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </Modal>
@@ -264,32 +293,56 @@ const Hive: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 16,
     backgroundColor: '#f5f5f5',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f5f5f5',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6200EE',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#f5f5f5',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 24,
+    textAlign: 'center',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#333',
+    marginBottom: 16,
+    color: '#6200EE',
   },
   searchContainer: {
-    marginBottom: 15,
+    marginBottom: 16,
   },
   searchInput: {
-    backgroundColor: '#fff',
-    padding: 10,
-    borderRadius: 5,
-    borderWidth: 1,
+    height: 40,
     borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#fff',
   },
   createButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#6200EE',
     padding: 12,
-    borderRadius: 5,
-    marginBottom: 15,
+    borderRadius: 8,
     alignItems: 'center',
+    marginBottom: 16,
   },
   createButtonText: {
     color: 'white',
@@ -297,28 +350,33 @@ const styles = StyleSheet.create({
   },
   groupItem: {
     backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 5,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   groupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    marginBottom: 8,
   },
   groupName: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   groupPrivacy: {
+    fontSize: 14,
     color: '#666',
-    fontStyle: 'italic',
   },
   groupDescription: {
-    marginBottom: 10,
-    color: '#555',
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 12,
   },
   groupFooter: {
     flexDirection: 'row',
@@ -326,19 +384,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   memberCount: {
+    fontSize: 14,
     color: '#666',
   },
   joinButton: {
-    backgroundColor: '#2196F3',
-    padding: 8,
-    borderRadius: 5,
+    backgroundColor: '#6200EE',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
   },
   leaveButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#ff4444',
   },
   joinButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontSize: 14,
   },
   modalContainer: {
     flex: 1,
@@ -348,24 +408,24 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: 'white',
+    borderRadius: 8,
     padding: 20,
-    borderRadius: 10,
     width: '80%',
-    maxHeight: '80%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
+    marginBottom: 16,
+    color: '#6200EE',
   },
   input: {
-    backgroundColor: '#f5f5f5',
-    padding: 10,
-    borderRadius: 5,
-    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    backgroundColor: '#fff',
   },
   textArea: {
     height: 100,
@@ -374,70 +434,36 @@ const styles = StyleSheet.create({
   privacyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 16,
   },
   privacyLabel: {
-    marginRight: 10,
+    marginRight: 16,
+    fontSize: 16,
   },
   privacyOption: {
     padding: 8,
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 5,
-    marginRight: 10,
+    borderRadius: 4,
+    marginRight: 8,
   },
   selectedPrivacy: {
-    backgroundColor: '#e3f2fd',
-    borderColor: '#2196F3',
+    backgroundColor: '#6200EE',
+    borderColor: '#6200EE',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
   modalButton: {
-    padding: 10,
-    borderRadius: 5,
-    flex: 1,
-    marginHorizontal: 5,
-    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginLeft: 8,
   },
   cancelButton: {
-    backgroundColor: '#f44336',
-  },
-  createButtonModal: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#f5f5f5',
   },
   modalButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  groupDetailDescription: {
-    marginBottom: 15,
-    color: '#555',
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginTop: 10,
-    marginBottom: 5,
-  },
-  memberList: {
-    marginBottom: 15,
-    color: '#555',
-  },
-  activityText: {
-    color: '#777',
-    fontStyle: 'italic',
-  },
-  closeButton: {
-    backgroundColor: '#2196F3',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 15,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    color: 'white',
     fontWeight: 'bold',
   },
 });
