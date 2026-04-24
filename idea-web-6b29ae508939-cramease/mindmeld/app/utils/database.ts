@@ -1,7 +1,13 @@
 import * as SQLite from 'expo-sqlite';
-import { calculateNextReview, ReviewHistory } from './spacedRepetition';
+import { calculateNextReview } from './spacedRepetition';
 
 const db = SQLite.openDatabase('mindmeld.db');
+
+export interface ReviewHistory {
+  interval: number;
+  repetition: number;
+  efactor: number;
+}
 
 export const initializeDatabase = () => {
   db.transaction(tx => {
