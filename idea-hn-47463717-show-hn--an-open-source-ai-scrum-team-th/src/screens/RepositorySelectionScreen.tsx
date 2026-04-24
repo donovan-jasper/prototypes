@@ -38,7 +38,7 @@ const RepositorySelectionScreen: React.FC = () => {
         setFilteredRepositories(response.data);
       } catch (error) {
         console.error('Error fetching repositories:', error);
-        Alert.alert('Error', 'Could not fetch repositories');
+        Alert.alert('Error', 'Could not fetch repositories. Please try again.');
         navigation.navigate('Login');
       } finally {
         setLoading(false);
@@ -66,14 +66,14 @@ const RepositorySelectionScreen: React.FC = () => {
       navigation.navigate('IssueList', { repo: repo.full_name });
     } catch (error) {
       console.error('Error saving repository:', error);
-      Alert.alert('Error', 'Could not save repository selection');
+      Alert.alert('Error', 'Could not save repository selection. Please try again.');
     }
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" />
+        <ActivityIndicator size="large" color="#6200ee" />
         <Text style={styles.loadingText}>Loading your repositories...</Text>
       </View>
     );
@@ -86,6 +86,7 @@ const RepositorySelectionScreen: React.FC = () => {
       <TextInput
         style={styles.searchBar}
         placeholder="Search repositories..."
+        placeholderTextColor="#999"
         value={searchQuery}
         onChangeText={setSearchQuery}
         autoCapitalize="none"
@@ -93,7 +94,7 @@ const RepositorySelectionScreen: React.FC = () => {
 
       {filteredRepositories.length === 0 && searchQuery !== '' ? (
         <View style={styles.noResultsContainer}>
-          <Text style={styles.noResultsText}>No repositories found</Text>
+          <Text style={styles.noResultsText}>No repositories found matching "{searchQuery}"</Text>
         </View>
       ) : (
         <FlatList
@@ -103,6 +104,7 @@ const RepositorySelectionScreen: React.FC = () => {
             <TouchableOpacity
               style={styles.repoItem}
               onPress={() => handleRepositorySelect(item)}
+              activeOpacity={0.7}
             >
               <View style={styles.repoHeader}>
                 <Text style={styles.repoName}>{item.name}</Text>
@@ -113,9 +115,16 @@ const RepositorySelectionScreen: React.FC = () => {
               {item.description && (
                 <Text style={styles.repoDescription}>{item.description}</Text>
               )}
+              <Text style={styles.repoFullName}>{item.full_name}</Text>
             </TouchableOpacity>
           )}
           contentContainerStyle={styles.listContent}
+          ListEmptyComponent={
+            <View style={styles.emptyList}>
+              <Text style={styles.emptyListText}>You don't have any repositories yet.</Text>
+              <Text style={styles.emptyListSubtext}>Create one on GitHub to get started.</Text>
+            </View>
+          }
         />
       )}
     </View>
@@ -155,6 +164,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: '#666',
+    fontSize: 16,
   },
   listContent: {
     paddingBottom: 20,
@@ -174,13 +184,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
   },
   repoName: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#333',
-    flex: 1,
   },
   starsContainer: {
     backgroundColor: '#f0f0f0',
@@ -189,22 +198,43 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   starsText: {
-    fontSize: 12,
+    fontSize: 14,
     color: '#666',
   },
   repoDescription: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
+    marginBottom: 8,
+  },
+  repoFullName: {
+    fontSize: 12,
+    color: '#999',
   },
   noResultsContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   noResultsText: {
     fontSize: 16,
     color: '#666',
+    textAlign: 'center',
+  },
+  emptyList: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyListText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyListSubtext: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
   },
 });
 

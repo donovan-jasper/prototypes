@@ -13,9 +13,48 @@ const App: React.FC = () => {
     <NavigationContainer>
       <Stack.Navigator initialRouteName="Login">
         <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="RepositorySelection" component={RepositorySelectionScreen} options={{ title: 'Select Repository' }} />
-        <Stack.Screen name="IssueList" component={IssueListScreen} options={{ title: 'Issues' }} />
-        <Stack.Screen name="PRReview" component={PRReviewScreen} options={{ title: 'Pull Request Review' }} />
+        <Stack.Screen
+          name="RepositorySelection"
+          component={RepositorySelectionScreen}
+          options={{
+            title: 'Select Repository',
+            headerStyle: {
+              backgroundColor: '#6200ee',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          }}
+        />
+        <Stack.Screen
+          name="IssueList"
+          component={IssueListScreen}
+          options={({ route }) => ({
+            title: route.params?.repo ? `${route.params.repo.split('/')[1]} Issues` : 'Issues',
+            headerStyle: {
+              backgroundColor: '#6200ee',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          })}
+        />
+        <Stack.Screen
+          name="PRReview"
+          component={PRReviewScreen}
+          options={{
+            title: 'Pull Request Review',
+            headerStyle: {
+              backgroundColor: '#6200ee',
+            },
+            headerTintColor: '#fff',
+            headerTitleStyle: {
+              fontWeight: 'bold',
+            },
+          }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
