@@ -7,8 +7,8 @@ import AppointmentCard from '../../components/AppointmentCard';
 export default function DashboardScreen() {
   const router = useRouter();
   const appointments = useStore((state) => state.appointments);
-  
-  const sortedAppointments = [...appointments].sort((a, b) => 
+
+  const sortedAppointments = [...appointments].sort((a, b) =>
     new Date(a.date).getTime() - new Date(b.date).getTime()
   );
 
@@ -16,7 +16,7 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Family Health Dashboard</Text>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.addButton}
           onPress={() => router.push('/appointment/add')}
         >
@@ -36,7 +36,7 @@ export default function DashboardScreen() {
           data={sortedAppointments}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <AppointmentCard 
+            <AppointmentCard
               appointment={item}
               onPress={() => router.push(`/appointment/${item.id}`)}
             />
