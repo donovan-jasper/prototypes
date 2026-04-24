@@ -14,7 +14,7 @@ import { postProduct as postToFacebook, retryPostProduct as retryFacebook } from
 import { addProduct } from '../../lib/db';
 import { useAuthStore } from '../../lib/store/useAuthStore';
 import { useNavigation } from '@react-navigation/native';
-import { compressImage, formatImageForPlatform, addWatermark } from '../../lib/utils/imageProcessor';
+import { compressImage, formatImageForPlatform, addWatermark, saveImageToDevice } from '../../lib/utils/imageProcessor';
 import * as Network from 'expo-network';
 import { useQueueStore } from '../../lib/store/useQueueStore';
 
@@ -136,58 +136,59 @@ export default function PostScreen() {
           // Process image for platform
           let processedImageUri = await compressImage(imageUri);
           processedImageUri = await formatImageForPlatform(processedImageUri, platform);
-          if (!isPremium) {
-            processedImageUri = await addWatermark(processedImageUri);
-          }
+          processedImageUri = await addWatermark(processedImageUri);
+
+          // Save processed image to device
+          const savedImageUri = await saveImageToDevice(processedImageUri);
+          product.imageUri = savedImageUri;
 
           // Update product with processed image
-          const platformProduct = { ...product, imageUri: processedImageUri };
+          await updateProduct(product);
 
           // Post to platform
           let result;
-          switch (platform) {
-            case 'TikTok':
-              result = await postToTikTok(platformProduct, connectedPlatform.apiKey);
+          switch (platform.toLowerCase()) {
+            case 'tiktok':
+              result = await postToTikTok(product, connectedPlatform.apiKey);
               break;
-            case 'Instagram':
-              result = await postToInstagram(platformProduct, connectedPlatform.apiKey, connectedPlatform.businessAccountId);
+            case 'instagram':
+              result = await postToInstagram(product, connectedPlatform.apiKey, connectedPlatform.businessAccountId);
               break;
-            case 'Facebook':
-              result = await postToFacebook(platformProduct, connectedPlatform.apiKey, connectedPlatform.pageId);
+            case 'facebook':
+              result = await postToFacebook(product, connectedPlatform.apiKey, connectedPlatform.pageId);
               break;
             default:
               throw new Error(`Unsupported platform: ${platform}`);
           }
 
-          platformResults.push({ platform, success: true, result });
+          platformResults.push({
+            platform,
+            success: true,
+            message: result.message || 'Successfully posted'
+          });
+
+          completedPlatforms++;
+          setPostingProgress(Math.round((completedPlatforms / totalPlatforms) * 100));
         } catch (error) {
           console.error(`Error posting to ${platform}:`, error);
-          platformResults.push({ platform, success: false, error: error.message });
+          platformResults.push({
+            platform,
+            success: false,
+            message: error.message || `Failed to post to ${platform}`
+          });
         }
-
-        completedPlatforms++;
-        setPostingProgress((completedPlatforms / totalPlatforms) * 100);
       }
 
       // Show results
-      const successfulPosts = platformResults.filter(r => r.success).length;
-      const failedPosts = platformResults.filter(r => !r.success).length;
-
-      if (successfulPosts > 0) {
-        setSnackbarMessage(`Posted to ${successfulPosts} platform${successfulPosts > 1 ? 's' : ''}`);
-      }
-
-      if (failedPosts > 0) {
-        Alert.alert(
-          'Partial Success',
-          `${successfulPosts} platform${successfulPosts > 1 ? 's' : ''} succeeded, ${failedPosts} failed.`,
-          [{ text: 'OK' }]
-        );
-      }
+      const successCount = platformResults.filter(r => r.success).length;
+      setSnackbarMessage(`Posted to ${successCount} of ${totalPlatforms} platforms`);
+      setSnackbarVisible(true);
 
       // Reset form
       reset();
       setImageUri(null);
+
+      // Navigate to inventory
       navigation.navigate('inventory');
     } catch (error) {
       console.error('Error posting product:', error);
@@ -195,6 +196,7 @@ export default function PostScreen() {
       setSnackbarVisible(true);
     } finally {
       setIsPosting(false);
+      setPostingProgress(0);
     }
   };
 
@@ -202,35 +204,33 @@ export default function PostScreen() {
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Quick Post</Text>
 
-      <View style={styles.imageContainer}>
-        {imageUri ? (
+      {imageUri ? (
+        <View style={styles.imageContainer}>
           <Image source={{ uri: imageUri }} style={styles.productImage} />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No image selected</Text>
-          </View>
-        )}
-
-        <View style={styles.imageButtons}>
-          <Button
-            mode="contained"
+          <TouchableOpacity
+            style={styles.changeImageButton}
             onPress={() => setShowCamera(true)}
-            style={styles.imageButton}
-            icon="camera"
           >
-            Take Photo
-          </Button>
-
-          <Button
-            mode="outlined"
-            onPress={handleImagePicker}
-            style={styles.imageButton}
-            icon="image"
-          >
-            Choose from Library
-          </Button>
+            <Text style={styles.changeImageText}>Change Photo</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+      ) : (
+        <View style={styles.imagePlaceholder}>
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={() => setShowCamera(true)}
+          >
+            <Text style={styles.cameraButtonText}>Take Photo</Text>
+          </TouchableOpacity>
+          <Text style={styles.orText}>or</Text>
+          <TouchableOpacity
+            style={styles.galleryButton}
+            onPress={handleImagePicker}
+          >
+            <Text style={styles.galleryButtonText}>Choose from Gallery</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <View style={styles.formContainer}>
         <Controller
@@ -240,11 +240,12 @@ export default function PostScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               label="Product Title"
-              value={value}
-              onChangeText={onChange}
+              mode="outlined"
               onBlur={onBlur}
-              error={!!errors.title}
+              onChangeText={onChange}
+              value={value}
               style={styles.input}
+              error={!!errors.title}
             />
           )}
         />
@@ -261,13 +262,14 @@ export default function PostScreen() {
           }}
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
-              label="Price ($)"
-              value={value}
-              onChangeText={onChange}
+              label="Price"
+              mode="outlined"
               onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
               keyboardType="numeric"
               error={!!errors.price}
-              style={styles.input}
             />
           )}
         />
@@ -285,12 +287,13 @@ export default function PostScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               label="Inventory Count"
-              value={value}
-              onChangeText={onChange}
+              mode="outlined"
               onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={styles.input}
               keyboardType="numeric"
               error={!!errors.inventory}
-              style={styles.input}
             />
           )}
         />
@@ -301,12 +304,13 @@ export default function PostScreen() {
           render={({ field: { onChange, onBlur, value } }) => (
             <TextInput
               label="Description"
-              value={value}
-              onChangeText={onChange}
+              mode="outlined"
               onBlur={onBlur}
+              onChangeText={onChange}
+              value={value}
+              style={[styles.input, styles.descriptionInput]}
               multiline
-              numberOfLines={3}
-              style={[styles.input, styles.textArea]}
+              numberOfLines={4}
             />
           )}
         />
@@ -328,20 +332,18 @@ export default function PostScreen() {
       <Button
         mode="contained"
         onPress={handleSubmit(onSubmit)}
+        style={styles.postButton}
         loading={isPosting}
         disabled={isPosting}
-        style={styles.postButton}
-        icon="send"
       >
-        Post Everywhere
+        {isPosting ? 'Posting...' : 'Post Everywhere'}
       </Button>
 
       {isPosting && (
         <View style={styles.progressContainer}>
-          <Text style={styles.progressText}>
-            Posting to {postingPlatforms.join(', ')}...
-          </Text>
+          <Text style={styles.progressText}>Posting to platforms...</Text>
           <ProgressBar progress={postingProgress / 100} style={styles.progressBar} />
+          <Text style={styles.progressPercent}>{postingProgress}%</Text>
         </View>
       )}
 
@@ -353,19 +355,14 @@ export default function PostScreen() {
       )}
 
       <Portal>
-        <Snackbar
-          visible={snackbarVisible}
-          onDismiss={() => setSnackbarVisible(false)}
-          duration={3000}
-        >
-          {snackbarMessage}
-        </Snackbar>
-
         <Dialog visible={showUpgradeDialog} onDismiss={() => setShowUpgradeDialog(false)}>
-          <Dialog.Title>Upgrade Required</Dialog.Title>
+          <Dialog.Title>Upgrade to Premium</Dialog.Title>
           <Dialog.Content>
             <Paragraph>
-              You can only post to 2 platforms on the free tier. Upgrade to post to all selected platforms.
+              To post to more than 2 platforms, please upgrade to SyncSell Premium.
+            </Paragraph>
+            <Paragraph style={styles.dialogHighlight}>
+              Unlimited platforms, scheduled posting, and more!
             </Paragraph>
           </Dialog.Content>
           <Dialog.Actions>
@@ -376,6 +373,18 @@ export default function PostScreen() {
             }}>Upgrade</Button>
           </Dialog.Actions>
         </Dialog>
+
+        <Snackbar
+          visible={snackbarVisible}
+          onDismiss={() => setSnackbarVisible(false)}
+          duration={3000}
+          action={{
+            label: 'OK',
+            onPress: () => setSnackbarVisible(false),
+          }}
+        >
+          {snackbarMessage}
+        </Snackbar>
       </Portal>
     </ScrollView>
   );
@@ -387,73 +396,103 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
+    paddingBottom: 40,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 24,
-    textAlign: 'center',
+    marginBottom: 20,
+    color: '#333',
   },
   imageContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
     alignItems: 'center',
   },
   productImage: {
     width: '100%',
-    height: 250,
+    height: 300,
     borderRadius: 8,
-    marginBottom: 16,
     resizeMode: 'cover',
   },
-  placeholderImage: {
-    width: '100%',
-    height: 250,
-    borderRadius: 8,
+  changeImageButton: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#6200ee',
+    borderRadius: 4,
+  },
+  changeImageText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  imagePlaceholder: {
+    height: 300,
     backgroundColor: '#e0e0e0',
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  placeholderText: {
-    color: '#757575',
+  cameraButton: {
+    backgroundColor: '#6200ee',
+    padding: 15,
+    borderRadius: 4,
+    marginBottom: 10,
   },
-  imageButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
+  cameraButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
-  imageButton: {
-    flex: 1,
-    marginHorizontal: 4,
+  orText: {
+    marginVertical: 10,
+    color: '#666',
+  },
+  galleryButton: {
+    padding: 15,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#6200ee',
+  },
+  galleryButtonText: {
+    color: '#6200ee',
+    fontWeight: 'bold',
   },
   formContainer: {
-    marginBottom: 24,
+    marginBottom: 20,
   },
   input: {
-    marginBottom: 16,
+    marginBottom: 15,
     backgroundColor: 'white',
   },
-  textArea: {
-    height: 100,
+  descriptionInput: {
+    height: 120,
   },
   postButton: {
-    marginBottom: 16,
-    paddingVertical: 8,
+    marginTop: 10,
+    padding: 8,
   },
   progressContainer: {
-    marginTop: 16,
-    padding: 16,
-    backgroundColor: 'white',
-    borderRadius: 8,
+    marginTop: 20,
+    alignItems: 'center',
   },
   progressText: {
-    marginBottom: 8,
+    marginBottom: 10,
     fontSize: 16,
-    textAlign: 'center',
+    color: '#666',
   },
   progressBar: {
+    width: '100%',
     height: 8,
     borderRadius: 4,
+  },
+  progressPercent: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
+  },
+  dialogHighlight: {
+    fontWeight: 'bold',
+    marginTop: 10,
+    color: '#6200ee',
   },
 });

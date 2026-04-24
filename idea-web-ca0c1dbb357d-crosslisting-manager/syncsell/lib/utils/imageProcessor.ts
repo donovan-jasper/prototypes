@@ -1,111 +1,158 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const compressImage = async (uri: string): Promise<string> => {
   try {
     // Get image info to determine dimensions
-    const imageInfo = await FileSystem.getInfoAsync(uri);
-    if (!imageInfo.exists) {
-      throw new Error('Image file does not exist');
-    }
-
-    // Calculate new dimensions to maintain aspect ratio but reduce size
-    const maxWidth = 1024;
-    const maxHeight = 1024;
-
-    const manipResult = await ImageManipulator.manipulateAsync(
+    const imageInfo = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: { width: maxWidth, height: maxHeight } }],
-      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+      [],
+      { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
     );
 
-    // Verify the file size is under 2MB
-    const fileInfo = await FileSystem.getInfoAsync(manipResult.uri);
-    if (fileInfo.size > 2 * 1024 * 1024) {
-      // If still too large, compress further
-      const furtherCompressed = await ImageManipulator.manipulateAsync(
-        manipResult.uri,
-        [],
-        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+    // Further compress if needed
+    if (imageInfo.width > 1000 || imageInfo.height > 1000) {
+      const resizeRatio = Math.min(1000 / imageInfo.width, 1000 / imageInfo.height);
+      const newWidth = Math.round(imageInfo.width * resizeRatio);
+      const newHeight = Math.round(imageInfo.height * resizeRatio);
+
+      const resizedImage = await ImageManipulator.manipulateAsync(
+        uri,
+        [{ resize: { width: newWidth, height: newHeight } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
-      return furtherCompressed.uri;
+
+      return resizedImage.uri;
     }
 
-    return manipResult.uri;
+    return imageInfo.uri;
   } catch (error) {
     console.error('Error compressing image:', error);
-    throw error;
+    return uri; // Return original if compression fails
   }
 };
 
 export const formatImageForPlatform = async (uri: string, platform: string): Promise<string> => {
   try {
-    let aspectRatio = { width: 1024, height: 1024 }; // Default square
+    const imageInfo = await ImageManipulator.manipulateAsync(uri, [], { compress: 1 });
 
-    switch (platform) {
-      case 'TikTok Shop':
-        // TikTok prefers square images
-        aspectRatio = { width: 1024, height: 1024 };
+    let aspectRatio = 1; // Default square
+
+    switch (platform.toLowerCase()) {
+      case 'tiktok':
+        aspectRatio = 1; // Square
         break;
-      case 'Instagram Shopping':
-        // Instagram prefers portrait images
-        aspectRatio = { width: 1080, height: 1350 };
+      case 'instagram':
+        aspectRatio = 4/5; // Portrait
         break;
-      case 'Facebook Marketplace':
-        // Facebook prefers square images
-        aspectRatio = { width: 1024, height: 1024 };
+      case 'facebook':
+        aspectRatio = 16/9; // Landscape
         break;
       default:
-        aspectRatio = { width: 1024, height: 1024 };
+        aspectRatio = 1;
     }
 
-    const manipResult = await ImageManipulator.manipulateAsync(
+    // Calculate new dimensions while maintaining aspect ratio
+    let newWidth, newHeight;
+
+    if (imageInfo.width / imageInfo.height > aspectRatio) {
+      // Image is wider than target aspect ratio
+      newHeight = imageInfo.height;
+      newWidth = Math.round(newHeight * aspectRatio);
+    } else {
+      // Image is taller than target aspect ratio
+      newWidth = imageInfo.width;
+      newHeight = Math.round(newWidth / aspectRatio);
+    }
+
+    // Crop the image to the target aspect ratio
+    const croppedImage = await ImageManipulator.manipulateAsync(
       uri,
-      [{ resize: aspectRatio }],
-      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+      [{
+        crop: {
+          originX: Math.max(0, Math.round((imageInfo.width - newWidth) / 2)),
+          originY: Math.max(0, Math.round((imageInfo.height - newHeight) / 2)),
+          width: newWidth,
+          height: newHeight
+        }
+      }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
     );
 
-    return manipResult.uri;
+    return croppedImage.uri;
   } catch (error) {
     console.error('Error formatting image for platform:', error);
-    throw error;
+    return uri; // Return original if formatting fails
   }
 };
 
-export const addWatermark = async (uri: string, isPremium: boolean): Promise<string> => {
+export const addWatermark = async (uri: string): Promise<string> => {
+  const { isPremium } = useAuthStore.getState();
+
   if (isPremium) {
-    // Premium users don't get watermarks
-    return uri;
+    return uri; // No watermark for premium users
   }
 
   try {
-    // Create a watermark text
-    const watermarkText = 'SyncSell - Free Tier';
+    // Create a watermark image (in a real app, you'd have an actual watermark image)
+    const watermarkText = 'SyncSell';
+    const watermarkUri = await createWatermarkImage(watermarkText);
 
-    // Add watermark to the image
-    const manipResult = await ImageManipulator.manipulateAsync(
+    // Composite the watermark onto the original image
+    const watermarkedImage = await ImageManipulator.manipulateAsync(
       uri,
-      [
-        {
-          text: watermarkText,
-          position: { x: 50, y: 50 },
-          fontSize: 30,
-          color: 'rgba(255,255,255,0.7)',
-          shadow: {
-            color: 'black',
-            offset: { width: 2, height: 2 },
-            blur: 3,
-          },
-        },
-      ],
-      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG, base64: false }
+      [{
+        overlay: {
+          uri: watermarkUri,
+          position: { x: 20, y: 20 },
+          size: { width: 100, height: 50 }
+        }
+      }],
+      { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
     );
 
-    return manipResult.uri;
+    // Clean up the temporary watermark image
+    await FileSystem.deleteAsync(watermarkUri, { idempotent: true });
+
+    return watermarkedImage.uri;
   } catch (error) {
     console.error('Error adding watermark:', error);
-    // Return original image if watermark fails
-    return uri;
+    return uri; // Return original if watermarking fails
+  }
+};
+
+const createWatermarkImage = async (text: string): Promise<string> => {
+  // In a real app, you would create an actual image with the watermark text
+  // This is a simplified version that just creates a blank image
+  const width = 200;
+  const height = 100;
+
+  const image = await ImageManipulator.manipulateAsync(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=',
+    [{
+      resize: { width, height }
+    }],
+    { format: ImageManipulator.SaveFormat.PNG }
+  );
+
+  return image.uri;
+};
+
+export const saveImageToDevice = async (uri: string): Promise<string> => {
+  try {
+    const fileName = `syncsell-${Date.now()}.jpg`;
+    const filePath = `${FileSystem.documentDirectory}${fileName}`;
+
+    await FileSystem.copyAsync({
+      from: uri,
+      to: filePath,
+    });
+
+    return filePath;
+  } catch (error) {
+    console.error('Error saving image to device:', error);
+    throw error;
   }
 };

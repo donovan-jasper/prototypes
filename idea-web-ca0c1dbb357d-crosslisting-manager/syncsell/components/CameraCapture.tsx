@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Dimensions, Alert, ActivityIndicator } from 'react-native';
 import { Camera } from 'expo-camera';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -172,38 +172,36 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 50,
   },
-  closeButtonText: {
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+  },
+  loadingText: {
     color: 'white',
+    marginTop: 20,
     fontSize: 16,
   },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
     backgroundColor: 'white',
+    padding: 20,
   },
   permissionText: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 10,
-    textAlign: 'center',
   },
   permissionSubtext: {
     fontSize: 16,
-    color: '#666',
     textAlign: 'center',
     marginBottom: 20,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'white',
-  },
-  loadingText: {
-    marginTop: 10,
+  closeButtonText: {
+    color: '#6200ee',
     fontSize: 16,
-    color: '#666',
   },
 });

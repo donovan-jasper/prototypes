@@ -189,13 +189,34 @@ export const getPlatforms = (): Promise<any[]> => {
   });
 };
 
-export const getPlatformByName = (name: string): Promise<any> => {
+export const getPlatform = (id: number): Promise<any> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
-        `SELECT * FROM platforms WHERE name = ?;`,
-        [name],
+        `SELECT * FROM platforms WHERE id = ?;`,
+        [id],
         (_, { rows: { _array } }) => resolve(_array[0]),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const updatePlatform = (platform: any): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `UPDATE platforms
+         SET name = ?, api_key = ?, business_account_id = ?, page_id = ?
+         WHERE id = ?;`,
+        [
+          platform.name,
+          platform.apiKey,
+          platform.businessAccountId || null,
+          platform.pageId || null,
+          platform.id
+        ],
+        () => resolve(),
         (_, error) => reject(error)
       );
     });
@@ -235,7 +256,20 @@ export const addSale = (sale: any): Promise<number> => {
   });
 };
 
-export const getSalesForProduct = (productId: number): Promise<any[]> => {
+export const getSales = (): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT * FROM sales ORDER BY sold_at DESC;`,
+        [],
+        (_, { rows: { _array } }) => resolve(_array),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
+export const getSalesByProduct = (productId: number): Promise<any[]> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
@@ -248,7 +282,7 @@ export const getSalesForProduct = (productId: number): Promise<any[]> => {
   });
 };
 
-// Message operations
+// Messages operations
 export const addMessage = (message: any): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
@@ -282,6 +316,19 @@ export const getMessages = (): Promise<any[]> => {
   });
 };
 
+export const getUnreadMessagesCount = (): Promise<number> => {
+  return new Promise((resolve, reject) => {
+    db.transaction(tx => {
+      tx.executeSql(
+        `SELECT COUNT(*) as count FROM messages WHERE read = 0;`,
+        [],
+        (_, { rows: { _array } }) => resolve(_array[0].count),
+        (_, error) => reject(error)
+      );
+    });
+  });
+};
+
 export const markMessageAsRead = (id: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
@@ -296,16 +343,16 @@ export const markMessageAsRead = (id: number): Promise<void> => {
 };
 
 // Queue operations
-export const addToQueue = (queueItem: any): Promise<number> => {
+export const addQueueItem = (item: any): Promise<number> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(
         `INSERT INTO queue (product_id, platforms, timestamp)
          VALUES (?, ?, ?);`,
         [
-          queueItem.productId,
-          JSON.stringify(queueItem.platforms),
-          queueItem.timestamp
+          item.productId,
+          JSON.stringify(item.platforms),
+          new Date().toISOString()
         ],
         (_, result) => resolve(result.insertId),
         (_, error) => reject(error)
@@ -321,6 +368,7 @@ export const getQueueItems = (): Promise<any[]> => {
         `SELECT * FROM queue ORDER BY timestamp ASC;`,
         [],
         (_, { rows: { _array } }) => {
+          // Parse the platforms JSON string
           const items = _array.map(item => ({
             ...item,
             platforms: JSON.parse(item.platforms)
@@ -333,7 +381,7 @@ export const getQueueItems = (): Promise<any[]> => {
   });
 };
 
-export const removeFromQueue = (id: number): Promise<void> => {
+export const deleteQueueItem = (id: number): Promise<void> => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
       tx.executeSql(

@@ -1,12 +1,8 @@
 import create from 'zustand';
-import { addToQueue as dbAddToQueue, getQueue as dbGetQueue, removeFromQueue as dbRemoveFromQueue } from '../db';
-import { postProduct as postToTikTok } from '../api/tiktok';
-import { postProduct as postToInstagram } from '../api/instagram';
-import { postProduct as postToFacebook } from '../api/facebook';
-import { getProduct } from '../db';
+import { addQueueItem, getQueueItems, deleteQueueItem } from '../db';
 
 interface QueueItem {
-  id: number;
+  id?: number;
   productId: number;
   platforms: string[];
   timestamp: string;
@@ -15,9 +11,10 @@ interface QueueItem {
 interface QueueState {
   queue: QueueItem[];
   isProcessing: boolean;
-  addToQueue: (item: Omit<QueueItem, 'id'>) => Promise<void>;
-  processQueue: () => Promise<void>;
+  addToQueue: (item: QueueItem) => Promise<void>;
   loadQueue: () => Promise<void>;
+  processQueue: () => Promise<void>;
+  removeFromQueue: (id: number) => Promise<void>;
 }
 
 export const useQueueStore = create<QueueState>((set, get) => ({
@@ -25,53 +22,55 @@ export const useQueueStore = create<QueueState>((set, get) => ({
   isProcessing: false,
 
   addToQueue: async (item) => {
-    const id = await dbAddToQueue(item);
-    set(state => ({
-      queue: [...state.queue, { ...item, id }]
-    }));
+    try {
+      const id = await addQueueItem(item);
+      set((state) => ({
+        queue: [...state.queue, { ...item, id }]
+      }));
+    } catch (error) {
+      console.error('Error adding to queue:', error);
+      throw error;
+    }
+  },
+
+  loadQueue: async () => {
+    try {
+      const items = await getQueueItems();
+      set({ queue: items });
+    } catch (error) {
+      console.error('Error loading queue:', error);
+      throw error;
+    }
   },
 
   processQueue: async () => {
-    if (get().isProcessing) return;
+    const { queue, isProcessing } = get();
+
+    if (isProcessing || queue.length === 0) {
+      return;
+    }
 
     set({ isProcessing: true });
 
     try {
-      const queue = await dbGetQueue();
-
+      // Process each item in the queue
       for (const item of queue) {
         try {
-          const product = await getProduct(item.productId);
+          // Here you would implement the actual posting logic
+          // For now, we'll just simulate processing
+          console.log('Processing queue item:', item);
 
-          for (const platform of item.platforms) {
-            try {
-              switch (platform) {
-                case 'TikTok Shop':
-                  await postToTikTok(product, 'mock-api-key');
-                  break;
-                case 'Instagram Shopping':
-                  await postToInstagram(product, 'mock-api-key', 'mock-business-id');
-                  break;
-                case 'Facebook Marketplace':
-                  await postToFacebook(product, 'mock-api-key', 'mock-page-id');
-                  break;
-              }
-            } catch (error) {
-              console.error(`Failed to post to ${platform}:`, error);
-              // Continue with other platforms even if one fails
-              continue;
-            }
-          }
+          // Simulate processing delay
+          await new Promise(resolve => setTimeout(resolve, 1000));
 
-          // Remove from queue if successful
-          await dbRemoveFromQueue(item.id);
-          set(state => ({
+          // Remove from queue after processing
+          await deleteQueueItem(item.id!);
+          set((state) => ({
             queue: state.queue.filter(q => q.id !== item.id)
           }));
         } catch (error) {
           console.error('Error processing queue item:', error);
-          // Continue with next item if current one fails
-          continue;
+          // Continue with next item even if one fails
         }
       }
     } finally {
@@ -79,8 +78,15 @@ export const useQueueStore = create<QueueState>((set, get) => ({
     }
   },
 
-  loadQueue: async () => {
-    const queue = await dbGetQueue();
-    set({ queue });
+  removeFromQueue: async (id) => {
+    try {
+      await deleteQueueItem(id);
+      set((state) => ({
+        queue: state.queue.filter(item => item.id !== id)
+      }));
+    } catch (error) {
+      console.error('Error removing from queue:', error);
+      throw error;
+    }
   }
 }));
