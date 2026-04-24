@@ -4,8 +4,9 @@ export interface Transaction {
   amount: number;
   payee: string;
   type: 'deposit' | 'withdrawal' | 'transfer';
-  documentId: string;
-  documentHash: string;
+  documentId?: string;
+  documentHash?: string;
+  runningBalance?: number; // Added for trace results
 }
 
 export interface Document {
@@ -14,25 +15,6 @@ export interface Document {
   hash: string;
   uploadDate: Date;
   ocrText: string;
-}
-
-export interface TraceResult {
-  explained: boolean;
-  gap: number;
-  timeline: Transaction[];
-  startBalance: number;
-  endBalance: number;
-}
-
-export interface AuditPDFOptions {
-  includeDocuments: boolean;
-  includeHashes: boolean;
-  watermark: boolean;
-}
-
-export interface SubscriptionStatus {
-  isPremium: boolean;
-  documentCount: number;
-  maxDocuments: number;
-  expirationDate?: Date;
+  fileName?: string;
+  fileSize?: number;
 }
