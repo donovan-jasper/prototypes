@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, TextInput, Button, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, doc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
 import { firebaseConfig } from '../../../firebaseConfig';
+import NewQuestion from './NewQuestion';
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
@@ -21,11 +23,7 @@ const CommunityScreen = () => {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [newQuestion, setNewQuestion] = useState({
-    title: '',
-    content: '',
-    author: 'Anonymous'
-  });
+  const navigation = useNavigation();
 
   useEffect(() => {
     const q = query(collection(db, 'questions'), orderBy('createdAt', 'desc'));
@@ -61,27 +59,8 @@ const CommunityScreen = () => {
     }
   };
 
-  const handleSubmitQuestion = async () => {
-    if (!newQuestion.title || !newQuestion.content) {
-      Alert.alert('Error', 'Please fill in both title and content');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await addDoc(collection(db, 'questions'), {
-        ...newQuestion,
-        upvotes: 0,
-        isAnswered: false,
-        createdAt: serverTimestamp()
-      });
-      setNewQuestion({ title: '', content: '', author: 'Anonymous' });
-      setLoading(false);
-    } catch (err) {
-      console.error('Error submitting question:', err);
-      Alert.alert('Error', 'Failed to submit question. Please try again.');
-      setLoading(false);
-    }
+  const navigateToNewQuestion = () => {
+    navigation.navigate('NewQuestion');
   };
 
   if (loading && questions.length === 0) {
@@ -105,34 +84,12 @@ const CommunityScreen = () => {
     <View style={styles.container}>
       <Text style={styles.header}>Community Q&A</Text>
 
-      <View style={styles.formContainer}>
-        <Text style={styles.formTitle}>Ask a Question</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Title"
-          value={newQuestion.title}
-          onChangeText={(text) => setNewQuestion({...newQuestion, title: text})}
-        />
-        <TextInput
-          style={[styles.input, styles.multilineInput]}
-          placeholder="Content"
-          multiline
-          numberOfLines={4}
-          value={newQuestion.content}
-          onChangeText={(text) => setNewQuestion({...newQuestion, content: text})}
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Your Name (optional)"
-          value={newQuestion.author}
-          onChangeText={(text) => setNewQuestion({...newQuestion, author: text || 'Anonymous'})}
-        />
-        <Button
-          title="Submit Question"
-          onPress={handleSubmitQuestion}
-          disabled={loading}
-        />
-      </View>
+      <TouchableOpacity
+        style={styles.addButton}
+        onPress={navigateToNewQuestion}
+      >
+        <Text style={styles.addButtonText}>Ask a Question</Text>
+      </TouchableOpacity>
 
       <FlatList
         data={questions}
@@ -167,53 +124,29 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
   header: {
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
-    textAlign: 'center',
   },
-  formContainer: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+  addButton: {
+    backgroundColor: '#007AFF',
     padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
     marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 12,
-    color: '#333',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 10,
+  addButtonText: {
+    color: 'white',
     fontSize: 16,
-  },
-  multilineInput: {
-    height: 100,
-    textAlignVertical: 'top',
+    fontWeight: '600',
   },
   questionCard: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
+    marginBottom: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -222,7 +155,7 @@ const styles = StyleSheet.create({
   },
   questionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     marginBottom: 8,
     color: '#333',
   },
@@ -238,7 +171,7 @@ const styles = StyleSheet.create({
   },
   authorText: {
     fontSize: 14,
-    color: '#888',
+    color: '#999',
   },
   upvoteContainer: {
     flexDirection: 'row',
@@ -249,11 +182,16 @@ const styles = StyleSheet.create({
     color: '#007AFF',
     marginLeft: 4,
   },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
   errorText: {
     color: 'red',
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
   },
 });
 

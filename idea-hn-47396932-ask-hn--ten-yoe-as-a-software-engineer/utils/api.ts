@@ -24,9 +24,3 @@ export const getQuestions = async (): Promise<Question[]> => {
     throw error;
   }
 };
-
-export const submitQuestion = async (question: Omit<Question, 'id'>): Promise<Question> => {
-  // This function is now handled directly in the component using Firebase
-  // The actual implementation is in the component file
-  throw new Error('submitQuestion should be handled in the component using Firebase');
-};

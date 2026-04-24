@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { submitQuestion } from '../../../utils/api';
+import { getFirestore, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { firebaseConfig } from '../../../firebaseConfig';
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 const NewQuestion = () => {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [author, setAuthor] = useState('Anonymous');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigation = useNavigation();
 
@@ -17,13 +23,13 @@ const NewQuestion = () => {
 
     setIsSubmitting(true);
     try {
-      await submitQuestion({
+      await addDoc(collection(db, 'questions'), {
         title: title.trim(),
         content: content.trim(),
-        author: 'Current User', // Replace with actual user data
+        author: author.trim() || 'Anonymous',
         upvotes: 0,
         isAnswered: false,
-        createdAt: new Date(),
+        createdAt: serverTimestamp(),
       });
       navigation.goBack();
     } catch (error) {
@@ -54,6 +60,13 @@ const NewQuestion = () => {
         multiline
         numberOfLines={6}
         maxLength={500}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Your Name (optional)"
+        value={author}
+        onChangeText={setAuthor}
       />
 
       <TouchableOpacity
