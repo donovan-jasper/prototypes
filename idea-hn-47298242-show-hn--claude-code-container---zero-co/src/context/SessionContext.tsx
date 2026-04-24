@@ -32,6 +32,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [outputs, setOutputs] = useState<Output[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
 
   useEffect(() => {
     const initSession = async () => {
@@ -69,15 +70,11 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
             id: Date.now(),
           }]);
           setIsRunning(false);
+          setExecutionError(errorData.error);
         });
       } catch (error) {
         console.error('Error creating session:', error);
-        setOutputs(prev => [...prev, {
-          output: 'Failed to connect to server',
-          language,
-          timestamp: new Date(),
-          id: Date.now(),
-        }]);
+        setExecutionError('Failed to connect to server');
       }
     };
 
@@ -94,6 +91,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     if (!sessionId || !code.trim()) return;
 
     setIsRunning(true);
+    setExecutionError(null);
 
     try {
       const controller = new AbortController();
@@ -112,12 +110,7 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        setOutputs(prev => [...prev, {
-          output: errorData.error || 'Execution failed',
-          language,
-          timestamp: new Date(),
-          id: Date.now(),
-        }]);
+        setExecutionError(errorData.error || 'Execution failed');
         setIsRunning(false);
         return;
       }
@@ -138,20 +131,16 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
 
     } catch (error) {
       console.error('Error running code:', error);
-      setOutputs(prev => [...prev, {
-        output: error instanceof DOMException && error.name === 'AbortError'
-          ? 'Execution timed out (30 seconds)'
-          : 'Network error occurred',
-        language,
-        timestamp: new Date(),
-        id: Date.now(),
-      }]);
+      setExecutionError(error instanceof DOMException && error.name === 'AbortError'
+        ? 'Execution timed out (30 seconds)'
+        : 'Network error occurred');
       setIsRunning(false);
     }
   };
 
   const clearOutputs = () => {
     setOutputs([]);
+    setExecutionError(null);
   };
 
   return (

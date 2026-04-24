@@ -6,12 +6,12 @@ import { useSession } from '../context/SessionContext';
 import { useCodeExecution } from '../hooks/useCodeExecution';
 
 export default function EditorScreen() {
-  const { code, language, sessionId, setCode, setLanguage } = useSession();
-  const { executeCode, isExecuting, executionError } = useCodeExecution();
+  const { code, language, sessionId, setCode, setLanguage, runCode, isRunning } = useSession();
+  const { executionError } = useCodeExecution();
 
   const handleRunCode = async () => {
     if (!code.trim()) return;
-    await executeCode(code);
+    await runCode();
   };
 
   return (
@@ -33,11 +33,11 @@ export default function EditorScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.runButton, (isExecuting || !sessionId) && styles.runButtonDisabled]}
+          style={[styles.runButton, (isRunning || !sessionId) && styles.runButtonDisabled]}
           onPress={handleRunCode}
-          disabled={isExecuting || !sessionId}
+          disabled={isRunning || !sessionId}
         >
-          {isExecuting ? (
+          {isRunning ? (
             <>
               <ActivityIndicator size="small" color="#fff" style={styles.spinner} />
               <Text style={styles.runButtonText}>Running...</Text>

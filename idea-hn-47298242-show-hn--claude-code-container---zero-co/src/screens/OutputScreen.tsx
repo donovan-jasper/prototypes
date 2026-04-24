@@ -4,7 +4,7 @@ import { useSession } from '../context/SessionContext';
 import { useCodeExecution } from '../hooks/useCodeExecution';
 
 export default function OutputScreen() {
-  const { outputs, clearOutputs, sessionId } = useSession();
+  const { outputs, clearOutputs, sessionId, isRunning } = useSession();
   const { executionError } = useCodeExecution();
 
   const renderOutput = ({ item }: { item: any }) => (
@@ -35,7 +35,14 @@ export default function OutputScreen() {
         </View>
       )}
 
-      {outputs.length === 0 && !executionError ? (
+      {isRunning && (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="small" color="#4f46e5" />
+          <Text style={styles.loadingText}>Executing code...</Text>
+        </View>
+      )}
+
+      {outputs.length === 0 && !executionError && !isRunning ? (
         <View style={styles.placeholderContainer}>
           <Text style={styles.placeholder}>
             {sessionId ? 'Run code to see output here...' : 'Connecting to server...'}
@@ -89,6 +96,17 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#fff',
     fontSize: 14,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    backgroundColor: '#1e293b',
+  },
+  loadingText: {
+    color: '#94a3b8',
+    fontSize: 14,
+    marginLeft: 8,
   },
   placeholderContainer: {
     flex: 1,
