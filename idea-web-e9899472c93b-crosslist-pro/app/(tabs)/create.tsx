@@ -10,6 +10,7 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -29,24 +30,30 @@ export default function CreateProduct() {
   const [quantity, setQuantity] = useState('');
   const [imageUri, setImageUri] = useState<string | undefined>(undefined);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    try {
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'Please allow access to your photo library');
-      return;
-    }
+      if (!permissionResult.granted) {
+        Alert.alert('Permission Required', 'Please allow access to your photo library');
+        return;
+      }
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    if (!result.canceled) {
-      setImageUri(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Image picker error:', error);
+      Alert.alert('Error', 'Failed to pick image. Please try again.');
     }
   };
 
@@ -82,34 +89,43 @@ export default function CreateProduct() {
     return true;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) {
       return;
     }
 
-    addProduct({
-      title: title.trim(),
-      description: description.trim(),
-      price: parseFloat(price),
-      quantity: parseInt(quantity),
-      imageUri,
-      platforms: selectedPlatforms,
-    });
+    setIsSubmitting(true);
 
-    Toast.show({
-      type: 'success',
-      text1: 'Product Created',
-      text2: 'Your product has been successfully added',
-      visibilityTime: 3000,
-    });
+    try {
+      addProduct({
+        title: title.trim(),
+        description: description.trim(),
+        price: parseFloat(price),
+        quantity: parseInt(quantity),
+        imageUri,
+        platforms: selectedPlatforms,
+      });
 
-    setTitle('');
-    setDescription('');
-    setPrice('');
-    setQuantity('');
-    setImageUri(undefined);
-    setSelectedPlatforms([]);
-    router.push('/(tabs)');
+      Toast.show({
+        type: 'success',
+        text1: 'Product Created',
+        text2: 'Your product has been successfully added',
+        visibilityTime: 3000,
+      });
+
+      setTitle('');
+      setDescription('');
+      setPrice('');
+      setQuantity('');
+      setImageUri(undefined);
+      setSelectedPlatforms([]);
+      router.push('/(tabs)');
+    } catch (error) {
+      console.error('Product creation error:', error);
+      Alert.alert('Error', 'Failed to create product. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -178,7 +194,8 @@ export default function CreateProduct() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Publish To</Text>
+          <Text style={styles.sectionTitle}>Platforms</Text>
+          <Text style={styles.sectionSubtitle}>Select where to list this product</Text>
           <View style={styles.platformContainer}>
             {PLATFORMS.map((platform) => (
               <TouchableOpacity
@@ -202,8 +219,16 @@ export default function CreateProduct() {
           </View>
         </View>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-          <Text style={styles.submitButtonText}>Create Product</Text>
+        <TouchableOpacity
+          style={styles.submitButton}
+          onPress={handleSubmit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Create Product</Text>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -213,7 +238,7 @@ export default function CreateProduct() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: '#fff',
   },
   content: {
     padding: 20,
@@ -225,25 +250,25 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
+    marginBottom: 12,
     color: '#333',
+  },
+  sectionSubtitle: {
+    fontSize: 14,
+    color: '#666',
     marginBottom: 12,
   },
   imagePicker: {
     width: '100%',
     aspectRatio: 1,
-    backgroundColor: '#FFFFFF',
     borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 8,
+    overflow: 'hidden',
   },
   imagePickerPlaceholder: {
+    justifyContent: 'center',
     alignItems: 'center',
   },
   imagePickerText: {
@@ -251,17 +276,21 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
   },
+  imagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
   input: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#f5f5f5',
     padding: 12,
     borderRadius: 8,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
     fontSize: 16,
+    marginBottom: 12,
   },
   textArea: {
     height: 120,
+    textAlignVertical: 'top',
   },
   row: {
     flexDirection: 'row',
@@ -284,21 +313,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#f0f0f0',
     margin: 4,
   },
   platformButtonSelected: {
     backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
   },
   platformButtonText: {
     color: '#333',
     fontSize: 14,
   },
   platformButtonTextSelected: {
-    color: '#FFFFFF',
+    color: '#fff',
   },
   submitButton: {
     backgroundColor: '#007AFF',
@@ -308,7 +334,7 @@ const styles = StyleSheet.create({
     marginTop: 24,
   },
   submitButtonText: {
-    color: '#FFFFFF',
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
