@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { View, StyleSheet, Text, TouchableOpacity, Platform, StatusBar, Dimensions } from 'react-native';
 import { useAppStore } from '../store/useAppStore';
 import AppDrawer from './AppDrawer';
+import Widget from './Widget';
+import WidgetMenu from './WidgetMenu';
 import { format } from 'date-fns';
 import Animated, {
   useSharedValue,
@@ -17,10 +19,11 @@ import { useFocusEffect } from '@react-navigation/native';
 const { height } = Dimensions.get('window');
 
 const BlankCanvas: React.FC = () => {
-  const { currentTheme, currentMode, widgets } = useAppStore();
+  const { currentTheme, currentMode, widgets, addWidget, removeWidget } = useAppStore();
   const [showAppDrawer, setShowAppDrawer] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showWidgetMenu, setShowWidgetMenu] = useState(false);
+  const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
 
   // Animation values
   const drawerTranslateY = useSharedValue(height);
@@ -89,13 +92,24 @@ const BlankCanvas: React.FC = () => {
     }, [])
   );
 
-  const handleLongPress = () => {
+  const handleLongPress = (widgetId: string) => {
+    setSelectedWidgetId(widgetId);
     setShowWidgetMenu(true);
   };
 
   const handleSwipeUp = () => {
     setShowAppDrawer(true);
     drawerTranslateY.value = withSpring(0, { damping: 20 });
+  };
+
+  const handleAddWidget = (widgetType: 'timer' | 'scratchpad' | 'habitTracker') => {
+    addWidget(widgetType);
+    setShowWidgetMenu(false);
+  };
+
+  const handleRemoveWidget = (widgetId: string) => {
+    removeWidget(widgetId);
+    setShowWidgetMenu(false);
   };
 
   return (
@@ -120,44 +134,19 @@ const BlankCanvas: React.FC = () => {
       )}
 
       {/* Widgets area */}
-      <Animated.View style={[styles.widgetsContainer, widgetContainerStyle]}>
-        {widgets.map((widget) => (
-          <TouchableOpacity
-            key={widget.id}
-            style={[styles.widget, { backgroundColor: currentTheme.widgetBackground }]}
-            onLongPress={handleLongPress}
-            activeOpacity={0.8}
-          >
-            {/* Render widget based on type */}
-            {widget.type === 'timer' && (
-              <View style={styles.timerWidget}>
-                <Text style={[styles.widgetTitle, { color: currentTheme.text }]}>Timer</Text>
-                <Text style={[styles.widgetValue, { color: currentTheme.text }]}>25:00</Text>
-                <View style={styles.timerControls}>
-                  <TouchableOpacity style={styles.timerButton}>
-                    <Text style={[styles.timerButtonText, { color: currentTheme.text }]}>Start</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-            {widget.type === 'scratchpad' && (
-              <View style={styles.scratchpadWidget}>
-                <Text style={[styles.widgetTitle, { color: currentTheme.text }]}>Notes</Text>
-                <Text style={[styles.widgetText, { color: currentTheme.text }]}>Quick notes...</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-      </Animated.View>
-
-      {/* Swipe up gesture area */}
       <PanGestureHandler onGestureEvent={swipeUpHandler}>
-        <Animated.View style={styles.swipeUpArea}>
-          <View style={[styles.swipeIndicator, { backgroundColor: currentTheme.text }]} />
+        <Animated.View style={[styles.widgetsContainer, widgetContainerStyle]}>
+          {widgets.map((widget) => (
+            <Widget
+              key={widget.id}
+              widget={widget}
+              onLongPress={() => handleLongPress(widget.id)}
+            />
+          ))}
         </Animated.View>
       </PanGestureHandler>
 
-      {/* App drawer */}
+      {/* App Drawer */}
       <PanGestureHandler onGestureEvent={gestureHandler}>
         <Animated.View style={[styles.drawerContainer, drawerStyle]}>
           <AppDrawer
@@ -171,29 +160,13 @@ const BlankCanvas: React.FC = () => {
         </Animated.View>
       </PanGestureHandler>
 
-      {/* Widget menu modal */}
-      {showWidgetMenu && (
-        <View style={styles.widgetMenu}>
-          <Text style={[styles.widgetMenuTitle, { color: currentTheme.text }]}>Add Widget</Text>
-          <View style={styles.widgetOptions}>
-            <TouchableOpacity style={styles.widgetOption}>
-              <Text style={[styles.widgetOptionText, { color: currentTheme.text }]}>Timer</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.widgetOption}>
-              <Text style={[styles.widgetOptionText, { color: currentTheme.text }]}>Scratchpad</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.widgetOption}>
-              <Text style={[styles.widgetOptionText, { color: currentTheme.text }]}>Habit Tracker</Text>
-            </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setShowWidgetMenu(false)}
-          >
-            <Text style={[styles.closeButtonText, { color: currentTheme.text }]}>Close</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Widget Menu */}
+      <WidgetMenu
+        visible={showWidgetMenu}
+        onClose={() => setShowWidgetMenu(false)}
+        onAddWidget={handleAddWidget}
+        onRemoveWidget={handleRemoveWidget}
+      />
     </View>
   );
 };
@@ -201,12 +174,13 @@ const BlankCanvas: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 40 : StatusBar.currentHeight,
   },
   timeContainer: {
+    position: 'absolute',
+    top: 40,
+    left: 20,
+    right: 20,
     alignItems: 'center',
-    marginTop: 20,
   },
   timeText: {
     fontSize: 48,
@@ -218,81 +192,20 @@ const styles = StyleSheet.create({
   },
   modeIndicator: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 60 : StatusBar.currentHeight + 20,
+    top: 20,
     right: 20,
-    paddingVertical: 4,
     paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 12,
   },
   modeText: {
     color: 'white',
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   widgetsContainer: {
     flex: 1,
     padding: 20,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  widget: {
-    width: '48%',
-    marginBottom: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  timerWidget: {
-    padding: 16,
-    height: 160,
-    justifyContent: 'space-between',
-  },
-  scratchpadWidget: {
-    padding: 16,
-    height: 160,
-  },
-  widgetTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  widgetValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  widgetText: {
-    fontSize: 14,
-    marginTop: 8,
-  },
-  timerControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 10,
-  },
-  timerButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-  timerButtonText: {
-    fontSize: 14,
-  },
-  swipeUpArea: {
-    height: 60,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  swipeIndicator: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    opacity: 0.5,
   },
   drawerContainer: {
     position: 'absolute',
@@ -300,51 +213,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: height * 0.8,
-    backgroundColor: 'transparent',
-  },
-  widgetMenu: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.9)',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-  },
-  widgetMenuTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  widgetOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  widgetOption: {
-    width: '30%',
-    padding: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  widgetOptionText: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  closeButton: {
-    padding: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
   },
 });
 
