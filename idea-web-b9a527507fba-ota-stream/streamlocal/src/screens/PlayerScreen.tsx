@@ -173,7 +173,7 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
       {/* Program Schedule */}
       <View style={styles.scheduleContainer}>
         <Text style={styles.scheduleTitle}>Up Next</Text>
-        <Text style={styles.scheduleItem}>{channel.nextProgram}</Text>
+        <Text style={styles.scheduleText}>{channel.nextProgram}</Text>
       </View>
 
       <Snackbar
@@ -191,86 +191,93 @@ const PlayerScreen: React.FC<PlayerScreenProps> = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#000',
   },
   playerContainer: {
-    height: 250,
+    flex: 1,
     backgroundColor: '#000',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  loadingText: {
+    color: '#fff',
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  errorText: {
+    color: '#fff',
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#6200ee',
+    marginTop: 20,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    backgroundColor: '#121212',
   },
   channelLogo: {
-    width: 50,
-    height: 50,
-    marginRight: 16,
+    width: 40,
+    height: 40,
+    marginRight: 12,
+    borderRadius: 4,
   },
   channelInfo: {
     flex: 1,
   },
   channelName: {
+    color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
   },
   programTitle: {
+    color: '#fff',
     fontSize: 14,
-    color: '#666',
     marginTop: 4,
   },
   nextProgram: {
+    color: '#aaa',
     fontSize: 12,
-    color: '#999',
     marginTop: 4,
   },
   headerButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   favoriteButton: {
     marginRight: 8,
   },
   scheduleContainer: {
     padding: 16,
+    backgroundColor: '#121212',
   },
   scheduleTitle: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 8,
   },
-  scheduleItem: {
+  scheduleText: {
+    color: '#fff',
     fontSize: 14,
-    color: '#333',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  backButton: {
-    marginTop: 20,
   },
   snackbar: {
-    marginBottom: 20,
+    backgroundColor: '#333',
   },
 });
 

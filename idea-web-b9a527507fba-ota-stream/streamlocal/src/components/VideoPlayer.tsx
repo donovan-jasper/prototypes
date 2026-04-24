@@ -20,6 +20,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isCasting, setIsCasting] = useState(false);
+  const [volume, setVolume] = useState(1.0);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -97,6 +98,13 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
     }
   };
 
+  const handleVolumeChange = (newVolume: number) => {
+    setVolume(newVolume);
+    if (videoRef.current) {
+      videoRef.current.setVolumeAsync(newVolume);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <TouchableOpacity
@@ -116,6 +124,7 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
           onReadyForDisplay={handleReadyForDisplay}
           onError={handleError}
           shouldPlay={true}
+          volume={volume}
         />
 
         {isLoading && (
@@ -182,6 +191,24 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
                   color="#fff"
                 />
               </TouchableOpacity>
+
+              <View style={styles.volumeControl}>
+                <IconButton
+                  icon="volume-minus"
+                  size={20}
+                  color="#fff"
+                  onPress={() => handleVolumeChange(Math.max(0, volume - 0.1))}
+                />
+                <View style={styles.volumeBar}>
+                  <View style={[styles.volumeFill, { width: `${volume * 100}%` }]} />
+                </View>
+                <IconButton
+                  icon="volume-plus"
+                  size={20}
+                  color="#fff"
+                  onPress={() => handleVolumeChange(Math.min(1, volume + 0.1))}
+                />
+              </View>
             </View>
           </>
         )}
@@ -193,10 +220,11 @@ const VideoPlayer: React.FC<VideoPlayerProps> = ({ streamUrl, channelName, curre
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
   },
   videoContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   video: {
     width: '100%',
@@ -207,21 +235,25 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)',
+    width: '100%',
+    height: '100%',
   },
   loadingText: {
     color: '#fff',
-    marginTop: 10,
+    marginTop: 16,
     fontSize: 16,
   },
   errorContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)',
+    width: '100%',
+    height: '100%',
     padding: 20,
   },
   errorText: {
@@ -232,34 +264,54 @@ const styles = StyleSheet.create({
   },
   infoOverlay: {
     position: 'absolute',
-    top: 20,
-    left: 20,
-    right: 20,
-    padding: 10,
+    top: 16,
+    left: 16,
+    right: 16,
     backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 5,
+    padding: 8,
+    borderRadius: 4,
   },
   channelName: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
   programTitle: {
     color: '#fff',
     fontSize: 14,
-    marginTop: 5,
+    marginTop: 4,
   },
   controlsOverlay: {
     position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
+    bottom: 16,
+    left: 16,
+    right: 16,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 8,
+    borderRadius: 4,
   },
   controlButton: {
-    marginHorizontal: 10,
+    marginHorizontal: 4,
+  },
+  volumeControl: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  volumeBar: {
+    width: 100,
+    height: 4,
+    backgroundColor: '#555',
+    borderRadius: 2,
+    marginHorizontal: 8,
+  },
+  volumeFill: {
+    height: '100%',
+    backgroundColor: '#fff',
+    borderRadius: 2,
   },
 });
 
