@@ -145,9 +145,9 @@ const GroupDetail: React.FC = () => {
 
       if (challengeDoc.exists()) {
         const challengeData = challengeDoc.data() as Challenge;
-        const isCompleted = challengeData.completedBy?.includes(currentUser.uid);
+        const completedBy = challengeData.completedBy || [];
 
-        if (isCompleted) {
+        if (completedBy.includes(currentUser.uid)) {
           // Remove completion
           await updateDoc(challengeRef, {
             completedBy: arrayRemove(currentUser.uid)
@@ -229,25 +229,59 @@ const GroupDetail: React.FC = () => {
     }
   };
 
-  const handleLeaveGroup = async () => {
-    if (!group) return;
+  const renderChallengeItem = ({ item }: { item: Challenge }) => {
+    const currentUser = auth.currentUser;
+    const isCompleted = currentUser && item.completedBy?.includes(currentUser.uid);
 
-    try {
-      const currentUser = auth.currentUser;
-      if (!currentUser) return;
-
-      const groupRef = doc(db, 'groups', group.id);
-      await updateDoc(groupRef, {
-        members: arrayRemove(currentUser.uid)
-      });
-
-      Alert.alert('Success', 'You left the group');
-      navigation.goBack();
-    } catch (error) {
-      console.error('Error leaving group:', error);
-      Alert.alert('Error', 'Failed to leave group');
-    }
+    return (
+      <View style={styles.challengeCard}>
+        <View style={styles.challengeHeader}>
+          <Text style={styles.challengeTitle}>{item.title}</Text>
+          {isAdmin && (
+            <TouchableOpacity
+              onPress={() => {
+                setChallengeToDelete(item.id);
+                setShowDeleteConfirm(true);
+              }}
+            >
+              <Ionicons name="trash-outline" size={20} color="#ff5252" />
+            </TouchableOpacity>
+          )}
+        </View>
+        <Text style={styles.challengeDescription}>{item.description}</Text>
+        <View style={styles.challengeFooter}>
+          <View style={styles.xpContainer}>
+            <Ionicons name="star" size={16} color="#FFD700" />
+            <Text style={styles.xpText}>{item.xpReward} XP</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.completeButton, isCompleted && styles.completedButton]}
+            onPress={() => handleToggleChallengeCompletion(item.id)}
+          >
+            <Text style={styles.completeButtonText}>
+              {isCompleted ? 'Completed' : 'Mark Complete'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
   };
+
+  const renderMemberItem = ({ item }: { item: User }) => (
+    <View style={styles.memberItem}>
+      <Text style={styles.memberName}>{item.displayName || 'Anonymous'}</Text>
+      {isAdmin && item.id !== auth.currentUser?.uid && (
+        <TouchableOpacity
+          onPress={() => {
+            setSelectedMember(item);
+            setShowMemberModal(true);
+          }}
+        >
+          <Ionicons name="ellipsis-vertical" size={20} color="#666" />
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 
   if (loading) {
     return (
@@ -274,21 +308,15 @@ const GroupDetail: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView>
         <View style={styles.header}>
           <Text style={styles.groupName}>{group.name}</Text>
-          <Text style={styles.groupDescription}>{group.description}</Text>
-          <View style={styles.groupInfo}>
-            <View style={styles.infoItem}>
-              <Ionicons name="people" size={16} color="#666" />
-              <Text style={styles.infoText}>{members.length} members</Text>
-            </View>
-            <View style={styles.infoItem}>
-              <Ionicons name="lock-closed" size={16} color="#666" />
-              <Text style={styles.infoText}>{group.privacy}</Text>
-            </View>
+          <View style={[styles.privacyBadge, group.privacy === 'public' ? styles.publicBadge : styles.privateBadge]}>
+            <Text style={styles.privacyText}>{group.privacy}</Text>
           </View>
         </View>
+
+        <Text style={styles.description}>{group.description}</Text>
 
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -303,137 +331,34 @@ const GroupDetail: React.FC = () => {
             )}
           </View>
 
-          {challenges.length === 0 ? (
-            <Text style={styles.emptyText}>No challenges yet. {isAdmin ? 'Add one!' : 'Ask the admin to add some.'}</Text>
-          ) : (
+          {challenges.length > 0 ? (
             <FlatList
               data={challenges}
+              renderItem={renderChallengeItem}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                const currentUser = auth.currentUser;
-                const isCompleted = currentUser && item.completedBy?.includes(currentUser.uid);
-
-                return (
-                  <View style={styles.challengeItem}>
-                    <View style={styles.challengeHeader}>
-                      <Text style={styles.challengeTitle}>{item.title}</Text>
-                      <Text style={styles.challengeXP}>{item.xpReward} XP</Text>
-                    </View>
-                    <Text style={styles.challengeDescription}>{item.description}</Text>
-                    <View style={styles.challengeActions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.completeButton,
-                          isCompleted && styles.completedButton
-                        ]}
-                        onPress={() => handleToggleChallengeCompletion(item.id)}
-                      >
-                        <Text style={styles.completeButtonText}>
-                          {isCompleted ? 'Completed' : 'Mark Complete'}
-                        </Text>
-                      </TouchableOpacity>
-                      {isAdmin && (
-                        <TouchableOpacity
-                          style={styles.deleteButton}
-                          onPress={() => {
-                            setChallengeToDelete(item.id);
-                            setShowDeleteConfirm(true);
-                          }}
-                        >
-                          <Ionicons name="trash" size={18} color="#F44336" />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                );
-              }}
               scrollEnabled={false}
             />
+          ) : (
+            <Text style={styles.emptyText}>No challenges yet. {isAdmin ? 'Create one!' : 'Ask the admin to add some.'}</Text>
           )}
         </View>
 
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Members</Text>
-            {isAdmin && (
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={() => setShowMemberModal(true)}
-              >
-                <Ionicons name="person-add" size={20} color="white" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {members.length === 0 ? (
-            <Text style={styles.emptyText}>No members yet</Text>
-          ) : (
+          <Text style={styles.sectionTitle}>Members ({members.length})</Text>
+          {members.length > 0 ? (
             <FlatList
               data={members}
+              renderItem={renderMemberItem}
               keyExtractor={(item) => item.id}
-              renderItem={({ item }) => (
-                <View style={styles.memberItem}>
-                  <View style={styles.memberInfo}>
-                    <View style={styles.avatar}>
-                      <Text style={styles.avatarText}>
-                        {item.displayName?.charAt(0).toUpperCase() || 'U'}
-                      </Text>
-                    </View>
-                    <View>
-                      <Text style={styles.memberName}>{item.displayName || 'Anonymous'}</Text>
-                      <Text style={styles.memberEmail}>{item.email}</Text>
-                    </View>
-                  </View>
-                  {isAdmin && item.id !== group.adminId && (
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => handleRemoveMember(item.id)}
-                    >
-                      <Ionicons name="close" size={20} color="#F44336" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              )}
               scrollEnabled={false}
             />
-          )}
-        </View>
-
-        <View style={styles.actionButtons}>
-          {isAdmin ? (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.dangerButton]}
-              onPress={() => Alert.alert(
-                'Delete Group',
-                'Are you sure you want to delete this group? This action cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { text: 'Delete', style: 'destructive', onPress: async () => {
-                    try {
-                      await deleteDoc(doc(db, 'groups', group.id));
-                      Alert.alert('Success', 'Group deleted successfully');
-                      navigation.goBack();
-                    } catch (error) {
-                      console.error('Error deleting group:', error);
-                      Alert.alert('Error', 'Failed to delete group');
-                    }
-                  }}
-                ]
-              )}
-            >
-              <Text style={styles.actionButtonText}>Delete Group</Text>
-            </TouchableOpacity>
           ) : (
-            <TouchableOpacity
-              style={[styles.actionButton, styles.dangerButton]}
-              onPress={handleLeaveGroup}
-            >
-              <Text style={styles.actionButtonText}>Leave Group</Text>
-            </TouchableOpacity>
+            <Text style={styles.emptyText}>No members yet</Text>
           )}
         </View>
       </ScrollView>
 
+      {/* Create Challenge Modal */}
       <Modal
         visible={showChallengeModal}
         animationType="slide"
@@ -475,7 +400,7 @@ const GroupDetail: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateChallenge}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -485,28 +410,60 @@ const GroupDetail: React.FC = () => {
         </View>
       </Modal>
 
+      {/* Member Options Modal */}
+      <Modal
+        visible={showMemberModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowMemberModal(false)}
+      >
+        <View style={styles.memberModalContainer}>
+          <View style={styles.memberModalContent}>
+            <Text style={styles.memberModalTitle}>Member Options</Text>
+            <TouchableOpacity
+              style={styles.memberOption}
+              onPress={() => {
+                if (selectedMember) {
+                  handleRemoveMember(selectedMember.id);
+                  setShowMemberModal(false);
+                }
+              }}
+            >
+              <Text style={styles.memberOptionText}>Remove Member</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.memberOption}
+              onPress={() => setShowMemberModal(false)}
+            >
+              <Text style={styles.memberOptionText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
       <Modal
         visible={showDeleteConfirm}
         animationType="fade"
         transparent={true}
         onRequestClose={() => setShowDeleteConfirm(false)}
       >
-        <View style={styles.confirmModalContainer}>
-          <View style={styles.confirmModalContent}>
-            <Text style={styles.confirmModalTitle}>Delete Challenge</Text>
-            <Text style={styles.confirmModalText}>Are you sure you want to delete this challenge?</Text>
-            <View style={styles.confirmModalButtons}>
+        <View style={styles.deleteModalContainer}>
+          <View style={styles.deleteModalContent}>
+            <Text style={styles.deleteModalTitle}>Delete Challenge</Text>
+            <Text style={styles.deleteModalText}>Are you sure you want to delete this challenge?</Text>
+            <View style={styles.deleteModalButtons}>
               <TouchableOpacity
-                style={[styles.confirmModalButton, styles.cancelButton]}
+                style={[styles.deleteModalButton, styles.cancelButton]}
                 onPress={() => setShowDeleteConfirm(false)}
               >
-                <Text style={styles.confirmModalButtonText}>Cancel</Text>
+                <Text style={styles.deleteModalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.confirmModalButton, styles.dangerButton]}
+                style={[styles.deleteModalButton, styles.deleteButton]}
                 onPress={handleDeleteChallenge}
               >
-                <Text style={styles.confirmModalButtonText}>Delete</Text>
+                <Text style={styles.deleteModalButtonText}>Delete</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -521,15 +478,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     marginTop: 16,
@@ -540,77 +492,69 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
+    padding: 24,
   },
   errorText: {
     fontSize: 18,
     color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
+    marginBottom: 24,
   },
   backButton: {
     backgroundColor: '#6200EE',
-    paddingVertical: 10,
     paddingHorizontal: 20,
+    paddingVertical: 12,
     borderRadius: 8,
   },
   backButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
   header: {
-    backgroundColor: 'white',
-    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   groupName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 8,
   },
-  groupDescription: {
+  privacyBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  publicBadge: {
+    backgroundColor: '#e3f2fd',
+  },
+  privateBadge: {
+    backgroundColor: '#f3e5f5',
+  },
+  privacyText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  description: {
     fontSize: 16,
     color: '#666',
+    padding: 16,
+    backgroundColor: 'white',
     marginBottom: 16,
-  },
-  groupInfo: {
-    flexDirection: 'row',
-  },
-  infoItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  infoText: {
-    fontSize: 14,
-    color: '#666',
-    marginLeft: 4,
   },
   section: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
     marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    padding: 16,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
@@ -625,59 +569,55 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    paddingVertical: 16,
-  },
-  challengeItem: {
+  challengeCard: {
     backgroundColor: '#f9f9f9',
     borderRadius: 8,
-    padding: 12,
+    padding: 16,
     marginBottom: 12,
   },
   challengeHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   challengeTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: '#333',
-  },
-  challengeXP: {
-    fontSize: 14,
-    color: '#6200EE',
-    fontWeight: '600',
   },
   challengeDescription: {
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
   },
-  challengeActions: {
+  challengeFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
+  xpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  xpText: {
+    fontSize: 14,
+    color: '#FFD700',
+    marginLeft: 4,
+    fontWeight: 'bold',
+  },
   completeButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#6200EE',
   },
   completedButton: {
-    backgroundColor: '#8BC34A',
+    backgroundColor: '#4CAF50',
   },
   completeButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  deleteButton: {
-    padding: 4,
+    fontWeight: 'bold',
   },
   memberItem: {
     flexDirection: 'row',
@@ -687,72 +627,34 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  memberInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#6200EE',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   memberName: {
     fontSize: 16,
-    fontWeight: '600',
     color: '#333',
   },
-  memberEmail: {
+  emptyText: {
     fontSize: 14,
-    color: '#666',
-  },
-  removeButton: {
-    padding: 4,
-  },
-  actionButtons: {
-    marginTop: 16,
-  },
-  actionButton: {
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  dangerButton: {
-    backgroundColor: '#F44336',
-  },
-  actionButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    color: '#999',
+    textAlign: 'center',
+    padding: 16,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 400,
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
+    width: '90%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
-    textAlign: 'center',
   },
   input: {
     backgroundColor: '#f5f5f5',
@@ -760,7 +662,6 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: '#333',
   },
   textArea: {
     height: 100,
@@ -771,61 +672,89 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalButton: {
-    paddingVertical: 10,
     paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginLeft: 10,
+    marginLeft: 8,
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
   },
-  confirmButton: {
+  createButton: {
     backgroundColor: '#6200EE',
   },
   modalButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
-  confirmModalContainer: {
+  memberModalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  confirmModalContent: {
+  memberModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 8,
     width: '80%',
     maxWidth: 300,
+  },
+  memberModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  memberOption: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  memberOptionText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  deleteModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  deleteModalContent: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
+    width: '80%',
+    maxWidth: 300,
   },
-  confirmModalTitle: {
+  deleteModalTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 12,
     color: '#333',
-    textAlign: 'center',
   },
-  confirmModalText: {
+  deleteModalText: {
     fontSize: 16,
     color: '#666',
     marginBottom: 20,
-    textAlign: 'center',
   },
-  confirmModalButtons: {
+  deleteModalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
   },
-  confirmModalButton: {
-    paddingVertical: 10,
+  deleteModalButton: {
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 8,
+    marginLeft: 8,
   },
-  confirmModalButtonText: {
+  deleteButton: {
+    backgroundColor: '#ff5252',
+  },
+  deleteModalButtonText: {
     color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 

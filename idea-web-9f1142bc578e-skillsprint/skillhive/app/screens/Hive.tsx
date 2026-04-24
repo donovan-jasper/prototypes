@@ -119,6 +119,33 @@ const Hive: React.FC = () => {
     group.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const renderGroupItem = ({ item }: { item: Group }) => {
+    const isMember = item.members.includes(auth.currentUser?.uid || '');
+    return (
+      <TouchableOpacity
+        style={styles.groupCard}
+        onPress={() => navigation.navigate('GroupDetail', { groupId: item.id })}
+      >
+        <View style={styles.groupHeader}>
+          <Text style={styles.groupName}>{item.name}</Text>
+          <View style={[styles.privacyBadge, item.privacy === 'public' ? styles.publicBadge : styles.privateBadge]}>
+            <Text style={styles.privacyText}>{item.privacy}</Text>
+          </View>
+        </View>
+        <Text style={styles.groupDescription}>{item.description}</Text>
+        <View style={styles.groupFooter}>
+          <Text style={styles.memberCount}>{item.members.length} members</Text>
+          <TouchableOpacity
+            style={[styles.joinButton, isMember ? styles.leaveButton : styles.joinButton]}
+            onPress={() => handleJoinLeaveGroup(item)}
+          >
+            <Text style={styles.joinButtonText}>{isMember ? 'Leave' : 'Join'}</Text>
+          </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -157,48 +184,19 @@ const Hive: React.FC = () => {
         />
       </View>
 
-      <TouchableOpacity
-        style={styles.createButton}
-        onPress={() => setShowCreateModal(true)}
-      >
-        <Text style={styles.createButtonText}>Create New Group</Text>
-      </TouchableOpacity>
-
       <FlatList
         data={filteredGroups}
+        renderItem={renderGroupItem}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.groupItem}
-            onPress={() => navigation.navigate('GroupDetail', { groupId: item.id })}
-          >
-            <View style={styles.groupHeader}>
-              <Text style={styles.groupName}>{item.name}</Text>
-              <Text style={[
-                styles.groupPrivacy,
-                { color: item.privacy === 'public' ? '#4CAF50' : '#F44336' }
-              ]}>
-                {item.privacy === 'public' ? 'Public' : 'Private'}
-              </Text>
-            </View>
-            <Text style={styles.groupDescription}>{item.description}</Text>
-            <View style={styles.groupFooter}>
-              <Text style={styles.memberCount}>{item.members.length} members</Text>
-              <TouchableOpacity
-                style={[
-                  styles.joinButton,
-                  item.members.includes(auth.currentUser?.uid || '') && styles.leaveButton
-                ]}
-                onPress={() => handleJoinLeaveGroup(item)}
-              >
-                <Text style={styles.joinButtonText}>
-                  {item.members.includes(auth.currentUser?.uid || '') ? 'Leave' : 'Join'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-        )}
         contentContainerStyle={styles.listContent}
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.createButton}
+            onPress={() => setShowCreateModal(true)}
+          >
+            <Text style={styles.createButtonText}>Create New Group</Text>
+          </TouchableOpacity>
+        }
       />
 
       <Modal
@@ -231,22 +229,16 @@ const Hive: React.FC = () => {
             <View style={styles.privacyContainer}>
               <Text style={styles.privacyLabel}>Privacy:</Text>
               <TouchableOpacity
-                style={[
-                  styles.privacyOption,
-                  newGroup.privacy === 'public' && styles.selectedPrivacy
-                ]}
+                style={[styles.privacyOption, newGroup.privacy === 'public' && styles.selectedPrivacy]}
                 onPress={() => setNewGroup({...newGroup, privacy: 'public'})}
               >
-                <Text style={styles.privacyText}>Public</Text>
+                <Text style={styles.privacyOptionText}>Public</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.privacyOption,
-                  newGroup.privacy === 'private' && styles.selectedPrivacy
-                ]}
+                style={[styles.privacyOption, newGroup.privacy === 'private' && styles.selectedPrivacy]}
                 onPress={() => setNewGroup({...newGroup, privacy: 'private'})}
               >
-                <Text style={styles.privacyText}>Private</Text>
+                <Text style={styles.privacyOptionText}>Private</Text>
               </TouchableOpacity>
             </View>
 
@@ -258,7 +250,7 @@ const Hive: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.confirmButton]}
+                style={[styles.modalButton, styles.createButton]}
                 onPress={handleCreateGroup}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -277,92 +269,43 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f5f5f5',
-  },
-  loadingText: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#f5f5f5',
-  },
-  emptyText: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 20,
-    textAlign: 'center',
-  },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
     borderRadius: 8,
     paddingHorizontal: 12,
+    paddingVertical: 8,
     marginBottom: 16,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    height: 40,
     fontSize: 16,
-    color: '#333',
-  },
-  createButton: {
-    backgroundColor: '#6200EE',
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  createButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
   },
   listContent: {
     paddingBottom: 20,
   },
-  groupItem: {
+  groupCard: {
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   groupHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   groupName: {
@@ -370,8 +313,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  groupPrivacy: {
-    fontSize: 14,
+  privacyBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  publicBadge: {
+    backgroundColor: '#e3f2fd',
+  },
+  privateBadge: {
+    backgroundColor: '#f3e5f5',
+  },
+  privacyText: {
+    fontSize: 12,
     fontWeight: '600',
   },
   groupDescription: {
@@ -389,38 +343,70 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   joinButton: {
-    backgroundColor: '#4CAF50',
-    paddingVertical: 6,
     paddingHorizontal: 16,
-    borderRadius: 4,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#6200EE',
   },
   leaveButton: {
-    backgroundColor: '#F44336',
+    backgroundColor: '#ff5252',
   },
   joinButtonText: {
     color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  createButton: {
+    backgroundColor: '#6200EE',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  createButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 24,
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalContent: {
-    width: '90%',
-    maxWidth: 400,
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 20,
+    width: '90%',
+    maxWidth: 400,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
-    textAlign: 'center',
   },
   input: {
     backgroundColor: '#f5f5f5',
@@ -428,7 +414,6 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 16,
     fontSize: 16,
-    color: '#333',
   },
   textArea: {
     height: 100,
@@ -441,12 +426,12 @@ const styles = StyleSheet.create({
   },
   privacyLabel: {
     fontSize: 16,
-    color: '#333',
     marginRight: 16,
+    color: '#333',
   },
   privacyOption: {
-    paddingVertical: 8,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 20,
     marginRight: 8,
     backgroundColor: '#f5f5f5',
@@ -454,30 +439,28 @@ const styles = StyleSheet.create({
   selectedPrivacy: {
     backgroundColor: '#6200EE',
   },
-  privacyText: {
+  privacyOptionText: {
     color: '#333',
-    fontSize: 14,
   },
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   modalButton: {
-    paddingVertical: 10,
     paddingHorizontal: 20,
+    paddingVertical: 10,
     borderRadius: 8,
-    marginLeft: 10,
+    marginLeft: 8,
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
   },
-  confirmButton: {
+  createButton: {
     backgroundColor: '#6200EE',
   },
   modalButtonText: {
-    color: 'white',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
   },
 });
 
