@@ -1,5 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { Platform } from 'react-native';
+import { getStoredToken, refreshToken } from './auth';
 
 const db = SQLite.openDatabase('discordx.db');
 
@@ -23,16 +24,31 @@ const initializeDatabase = () => {
 };
 
 const fetchWithAuth = async (endpoint, token) => {
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-  return response.json();
+  try {
+    const response = await fetch(`${BASE_URL}${endpoint}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (response.status === 401) {
+      // Token expired, refresh and retry
+      const newToken = await refreshToken();
+      return fetchWithAuth(endpoint, newToken);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('API request failed:', error);
+    throw error;
+  }
 };
 
-const syncServers = async (token) => {
+const syncServers = async () => {
+  const token = await getStoredToken();
+  if (!token) throw new Error('No authentication token');
+
   const servers = await fetchWithAuth('/users/@me/guilds', token);
 
   db.transaction(tx => {
@@ -47,7 +63,10 @@ const syncServers = async (token) => {
   return servers;
 };
 
-const syncChannels = async (serverId, token) => {
+const syncChannels = async (serverId) => {
+  const token = await getStoredToken();
+  if (!token) throw new Error('No authentication token');
+
   const channels = await fetchWithAuth(`/guilds/${serverId}/channels`, token);
 
   db.transaction(tx => {
@@ -62,7 +81,10 @@ const syncChannels = async (serverId, token) => {
   return channels;
 };
 
-const syncMessages = async (channelId, token) => {
+const syncMessages = async (channelId) => {
+  const token = await getStoredToken();
+  if (!token) throw new Error('No authentication token');
+
   const messages = await fetchWithAuth(`/channels/${channelId}/messages`, token);
 
   db.transaction(tx => {

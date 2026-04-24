@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { getOfflineServers, syncServers } from '../services/discordApi';
-import { authenticateWithDiscord } from '../services/auth';
+import { getStoredToken, logout } from '../services/auth';
 
 const MainScreen = ({ navigation }) => {
   const [servers, setServers] = useState([]);
@@ -15,12 +15,18 @@ const MainScreen = ({ navigation }) => {
         setServers(offlineServers);
       } else {
         // If no offline data, try to sync with Discord
-        const token = await authenticateWithDiscord();
-        const syncedServers = await syncServers(token);
-        setServers(syncedServers);
+        const token = await getStoredToken();
+        if (token) {
+          const syncedServers = await syncServers();
+          setServers(syncedServers);
+        } else {
+          // No token, redirect to login
+          navigation.replace('Login');
+        }
       }
     } catch (error) {
       console.error('Error loading servers:', error);
+      Alert.alert('Error', 'Failed to load servers. Please try again.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -30,13 +36,23 @@ const MainScreen = ({ navigation }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const token = await authenticateWithDiscord();
-      const syncedServers = await syncServers(token);
+      const syncedServers = await syncServers();
       setServers(syncedServers);
     } catch (error) {
       console.error('Error refreshing servers:', error);
+      Alert.alert('Error', 'Failed to refresh servers. Please check your connection.');
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigation.replace('Login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Error', 'Failed to logout. Please try again.');
     }
   };
 
@@ -73,7 +89,12 @@ const MainScreen = ({ navigation }) => {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         ListHeaderComponent={
-          <Text style={styles.header}>Your Servers</Text>
+          <View style={styles.headerContainer}>
+            <Text style={styles.header}>Your Servers</Text>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+              <Text style={styles.logoutText}>Logout</Text>
+            </TouchableOpacity>
+          </View>
         }
       />
     </View>
@@ -91,12 +112,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#36393F',
   },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    backgroundColor: '#2F3136',
+  },
   header: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
-    padding: 15,
+  },
+  logoutButton: {
+    padding: 8,
     backgroundColor: '#2F3136',
+    borderRadius: 4,
+  },
+  logoutText: {
+    color: '#ED4245',
+    fontSize: 14,
   },
   serverItem: {
     flexDirection: 'row',

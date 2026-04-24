@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { getOfflineChannels, syncChannels } from '../services/discordApi';
-import { authenticateWithDiscord } from '../services/auth';
+import { getStoredToken } from '../services/auth';
 
 const ChannelsScreen = ({ route, navigation }) => {
   const { serverId } = route.params;
@@ -16,12 +16,18 @@ const ChannelsScreen = ({ route, navigation }) => {
         setChannels(offlineChannels);
       } else {
         // If no offline data, try to sync with Discord
-        const token = await authenticateWithDiscord();
-        const syncedChannels = await syncChannels(serverId, token);
-        setChannels(syncedChannels);
+        const token = await getStoredToken();
+        if (token) {
+          const syncedChannels = await syncChannels(serverId);
+          setChannels(syncedChannels);
+        } else {
+          // No token, redirect to login
+          navigation.replace('Login');
+        }
       }
     } catch (error) {
       console.error('Error loading channels:', error);
+      Alert.alert('Error', 'Failed to load channels. Please try again.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -31,11 +37,11 @@ const ChannelsScreen = ({ route, navigation }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const token = await authenticateWithDiscord();
-      const syncedChannels = await syncChannels(serverId, token);
+      const syncedChannels = await syncChannels(serverId);
       setChannels(syncedChannels);
     } catch (error) {
       console.error('Error refreshing channels:', error);
+      Alert.alert('Error', 'Failed to refresh channels. Please check your connection.');
     } finally {
       setRefreshing(false);
     }

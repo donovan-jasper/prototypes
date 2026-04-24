@@ -19,7 +19,7 @@ const LoginScreen = ({ navigation }) => {
       const token = await authenticateWithDiscord();
 
       // Sync servers
-      await syncServers(token);
+      await syncServers();
 
       // Navigate to main app
       navigation.replace('Main');

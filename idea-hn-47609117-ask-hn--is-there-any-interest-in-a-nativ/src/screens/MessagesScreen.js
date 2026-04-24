@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { getOfflineMessages, syncMessages } from '../services/discordApi';
-import { authenticateWithDiscord } from '../services/auth';
+import { getStoredToken } from '../services/auth';
 
 const MessagesScreen = ({ route }) => {
   const { channelId } = route.params;
@@ -16,12 +16,18 @@ const MessagesScreen = ({ route }) => {
         setMessages(offlineMessages);
       } else {
         // If no offline data, try to sync with Discord
-        const token = await authenticateWithDiscord();
-        const syncedMessages = await syncMessages(channelId, token);
-        setMessages(syncedMessages);
+        const token = await getStoredToken();
+        if (token) {
+          const syncedMessages = await syncMessages(channelId);
+          setMessages(syncedMessages);
+        } else {
+          // No token, redirect to login
+          navigation.replace('Login');
+        }
       }
     } catch (error) {
       console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages. Please try again.');
     } finally {
       setIsLoading(false);
       setRefreshing(false);
@@ -31,11 +37,11 @@ const MessagesScreen = ({ route }) => {
   const handleRefresh = async () => {
     setRefreshing(true);
     try {
-      const token = await authenticateWithDiscord();
-      const syncedMessages = await syncMessages(channelId, token);
+      const syncedMessages = await syncMessages(channelId);
       setMessages(syncedMessages);
     } catch (error) {
       console.error('Error refreshing messages:', error);
+      Alert.alert('Error', 'Failed to refresh messages. Please check your connection.');
     } finally {
       setRefreshing(false);
     }
@@ -49,7 +55,7 @@ const MessagesScreen = ({ route }) => {
     <View style={styles.messageItem}>
       <Text style={styles.messageAuthor}>{item.author}</Text>
       <Text style={styles.messageContent}>{item.content}</Text>
-      <Text style={styles.messageTime}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
+      <Text style={styles.messageTimestamp}>{new Date(item.timestamp).toLocaleString()}</Text>
     </View>
   );
 
@@ -70,6 +76,7 @@ const MessagesScreen = ({ route }) => {
         refreshing={refreshing}
         onRefresh={handleRefresh}
         inverted
+        contentContainerStyle={styles.messagesList}
       />
     </View>
   );
@@ -86,23 +93,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#36393F',
   },
+  messagesList: {
+    padding: 10,
+  },
   messageItem: {
-    padding: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: '#2F3136',
+    backgroundColor: '#40444B',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
   },
   messageAuthor: {
     color: '#5865F2',
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   messageContent: {
     color: '#fff',
-    marginBottom: 5,
+    marginBottom: 4,
   },
-  messageTime: {
+  messageTimestamp: {
     color: '#72767D',
     fontSize: 12,
+    textAlign: 'right',
   },
 });
 
