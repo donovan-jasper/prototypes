@@ -7,6 +7,7 @@ export function calculateConnectionScore(lastContactDate: string | null): number
   const lastContact = new Date(lastContactDate);
   const daysSince = Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
 
+  // Exponential decay curve for connection score
   if (daysSince <= 7) return 100;
   if (daysSince <= 14) return 80;
   if (daysSince <= 30) return 60;
@@ -22,9 +23,9 @@ export function getConnectionStatus(score: number): 'thriving' | 'maintaining' |
 }
 
 export function getConnectionColor(score: number): string {
-  if (score >= 70) return '#4CAF50';
-  if (score >= 40) return '#FFC107';
-  return '#F44336';
+  if (score >= 70) return '#4CAF50'; // Green
+  if (score >= 40) return '#FFC107'; // Yellow
+  return '#F44336'; // Red
 }
 
 export function getDaysSinceLastContact(lastContactDate: string | null): number {
@@ -35,33 +36,88 @@ export function getDaysSinceLastContact(lastContactDate: string | null): number 
   return Math.floor((now.getTime() - lastContact.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export function calculateStreak(
-  lastInteraction: string | null,
-  currentStreak: number,
-  freezeUsed: boolean
-): { currentDays: number; freezeUsed: boolean } {
-  if (!lastInteraction) {
-    return { currentDays: 0, freezeUsed: false };
-  }
-
-  const now = new Date();
-  const lastDate = new Date(lastInteraction);
-  const daysSince = Math.floor((now.getTime() - lastDate.getTime()) / (1000 * 60 * 60 * 24));
-
-  // If streak was frozen and we're continuing it
-  if (freezeUsed && daysSince <= 1) {
-    return { currentDays: currentStreak + 1, freezeUsed: false };
-  }
-
-  // If streak was broken
-  if (daysSince > 1) {
-    return { currentDays: 0, freezeUsed: false };
-  }
-
-  // Normal streak continuation
-  return { currentDays: currentStreak + 1, freezeUsed };
+export interface StreakState {
+  currentDays: number;
+  longestDays: number;
+  lastInteraction: string | null;
+  freezeUsed: boolean;
+  freezeAvailable: boolean;
 }
 
-export function freezeStreak(currentStreak: number): { currentDays: number; freezeUsed: boolean } {
-  return { currentDays: currentStreak, freezeUsed: true };
+export function calculateStreak(
+  currentStreak: StreakState,
+  lastInteractionDate: string | null,
+  freezeUsed: boolean = false,
+  freezeAvailable: boolean = true
+): StreakState {
+  const now = new Date();
+  const lastInteraction = lastInteractionDate ? new Date(lastInteractionDate) : null;
+
+  // If no previous interaction, start fresh streak
+  if (!lastInteraction) {
+    return {
+      currentDays: 0,
+      longestDays: currentStreak.longestDays,
+      lastInteraction: null,
+      freezeUsed: false,
+      freezeAvailable: freezeAvailable
+    };
+  }
+
+  const daysSince = Math.floor((now.getTime() - lastInteraction.getTime()) / (1000 * 60 * 60 * 24));
+
+  // If interaction was today, increment streak
+  if (daysSince === 0) {
+    const newCurrent = currentStreak.currentDays + 1;
+    return {
+      currentDays: newCurrent,
+      longestDays: Math.max(currentStreak.longestDays, newCurrent),
+      lastInteraction: lastInteractionDate,
+      freezeUsed: false,
+      freezeAvailable: freezeAvailable
+    };
+  }
+
+  // If interaction was yesterday, continue streak
+  if (daysSince === 1) {
+    const newCurrent = currentStreak.currentDays + 1;
+    return {
+      currentDays: newCurrent,
+      longestDays: Math.max(currentStreak.longestDays, newCurrent),
+      lastInteraction: lastInteractionDate,
+      freezeUsed: false,
+      freezeAvailable: freezeAvailable
+    };
+  }
+
+  // If streak was broken (more than 1 day since last interaction)
+  return {
+    currentDays: 0,
+    longestDays: currentStreak.longestDays,
+    lastInteraction: lastInteractionDate,
+    freezeUsed: false,
+    freezeAvailable: freezeAvailable
+  };
+}
+
+export function freezeStreak(currentStreak: StreakState): StreakState {
+  if (currentStreak.freezeUsed || !currentStreak.freezeAvailable) {
+    throw new Error('Streak freeze already used or not available');
+  }
+
+  return {
+    ...currentStreak,
+    freezeUsed: true,
+    freezeAvailable: false
+  };
+}
+
+export function resetMonthlyFreeze(): StreakState {
+  return {
+    currentDays: 0,
+    longestDays: 0,
+    lastInteraction: null,
+    freezeUsed: false,
+    freezeAvailable: true
+  };
 }
