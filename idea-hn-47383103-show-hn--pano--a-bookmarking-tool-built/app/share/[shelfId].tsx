@@ -1,197 +1,178 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, FlatList, ActivityIndicator, Alert, Linking, ScrollView } from 'react-native';
-import { Text, useTheme, Button, Appbar, IconButton, Card, Avatar } from 'react-native-paper';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useItems } from '../../hooks/useItems';
-import { useShelves } from '../../hooks/useShelves';
-import { ItemCard } from '../../components/ItemCard';
-import { parseShareLink, cloneShelf } from '../../lib/utils/share';
-import { useUserStore } from '../../lib/store/user';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Linking } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { useDatabase } from '../../hooks/useDatabase';
+import { ShelfQueries, ItemQueries } from '../../lib/db/queries';
+import { Shelf, Item } from '../../lib/db/schema';
+import { Image } from 'expo-image';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useTheme } from 'react-native-paper';
 import { trackShelfView } from '../../lib/utils/share';
 
-export default function PublicShelfScreen() {
+export default function ShareShelfScreen() {
+  const { shelfId } = useLocalSearchParams<{ shelfId: string }>();
+  const { db } = useDatabase();
   const theme = useTheme();
-  const router = useRouter();
-  const { shelfId: shelfIdParam, token } = useLocalSearchParams<{ shelfId: string; token: string }>();
-  const shelfId = parseInt(shelfIdParam, 10);
 
-  const { shelves, loading: shelvesLoading } = useShelves();
-  const { items, loading: itemsLoading, refresh } = useItems(shelfId);
-  const { user, isPremium } = useUserStore();
-
-  const [isCloning, setIsCloning] = useState(false);
-  const [isValidLink, setIsValidLink] = useState(true);
-  const [viewCount, setViewCount] = useState<number | null>(null);
-
-  const shelf = shelves.find(s => s.id === shelfId);
+  const [shelf, setShelf] = useState<(Shelf & { item_count: number }) | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [viewCount, setViewCount] = useState<number>(0);
 
   useEffect(() => {
-    // Verify the share link is valid
-    const linkValid = parseShareLink(`https://shelflife.app/share/${shelfId}?token=${token}`);
-    if (!linkValid) {
-      setIsValidLink(false);
-      return;
+    async function loadShelf() {
+      if (!db || !shelfId) return;
+
+      try {
+        setLoading(true);
+        const shelfQueries = new ShelfQueries(db);
+        const itemQueries = new ItemQueries(db);
+
+        // Get shelf data
+        const shelfData = await shelfQueries.getShelf(parseInt(shelfId));
+        if (!shelfData) {
+          setError('Shelf not found');
+          return;
+        }
+
+        // Get items
+        const itemsData = await itemQueries.getItemsForShare(parseInt(shelfId));
+
+        // Track view
+        const newViewCount = await trackShelfView(parseInt(shelfId));
+
+        setShelf(shelfData);
+        setItems(itemsData);
+        setViewCount(newViewCount);
+      } catch (err) {
+        console.error('Error loading shelf:', err);
+        setError('Failed to load shelf');
+      } finally {
+        setLoading(false);
+      }
     }
 
-    // Track view if premium user
-    if (isPremium && shelfId) {
-      trackShelfView(shelfId).then(count => {
-        setViewCount(count);
-      }).catch(() => {
-        // Silently fail if tracking fails
-      });
-    }
-  }, [shelfId, token, isPremium]);
+    loadShelf();
+  }, [db, shelfId]);
 
-  const handleCloneShelf = async () => {
-    if (!shelf || !user) {
-      Alert.alert('Error', 'You must be logged in to clone a shelf.');
-      return;
-    }
-
-    setIsCloning(true);
-    try {
-      await cloneShelf(shelfId, user.id);
-      Alert.alert(
-        'Success',
-        `Shelf "${shelf.name}" has been cloned to your library.`,
-        [
-          {
-            text: 'View My Library',
-            onPress: () => router.push('/'),
-          },
-          {
-            text: 'OK',
-          },
-        ]
-      );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to clone shelf. Please try again.');
-    } finally {
-      setIsCloning(false);
-    }
+  const handleClone = async () => {
+    // In a real app, this would require authentication
+    // For now, we'll just show a message
+    alert('Clone functionality would be implemented here');
   };
 
-  const handleOpenInBrowser = (url: string) => {
-    Linking.openURL(url).catch(() => {
-      Alert.alert('Error', 'Failed to open URL');
-    });
+  const handleOpenInApp = async () => {
+    // In a real app, this would open the app with the shelf
+    // For now, we'll just show a message
+    alert('Open in app functionality would be implemented here');
   };
 
-  const renderEmpty = () => (
-    <View style={styles.emptyContainer}>
-      <Text variant="displaySmall" style={{ marginBottom: 16 }}>🔗</Text>
-      <Text variant="headlineSmall" style={{ marginBottom: 8, textAlign: 'center' }}>
-        No items in this shelf
-      </Text>
-    </View>
-  );
-
-  const renderHeader = () => (
-    <View style={styles.header}>
-      <Text variant="headlineMedium" style={styles.shelfName}>
-        {shelf?.name || 'Shelf'}
-      </Text>
-      {shelf?.description && (
-        <Text variant="bodyMedium" style={[styles.shelfDescription, { color: theme.colors.onSurfaceVariant }]}>
-          {shelf.description}
-        </Text>
-      )}
-      <Text variant="bodySmall" style={{ color: theme.colors.primary, marginTop: 8 }}>
-        {items.length} {items.length === 1 ? 'item' : 'items'}
-      </Text>
-
-      {isPremium && viewCount !== null && (
-        <View style={styles.viewCountContainer}>
-          <Avatar.Icon
-            size={24}
-            icon="eye"
-            style={{ backgroundColor: theme.colors.surfaceVariant }}
-            color={theme.colors.onSurfaceVariant}
-          />
-          <Text variant="bodySmall" style={{ marginLeft: 4, color: theme.colors.onSurfaceVariant }}>
-            {viewCount} {viewCount === 1 ? 'view' : 'views'}
-          </Text>
-        </View>
-      )}
-    </View>
-  );
-
-  const renderItem = ({ item }: { item: any }) => (
-    <ItemCard
-      item={item}
-      onPress={() => handleOpenInBrowser(item.url)}
-      showActions={false}
-    />
-  );
-
-  if (!isValidLink) {
+  if (loading) {
     return (
-      <View style={[styles.container, styles.center]}>
-        <Text variant="headlineSmall">Invalid Share Link</Text>
-        <Text style={{ marginTop: 16, textAlign: 'center' }}>
-          The link you followed is not valid or has expired.
-        </Text>
-        <Button
-          mode="contained"
-          onPress={() => router.back()}
-          style={{ marginTop: 24 }}
-        >
-          Go Back
-        </Button>
-      </View>
-    );
-  }
-
-  if (shelvesLoading || itemsLoading) {
-    return (
-      <View style={[styles.container, styles.center]}>
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
   }
 
+  if (error) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>{error}</Text>
+      </View>
+    );
+  }
+
+  if (!shelf) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.errorText, { color: theme.colors.error }]}>Shelf not found</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Appbar.Header>
-        <Appbar.BackAction onPress={() => router.back()} />
-        <Appbar.Content title="Shared Shelf" />
-      </Appbar.Header>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {renderHeader()}
-
-        <FlatList
-          data={items}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.id.toString()}
-          ListEmptyComponent={renderEmpty}
-          contentContainerStyle={styles.listContent}
-          scrollEnabled={false}
-        />
-
-        <View style={styles.actionButtons}>
-          <Button
-            mode="contained"
-            onPress={handleCloneShelf}
-            loading={isCloning}
-            disabled={isCloning}
-            icon="content-copy"
-            style={styles.cloneButton}
-          >
-            Clone to My Library
-          </Button>
-
-          <Button
-            mode="outlined"
-            onPress={() => router.push('/')}
-            icon="home"
-          >
-            Go to Home
-          </Button>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        {shelf.cover_image && (
+          <Image
+            source={{ uri: shelf.cover_image }}
+            style={styles.coverImage}
+            contentFit="cover"
+          />
+        )}
+        <View style={styles.headerContent}>
+          <Text style={[styles.shelfName, { color: theme.colors.onBackground }]}>{shelf.name}</Text>
+          {shelf.description && (
+            <Text style={[styles.shelfDescription, { color: theme.colors.onBackground }]}>
+              {shelf.description}
+            </Text>
+          )}
+          <Text style={[styles.viewCount, { color: theme.colors.onBackground }]}>
+            {viewCount} {viewCount === 1 ? 'view' : 'views'}
+          </Text>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+
+      <View style={styles.actions}>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
+          onPress={handleClone}
+        >
+          <MaterialIcons name="file-copy" size={20} color={theme.colors.onPrimary} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.onPrimary }]}>Clone to My Library</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.colors.secondary }]}
+          onPress={handleOpenInApp}
+        >
+          <MaterialIcons name="open-in-new" size={20} color={theme.colors.onSecondary} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.onSecondary }]}>Open in App</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.itemsContainer}>
+        {items.map((item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[styles.itemCard, { backgroundColor: theme.colors.surface }]}
+            onPress={() => Linking.openURL(item.url)}
+          >
+            {item.image_url && (
+              <Image
+                source={{ uri: item.image_url }}
+                style={styles.itemImage}
+                contentFit="cover"
+              />
+            )}
+            <View style={styles.itemContent}>
+              <Text style={[styles.itemTitle, { color: theme.colors.onSurface }]} numberOfLines={2}>
+                {item.title}
+              </Text>
+              {item.description && (
+                <Text style={[styles.itemDescription, { color: theme.colors.onSurface }]} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              )}
+              <View style={styles.itemFooter}>
+                {item.favicon_url && (
+                  <Image
+                    source={{ uri: item.favicon_url }}
+                    style={styles.favicon}
+                    contentFit="contain"
+                  />
+                )}
+                <Text style={[styles.itemUrl, { color: theme.colors.onSurface }]} numberOfLines={1}>
+                  {new URL(item.url).hostname}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </ScrollView>
   );
 }
 
@@ -199,40 +180,92 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  center: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
+  header: {
     padding: 16,
   },
-  header: {
-    marginBottom: 24,
+  coverImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  headerContent: {
+    marginBottom: 16,
   },
   shelfName: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
   shelfDescription: {
+    fontSize: 16,
     marginBottom: 8,
   },
-  viewCountContainer: {
+  viewCount: {
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  actions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 4,
   },
-  listContent: {
-    paddingBottom: 24,
+  actionButtonText: {
+    marginLeft: 8,
+    fontWeight: 'bold',
   },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 48,
+  itemsContainer: {
+    paddingHorizontal: 16,
   },
-  actionButtons: {
-    marginTop: 24,
-    gap: 12,
+  itemCard: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    marginBottom: 16,
+    overflow: 'hidden',
   },
-  cloneButton: {
+  itemImage: {
+    width: 100,
+    height: 100,
+  },
+  itemContent: {
+    flex: 1,
+    padding: 12,
+  },
+  itemTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  itemDescription: {
+    fontSize: 14,
     marginBottom: 8,
+  },
+  itemFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  favicon: {
+    width: 16,
+    height: 16,
+    marginRight: 4,
+  },
+  itemUrl: {
+    fontSize: 12,
+    opacity: 0.7,
+  },
+  errorText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });

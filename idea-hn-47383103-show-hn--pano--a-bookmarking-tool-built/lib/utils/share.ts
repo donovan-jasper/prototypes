@@ -76,11 +76,30 @@ export async function cloneShelf(shelfId: number, userId: string): Promise<void>
 }
 
 export async function trackShelfView(shelfId: number): Promise<number> {
-  // In a real app, this would call an API to track the view
-  // and return the updated view count
-  console.log(`Tracking view for shelf ${shelfId}`);
+  const db = await initDatabase();
+  const shelfQueries = new ShelfQueries(db);
 
-  // Simulate getting the view count
-  // In a real implementation, this would fetch from a database or API
-  return Math.floor(Math.random() * 100) + 1;
+  // Increment view count in database
+  await db.runAsync(
+    'UPDATE shelves SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?',
+    [shelfId]
+  );
+
+  // Get updated view count
+  const result = await db.getFirstAsync<{ view_count: number }>(
+    'SELECT view_count FROM shelves WHERE id = ?',
+    [shelfId]
+  );
+
+  return result?.view_count || 0;
+}
+
+export async function getShelfViewCount(shelfId: number): Promise<number> {
+  const db = await initDatabase();
+  const result = await db.getFirstAsync<{ view_count: number }>(
+    'SELECT view_count FROM shelves WHERE id = ?',
+    [shelfId]
+  );
+
+  return result?.view_count || 0;
 }

@@ -8,12 +8,12 @@ export class ShelfQueries {
     const maxOrder = await this.db.getFirstAsync<{ max_order: number }>(
       'SELECT COALESCE(MAX(order_index), -1) as max_order FROM shelves'
     );
-    
+
     const result = await this.db.runAsync(
       'INSERT INTO shelves (name, description, order_index) VALUES (?, ?, ?)',
       [name, description || null, (maxOrder?.max_order ?? -1) + 1]
     );
-    
+
     return result.lastInsertRowId;
   }
 
@@ -67,6 +67,10 @@ export class ShelfQueries {
       updates.push('cover_image = ?');
       values.push(data.cover_image);
     }
+    if (data.view_count !== undefined) {
+      updates.push('view_count = ?');
+      values.push(data.view_count);
+    }
 
     updates.push('updated_at = CURRENT_TIMESTAMP');
     values.push(id);
@@ -97,6 +101,29 @@ export class ShelfQueries {
         );
       }
     });
+  }
+
+  async incrementViewCount(shelfId: number): Promise<number> {
+    await this.db.runAsync(
+      'UPDATE shelves SET view_count = COALESCE(view_count, 0) + 1 WHERE id = ?',
+      [shelfId]
+    );
+
+    const result = await this.db.getFirstAsync<{ view_count: number }>(
+      'SELECT view_count FROM shelves WHERE id = ?',
+      [shelfId]
+    );
+
+    return result?.view_count || 0;
+  }
+
+  async getViewCount(shelfId: number): Promise<number> {
+    const result = await this.db.getFirstAsync<{ view_count: number }>(
+      'SELECT view_count FROM shelves WHERE id = ?',
+      [shelfId]
+    );
+
+    return result?.view_count || 0;
   }
 }
 
@@ -186,20 +213,19 @@ export class ItemQueries {
   }
 
   async searchItems(query: string): Promise<Item[]> {
-    const searchTerm = `%${query}%`;
     return await this.db.getAllAsync<Item>(
-      `SELECT * FROM items 
-       WHERE title LIKE ? OR description LIKE ? OR url LIKE ? OR tags LIKE ?
+      `SELECT * FROM items
+       WHERE title LIKE ? OR description LIKE ? OR tags LIKE ?
        ORDER BY created_at DESC`,
-      [searchTerm, searchTerm, searchTerm, searchTerm]
+      [`%${query}%`, `%${query}%`, `%${query}%`]
     );
   }
 
-  async getShelfItemCount(shelfId: number): Promise<number> {
-    const result = await this.db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM items WHERE shelf_id = ?',
+  async getItemsForShare(shelfId: number): Promise<Item[]> {
+    return await this.db.getAllAsync<Item>(
+      `SELECT id, url, title, description, image_url, favicon_url, tags
+       FROM items WHERE shelf_id = ? ORDER BY created_at DESC`,
       [shelfId]
     );
-    return result?.count ?? 0;
   }
 }
