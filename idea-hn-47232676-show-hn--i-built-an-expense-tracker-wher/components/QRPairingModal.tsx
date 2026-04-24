@@ -146,7 +146,7 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
     return (
       <Modal visible={visible} onRequestClose={onClose}>
         <View style={styles.container}>
-          <Text>Requesting for camera permission</Text>
+          <Text>Requesting camera permission...</Text>
         </View>
       </Modal>
     );
@@ -168,53 +168,73 @@ export default function QRPairingModal({ visible, onClose }: { visible: boolean;
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Pair Devices</Text>
-          <TouchableOpacity onPress={onClose}>
+          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
             <Ionicons name="close" size={24} color="#333" />
           </TouchableOpacity>
         </View>
 
-        {renderConnectionStatus()}
-
         <View style={styles.modeSelector}>
           <TouchableOpacity
-            style={[styles.modeButton, mode === 'generate' && styles.activeMode]}
+            style={[styles.modeButton, mode === 'generate' && styles.activeModeButton]}
             onPress={() => setMode('generate')}
           >
-            <Text style={styles.modeButtonText}>Show QR Code</Text>
+            <Text style={[styles.modeButtonText, mode === 'generate' && styles.activeModeButtonText]}>
+              Generate QR Code
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.modeButton, mode === 'scan' && styles.activeMode]}
+            style={[styles.modeButton, mode === 'scan' && styles.activeModeButton]}
             onPress={() => setMode('scan')}
           >
-            <Text style={styles.modeButtonText}>Scan QR Code</Text>
+            <Text style={[styles.modeButtonText, mode === 'scan' && styles.activeModeButtonText]}>
+              Scan QR Code
+            </Text>
           </TouchableOpacity>
         </View>
+
+        {renderConnectionStatus()}
 
         {mode === 'generate' ? (
           <View style={styles.qrContainer}>
             {isProcessing ? (
               <ActivityIndicator size="large" color="#2e78b7" />
             ) : (
-              qrCode && <QRCode value={qrCode} size={250} />
+              qrCode ? (
+                <QRCode
+                  value={qrCode}
+                  size={250}
+                  color="#2e78b7"
+                  backgroundColor="white"
+                />
+              ) : (
+                <Text>Generating QR code...</Text>
+              )
             )}
             <Text style={styles.instructionText}>
-              Scan this QR code with the other device to pair
+              Scan this QR code on another device to pair
             </Text>
           </View>
         ) : (
           <View style={styles.scannerContainer}>
             <BarCodeScanner
-              onBarCodeScanned={handleBarCodeScanned}
+              onBarCodeScanned={scanned ? undefined : handleBarCodeScanned}
               style={StyleSheet.absoluteFillObject}
             />
-            <View style={styles.scannerOverlay}>
-              <Text style={styles.scannerText}>Scan the QR code from the other device</Text>
-            </View>
+            {scanned && (
+              <TouchableOpacity
+                style={styles.scanAgainButton}
+                onPress={() => setScanned(false)}
+              >
+                <Text style={styles.scanAgainText}>Tap to Scan Again</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         <View style={styles.footer}>
-          <Button title="Cancel" onPress={onClose} color="#666" />
+          <Text style={styles.footerText}>
+            Keep devices close for best results
+          </Text>
         </View>
       </View>
     </Modal>
@@ -225,7 +245,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: 'white',
   },
   header: {
     flexDirection: 'row',
@@ -236,29 +256,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: '#2e78b7',
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 15,
-    padding: 10,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 8,
-  },
-  statusText: {
-    marginLeft: 8,
-    fontSize: 16,
-  },
-  retryButton: {
-    marginLeft: 10,
+  closeButton: {
     padding: 5,
-    backgroundColor: '#2e78b7',
-    borderRadius: 4,
-  },
-  retryText: {
-    color: 'white',
-    fontSize: 14,
   },
   modeSelector: {
     flexDirection: 'row',
@@ -268,52 +269,75 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 10,
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    marginHorizontal: 5,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
   },
-  activeMode: {
-    backgroundColor: '#2e78b7',
+  activeModeButton: {
+    borderBottomColor: '#2e78b7',
   },
   modeButtonText: {
-    color: '#333',
+    color: '#666',
+  },
+  activeModeButtonText: {
+    color: '#2e78b7',
     fontWeight: 'bold',
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 5,
+  },
+  statusText: {
+    marginLeft: 10,
+    color: '#333',
+  },
+  retryButton: {
+    marginLeft: 10,
+    padding: 5,
+    backgroundColor: '#2e78b7',
+    borderRadius: 5,
+  },
+  retryText: {
+    color: 'white',
+    fontSize: 12,
   },
   qrContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
   },
   instructionText: {
     marginTop: 20,
     fontSize: 16,
-    textAlign: 'center',
     color: '#666',
+    textAlign: 'center',
   },
   scannerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
   },
-  scannerOverlay: {
+  scanAgainButton: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    bottom: 20,
+    padding: 15,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 5,
   },
-  scannerText: {
+  scanAgainText: {
     color: 'white',
-    fontSize: 18,
-    textAlign: 'center',
-    padding: 20,
+    fontWeight: 'bold',
   },
   footer: {
-    marginTop: 20,
+    padding: 10,
+    alignItems: 'center',
+  },
+  footerText: {
+    color: '#666',
+    fontSize: 12,
   },
 });

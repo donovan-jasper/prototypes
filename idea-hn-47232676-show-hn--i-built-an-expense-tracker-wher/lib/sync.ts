@@ -1,6 +1,6 @@
-import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate, mediaDevices } from 'react-native-webrtc';
+import { RTCPeerConnection, RTCSessionDescription, RTCIceCandidate } from 'react-native-webrtc';
 import { encryptMessage, decryptMessage } from './encryption';
-import { getExpenses, addExpense, updateExpense, useSQLiteContext } from './database';
+import { getExpenses, addExpense, updateExpense } from './database';
 import { useStore } from './store';
 import * as SecureStore from 'expo-secure-store';
 import * as Application from 'expo-application';
@@ -82,7 +82,7 @@ const setupDataChannel = (channel: RTCDataChannel) => {
         return;
       }
 
-      const decryptedData = decryptMessage(encryptedData, encryptionKey);
+      const decryptedData = await decryptMessage(encryptedData, encryptionKey);
       const payload: SyncPayload = JSON.parse(decryptedData);
 
       console.log('Received sync payload:', payload);
@@ -175,59 +175,102 @@ export const initializePeerConnection = async (isInitiator: boolean): Promise<st
   }
 };
 
-export const handleSignalingData = async (qrDataString: string): Promise<string> => {
+export const handleSignalingData = async (data: string): Promise<string | null> => {
   try {
-    const qrData = JSON.parse(qrDataString);
-    const signalingData: SignalingData = JSON.parse(qrData.signalingData);
-
-    if (qrData.publicKey) {
-      setEncryptionKey(qrData.publicKey);
-    }
+    const signalingData: SignalingData = JSON.parse(data);
 
     if (!peerConnection) {
       await initializePeerConnection(false);
     }
 
     if (signalingData.type === 'offer') {
-      await peerConnection!.setRemoteDescription(
-        new RTCSessionDescription({ type: 'offer', sdp: signalingData.sdp! })
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({
+          type: 'offer',
+          sdp: signalingData.sdp,
+        })
       );
 
-      const answer = await peerConnection!.createAnswer();
-      await peerConnection!.setLocalDescription(answer);
+      const answer = await peerConnection.createAnswer();
+      await peerConnection.setLocalDescription(answer);
 
-      await new Promise<void>((resolve) => {
-        if (peerConnection?.iceGatheringState === 'complete') {
-          resolve();
-        } else {
-          peerConnection!.onicegatheringstatechange = () => {
-            if (peerConnection?.iceGatheringState === 'complete') {
-              resolve();
-            }
-          };
-        }
-      });
-
-      const responseData: SignalingData = {
+      const answerData: SignalingData = {
         type: 'answer',
-        sdp: peerConnection!.localDescription!.sdp,
+        sdp: answer.sdp,
         deviceId: await getDeviceId(),
       };
 
-      return JSON.stringify(responseData);
+      return JSON.stringify(answerData);
     } else if (signalingData.type === 'answer') {
-      await peerConnection!.setRemoteDescription(
-        new RTCSessionDescription({ type: 'answer', sdp: signalingData.sdp! })
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.setRemoteDescription(
+        new RTCSessionDescription({
+          type: 'answer',
+          sdp: signalingData.sdp,
+        })
       );
     } else if (signalingData.type === 'candidate' && signalingData.candidate) {
-      await peerConnection!.addIceCandidate(new RTCIceCandidate(signalingData.candidate));
+      if (!peerConnection) throw new Error('Peer connection not initialized');
+
+      await peerConnection.addIceCandidate(
+        new RTCIceCandidate(signalingData.candidate)
+      );
     }
 
-    return '';
+    return null;
   } catch (error) {
     console.error('Error handling signaling data:', error);
     throw error;
   }
+};
+
+export const createSyncPayload = async (): Promise<SyncPayload> => {
+  const expenses = await getExpenses();
+  const currentDeviceId = await getDeviceId();
+
+  return {
+    expenses,
+    timestamp: Date.now(),
+    deviceId: currentDeviceId,
+  };
+};
+
+export const applySyncPayload = async (payload: SyncPayload) => {
+  const currentDeviceId = await getDeviceId();
+
+  // Only process if payload is newer than our last sync
+  if (payload.timestamp <= lastSyncTimestamp) {
+    console.log('Payload is older than last sync, skipping');
+    return;
+  }
+
+  lastSyncTimestamp = payload.timestamp;
+
+  // Process expenses
+  for (const expense of payload.expenses) {
+    // Skip expenses from our own device
+    if (expense.deviceId === currentDeviceId) continue;
+
+    // Check if expense already exists
+    const existingExpense = await getExpenseById(expense.id);
+
+    if (existingExpense) {
+      // Update existing expense if it's newer
+      if (expense.updatedAt > existingExpense.updatedAt) {
+        await updateExpense(expense.id, expense);
+      }
+    } else {
+      // Add new expense
+      await addExpense(expense);
+    }
+  }
+
+  // Update the store
+  const allExpenses = await getExpenses();
+  useStore.getState().setExpenses(allExpenses);
 };
 
 export const sendSyncPayload = async () => {
@@ -237,77 +280,24 @@ export const sendSyncPayload = async () => {
   }
 
   try {
-    const expenses = await getExpenses();
-    const currentDeviceId = await getDeviceId();
-
-    const payload: SyncPayload = {
-      expenses,
-      timestamp: Date.now(),
-      deviceId: currentDeviceId,
-    };
-
+    const payload = await createSyncPayload();
     if (!encryptionKey) {
       console.error('No encryption key available');
       return;
     }
 
-    const encryptedData = encryptMessage(JSON.stringify(payload), encryptionKey);
-    dataChannel.send(encryptedData);
-    console.log('Sent sync payload');
+    const encryptedPayload = await encryptMessage(JSON.stringify(payload), encryptionKey);
+    dataChannel.send(encryptedPayload);
   } catch (error) {
     console.error('Error sending sync payload:', error);
   }
 };
 
-export const applySyncPayload = async (payload: SyncPayload) => {
-  try {
-    const db = useSQLiteContext();
-
-    // Only apply changes that are newer than our last sync
-    if (payload.timestamp <= lastSyncTimestamp) {
-      console.log('Received payload is older than last sync, ignoring');
-      return;
-    }
-
-    lastSyncTimestamp = payload.timestamp;
-
-    // Process each expense in the payload
-    for (const expense of payload.expenses) {
-      // Check if we already have this expense
-      const existingExpense = await db.getFirstAsync<Expense>(
-        'SELECT * FROM expenses WHERE id = ?',
-        [expense.id]
-      );
-
-      if (existingExpense) {
-        // If we have it, update it if the remote version is newer
-        if (expense.updatedAt > existingExpense.updatedAt) {
-          await updateExpense(expense.id, expense);
-        }
-      } else {
-        // If we don't have it, add it
-        await addExpense(expense);
-      }
-    }
-
-    // Update the UI with the new data
-    const allExpenses = await getExpenses();
-    useStore.getState().setExpenses(allExpenses);
-
-    console.log('Applied sync payload successfully');
-  } catch (error) {
-    console.error('Error applying sync payload:', error);
-  }
-};
-
 export const closeConnection = () => {
-  if (dataChannel) {
-    dataChannel.close();
-  }
   if (peerConnection) {
     peerConnection.close();
+    peerConnection = null;
   }
-  peerConnection = null;
   dataChannel = null;
   useStore.getState().setSyncStatus('offline');
 };

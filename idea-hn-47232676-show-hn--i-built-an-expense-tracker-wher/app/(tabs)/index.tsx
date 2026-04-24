@@ -1,123 +1,134 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { useStore } from '../../lib/store';
-import { getBalance } from '../../lib/database';
-import { useSQLiteContext } from 'expo-sqlite';
+import { getExpenses, getBalance } from '../../lib/database';
 import { Ionicons } from '@expo/vector-icons';
-import SyncIndicator from '../../components/SyncIndicator';
-import { useNavigation } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+
+interface BalanceItem {
+  user: string;
+  amount: number;
+}
 
 export default function DashboardScreen() {
-  const { expenses, syncStatus, pairedDevice } = useStore();
-  const [balances, setBalances] = useState<{ [key: string]: number }>({});
-  const db = useSQLiteContext();
-  const navigation = useNavigation();
+  const { expenses, syncStatus, setExpenses } = useStore();
+  const [balances, setBalances] = useState<BalanceItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    const fetchBalances = async () => {
+    const loadData = async () => {
       try {
-        const users = await db.getAllAsync<{ id: string; name: string }>('SELECT id, name FROM users');
-        const balanceMap: { [key: string]: number } = {};
+        setIsLoading(true);
+        const expensesData = await getExpenses();
+        setExpenses(expensesData);
 
-        for (const user of users) {
-          const balance = await getBalance(user.id);
-          balanceMap[user.id] = balance;
-        }
-
-        setBalances(balanceMap);
+        // Calculate balances
+        // In a real app, you would get the current user's ID
+        const currentUserId = 'user1'; // Replace with actual user ID
+        const balanceData = await getBalance(currentUserId);
+        setBalances(balanceData);
       } catch (error) {
-        console.error('Error fetching balances:', error);
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchBalances();
-  }, [expenses, syncStatus]);
+    loadData();
+  }, [syncStatus]);
 
-  const renderBalanceItem = ({ item }: { item: { id: string; name: string } }) => {
-    const balance = balances[item.id] || 0;
-    const isPositive = balance > 0;
-
-    return (
-      <View style={styles.balanceItem}>
-        <Text style={styles.balanceName}>{item.name}</Text>
-        <Text style={[styles.balanceAmount, { color: isPositive ? '#4CAF50' : '#F44336' }]}>
-          {isPositive ? '+' : ''}${Math.abs(balance).toFixed(2)}
-        </Text>
-      </View>
-    );
-  };
-
-  const renderExpenseItem = ({ item }: { item: any }) => (
+  const renderExpenseItem = ({ item }: { item: Expense }) => (
     <View style={styles.expenseItem}>
-      <View style={styles.expenseHeader}>
+      <View style={styles.expenseInfo}>
         <Text style={styles.expenseDescription}>{item.description}</Text>
-        <Text style={styles.expenseAmount}>${item.amount.toFixed(2)}</Text>
-      </View>
-      <View style={styles.expenseDetails}>
         <Text style={styles.expenseDate}>{new Date(item.date).toLocaleDateString()}</Text>
-        <Text style={styles.expensePayer}>Paid by: {item.paidBy}</Text>
       </View>
+      <Text style={styles.expenseAmount}>${item.amount.toFixed(2)}</Text>
     </View>
   );
 
+  const renderBalanceItem = ({ item }: { item: BalanceItem }) => (
+    <View style={styles.balanceItem}>
+      <Text style={styles.balanceUser}>{item.user}</Text>
+      <Text style={[styles.balanceAmount, item.amount > 0 ? styles.positive : styles.negative]}>
+        {item.amount > 0 ? '+' : ''}${Math.abs(item.amount).toFixed(2)}
+      </Text>
+    </View>
+  );
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2e78b7" />
+        <Text style={styles.loadingText}>Loading your data...</Text>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView style={styles.container}>
+    <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>PairPurse</Text>
-        <SyncIndicator />
-      </View>
-
-      {!pairedDevice && (
-        <TouchableOpacity
-          style={styles.pairingPrompt}
-          onPress={() => navigation.navigate('settings')}
-        >
-          <Ionicons name="link" size={24} color="#2e78b7" />
-          <Text style={styles.pairingText}>Pair with another device to sync expenses</Text>
-        </TouchableOpacity>
-      )}
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Balances</Text>
-        {Object.keys(balances).length > 0 ? (
-          <FlatList
-            data={Object.entries(balances).map(([id, balance]) => ({ id, name: id, balance }))}
-            renderItem={renderBalanceItem}
-            keyExtractor={(item) => item.id}
-            scrollEnabled={false}
+        <Text style={styles.title}>Your Balances</Text>
+        <View style={styles.syncStatus}>
+          <Ionicons
+            name={syncStatus === 'connected' ? 'cloud-done' :
+                  syncStatus === 'syncing' ? 'sync' : 'cloud-offline'}
+            size={16}
+            color={syncStatus === 'connected' ? '#4CAF50' :
+                  syncStatus === 'syncing' ? '#FF9800' : '#9E9E9E'}
           />
-        ) : (
-          <Text style={styles.emptyText}>No balances to show</Text>
-        )}
+          <Text style={styles.syncStatusText}>
+            {syncStatus === 'connected' ? 'Synced' :
+             syncStatus === 'syncing' ? 'Syncing...' : 'Offline'}
+          </Text>
+        </View>
       </View>
+
+      {balances.length > 0 ? (
+        <FlatList
+          data={balances}
+          renderItem={renderBalanceItem}
+          keyExtractor={(item) => item.user}
+          style={styles.balanceList}
+        />
+      ) : (
+        <View style={styles.emptyBalances}>
+          <Text style={styles.emptyBalancesText}>No balances to show</Text>
+          <Text style={styles.emptyBalancesSubtext}>Add expenses to see your balances</Text>
+        </View>
+      )}
 
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Recent Expenses</Text>
-          <TouchableOpacity onPress={() => navigation.navigate('expenses')}>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/expenses')}>
             <Text style={styles.viewAll}>View All</Text>
           </TouchableOpacity>
         </View>
+
         {expenses.length > 0 ? (
           <FlatList
             data={expenses.slice(0, 5)}
             renderItem={renderExpenseItem}
             keyExtractor={(item) => item.id}
-            scrollEnabled={false}
+            style={styles.expenseList}
           />
         ) : (
-          <Text style={styles.emptyText}>No expenses yet</Text>
+          <View style={styles.emptyExpenses}>
+            <Text style={styles.emptyExpensesText}>No expenses yet</Text>
+            <Text style={styles.emptyExpensesSubtext}>Add your first expense to get started</Text>
+          </View>
         )}
       </View>
 
       <TouchableOpacity
-        style={styles.settleButton}
-        onPress={() => navigation.navigate('add')}
+        style={styles.addButton}
+        onPress={() => router.push('/(tabs)/add')}
       >
         <Ionicons name="add" size={24} color="white" />
-        <Text style={styles.settleButtonText}>Add Expense</Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -126,49 +137,41 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f8f8',
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#666',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#2e78b7',
+    backgroundColor: 'white',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  pairingPrompt: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#e3f2fd',
-    margin: 20,
-    borderRadius: 8,
-  },
-  pairingText: {
-    marginLeft: 10,
-    color: '#2e78b7',
-    fontWeight: '500',
-  },
-  section: {
-    marginBottom: 20,
-    paddingHorizontal: 20,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
-  viewAll: {
-    color: '#2e78b7',
-    fontWeight: '500',
+  syncStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  syncStatusText: {
+    marginLeft: 5,
+    color: '#666',
+    fontSize: 14,
+  },
+  balanceList: {
+    backgroundColor: 'white',
+    padding: 15,
   },
   balanceItem: {
     flexDirection: 'row',
@@ -178,68 +181,109 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
-  balanceName: {
+  balanceUser: {
     fontSize: 16,
+    color: '#333',
   },
   balanceAmount: {
     fontSize: 16,
     fontWeight: 'bold',
   },
-  expenseItem: {
-    padding: 15,
-    marginBottom: 10,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+  positive: {
+    color: '#4CAF50',
   },
-  expenseHeader: {
+  negative: {
+    color: '#F44336',
+  },
+  section: {
+    marginTop: 20,
+    backgroundColor: 'white',
+    padding: 15,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  viewAll: {
+    color: '#2e78b7',
+    fontSize: 14,
+  },
+  expenseList: {
+    maxHeight: 300,
+  },
+  expenseItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  expenseInfo: {
+    flex: 1,
   },
   expenseDescription: {
     fontSize: 16,
-    fontWeight: '500',
+    color: '#333',
+  },
+  expenseDate: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
   },
   expenseAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2e78b7',
+    color: '#333',
   },
-  expenseDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  expenseDate: {
-    fontSize: 14,
-    color: '#666',
-  },
-  expensePayer: {
-    fontSize: 14,
-    color: '#666',
-  },
-  emptyText: {
-    textAlign: 'center',
-    color: '#999',
-    marginTop: 10,
-  },
-  settleButton: {
-    flexDirection: 'row',
+  emptyBalances: {
+    padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#2e78b7',
-    padding: 15,
-    margin: 20,
-    borderRadius: 8,
+    backgroundColor: 'white',
   },
-  settleButtonText: {
-    color: 'white',
+  emptyBalancesText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
+    color: '#333',
+    marginBottom: 5,
+  },
+  emptyBalancesSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
+  emptyExpenses: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyExpensesText: {
+    fontSize: 16,
+    color: '#333',
+    marginBottom: 5,
+  },
+  emptyExpensesSubtext: {
+    fontSize: 14,
+    color: '#666',
+  },
+  addButton: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2e78b7',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
 });
