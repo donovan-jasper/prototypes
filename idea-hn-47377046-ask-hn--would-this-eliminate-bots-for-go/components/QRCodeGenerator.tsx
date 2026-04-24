@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   tokenText: {
     fontSize: 14,
-    fontFamily: 'monospace',
+    color: '#1C1C1E',
     backgroundColor: '#F2F2F7',
     padding: 12,
     borderRadius: 8,
@@ -226,23 +226,22 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     flex: 1,
-    padding: 12,
+    paddingVertical: 12,
     borderRadius: 8,
-    backgroundColor: '#007AFF',
-    marginHorizontal: 4,
+    backgroundColor: '#F2F2F7',
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   shareButton: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#007AFF',
+    backgroundColor: '#007AFF',
   },
   actionText: {
-    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
+    color: '#1C1C1E',
   },
   shareText: {
-    color: '#007AFF',
+    color: '#FFFFFF',
   },
   instructions: {
     fontSize: 14,
@@ -251,7 +250,7 @@ const styles = StyleSheet.create({
   },
   expiredContainer: {
     alignItems: 'center',
-    padding: 24,
+    paddingVertical: 32,
   },
   expiredText: {
     fontSize: 18,
@@ -262,12 +261,11 @@ const styles = StyleSheet.create({
   expiredSubtext: {
     fontSize: 14,
     color: '#8E8E93',
-    textAlign: 'center',
   },
   errorText: {
     fontSize: 16,
     color: '#FF3B30',
-    marginBottom: 16,
+    marginBottom: 24,
     textAlign: 'center',
   },
 });
