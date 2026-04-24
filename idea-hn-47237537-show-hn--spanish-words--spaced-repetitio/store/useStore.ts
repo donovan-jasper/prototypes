@@ -145,7 +145,7 @@ export const useStore = create<StoreState>()(
           }
 
           const diffTime = today.getTime() - lastPracticedDate.getTime();
-          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
           if (diffDays === 1) {
             // Consecutive day
@@ -155,15 +155,14 @@ export const useStore = create<StoreState>()(
             set({ streak: 1, lastPracticed: today.getTime() });
           }
         } else {
-          // First time practicing
+          // First practice
           set({ streak: 1, lastPracticed: today.getTime() });
         }
       },
 
       updateSettings: async (newSettings) => {
         try {
-          const currentSettings = get().settings;
-          const updatedSettings = { ...currentSettings, ...newSettings };
+          const updatedSettings = { ...get().settings, ...newSettings };
           await updateSettings(updatedSettings);
           set({ settings: updatedSettings });
         } catch (error) {

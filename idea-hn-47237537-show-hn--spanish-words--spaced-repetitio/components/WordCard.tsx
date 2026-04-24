@@ -185,19 +185,19 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
                 </TouchableOpacity>
 
                 <View style={styles.swipeIndicators}>
-                  <View style={[styles.indicator, styles.leftIndicator]}>
-                    <Ionicons name="arrow-back" size={24} color="#FF9800" />
-                    <Text style={styles.indicatorText}>Learning</Text>
+                  <View style={[styles.swipeIndicator, styles.swipeLeft]}>
+                    <Ionicons name="arrow-back" size={24} color="#FF5252" />
+                    <Text style={styles.swipeText}>Learning</Text>
                   </View>
 
-                  <View style={[styles.indicator, styles.downIndicator]}>
-                    <Ionicons name="arrow-down" size={24} color="#F44336" />
-                    <Text style={styles.indicatorText}>Forgot</Text>
+                  <View style={[styles.swipeIndicator, styles.swipeDown]}>
+                    <Ionicons name="arrow-down" size={24} color="#FFC107" />
+                    <Text style={styles.swipeText}>Forgot</Text>
                   </View>
 
-                  <View style={[styles.indicator, styles.rightIndicator]}>
+                  <View style={[styles.swipeIndicator, styles.swipeRight]}>
                     <Ionicons name="arrow-forward" size={24} color="#4CAF50" />
-                    <Text style={styles.indicatorText}>Know it</Text>
+                    <Text style={styles.swipeText}>Know it</Text>
                   </View>
                 </View>
               </>
@@ -206,7 +206,7 @@ export default function WordCard({ word, onSwipe }: WordCardProps) {
                 style={styles.revealButton}
                 onPress={() => setShowTranslation(true)}
               >
-                <Text style={styles.revealButtonText}>Show Translation</Text>
+                <Text style={styles.revealText}>Show Translation</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -229,8 +229,8 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 5,
     padding: 20,
     justifyContent: 'center',
@@ -248,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   wordText: {
-    fontSize: 32,
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#1E40AF',
     marginBottom: 10,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
   audioButton: {
     marginBottom: 20,
     padding: 10,
-    backgroundColor: '#EFF6FF',
+    backgroundColor: '#E0F2FE',
     borderRadius: 50,
   },
   revealButton: {
@@ -278,35 +278,34 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E40AF',
     borderRadius: 8,
   },
-  revealButtonText: {
+  revealText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
   },
   swipeIndicators: {
-    position: 'absolute',
-    bottom: 20,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 30,
+  },
+  swipeIndicator: {
     alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
   },
-  indicator: {
-    alignItems: 'center',
+  swipeLeft: {
+    backgroundColor: '#FFEBEE',
   },
-  leftIndicator: {
-    transform: [{ rotate: '180deg' }],
+  swipeDown: {
+    backgroundColor: '#FFF8E1',
   },
-  downIndicator: {
-    transform: [{ rotate: '90deg' }],
+  swipeRight: {
+    backgroundColor: '#E8F5E9',
   },
-  rightIndicator: {
-    transform: [{ rotate: '0deg' }],
-  },
-  indicatorText: {
+  swipeText: {
     fontSize: 12,
-    color: '#6B7280',
     marginTop: 5,
+    color: '#4B5563',
   },
 });

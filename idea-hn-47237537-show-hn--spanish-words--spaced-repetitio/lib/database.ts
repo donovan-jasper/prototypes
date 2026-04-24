@@ -174,34 +174,28 @@ export const getDueWords = async (limit: number, newWordsOnly: boolean = false) 
   return new Promise<Word[]>((resolve, reject) => {
     db.transaction(
       (tx) => {
+        let query = `
+          SELECT w.*, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
+          FROM words w
+          LEFT JOIN user_progress up ON w.id = up.wordId
+        `;
+
         if (newWordsOnly) {
-          // Get words that have never been reviewed
-          tx.executeSql(
-            `SELECT w.*, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
-             FROM words w
-             LEFT JOIN user_progress up ON w.id = up.wordId
-             WHERE up.wordId IS NULL
-             ORDER BY w.frequency DESC
-             LIMIT ?`,
-            [limit],
-            (_, { rows }) => resolve(rows._array),
-            (_, error) => reject(error)
-          );
+          query += ' WHERE up.wordId IS NULL';
         } else {
-          // Get words that are due for review
-          const now = Date.now();
-          tx.executeSql(
-            `SELECT w.*, up.difficulty, up.stability, up.retrievability, up.correctCount, up.incorrectCount
-             FROM words w
-             JOIN user_progress up ON w.id = up.wordId
-             WHERE up.nextReview <= ?
-             ORDER BY up.nextReview ASC
-             LIMIT ?`,
-            [now, limit],
-            (_, { rows }) => resolve(rows._array),
-            (_, error) => reject(error)
-          );
+          query += ' WHERE up.nextReview <= ? OR up.nextReview IS NULL';
         }
+
+        query += ' ORDER BY RANDOM() LIMIT ?';
+
+        const params = newWordsOnly ? [limit] : [Date.now(), limit];
+
+        tx.executeSql(
+          query,
+          params,
+          (_, { rows }) => resolve(rows._array),
+          (_, error) => reject(error)
+        );
       }
     );
   });
@@ -212,9 +206,7 @@ export const getTotalWordsLearned = async () => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          `SELECT COUNT(*) as count
-           FROM user_progress
-           WHERE correctCount > 0`,
+          'SELECT COUNT(*) as count FROM user_progress WHERE correctCount > 0',
           [],
           (_, { rows }) => resolve(rows._array[0].count),
           (_, error) => reject(error)
@@ -233,11 +225,12 @@ export const getSettings = async () => {
           [],
           (_, { rows }) => {
             if (rows.length > 0) {
+              const settings = rows._array[0];
               resolve({
-                notificationsEnabled: rows._array[0].notificationsEnabled === 1,
-                notificationTime: rows._array[0].notificationTime,
-                dailyGoal: rows._array[0].dailyGoal,
-                currentLanguage: rows._array[0].currentLanguage,
+                notificationsEnabled: settings.notificationsEnabled === 1,
+                notificationTime: settings.notificationTime,
+                dailyGoal: settings.dailyGoal,
+                currentLanguage: settings.currentLanguage,
               });
             } else {
               resolve({
@@ -254,22 +247,17 @@ export const getSettings = async () => {
   });
 };
 
-export const updateSettings = async (newSettings: Partial<Settings>) => {
+export const updateSettings = async (settings: Settings) => {
   return new Promise((resolve, reject) => {
     db.transaction(
       (tx) => {
         tx.executeSql(
-          `UPDATE settings
-           SET notificationsEnabled = ?,
-               notificationTime = ?,
-               dailyGoal = ?,
-               currentLanguage = ?
-           WHERE id = 1`,
+          'UPDATE settings SET notificationsEnabled = ?, notificationTime = ?, dailyGoal = ?, currentLanguage = ? WHERE id = 1',
           [
-            newSettings.notificationsEnabled !== undefined ? (newSettings.notificationsEnabled ? 1 : 0) : 1,
-            newSettings.notificationTime || null,
-            newSettings.dailyGoal || 10,
-            newSettings.currentLanguage || 'spanish'
+            settings.notificationsEnabled ? 1 : 0,
+            settings.notificationTime,
+            settings.dailyGoal,
+            settings.currentLanguage,
           ],
           (_, result) => resolve(result.rowsAffected),
           (_, error) => reject(error)
