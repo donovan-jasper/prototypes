@@ -5,7 +5,7 @@ import { collection, query, where, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase';
 
 const FeedbackScreen = ({ route }) => {
-  const { submissionId } = route.params;
+  const { submissionId, templateType, reviewerId } = route.params;
   const [feedbackResults, setFeedbackResults] = useState(null);
   const [individualFeedback, setIndividualFeedback] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,23 +28,23 @@ const FeedbackScreen = ({ route }) => {
       });
 
       if (feedbackData.length > 0) {
-        // Calculate average scores for each question
-        const totalQuestion1 = feedbackData.reduce((sum, feedback) => sum + (feedback.question1 || 0), 0);
-        const totalQuestion2 = feedbackData.reduce((sum, feedback) => sum + (feedback.question2 || 0), 0);
-        const totalQuestion3 = feedbackData.reduce((sum, feedback) => sum + (feedback.question3 || 0), 0);
+        // Calculate average scores
+        const totalClarity = feedbackData.reduce((sum, feedback) => sum + (feedback.clarity || 0), 0);
+        const totalWouldUse = feedbackData.reduce((sum, feedback) => sum + (feedback.wouldUse || 0), 0);
+        const totalRating = feedbackData.reduce((sum, feedback) => sum + (feedback.rating || 0), 0);
 
-        const averageQuestion1 = (totalQuestion1 / feedbackData.length).toFixed(1);
-        const averageQuestion2 = (totalQuestion2 / feedbackData.length).toFixed(1);
-        const averageQuestion3 = (totalQuestion3 / feedbackData.length).toFixed(1);
+        const averageClarity = (totalClarity / feedbackData.length).toFixed(1);
+        const averageWouldUse = (totalWouldUse / feedbackData.length).toFixed(1);
+        const averageRating = (totalRating / feedbackData.length).toFixed(1);
 
         // Calculate overall average score
-        const totalScore = feedbackData.reduce((sum, feedback) => sum + (feedback.score || 0), 0);
-        const averageScore = (totalScore / feedbackData.length).toFixed(1);
+        const totalScore = totalClarity + totalWouldUse + totalRating;
+        const averageScore = (totalScore / (feedbackData.length * 3)).toFixed(1);
 
         setFeedbackResults({
-          question1: averageQuestion1,
-          question2: averageQuestion2,
-          question3: averageQuestion3,
+          clarity: averageClarity,
+          wouldUse: averageWouldUse,
+          rating: averageRating,
           score: averageScore,
           count: feedbackData.length
         });
@@ -72,22 +72,22 @@ const FeedbackScreen = ({ route }) => {
 
   const renderFeedbackItem = ({ item }) => (
     <View style={styles.feedbackItem}>
-      <Text style={styles.reviewerName}>{item.reviewerName || 'Anonymous'}</Text>
+      <Text style={styles.reviewerName}>{item.reviewerId || 'Anonymous'}</Text>
 
       <View style={styles.scoresContainer}>
         <View style={styles.scoreItem}>
           <Text style={styles.scoreLabel}>Clarity:</Text>
-          <Text style={styles.scoreValue}>{item.question1 || 'N/A'}/10</Text>
+          <Text style={styles.scoreValue}>{item.clarity || 'N/A'}/10</Text>
         </View>
 
         <View style={styles.scoreItem}>
           <Text style={styles.scoreLabel}>Would Use:</Text>
-          <Text style={styles.scoreValue}>{item.question2 || 'N/A'}/10</Text>
+          <Text style={styles.scoreValue}>{item.wouldUse || 'N/A'}/10</Text>
         </View>
 
         <View style={styles.scoreItem}>
           <Text style={styles.scoreLabel}>Rating:</Text>
-          <Text style={styles.scoreValue}>{item.question3 || 'N/A'}/10</Text>
+          <Text style={styles.scoreValue}>{item.rating || 'N/A'}/10</Text>
         </View>
       </View>
 
@@ -120,33 +120,27 @@ const FeedbackScreen = ({ route }) => {
 
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>Average Clarity:</Text>
-            <Text style={styles.resultValue}>{feedbackResults.question1}/10</Text>
+            <Text style={styles.resultValue}>{feedbackResults.clarity}/10</Text>
           </View>
 
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>Would Use:</Text>
-            <Text style={styles.resultValue}>{feedbackResults.question2}/10</Text>
+            <Text style={styles.resultValue}>{feedbackResults.wouldUse}/10</Text>
           </View>
 
           <View style={styles.resultItem}>
             <Text style={styles.resultLabel}>Average Rating:</Text>
-            <Text style={styles.resultValue}>{feedbackResults.question3}/10</Text>
+            <Text style={styles.resultValue}>{feedbackResults.rating}/10</Text>
           </View>
 
-          <View style={styles.scoreContainer}>
-            <Text style={styles.scoreText}>Final Score: {feedbackResults.score}/10</Text>
+          <View style={styles.resultItem}>
+            <Text style={styles.resultLabel}>Overall Score:</Text>
+            <Text style={styles.resultValue}>{feedbackResults.score}/10</Text>
           </View>
-        </View>
-      ) : (
-        <View style={styles.noFeedbackContainer}>
-          <Text style={styles.noFeedbackText}>No feedback received yet</Text>
-          <Text style={styles.noFeedbackSubtext}>Share your submission link to get feedback</Text>
-        </View>
-      )}
 
-      {individualFeedback.length > 0 && (
-        <View style={styles.individualFeedbackContainer}>
-          <Text style={styles.sectionTitle}>Individual Reviews</Text>
+          <View style={styles.divider} />
+
+          <Text style={styles.sectionTitle}>Individual Feedback</Text>
           <FlatList
             data={individualFeedback}
             renderItem={renderFeedbackItem}
@@ -154,12 +148,18 @@ const FeedbackScreen = ({ route }) => {
             scrollEnabled={false}
           />
         </View>
+      ) : (
+        <View style={styles.noFeedbackContainer}>
+          <Text style={styles.noFeedbackText}>No feedback yet. Be the first to submit!</Text>
+        </View>
       )}
 
-      <View style={styles.formContainer}>
-        <Text style={styles.formTitle}>Provide Your Feedback</Text>
-        <FeedbackForm onSubmit={handleSubmit} submissionId={submissionId} />
-      </View>
+      <FeedbackForm
+        onSubmit={handleSubmit}
+        submissionId={submissionId}
+        templateType={templateType}
+        reviewerId={reviewerId}
+      />
     </ScrollView>
   );
 };
@@ -167,14 +167,14 @@ const FeedbackScreen = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#f5f5f5',
   },
   title: {
     fontSize: 24,
-    marginBottom: 20,
     fontWeight: 'bold',
     color: '#333',
+    margin: 20,
+    textAlign: 'center',
   },
   loadingContainer: {
     flex: 1,
@@ -188,18 +188,21 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   resultsContainer: {
-    marginBottom: 30,
-    padding: 15,
-    backgroundColor: '#f8f8f8',
+    backgroundColor: '#fff',
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
+    padding: 20,
+    margin: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   resultsTitle: {
     fontSize: 20,
-    marginBottom: 10,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 10,
   },
   feedbackCount: {
     fontSize: 16,
@@ -213,66 +216,35 @@ const styles = StyleSheet.create({
   },
   resultLabel: {
     fontSize: 16,
-    color: '#444',
+    color: '#333',
   },
   resultValue: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
     color: '#007AFF',
   },
-  scoreContainer: {
-    marginTop: 15,
-    paddingTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-  },
-  scoreText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E86DE',
-    textAlign: 'center',
-  },
-  noFeedbackContainer: {
-    marginBottom: 30,
-    padding: 20,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    alignItems: 'center',
-  },
-  noFeedbackText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#666',
-    marginBottom: 5,
-  },
-  noFeedbackSubtext: {
-    fontSize: 14,
-    color: '#888',
-  },
-  individualFeedbackContainer: {
-    marginBottom: 30,
+  divider: {
+    height: 1,
+    backgroundColor: '#eee',
+    marginVertical: 20,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
-    marginBottom: 15,
     color: '#333',
+    marginBottom: 15,
   },
   feedbackItem: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
     padding: 15,
     marginBottom: 15,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   reviewerName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontWeight: '600',
     color: '#333',
+    marginBottom: 10,
   },
   scoresContainer: {
     marginBottom: 10,
@@ -288,34 +260,39 @@ const styles = StyleSheet.create({
   },
   scoreValue: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#444',
+    fontWeight: '600',
+    color: '#007AFF',
   },
   commentContainer: {
     marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
   },
   commentLabel: {
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#444',
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 5,
   },
   commentText: {
     fontSize: 14,
-    color: '#333',
+    color: '#666',
     lineHeight: 20,
   },
-  formContainer: {
-    marginBottom: 30,
+  noFeedbackContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 20,
+    margin: 10,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  formTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+  noFeedbackText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
