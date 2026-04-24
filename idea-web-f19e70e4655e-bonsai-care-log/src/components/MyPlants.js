@@ -1,114 +1,121 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
-import { useHistory } from 'react-router-dom';
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 
 const MyPlants = () => {
-  const history = useHistory();
   const [plants, setPlants] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const navigation = useNavigation();
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockPlants = [
-      {
-        id: '1',
-        name: 'Monstera Deliciosa',
-        scientificName: 'Monstera adansonii',
-        image: 'https://example.com/monstera1.jpg',
-        lastWatered: '2023-05-15',
-        wateringFrequency: 'every 7-10 days',
-        nextWatering: '2023-06-01',
-        careReminders: 2
-      },
-      {
-        id: '2',
-        name: 'Snake Plant',
-        scientificName: 'Sansevieria trifasciata',
-        image: 'https://example.com/snakeplant.jpg',
-        lastWatered: '2023-05-20',
-        wateringFrequency: 'every 2-3 weeks',
-        nextWatering: '2023-06-10',
-        careReminders: 1
-      },
-      {
-        id: '3',
-        name: 'Pothos',
-        scientificName: 'Epipremnum aureum',
-        image: 'https://example.com/pothos.jpg',
-        lastWatered: '2023-05-18',
-        wateringFrequency: 'every 7 days',
-        nextWatering: '2023-06-04',
-        careReminders: 0
+    // Simulate API call to fetch plants
+    const fetchPlants = async () => {
+      try {
+        // In a real app, this would be an actual API call
+        const mockPlants = [
+          {
+            id: '1',
+            name: 'Monstera Deliciosa',
+            nickname: 'Big Monsta',
+            image: 'https://images.unsplash.com/photo-1588082961428-9b7c5f4927d9?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            lastWatered: '2023-05-15',
+            wateringFrequency: 7,
+            nextWatering: '2023-05-22'
+          },
+          {
+            id: '2',
+            name: 'Snake Plant',
+            nickname: 'Sly Snake',
+            image: 'https://images.unsplash.com/photo-1588082961428-9b7c5f4927d9?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            lastWatered: '2023-05-10',
+            wateringFrequency: 14,
+            nextWatering: '2023-05-24'
+          },
+          {
+            id: '3',
+            name: 'Pothos',
+            nickname: 'Golden Pothos',
+            image: 'https://images.unsplash.com/photo-1588082961428-9b7c5f4927d9?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+            lastWatered: '2023-05-01',
+            wateringFrequency: 5,
+            nextWatering: '2023-05-06'
+          }
+        ];
+        setPlants(mockPlants);
+      } catch (error) {
+        console.error('Error fetching plants:', error);
+      } finally {
+        setLoading(false);
       }
-    ];
+    };
 
-    setPlants(mockPlants);
+    fetchPlants();
   }, []);
 
-  const filteredPlants = plants.filter(plant =>
-    plant.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    plant.scientificName.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const calculateDaysUntilWatering = (nextWateringDate) => {
+    const today = new Date();
+    const nextDate = new Date(nextWateringDate);
+    const diffTime = nextDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
-  const renderPlantItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.plantCard}
-      onPress={() => history.push(`/plant/${item.id}`)}
-    >
-      <Image source={{ uri: item.image }} style={styles.plantImage} />
-      <View style={styles.plantInfo}>
-        <Text style={styles.plantName}>{item.name}</Text>
-        <Text style={styles.scientificName}>{item.scientificName}</Text>
-        <View style={styles.careSummary}>
-          <Text style={styles.careText}>Last watered: {item.lastWatered}</Text>
-          <Text style={styles.careText}>Water {item.wateringFrequency}</Text>
-          <Text style={styles.careText}>Next watering: {item.nextWatering}</Text>
-        </View>
-        {item.careReminders > 0 && (
-          <View style={styles.reminderBadge}>
-            <Text style={styles.reminderText}>{item.careReminders} reminders</Text>
+  const renderPlantItem = ({ item }) => {
+    const daysUntilWatering = calculateDaysUntilWatering(item.nextWatering);
+
+    return (
+      <TouchableOpacity
+        style={styles.plantCard}
+        onPress={() => navigation.navigate('PlantDetail', { plantId: item.id })}
+      >
+        <Image source={{ uri: item.image }} style={styles.plantImage} />
+        <View style={styles.plantInfo}>
+          <Text style={styles.plantName}>{item.nickname || item.name}</Text>
+          <Text style={styles.plantSpecies}>{item.name}</Text>
+          <View style={styles.reminderContainer}>
+            <Text style={styles.reminderText}>
+              Water in {daysUntilWatering} day{daysUntilWatering !== 1 ? 's' : ''}
+            </Text>
+            {daysUntilWatering <= 3 && (
+              <View style={styles.urgentBadge}>
+                <Text style={styles.urgentText}>URGENT</Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text>Loading your plants...</Text>
       </View>
-    </TouchableOpacity>
-  );
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Plants</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search plants..."
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+      <Text style={styles.header}>My Plants</Text>
+      {plants.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>You don't have any plants yet!</Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddPlant')}
+          >
+            <Text style={styles.addButtonText}>Add Your First Plant</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <FlatList
+          data={plants}
+          renderItem={renderPlantItem}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
         />
-      </View>
-
-      <FlatList
-        data={filteredPlants}
-        keyExtractor={(item) => item.id}
-        renderItem={renderPlantItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No plants found. Add your first plant!</Text>
-            <TouchableOpacity
-              style={styles.addButton}
-              onPress={() => history.push('/add-plant')}
-            >
-              <Text style={styles.addButtonText}>Add Plant</Text>
-            </TouchableOpacity>
-          </View>
-        }
-      />
-
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={() => history.push('/add-plant')}
-      >
-        <Text style={styles.fabText}>+</Text>
-      </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -117,37 +124,49 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
   header: {
-    padding: 16,
-    backgroundColor: '#2ecc71',
-  },
-  title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 12,
+    marginBottom: 20,
+    color: '#2E7D32',
   },
-  searchInput: {
-    backgroundColor: 'white',
-    padding: 12,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+  },
+  addButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
     borderRadius: 8,
-    fontSize: 16,
+  },
+  addButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
   },
   listContent: {
-    padding: 16,
+    paddingBottom: 20,
   },
   plantCard: {
-    flexDirection: 'row',
     backgroundColor: 'white',
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 2,
+    flexDirection: 'row',
   },
   plantImage: {
     width: 120,
@@ -156,79 +175,36 @@ const styles = StyleSheet.create({
   plantInfo: {
     flex: 1,
     padding: 12,
-    position: 'relative',
   },
   plantName: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
+    fontWeight: 'bold',
     marginBottom: 4,
   },
-  scientificName: {
+  plantSpecies: {
     fontSize: 14,
-    color: '#7f8c8d',
-    fontStyle: 'italic',
+    color: '#666',
     marginBottom: 8,
   },
-  careSummary: {
-    marginBottom: 8,
-  },
-  careText: {
-    fontSize: 14,
-    color: '#2c3e50',
-    marginBottom: 4,
-  },
-  reminderBadge: {
-    position: 'absolute',
-    right: 12,
-    top: 12,
-    backgroundColor: '#e74c3c',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  reminderContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 'auto',
   },
   reminderText: {
+    fontSize: 14,
+    color: '#4CAF50',
+  },
+  urgentBadge: {
+    backgroundColor: '#FF5252',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 12,
+    marginLeft: 8,
+  },
+  urgentText: {
     color: 'white',
     fontSize: 12,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#7f8c8d',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  addButton: {
-    backgroundColor: '#2ecc71',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-  },
-  addButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#2ecc71',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 8,
-  },
-  fabText: {
-    color: 'white',
-    fontSize: 24,
     fontWeight: 'bold',
   },
 });

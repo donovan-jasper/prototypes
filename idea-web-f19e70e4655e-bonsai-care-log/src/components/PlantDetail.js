@@ -1,94 +1,155 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, FlatList } from 'react-native';
-import { useParams } from 'react-router-dom';
+import { View, Text, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 const PlantDetail = () => {
-  const { id } = useParams();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { plantId } = route.params;
   const [plant, setPlant] = useState(null);
-  const [photos, setPhotos] = useState([]);
-  const [reminders, setReminders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Mock data for demonstration
-    const mockPlant = {
-      id: '1',
-      name: 'Monstera Deliciosa',
-      scientificName: 'Monstera adansonii',
-      description: 'A popular tropical plant with large, split leaves. Thrives in bright, indirect light and prefers well-draining soil.',
-      lastWatered: '2023-05-15',
-      wateringFrequency: 'every 7-10 days',
-      lightRequirements: 'Bright, indirect light',
-      careInstructions: 'Water when the top inch of soil is dry. Avoid direct sunlight which can scorch the leaves.'
+    // Simulate API call to fetch plant details
+    const fetchPlantDetails = async () => {
+      try {
+        // In a real app, this would be an actual API call with the plantId
+        const mockPlant = {
+          id: plantId,
+          name: 'Monstera Deliciosa',
+          nickname: 'Big Monsta',
+          image: 'https://images.unsplash.com/photo-1588082961428-9b7c5f4927d9?ixlib=rb-1.2.1&auto=format&fit=crop&w=500&q=60',
+          lastWatered: '2023-05-15',
+          wateringFrequency: 7,
+          nextWatering: '2023-05-22',
+          careNotes: 'Needs bright, indirect light. Fertilize every 4 weeks.',
+          growthStage: 'Mature',
+          acquiredDate: '2022-03-10',
+          location: 'Living room',
+          sunlight: 'Bright, indirect',
+          soilType: 'Well-draining potting mix',
+          lastFertilized: '2023-04-15',
+          fertilizerFrequency: 30,
+          nextFertilizing: '2023-05-15'
+        };
+        setPlant(mockPlant);
+      } catch (error) {
+        console.error('Error fetching plant details:', error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    const mockPhotos = [
-      { id: '1', uri: 'https://example.com/monstera1.jpg', date: '2023-01-10' },
-      { id: '2', uri: 'https://example.com/monstera2.jpg', date: '2023-03-15' },
-      { id: '3', uri: 'https://example.com/monstera3.jpg', date: '2023-05-20' }
-    ];
+    fetchPlantDetails();
+  }, [plantId]);
 
-    const mockReminders = [
-      { id: '1', message: 'Water your Monstera', dueDate: '2023-06-01' },
-      { id: '2', message: 'Check for pests', dueDate: '2023-06-15' }
-    ];
+  const calculateDaysUntil = (dateString) => {
+    const today = new Date();
+    const targetDate = new Date(dateString);
+    const diffTime = targetDate - today;
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
 
-    setPlant(mockPlant);
-    setPhotos(mockPhotos);
-    setReminders(mockReminders);
-  }, [id]);
-
-  if (!plant) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <Text>Loading...</Text>
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4CAF50" />
+        <Text>Loading plant details...</Text>
       </View>
     );
   }
 
+  if (!plant) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>Plant not found</Text>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.backButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const daysUntilWatering = calculateDaysUntil(plant.nextWatering);
+  const daysUntilFertilizing = calculateDaysUntil(plant.nextFertilizing);
+
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{plant.name}</Text>
-        <Text style={styles.scientificName}>{plant.scientificName}</Text>
-      </View>
+      <Image source={{ uri: plant.image }} style={styles.plantImage} />
+      <View style={styles.infoContainer}>
+        <Text style={styles.plantName}>{plant.nickname || plant.name}</Text>
+        <Text style={styles.plantSpecies}>{plant.name}</Text>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Plant Photos</Text>
-        <FlatList
-          horizontal
-          data={photos}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View style={styles.photoContainer}>
-              <Image source={{ uri: item.uri }} style={styles.photo} />
-              <Text style={styles.photoDate}>{item.date}</Text>
-            </View>
-          )}
-        />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Care Information</Text>
-        <View style={styles.careInfo}>
-          <Text style={styles.careText}>Last Watered: {plant.lastWatered}</Text>
-          <Text style={styles.careText}>Watering Frequency: {plant.wateringFrequency}</Text>
-          <Text style={styles.careText}>Light Requirements: {plant.lightRequirements}</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Care Reminders</Text>
-        {reminders.map(reminder => (
-          <View key={reminder.id} style={styles.reminderItem}>
-            <Text style={styles.reminderText}>{reminder.message}</Text>
-            <Text style={styles.reminderDate}>Due: {new Date(reminder.dueDate).toLocaleDateString()}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Care Reminders</Text>
+          <View style={styles.reminderItem}>
+            <Text style={styles.reminderLabel}>Watering:</Text>
+            <Text style={styles.reminderValue}>
+              Every {plant.wateringFrequency} days
+            </Text>
+            <Text style={[
+              styles.reminderStatus,
+              daysUntilWatering <= 3 ? styles.urgentStatus : styles.normalStatus
+            ]}>
+              {daysUntilWatering <= 0 ? 'Overdue' : `Due in ${daysUntilWatering} days`}
+            </Text>
           </View>
-        ))}
-      </View>
+          <View style={styles.reminderItem}>
+            <Text style={styles.reminderLabel}>Fertilizing:</Text>
+            <Text style={styles.reminderValue}>
+              Every {plant.fertilizerFrequency} days
+            </Text>
+            <Text style={[
+              styles.reminderStatus,
+              daysUntilFertilizing <= 3 ? styles.urgentStatus : styles.normalStatus
+            ]}>
+              {daysUntilFertilizing <= 0 ? 'Overdue' : `Due in ${daysUntilFertilizing} days`}
+            </Text>
+          </View>
+        </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Care Instructions</Text>
-        <Text style={styles.instructions}>{plant.careInstructions}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Plant Details</Text>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Growth Stage:</Text>
+            <Text style={styles.detailValue}>{plant.growthStage}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Acquired:</Text>
+            <Text style={styles.detailValue}>{plant.acquiredDate}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Location:</Text>
+            <Text style={styles.detailValue}>{plant.location}</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Care Requirements</Text>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Sunlight:</Text>
+            <Text style={styles.detailValue}>{plant.sunlight}</Text>
+          </View>
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Soil Type:</Text>
+            <Text style={styles.detailValue}>{plant.soilType}</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Care Notes</Text>
+          <Text style={styles.careNotes}>{plant.careNotes}</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => navigation.navigate('CareReminders')}
+        >
+          <Text style={styles.actionButtonText}>View All Reminders</Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -97,82 +158,121 @@ const PlantDetail = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    marginBottom: 24,
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  title: {
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  plantImage: {
+    width: '100%',
+    height: 300,
+    resizeMode: 'cover',
+  },
+  infoContainer: {
+    padding: 16,
+  },
+  plantName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#2c3e50',
     marginBottom: 4,
   },
-  scientificName: {
+  plantSpecies: {
     fontSize: 16,
-    color: '#7f8c8d',
-    fontStyle: 'italic',
+    color: '#666',
+    marginBottom: 20,
   },
   section: {
     marginBottom: 24,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#2c3e50',
+    fontWeight: 'bold',
+    color: '#2E7D32',
     marginBottom: 12,
-  },
-  photoContainer: {
-    marginRight: 12,
-    width: 120,
-  },
-  photo: {
-    width: 120,
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  photoDate: {
-    fontSize: 12,
-    color: '#7f8c8d',
-    textAlign: 'center',
-  },
-  careInfo: {
-    marginBottom: 12,
-  },
-  careText: {
-    fontSize: 16,
-    color: '#2c3e50',
-    marginBottom: 8,
   },
   reminderItem: {
-    marginBottom: 12,
-    padding: 12,
-    backgroundColor: '#e8f4f8',
-    borderRadius: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
   },
-  reminderText: {
+  reminderLabel: {
     fontSize: 16,
-    color: '#2c3e50',
-    marginBottom: 4,
+    color: '#444',
   },
-  reminderDate: {
+  reminderValue: {
+    fontSize: 16,
+  },
+  reminderStatus: {
     fontSize: 14,
-    color: '#7f8c8d',
+    fontWeight: 'bold',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  instructions: {
+  urgentStatus: {
+    backgroundColor: '#FFEBEE',
+    color: '#FF5252',
+  },
+  normalStatus: {
+    backgroundColor: '#E8F5E9',
+    color: '#4CAF50',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  detailLabel: {
     fontSize: 16,
-    color: '#2c3e50',
+    color: '#666',
+    width: '40%',
+  },
+  detailValue: {
+    fontSize: 16,
+    width: '60%',
+  },
+  careNotes: {
+    fontSize: 16,
     lineHeight: 24,
+    color: '#444',
+  },
+  actionButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 
