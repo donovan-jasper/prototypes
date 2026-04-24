@@ -227,8 +227,8 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
   }
 };
 
-// Poll for room updates
-export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => void): (() => void) => {
+// Poll room updates every 5 seconds
+export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => void) => {
   const interval = setInterval(async () => {
     try {
       const status = await getRoomStatus(code);
@@ -236,7 +236,7 @@ export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => 
     } catch (error) {
       console.error('Error polling room updates:', error);
     }
-  }, 5000); // Poll every 5 seconds
+  }, 5000);
 
   // Return cleanup function
   return () => clearInterval(interval);

@@ -48,6 +48,11 @@ export default function TogetherScreen() {
       return;
     }
 
+    if (roomCode.length !== 6) {
+      Alert.alert('Error', 'Room code must be 6 characters');
+      return;
+    }
+
     setLoading(true);
     try {
       const status = await joinRoom(roomCode, username);
@@ -182,7 +187,7 @@ export default function TogetherScreen() {
           <FlatList
             data={rooms}
             renderItem={renderRoomItem}
-            keyExtractor={(item) => item.id.toString()}
+            keyExtractor={(item) => item.code}
           />
         ) : (
           <Text style={styles.emptyText}>No recent rooms</Text>
@@ -203,12 +208,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     color: '#333',
-    textAlign: 'center',
   },
   section: {
     marginBottom: 20,
-    padding: 15,
     backgroundColor: 'white',
+    padding: 15,
     borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -223,20 +227,19 @@ const styles = StyleSheet.create({
     color: '#6200ee',
   },
   input: {
-    height: 50,
+    height: 40,
     borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
+    borderRadius: 5,
+    paddingHorizontal: 10,
     marginBottom: 10,
     backgroundColor: 'white',
   },
   button: {
     backgroundColor: '#6200ee',
-    padding: 15,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 5,
     alignItems: 'center',
-    marginTop: 10,
   },
   disabledButton: {
     backgroundColor: '#cccccc',
@@ -244,13 +247,12 @@ const styles = StyleSheet.create({
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
   },
   roomItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
   },
@@ -265,7 +267,6 @@ const styles = StyleSheet.create({
   roomDuration: {
     fontSize: 14,
     color: '#666',
-    marginTop: 4,
   },
   shareButton: {
     padding: 8,

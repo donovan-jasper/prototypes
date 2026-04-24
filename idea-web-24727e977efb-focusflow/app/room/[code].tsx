@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   },
   roomInfoContainer: {
     backgroundColor: 'white',
-    padding: 20,
+    padding: 15,
     borderRadius: 10,
     marginBottom: 20,
     shadowColor: '#000',
@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
   roomCode: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#6200ee',
     marginBottom: 5,
   },
   roomDuration: {
@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   timeLeft: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#6200ee',
+    color: '#333',
     textAlign: 'center',
     marginTop: 10,
   },
@@ -238,16 +238,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   participantName: {
-    fontSize: 14,
-    color: '#333',
+    fontSize: 12,
+    color: '#666',
   },
   actionsContainer: {
     marginTop: 'auto',
   },
   leaveButton: {
-    backgroundColor: '#ff3b30',
+    backgroundColor: '#f44336',
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 5,
     alignItems: 'center',
   },
   leaveButtonText: {
@@ -261,20 +261,19 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   errorText: {
-    color: '#ff3b30',
+    color: '#f44336',
     textAlign: 'center',
     marginBottom: 20,
     fontSize: 16,
   },
   button: {
     backgroundColor: '#6200ee',
-    padding: 15,
-    borderRadius: 8,
+    padding: 12,
+    borderRadius: 5,
     alignItems: 'center',
   },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 16,
   },
 });
