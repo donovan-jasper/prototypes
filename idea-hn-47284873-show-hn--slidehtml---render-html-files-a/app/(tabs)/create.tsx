@@ -173,7 +173,6 @@ export default function CreateScreen() {
             multiline
             numberOfLines={4}
             style={styles.promptInput}
-            mode="outlined"
             placeholder="Describe your presentation topic or upload content"
             disabled={loading}
           />
@@ -194,7 +193,7 @@ export default function CreateScreen() {
             mode="contained"
             onPress={handleGenerate}
             loading={loading}
-            disabled={!prompt.trim() || loading}
+            disabled={loading || !prompt.trim()}
             style={styles.generateButton}
             icon="magic"
           >
@@ -202,52 +201,31 @@ export default function CreateScreen() {
           </Button>
 
           {error && (
-            <Text variant="bodyMedium" style={styles.errorText}>
+            <Text style={styles.errorText} variant="bodyMedium">
               {error}
             </Text>
           )}
         </View>
 
-        {loading && (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" animating={true} />
-            <Text variant="bodyMedium" style={styles.loadingText}>
-              Generating your slides with AI...
+        {generatedHtml && (
+          <View style={styles.previewSection}>
+            <Text variant="titleMedium" style={styles.previewTitle}>
+              Preview
             </Text>
-          </View>
-        )}
-      </ScrollView>
+            <Text variant="bodyMedium" style={styles.previewSubtitle}>
+              {slideCount} slides generated
+            </Text>
 
-      <Portal>
-        <Modal
-          visible={showPreviewModal}
-          onDismiss={() => setShowPreviewModal(false)}
-          contentContainerStyle={styles.modalContainer}
-        >
-          <Surface style={styles.modalContent} elevation={4}>
-            <View style={styles.modalHeader}>
-              <Text variant="headlineSmall">Preview</Text>
-              <IconButton
-                icon="close"
-                size={24}
-                onPress={() => setShowPreviewModal(false)}
-              />
+            <View style={styles.previewContainer}>
+              <SlideViewer html={generatedHtml} />
             </View>
 
-            <Divider />
-
-            {generatedHtml && (
-              <View style={styles.previewContainer}>
-                <SlideViewer html={generatedHtml} />
-              </View>
-            )}
-
-            <View style={styles.modalActions}>
+            <View style={styles.actionButtons}>
               <Button
                 mode="outlined"
                 onPress={handleRegenerate}
                 icon="refresh"
-                style={styles.modalButton}
+                style={styles.actionButton}
               >
                 Regenerate
               </Button>
@@ -255,7 +233,48 @@ export default function CreateScreen() {
                 mode="contained"
                 onPress={handleSave}
                 icon="content-save"
-                style={styles.modalButton}
+                style={styles.actionButton}
+              >
+                Save Deck
+              </Button>
+            </View>
+          </View>
+        )}
+      </ScrollView>
+
+      <Portal>
+        <Modal
+          visible={showPreviewModal && !!generatedHtml}
+          onDismiss={() => setShowPreviewModal(false)}
+          contentContainerStyle={styles.modalContainer}
+        >
+          <Surface style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text variant="headlineSmall">Generated Slides</Text>
+              <IconButton
+                icon="close"
+                onPress={() => setShowPreviewModal(false)}
+              />
+            </View>
+
+            <View style={styles.modalPreview}>
+              <SlideViewer html={generatedHtml || ''} />
+            </View>
+
+            <View style={styles.modalActions}>
+              <Button
+                mode="outlined"
+                onPress={handleRegenerate}
+                icon="refresh"
+                style={styles.modalActionButton}
+              >
+                Try Again
+              </Button>
+              <Button
+                mode="contained"
+                onPress={handleSave}
+                icon="content-save"
+                style={styles.modalActionButton}
               >
                 Save Deck
               </Button>
@@ -280,6 +299,7 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 16,
     borderRadius: 8,
+    backgroundColor: '#fff',
   },
   headerTitle: {
     marginBottom: 4,
@@ -292,7 +312,6 @@ const styles = StyleSheet.create({
   },
   demoBanner: {
     marginBottom: 16,
-    backgroundColor: '#e3f2fd',
   },
   inputSection: {
     marginBottom: 24,
@@ -301,8 +320,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   promptInput: {
+    backgroundColor: '#fff',
     marginBottom: 16,
-    backgroundColor: 'white',
   },
   themeSelector: {
     marginBottom: 16,
@@ -311,57 +330,69 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   segmentedButtons: {
-    backgroundColor: 'white',
+    backgroundColor: '#fff',
   },
   generateButton: {
     marginTop: 8,
   },
   errorText: {
-    color: 'red',
+    color: '#d32f2f',
     marginTop: 8,
     textAlign: 'center',
   },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 32,
+  previewSection: {
+    marginTop: 24,
   },
-  loadingText: {
-    marginTop: 16,
+  previewTitle: {
+    marginBottom: 4,
+  },
+  previewSubtitle: {
     color: '#666',
+    marginBottom: 16,
+  },
+  previewContainer: {
+    height: 300,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    flex: 1,
+    marginHorizontal: 4,
   },
   modalContainer: {
-    padding: 20,
     flex: 1,
     justifyContent: 'center',
+    padding: 16,
   },
   modalContent: {
-    backgroundColor: 'white',
-    borderRadius: 8,
     padding: 16,
-    maxHeight: '90%',
+    borderRadius: 8,
+    backgroundColor: '#fff',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 16,
   },
-  previewContainer: {
-    flex: 1,
-    marginVertical: 16,
-    borderWidth: 1,
-    borderColor: '#eee',
-    borderRadius: 4,
-    overflow: 'hidden',
+  modalPreview: {
     height: 400,
+    marginBottom: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#000',
   },
   modalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
   },
-  modalButton: {
+  modalActionButton: {
     flex: 1,
     marginHorizontal: 4,
   },
