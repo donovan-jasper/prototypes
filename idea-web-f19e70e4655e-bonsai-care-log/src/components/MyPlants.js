@@ -1,85 +1,125 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
 
-function MyPlants() {
-  const [plants, setPlants] = useState([]);
-  const [loading, setLoading] = useState(true);
+const MyPlants = ({ navigation }) => {
+  const [plants, setPlants] = useState([
+    {
+      id: '1',
+      name: 'Monstera',
+      species: 'Monstera deliciosa',
+      photos: [
+        {
+          uri: 'https://images.unsplash.com/photo-1587402092301-725e37c70fd8',
+          date: '2023-05-15',
+          caption: 'First leaf appeared!'
+        },
+        {
+          uri: 'https://images.unsplash.com/photo-1587351177732-5b0739d1bd44',
+          date: '2023-06-20',
+          caption: 'Growing nicely'
+        }
+      ],
+      reminders: [
+        { text: 'Water every 7 days', date: '2023-07-10' },
+        { text: 'Fertilize next month', date: '2023-07-25' }
+      ],
+      communityPosts: [
+        { author: 'GreenThumb123', content: 'My Monstera is doing great!', date: '2023-06-18' },
+        { author: 'PlantLover', content: 'Just added mine to the collection!', date: '2023-06-22' }
+      ]
+    },
+    {
+      id: '2',
+      name: 'Snake Plant',
+      species: 'Sansevieria trifasciata',
+      photos: [
+        {
+          uri: 'https://images.unsplash.com/photo-1587402092301-725e37c70fd8',
+          date: '2023-04-10',
+          caption: 'Bought this plant'
+        }
+      ],
+      reminders: [
+        { text: 'Water every 2 weeks', date: '2023-07-15' }
+      ],
+      communityPosts: []
+    }
+  ]);
 
-  useEffect(() => {
-    fetch('/api/plants')
-      .then(response => response.json())
-      .then(data => {
-        setPlants(data);
-        setLoading(false);
-      })
-      .catch(error => {
-        console.error('Error fetching plants:', error);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
-    return <div>Loading your plants...</div>;
-  }
+  const renderPlantItem = ({ item }) => (
+    <TouchableOpacity
+      style={styles.plantItem}
+      onPress={() => navigation.navigate('PlantDetail', { plant: item })}
+    >
+      <Image
+        source={{ uri: item.photos && item.photos.length > 0 ? item.photos[0].uri : 'https://via.placeholder.com/100' }}
+        style={styles.plantImage}
+      />
+      <View style={styles.plantInfo}>
+        <Text style={styles.plantName}>{item.name}</Text>
+        <Text style={styles.plantSpecies}>{item.species}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   return (
-    <div style={styles.container}>
-      <h1>My Plants</h1>
-      <Link to="/add-plant">
-        <button style={styles.addButton}>+ Add New Plant</button>
-      </Link>
-      {plants.length === 0 ? (
-        <p>No plants yet. Add your first plant to get started!</p>
-      ) : (
-        <ul style={styles.plantList}>
-          {plants.map(plant => (
-            <li key={plant._id} style={styles.plantItem}>
-              <Link to={`/plant/${plant._id}`} style={styles.plantLink}>
-                <h2>{plant.name}</h2>
-                <p>{plant.species}</p>
-                <p>Acquired: {new Date(plant.acquiredDate).toLocaleDateString()}</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <View style={styles.container}>
+      <Text style={styles.title}>My Plants</Text>
+      <FlatList
+        data={plants}
+        renderItem={renderPlantItem}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+      />
+    </View>
   );
-}
+};
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
-    padding: '20px',
-    maxWidth: '800px',
-    margin: '0 auto'
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  addButton: {
-    backgroundColor: '#2e8b57',
-    color: 'white',
-    padding: '12px 24px',
-    fontSize: '16px',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    marginBottom: '20px',
-    fontWeight: 'bold'
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    padding: 20,
+    color: '#333',
   },
-  plantList: {
-    listStyle: 'none',
-    padding: 0
+  list: {
+    paddingHorizontal: 10,
   },
   plantItem: {
-    backgroundColor: '#f5f5f5',
-    marginBottom: '12px',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s'
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'white',
+    marginBottom: 10,
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  plantLink: {
-    display: 'block',
-    padding: '16px',
-    color: 'inherit',
-    textDecoration: 'none'
-  }
-};
+  plantImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginRight: 15,
+  },
+  plantInfo: {
+    flex: 1,
+  },
+  plantName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  plantSpecies: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 3,
+  },
+});
 
 export default MyPlants;

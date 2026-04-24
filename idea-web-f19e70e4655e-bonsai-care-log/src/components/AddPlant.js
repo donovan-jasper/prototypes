@@ -1,177 +1,126 @@
 import React, { useState } from 'react';
-import { useHistory } from 'react-router-dom';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
 
-function AddPlant() {
-  const history = useHistory();
-  const [formData, setFormData] = useState({
-    name: '',
-    species: '',
-    acquiredDate: new Date().toISOString().split('T')[0]
-  });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+const AddPlant = () => {
+  const navigation = useNavigation();
+  const [name, setName] = useState('');
+  const [species, setSpecies] = useState('');
+  const [photo, setPhoto] = useState(null);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const handleChoosePhoto = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    setSubmitting(true);
-
-    if (!formData.name || !formData.species || !formData.acquiredDate) {
-      setError('All fields are required');
-      setSubmitting(false);
+    if (permissionResult.granted === false) {
+      Alert.alert('Permission required', 'Please enable camera roll permissions in settings');
       return;
     }
 
-    try {
-      const response = await fetch('/api/plants', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
+    const pickerResult = await ImagePicker.launchImageLibraryAsync();
 
-      if (!response.ok) {
-        throw new Error('Failed to add plant');
-      }
-
-      const newPlant = await response.json();
-      history.push(`/plant/${newPlant._id}`);
-    } catch (err) {
-      setError('Failed to add plant. Please try again.');
-      setSubmitting(false);
+    if (!pickerResult.canceled) {
+      setPhoto(pickerResult.assets[0].uri);
     }
   };
 
+  const handleSubmit = () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter a plant name');
+      return;
+    }
+
+    // Here you would typically save to your data store
+    console.log('Plant added:', { name, species, photo });
+
+    // Navigate back to MyPlants
+    navigation.navigate('MyPlants');
+  };
+
   return (
-    <div style={styles.container}>
-      <h1>Add New Plant</h1>
-      <form onSubmit={handleSubmit} style={styles.form}>
-        <div style={styles.formGroup}>
-          <label htmlFor="name" style={styles.label}>Plant Name</label>
-          <input
-            type="text"
-            id="name"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            style={styles.input}
-            placeholder="e.g., My Monstera"
-          />
-        </div>
+    <View style={styles.container}>
+      <Text style={styles.title}>Add New Plant</Text>
 
-        <div style={styles.formGroup}>
-          <label htmlFor="species" style={styles.label}>Species</label>
-          <input
-            type="text"
-            id="species"
-            name="species"
-            value={formData.species}
-            onChange={handleChange}
-            style={styles.input}
-            placeholder="e.g., Monstera deliciosa"
-          />
-        </div>
+      <TextInput
+        style={styles.input}
+        placeholder="Plant Name (required)"
+        value={name}
+        onChangeText={setName}
+      />
 
-        <div style={styles.formGroup}>
-          <label htmlFor="acquiredDate" style={styles.label}>Acquired Date</label>
-          <input
-            type="date"
-            id="acquiredDate"
-            name="acquiredDate"
-            value={formData.acquiredDate}
-            onChange={handleChange}
-            style={styles.input}
-          />
-        </div>
+      <TextInput
+        style={styles.input}
+        placeholder="Species (optional)"
+        value={species}
+        onChangeText={setSpecies}
+      />
 
-        {error && <p style={styles.error}>{error}</p>}
+      <TouchableOpacity style={styles.photoButton} onPress={handleChoosePhoto}>
+        {photo ? (
+          <Image source={{ uri: photo }} style={styles.previewImage} />
+        ) : (
+          <Text style={styles.photoButtonText}>Add Photo</Text>
+        )}
+      </TouchableOpacity>
 
-        <div style={styles.buttonGroup}>
-          <button
-            type="submit"
-            disabled={submitting}
-            style={styles.submitButton}
-          >
-            {submitting ? 'Adding...' : 'Add Plant'}
-          </button>
-          <button
-            type="button"
-            onClick={() => history.goBack()}
-            style={styles.cancelButton}
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    </div>
+      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.submitButtonText}>Add Plant</Text>
+      </TouchableOpacity>
+    </View>
   );
-}
+};
 
-const styles = {
+const styles = StyleSheet.create({
   container: {
-    padding: '20px',
-    maxWidth: '600px',
-    margin: '0 auto'
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    padding: 20,
   },
-  form: {
-    backgroundColor: '#f9f9f9',
-    padding: '24px',
-    borderRadius: '8px'
-  },
-  formGroup: {
-    marginBottom: '20px'
-  },
-  label: {
-    display: 'block',
-    marginBottom: '8px',
+  title: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333'
+    marginBottom: 24,
+    color: '#2c3e50',
+    textAlign: 'center',
   },
   input: {
+    backgroundColor: 'white',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    fontSize: 16,
+    elevation: 1,
+  },
+  photoButton: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
+    marginBottom: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 1,
+    height: 150,
+  },
+  photoButtonText: {
+    color: '#7f8c8d',
+    fontSize: 16,
+  },
+  previewImage: {
     width: '100%',
-    padding: '10px',
-    fontSize: '16px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    boxSizing: 'border-box'
-  },
-  error: {
-    color: '#d32f2f',
-    marginBottom: '16px'
-  },
-  buttonGroup: {
-    display: 'flex',
-    gap: '12px'
+    height: '100%',
+    borderRadius: 8,
   },
   submitButton: {
-    flex: 1,
-    backgroundColor: '#2e8b57',
-    color: 'white',
-    padding: '12px 24px',
-    fontSize: '16px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    fontWeight: 'bold'
+    backgroundColor: '#27ae60',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
   },
-  cancelButton: {
-    flex: 1,
-    backgroundColor: '#757575',
+  submitButtonText: {
     color: 'white',
-    padding: '12px 24px',
-    fontSize: '16px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer'
-  }
-};
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+});
 
 export default AddPlant;
