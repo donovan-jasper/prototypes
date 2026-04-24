@@ -7,21 +7,23 @@ import useGitHubPRs from '../hooks/useGitHubPRs';
 interface PR {
   id: number;
   title: string;
-  // Add other PR properties as needed
+  number: number;
+  owner: string;
+  repo: string;
 }
 
 const PRReviewScreen: React.FC = () => {
   const route = useRoute();
   const { pr } = route.params as { pr: PR };
-  const { loading, approvePR, rejectPR } = useGitHubPRs();
+  const { loading, approvePR, rejectPR } = useGitHubPRs('your-github-token');
 
   const handleApprove = async () => {
-    const result = await approvePR(pr.id);
+    const result = await approvePR(pr.owner, pr.repo, pr.number);
     Alert.alert('Success', result.message);
   };
 
   const handleReject = async () => {
-    const result = await rejectPR(pr.id);
+    const result = await rejectPR(pr.owner, pr.repo, pr.number);
     Alert.alert('Success', result.message);
   };
 
