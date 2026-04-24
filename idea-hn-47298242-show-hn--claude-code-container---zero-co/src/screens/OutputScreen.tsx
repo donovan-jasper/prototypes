@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, ScrollView, TouchableOpacity } from 'react-native';
 import { useSession } from '../context/SessionContext';
 
 export default function OutputScreen() {
-  const { outputs, clearOutputs } = useSession();
+  const { outputs, clearOutputs, sessionId } = useSession();
 
   const renderOutput = ({ item }: { item: any }) => (
     <View style={styles.outputItem}>
@@ -29,7 +29,9 @@ export default function OutputScreen() {
 
       {outputs.length === 0 ? (
         <View style={styles.placeholderContainer}>
-          <Text style={styles.placeholder}>Run code to see output here...</Text>
+          <Text style={styles.placeholder}>
+            {sessionId ? 'Run code to see output here...' : 'Connecting to server...'}
+          </Text>
         </View>
       ) : (
         <FlatList
