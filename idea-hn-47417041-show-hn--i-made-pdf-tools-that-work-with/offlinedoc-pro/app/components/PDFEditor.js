@@ -149,162 +149,176 @@ const PDFEditor = ({ pdfData, onSave }) => {
       const fileName = `edited_${Date.now()}.pdf`;
       const fileUri = await saveFile(fileName, editedPdf);
       Alert.alert('Success', 'PDF saved successfully!');
-      if (onSave) onSave(fileUri);
+      onSave(fileUri);
     } catch (error) {
       console.error('Save Error:', error);
       Alert.alert('Error', 'Failed to save the PDF.');
     }
   };
 
-  const handlePanGesture = (event) => {
-    if (event.nativeEvent.state === State.ACTIVE) {
-      setTranslateX(lastTranslateX + event.nativeEvent.translationX);
-      setTranslateY(lastTranslateY + event.nativeEvent.translationY);
-    } else if (event.nativeEvent.state === State.END) {
+  const handlePanGesture = ({ nativeEvent }) => {
+    if (nativeEvent.state === State.ACTIVE) {
+      setTranslateX(lastTranslateX + nativeEvent.translationX);
+      setTranslateY(lastTranslateY + nativeEvent.translationY);
+    } else if (nativeEvent.state === State.END) {
       setLastTranslateX(translateX);
       setLastTranslateY(translateY);
     }
   };
 
-  const handlePinchGesture = (event) => {
-    if (event.nativeEvent.state === State.ACTIVE) {
-      setScale(scale * event.nativeEvent.scale);
+  const handlePinchGesture = ({ nativeEvent }) => {
+    if (nativeEvent.state === State.ACTIVE) {
+      setScale(scale * nativeEvent.scale);
     }
   };
 
-  const handleAddAnnotation = (type) => {
-    if (type === 'text' && textInput.trim() === '') {
-      Alert.alert('Empty Text', 'Please enter some text for the annotation.');
-      return;
+  const handleAddAnnotation = () => {
+    if (tool === 'text' && textInput.trim()) {
+      const newAnnotation = {
+        id: Date.now(),
+        type: 'text',
+        text: textInput,
+        x: 50,
+        y: 50,
+      };
+      setAnnotations([...annotations, newAnnotation]);
+      setTextInput('');
     }
-
-    const newAnnotation = {
-      id: Date.now(),
-      type,
-      x: 50,
-      y: 50,
-      ...(type === 'text' && { text: textInput }),
-      ...(type === 'rectangle' && { width: 100, height: 50 }),
-      ...(type === 'circle' && { radius: 50 }),
-    };
-
-    setAnnotations([...annotations, newAnnotation]);
-    setTextInput('');
   };
 
-  const handleAnnotationPress = (id) => {
-    setCurrentAnnotation(id);
+  const handleToolChange = (selectedTool) => {
+    setTool(selectedTool);
+    if (selectedTool !== 'text') {
+      setTextInput('');
+    }
   };
 
-  const handleAnnotationMove = (id, dx, dy) => {
-    setAnnotations(annotations.map(ann =>
-      ann.id === id ? { ...ann, x: ann.x + dx, y: ann.y + dy } : ann
-    ));
-  };
-
-  const handlePdfLayout = (event) => {
-    setPdfDimensions({
-      width: event.nativeEvent.layout.width,
-      height: event.nativeEvent.layout.height,
+  const renderAnnotations = () => {
+    return annotations.map(annotation => {
+      if (annotation.type === 'text') {
+        return (
+          <SvgText
+            key={annotation.id}
+            x={annotation.x}
+            y={annotation.y}
+            fontSize="12"
+            fill="black"
+          >
+            {annotation.text}
+          </SvgText>
+        );
+      } else if (annotation.type === 'rectangle') {
+        return (
+          <Rect
+            key={annotation.id}
+            x={annotation.x}
+            y={annotation.y}
+            width={annotation.width}
+            height={annotation.height}
+            stroke="black"
+            strokeWidth="1"
+            fill="none"
+          />
+        );
+      } else if (annotation.type === 'circle') {
+        return (
+          <Circle
+            key={annotation.id}
+            cx={annotation.x + annotation.radius}
+            cy={annotation.y + annotation.radius}
+            r={annotation.radius}
+            stroke="black"
+            strokeWidth="1"
+            fill="none"
+          />
+        );
+      }
+      return null;
     });
   };
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.toolbar}>
-        <Button title="Text" onPress={() => setTool('text')} />
-        <Button title="Rectangle" onPress={() => setTool('rectangle')} />
-        <Button title="Circle" onPress={() => setTool('circle')} />
-        <Button title="OCR" onPress={handleOCR} disabled={ocrLimitReached} />
-        <Button title="Save" onPress={handleSave} />
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'text' && styles.activeTool]}
+          onPress={() => handleToolChange('text')}
+        >
+          <Text style={styles.toolButtonText}>Text</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'rectangle' && styles.activeTool]}
+          onPress={() => handleToolChange('rectangle')}
+        >
+          <Text style={styles.toolButtonText}>Rectangle</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toolButton, tool === 'circle' && styles.activeTool]}
+          onPress={() => handleToolChange('circle')}
+        >
+          <Text style={styles.toolButtonText}>Circle</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.toolButton}
+          onPress={handleOCR}
+          disabled={ocrLimitReached}
+        >
+          <Text style={[styles.toolButtonText, ocrLimitReached && styles.disabledText]}>OCR</Text>
+        </TouchableOpacity>
       </View>
 
       {tool === 'text' && (
         <View style={styles.textInputContainer}>
           <TextInput
             style={styles.textInput}
-            placeholder="Enter annotation text"
             value={textInput}
             onChangeText={setTextInput}
+            placeholder="Enter text annotation"
           />
-          <Button title="Add Text" onPress={() => handleAddAnnotation('text')} />
+          <Button title="Add" onPress={handleAddAnnotation} />
         </View>
       )}
 
-      <View style={styles.editorContainer}>
-        <PinchGestureHandler onGestureEvent={handlePinchGesture}>
-          <PanGestureHandler onGestureEvent={handlePanGesture}>
-            <View style={styles.pdfContainer} onLayout={handlePdfLayout}>
+      <View style={styles.pdfContainer}>
+        <PanGestureHandler onGestureEvent={handlePanGesture}>
+          <PinchGestureHandler onGestureEvent={handlePinchGesture}>
+            <View style={styles.pdfWrapper}>
               <Pdf
                 ref={pdfRef}
                 source={{ uri: `data:application/pdf;base64,${pdfData}` }}
                 style={styles.pdf}
-                onLoadComplete={(numberOfPages, filePath) => {
-                  console.log(`Number of pages: ${numberOfPages}`);
+                onLoadComplete={(numberOfPages, filePath, { width, height }) => {
+                  setPdfDimensions({ width, height });
                 }}
-                onError={(error) => {
-                  console.log(error);
+                onPressLink={(uri) => {
+                  console.log(`Link pressed: ${uri}`);
                 }}
               />
-
               <Svg
                 ref={svgRef}
                 style={StyleSheet.absoluteFill}
-                width={pdfDimensions.width}
-                height={pdfDimensions.height}
+                width={pdfDimensions.width * scale}
+                height={pdfDimensions.height * scale}
               >
-                {annotations.map(annotation => (
-                  <React.Fragment key={annotation.id}>
-                    {annotation.type === 'text' && (
-                      <SvgText
-                        x={annotation.x}
-                        y={annotation.y}
-                        fontSize="12"
-                        fill="black"
-                        onPress={() => handleAnnotationPress(annotation.id)}
-                      >
-                        {annotation.text}
-                      </SvgText>
-                    )}
-                    {annotation.type === 'rectangle' && (
-                      <Rect
-                        x={annotation.x}
-                        y={annotation.y}
-                        width={annotation.width}
-                        height={annotation.height}
-                        stroke="black"
-                        strokeWidth="1"
-                        fill="none"
-                        onPress={() => handleAnnotationPress(annotation.id)}
-                      />
-                    )}
-                    {annotation.type === 'circle' && (
-                      <Circle
-                        cx={annotation.x + annotation.radius}
-                        cy={annotation.y + annotation.radius}
-                        r={annotation.radius}
-                        stroke="black"
-                        strokeWidth="1"
-                        fill="none"
-                        onPress={() => handleAnnotationPress(annotation.id)}
-                      />
-                    )}
-                  </React.Fragment>
-                ))}
+                <Svg.Group transform={`translate(${translateX}, ${translateY}) scale(${scale})`}>
+                  {renderAnnotations()}
+                </Svg.Group>
               </Svg>
             </View>
-          </PanGestureHandler>
-        </PinchGestureHandler>
+          </PinchGestureHandler>
+        </PanGestureHandler>
       </View>
 
       {ocrText && (
-        <View style={styles.ocrContainer}>
-          <Text style={styles.ocrTitle}>Extracted Text:</Text>
-          <ScrollView style={styles.ocrTextContainer}>
-            <Text>{ocrText}</Text>
-          </ScrollView>
-        </View>
+        <ScrollView style={styles.ocrResult}>
+          <Text>{ocrText}</Text>
+        </ScrollView>
       )}
+
+      <View style={styles.actionButtons}>
+        <Button title="Save" onPress={handleSave} />
+        <Button title="Apply Changes" onPress={handleEdit} />
+      </View>
     </GestureHandlerRootView>
   );
 };
@@ -312,14 +326,28 @@ const PDFEditor = ({ pdfData, onSave }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
   },
   toolbar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
     padding: 10,
+    backgroundColor: '#f0f0f0',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+  },
+  toolButton: {
+    padding: 10,
+    marginRight: 10,
+    backgroundColor: '#ddd',
+    borderRadius: 5,
+  },
+  activeTool: {
+    backgroundColor: '#4CAF50',
+  },
+  toolButtonText: {
+    color: 'black',
+  },
+  disabledText: {
+    color: '#999',
   },
   textInputContainer: {
     flexDirection: 'row',
@@ -332,34 +360,36 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     padding: 8,
     marginRight: 10,
-  },
-  editorContainer: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    margin: 10,
+    borderRadius: 5,
   },
   pdfContainer: {
     flex: 1,
-    position: 'relative',
+    backgroundColor: '#f5f5f5',
+  },
+  pdfWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   pdf: {
     flex: 1,
     width: '100%',
     height: '100%',
   },
-  ocrContainer: {
-    height: 200,
+  ocrResult: {
+    maxHeight: 150,
+    padding: 10,
+    backgroundColor: '#f0f0f0',
     borderTopWidth: 1,
     borderTopColor: '#ccc',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
     padding: 10,
-  },
-  ocrTitle: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-  },
-  ocrTextContainer: {
-    flex: 1,
+    backgroundColor: '#f0f0f0',
+    borderTopWidth: 1,
+    borderTopColor: '#ccc',
   },
 });
 

@@ -1,14 +1,15 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Alert } from 'react-native';
 import PDFEditor from '../components/PDFEditor';
+import { saveFile } from '../utils/storage';
 
 const EditorScreen = ({ route, navigation }) => {
   const { pdfData } = route.params;
 
-  const handleSave = (editedPdf) => {
-    // In a real app, you would save the PDF to storage here
-    console.log('PDF saved:', editedPdf);
-    navigation.navigate('Home');
+  const handleSave = (fileUri) => {
+    if (fileUri) {
+      navigation.navigate('Home', { refresh: true });
+    }
   };
 
   return (
