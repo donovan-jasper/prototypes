@@ -1,51 +1,77 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
-import * as ImagePicker from 'expo-image-picker';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { Camera, CameraType, FlashMode } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
+import * as MediaLibrary from 'expo-media-library';
 
-const CameraCapture = ({ onCapture }) => {
-  const [permission, requestPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<CameraType>('back');
-  const [image, setImage] = useState(null);
-  const cameraRef = useRef(null);
+interface CameraCaptureProps {
+  onCapture: (imageUri: string) => void;
+  onCancel: () => void;
+}
+
+const CameraCapture: React.FC<CameraCaptureProps> = ({ onCapture, onCancel }) => {
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [flashMode, setFlashMode] = useState(FlashMode.off);
+  const [cameraType, setCameraType] = useState(CameraType.back);
+  const [isReady, setIsReady] = useState(false);
+  const cameraRef = useRef<Camera>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      setHasPermission(status === 'granted');
+
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Camera access is required to take photos. Please enable it in your settings.',
+          [{ text: 'OK' }]
+        );
+      }
+    })();
+  }, []);
+
+  const toggleFlash = () => {
+    setFlashMode(
+      flashMode === FlashMode.off ? FlashMode.on : FlashMode.off
+    );
+  };
+
+  const toggleCameraType = () => {
+    setCameraType(
+      cameraType === CameraType.back ? CameraType.front : CameraType.back
+    );
+  };
 
   const takePicture = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
-      setImage(photo.uri);
-      onCapture(photo.uri);
+    if (cameraRef.current && isReady) {
+      try {
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.8,
+          skipProcessing: true,
+        });
+
+        // Save to media library
+        await MediaLibrary.saveToLibraryAsync(photo.uri);
+
+        onCapture(photo.uri);
+      } catch (error) {
+        console.error('Error taking picture:', error);
+        Alert.alert('Error', 'Failed to capture image. Please try again.');
+      }
     }
   };
 
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
-      onCapture(result.assets[0].uri);
-    }
-  };
-
-  const toggleCameraFacing = () => {
-    setFacing(current => (current === 'back' ? 'front' : 'back'));
-  };
-
-  if (!permission) {
-    return <View />;
+  if (hasPermission === null) {
+    return <View style={styles.container} />;
   }
 
-  if (!permission.granted) {
+  if (hasPermission === false) {
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
-        <TouchableOpacity onPress={requestPermission} style={styles.permissionButton}>
-          <Text style={styles.permissionButtonText}>Grant Permission</Text>
+        <Text style={styles.text}>No access to camera</Text>
+        <TouchableOpacity style={styles.button} onPress={onCancel}>
+          <Text style={styles.buttonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
     );
@@ -53,44 +79,44 @@ const CameraCapture = ({ onCapture }) => {
 
   return (
     <View style={styles.container}>
-      {image ? (
-        <View style={styles.container}>
-          <Image source={{ uri: image }} style={styles.image} />
-          <TouchableOpacity
-            onPress={() => setImage(null)}
-            style={styles.retakeButton}
-          >
-            <Ionicons name="camera" size={24} color="black" />
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <CameraView
-          ref={cameraRef}
-          style={styles.camera}
-          facing={facing}
-        >
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              onPress={toggleCameraFacing}
-              style={styles.flipButton}
-            >
-              <Ionicons name="camera-reverse" size={24} color="black" />
+      <Camera
+        ref={cameraRef}
+        style={styles.camera}
+        type={cameraType}
+        flashMode={flashMode}
+        onCameraReady={() => setIsReady(true)}
+        ratio="16:9"
+      >
+        <View style={styles.controlsContainer}>
+          <View style={styles.topControls}>
+            <TouchableOpacity style={styles.controlButton} onPress={onCancel}>
+              <Ionicons name="close" size={32} color="white" />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={takePicture}
-              style={styles.captureButton}
-            >
-              <Ionicons name="camera" size={32} color="black" />
+
+            <TouchableOpacity style={styles.controlButton} onPress={toggleFlash}>
+              <Ionicons
+                name={flashMode === FlashMode.off ? 'flash-off' : 'flash'}
+                size={28}
+                color="white"
+              />
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={pickImage}
-              style={styles.galleryButton}
-            >
-              <Ionicons name="image" size={24} color="black" />
+
+            <TouchableOpacity style={styles.controlButton} onPress={toggleCameraType}>
+              <Ionicons name="camera-reverse" size={28} color="white" />
             </TouchableOpacity>
           </View>
-        </CameraView>
-      )}
+
+          <View style={styles.bottomControls}>
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={takePicture}
+              disabled={!isReady}
+            >
+              <View style={styles.captureButtonInner} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Camera>
     </View>
   );
 };
@@ -98,68 +124,64 @@ const CameraCapture = ({ onCapture }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  message: {
-    textAlign: 'center',
-    paddingBottom: 10,
-  },
-  permissionButton: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  permissionButtonText: {
-    color: 'white',
-    fontSize: 16,
   },
   camera: {
     flex: 1,
-    width: '100%',
   },
-  buttonContainer: {
+  controlsContainer: {
     flex: 1,
-    flexDirection: 'row',
-    backgroundColor: 'transparent',
-    margin: 64,
+    justifyContent: 'space-between',
+    padding: 20,
   },
-  flipButton: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    backgroundColor: 'white',
-    padding: 8,
+  topControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  bottomControls: {
+    alignItems: 'center',
+  },
+  controlButton: {
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     borderRadius: 50,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   captureButton: {
-    position: 'absolute',
-    bottom: 0,
-    alignSelf: 'center',
     backgroundColor: 'white',
-    padding: 16,
     borderRadius: 50,
+    width: 70,
+    height: 70,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'rgba(0, 0, 0, 0.2)',
   },
-  galleryButton: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
+  captureButtonInner: {
     backgroundColor: 'white',
-    padding: 8,
-    borderRadius: 50,
+    borderRadius: 40,
+    width: 60,
+    height: 60,
+    borderWidth: 2,
+    borderColor: 'rgba(0, 0, 0, 0.2)',
   },
-  image: {
-    flex: 1,
-    width: '100%',
+  text: {
+    color: 'white',
+    fontSize: 18,
+    textAlign: 'center',
   },
-  retakeButton: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    backgroundColor: 'white',
-    padding: 8,
-    borderRadius: 50,
+  button: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

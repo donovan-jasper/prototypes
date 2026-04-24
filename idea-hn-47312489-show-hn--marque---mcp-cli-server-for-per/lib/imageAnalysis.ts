@@ -2,18 +2,49 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as FileSystem from 'expo-file-system';
 import { analyzeImage } from './ai';
 
-export const analyzeImageFromUri = async (imageUri: string) => {
+export interface ImageAnalysis {
+  colors: string[];
+  typography: {
+    base: number;
+    ratio: number;
+    fontFamily?: string;
+    weights?: number[];
+  };
+  spacing: {
+    base: number;
+    ratio: number;
+  };
+  components?: {
+    buttons?: {
+      primary: {
+        background: string;
+        text: string;
+      };
+      secondary: {
+        background: string;
+        text: string;
+      };
+    };
+    cards?: {
+      background: string;
+      borderRadius: number;
+      shadow: string;
+    };
+  };
+}
+
+export const analyzeImageFromUri = async (imageUri: string): Promise<ImageAnalysis> => {
   try {
     const base64Data = await convertImageToBase64(imageUri);
     const analysis = await analyzeImage(imageUri);
-    return analysis;
+    return normalizeAnalysis(analysis);
   } catch (error) {
     console.error('Error analyzing image:', error);
     throw error;
   }
 };
 
-export const extractColors = async (imageUri: string) => {
+export const extractColors = async (imageUri: string): Promise<string[]> => {
   try {
     const analysis = await analyzeImageFromUri(imageUri);
     return analysis.colors || [];
@@ -23,7 +54,7 @@ export const extractColors = async (imageUri: string) => {
   }
 };
 
-export const analyzeTypography = async (imageUri: string) => {
+export const analyzeTypography = async (imageUri: string): Promise<ImageAnalysis['typography']> => {
   try {
     const analysis = await analyzeImageFromUri(imageUri);
     return analysis.typography || { base: 16, ratio: 1.25 };
@@ -55,4 +86,22 @@ export const convertImageToBase64 = async (imageUri: string): Promise<string> =>
     }
     throw new Error('Failed to process image. Please try again.');
   }
+};
+
+const normalizeAnalysis = (rawAnalysis: any): ImageAnalysis => {
+  // Ensure we have all required fields with defaults
+  return {
+    colors: rawAnalysis.colors || [],
+    typography: {
+      base: rawAnalysis.typography?.base || 16,
+      ratio: rawAnalysis.typography?.ratio || 1.25,
+      fontFamily: rawAnalysis.typography?.fontFamily,
+      weights: rawAnalysis.typography?.weights || [400, 500, 700]
+    },
+    spacing: {
+      base: rawAnalysis.spacing?.base || 4,
+      ratio: rawAnalysis.spacing?.ratio || 1.5
+    },
+    components: rawAnalysis.components || {}
+  };
 };
