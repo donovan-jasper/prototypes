@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, Switch, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Text, Switch, Alert, Platform, TouchableOpacity } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import FocusTimer from '../components/FocusTimer';
 import ProgressBar from '../components/ProgressBar';
 import FocusIndicator from '../components/FocusIndicator';
@@ -137,13 +138,31 @@ const FocusTimerScreen: React.FC = () => {
 
       <View style={styles.settingsRow}>
         <Text style={styles.settingsLabel}>Distraction Blocking</Text>
+        <TouchableOpacity
+          style={styles.shieldButton}
+          onPress={toggleDistractionBlocking}
+          disabled={!isFocusActive}
+        >
+          <Ionicons
+            name={isDistractionBlockingEnabled ? "shield-checkmark" : "shield-outline"}
+            size={24}
+            color={isDistractionBlockingEnabled ? "#4CAF50" : "#9E9E9E"}
+          />
+        </TouchableOpacity>
         <Switch
           value={isDistractionBlockingEnabled}
           onValueChange={toggleDistractionBlocking}
-          trackColor={{ false: '#767577', true: '#81b0ff' }}
-          thumbColor={isDistractionBlockingEnabled ? '#f5dd4b' : '#f4f3f4'}
+          disabled={!isFocusActive}
+          trackColor={{ false: "#767577", true: "#81b0ff" }}
+          thumbColor={isDistractionBlockingEnabled ? "#f5dd4b" : "#f4f3f4"}
         />
       </View>
+
+      {!isFocusActive && (
+        <Text style={styles.hintText}>
+          Distraction blocking is only available during calendar events
+        </Text>
+      )}
     </View>
   );
 };
@@ -151,12 +170,14 @@ const FocusTimerScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
     padding: 20,
+    backgroundColor: '#f5f5f5',
   },
   eventInfo: {
     marginVertical: 20,
+    padding: 15,
+    backgroundColor: 'white',
+    borderRadius: 10,
     alignItems: 'center',
   },
   eventTitle: {
@@ -165,19 +186,28 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   eventTime: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#666',
   },
   settingsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    width: '100%',
     marginTop: 20,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   settingsLabel: {
     fontSize: 16,
+    color: '#333',
+  },
+  shieldButton: {
+    padding: 10,
+  },
+  hintText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 
