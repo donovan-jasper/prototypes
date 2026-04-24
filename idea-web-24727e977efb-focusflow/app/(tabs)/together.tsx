@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
 import { useStore } from '../../store/useStore';
 import { createRoom, joinRoom, getRoomStatus } from '../../lib/room-manager';
 import { useRouter } from 'expo-router';
+import { useSQLiteContext } from 'expo-sqlite';
 
 export default function TogetherScreen() {
   const [roomCode, setRoomCode] = useState('');
@@ -10,40 +11,55 @@ export default function TogetherScreen() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const db = useSQLiteContext();
 
   const createNewRoom = async () => {
-    if (!username) return;
+    if (!username) {
+      Alert.alert('Error', 'Please enter your name');
+      return;
+    }
+
     setLoading(true);
     try {
       const room = await createRoom(username, 50); // Default 50 min duration
       router.push(`/room/${room.code}`);
     } catch (error) {
       console.error('Error creating room:', error);
+      Alert.alert('Error', 'Failed to create room');
     } finally {
       setLoading(false);
     }
   };
 
   const joinExistingRoom = async () => {
-    if (!roomCode || !username) return;
+    if (!roomCode || !username) {
+      Alert.alert('Error', 'Please enter room code and your name');
+      return;
+    }
+
     setLoading(true);
     try {
       await joinRoom(roomCode, username);
       router.push(`/room/${roomCode}`);
     } catch (error) {
       console.error('Error joining room:', error);
+      Alert.alert('Error', 'Failed to join room');
     } finally {
       setLoading(false);
     }
   };
 
+  const loadActiveRooms = async () => {
+    try {
+      const result = await db.getAllAsync('SELECT * FROM rooms ORDER BY created_at DESC LIMIT 5');
+      setRooms(result);
+    } catch (error) {
+      console.error('Error loading rooms:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchRooms = async () => {
-      // In a real app, this would fetch active rooms from the server
-      // For now, we'll just show a sample room
-      setRooms([{ code: 'ABC123', participants: 2, duration: 50 }]);
-    };
-    fetchRooms();
+    loadActiveRooms();
   }, []);
 
   return (
@@ -74,6 +90,7 @@ export default function TogetherScreen() {
           placeholder="Room code"
           value={roomCode}
           onChangeText={setRoomCode}
+          autoCapitalize="characters"
         />
         <TextInput
           style={styles.input}
@@ -92,20 +109,24 @@ export default function TogetherScreen() {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Active Rooms</Text>
-        <FlatList
-          data={rooms}
-          keyExtractor={(item) => item.code}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.roomCard}
-              onPress={() => router.push(`/room/${item.code}`)}
-            >
-              <Text style={styles.roomCode}>Room: {item.code}</Text>
-              <Text>Participants: {item.participants}</Text>
-              <Text>Duration: {item.duration} minutes</Text>
-            </TouchableOpacity>
-          )}
-        />
+        {rooms.length > 0 ? (
+          <FlatList
+            data={rooms}
+            keyExtractor={(item) => item.code}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.roomCard}
+                onPress={() => router.push(`/room/${item.code}`)}
+              >
+                <Text style={styles.roomCode}>Room: {item.code}</Text>
+                <Text>Created by: {item.creator}</Text>
+                <Text>Duration: {item.duration} minutes</Text>
+              </TouchableOpacity>
+            )}
+          />
+        ) : (
+          <Text style={styles.noRoomsText}>No active rooms found</Text>
+        )}
       </View>
     </View>
   );
@@ -161,5 +182,10 @@ const styles = StyleSheet.create({
   roomCode: {
     fontWeight: 'bold',
     marginBottom: 5,
+  },
+  noRoomsText: {
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 10,
   },
 });

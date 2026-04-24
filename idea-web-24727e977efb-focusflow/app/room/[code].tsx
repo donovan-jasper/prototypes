@@ -1,16 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getRoomStatus, leaveRoom } from '../../lib/room-manager';
 import { useStore } from '../../store/useStore';
+import * as Notifications from 'expo-notifications';
 
 export default function RoomScreen() {
   const { code } = useLocalSearchParams();
   const [roomStatus, setRoomStatus] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const router = useRouter();
   const { activeSession } = useStore();
+  const intervalRef = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     const fetchRoomStatus = async () => {
@@ -19,23 +23,24 @@ export default function RoomScreen() {
         setRoomStatus(status);
         setTimeLeft(status.duration * 60); // Convert to seconds
         setLoading(false);
+        setError(null);
       } catch (error) {
         console.error('Error fetching room status:', error);
-        Alert.alert('Error', 'Failed to load room status');
-        router.back();
+        setError('Failed to load room status');
+        setLoading(false);
       }
     };
 
     fetchRoomStatus();
 
     // Set up polling every 5 seconds
-    const interval = setInterval(fetchRoomStatus, 5000);
+    intervalRef.current = setInterval(fetchRoomStatus, 5000);
 
     // Set up timer countdown
-    const timer = setInterval(() => {
+    timerRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 0) {
-          clearInterval(timer);
+          clearInterval(timerRef.current);
           return 0;
         }
         return prev - 1;
@@ -43,8 +48,8 @@ export default function RoomScreen() {
     }, 1000);
 
     return () => {
-      clearInterval(interval);
-      clearInterval(timer);
+      clearInterval(intervalRef.current);
+      clearInterval(timerRef.current);
     };
   }, [code]);
 
@@ -67,7 +72,22 @@ export default function RoomScreen() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <Text>Loading room...</Text>
+        <ActivityIndicator size="large" color="#6200ee" />
+        <Text style={styles.loadingText}>Loading room...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.buttonText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -145,6 +165,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   leaveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  loadingText: {
+    marginTop: 10,
+    textAlign: 'center',
+    color: '#666',
+  },
+  errorText: {
+    color: '#f44336',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  button: {
+    backgroundColor: '#6200ee',
+    padding: 12,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  buttonText: {
     color: 'white',
     fontWeight: 'bold',
   },

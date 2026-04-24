@@ -14,6 +14,7 @@ interface Room {
   creator: string;
   duration: number;
   participants: string[];
+  createdAt: number;
 }
 
 interface StoreState {
@@ -23,6 +24,7 @@ interface StoreState {
   clearActiveSession: () => void;
   setActiveRoom: (room: Room) => void;
   clearActiveRoom: () => void;
+  updateRoomParticipants: (participants: string[]) => void;
 }
 
 export const useStore = create<StoreState>((set) => ({
@@ -32,4 +34,10 @@ export const useStore = create<StoreState>((set) => ({
   clearActiveSession: () => set({ activeSession: null }),
   setActiveRoom: (room) => set({ activeRoom: room }),
   clearActiveRoom: () => set({ activeRoom: null }),
+  updateRoomParticipants: (participants) =>
+    set((state) => ({
+      activeRoom: state.activeRoom
+        ? { ...state.activeRoom, participants }
+        : null,
+    })),
 }));

@@ -1,24 +1,31 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, AppState, AppStateStatus } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView, AppState, AppStateStatus, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useStore } from '../store/useStore';
 import { endFocusSession } from '../lib/focus-engine';
-import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, setupNotificationHandler, isAppBlocked } from '../lib/app-blocker';
+import { blockApps, unblockApps, COMMON_APPS, requestNotificationPermissions, setupNotificationHandler, isAppBlocked, checkBlockedApps } from '../lib/app-blocker';
+import { ProgressChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
+import * as Notifications from 'expo-notifications';
+
+const screenWidth = Dimensions.get('window').width;
 
 export default function FocusSessionScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { activeSession, setActiveSession, clearActiveSession } = useStore();
-  
+
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [showBlockingOverlay, setShowBlockingOverlay] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
 
   useEffect(() => {
     setupNotificationHandler();
     requestNotificationPermissions();
+    checkBlockedApps();
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
 
@@ -34,7 +41,7 @@ export default function FocusSessionScreen() {
       activeSession
     ) {
       setShowBlockingOverlay(true);
-      
+
       setTimeout(() => {
         setShowBlockingOverlay(false);
       }, 2000);
@@ -48,7 +55,7 @@ export default function FocusSessionScreen() {
       const duration = parseInt(params.duration as string, 10);
       const blockedAppsParam = params.blockedApps as string;
       const blockedAppsList = blockedAppsParam ? blockedAppsParam.split(',') : [];
-      
+
       const newSession = {
         id: Date.now().toString(),
         duration,
@@ -56,11 +63,12 @@ export default function FocusSessionScreen() {
         endTime: Date.now() + duration * 60 * 1000,
         blockedApps: blockedAppsList,
       };
-      
+
       setActiveSession(newSession);
       setTimeRemaining(duration * 60);
-      
+
       if (blockedAppsList.length > 0) {
+        setIsBlocking(true);
         blockApps(blockedAppsList);
       }
     } else if (activeSession) {
@@ -148,6 +156,11 @@ export default function FocusSessionScreen() {
       .filter((name): name is string => name !== undefined);
   };
 
+  const chartData = {
+    labels: ['Progress'],
+    data: [getProgress() / 100],
+  };
+
   if (!activeSession) {
     return (
       <View style={styles.container}>
@@ -156,285 +169,84 @@ export default function FocusSessionScreen() {
           style={styles.backButton}
           onPress={() => router.replace('/(tabs)')}
         >
-          <Text style={styles.backButtonText}>Go Back</Text>
+          <Text style={styles.backButtonText}>Back to Home</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const blockedAppNames = getBlockedAppNames();
-
   return (
-    <>
-      <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.headerText}>Focus Session</Text>
-          <Text style={styles.durationText}>{activeSession.duration} minutes</Text>
+    <View style={styles.container}>
+      {showBlockingOverlay && (
+        <View style={styles.blockingOverlay}>
+          <Text style={styles.blockingText}>Focus Mode Active</Text>
         </View>
+      )}
 
-        <View style={styles.timerContainer}>
-          <View style={styles.progressRing}>
-            <View style={[styles.progressFill, { height: `${getProgress()}%` }]} />
-          </View>
-          <View style={styles.timerContent}>
-            <Text style={styles.timerText}>{formatTime(timeRemaining)}</Text>
-            <Text style={styles.timerLabel}>remaining</Text>
-          </View>
-        </View>
+      <View style={styles.timerContainer}>
+        <ProgressChart
+          data={chartData}
+          width={screenWidth - 40}
+          height={220}
+          strokeWidth={16}
+          radius={32}
+          chartConfig={{
+            backgroundColor: '#1cc910',
+            backgroundGradientFrom: '#eff3ff',
+            backgroundGradientTo: '#efefef',
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(28, 201, 16, ${opacity})`,
+            labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+          }}
+          hideLegend={true}
+        />
+        <Text style={styles.timeText}>{formatTime(timeRemaining)}</Text>
+      </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{Math.floor(getProgress())}%</Text>
-            <Text style={styles.statLabel}>Complete</Text>
-          </View>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>
-              {Math.floor((activeSession.duration * 60 - timeRemaining) / 60)}
-            </Text>
-            <Text style={styles.statLabel}>Minutes Focused</Text>
-          </View>
-        </View>
+      <View style={styles.infoContainer}>
+        <Text style={styles.durationText}>
+          {activeSession.duration} minute focus session
+        </Text>
 
-        {blockedAppNames.length > 0 && (
-          <View style={styles.blockedAppsSection}>
-            <Text style={styles.blockedAppsTitle}>Blocked Apps</Text>
-            <View style={styles.blockedAppsList}>
-              {blockedAppNames.map((appName, index) => (
-                <View key={index} style={styles.blockedAppChip}>
+        {isBlocking && (
+          <View style={styles.blockedAppsContainer}>
+            <Text style={styles.blockedAppsTitle}>Blocked Apps:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {getBlockedAppNames().map((appName, index) => (
+                <View key={index} style={styles.blockedAppTag}>
                   <Text style={styles.blockedAppText}>{appName}</Text>
                 </View>
               ))}
-            </View>
-            <View style={styles.blockingInfoBox}>
-              <Text style={styles.blockingInfoTitle}>📱 How blocking works:</Text>
-              <Text style={styles.blockingInfoText}>
-                <Text style={styles.bold}>iOS:</Text> You'll see this overlay when returning to ZenBlock. For full blocking, manually restrict apps in Screen Time settings.
-              </Text>
-              <Text style={styles.blockingInfoText}>
-                <Text style={styles.bold}>Android:</Text> Enable accessibility service in Settings → Accessibility → ZenBlock for automatic app blocking.
-              </Text>
-            </View>
+            </ScrollView>
           </View>
         )}
+      </View>
 
-        <View style={styles.actions}>
-          <TouchableOpacity
-            style={styles.endButton}
-            onPress={handleEndEarly}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.endButtonText}>End Early</Text>
-          </TouchableOpacity>
-        </View>
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={[styles.button, styles.endButton]}
+          onPress={handleEndEarly}
+        >
+          <Text style={styles.buttonText}>End Early</Text>
+        </TouchableOpacity>
+      </View>
 
-        <View style={styles.tipContainer}>
-          <Text style={styles.tipText}>
-            Stay present. Breathe. You've got this.
+      {Platform.OS === 'android' && (
+        <View style={styles.warningContainer}>
+          <Text style={styles.warningText}>
+            Note: On Android, you'll need to manually close blocked apps.
           </Text>
         </View>
-      </ScrollView>
-
-      {showBlockingOverlay && (
-        <View style={styles.blockingOverlay}>
-          <View style={styles.blockingOverlayContent}>
-            <Text style={styles.blockingOverlayEmoji}>🧘</Text>
-            <Text style={styles.blockingOverlayTitle}>Stay Focused</Text>
-            <Text style={styles.blockingOverlayText}>
-              You're in a focus session
-            </Text>
-            <Text style={styles.blockingOverlayTime}>
-              {formatTime(timeRemaining)} remaining
-            </Text>
-          </View>
-        </View>
       )}
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  scrollContent: {
+    backgroundColor: '#fff',
     padding: 20,
-    paddingBottom: 40,
-  },
-  header: {
-    marginTop: 60,
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  headerText: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#666',
-    marginBottom: 4,
-  },
-  durationText: {
-    fontSize: 16,
-    color: '#999',
-  },
-  timerContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
-    position: 'relative',
-  },
-  progressRing: {
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    backgroundColor: '#fff',
-    borderWidth: 8,
-    borderColor: '#e0e0e0',
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  progressFill: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#6366f1',
-    opacity: 0.2,
-  },
-  timerContent: {
-    position: 'absolute',
-    alignItems: 'center',
-  },
-  timerText: {
-    fontSize: 64,
-    fontWeight: 'bold',
-    color: '#1a1a1a',
-    fontVariant: ['tabular-nums'],
-  },
-  timerLabel: {
-    fontSize: 16,
-    color: '#666',
-    marginTop: 4,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 32,
-    paddingHorizontal: 20,
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#6366f1',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-  },
-  blockedAppsSection: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 24,
-  },
-  blockedAppsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 12,
-  },
-  blockedAppsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  blockedAppChip: {
-    backgroundColor: '#f0f0ff',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: '#6366f1',
-  },
-  blockedAppText: {
-    fontSize: 14,
-    color: '#6366f1',
-    fontWeight: '500',
-  },
-  blockingInfoBox: {
-    backgroundColor: '#f9fafb',
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 3,
-    borderLeftColor: '#6366f1',
-  },
-  blockingInfoTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1a1a1a',
-    marginBottom: 8,
-  },
-  blockingInfoText: {
-    fontSize: 13,
-    color: '#666',
-    lineHeight: 18,
-    marginBottom: 6,
-  },
-  bold: {
-    fontWeight: '600',
-    color: '#1a1a1a',
-  },
-  actions: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  endButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#ef4444',
-  },
-  endButtonText: {
-    color: '#ef4444',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  tipContainer: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 20,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  errorText: {
-    fontSize: 18,
-    color: '#666',
-    textAlign: 'center',
-    marginTop: 100,
-  },
-  backButton: {
-    backgroundColor: '#6366f1',
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignSelf: 'center',
-    marginTop: 20,
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   blockingOverlay: {
     position: 'absolute',
@@ -442,35 +254,98 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(99, 102, 241, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 9999,
+    zIndex: 100,
   },
-  blockingOverlayContent: {
-    alignItems: 'center',
-    padding: 40,
-  },
-  blockingOverlayEmoji: {
-    fontSize: 80,
-    marginBottom: 20,
-  },
-  blockingOverlayTitle: {
-    fontSize: 32,
+  blockingText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 12,
+    color: '#1cc910',
   },
-  blockingOverlayText: {
-    fontSize: 18,
-    color: '#fff',
-    opacity: 0.9,
-    marginBottom: 24,
+  timerContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
   },
-  blockingOverlayTime: {
+  timeText: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#fff',
-    fontVariant: ['tabular-nums'],
+    position: 'absolute',
+    top: '50%',
+    marginTop: -24,
+  },
+  infoContainer: {
+    marginVertical: 20,
+    alignItems: 'center',
+  },
+  durationText: {
+    fontSize: 18,
+    color: '#666',
+    marginBottom: 10,
+  },
+  blockedAppsContainer: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  blockedAppsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  blockedAppTag: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginRight: 8,
+  },
+  blockedAppText: {
+    fontSize: 14,
+  },
+  buttonContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  button: {
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  endButton: {
+    backgroundColor: '#ff4444',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  warningContainer: {
+    marginTop: 20,
+    padding: 10,
+    backgroundColor: '#fff8e1',
+    borderRadius: 8,
+  },
+  warningText: {
+    color: '#ff9800',
+    textAlign: 'center',
+  },
+  errorText: {
+    fontSize: 18,
+    color: 'red',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  backButton: {
+    backgroundColor: '#1cc910',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

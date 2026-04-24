@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { useSQLiteContext } from 'expo-sqlite';
 
 const db = SQLite.openDatabase('zenblock.db');
 
@@ -52,177 +53,153 @@ const generateRoomCode = () => {
 };
 
 // Create a new focus room
-export const createRoom = (username: string, duration: number): Promise<Room> => {
-  return new Promise((resolve, reject) => {
-    const code = generateRoomCode();
-    const createdAt = Date.now();
+export const createRoom = async (username: string, duration: number): Promise<Room> => {
+  const db = useSQLiteContext();
+  const code = generateRoomCode();
+  const createdAt = Date.now();
 
-    db.transaction(tx => {
-      tx.executeSql(
-        'INSERT INTO rooms (code, creator, duration, created_at) VALUES (?, ?, ?, ?)',
-        [code, username, duration, createdAt],
-        (_, result) => {
-          const roomId = result.insertId;
-          tx.executeSql(
-            'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
-            [roomId, username, createdAt],
-            () => {
-              resolve({
-                id: roomId,
-                code,
-                creator: username,
-                duration,
-                createdAt
-              });
-            },
-            (_, error) => reject(error)
-          );
-        },
-        (_, error) => reject(error)
-      );
-    });
-  });
+  try {
+    // Insert the room
+    const result = await db.runAsync(
+      'INSERT INTO rooms (code, creator, duration, created_at) VALUES (?, ?, ?, ?)',
+      [code, username, duration, createdAt]
+    );
+
+    const roomId = result.lastInsertRowId;
+
+    // Add creator as first participant
+    await db.runAsync(
+      'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
+      [roomId, username, createdAt]
+    );
+
+    return {
+      id: roomId,
+      code,
+      creator: username,
+      duration,
+      createdAt
+    };
+  } catch (error) {
+    console.error('Error creating room:', error);
+    throw error;
+  }
 };
 
 // Join an existing room
-export const joinRoom = (code: string, username: string): Promise<RoomStatus> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      // First find the room by code
-      tx.executeSql(
-        'SELECT * FROM rooms WHERE code = ?',
-        [code],
-        (_, { rows }) => {
-          if (rows.length === 0) {
-            reject(new Error('Room not found'));
-            return;
-          }
+export const joinRoom = async (code: string, username: string): Promise<RoomStatus> => {
+  const db = useSQLiteContext();
 
-          const room = rows.item(0);
-          const joinedAt = Date.now();
+  try {
+    // Find the room by code
+    const roomResult = await db.getFirstAsync(
+      'SELECT * FROM rooms WHERE code = ?',
+      [code]
+    );
 
-          // Add participant to the room
-          tx.executeSql(
-            'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
-            [room.id, username, joinedAt],
-            () => {
-              // Get all participants
-              tx.executeSql(
-                'SELECT username FROM room_participants WHERE room_id = ?',
-                [room.id],
-                (_, { rows: participantRows }) => {
-                  const participants = [];
-                  for (let i = 0; i < participantRows.length; i++) {
-                    participants.push(participantRows.item(i).username);
-                  }
+    if (!roomResult) {
+      throw new Error('Room not found');
+    }
 
-                  resolve({
-                    code: room.code,
-                    duration: room.duration,
-                    participants,
-                    createdAt: room.created_at
-                  });
-                },
-                (_, error) => reject(error)
-              );
-            },
-            (_, error) => reject(error)
-          );
-        },
-        (_, error) => reject(error)
-      );
-    });
-  });
+    const joinedAt = Date.now();
+
+    // Add participant to the room
+    await db.runAsync(
+      'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
+      [roomResult.id, username, joinedAt]
+    );
+
+    // Get all participants
+    const participantsResult = await db.getAllAsync(
+      'SELECT username FROM room_participants WHERE room_id = ?',
+      [roomResult.id]
+    );
+
+    const participants = participantsResult.map(row => row.username);
+
+    return {
+      code: roomResult.code,
+      duration: roomResult.duration,
+      participants,
+      createdAt: roomResult.created_at
+    };
+  } catch (error) {
+    console.error('Error joining room:', error);
+    throw error;
+  }
 };
 
 // Leave a room
-export const leaveRoom = (code: string, username: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      // First find the room by code
-      tx.executeSql(
-        'SELECT id FROM rooms WHERE code = ?',
-        [code],
-        (_, { rows }) => {
-          if (rows.length === 0) {
-            reject(new Error('Room not found'));
-            return;
-          }
+export const leaveRoom = async (code: string, username: string): Promise<void> => {
+  const db = useSQLiteContext();
 
-          const roomId = rows.item(0).id;
+  try {
+    // Find the room by code
+    const roomResult = await db.getFirstAsync(
+      'SELECT id FROM rooms WHERE code = ?',
+      [code]
+    );
 
-          // Remove the participant
-          tx.executeSql(
-            'DELETE FROM room_participants WHERE room_id = ? AND username = ?',
-            [roomId, username],
-            () => {
-              // Check if room is now empty
-              tx.executeSql(
-                'SELECT COUNT(*) as count FROM room_participants WHERE room_id = ?',
-                [roomId],
-                (_, { rows: countRows }) => {
-                  if (countRows.item(0).count === 0) {
-                    // If room is empty, delete it
-                    tx.executeSql(
-                      'DELETE FROM rooms WHERE id = ?',
-                      [roomId],
-                      () => resolve(),
-                      (_, error) => reject(error)
-                    );
-                  } else {
-                    resolve();
-                  }
-                },
-                (_, error) => reject(error)
-              );
-            },
-            (_, error) => reject(error)
-          );
-        },
-        (_, error) => reject(error)
+    if (!roomResult) {
+      throw new Error('Room not found');
+    }
+
+    // Remove the participant
+    await db.runAsync(
+      'DELETE FROM room_participants WHERE room_id = ? AND username = ?',
+      [roomResult.id, username]
+    );
+
+    // Check if room is now empty
+    const countResult = await db.getFirstAsync(
+      'SELECT COUNT(*) as count FROM room_participants WHERE room_id = ?',
+      [roomResult.id]
+    );
+
+    if (countResult.count === 0) {
+      // If room is empty, delete it
+      await db.runAsync(
+        'DELETE FROM rooms WHERE id = ?',
+        [roomResult.id]
       );
-    });
-  });
+    }
+  } catch (error) {
+    console.error('Error leaving room:', error);
+    throw error;
+  }
 };
 
-// Get current room status
-export const getRoomStatus = (code: string): Promise<RoomStatus> => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      // First find the room by code
-      tx.executeSql(
-        'SELECT * FROM rooms WHERE code = ?',
-        [code],
-        (_, { rows }) => {
-          if (rows.length === 0) {
-            reject(new Error('Room not found'));
-            return;
-          }
+// Get room status
+export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
+  const db = useSQLiteContext();
 
-          const room = rows.item(0);
+  try {
+    // Find the room by code
+    const roomResult = await db.getFirstAsync(
+      'SELECT * FROM rooms WHERE code = ?',
+      [code]
+    );
 
-          // Get all participants
-          tx.executeSql(
-            'SELECT username FROM room_participants WHERE room_id = ?',
-            [room.id],
-            (_, { rows: participantRows }) => {
-              const participants = [];
-              for (let i = 0; i < participantRows.length; i++) {
-                participants.push(participantRows.item(i).username);
-              }
+    if (!roomResult) {
+      throw new Error('Room not found');
+    }
 
-              resolve({
-                code: room.code,
-                duration: room.duration,
-                participants,
-                createdAt: room.created_at
-              });
-            },
-            (_, error) => reject(error)
-          );
-        },
-        (_, error) => reject(error)
-      );
-    });
-  });
+    // Get all participants
+    const participantsResult = await db.getAllAsync(
+      'SELECT username FROM room_participants WHERE room_id = ?',
+      [roomResult.id]
+    );
+
+    const participants = participantsResult.map(row => row.username);
+
+    return {
+      code: roomResult.code,
+      duration: roomResult.duration,
+      participants,
+      createdAt: roomResult.created_at
+    };
+  } catch (error) {
+    console.error('Error getting room status:', error);
+    throw error;
+  }
 };
