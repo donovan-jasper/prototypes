@@ -23,7 +23,6 @@ const Hive: React.FC = () => {
     description: '',
     privacy: 'public' as 'public' | 'private'
   });
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const navigation = useNavigation();
   const db = getFirestore();
   const auth = getAuth();
@@ -151,7 +150,7 @@ const Hive: React.FC = () => {
         renderItem={({ item }) => (
           <TouchableOpacity
             style={styles.groupItem}
-            onPress={() => setSelectedGroup(item)}
+            onPress={() => navigation.navigate('GroupDetail', { groupId: item.id })}
           >
             <View style={styles.groupHeader}>
               <Text style={styles.groupName}>{item.name}</Text>
@@ -192,7 +191,7 @@ const Hive: React.FC = () => {
               style={styles.input}
               placeholder="Group Name"
               value={newGroup.name}
-              onChangeText={(text) => setNewGroup({...newGroup, name: text})}
+              onChangeText={(text) => setNewGroup({ ...newGroup, name: text })}
             />
 
             <TextInput
@@ -201,7 +200,7 @@ const Hive: React.FC = () => {
               multiline
               numberOfLines={4}
               value={newGroup.description}
-              onChangeText={(text) => setNewGroup({...newGroup, description: text})}
+              onChangeText={(text) => setNewGroup({ ...newGroup, description: text })}
             />
 
             <View style={styles.privacyContainer}>
@@ -211,18 +210,18 @@ const Hive: React.FC = () => {
                   styles.privacyOption,
                   newGroup.privacy === 'public' && styles.selectedPrivacy
                 ]}
-                onPress={() => setNewGroup({...newGroup, privacy: 'public'})}
+                onPress={() => setNewGroup({ ...newGroup, privacy: 'public' })}
               >
-                <Text>Public</Text>
+                <Text style={styles.privacyOptionText}>Public</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.privacyOption,
                   newGroup.privacy === 'private' && styles.selectedPrivacy
                 ]}
-                onPress={() => setNewGroup({...newGroup, privacy: 'private'})}
+                onPress={() => setNewGroup({ ...newGroup, privacy: 'private' })}
               >
-                <Text>Private</Text>
+                <Text style={styles.privacyOptionText}>Private</Text>
               </TouchableOpacity>
             </View>
 
@@ -234,7 +233,7 @@ const Hive: React.FC = () => {
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalButton, styles.createButton]}
+                style={[styles.modalButton, styles.createModalButton]}
                 onPress={handleCreateGroup}
               >
                 <Text style={styles.modalButtonText}>Create</Text>
@@ -243,49 +242,6 @@ const Hive: React.FC = () => {
           </View>
         </View>
       </Modal>
-
-      {selectedGroup && (
-        <Modal
-          visible={!!selectedGroup}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setSelectedGroup(null)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>{selectedGroup.name}</Text>
-              <Text style={styles.groupPrivacy}>
-                {selectedGroup.privacy === 'public' ? 'Public Group' : 'Private Group'}
-              </Text>
-              <Text style={styles.groupDescription}>{selectedGroup.description}</Text>
-              <Text style={styles.memberCount}>{selectedGroup.members.length} members</Text>
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setSelectedGroup(null)}
-                >
-                  <Text style={styles.modalButtonText}>Close</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.modalButton,
-                    selectedGroup.members.includes(auth.currentUser?.uid || '') ? styles.leaveButton : styles.joinButton
-                  ]}
-                  onPress={() => {
-                    handleJoinLeaveGroup(selectedGroup);
-                    setSelectedGroup(null);
-                  }}
-                >
-                  <Text style={styles.modalButtonText}>
-                    {selectedGroup.members.includes(auth.currentUser?.uid || '') ? 'Leave' : 'Join'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
     </View>
   );
 };
@@ -311,31 +267,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
     backgroundColor: '#f5f5f5',
   },
   emptyText: {
     fontSize: 18,
-    color: '#666',
-    marginBottom: 24,
-    textAlign: 'center',
+    color: '#333',
+    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: '#6200EE',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   searchContainer: {
     marginBottom: 16,
   },
   searchInput: {
-    height: 40,
-    borderColor: '#ddd',
-    borderWidth: 1,
+    backgroundColor: 'white',
+    padding: 12,
     borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#fff',
+    fontSize: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
   },
   createButton: {
     backgroundColor: '#6200EE',
@@ -346,12 +304,13 @@ const styles = StyleSheet.create({
   },
   createButtonText: {
     color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
   groupItem: {
     backgroundColor: 'white',
-    borderRadius: 8,
     padding: 16,
+    borderRadius: 8,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -367,7 +326,7 @@ const styles = StyleSheet.create({
   groupName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#6200EE',
   },
   groupPrivacy: {
     fontSize: 14,
@@ -375,7 +334,7 @@ const styles = StyleSheet.create({
   },
   groupDescription: {
     fontSize: 14,
-    color: '#666',
+    color: '#333',
     marginBottom: 12,
   },
   groupFooter: {
@@ -388,44 +347,44 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   joinButton: {
-    backgroundColor: '#6200EE',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
     borderRadius: 4,
   },
   leaveButton: {
-    backgroundColor: '#ff4444',
+    backgroundColor: '#F44336',
   },
   joinButtonText: {
     color: 'white',
     fontSize: 14,
+    fontWeight: 'bold',
   },
   modalContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: 'white',
-    borderRadius: 8,
-    padding: 20,
     width: '80%',
-    maxWidth: 400,
+    padding: 20,
+    borderRadius: 8,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 16,
     color: '#6200EE',
+    marginBottom: 20,
+    textAlign: 'center',
   },
   input: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
     padding: 12,
-    marginBottom: 16,
-    backgroundColor: '#fff',
+    borderRadius: 8,
+    marginBottom: 12,
+    fontSize: 16,
   },
   textArea: {
     height: 100,
@@ -434,36 +393,45 @@ const styles = StyleSheet.create({
   privacyContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   privacyLabel: {
-    marginRight: 16,
     fontSize: 16,
+    color: '#333',
+    marginRight: 10,
   },
   privacyOption: {
     padding: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
     borderRadius: 4,
     marginRight: 8,
+    backgroundColor: '#f5f5f5',
   },
   selectedPrivacy: {
     backgroundColor: '#6200EE',
-    borderColor: '#6200EE',
+  },
+  privacyOptionText: {
+    color: '#333',
   },
   modalButtons: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
   },
   modalButton: {
     padding: 12,
     borderRadius: 8,
-    marginLeft: 8,
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
   },
   cancelButton: {
     backgroundColor: '#f5f5f5',
   },
+  createModalButton: {
+    backgroundColor: '#6200EE',
+  },
   modalButtonText: {
+    color: 'white',
+    fontSize: 16,
     fontWeight: 'bold',
   },
 });
