@@ -17,6 +17,14 @@ interface Room {
   createdAt: number;
 }
 
+interface RoomStatus {
+  code: string;
+  creator: string;
+  duration: number;
+  participants: string[];
+  createdAt: number;
+}
+
 interface StoreState {
   activeSession: FocusSession | null;
   activeRoom: Room | null;

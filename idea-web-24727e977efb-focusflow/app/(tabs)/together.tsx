@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, Share, ActivityIndicator } from 'react-native';
 import { useStore } from '../../store/useStore';
 import { createRoom, joinRoom, getRoomStatus, pollRoomUpdates } from '../../lib/room-manager';
 import { useRouter } from 'expo-router';
 import { useSQLiteContext } from 'expo-sqlite';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function TogetherScreen() {
   const [roomCode, setRoomCode] = useState('');
@@ -77,6 +78,26 @@ export default function TogetherScreen() {
     loadActiveRooms();
   }, []);
 
+  const shareRoomLink = async (code) => {
+    try {
+      const result = await Share.share({
+        message: `Join my focus room: ${code}\n\nDownload ZenBlock to focus together!`,
+        url: `https://zenblock.app/room/${code}`
+      });
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // shared with activity type of result.activityType
+        } else {
+          // shared
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // dismissed
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to share room');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Focus Together</Text>
@@ -94,7 +115,11 @@ export default function TogetherScreen() {
           onPress={createNewRoom}
           disabled={loading || !username}
         >
-          <Text style={styles.buttonText}>Create Room</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Create Room</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -118,7 +143,11 @@ export default function TogetherScreen() {
           onPress={joinExistingRoom}
           disabled={loading || !roomCode || !username}
         >
-          <Text style={styles.buttonText}>Join Room</Text>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.buttonText}>Join Room</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -129,18 +158,29 @@ export default function TogetherScreen() {
             data={rooms}
             keyExtractor={(item) => item.code}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.roomCard}
-                onPress={() => router.push(`/room/${item.code}`)}
-              >
-                <Text style={styles.roomCode}>Room: {item.code}</Text>
-                <Text>Created by: {item.creator}</Text>
-                <Text>Duration: {item.duration} minutes</Text>
-              </TouchableOpacity>
+              <View style={styles.roomCard}>
+                <View style={styles.roomHeader}>
+                  <Text style={styles.roomCode}>Room: {item.code}</Text>
+                  <TouchableOpacity onPress={() => shareRoomLink(item.code)}>
+                    <MaterialIcons name="share" size={24} color="#6200ee" />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.roomInfo}>Created by: {item.creator}</Text>
+                <Text style={styles.roomInfo}>Duration: {item.duration} minutes</Text>
+                <TouchableOpacity
+                  style={styles.joinButton}
+                  onPress={() => {
+                    setRoomCode(item.code);
+                    joinExistingRoom();
+                  }}
+                >
+                  <Text style={styles.joinButtonText}>Join</Text>
+                </TouchableOpacity>
+              </View>
             )}
           />
         ) : (
-          <Text style={styles.noRoomsText}>No active rooms found</Text>
+          <Text style={styles.emptyText}>No active rooms yet</Text>
         )}
       </View>
     </View>
@@ -157,7 +197,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
-    textAlign: 'center',
+    color: '#333',
   },
   section: {
     marginBottom: 20,
@@ -166,40 +206,67 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
+    color: '#6200ee',
   },
   input: {
-    height: 40,
+    height: 50,
     borderColor: '#ddd',
     borderWidth: 1,
-    borderRadius: 5,
-    paddingHorizontal: 10,
+    borderRadius: 8,
+    paddingHorizontal: 15,
     marginBottom: 10,
+    backgroundColor: '#f9f9f9',
   },
   button: {
     backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 5,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
   buttonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   roomCard: {
     backgroundColor: '#f5f5f5',
+    borderRadius: 8,
     padding: 15,
-    borderRadius: 5,
     marginBottom: 10,
   },
-  roomCode: {
-    fontWeight: 'bold',
+  roomHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 5,
   },
-  noRoomsText: {
+  roomCode: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  roomInfo: {
+    fontSize: 14,
     color: '#666',
+    marginBottom: 5,
+  },
+  joinButton: {
+    backgroundColor: '#6200ee',
+    padding: 10,
+    borderRadius: 5,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  joinButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  emptyText: {
+    color: '#999',
     textAlign: 'center',
+    marginTop: 10,
   },
 });

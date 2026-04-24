@@ -1,8 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { useSQLiteContext } from 'expo-sqlite';
 
-const db = SQLite.openDatabase('zenblock.db');
-
 interface Room {
   id: number;
   code: string;
@@ -13,33 +11,37 @@ interface Room {
 
 interface RoomStatus {
   code: string;
+  creator: string;
   duration: number;
   participants: string[];
   createdAt: number;
 }
 
 // Initialize the database tables
-export const initRoomDB = () => {
-  db.transaction(tx => {
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS rooms (
+export const initRoomDB = async () => {
+  const db = useSQLiteContext();
+  try {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS rooms (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         code TEXT UNIQUE,
         creator TEXT,
         duration INTEGER,
         created_at INTEGER
-      );`
-    );
-    tx.executeSql(
-      `CREATE TABLE IF NOT EXISTS room_participants (
+      );
+
+      CREATE TABLE IF NOT EXISTS room_participants (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         room_id INTEGER,
         username TEXT,
         joined_at INTEGER,
         FOREIGN KEY(room_id) REFERENCES rooms(id)
-      );`
-    );
-  });
+      );
+    `);
+  } catch (error) {
+    console.error('Error initializing room database:', error);
+    throw error;
+  }
 };
 
 // Generate a random 6-character room code
@@ -103,11 +105,19 @@ export const joinRoom = async (code: string, username: string): Promise<RoomStat
 
     const joinedAt = Date.now();
 
-    // Add participant to the room
-    await db.runAsync(
-      'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
-      [roomResult.id, username, joinedAt]
+    // Check if user is already in the room
+    const existingParticipant = await db.getFirstAsync(
+      'SELECT * FROM room_participants WHERE room_id = ? AND username = ?',
+      [roomResult.id, username]
     );
+
+    if (!existingParticipant) {
+      // Add participant to the room
+      await db.runAsync(
+        'INSERT INTO room_participants (room_id, username, joined_at) VALUES (?, ?, ?)',
+        [roomResult.id, username, joinedAt]
+      );
+    }
 
     // Get all participants
     const participantsResult = await db.getAllAsync(
@@ -119,6 +129,7 @@ export const joinRoom = async (code: string, username: string): Promise<RoomStat
 
     return {
       code: roomResult.code,
+      creator: roomResult.creator,
       duration: roomResult.duration,
       participants,
       createdAt: roomResult.created_at
@@ -194,6 +205,7 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
 
     return {
       code: roomResult.code,
+      creator: roomResult.creator,
       duration: roomResult.duration,
       participants,
       createdAt: roomResult.created_at
@@ -205,16 +217,16 @@ export const getRoomStatus = async (code: string): Promise<RoomStatus> => {
 };
 
 // Poll for room updates
-export const pollRoomUpdates = async (code: string, callback: (status: RoomStatus) => void) => {
+export const pollRoomUpdates = (code: string, callback: (status: RoomStatus) => void) => {
   const interval = setInterval(async () => {
     try {
       const status = await getRoomStatus(code);
       callback(status);
     } catch (error) {
       console.error('Error polling room updates:', error);
-      clearInterval(interval);
     }
-  }, 5000);
+  }, 5000); // Poll every 5 seconds
 
+  // Return a function to stop polling
   return () => clearInterval(interval);
 };

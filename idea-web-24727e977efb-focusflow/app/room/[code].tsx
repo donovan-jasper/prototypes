@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, FlatList } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { getRoomStatus, leaveRoom, pollRoomUpdates } from '../../lib/room-manager';
 import { useStore } from '../../store/useStore';
 import * as Notifications from 'expo-notifications';
+import { MaterialIcons } from '@expo/vector-icons';
 
 export default function RoomScreen() {
   const { code } = useLocalSearchParams();
@@ -15,6 +16,7 @@ export default function RoomScreen() {
   const { activeRoom, updateRoomStatus } = useStore();
   const intervalRef = useRef(null);
   const timerRef = useRef(null);
+  const lastParticipantsRef = useRef([]);
 
   useEffect(() => {
     const fetchRoomStatus = async () => {
@@ -23,6 +25,7 @@ export default function RoomScreen() {
         setRoomStatus(status);
         setTimeLeft(status.duration * 60); // Convert to seconds
         updateRoomStatus(status);
+        lastParticipantsRef.current = status.participants;
         setLoading(false);
         setError(null);
       } catch (error) {
@@ -38,6 +41,26 @@ export default function RoomScreen() {
     const stopPolling = pollRoomUpdates(code, (status) => {
       setRoomStatus(status);
       updateRoomStatus(status);
+
+      // Check for participant changes
+      if (lastParticipantsRef.current.length !== status.participants.length) {
+        const leftParticipants = lastParticipantsRef.current.filter(
+          p => !status.participants.includes(p)
+        );
+
+        if (leftParticipants.length > 0) {
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Someone left the room",
+              body: `${leftParticipants.join(', ')} has left the focus session`,
+              sound: true,
+            },
+            trigger: null,
+          });
+        }
+      }
+
+      lastParticipantsRef.current = status.participants;
     });
 
     // Set up timer countdown
@@ -107,11 +130,20 @@ export default function RoomScreen() {
 
       <View style={styles.participantsContainer}>
         <Text style={styles.sectionTitle}>Participants ({roomStatus.participants.length})</Text>
-        {roomStatus.participants.map((participant, index) => (
-          <View key={index} style={styles.participant}>
-            <Text>{participant}</Text>
-          </View>
-        ))}
+        <FlatList
+          data={roomStatus.participants}
+          keyExtractor={(item, index) => index.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <View style={styles.participant}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{item.charAt(0).toUpperCase()}</Text>
+              </View>
+              <Text style={styles.participantName}>{item}</Text>
+            </View>
+          )}
+        />
       </View>
 
       <TouchableOpacity
@@ -131,9 +163,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
   },
   title: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     marginBottom: 20,
+    color: '#333',
     textAlign: 'center',
   },
   timerContainer: {
@@ -143,6 +176,7 @@ const styles = StyleSheet.create({
   timer: {
     fontSize: 48,
     fontWeight: 'bold',
+    color: '#6200ee',
   },
   timerLabel: {
     fontSize: 16,
@@ -155,22 +189,41 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
+    color: '#6200ee',
   },
   participant: {
-    backgroundColor: '#f5f5f5',
-    padding: 10,
-    borderRadius: 5,
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#6200ee',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 5,
+  },
+  avatarText: {
+    color: '#fff',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  participantName: {
+    fontSize: 12,
+    color: '#666',
   },
   leaveButton: {
     backgroundColor: '#f44336',
     padding: 15,
-    borderRadius: 5,
+    borderRadius: 8,
     alignItems: 'center',
+    marginTop: 'auto',
   },
   leaveButtonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
   loadingText: {
     marginTop: 10,
@@ -179,17 +232,19 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#f44336',
+    fontSize: 16,
     textAlign: 'center',
     marginBottom: 20,
   },
   button: {
     backgroundColor: '#6200ee',
-    padding: 12,
-    borderRadius: 5,
+    padding: 15,
+    borderRadius: 8,
     alignItems: 'center',
   },
   buttonText: {
-    color: 'white',
+    color: '#fff',
     fontWeight: 'bold',
+    fontSize: 16,
   },
 });
