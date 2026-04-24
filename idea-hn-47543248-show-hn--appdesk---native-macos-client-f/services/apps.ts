@@ -38,5 +38,12 @@ export const fetchUserApps = async (): Promise<AppData[]> => {
   await new Promise(resolve => setTimeout(resolve, 1000));
 
   // In a real app, this would fetch from your backend
+  // For now, we'll return the mock data
   return mockApps;
+
+  // In a production app, you might want to:
+  // 1. Check for cached data first
+  // 2. Make the API call
+  // 3. Update cache if successful
+  // 4. Handle errors appropriately
 };
