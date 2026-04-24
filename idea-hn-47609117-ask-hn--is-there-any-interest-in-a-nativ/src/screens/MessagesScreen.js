@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
-import { getOfflineMessages, syncMessages, sendMessage } from '../services/discordApi';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { View, Text, FlatList, StyleSheet, ActivityIndicator, Alert, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard } from 'react-native';
+import { getOfflineMessages, syncMessages, sendMessage, getLastSyncTime } from '../services/discordApi';
 import { getStoredToken } from '../services/auth';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -12,19 +12,28 @@ const MessagesScreen = ({ route, navigation }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState(null);
+  const flatListRef = useRef(null);
 
   const loadMessages = useCallback(async (showLoading = true) => {
     if (showLoading) setIsLoading(true);
 
     try {
+      // Get last sync time
+      const syncTime = await getLastSyncTime('last_message_sync');
+      setLastSyncTime(syncTime);
+
+      // Try to get offline data first
       const offlineMessages = await getOfflineMessages(channelId);
-      setMessages(offlineMessages);
+      if (offlineMessages.length > 0) {
+        setMessages(offlineMessages);
+      }
 
       // Try to sync with Discord if we have a token
       const token = await getStoredToken();
       if (token) {
         const syncedMessages = await syncMessages(channelId);
         setMessages(syncedMessages);
+        setLastSyncTime(new Date());
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -65,6 +74,12 @@ const MessagesScreen = ({ route, navigation }) => {
       const message = await sendMessage(channelId, newMessage);
       setMessages(prev => [message, ...prev]);
       setNewMessage('');
+      Keyboard.dismiss();
+
+      // Scroll to the new message
+      if (flatListRef.current) {
+        flatListRef.current.scrollToOffset({ offset: 0, animated: true });
+      }
     } catch (error) {
       console.error('Error sending message:', error);
       Alert.alert('Error', error.message || 'Failed to send message. Please try again.');
@@ -81,9 +96,13 @@ const MessagesScreen = ({ route, navigation }) => {
 
   const renderMessageItem = ({ item }) => (
     <View style={styles.messageItem}>
-      <Text style={styles.messageAuthor}>{item.author}</Text>
+      <View style={styles.messageHeader}>
+        <Text style={styles.messageAuthor}>{item.author}</Text>
+        <Text style={styles.messageTime}>
+          {new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+        </Text>
+      </View>
       <Text style={styles.messageContent}>{item.content}</Text>
-      <Text style={styles.messageTime}>{new Date(item.timestamp).toLocaleTimeString()}</Text>
     </View>
   );
 
@@ -102,6 +121,7 @@ const MessagesScreen = ({ route, navigation }) => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       <FlatList
+        ref={flatListRef}
         data={messages}
         renderItem={renderMessageItem}
         keyExtractor={(item) => item.id}
@@ -127,6 +147,7 @@ const MessagesScreen = ({ route, navigation }) => {
           placeholderTextColor="#72767D"
           multiline
           editable={!isSending}
+          onSubmitEditing={handleSendMessage}
         />
         <TouchableOpacity
           style={[styles.sendButton, isSending && styles.sendButtonDisabled]}
@@ -156,65 +177,73 @@ const styles = StyleSheet.create({
     backgroundColor: '#36393F',
   },
   messagesList: {
-    padding: 10,
-  },
-  messageItem: {
-    backgroundColor: '#2F3136',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 10,
-  },
-  messageAuthor: {
-    color: '#5865F2',
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  messageContent: {
-    color: '#DCDDDE',
-    fontSize: 16,
-  },
-  messageTime: {
-    color: '#72767D',
-    fontSize: 12,
-    marginTop: 4,
-    textAlign: 'right',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    backgroundColor: '#2F3136',
-    borderTopWidth: 1,
-    borderTopColor: '#202225',
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#40444B',
-    borderRadius: 8,
-    padding: 12,
-    color: '#DCDDDE',
-    marginRight: 8,
-    maxHeight: 100,
-  },
-  sendButton: {
-    backgroundColor: '#5865F2',
-    borderRadius: 8,
-    padding: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 60,
-  },
-  sendButtonDisabled: {
-    backgroundColor: '#4F5D95',
-  },
-  sendButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    paddingHorizontal: 10,
+    paddingBottom: 10,
   },
   syncStatus: {
     color: '#72767D',
     fontSize: 12,
     textAlign: 'center',
     marginBottom: 10,
+  },
+  messageItem: {
+    backgroundColor: '#40444B',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    maxWidth: '80%',
+    alignSelf: 'flex-start',
+  },
+  messageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  messageAuthor: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  messageTime: {
+    color: '#72767D',
+    fontSize: 12,
+  },
+  messageContent: {
+    color: '#DCDEE0',
+    fontSize: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#2F3136',
+    backgroundColor: '#36393F',
+  },
+  input: {
+    flex: 1,
+    backgroundColor: '#40444B',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    color: '#fff',
+    fontSize: 16,
+    maxHeight: 100,
+  },
+  sendButton: {
+    backgroundColor: '#5865F2',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    marginLeft: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendButtonDisabled: {
+    opacity: 0.5,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
 });
 

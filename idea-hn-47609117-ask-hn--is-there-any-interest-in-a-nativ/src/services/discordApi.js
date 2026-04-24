@@ -27,19 +27,26 @@ const initializeDatabase = () => {
   });
 };
 
-const fetchWithAuth = async (endpoint, token) => {
+const fetchWithAuth = async (endpoint, token, method = 'GET', body = null) => {
   try {
-    const response = await fetch(`${BASE_URL}${endpoint}`, {
+    const options = {
+      method,
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-    });
+    };
+
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(`${BASE_URL}${endpoint}`, options);
 
     if (response.status === 401) {
       // Token expired, refresh and retry
       const newToken = await refreshToken();
-      return fetchWithAuth(endpoint, newToken);
+      return fetchWithAuth(endpoint, newToken, method, body);
     }
 
     if (!response.ok) {
@@ -150,6 +157,33 @@ const syncMessages = async (channelId) => {
   }
 };
 
+const sendMessage = async (channelId, content) => {
+  const token = await getStoredToken();
+  if (!token) throw new Error('No authentication token');
+
+  try {
+    const message = await fetchWithAuth(
+      `/channels/${channelId}/messages`,
+      token,
+      'POST',
+      { content }
+    );
+
+    // Save the new message to local database
+    db.transaction(tx => {
+      tx.executeSql(
+        'INSERT INTO messages (id, channel_id, content, author, timestamp) VALUES (?, ?, ?, ?, ?);',
+        [message.id, channelId, message.content, message.author.username, message.timestamp]
+      );
+    });
+
+    return message;
+  } catch (error) {
+    console.error('Failed to send message:', error);
+    throw error;
+  }
+};
+
 const getOfflineServers = () => {
   return new Promise((resolve, reject) => {
     db.transaction(tx => {
@@ -208,50 +242,14 @@ const getLastSyncTime = (key) => {
   });
 };
 
-const sendMessage = async (channelId, content) => {
-  const token = await getStoredToken();
-  if (!token) throw new Error('No authentication token');
-
-  try {
-    const response = await fetch(`${BASE_URL}/channels/${channelId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ content }),
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
-    }
-
-    const message = await response.json();
-
-    // Save to local database
-    db.transaction(tx => {
-      tx.executeSql(
-        'INSERT INTO messages (id, channel_id, content, author, timestamp) VALUES (?, ?, ?, ?, ?);',
-        [message.id, channelId, message.content, message.author.username, message.timestamp]
-      );
-    });
-
-    return message;
-  } catch (error) {
-    console.error('Failed to send message:', error);
-    throw error;
-  }
-};
-
 export {
   initializeDatabase,
   syncServers,
   syncChannels,
   syncMessages,
+  sendMessage,
   getOfflineServers,
   getOfflineChannels,
   getOfflineMessages,
-  getLastSyncTime,
-  sendMessage,
+  getLastSyncTime
 };
