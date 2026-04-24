@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { GitHub } from 'react-native-github-api';
+import * as AuthSession from 'expo-auth-session';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen: React.FC = () => {
@@ -11,29 +11,69 @@ const LoginScreen: React.FC = () => {
   const handleGitHubLogin = async () => {
     setLoading(true);
     try {
-      const github = new GitHub({
-        clientId: 'YOUR_GITHUB_CLIENT_ID',
-        clientSecret: 'YOUR_GITHUB_CLIENT_SECRET',
-        redirectUri: 'YOUR_REDIRECT_URI',
+      // GitHub OAuth configuration
+      const config = {
+        clientId: 'YOUR_GITHUB_CLIENT_ID', // Replace with your actual client ID
+        scopes: ['repo', 'user', 'notifications'],
+        redirectUri: AuthSession.makeRedirectUri({
+          useProxy: true,
+        }),
+      };
+
+      // Start the OAuth flow
+      const result = await AuthSession.startAsync({
+        authUrl:
+          `https://github.com/login/oauth/authorize?` +
+          `client_id=${config.clientId}` +
+          `&redirect_uri=${encodeURIComponent(config.redirectUri)}` +
+          `&scope=${encodeURIComponent(config.scopes.join(' '))}`,
       });
 
-      const authUrl = github.getAuthUrl({
-        scopes: ['repo', 'user'],
-        state: 'random_string',
-      });
+      if (result.type === 'success') {
+        // Exchange the authorization code for an access token
+        const response = await fetch('https://github.com/login/oauth/access_token', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: config.clientId,
+            client_secret: 'YOUR_GITHUB_CLIENT_SECRET', // Replace with your actual client secret
+            code: result.params.code,
+            redirect_uri: config.redirectUri,
+          }),
+        });
 
-      // In a real app, you would open this URL in a WebView or browser
-      // For this example, we'll simulate the OAuth flow
-      const token = await github.authenticate({
-        type: 'token',
-        token: 'YOUR_TEST_TOKEN', // Replace with actual token from OAuth flow
-      });
+        const data = await response.json();
 
-      await AsyncStorage.setItem('githubToken', token);
-      navigation.navigate('RepositorySelection');
+        if (data.access_token) {
+          // Store the token securely
+          await AsyncStorage.setItem('githubToken', data.access_token);
+
+          // Verify the token by fetching user data
+          const userResponse = await fetch('https://api.github.com/user', {
+            headers: {
+              Authorization: `token ${data.access_token}`,
+            },
+          });
+
+          if (userResponse.ok) {
+            const userData = await userResponse.json();
+            await AsyncStorage.setItem('githubUser', JSON.stringify(userData));
+            navigation.navigate('RepositorySelection');
+          } else {
+            throw new Error('Failed to fetch user data');
+          }
+        } else {
+          throw new Error(data.error || 'Failed to get access token');
+        }
+      } else {
+        throw new Error('Authentication cancelled');
+      }
     } catch (error) {
       console.error('GitHub login error:', error);
-      Alert.alert('Login Failed', 'Could not authenticate with GitHub');
+      Alert.alert('Login Failed', error.message || 'Could not authenticate with GitHub');
     } finally {
       setLoading(false);
     }
@@ -49,9 +89,11 @@ const LoginScreen: React.FC = () => {
         onPress={handleGitHubLogin}
         disabled={loading}
       >
-        <Text style={styles.loginButtonText}>
-          {loading ? 'Connecting...' : 'Login with GitHub'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator color="#fff" />
+        ) : (
+          <Text style={styles.loginButtonText}>Login with GitHub</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -75,6 +117,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 30,
     color: '#666',
+    textAlign: 'center',
   },
   loginButton: {
     backgroundColor: '#24292e',
@@ -83,6 +126,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     width: '100%',
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   loginButtonText: {
     color: 'white',
