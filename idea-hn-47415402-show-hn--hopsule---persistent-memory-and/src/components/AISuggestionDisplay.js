@@ -159,38 +159,35 @@ const AISuggestionDisplay = ({ prompt }) => {
 
   if (rulesLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Loading team rules...</Text>
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Loading rules...</Text>
       </View>
     );
   }
 
   if (rulesError) {
     return (
-      <View style={styles.errorContainer}>
-        <Text style={styles.errorText}>Error loading rules: {rulesError}</Text>
-        <TouchableOpacity onPress={fetchSuggestions} style={styles.retryButton}>
-          <Text style={styles.retryButtonText}>Retry</Text>
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Error loading rules: {rulesError.message}</Text>
       </View>
     );
   }
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Fetching AI suggestions...</Text>
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Fetching AI suggestions...</Text>
       </View>
     );
   }
 
   if (apiError) {
     return (
-      <View style={styles.errorContainer}>
+      <View style={styles.container}>
         <Text style={styles.errorText}>Error: {apiError}</Text>
-        <TouchableOpacity onPress={fetchSuggestions} style={styles.retryButton}>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchSuggestions}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </View>
@@ -199,196 +196,176 @@ const AISuggestionDisplay = ({ prompt }) => {
 
   if (!selectedSuggestion) {
     return (
-      <View style={styles.noSuggestionContainer}>
-        <Text style={styles.noSuggestionText}>No suggestions available</Text>
+      <View style={styles.container}>
+        <Text style={styles.noSuggestionsText}>No suggestions available</Text>
       </View>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerText}>AI Suggestions</Text>
-        {violations.length > 0 && (
-          <ConflictAlert
-            violations={violations}
-            onPress={() => Alert.alert('Rule Violations', violations.map(v => `${v.name} (${v.severity})`).join('\n'))}
-          />
-        )}
-      </View>
-
-      <View style={styles.suggestionContainer}>
-        <Text style={styles.suggestionTitle}>Original Suggestion:</Text>
-        <ScrollView horizontal style={styles.codeContainer}>
-          <Text style={styles.suggestionText}>{selectedSuggestion}</Text>
-        </ScrollView>
-
-        <Text style={styles.suggestionTitle}>Processed Suggestion:</Text>
-        <ScrollView horizontal style={styles.codeContainer}>
+    <View style={styles.container}>
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.suggestionContainer}>
+          <Text style={styles.sectionTitle}>AI Suggestion</Text>
           {renderHighlightedCode()}
-        </ScrollView>
-      </View>
 
-      {aiAnalysis && (
-        <View style={styles.analysisContainer}>
-          <Text style={styles.analysisTitle}>AI Analysis:</Text>
-          <Text style={styles.analysisText}>{JSON.stringify(aiAnalysis, null, 2)}</Text>
+          {violations.length > 0 && (
+            <View style={styles.violationsContainer}>
+              <Text style={styles.sectionTitle}>Rule Violations</Text>
+              {violations.map((violation, index) => (
+                <ConflictAlert
+                  key={index}
+                  ruleName={violation.name}
+                  severity={violation.severity}
+                  message={`Pattern: ${violation.pattern}`}
+                />
+              ))}
+            </View>
+          )}
+
+          {aiAnalysis && (
+            <View style={styles.analysisContainer}>
+              <Text style={styles.sectionTitle}>AI Analysis</Text>
+              <Text style={styles.analysisText}>
+                Complexity: {aiAnalysis.complexity || 'N/A'}
+              </Text>
+              <Text style={styles.analysisText}>
+                Maintainability: {aiAnalysis.maintainability || 'N/A'}
+              </Text>
+              <Text style={styles.analysisText}>
+                Performance: {aiAnalysis.performance || 'N/A'}
+              </Text>
+            </View>
+          )}
         </View>
-      )}
+      </ScrollView>
 
-      <View style={styles.actionButtons}>
+      <View style={styles.actionButtonsContainer}>
         <TouchableOpacity
-          style={[styles.button, styles.acceptButton]}
-          onPress={handleAccept}
-          disabled={isAccepted || isRejected}
-        >
-          <Text style={styles.buttonText}>Accept</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.button, styles.rejectButton]}
+          style={[styles.actionButton, styles.rejectButton]}
           onPress={handleReject}
-          disabled={isAccepted || isRejected}
+          disabled={isRejected}
         >
-          <Text style={styles.buttonText}>Reject</Text>
+          <Text style={styles.actionButtonText}>Reject</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.acceptButton]}
+          onPress={handleAccept}
+          disabled={isAccepted}
+        >
+          <Text style={styles.actionButtonText}>Accept</Text>
         </TouchableOpacity>
       </View>
-
-      {isAccepted && (
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>Suggestion accepted!</Text>
-        </View>
-      )}
-
-      {isRejected && (
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>Suggestion rejected</Text>
-        </View>
-      )}
-    </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
     backgroundColor: '#f5f5f5',
+    padding: 16,
   },
-  loadingContainer: {
+  scrollContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  errorText: {
-    color: 'red',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#007AFF',
-    padding: 10,
-    borderRadius: 5,
-  },
-  retryButtonText: {
-    color: 'white',
-  },
-  noSuggestionContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  noSuggestionText: {
-    fontSize: 16,
-    color: '#666',
-  },
-  header: {
-    marginBottom: 20,
-  },
-  headerText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 10,
   },
   suggestionContainer: {
-    marginBottom: 20,
+    backgroundColor: 'white',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  suggestionTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  codeContainer: {
-    backgroundColor: '#282c34',
-    borderRadius: 4,
-    padding: 10,
-    marginBottom: 15,
-    maxHeight: 200,
+    marginBottom: 12,
+    color: '#333',
   },
   suggestionText: {
-    color: '#abb2bf',
     fontFamily: 'monospace',
+    fontSize: 14,
+    lineHeight: 20,
+    color: '#333',
   },
   violationText: {
-    color: '#ffcc00',
-    backgroundColor: 'rgba(255, 204, 0, 0.2)',
+    backgroundColor: 'rgba(255, 204, 204, 0.5)',
+    color: '#d32f2f',
   },
   errorViolation: {
-    color: '#ff6b6b',
-    backgroundColor: 'rgba(255, 107, 107, 0.2)',
+    backgroundColor: 'rgba(255, 152, 152, 0.7)',
+    color: '#b71c1c',
+    fontWeight: 'bold',
+  },
+  violationsContainer: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   analysisContainer: {
-    marginBottom: 20,
-  },
-  analysisTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
   },
   analysisText: {
-    fontFamily: 'monospace',
-    backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 4,
+    fontSize: 14,
+    marginBottom: 8,
+    color: '#555',
   },
-  actionButtons: {
+  actionButtonsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginTop: 16,
   },
-  button: {
-    padding: 12,
-    borderRadius: 5,
+  actionButton: {
     flex: 1,
-    marginHorizontal: 5,
+    padding: 14,
+    borderRadius: 8,
     alignItems: 'center',
+    marginHorizontal: 4,
   },
   acceptButton: {
     backgroundColor: '#4CAF50',
   },
   rejectButton: {
-    backgroundColor: '#f44336',
+    backgroundColor: '#F44336',
   },
-  buttonText: {
+  actionButtonText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
   },
-  statusContainer: {
-    padding: 10,
-    borderRadius: 5,
-    backgroundColor: '#e3f2fd',
+  loadingText: {
     marginTop: 10,
-  },
-  statusText: {
     textAlign: 'center',
-    fontWeight: 'bold',
+    color: '#666',
+  },
+  errorText: {
+    color: '#F44336',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  noSuggestionsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+  },
+  retryButton: {
+    backgroundColor: '#007AFF',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  retryButtonText: {
+    color: 'white',
+    fontWeight: '600',
   },
 });
 
