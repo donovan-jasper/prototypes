@@ -11,17 +11,27 @@ export const initDB = () => {
   });
 };
 
-export const saveFile = (name, data) => {
-  return new Promise((resolve, reject) => {
-    db.transaction(tx => {
-      tx.executeSql(
-        'INSERT INTO files (name, data) VALUES (?, ?);',
-        [name, data],
-        (_, result) => resolve(result),
-        (_, error) => reject(error)
-      );
+export const saveFile = async (name, data) => {
+  try {
+    // Save to SQLite
+    await new Promise((resolve, reject) => {
+      db.transaction(tx => {
+        tx.executeSql(
+          'INSERT INTO files (name, data) VALUES (?, ?);',
+          [name, data],
+          (_, result) => resolve(result),
+          (_, error) => reject(error)
+        );
+      });
     });
-  });
+
+    // Save to file system
+    const fileUri = await saveToFileSystem(name, data);
+    return fileUri;
+  } catch (error) {
+    console.error('Save Error:', error);
+    throw error;
+  }
 };
 
 export const getFiles = () => {

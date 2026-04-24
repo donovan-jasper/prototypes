@@ -7,6 +7,7 @@ import * as FileSystem from 'expo-file-system';
 import * as SQLite from 'expo-sqlite';
 import { createWorker } from 'tesseract.js';
 import Pdf from 'react-native-pdf';
+import { saveFile } from '../utils/storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ const PDFEditor = ({ pdfData, onSave }) => {
   const [translateY, setTranslateY] = useState(0);
   const [lastTranslateX, setLastTranslateX] = useState(0);
   const [lastTranslateY, setLastTranslateY] = useState(0);
+  const [pdfDimensions, setPdfDimensions] = useState({ width: 0, height: 0 });
   const svgRef = useRef(null);
   const pdfRef = useRef(null);
   const db = SQLite.openDatabase('offlinedoc.db');
@@ -138,86 +140,19 @@ const PDFEditor = ({ pdfData, onSave }) => {
   };
 
   const handleSave = async () => {
-    if (editedPdf) {
-      try {
-        const fileUri = FileSystem.documentDirectory + 'edited.pdf';
-        await FileSystem.writeAsStringAsync(fileUri, editedPdf, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        // Save to SQLite
-        const fileData = await FileSystem.readAsStringAsync(fileUri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-
-        await saveFile('edited.pdf', fileData);
-        onSave(fileData);
-        Alert.alert('Success', 'PDF saved successfully!');
-      } catch (error) {
-        console.error('Save Error:', error);
-        Alert.alert('Error', 'Failed to save PDF');
-      }
+    if (!editedPdf) {
+      Alert.alert('No Changes', 'No edits have been made to save.');
+      return;
     }
-  };
 
-  const handleGestureEvent = (event) => {
-    if (tool === 'text') {
-      setCurrentAnnotation({
-        type: 'text',
-        x: event.nativeEvent.x,
-        y: event.nativeEvent.y,
-        text: textInput,
-      });
-    } else if (tool === 'rectangle') {
-      if (!currentAnnotation) {
-        setCurrentAnnotation({
-          type: 'rectangle',
-          x: event.nativeEvent.x,
-          y: event.nativeEvent.y,
-          width: 0,
-          height: 0,
-        });
-      } else {
-        const newWidth = event.nativeEvent.x - currentAnnotation.x;
-        const newHeight = event.nativeEvent.y - currentAnnotation.y;
-        setCurrentAnnotation({
-          ...currentAnnotation,
-          width: newWidth,
-          height: newHeight,
-        });
-      }
-    } else if (tool === 'circle') {
-      if (!currentAnnotation) {
-        setCurrentAnnotation({
-          type: 'circle',
-          x: event.nativeEvent.x,
-          y: event.nativeEvent.y,
-          radius: 0,
-        });
-      } else {
-        const dx = event.nativeEvent.x - currentAnnotation.x;
-        const dy = event.nativeEvent.y - currentAnnotation.y;
-        const newRadius = Math.sqrt(dx * dx + dy * dy);
-        setCurrentAnnotation({
-          ...currentAnnotation,
-          radius: newRadius,
-        });
-      }
-    }
-  };
-
-  const handleGestureStateChange = (event) => {
-    if (event.nativeEvent.oldState === State.ACTIVE) {
-      if (currentAnnotation) {
-        setAnnotations([...annotations, currentAnnotation]);
-        setCurrentAnnotation(null);
-      }
-    }
-  };
-
-  const handlePinchGesture = (event) => {
-    if (event.nativeEvent.state === State.ACTIVE) {
-      setScale(scale * event.nativeEvent.scale);
+    try {
+      const fileName = `edited_${Date.now()}.pdf`;
+      const fileUri = await saveFile(fileName, editedPdf);
+      Alert.alert('Success', 'PDF saved successfully!');
+      if (onSave) onSave(fileUri);
+    } catch (error) {
+      console.error('Save Error:', error);
+      Alert.alert('Error', 'Failed to save the PDF.');
     }
   };
 
@@ -231,184 +166,145 @@ const PDFEditor = ({ pdfData, onSave }) => {
     }
   };
 
-  const renderAnnotations = () => {
-    return annotations.map((annotation, index) => {
-      if (annotation.type === 'text') {
-        return (
-          <SvgText
-            key={`text-${index}`}
-            x={annotation.x}
-            y={annotation.y}
-            fontSize="12"
-            fill="black"
-          >
-            {annotation.text}
-          </SvgText>
-        );
-      } else if (annotation.type === 'rectangle') {
-        return (
-          <Rect
-            key={`rect-${index}`}
-            x={annotation.x}
-            y={annotation.y}
-            width={annotation.width}
-            height={annotation.height}
-            stroke="black"
-            strokeWidth="1"
-            fill="none"
-          />
-        );
-      } else if (annotation.type === 'circle') {
-        return (
-          <Circle
-            key={`circle-${index}`}
-            cx={annotation.x + annotation.radius}
-            cy={annotation.y + annotation.radius}
-            r={annotation.radius}
-            stroke="black"
-            strokeWidth="1"
-            fill="none"
-          />
-        );
-      }
-      return null;
-    });
+  const handlePinchGesture = (event) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      setScale(scale * event.nativeEvent.scale);
+    }
   };
 
-  const renderCurrentAnnotation = () => {
-    if (!currentAnnotation) return null;
-
-    if (currentAnnotation.type === 'text') {
-      return (
-        <SvgText
-          x={currentAnnotation.x}
-          y={currentAnnotation.y}
-          fontSize="12"
-          fill="black"
-        >
-          {currentAnnotation.text}
-        </SvgText>
-      );
-    } else if (currentAnnotation.type === 'rectangle') {
-      return (
-        <Rect
-          x={currentAnnotation.x}
-          y={currentAnnotation.y}
-          width={currentAnnotation.width}
-          height={currentAnnotation.height}
-          stroke="black"
-          strokeWidth="1"
-          fill="none"
-        />
-      );
-    } else if (currentAnnotation.type === 'circle') {
-      return (
-        <Circle
-          cx={currentAnnotation.x + currentAnnotation.radius}
-          cy={currentAnnotation.y + currentAnnotation.radius}
-          r={currentAnnotation.radius}
-          stroke="black"
-          strokeWidth="1"
-          fill="none"
-        />
-      );
+  const handleAddAnnotation = (type) => {
+    if (type === 'text' && textInput.trim() === '') {
+      Alert.alert('Empty Text', 'Please enter some text for the annotation.');
+      return;
     }
-    return null;
+
+    const newAnnotation = {
+      id: Date.now(),
+      type,
+      x: 50,
+      y: 50,
+      ...(type === 'text' && { text: textInput }),
+      ...(type === 'rectangle' && { width: 100, height: 50 }),
+      ...(type === 'circle' && { radius: 50 }),
+    };
+
+    setAnnotations([...annotations, newAnnotation]);
+    setTextInput('');
+  };
+
+  const handleAnnotationPress = (id) => {
+    setCurrentAnnotation(id);
+  };
+
+  const handleAnnotationMove = (id, dx, dy) => {
+    setAnnotations(annotations.map(ann =>
+      ann.id === id ? { ...ann, x: ann.x + dx, y: ann.y + dy } : ann
+    ));
+  };
+
+  const handlePdfLayout = (event) => {
+    setPdfDimensions({
+      width: event.nativeEvent.layout.width,
+      height: event.nativeEvent.layout.height,
+    });
   };
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <View style={styles.toolbar}>
-        <TouchableOpacity
-          style={[styles.toolButton, tool === 'text' && styles.activeTool]}
-          onPress={() => setTool('text')}
-        >
-          <Text style={styles.toolButtonText}>Text</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toolButton, tool === 'rectangle' && styles.activeTool]}
-          onPress={() => setTool('rectangle')}
-        >
-          <Text style={styles.toolButtonText}>Rectangle</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toolButton, tool === 'circle' && styles.activeTool]}
-          onPress={() => setTool('circle')}
-        >
-          <Text style={styles.toolButtonText}>Circle</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toolButton, tool === 'eraser' && styles.activeTool]}
-          onPress={() => setTool('eraser')}
-        >
-          <Text style={styles.toolButtonText}>Eraser</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.toolButton}
-          onPress={handleOCR}
-        >
-          <Text style={styles.toolButtonText}>OCR</Text>
-        </TouchableOpacity>
+        <Button title="Text" onPress={() => setTool('text')} />
+        <Button title="Rectangle" onPress={() => setTool('rectangle')} />
+        <Button title="Circle" onPress={() => setTool('circle')} />
+        <Button title="OCR" onPress={handleOCR} disabled={ocrLimitReached} />
+        <Button title="Save" onPress={handleSave} />
       </View>
 
       {tool === 'text' && (
-        <TextInput
-          style={styles.textInput}
-          placeholder="Enter text"
-          value={textInput}
-          onChangeText={setTextInput}
-        />
+        <View style={styles.textInputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Enter annotation text"
+            value={textInput}
+            onChangeText={setTextInput}
+          />
+          <Button title="Add Text" onPress={() => handleAddAnnotation('text')} />
+        </View>
       )}
 
-      <View style={styles.pdfContainer}>
-        <PinchGestureHandler
-          onGestureEvent={handlePinchGesture}
-          onHandlerStateChange={handlePinchGesture}
-        >
-          <PanGestureHandler
-            onGestureEvent={handlePanGesture}
-            onHandlerStateChange={handlePanGesture}
-          >
-            <View style={styles.pdfWrapper}>
+      <View style={styles.editorContainer}>
+        <PinchGestureHandler onGestureEvent={handlePinchGesture}>
+          <PanGestureHandler onGestureEvent={handlePanGesture}>
+            <View style={styles.pdfContainer} onLayout={handlePdfLayout}>
               <Pdf
                 ref={pdfRef}
                 source={{ uri: `data:application/pdf;base64,${pdfData}` }}
                 style={styles.pdf}
-                scale={scale}
-                horizontal={true}
-                enablePaging={true}
-                spacing={10}
+                onLoadComplete={(numberOfPages, filePath) => {
+                  console.log(`Number of pages: ${numberOfPages}`);
+                }}
+                onError={(error) => {
+                  console.log(error);
+                }}
               />
+
               <Svg
                 ref={svgRef}
                 style={StyleSheet.absoluteFill}
-                width={width}
-                height={height}
+                width={pdfDimensions.width}
+                height={pdfDimensions.height}
               >
-                {renderAnnotations()}
-                {renderCurrentAnnotation()}
+                {annotations.map(annotation => (
+                  <React.Fragment key={annotation.id}>
+                    {annotation.type === 'text' && (
+                      <SvgText
+                        x={annotation.x}
+                        y={annotation.y}
+                        fontSize="12"
+                        fill="black"
+                        onPress={() => handleAnnotationPress(annotation.id)}
+                      >
+                        {annotation.text}
+                      </SvgText>
+                    )}
+                    {annotation.type === 'rectangle' && (
+                      <Rect
+                        x={annotation.x}
+                        y={annotation.y}
+                        width={annotation.width}
+                        height={annotation.height}
+                        stroke="black"
+                        strokeWidth="1"
+                        fill="none"
+                        onPress={() => handleAnnotationPress(annotation.id)}
+                      />
+                    )}
+                    {annotation.type === 'circle' && (
+                      <Circle
+                        cx={annotation.x + annotation.radius}
+                        cy={annotation.y + annotation.radius}
+                        r={annotation.radius}
+                        stroke="black"
+                        strokeWidth="1"
+                        fill="none"
+                        onPress={() => handleAnnotationPress(annotation.id)}
+                      />
+                    )}
+                  </React.Fragment>
+                ))}
               </Svg>
-              <PanGestureHandler
-                onGestureEvent={handleGestureEvent}
-                onHandlerStateChange={handleGestureStateChange}
-              >
-                <View style={StyleSheet.absoluteFill} />
-              </PanGestureHandler>
             </View>
           </PanGestureHandler>
         </PinchGestureHandler>
       </View>
 
       {ocrText && (
-        <ScrollView style={styles.ocrResult}>
-          <Text>{ocrText}</Text>
-        </ScrollView>
+        <View style={styles.ocrContainer}>
+          <Text style={styles.ocrTitle}>Extracted Text:</Text>
+          <ScrollView style={styles.ocrTextContainer}>
+            <Text>{ocrText}</Text>
+          </ScrollView>
+        </View>
       )}
-
-      <View style={styles.buttonContainer}>
-        <Button title="Apply Changes" onPress={handleEdit} />
-        <Button title="Save PDF" onPress={handleSave} />
-      </View>
     </GestureHandlerRootView>
   );
 };
@@ -420,57 +316,50 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     flexDirection: 'row',
+    justifyContent: 'space-around',
     padding: 10,
-    backgroundColor: '#f0f0f0',
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
   },
-  toolButton: {
+  textInputContainer: {
+    flexDirection: 'row',
     padding: 10,
-    marginRight: 5,
-    backgroundColor: '#ddd',
-    borderRadius: 5,
-  },
-  activeTool: {
-    backgroundColor: '#4CAF50',
-  },
-  toolButtonText: {
-    color: '#fff',
+    alignItems: 'center',
   },
   textInput: {
-    height: 40,
-    borderColor: 'gray',
+    flex: 1,
     borderWidth: 1,
-    padding: 10,
+    borderColor: '#ccc',
+    padding: 8,
+    marginRight: 10,
+  },
+  editorContainer: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: '#ccc',
     margin: 10,
   },
   pdfContainer: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  pdfWrapper: {
     flex: 1,
     position: 'relative',
   },
   pdf: {
     flex: 1,
-    width: width,
-    height: height,
+    width: '100%',
+    height: '100%',
   },
-  ocrResult: {
-    maxHeight: 150,
-    padding: 10,
-    backgroundColor: '#f9f9f9',
+  ocrContainer: {
+    height: 200,
     borderTopWidth: 1,
     borderTopColor: '#ccc',
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
     padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderTopWidth: 1,
-    borderTopColor: '#ccc',
+  },
+  ocrTitle: {
+    fontWeight: 'bold',
+    marginBottom: 5,
+  },
+  ocrTextContainer: {
+    flex: 1,
   },
 });
 
