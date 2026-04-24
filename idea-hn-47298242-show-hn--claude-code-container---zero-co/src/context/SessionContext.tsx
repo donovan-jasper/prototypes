@@ -96,13 +96,19 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
     setIsRunning(true);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(`${API_URL}/api/run/${sessionId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ code, language }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -113,11 +119,29 @@ export const SessionProvider = ({ children }: { children: ReactNode }) => {
           id: Date.now(),
         }]);
         setIsRunning(false);
+        return;
       }
+
+      // The actual output will be received via socket.io
+      // We just need to handle the case where the request succeeds but no output is received
+      setTimeout(() => {
+        if (isRunning) {
+          setIsRunning(false);
+          setOutputs(prev => [...prev, {
+            output: 'Execution completed (no output received)',
+            language,
+            timestamp: new Date(),
+            id: Date.now(),
+          }]);
+        }
+      }, 5000); // Fallback if no output is received within 5 seconds
+
     } catch (error) {
       console.error('Error running code:', error);
       setOutputs(prev => [...prev, {
-        output: 'Network error occurred',
+        output: error instanceof DOMException && error.name === 'AbortError'
+          ? 'Execution timed out (30 seconds)'
+          : 'Network error occurred',
         language,
         timestamp: new Date(),
         id: Date.now(),
